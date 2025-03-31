@@ -23,6 +23,10 @@
       {
         "class_name": "SentryMCP",
         "name": "MCP_OBJECT"
+      },
+      {
+        "class_name": "UserContext",
+        "name": "USER_CONTEXT"
       }
     ]
   },

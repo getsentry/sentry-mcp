@@ -1,6 +1,6 @@
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Props } from "./types";
+import type { Env, Props } from "./types";
 import { z } from "zod";
 import type { SentryEventSchema } from "./schema";
 import { SentryApiService } from "./sentry-api";

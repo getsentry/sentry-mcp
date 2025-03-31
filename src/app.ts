@@ -1,16 +1,15 @@
 import { Hono } from "hono";
 import { withSentry } from "@sentry/cloudflare";
-import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import authHandler from "./auth-handler";
+import { Env } from "./types";
 
 const app = new Hono<{
-  Bindings: Env & { OAUTH_PROVIDER: OAuthHelpers; SENTRY_DSN: string };
+  Bindings: Env;
 }>()
   .get("/robots.txt", (c) => {
     return c.text("User-agent: *\nDisallow: /");
   })
   .get("/", async (c) => {
-    console.log();
     return c.text("https://github.com/getsentry/sentry-mcp");
   })
   .route("/", authHandler);

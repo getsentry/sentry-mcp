@@ -1,18 +1,15 @@
-import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import { exchangeCodeForAccessToken, getUpstreamAuthorizeUrl } from "./utils";
 import type { Props } from "./types";
 import { SentryApiService } from "./sentry-api";
+import { Env } from "./types";
 
 const SENTRY_AUTH_URL = "https://sentry.io/oauth/authorize/";
 const SENTRY_TOKEN_URL = "https://sentry.io/oauth/token/";
 
 export default new Hono<{
-  Bindings: Env & {
-    OAUTH_PROVIDER: OAuthHelpers;
-    SENTRY_CLIENT_ID: string;
-    SENTRY_CLIENT_SECRET: string;
-  };
+  Bindings: Env;
 }>()
   /**
    * OAuth Authorization Endpoint
@@ -37,7 +34,7 @@ export default new Hono<{
         client_id: c.env.SENTRY_CLIENT_ID,
         redirect_uri: new URL("/callback", c.req.url).href,
         state: btoa(JSON.stringify(oauthReqInfo)),
-      }),
+      })
     );
   })
 
@@ -51,7 +48,9 @@ export default new Hono<{
    */
   .get("/callback", async (c) => {
     // Get the oathReqInfo out of KV
-    const oauthReqInfo = JSON.parse(atob(c.req.query("state") as string)) as AuthRequest;
+    const oauthReqInfo = JSON.parse(
+      atob(c.req.query("state") as string)
+    ) as AuthRequest;
     if (!oauthReqInfo.clientId) {
       return c.text("Invalid state", 400);
     }
@@ -73,21 +72,27 @@ export default new Hono<{
       return c.text("No organizations found", 400);
     }
 
+    const userId = payload.user.id;
+
+    const doId = c.env.USER_CONTEXT.idFromName(userId);
+    const userContext = c.env.USER_CONTEXT.get(doId);
+    await userContext.addClientId(oauthReqInfo.clientId, orgsList[0].slug);
+
     // Return back to the MCP client a new token
     const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
       request: oauthReqInfo,
-      userId: payload.user.id,
+      userId,
       metadata: {
         label: payload.user.name,
       },
       scope: oauthReqInfo.scope,
-      // This will be available on this.props inside MyMCP
+      // This will be available on this.props inside SentryMCP
       props: {
-        id: payload.user.id,
+        id: userId,
         name: payload.user.name,
         accessToken: payload.access_token,
         organizationSlug: orgsList[0].slug,
-      } as Props,
+      } satisfies Props,
     });
 
     return Response.redirect(redirectTo);
