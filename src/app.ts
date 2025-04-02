@@ -9,8 +9,8 @@ const app = new Hono<{
   .get("/robots.txt", (c) => {
     return c.text("User-agent: *\nDisallow: /");
   })
-  .route("/", homeHandler)
-  .route("/", authHandler);
+  .route("/", authHandler)
+  .route("/", homeHandler);
 
 export default withSentry(
   (env) => ({

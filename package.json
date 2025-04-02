@@ -3,8 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
+    "build": "vite build --mode client && vite build",
+    "deploy": "pnpm run build && wrangler deploy",
+    "dev": "vite",
     "format": "biome format --write",
     "lint:fix": "biome lint --fix",
     "inspector": "pnpx @modelcontextprotocol/inspector@latest",
@@ -13,8 +14,13 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@hono/vite-build": "^1.5.0",
+    "@tailwindcss/typography": "^0.5.16",
+    "@tailwindcss/vite": "^4.1.1",
     "@types/node": "^22.13.14",
+    "tailwindcss": "^4.1.1",
     "typescript": "^5.8.2",
+    "vite": "^6.2.4",
     "wrangler": "^4.2.0"
   },
   "dependencies": {
@@ -23,8 +29,8 @@
     "@sentry/cloudflare": "^9.10.1",
     "agents": "^0.0.45",
     "hono": "^4.7.5",
+    "honox": "^0.1.39",
     "just-pick": "^4.2.0",
-    "marked": "^15.0.7",
     "workers-mcp": "0.1.0-3",
     "zod": "^3.24.2"
   }
