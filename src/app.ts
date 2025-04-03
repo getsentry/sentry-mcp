@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import authHandler from "./routes/auth";
-import homeHandler from "./routes/home";
+import authHandler from "./authHandler";
+import webHandler from "./web/handler";
 
 export default new Hono<{
   Bindings: Env & { SENTRY_DSN: string };
@@ -8,5 +8,5 @@ export default new Hono<{
   .get("/robots.txt", (c) => {
     return c.text("User-agent: *\nDisallow: /");
   })
-  .route("/", homeHandler)
+  .route("/", webHandler)
   .route("/", authHandler);

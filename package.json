@@ -1,30 +1,45 @@
 {
   "name": "mcp-github-oauth",
   "version": "0.0.1",
+  "type": "module",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
+    "build": "vite build --mode client && vite build",
+    "deploy": "$npm_execpath run build && wrangler deploy dist/index.js",
+    "dev": "vite dev",
     "format": "biome format --write",
     "lint:fix": "biome lint --fix",
     "inspector": "pnpx @modelcontextprotocol/inspector@latest",
-    "start": "wrangler dev",
+    "preview": "$npm_execpath run build && wrangler dev dist/index.js",
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@cloudflare/vite-plugin": "^0.1.19",
+    "@hono/vite-build": "^1.5.0",
+    "@tailwindcss/typography": "^0.5.16",
+    "@tailwindcss/vite": "^4.1.1",
     "@types/node": "^22.13.14",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.1.1",
     "typescript": "^5.8.2",
+    "vite": "^6.0.11",
+    "vite-plugin-ssr-hot-reload": "^0.4.1",
     "wrangler": "^4.2.0"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.0.2",
+    "@hono/react-renderer": "^0.3.0",
     "@modelcontextprotocol/sdk": "^1.8.0",
     "@sentry/cloudflare": "^9.10.1",
     "agents": "^0.0.45",
     "hono": "^4.7.5",
     "just-pick": "^4.2.0",
     "marked": "^15.0.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "workers-mcp": "0.1.0-3",
     "zod": "^3.24.2"
   }

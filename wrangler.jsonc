@@ -6,6 +6,9 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sentry-mcp",
   "main": "src/index.ts",
+  "assets": {
+    "directory": "dist"
+  },
   "compatibility_date": "2025-03-29",
   "compatibility_flags": ["nodejs_compat"],
   "migrations": [

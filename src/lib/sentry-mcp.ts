@@ -1,6 +1,6 @@
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Props } from "./types";
+import type { Props } from "../types";
 import { z } from "zod";
 import {
   ParamIssueShortId,
@@ -8,9 +8,9 @@ import {
   ParamPlatform,
   ParamTeamSlug,
   type SentryEventSchema,
-} from "./schema";
+} from "../schema";
 import { SentryApiService } from "./sentry-api";
-import { logError } from "./utils";
+import { logError } from "./log";
 
 function formatEventOutput(event: z.infer<typeof SentryEventSchema>) {
   let output = "";
@@ -65,7 +65,7 @@ export default class SentryMCP extends McpAgent<Props, Env> {
           );
           const organizations = await apiService.listOrganizations();
 
-          let output = `# Organizations\n\n`;
+          let output = "# Organizations\n\n";
           output += organizations.map((org) => `- ${org.slug}\n`).join("");
 
           return {
@@ -297,7 +297,8 @@ export default class SentryMCP extends McpAgent<Props, Env> {
           if (clientKey) {
             output += `**SENTRY_DSN**: ${clientKey?.dsn.public}\n\n`;
           } else {
-            output += `**SENTRY_DSN**: There was an error fetching this value.\n\n`;
+            output +=
+              "**SENTRY_DSN**: There was an error fetching this value.\n\n";
           }
 
           output += "# Using this information\n\n";

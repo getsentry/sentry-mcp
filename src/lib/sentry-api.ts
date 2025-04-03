@@ -5,8 +5,8 @@ import {
   SentryOrgSchema,
   SentryProjectSchema,
   SentryTeamSchema,
-} from "./schema";
-import { logError } from "./utils";
+} from "../schema";
+import { logError } from "./log";
 
 const API_BASE_URL = "https://sentry.io/api/0";
 
