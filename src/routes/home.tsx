@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type SentryMCP from "../mcp";
+import type SentryMCP from "../mcp/server";
 import { css, Style } from "hono/css";
 
 const copyPasteHelper = `
