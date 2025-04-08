@@ -6,7 +6,7 @@ const API_BASE_URL = new URL(
   process.env.SENTRY_URL || "https://sentry.io",
 );
 
-const DOCS_BASE_URL = new URL("https://sentry-docs-bn6rz3jq8.sentry.dev/");
+const DOCS_BASE_URL = new URL("https://sentry-docs-oh5yb488h.sentry.dev/");
 
 export const SentryOrgSchema = z.object({
   id: z.string(),
