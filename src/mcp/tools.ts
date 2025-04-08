@@ -11,6 +11,7 @@ import {
   ParamPlatform,
   ParamTeamSlug,
 } from "./schema";
+import { findPlatformByNameOrId } from "../data/platforms";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 function formatEventOutput(event: z.infer<typeof SentryEventSchema>) {
@@ -152,6 +153,19 @@ export const TOOL_DEFINITIONS = [
           "The name of the project to create. Typically this is commonly the name of the repository or service. It is only used as a visual label in Sentry.",
         ),
       platform: ParamPlatform.optional(),
+    },
+  },
+  {
+    name: "instrument_sentry" as const,
+    description: [
+      "Use docs to instrument sentry in your codebase.",
+      "",
+      "Use this tool when you need to:",
+      "- Get instructions for integrating Sentry into a specific platform",
+      "- Access Sentry SDK setup documentation for a specific language/framework",
+    ].join("\n"),
+    paramsSchema: {
+      platform: ParamPlatform,
     },
   },
 ];
@@ -364,11 +378,20 @@ export const TOOL_HANDLERS = {
       throw new Error("Organization slug is required");
     }
 
+    // Look up platform ID from name if platform is provided
+    let platformId = platform;
+    if (platform) {
+      const platformInfo = findPlatformByNameOrId(platform);
+      if (platformInfo) {
+        platformId = platformInfo.id;
+      }
+    }
+
     const [project, clientKey] = await apiService.createProject({
       organizationSlug,
       teamSlug,
       name,
-      platform,
+      platform: platformId,
     });
 
     let output = "# New Project\n\n";
@@ -387,5 +410,43 @@ export const TOOL_HANDLERS = {
     output += `- You should always inform the user of the **SENTRY_DSN** and Project Slug values.\n`;
 
     return output;
+  },
+
+  instrument_sentry: async (context, { platform }) => {
+    const apiService = new SentryApiService(context.accessToken);
+
+    try {
+      // First look up the platform info from the provided name
+      const platformInfo = findPlatformByNameOrId(platform);
+
+      // Fetch the platform links markdown
+      const platformLinksMarkdown = await apiService.fetchPlatformLinks();
+
+      // Do a case-insensitive search for any link containing the platform name
+      // Remove dots from the search term to handle cases like "next.js" -> "nextjs"
+      const searchTerm = (platformInfo?.name || platform).replace(/\./g, "");
+      const linkRegex = new RegExp(
+        `\\[([^\\]]*${searchTerm}[^\\]]*)\\]\\(([^)]+)\\)`,
+        "i",
+      );
+      const match = platformLinksMarkdown.match(linkRegex);
+
+      // If we don't have a match, return not found message
+      if (!match) {
+        return `# Documentation Not Found\n\nCould not find documentation for platform: ${platform}. Available platforms are listed in the Sentry documentation.`;
+      }
+
+      // Extract the URL path
+      const platformDocsPath = match[2];
+
+      // Fetch the platform-specific documentation
+      const platformDocs = await apiService.fetchPlatformDocs(platformDocsPath);
+
+      return platformDocs;
+    } catch (error) {
+      return `# Error\n\nFailed to fetch documentation: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
   },
 } satisfies ToolHandlers;

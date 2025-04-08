@@ -6,6 +6,8 @@ const API_BASE_URL = new URL(
   process.env.SENTRY_URL || "https://sentry.io",
 );
 
+const DOCS_BASE_URL = new URL("https://sentry-docs-bn6rz3jq8.sentry.dev/");
+
 export const SentryOrgSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -333,5 +335,29 @@ export class SentryApiService {
 
     const listBody = await response.json<{ data: unknown[] }>();
     return listBody.data.map((i) => SentryDiscoverEventSchema.parse(i));
+  }
+
+  async fetchPlatformLinks(): Promise<string> {
+    // This endpoint would fetch the list of platform links in markdown format
+    const response = await fetch(`${DOCS_BASE_URL}/llms.txt`);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch platform links: ${response.status} ${response.statusText}`,
+      );
+    }
+    return await response.text();
+  }
+
+  async fetchPlatformDocs(platformDocsPath: string): Promise<string> {
+    // For platform documentation, we need to construct the full URL
+    // The platformDocsPath is relative, so we prepend the base URL
+    const fullUrl = `${DOCS_BASE_URL}${platformDocsPath}`;
+    const response = await fetch(fullUrl);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch platform docs: ${response.status} ${response.statusText}`,
+      );
+    }
+    return await response.text();
   }
 }
