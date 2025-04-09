@@ -1,13 +1,10 @@
-import type {
-  AuthRequest,
-  OAuthHelpers,
-} from "@cloudflare/workers-oauth-provider";
+import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import {
   exchangeCodeForAccessToken,
   getUpstreamAuthorizeUrl,
 } from "../lib/oauth";
-import type { WorkerProps } from "../types";
+import type { Env, WorkerProps } from "./types";
 import { SentryApiService } from "../lib/sentry-api";
 
 export const SENTRY_AUTH_URL = "/oauth/authorize/";
@@ -17,12 +14,7 @@ export const SCOPES =
   "org:read project:read project:write team:read team:write event:read";
 
 export default new Hono<{
-  Bindings: Env & {
-    OAUTH_PROVIDER: OAuthHelpers;
-    SENTRY_CLIENT_ID: string;
-    SENTRY_CLIENT_SECRET: string;
-    SENTRY_URL: string;
-  };
+  Bindings: Env;
 }>()
   /**
    * OAuth Authorization Endpoint
@@ -80,7 +72,6 @@ export default new Hono<{
       client_id: c.env.SENTRY_CLIENT_ID,
       client_secret: c.env.SENTRY_CLIENT_SECRET,
       code: c.req.query("code"),
-      redirect_uri: new URL("/callback", c.req.url).href,
     });
     if (errResponse) return errResponse;
 

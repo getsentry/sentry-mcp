@@ -5,7 +5,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sentry-mcp",
-  "main": "src/index.ts",
+  "main": "./src/worker/index.ts",
   "compatibility_date": "2025-03-21",
   "compatibility_flags": ["nodejs_compat"],
   "migrations": [
@@ -14,6 +14,9 @@
       "tag": "v1"
     }
   ],
+  "assets": {
+    "not_found_handling": "single-page-application"
+  },
   "vars": {
     "SENTRY_DSN": "https://7f7bbaad9504b727cdf8edc378c6d1de@o1.ingest.us.sentry.io/4509062593708032",
     "SENTRY_CLIENT_ID": "32d744a577ea363284b996867923fa4eb0bfdfcfe6b46399f078f753b7bb84f1",

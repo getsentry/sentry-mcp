@@ -4,7 +4,7 @@
     "enabled": true
   },
   "files": {
-    "ignore": ["worker-configuration.d.ts"]
+    "ignore": ["worker-configuration.d.ts", "tsconfig*.json"]
   },
   "vcs": {
     "enabled": true,

@@ -54,7 +54,6 @@ export function getUpstreamAuthorizeUrl({
  * @param {string} options.client_id - The client ID of the application.
  * @param {string} options.client_secret - The client secret of the application.
  * @param {string} options.code - The authorization code.
- * @param {string} options.redirect_uri - The redirect URI of the application.
  * @param {string} options.upstream_url - The token endpoint URL of the upstream service.
  *
  * @returns {Promise<[string, null] | [null, Response]>} A promise that resolves to an array containing the access token or an error response.
@@ -63,13 +62,11 @@ export async function exchangeCodeForAccessToken({
   client_id,
   client_secret,
   code,
-  redirect_uri,
   upstream_url,
 }: {
   code: string | undefined;
   upstream_url: string;
   client_secret: string;
-  redirect_uri: string;
   client_id: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!code) {
@@ -86,7 +83,6 @@ export async function exchangeCodeForAccessToken({
       client_id,
       client_secret,
       code,
-      // redirect_uri,
     }).toString(),
   });
   if (!resp.ok) {

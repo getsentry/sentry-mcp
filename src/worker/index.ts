@@ -1,8 +1,9 @@
 import { withSentry } from "@sentry/cloudflare";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
+import SentryMCP from "../mcp/transports/cloudflare-worker";
+import { SCOPES } from "./auth";
 import app from "./app";
-import SentryMCP from "./mcp/transports/cloudflare-worker";
-import { SCOPES } from "./routes/auth";
+import type { Env } from "./types";
 
 // required for Durable Objects
 export { SentryMCP };
@@ -27,4 +28,4 @@ export default withSentry(
     environment: env.NODE_ENV === "production" ? "production" : "development",
   }),
   oAuthProvider,
-);
+) satisfies ExportedHandler<Env>;

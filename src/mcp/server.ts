@@ -1,7 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ServerContext } from "../types";
 import { logError } from "../lib/logging";
-import { TOOL_DEFINITIONS, TOOL_HANDLERS } from "./tools";
+import { TOOL_HANDLERS } from "./tools";
+import { TOOL_DEFINITIONS } from "./toolDefinitions";
+import type { ServerContext } from "./types";
 
 export function configureServer(server: McpServer, context: ServerContext) {
   server.server.onerror = (error) => {
