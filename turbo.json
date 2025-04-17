@@ -1,0 +1,42 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "daemon": true,
+  "ui": "tui",
+  "tasks": {
+    "setup": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": true
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "*.tsbuildinfo"],
+      "cache": true
+    },
+    "after-build": {
+      "dependsOn": ["build"],
+      "cache": false
+    }
+  },
+  "globalPassThroughEnv": [
+    "NODE_ENV",
+    "CI",
+    "OPENAI_API_KEY",
+    "SENTRY_CLIENT_ID",
+    "SENTRY_CLIENT_SECRET",
+    "SENTRY_AUTH_TOKEN"
+  ]
+}

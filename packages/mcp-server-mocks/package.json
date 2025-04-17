@@ -1,0 +1,26 @@
+{
+  "name": "@sentry/mcp-server-mocks",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "FSL-1.1-ALv2",
+  "exports": {
+    ".": {
+      "types": "./dist/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsc -w",
+    "build": "tsc -b"
+  },
+  "devDependencies": {
+    "@sentry/mcp-server-tsconfig": "workspace:*"
+  },
+  "dependencies": {
+    "msw": "^2.7.4"
+  }
+}
