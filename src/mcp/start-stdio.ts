@@ -6,7 +6,7 @@ import { mswServer } from "../lib/sentry-msw.js";
 
 let accessToken = process.env.SENTRY_AUTH_TOKEN;
 
-if (process.argv.indexOf("--mocks")) {
+if (process.argv.includes("--mocks")) {
   mswServer.listen({
     onUnhandledRequest: (req, print) => {
       if (req.url.startsWith("https://api.openai.com/")) {
@@ -20,6 +20,14 @@ if (process.argv.indexOf("--mocks")) {
   });
 
   accessToken = "mocked-access-token";
+} else {
+  try {
+    mswServer.close();
+  } catch (e) {
+    console.log(
+      "Note: MSW server was not running or encountered an error while closing",
+    );
+  }
 }
 
 if (!accessToken) {
