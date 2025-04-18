@@ -5,6 +5,6 @@ import type { ServerContext } from "../types";
 
 export async function startStdio(server: McpServer, context: ServerContext) {
   const transport = new StdioServerTransport();
-  configureServer(server, context);
+  configureServer({ server, context });
   await server.connect(transport);
 }

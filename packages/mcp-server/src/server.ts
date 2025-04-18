@@ -5,7 +5,11 @@ import type { ServerContext } from "./types";
 import { setUser, startNewTrace, startSpan } from "@sentry/core";
 import { logError } from "./logging";
 
-export function configureServer(server: McpServer, context: ServerContext) {
+export function configureServer({
+  server,
+  context,
+  onToolComplete,
+}: { server: McpServer; context: ServerContext; onToolComplete?: () => void }) {
   server.server.onerror = (error) => {
     logError(error);
   };
@@ -61,6 +65,8 @@ export function configureServer(server: McpServer, context: ServerContext) {
                   ],
                   isError: true,
                 };
+              } finally {
+                onToolComplete?.();
               }
             },
           );
