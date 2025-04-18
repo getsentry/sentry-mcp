@@ -17,9 +17,9 @@ If you're looking to contribute, learn how it works, or to run this for self-hos
 
 ### Stdio vs Remote
 
-While this repository is focused on acting as an MCP service, we also support a `stdio` transport. However this is primarily for used testing purposes.
+While this repository is focused on acting as an MCP service, we also support a `stdio` transport. This is still a work in progress, but is the easiest way to adapt run the MCP against a self-hosted Sentry install.
 
-To utilize the `stdout` transport, you'll need to create an API token in Sentry with the necessary scopes. As of writing this is:
+To utilize the `stdout` transport, you'll need to create an Personal API Token (PAT) in Sentry with the necessary scopes. As of writing this is:
 
 ```
 org:read
@@ -30,26 +30,24 @@ team:write
 event:read
 ```
 
-You can find the canonical reference to the needed scopes in the [source code](https://github.com/getsentry/sentry-mcp/blob/main/src/routes/auth.ts).
-
-Bind the auth token in your `.dev.vars`:
+Clone the repository and set it up as you normally would:
 
 ```shell
-SENTRY_AUTH_TOKEN=
+pnpm install
+pnpm build
 ```
 
 Launch the transport:
 
 ```shell
-npm run start:stdio
+pnpm run --filter ./packages/mcp-server start --access-token=sentry-pat --host=sentry.example.com
 ```
 
-### Self-Hosted Sentry
-
-You can override the `SENTRY_HOST` env variable to set your base Sentry url:
+Note: You can also use environment variables:
 
 ```shell
-SENTRY_HOST=sentry.example.com
+SENTRY_AUTH_TOKEN=
+SENTRY_HOST=
 ```
 
 ### MCP Inspector
