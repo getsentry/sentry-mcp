@@ -12,6 +12,11 @@
       "cache": false,
       "persistent": true
     },
+    "deploy": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": true
+    },
     "lint": {
       "dependsOn": ["^build"],
       "cache": true

@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "dotenv -e .env -e .env.local -- turbo dev",
     "build": "turbo build after-build",
+    "deploy": "turbo deploy",
     "eval": "dotenv -e .env -e .env.local -- turbo eval",
     "eval:ci": "CI=true pnpm --stream -r run eval:ci",
     "format": "biome format --write",
