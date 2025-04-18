@@ -1,7 +1,7 @@
 import { Fragment } from "react/jsx-runtime";
 import { TOOL_DEFINITIONS } from "@sentry/mcp-server/toolDefinitions";
 import { RESOURCES } from "@sentry/mcp-server/resources";
-
+import { PROMPT_DEFINITIONS } from "@sentry/mcp-server/promptDefinitions";
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
 export default function App() {
@@ -183,7 +183,7 @@ export default function App() {
             </ul>
           </section>
 
-          <section className="tools" id="tools">
+          <section id="tools">
             <h2>Available Tools</h2>
             <p>
               <small>
@@ -216,7 +216,19 @@ export default function App() {
             </ul>
           </section>
 
-          <section className="resources" id="resources">
+          <section id="prompts">
+            <h2>Available Prompts</h2>
+            <ul>
+              {PROMPT_DEFINITIONS.map((prompt) => (
+                <li key={prompt.name}>
+                  <h3>{prompt.name}</h3>
+                  <p>{prompt.description.split("\n")[0]}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section id="resources">
             <h2>Available Resources</h2>
             <p>
               Generally speaking, resources that are made available can also be
@@ -230,7 +242,7 @@ export default function App() {
               {RESOURCES.map((resource) => (
                 <li key={resource.name}>
                   <h3>{resource.name}</h3>
-                  <p>{resource.description}</p>
+                  <p>{resource.description.split("\n")[0]}</p>
                 </li>
               ))}
             </ul>
@@ -271,6 +283,9 @@ export default function App() {
             </li>
             <li>
               <a href="#tools">Tools</a>
+            </li>
+            <li>
+              <a href="#prompts">Prompts</a>
             </li>
             <li>
               <a href="#resources">Resources</a>

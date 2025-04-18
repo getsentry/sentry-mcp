@@ -5,6 +5,8 @@ import type { ServerContext } from "./types";
 import { setUser, startNewTrace, startSpan } from "@sentry/core";
 import { logError } from "./logging";
 import { RESOURCES } from "./resources";
+import { PROMPT_DEFINITIONS } from "./promptDefinitions";
+import { PROMPT_HANDLERS } from "./prompts";
 
 function logAndFormatError(error: unknown) {
   const eventId = logError(error);
@@ -30,8 +32,7 @@ export async function configureServer({
     logError(error);
   };
 
-  const resources = RESOURCES;
-  for (const resource of resources) {
+  for (const resource of RESOURCES) {
     server.resource(
       resource.name,
       resource.uri,
@@ -59,6 +60,38 @@ export async function configureServer({
     );
   }
 
+  for (const prompt of PROMPT_DEFINITIONS) {
+    const handler = PROMPT_HANDLERS[prompt.name];
+
+    server.prompt(
+      prompt.name,
+      prompt.description,
+      prompt.paramsSchema,
+      async (...args) => {
+        try {
+          return await startNewTrace(async () => {
+            return await startSpan(
+              { name: `mcp.prompt/${prompt.name}` },
+              async () => {
+                if (context.userId) {
+                  setUser({
+                    id: context.userId,
+                  });
+                }
+
+                // TODO(dcramer): I'm too dumb to figure this out
+                // @ts-ignore
+                return await handler(...args);
+              },
+            );
+          });
+        } finally {
+          onToolComplete?.();
+        }
+      },
+    );
+  }
+
   for (const tool of TOOL_DEFINITIONS) {
     const handler = TOOL_HANDLERS[tool.name];
 
@@ -67,8 +100,6 @@ export async function configureServer({
       tool.description,
       tool.paramsSchema ? tool.paramsSchema : {},
       async (...args) => {
-        // TODO: sentry isnt supporting SSE super well, so we want to just grab
-        // every single tool call as a new trace
         try {
           return await startNewTrace(async () => {
             return await startSpan(

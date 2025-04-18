@@ -14,8 +14,8 @@
     }
   },
   "scripts": {
-    "dev": "tsc -w",
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "dev": "tsc -w"
   },
   "devDependencies": {
     "@sentry/mcp-server-tsconfig": "workspace:*"

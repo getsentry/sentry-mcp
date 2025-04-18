@@ -20,10 +20,6 @@
       "types": "./dist/api-client/index.ts",
       "default": "./dist/api-client/index.js"
     },
-    "./logging": {
-      "types": "./dist/logging.ts",
-      "default": "./dist/logging.js"
-    },
     "./transports/stdio": {
       "types": "./dist/transports/stdio.ts",
       "default": "./dist/transports/stdio.js"
@@ -32,13 +28,13 @@
       "types": "./dist/server.ts",
       "default": "./dist/server.js"
     },
+    "./promptDefinitions": {
+      "types": "./dist/promptDefinitions.ts",
+      "default": "./dist/promptDefinitions.js"
+    },
     "./resources": {
       "types": "./dist/resources.ts",
       "default": "./dist/resources.js"
-    },
-    "./tools": {
-      "types": "./dist/tools.ts",
-      "default": "./dist/tools.js"
     },
     "./toolDefinitions": {
       "types": "./dist/toolDefinitions.ts",
@@ -51,6 +47,7 @@
   },
   "scripts": {
     "build": "tsc -b",
+    "dev": "tsc -w",
     "start": "tsx src/bin.ts",
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
