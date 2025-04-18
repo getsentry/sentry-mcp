@@ -13,6 +13,7 @@ import {
   ErrorsSearchResponseSchema,
   SpansSearchResponseSchema,
   TagListSchema,
+  ApiErrorSchema,
 } from "./schema";
 import type {
   ClientKey,
@@ -27,6 +28,15 @@ import type {
   Team,
   TeamList,
 } from "./types";
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
 
 export class SentryApiService {
   private accessToken: string | null;
@@ -66,6 +76,16 @@ export class SentryApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
+      try {
+        const { data, success } = ApiErrorSchema.safeParse(
+          JSON.parse(errorText),
+        );
+
+        if (success) {
+          throw new ApiError(data.detail, response.status);
+        }
+      } catch (err) {}
+
       throw new Error(
         `API request failed: ${response.status} ${response.statusText}\n${errorText}`,
       );

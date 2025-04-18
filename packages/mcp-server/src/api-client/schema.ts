@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const ApiErrorSchema = z.object({
+  detail: z.string(),
+});
+
 export const OrganizationSchema = z.object({
   id: z.union([z.string(), z.number()]),
   slug: z.string(),

@@ -7,13 +7,25 @@ import { logError } from "./logging";
 import { RESOURCES } from "./resources";
 import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
+import { ApiError } from "./api-client";
 
-function logAndFormatError(error: unknown) {
+async function logAndFormatError(error: unknown) {
   const eventId = logError(error);
+
+  if (error instanceof ApiError) {
+    return [
+      "**Error**",
+      `There was an ${error.status} error with the your request to the Sentry API.`,
+      `${error.message}`,
+      "If you believe this was a genuine error, please report the following to the user for the Sentry team:",
+      `**Event ID**: ${eventId}`,
+    ].join("\n\n");
+  }
+
   return [
     "**Error**",
     "It looks like there was a problem communicating with the Sentry API.",
-    "Please give the following information to the Sentry team:",
+    "Please report the following to the user for the Sentry team:",
     `**Event ID**: ${eventId}`,
     process.env.NODE_ENV !== "production"
       ? error instanceof Error
@@ -129,7 +141,7 @@ export async function configureServer({
                     content: [
                       {
                         type: "text",
-                        text: logAndFormatError(error),
+                        text: await logAndFormatError(error),
                       },
                     ],
                     isError: true,
