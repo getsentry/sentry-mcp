@@ -34,6 +34,7 @@ export type ToolHandlers = {
 };
 
 export type ServerContext = {
+  host?: string;
   accessToken: string;
   organizationSlug: string | null;
   userId?: string | null;

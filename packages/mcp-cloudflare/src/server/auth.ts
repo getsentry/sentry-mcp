@@ -74,6 +74,7 @@ export default new Hono<{
 
     // Get organizations using the SentryApiService
     const apiService = new SentryApiService({
+      host: c.env.SENTRY_HOST,
       accessToken: payload.access_token,
     });
     const orgsList = await apiService.listOrganizations();

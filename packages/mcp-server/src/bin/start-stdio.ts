@@ -3,7 +3,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "../transports/stdio.js";
 
-const accessToken = process.env.SENTRY_AUTH_TOKEN;
+let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
+let host: string | undefined = process.env.SENTRY_HOST;
+
+for (const arg of process.argv) {
+  if (arg.startsWith("--access-token=")) {
+    accessToken = arg.split("=")[1];
+  }
+  if (arg.startsWith("--host=")) {
+    host = arg.split("=")[1];
+  }
+}
 
 if (!accessToken) {
   console.error("SENTRY_AUTH_TOKEN is not set");
@@ -20,6 +30,7 @@ const server = new McpServer({
 startStdio(server, {
   accessToken,
   organizationSlug: null,
+  host,
 }).catch((err) => {
   console.error("Server error:", err);
   process.exit(1);

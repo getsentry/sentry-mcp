@@ -5,6 +5,7 @@ import type { ServerContext, ToolHandlers } from "./types";
 
 function apiServiceFromContext(context: ServerContext) {
   return new SentryApiService({
+    host: context.host,
     accessToken: context.accessToken,
   });
 }
