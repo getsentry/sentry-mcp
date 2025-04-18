@@ -1,5 +1,5 @@
 {
-  "name": "@sentry/mcp-monorepo",
+  "name": "sentry-mcp",
   "version": "0.0.1",
   "private": true,
   "type": "module",
