@@ -69,11 +69,19 @@ describeEval("list-issues", {
         expected: "1",
       },
       {
+        input: `How many issues are in ${FIXTURES.organizationSlug}/${FIXTURES.projectSlug}?`,
+        expected: "2",
+      },
+      {
         input: `What issues are affecting jane@sentry.io in ${FIXTURES.organizationSlug}?`,
         expected: "No issues found",
       },
       {
         input: `How many issues are affecting jane@sentry.io in ${FIXTURES.organizationSlug}?`,
+        expected: "0",
+      },
+      {
+        input: `How many issues are in ${FIXTURES.organizationSlug}/foobar?`,
         expected: "0",
       },
     ];
