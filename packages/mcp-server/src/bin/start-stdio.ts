@@ -6,17 +6,21 @@ import { startStdio } from "../transports/stdio.js";
 let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
 let host: string | undefined = process.env.SENTRY_HOST;
 
-for (const arg of process.argv) {
+for (const arg of process.argv.slice(1)) {
   if (arg.startsWith("--access-token=")) {
     accessToken = arg.split("=")[1];
-  }
-  if (arg.startsWith("--host=")) {
+  } else if (arg.startsWith("--host=")) {
     host = arg.split("=")[1];
+  } else {
+    console.error("Invalid argument:", arg);
+    console.error("Usage: start-stdio --access-token=<token> [--host=<host>]");
+    process.exit(1);
   }
 }
 
 if (!accessToken) {
   console.error("SENTRY_AUTH_TOKEN is not set");
+  console.error("Usage: start-stdio --access-token=<token> [--host=<host>]");
   process.exit(1);
 }
 
