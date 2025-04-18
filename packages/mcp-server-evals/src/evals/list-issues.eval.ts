@@ -84,6 +84,10 @@ describeEval("list-issues", {
         input: `How many issues are in ${FIXTURES.organizationSlug}/foobar?`,
         expected: "0",
       },
+      {
+        input: `How many issues are in project:remote-mcp?`,
+        expected: "Invalid project",
+      },
     ];
   },
   task: TaskRunner(),

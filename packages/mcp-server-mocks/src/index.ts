@@ -1115,7 +1115,8 @@ export const restHandlers = [
       }
 
       const query = url.searchParams.get("query");
-      const sortedQuery = query ? query?.split(" ").sort().join(" ") : null;
+      const queryTokens = query?.split(" ").sort() ?? [];
+      const sortedQuery = queryTokens ? queryTokens.join(" ") : null;
       if (
         ![
           null,
@@ -1128,10 +1129,19 @@ export const restHandlers = [
           "user.email:david@sentry.io",
         ].includes(sortedQuery)
       ) {
+        if (queryTokens.includes("project:remote-mcp")) {
+          return HttpResponse.json(
+            {
+              detail:
+                "Invalid query. Project(s) remote-mcp do not exist or are not actively selected.",
+            },
+            { status: 400 },
+          );
+        }
         return HttpResponse.json([]);
       }
 
-      if (sortedQuery === "user.email:david@sentry.io") {
+      if (queryTokens.includes("user.email:david@sentry.io")) {
         return HttpResponse.json([IssuePayload]);
       }
 
