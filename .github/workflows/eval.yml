@@ -7,11 +7,13 @@ on:
     paths:
       - "packages/mcp-server/**"
       - "packages/mcp-server-evals/**"
+      - "packages/mcp-server-mocks/**"
       - ".github/workflows/eval.yml"
   pull_request:
     paths:
       - "packages/mcp-server/**"
       - "packages/mcp-server-evals/**"
+      - "packages/mcp-server-mocks/**"
       - ".github/workflows/eval.yml"
 
 jobs:
