@@ -47,7 +47,7 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "start": "tsx src/bin/start-stdio.ts",
+    "start": "tsx src/bin.ts",
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "vitest watch"
