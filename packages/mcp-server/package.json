@@ -8,7 +8,7 @@
   },
   "license": "FSL-1.1-ALv2",
   "bin": {
-    "sentry-mcp": "./dist/bin/start-stdio.js"
+    "sentry-mcp": "./dist/bin.js"
   },
   "files": ["./dist/*"],
   "exports": {

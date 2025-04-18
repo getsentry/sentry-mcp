@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { startStdio } from "../transports/stdio.js";
+import { startStdio } from "./transports/stdio";
 
 let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
 let host: string | undefined = process.env.SENTRY_HOST;
 
-for (const arg of process.argv.slice(1)) {
+for (const arg of process.argv.slice(2)) {
   if (arg.startsWith("--access-token=")) {
     accessToken = arg.split("=")[1];
   } else if (arg.startsWith("--host=")) {
