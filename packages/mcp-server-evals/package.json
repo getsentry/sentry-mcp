@@ -11,8 +11,8 @@
     "build": "tsc -b",
     "dev": "tsc -w",
     "start": "tsx src/bin/start-mock-stdio.ts",
-    "test": "vitest --config=vitest.config.ts",
-    "test:ci": "vitest run --coverage --reporter=junit --outputFile=eval.junit.xml"
+    "eval": "vitest --config=vitest.config.ts",
+    "eval:ci": "vitest run --coverage --reporter=junit --outputFile=eval.junit.xml"
   },
   "dependencies": {
     "@sentry/mcp-server": "workspace:*",

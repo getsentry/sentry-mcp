@@ -35,6 +35,6 @@ export type ToolHandlers = {
 
 export type ServerContext = {
   accessToken: string;
-  organizationSlug?: string | null;
-  logError?: (error: unknown) => string | undefined | void;
+  organizationSlug: string | null;
+  userId?: string | null;
 };

@@ -17,6 +17,10 @@
       "types": "./dist/api-client/index.ts",
       "default": "./dist/api-client/index.js"
     },
+    "./logging": {
+      "types": "./dist/logging.ts",
+      "default": "./dist/logging.js"
+    },
     "./transports/stdio": {
       "types": "./dist/transports/stdio.ts",
       "default": "./dist/transports/stdio.js"
@@ -46,12 +50,13 @@
     "test:watch": "vitest watch"
   },
   "devDependencies": {
-    "@sentry/mcp-server-tsconfig": "workspace:*",
     "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
     "msw": "^2.7.4"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.9.0",
+    "@sentry/core": "^9.13.0",
     "zod": "^3.24.3"
   }
 }

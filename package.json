@@ -11,9 +11,8 @@
   "scripts": {
     "dev": "dotenv -e .env -e .env.local -- turbo dev",
     "build": "turbo build after-build",
-    "eval": "vitest --config=vitest.eval.config.ts",
-    "eval:ci": "vitest run --config=vitest.eval.config.ts --coverage --reporter=junit --outputFile=eval.junit.xml",
-    "eval:dev": "evalite watch",
+    "eval": "dotenv -e .env -e .env.local -- turbo eval",
+    "eval:ci": "CI=true pnpm -r run eval:ci",
     "format": "biome format --write",
     "lint": "biome lint",
     "lint:fix": "biome lint --fix",

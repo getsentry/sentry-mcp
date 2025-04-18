@@ -1,6 +1,28 @@
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 
+const TagsPayload = [
+  { key: "transaction", name: "Transaction", totalValues: 1080 },
+  { key: "runtime.name", name: "Runtime.Name", totalValues: 1080 },
+  { key: "level", name: "Level", totalValues: 1144 },
+  { key: "device", name: "Device", totalValues: 25 },
+  { key: "os", name: "OS", totalValues: 1133 },
+  { key: "user", name: "User", totalValues: 1080 },
+  { key: "runtime", name: "Runtime", totalValues: 1080 },
+  { key: "release", name: "Release", totalValues: 1135 },
+  { key: "url", name: "URL", totalValues: 1080 },
+  { key: "uptime_rule", name: "Uptime Rule", totalValues: 9 },
+  { key: "server_name", name: "Server", totalValues: 1080 },
+  { key: "browser", name: "Browser", totalValues: 56 },
+  { key: "os.name", name: "Os.Name", totalValues: 1135 },
+  { key: "device.family", name: "Device.Family", totalValues: 25 },
+  { key: "replayId", name: "Replayid", totalValues: 55 },
+  { key: "client_os.name", name: "Client Os.Name", totalValues: 1 },
+  { key: "environment", name: "Environment", totalValues: 1144 },
+  { key: "service", name: "Service", totalValues: 1135 },
+  { key: "browser.name", name: "Browser.Name", totalValues: 56 },
+];
+
 const ReleasePayload = {
   id: 1402755016,
   version: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
@@ -234,7 +256,18 @@ const IssuePayload = {
   participants: [],
 };
 
-const IssueLatestEventPayload = {
+// a newer issue, seen less recently
+const IssuePayload2 = {
+  ...IssuePayload,
+  id: 6507376926,
+  shortId: "CLOUDFLARE-MCP-42",
+  count: 1,
+  title: "Error: Tool list_issues is already registered",
+  firstSeen: "2025-04-11T22:51:19.403000Z",
+  lastSeen: "2025-04-12T11:34:11Z",
+};
+
+const EventPayload = {
   id: "7ca573c0f4814912aaa9bdc77d1a7d51",
   groupID: "6507376925",
   eventID: "7ca573c0f4814912aaa9bdc77d1a7d51",
@@ -1063,12 +1096,9 @@ export const restHandlers = [
     "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/",
     ({ request }) => {
       const url = new URL(request.url);
+      const sort = url.searchParams.get("sort");
 
-      if (
-        !["user", "freq", "date", "new", null].includes(
-          url.searchParams.get("sort") as string,
-        )
-      ) {
+      if (![null, "user", "freq", "date", "new", null].includes(sort)) {
         return HttpResponse.json(
           `Invalid sort: ${url.searchParams.get("sort")}`,
           {
@@ -1101,7 +1131,14 @@ export const restHandlers = [
         return HttpResponse.json([]);
       }
 
-      return HttpResponse.json([IssuePayload]);
+      if (sortedQuery === "user.email:david@sentry.io") {
+        return HttpResponse.json([IssuePayload]);
+      }
+
+      if (sort === "date") {
+        return HttpResponse.json([IssuePayload, IssuePayload2]);
+      }
+      return HttpResponse.json([IssuePayload2, IssuePayload]);
     },
   ),
   http.get(
@@ -1113,12 +1150,30 @@ export const restHandlers = [
     () => HttpResponse.json(IssuePayload),
   ),
   http.get(
+    "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
+    () => HttpResponse.json(IssuePayload2),
+  ),
+  http.get(
+    "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
+    () => HttpResponse.json(IssuePayload2),
+  ),
+  http.get(
     "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
-    () => HttpResponse.json(IssueLatestEventPayload),
+    () => HttpResponse.json(EventPayload),
   ),
   http.get(
     "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
-    () => HttpResponse.json(IssueLatestEventPayload),
+    () => HttpResponse.json(EventPayload),
+  ),
+  // TODO: event payload should be tweaked to match issue
+  http.get(
+    "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/events/latest/",
+    () => HttpResponse.json(EventPayload),
+  ),
+  // TODO: event payload should be tweaked to match issue
+  http.get(
+    "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376926/events/latest/",
+    () => HttpResponse.json(EventPayload),
   ),
   http.get(
     "https://sentry.io/api/0/organizations/sentry-mcp-evals/releases/",
@@ -1127,6 +1182,9 @@ export const restHandlers = [
   http.get(
     "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/",
     () => HttpResponse.json([ReleasePayload]),
+  ),
+  http.get("https://sentry.io/api/0/organizations/sentry-mcp-evals/tags/", () =>
+    HttpResponse.json(TagsPayload),
   ),
 ];
 

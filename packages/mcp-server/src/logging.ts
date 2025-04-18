@@ -1,8 +1,4 @@
-import {
-  captureException,
-  captureMessage,
-  withScope,
-} from "@sentry/cloudflare";
+import { captureException, captureMessage, withScope } from "@sentry/core";
 
 export function logError(
   error: Error | unknown,

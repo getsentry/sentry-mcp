@@ -21,6 +21,11 @@
       "outputs": [],
       "cache": true
     },
+    "eval": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": true
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "*.tsbuildinfo"],

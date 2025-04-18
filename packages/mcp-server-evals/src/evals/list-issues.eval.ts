@@ -26,11 +26,31 @@ describeEval("list-issues", {
           "## CLOUDFLARE-MCP-41",
           "- **Issue ID**: CLOUDFLARE-MCP-41",
           `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
+          "",
+          "## CLOUDFLARE-MCP-42",
+          "- **Issue ID**: CLOUDFLARE-MCP-42",
+          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-42`,
         ].join("\n"),
       },
       {
         input: `Find the most recent production issues in ${FIXTURES.organizationSlug}`,
         expected: [
+          "## CLOUDFLARE-MCP-41",
+          "- **Issue ID**: CLOUDFLARE-MCP-41",
+          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
+          "",
+          "## CLOUDFLARE-MCP-42",
+          "- **Issue ID**: CLOUDFLARE-MCP-42",
+          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-42`,
+        ].join("\n"),
+      },
+      {
+        input: `Find the newest production issues in ${FIXTURES.organizationSlug}`,
+        expected: [
+          "## CLOUDFLARE-MCP-42",
+          "- **Issue ID**: CLOUDFLARE-MCP-42",
+          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-42`,
+          "",
           "## CLOUDFLARE-MCP-41",
           "- **Issue ID**: CLOUDFLARE-MCP-41",
           `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
@@ -45,8 +65,16 @@ describeEval("list-issues", {
         ].join("\n"),
       },
       {
+        input: `How many issues are affecting david@sentry.io in ${FIXTURES.organizationSlug}?`,
+        expected: "1",
+      },
+      {
         input: `What issues are affecting jane@sentry.io in ${FIXTURES.organizationSlug}?`,
         expected: "No issues found",
+      },
+      {
+        input: `How many issues are affecting jane@sentry.io in ${FIXTURES.organizationSlug}?`,
+        expected: "0",
       },
     ];
   },

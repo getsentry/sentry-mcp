@@ -64,6 +64,14 @@ export const ReleaseSchema = z.object({
 
 export const ReleaseListSchema = z.array(ReleaseSchema);
 
+export const TagSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  totalValues: z.number(),
+});
+
+export const TagListSchema = z.array(TagSchema);
+
 export const IssueSchema = z.object({
   id: z.union([z.string(), z.number()]),
   shortId: z.string(),

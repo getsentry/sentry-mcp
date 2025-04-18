@@ -1,3 +1,4 @@
+import { logError } from "../logging";
 import {
   OrganizationListSchema,
   ClientKeySchema,
@@ -11,6 +12,7 @@ import {
   EventSchema,
   ErrorsSearchResponseSchema,
   SpansSearchResponseSchema,
+  TagListSchema,
 } from "./schema";
 import type {
   ClientKey,
@@ -21,6 +23,7 @@ import type {
   Project,
   ProjectList,
   ReleaseList,
+  TagList,
   Team,
   TeamList,
 } from "./types";
@@ -29,23 +32,17 @@ export class SentryApiService {
   private accessToken: string | null;
   protected host: string;
   protected apiPrefix: string;
-  protected logError:
-    | ((error: unknown) => string | undefined | void)
-    | undefined;
 
   constructor({
     accessToken = null,
     host = process.env.SENTRY_HOST,
-    logError,
   }: {
     accessToken?: string | null;
     host?: string;
-    logError?: ((error: unknown) => void) | undefined;
   }) {
     this.accessToken = accessToken;
     this.host = host || "sentry.io";
     this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
-    this.logError = logError;
   }
 
   private async request(
@@ -168,7 +165,7 @@ export class SentryApiService {
       const clientKey = ClientKeySchema.parse(await keysResponse.json());
       return [project, clientKey];
     } catch (err) {
-      this.logError || console.error(err);
+      logError(err);
     }
     return [project, null];
   }
@@ -188,6 +185,28 @@ export class SentryApiService {
 
     const body = await response.json();
     return ReleaseListSchema.parse(body);
+  }
+
+  async listTags({
+    organizationSlug,
+    dataset,
+  }: {
+    organizationSlug: string;
+    dataset?: "errors" | "search_issues";
+  }): Promise<TagList> {
+    // TODO: this supports project in the query, but needs fixed
+    // to accept slugs
+    const searchQuery = new URLSearchParams();
+    if (dataset) {
+      searchQuery.set("dataset", dataset);
+    }
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/tags/${searchQuery.toString()}`,
+    );
+
+    const body = await response.json();
+    return TagListSchema.parse(body);
   }
 
   async listIssues({

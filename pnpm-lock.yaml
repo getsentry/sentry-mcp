@@ -129,6 +129,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.9.0
         version: 1.9.0
+      '@sentry/core':
+        specifier: ^9.13.0
+        version: 9.13.0
       zod:
         specifier: ^3.24.3
         version: 3.24.3

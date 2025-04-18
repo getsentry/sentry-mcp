@@ -11,17 +11,7 @@ export { SentryMCP };
 const oAuthProvider = new OAuthProvider({
   apiRoute: "/sse",
   // @ts-ignore
-  apiHandler: withSentry(
-    (env) => ({
-      debug: env.NODE_ENV !== "production",
-      dsn: env.SENTRY_DSN,
-      tracesSampleRate: 1,
-      sendDefaultPii: true,
-      environment: env.NODE_ENV === "production" ? "production" : "development",
-    }),
-    // @ts-ignore
-    SentryMCP.mount("/sse"),
-  ),
+  apiHandler: SentryMCP.mount("/sse"),
   // @ts-ignore
   defaultHandler: app,
   authorizeEndpoint: "/authorize",

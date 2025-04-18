@@ -1,7 +1,13 @@
 import { SentryApiService } from "./api-client/index";
 import { formatEventOutput } from "./internal/formatting";
 import { extractIssueId } from "./internal/issue-helpers";
-import type { ToolHandlers } from "./types";
+import type { ServerContext, ToolHandlers } from "./types";
+
+function apiServiceFromContext(context: ServerContext) {
+  return new SentryApiService({
+    accessToken: context.accessToken,
+  });
+}
 
 const QUERY_SYNTAX = [
   "Search queries are constructed using a `key:value` pattern, with an optional raw search at the end. Each `key:value` pair is a `token` and the optional raw search is itself a single `token`. The `key:value` pair `tokens` are treated as issue or event properties. The optional raw search is treated as a single `token` and searches event titles/messages.",
@@ -104,7 +110,7 @@ const QUERY_SYNTAX = [
 
 export const TOOL_HANDLERS = {
   list_organizations: async (context) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
     const organizations = await apiService.listOrganizations();
 
     let output = "# Organizations\n\n";
@@ -119,7 +125,7 @@ export const TOOL_HANDLERS = {
     return output;
   },
   list_teams: async (context, { organizationSlug }) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (!organizationSlug && context.organizationSlug) {
       organizationSlug = context.organizationSlug;
@@ -143,7 +149,7 @@ export const TOOL_HANDLERS = {
     return output;
   },
   list_projects: async (context, { organizationSlug }) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (!organizationSlug && context.organizationSlug) {
       organizationSlug = context.organizationSlug;
@@ -170,7 +176,7 @@ export const TOOL_HANDLERS = {
     context,
     { organizationSlug, projectSlug, query, sortBy },
   ) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (!organizationSlug && context.organizationSlug) {
       organizationSlug = context.organizationSlug;
@@ -212,17 +218,17 @@ export const TOOL_HANDLERS = {
           `**URL**: ${apiService.getIssueUrl(organizationSlug, issue.shortId)}`,
         ].join("\n"),
       )
-      .join("\n");
+      .join("\n\n");
     output += "\n\n";
 
     output += "# Using this information\n\n";
     output += `- You can reference the Issue ID in commit messages (e.g. \`Fixes <issueID>\`) to automatically close the issue when the commit is merged.\n`;
-    output += `- You can get more details about a specific issue by using the tool: \`get_issue_details(${organizationSlug}, <issueID>)\`\n`;
+    output += `- You can get more details about a specific issue by using the tool: \`get_issue_details(organizationSlug="${organizationSlug}", issueId=<issueID>)\`\n`;
 
     return output;
   },
   list_releases: async (context, { organizationSlug, projectSlug }) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (!organizationSlug && context.organizationSlug) {
       organizationSlug = context.organizationSlug;
@@ -321,11 +327,38 @@ export const TOOL_HANDLERS = {
 
     return output;
   },
+  list_tags: async (context, { organizationSlug }) => {
+    const apiService = apiServiceFromContext(context);
+
+    if (!organizationSlug && context.organizationSlug) {
+      organizationSlug = context.organizationSlug;
+    }
+
+    if (!organizationSlug) {
+      throw new Error("Organization slug is required");
+    }
+
+    const tagList = await apiService.listTags({ organizationSlug });
+
+    let output = `# Tags in **${organizationSlug}**\n\n`;
+
+    if (tagList.length === 0) {
+      output += "No tags found.\n";
+      return output;
+    }
+    output += tagList.map((tag) => [`- ${tag.key}`].join("\n")).join("\n");
+    output += "\n\n";
+
+    output += "# Using this information\n\n";
+    output += `- You can reference tags in the \`query\` parameter of various tools: \`tagName:tagValue\`.\n`;
+
+    return output;
+  },
   get_issue_summary: async (
     context,
     { issueId, issueUrl, organizationSlug },
   ) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (issueUrl) {
       const resolved = extractIssueId(issueUrl);
@@ -374,7 +407,7 @@ export const TOOL_HANDLERS = {
     context,
     { issueId, issueUrl, organizationSlug },
   ) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (issueUrl) {
       const resolved = extractIssueId(issueUrl);
@@ -440,7 +473,7 @@ export const TOOL_HANDLERS = {
     context,
     { filename, transaction, query, sortBy, organizationSlug, projectSlug },
   ) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (!organizationSlug && context.organizationSlug) {
       organizationSlug = context.organizationSlug;
@@ -487,7 +520,7 @@ export const TOOL_HANDLERS = {
 
     output += "# Using this information\n\n";
     output += `- You can reference the Issue ID in commit messages (e.g. \`Fixes <issueID>\`) to automatically close the issue when the commit is merged.\n`;
-    output += `- You can get more details about an error by using the tool: \`get_issue_details(${organizationSlug}, <issueID>)\`\n`;
+    output += `- You can get more details about an error by using the tool: \`get_issue_details(organizationSlug="${organizationSlug}", issueId=<issueID>)\`\n`;
 
     return output;
   },
@@ -496,7 +529,7 @@ export const TOOL_HANDLERS = {
     context,
     { transaction, query, sortBy, organizationSlug, projectSlug },
   ) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (!organizationSlug && context.organizationSlug) {
       organizationSlug = context.organizationSlug;
@@ -549,7 +582,7 @@ export const TOOL_HANDLERS = {
   },
 
   create_team: async (context, { organizationSlug, name }) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (!organizationSlug && context.organizationSlug) {
       organizationSlug = context.organizationSlug;
@@ -578,7 +611,7 @@ export const TOOL_HANDLERS = {
     context,
     { organizationSlug, teamSlug, name, platform },
   ) => {
-    const apiService = new SentryApiService(context);
+    const apiService = apiServiceFromContext(context);
 
     if (!organizationSlug && context.organizationSlug) {
       organizationSlug = context.organizationSlug;

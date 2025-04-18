@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { exchangeCodeForAccessToken, getUpstreamAuthorizeUrl } from "./oauth";
 import type { Env, WorkerProps } from "./types";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
-import { logError } from "./logging.js";
 
 export const SENTRY_AUTH_URL = "/oauth/authorize/";
 export const SENTRY_TOKEN_URL = "/oauth/token/";
@@ -76,7 +75,6 @@ export default new Hono<{
     // Get organizations using the SentryApiService
     const apiService = new SentryApiService({
       accessToken: payload.access_token,
-      logError,
     });
     const orgsList = await apiService.listOrganizations();
 
@@ -94,6 +92,7 @@ export default new Hono<{
         name: payload.user.name,
         accessToken: payload.access_token,
         organizationSlug: orgsList.length ? orgsList[0].slug : null,
+        scope: oauthReqInfo.scope.join(" "),
       } as WorkerProps,
     });
 

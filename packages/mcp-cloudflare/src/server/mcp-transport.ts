@@ -2,7 +2,6 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "./types.js";
-import { logError } from "./logging.js";
 
 // Context from the auth process, encrypted & stored in the auth token
 // and provided to the DurableMCP as this.props
@@ -14,8 +13,9 @@ export default class SentryMCP extends McpAgent<Env, unknown, WorkerProps> {
 
   async init() {
     configureServer(this.server, {
-      ...this.props,
-      logError,
+      accessToken: this.props.accessToken,
+      organizationSlug: this.props.organizationSlug,
+      userId: this.props.id,
     });
   }
 }

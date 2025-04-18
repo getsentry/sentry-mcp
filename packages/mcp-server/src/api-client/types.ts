@@ -10,6 +10,8 @@ import type {
   ProjectSchema,
   ReleaseListSchema,
   ReleaseSchema,
+  TagListSchema,
+  TagSchema,
   TeamListSchema,
   TeamSchema,
 } from "./schema";
@@ -21,9 +23,11 @@ export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;
 export type Issue = z.infer<typeof IssueSchema>;
 export type Event = z.infer<typeof EventSchema>;
+export type Tag = z.infer<typeof TagSchema>;
 
 export type OrganizationList = z.infer<typeof OrganizationListSchema>;
 export type TeamList = z.infer<typeof TeamListSchema>;
 export type ProjectList = z.infer<typeof ProjectListSchema>;
 export type ReleaseList = z.infer<typeof ReleaseListSchema>;
 export type IssueList = z.infer<typeof IssueListSchema>;
+export type TagList = z.infer<typeof TagListSchema>;
