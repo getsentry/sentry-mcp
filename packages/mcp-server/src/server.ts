@@ -4,8 +4,24 @@ import { TOOL_DEFINITIONS } from "./toolDefinitions";
 import type { ServerContext } from "./types";
 import { setUser, startNewTrace, startSpan } from "@sentry/core";
 import { logError } from "./logging";
+import { RESOURCES } from "./resources";
 
-export function configureServer({
+function logAndFormatError(error: unknown) {
+  const eventId = logError(error);
+  return [
+    "**Error**",
+    "It looks like there was a problem communicating with the Sentry API.",
+    "Please give the following information to the Sentry team:",
+    `**Event ID**: ${eventId}`,
+    process.env.NODE_ENV !== "production"
+      ? error instanceof Error
+        ? error.message
+        : String(error)
+      : "",
+  ].join("\n\n");
+}
+
+export async function configureServer({
   server,
   context,
   onToolComplete,
@@ -13,6 +29,35 @@ export function configureServer({
   server.server.onerror = (error) => {
     logError(error);
   };
+
+  const resources = RESOURCES;
+  for (const resource of resources) {
+    server.resource(
+      resource.name,
+      resource.uri,
+      {
+        description: resource.description,
+        mimeType: resource.mimeType,
+      },
+      // TODO: this doesnt support any error handling afaict via the spec
+      async (url) => {
+        return await startNewTrace(async () => {
+          return await startSpan(
+            { name: `mcp.resource/${resource.name}` },
+            async () => {
+              if (context.userId) {
+                setUser({
+                  id: context.userId,
+                });
+              }
+
+              return resource.handler(url);
+            },
+          );
+        });
+      },
+    );
+  }
 
   for (const tool of TOOL_DEFINITIONS) {
     const handler = TOOL_HANDLERS[tool.name];
@@ -24,7 +69,6 @@ export function configureServer({
       async (...args) => {
         // TODO: sentry isnt supporting SSE super well, so we want to just grab
         // every single tool call as a new trace
-        // TODO: this should only use @sentry/cloudflare in CF worker
         try {
           return await startNewTrace(async () => {
             return await startSpan(
@@ -50,18 +94,11 @@ export function configureServer({
                     ],
                   };
                 } catch (error) {
-                  const eventId = logError(error);
                   return {
                     content: [
                       {
                         type: "text",
-                        text: `**Error**\n\nIt looks like there was a problem communicating with the Sentry API.\n\nPlease give the following information to the Sentry team:\n\n**Event ID**: ${eventId}\n\n${
-                          process.env.NODE_ENV !== "production"
-                            ? error instanceof Error
-                              ? error.message
-                              : String(error)
-                            : ""
-                        }`,
+                        text: logAndFormatError(error),
                       },
                     ],
                     isError: true,

@@ -10,105 +10,6 @@ function apiServiceFromContext(context: ServerContext) {
   });
 }
 
-const QUERY_SYNTAX = [
-  "Search queries are constructed using a `key:value` pattern, with an optional raw search at the end. Each `key:value` pair is a `token` and the optional raw search is itself a single `token`. The `key:value` pair `tokens` are treated as issue or event properties. The optional raw search is treated as a single `token` and searches event titles/messages.",
-  "",
-  "For example:",
-  "",
-  "```",
-  'is:resolved user.username:"Jane Doe" server:web-8 example error',
-  "```",
-  "",
-  "In the example above, there are three keys (`is:`, `user.username:`, `server:`), but four tokens:",
-  "",
-  "- `is:resolved`",
-  '- `user.username:"Jane Doe"`',
-  "- `server:web-8`",
-  "- `example error`",
-  "",
-  'The tokens `is:resolved` and `user.username:"Jane Doe"` are standard search tokens because both use reserved keywords. The token `server:web-8` is pointing to a custom tag sent by the Sentry SDK. See [Custom Tags](/concepts/search/searchable-properties/#custom-tags) for more information on how to set tags.',
-  "",
-  "The token `example error` is utilizing the optional raw search and is passed as part of the issue search query (which uses a CONTAINS match similar to SQL). When using the optional raw search, you can provide _one_ string, and the query uses that entire string.",
-  "",
-  "### Comparison Operators",
-  "Sentry search supports the use of comparison operators:",
-  "",
-  "- greater than (`>`)",
-  "- less than (`<`)",
-  "- greater than or equal to (`>=`)",
-  "- less than or equal to (`<=`)",
-  "",
-  "Typically, when you search using properties that are numbers or durations, you should use comparison operators rather than just a colon (`:`) to find exact matches, since an exact match isn't likely to exist.",
-  "",
-  "Here are some examples of valid comparison operator searches:",
-  "",
-  "- `event.timestamp:>2023-09-28T00:00:00-07:00`",
-  "- `count_dead_clicks:<=10`",
-  "- `transaction.duration:>5s`",
-  "",
-  "### Using `OR` and `AND`",
-  "",
-  "Use `OR` and `AND` between tokens, and use parentheses `()` to group conditions. `AND` can also be used between non-aggregates and aggregates. However, `OR` cannot.",
-  "",
-  "- Non-aggregates filter data based on specific tags or attributes. For example, `user.username:jane` is a non-aggregate field.",
-  "- Aggregates filter data on numerical scales. For example, `count()` is an aggregate function and `count():>100` is an aggregate filter.",
-  "",
-  "Some examples of using the `OR` condition:",
-  "",
-  "```",
-  "# a valid `OR` query",
-  "browser:Chrome OR browser:Opera",
-  "```",
-  "",
-  "# an invalid `OR` query",
-  "user.username:janedoe OR count():>100",
-  "```",
-  "",
-  'Also, the queries prioritize `AND` before `OR`. For example, "x `AND` y `OR` z" is the same as "(x `AND` y) `OR` z". Parentheses can be used to change the grouping. For example, "x `AND` (y `OR` z)".',
-  "",
-  "### Multiple Values on the Same Key",
-  "",
-  'You can search multiple values for the same key by putting the values in a list. For example, "x:[value1, value2]" will find the the same results as "x:value1 `OR` x:value2". When you do this, the search returns issues/events that match any search term.',
-  "",
-  "An example of searching on the same key with a list of values:",
-  "",
-  "```",
-  "release:[12.0, 13.0]",
-  "```",
-  "",
-  "You can't use wildcards with this type of search.",
-  "",
-  "### Exclusion",
-  "",
-  "By default, search terms use the `AND` operator; that is, they return the intersection of issues/events that match all search terms.",
-  "",
-  "To change this, you can use the negation operator `!` to _exclude_ a search parameter.",
-  "",
-  "```",
-  "is:unresolved !user.email:example@customer.com",
-  "```",
-  "",
-  "In the example above, the search query returns all Issues that are unresolved _and_ have not affected the user with the email address `example@customer.com`.",
-  "",
-  "### Wildcards",
-  "",
-  "Search supports the wildcard operator `*` as a placeholder for specific characters and strings.",
-  "",
-  "```",
-  'browser:"Safari 11*"',
-  "```",
-  "",
-  'In the example above, the search query will match on `browser` values like `"Safari 11.0.2"`, `"Safari 11.0.3"`, etc.',
-  "",
-  "You may also combine operators like so:",
-  "",
-  "```",
-  '!message:"*Timeout"',
-  "```",
-  "",
-  "In the above example, the search query returns results which do not have message values like `ConnectionTimeout`, `ReadTimeout`, etc.",
-].join("\n");
-
 export const TOOL_HANDLERS = {
   list_organizations: async (context) => {
     const apiService = apiServiceFromContext(context);
@@ -502,7 +403,6 @@ export const TOOL_HANDLERS = {
     if (eventList.length === 0) {
       output += `No results found\n\n`;
       output += `We searched within the ${organizationSlug} organization.\n\n`;
-      output += `You may want to consult the \`help\` tool if you think your search syntax might be wrong.\n`;
       return output;
     }
 
@@ -557,7 +457,6 @@ export const TOOL_HANDLERS = {
     if (eventList.length === 0) {
       output += `No results found\n\n`;
       output += `We searched within the ${organizationSlug} organization.\n\n`;
-      output += `You may want to consult the \`help\` tool if you think your search syntax might be wrong.\n`;
       return output;
     }
 
@@ -645,13 +544,5 @@ export const TOOL_HANDLERS = {
     output += `- You should always inform the user of the **SENTRY_DSN** and Project Slug values.\n`;
 
     return output;
-  },
-
-  help: async (_context, { subject }) => {
-    if (subject === "query_syntax") {
-      return QUERY_SYNTAX;
-    }
-
-    return "Unknown subject";
   },
 } satisfies ToolHandlers;

@@ -22,7 +22,6 @@ const oAuthProvider = new OAuthProvider({
 
 export default withSentry(
   (env) => ({
-    debug: env.NODE_ENV !== "production",
     dsn: env.SENTRY_DSN,
     tracesSampleRate: 1,
     sendDefaultPii: true,

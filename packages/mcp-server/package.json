@@ -32,6 +32,10 @@
       "types": "./dist/server.ts",
       "default": "./dist/server.js"
     },
+    "./resources": {
+      "types": "./dist/resources.ts",
+      "default": "./dist/resources.js"
+    },
     "./tools": {
       "types": "./dist/tools.ts",
       "default": "./dist/tools.js"

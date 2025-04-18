@@ -1,5 +1,6 @@
 import { Fragment } from "react/jsx-runtime";
 import { TOOL_DEFINITIONS } from "@sentry/mcp-server/toolDefinitions";
+import { RESOURCES } from "@sentry/mcp-server/resources";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -215,8 +216,28 @@ export default function App() {
             </ul>
           </section>
 
-          <section id="resources">
-            <h2>Additional Resources</h2>
+          <section className="resources" id="resources">
+            <h2>Available Resources</h2>
+            <p>
+              Generally speaking, resources that are made available can also be
+              found{" "}
+              <a href="https://github.com/getsentry/sentry-ai-rules">
+                on GitHub in the sentry-ai-rules repository
+              </a>
+              .
+            </p>
+            <ul>
+              {RESOURCES.map((resource) => (
+                <li key={resource.name}>
+                  <h3>{resource.name}</h3>
+                  <p>{resource.description}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section id="more-information">
+            <h2>More Information</h2>
             <ul>
               <li>
                 <a href="https://github.com/getsentry/sentry-mcp">
@@ -253,6 +274,9 @@ export default function App() {
             </li>
             <li>
               <a href="#resources">Resources</a>
+            </li>
+            <li>
+              <a href="#more-information">More Information</a>
             </li>
           </ul>
         </nav>
