@@ -63,6 +63,48 @@ const ReleasePayload = {
   userAgent: null,
 };
 
+const ClientKeyPayload = {
+  id: "d20df0a1ab5031c7f3c7edca9c02814d",
+  name: "Default",
+  label: "Default",
+  public: "d20df0a1ab5031c7f3c7edca9c02814d",
+  secret: "154001fd3dfe38130e1c7948a323fad8",
+  projectId: 4509109104082945,
+  isActive: true,
+  rateLimit: null,
+  dsn: {
+    secret:
+      "https://d20df0a1ab5031c7f3c7edca9c02814d:154001fd3dfe38130e1c7948a323fad8@o4509106732793856.ingest.us.sentry.io/4509109104082945",
+    public:
+      "https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945",
+    csp: "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/csp-report/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
+    security:
+      "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/security/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
+    minidump:
+      "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/minidump/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
+    nel: "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/nel/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
+    unreal:
+      "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/unreal/d20df0a1ab5031c7f3c7edca9c02814d/",
+    crons:
+      "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/cron/___MONITOR_SLUG___/d20df0a1ab5031c7f3c7edca9c02814d/",
+    cdn: "https://js.sentry-cdn.com/d20df0a1ab5031c7f3c7edca9c02814d.min.js",
+  },
+  browserSdkVersion: "8.x",
+  browserSdk: {
+    choices: [
+      ["9.x", "9.x"],
+      ["8.x", "8.x"],
+      ["7.x", "7.x"],
+    ],
+  },
+  dateCreated: "2025-04-07T00:12:25.139394Z",
+  dynamicSdkLoaderOptions: {
+    hasReplay: true,
+    hasPerformance: true,
+    hasDebug: false,
+  },
+};
+
 const IssuePayload = {
   id: "6507376925",
   shareId: null,
@@ -975,47 +1017,13 @@ export const restHandlers = [
     "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
     () => {
       // TODO: validate payload (only accept 'Default' for key name)
-      return HttpResponse.json({
-        id: "d20df0a1ab5031c7f3c7edca9c02814d",
-        name: "Default",
-        label: "Default",
-        public: "d20df0a1ab5031c7f3c7edca9c02814d",
-        secret: "154001fd3dfe38130e1c7948a323fad8",
-        projectId: 4509109104082945,
-        isActive: true,
-        rateLimit: null,
-        dsn: {
-          secret:
-            "https://d20df0a1ab5031c7f3c7edca9c02814d:154001fd3dfe38130e1c7948a323fad8@o4509106732793856.ingest.us.sentry.io/4509109104082945",
-          public:
-            "https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945",
-          csp: "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/csp-report/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
-          security:
-            "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/security/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
-          minidump:
-            "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/minidump/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
-          nel: "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/nel/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
-          unreal:
-            "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/unreal/d20df0a1ab5031c7f3c7edca9c02814d/",
-          crons:
-            "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/cron/___MONITOR_SLUG___/d20df0a1ab5031c7f3c7edca9c02814d/",
-          cdn: "https://js.sentry-cdn.com/d20df0a1ab5031c7f3c7edca9c02814d.min.js",
-        },
-        browserSdkVersion: "8.x",
-        browserSdk: {
-          choices: [
-            ["9.x", "9.x"],
-            ["8.x", "8.x"],
-            ["7.x", "7.x"],
-          ],
-        },
-        dateCreated: "2025-04-07T00:12:25.139394Z",
-        dynamicSdkLoaderOptions: {
-          hasReplay: true,
-          hasPerformance: true,
-          hasDebug: false,
-        },
-      });
+      return HttpResponse.json(ClientKeyPayload);
+    },
+  ),
+  http.get(
+    "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+    () => {
+      return HttpResponse.json([ClientKeyPayload]);
     },
   ),
   http.get(

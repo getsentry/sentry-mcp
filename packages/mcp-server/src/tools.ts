@@ -1,6 +1,7 @@
-import { SentryApiService } from "./api-client/index";
+import { type ClientKey, SentryApiService } from "./api-client/index";
 import { formatEventOutput } from "./internal/formatting";
 import { extractIssueId } from "./internal/issue-helpers";
+import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 
 function apiServiceFromContext(context: ServerContext) {
@@ -288,7 +289,7 @@ export const TOOL_HANDLERS = {
       issueId,
     });
 
-    let output = `# ${issue.shortId}\n\n`;
+    let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
     output += `**Description**: ${issue.title}\n`;
     output += `**Culprit**: ${issue.culprit}\n`;
     output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
@@ -343,7 +344,7 @@ export const TOOL_HANDLERS = {
       }),
     ]);
 
-    let output = `# ${issue.shortId}\n\n`;
+    let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
     output += `**Description**: ${issue.title}\n`;
     output += `**Culprit**: ${issue.culprit}\n`;
     output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
@@ -497,7 +498,7 @@ export const TOOL_HANDLERS = {
       name,
     });
 
-    let output = "# New Team\n\n";
+    let output = `# New Team in **${organizationSlug}**\n\n`;
     output += `**ID**: ${team.id}\n`;
     output += `**Slug**: ${team.slug}\n`;
     output += `**Name**: ${team.name}\n`;
@@ -521,14 +522,24 @@ export const TOOL_HANDLERS = {
       throw new Error("Organization slug is required");
     }
 
-    const [project, clientKey] = await apiService.createProject({
+    const project = await apiService.createProject({
       organizationSlug,
       teamSlug,
       name,
       platform,
     });
+    let clientKey: ClientKey | null = null;
+    try {
+      clientKey = await apiService.createClientKey({
+        organizationSlug,
+        projectSlug: project.slug,
+        name: "Default",
+      });
+    } catch (err) {
+      logError(err);
+    }
 
-    let output = "# New Project\n\n";
+    let output = `# New Project in **${organizationSlug}**\n\n`;
     output += `**ID**: ${project.id}\n`;
     output += `**Slug**: ${project.slug}\n`;
     output += `**Name**: ${project.name}\n`;
@@ -543,6 +554,70 @@ export const TOOL_HANDLERS = {
     output += `- You can reference the **SENTRY_DSN** value to initialize Sentry's SDKs.\n`;
     output += `- You should always inform the user of the **SENTRY_DSN** and Project Slug values.\n`;
 
+    return output;
+  },
+
+  create_dsn: async (context, { organizationSlug, projectSlug, name }) => {
+    const apiService = apiServiceFromContext(context);
+
+    if (!organizationSlug && context.organizationSlug) {
+      organizationSlug = context.organizationSlug;
+    }
+
+    if (!organizationSlug) {
+      throw new Error("Organization slug is required");
+    }
+
+    const clientKey = await apiService.createClientKey({
+      organizationSlug,
+      projectSlug,
+      name,
+    });
+
+    let output = `# New DSN in **${organizationSlug}/${projectSlug}**\n\n`;
+    output += `**DSN**: ${clientKey.dsn.public}\n`;
+    output += `**Name**: ${clientKey.name}\n\n`;
+
+    output += "# Using this information\n\n";
+    output +=
+      "- The `SENTRY_DSN` value is a URL that you can use to initialize Sentry's SDKs.\n";
+
+    return output;
+  },
+
+  list_dsns: async (context, { organizationSlug, projectSlug }) => {
+    const apiService = apiServiceFromContext(context);
+
+    if (!organizationSlug && context.organizationSlug) {
+      organizationSlug = context.organizationSlug;
+    }
+
+    if (!organizationSlug) {
+      throw new Error("Organization slug is required");
+    }
+
+    const clientKeys = await apiService.listClientKeys({
+      organizationSlug,
+      projectSlug,
+    });
+
+    let output = `# DSNs in **${organizationSlug}/${projectSlug}**\n\n`;
+
+    if (clientKeys.length === 0) {
+      output +=
+        "No DSNs were found.\n\nYou can create new one using the `create_dsn` tool.";
+      return output;
+    }
+
+    for (const clientKey of clientKeys) {
+      output += `## ${clientKey.name}\n`;
+      output += `**ID**: ${clientKey.id}\n`;
+      output += `**DSN**: ${clientKey.dsn.public}\n\n`;
+    }
+
+    output += "# Using this information\n\n";
+    output +=
+      "- The `SENTRY_DSN` value is a URL that you can use to initialize Sentry's SDKs.\n";
     return output;
   },
 } satisfies ToolHandlers;

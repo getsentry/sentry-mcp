@@ -30,10 +30,15 @@ export const ProjectListSchema = z.array(ProjectSchema);
 
 export const ClientKeySchema = z.object({
   id: z.union([z.string(), z.number()]),
+  name: z.string(),
   dsn: z.object({
     public: z.string(),
   }),
+  isActive: z.boolean(),
+  dateCreated: z.string().datetime(),
 });
+
+export const ClientKeyListSchema = z.array(ClientKeySchema);
 
 export const ReleaseSchema = z.object({
   id: z.union([z.string(), z.number()]),

@@ -320,7 +320,7 @@ describe("get_issue_summary", () => {
       },
     );
     expect(result).toMatchInlineSnapshot(`
-      "# CLOUDFLARE-MCP-41
+      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
       **Description**: Error: Tool list_organizations is already registered
       **Culprit**: Object.fetch(index)
@@ -352,7 +352,7 @@ describe("get_issue_summary", () => {
     );
 
     expect(result).toMatchInlineSnapshot(`
-      "# CLOUDFLARE-MCP-41
+      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
       **Description**: Error: Tool list_organizations is already registered
       **Culprit**: Object.fetch(index)
@@ -385,7 +385,7 @@ describe("get_issue_details", () => {
       },
     );
     expect(result).toMatchInlineSnapshot(`
-      "# CLOUDFLARE-MCP-41
+      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
       **Description**: Error: Tool list_organizations is already registered
       **Culprit**: Object.fetch(index)
@@ -432,7 +432,7 @@ describe("get_issue_details", () => {
     );
 
     expect(result).toMatchInlineSnapshot(`
-      "# CLOUDFLARE-MCP-41
+      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
 
       **Description**: Error: Tool list_organizations is already registered
       **Culprit**: Object.fetch(index)
@@ -479,7 +479,7 @@ describe("create_team", () => {
       },
     );
     expect(result).toMatchInlineSnapshot(`
-      "# New Team
+      "# New Team in **sentry-mcp-evals**
 
       **ID**: 4509109078196224
       **Slug**: the-goats
@@ -509,7 +509,7 @@ describe("create_project", () => {
       },
     );
     expect(result).toMatchInlineSnapshot(`
-      "# New Project
+      "# New Project in **sentry-mcp-evals**
 
       **ID**: 4509109104082945
       **Slug**: cloudflare-mcp
@@ -520,6 +520,64 @@ describe("create_project", () => {
 
       - You can reference the **SENTRY_DSN** value to initialize Sentry's SDKs.
       - You should always inform the user of the **SENTRY_DSN** and Project Slug values.
+      "
+    `);
+  });
+});
+
+describe("create_dsn", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.create_dsn;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        name: "Default",
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# New DSN in **sentry-mcp-evals/cloudflare-mcp**
+
+      **DSN**: https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945
+      **Name**: Default
+
+      # Using this information
+
+      - The \`SENTRY_DSN\` value is a URL that you can use to initialize Sentry's SDKs.
+      "
+    `);
+  });
+});
+
+describe("list_dsn", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.list_dsns;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# DSNs in **sentry-mcp-evals/cloudflare-mcp**
+
+      ## Default
+      **ID**: d20df0a1ab5031c7f3c7edca9c02814d
+      **DSN**: https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945
+
+      # Using this information
+
+      - The \`SENTRY_DSN\` value is a URL that you can use to initialize Sentry's SDKs.
       "
     `);
   });

@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type {
+  ClientKeyListSchema,
   ClientKeySchema,
   EventSchema,
   IssueListSchema,
@@ -31,3 +32,4 @@ export type ProjectList = z.infer<typeof ProjectListSchema>;
 export type ReleaseList = z.infer<typeof ReleaseListSchema>;
 export type IssueList = z.infer<typeof IssueListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;
+export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;

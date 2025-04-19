@@ -14,9 +14,11 @@ import {
   SpansSearchResponseSchema,
   TagListSchema,
   ApiErrorSchema,
+  ClientKeyListSchema,
 } from "./schema";
 import type {
   ClientKey,
+  ClientKeyList,
   Event,
   Issue,
   IssueList,
@@ -159,7 +161,7 @@ export class SentryApiService {
     teamSlug: string;
     name: string;
     platform?: string;
-  }): Promise<[Project, ClientKey | null]> {
+  }): Promise<Project> {
     const response = await this.request(
       `/teams/${organizationSlug}/${teamSlug}/projects/`,
       {
@@ -170,24 +172,41 @@ export class SentryApiService {
         }),
       },
     );
-    const project = ProjectSchema.parse(await response.json());
+    return ProjectSchema.parse(await response.json());
+  }
 
-    try {
-      const keysResponse = await this.request(
-        `/projects/${organizationSlug}/${project.slug}/keys/`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            name: "Default",
-          }),
-        },
-      );
-      const clientKey = ClientKeySchema.parse(await keysResponse.json());
-      return [project, clientKey];
-    } catch (err) {
-      logError(err);
-    }
-    return [project, null];
+  async createClientKey({
+    organizationSlug,
+    projectSlug,
+    name,
+  }: {
+    organizationSlug: string;
+    projectSlug: string;
+    name?: string;
+  }): Promise<ClientKey> {
+    const response = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/keys/`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+        }),
+      },
+    );
+    return ClientKeySchema.parse(await response.json());
+  }
+
+  async listClientKeys({
+    organizationSlug,
+    projectSlug,
+  }: {
+    organizationSlug: string;
+    projectSlug: string;
+  }): Promise<ClientKeyList> {
+    const response = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/keys/`,
+    );
+    return ClientKeyListSchema.parse(await response.json());
   }
 
   async listReleases({
