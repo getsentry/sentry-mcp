@@ -40,7 +40,7 @@ pnpm build
 Launch the transport:
 
 ```shell
-pnpm run --filter ./packages/mcp-server start --access-token=sentry-pat --host=sentry.example.com
+pnpm start:stdio --access-token=sentry-pat --host=sentry.example.com
 ```
 
 Note: You can also use environment variables:

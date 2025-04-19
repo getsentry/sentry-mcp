@@ -19,6 +19,7 @@
     "lint:fix": "biome lint --fix",
     "inspector": "pnpx @modelcontextprotocol/inspector@latest",
     "prepare": "simple-git-hooks",
+    "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
     "test": "dotenv -e .env -e .env.local -- turbo test",
     "test:ci": "CI=true pnpm --stream -r run test:ci"
   },
