@@ -5,7 +5,7 @@ describeEval("get-issue", {
   data: async () => {
     return [
       {
-        input: "Analyze issue CLOUDFLARE-MCP-41 from Sentry.",
+        input: "Explain CLOUDFLARE-MCP-41 from Sentry.",
         expected: [
           "## CLOUDFLARE-MCP-41",
           "- **Error**: Tool list_organizations is already registered",

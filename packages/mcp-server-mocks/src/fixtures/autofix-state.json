@@ -4,7 +4,7 @@
     "request": {
       "project_id": 4505138086019073,
       "issue": {
-        "id": 6507376925,
+        "id": 8907376925,
         "title": "Error: Tool list_organizations is already registered",
         "short_id": "REMOTE-MCP-41"
       }

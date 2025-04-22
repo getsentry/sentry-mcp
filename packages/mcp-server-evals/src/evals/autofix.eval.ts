@@ -5,16 +5,16 @@ describeEval("begin-autofix", {
   data: async () => {
     return [
       {
-        input: `Can you root cause this issue in Sentry?\n${FIXTURES.issueUrl}\n\nJust kick off the process and give me the Run ID.`,
+        input: `Can you root cause this issue in Sentry?\n${FIXTURES.autofixIssueUrl}\n\nJust kick off the process and give me the Run ID.`,
         expected: "The analysis has started\n.Run ID: 123",
       },
       {
-        input: `Whats the status on rooting causing this issue in Sentry?\n${FIXTURES.issueUrl}`,
+        input: `Whats the status on rooting causing this issue in Sentry?\n${FIXTURES.autofixIssueUrl}`,
         expected:
           'Batched TRPC request incorrectly passed bottle ID 3216 to `bottleById`, instead of 16720, resulting in a "Bottle not found" error.',
       },
       {
-        input: `Can you root cause this issue and retrieve the analysis?\n${FIXTURES.issueUrl}`,
+        input: `Can you root cause this issue and retrieve the analysis?\n${FIXTURES.autofixIssueUrl}`,
         expected:
           'Batched TRPC request incorrectly passed bottle ID 3216 to `bottleById`, instead of 16720, resulting in a "Bottle not found" error.',
       },
