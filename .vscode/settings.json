@@ -7,9 +7,12 @@
   "files.trimFinalNewlines": false,
   "files.insertFinalNewline": true,
   "cursor.general.enableShadowWorkspace": true,
-  "editor.tabSize": 2,
-  "editor.defaultFormatter": "biomejs.biome",
+  "[json]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "biomejs.biome"
+  },
   "[typescript]": {
+    "editor.tabSize": 2,
     "editor.defaultFormatter": "biomejs.biome"
   },
   "[typescriptreact]": {

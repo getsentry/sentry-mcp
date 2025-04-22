@@ -5,20 +5,21 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src/mcp/**'
-      - '*.eval.ts'
-      - '.github/workflows/eval.yml'
+      - "packages/mcp-server/src/tools*"
+      - "packages/mcp-server-evals/**"
+      - "packages/mcp-server-mocks/**"
+      - ".github/workflows/eval.yml"
   pull_request:
-    branches: [main]
     paths:
-      - 'src/mcp/**'
-      - '*.eval.ts'
-      - '.github/workflows/eval.yml'
+      - "packages/mcp-server/src/tools*"
+      - "packages/mcp-server-evals/**"
+      - "packages/mcp-server-mocks/**"
+      - ".github/workflows/eval.yml"
 
 jobs:
-  evals:
+  eval:
     environment: Actions
-    runs-on: 'ubuntu-20.04'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -27,10 +28,10 @@ jobs:
         with:
           node-version: "20"
 
-      - uses: pnpm/action-setup@v3
+      # pnpm/action-setup@v4
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
         name: Install pnpm
         with:
-          version: 8
           run_install: false
 
       - name: Get pnpm store directory
@@ -47,9 +48,35 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run build
+        run: pnpm build
 
       - name: Run evals
-        run: pnpm eval:ci
+        run: pnpm eval:ci evals
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          directory: ./coverage/
+          flags: evals
+          name: codecov-evals
+          fail_ci_if_error: false
+
+      - name: Upload results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: ${{ !cancelled() }}
+        with:
+          report_paths: "**/*.junit.xml"
+          comment: false

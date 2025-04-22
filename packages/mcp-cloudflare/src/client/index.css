@@ -1,0 +1,28 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+.snippet {
+  position: relative;
+
+  button {
+    position: absolute;
+    right: 0.5rem;
+    top: 0.5rem;
+  }
+}
+
+.btn {
+  border-radius: 0.25rem;
+  border: 0;
+
+  color: var(--color-white);
+  background-color: var(--color-gray-600);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--color-gray-500);
+  }
+}

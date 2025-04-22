@@ -1,0 +1,29 @@
+{
+  "name": "@sentry/mcp-server-evals",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "FSL-1.1-ALv2",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -w",
+    "start": "tsx src/bin/start-mock-stdio.ts",
+    "eval": "vitest --config=vitest.config.ts",
+    "eval:ci": "vitest run --coverage --reporter=junit --outputFile=eval.junit.xml"
+  },
+  "dependencies": {
+    "@sentry/mcp-server": "workspace:*",
+    "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.9.0",
+    "@ai-sdk/openai": "^1.3.16",
+    "ai": "^4.3.9",
+    "msw": "^2.7.4",
+    "typescript": "^5.8.3",
+    "vitest-evals": "^0.1.5",
+    "zod": "^3.24.3"
+  }
+}

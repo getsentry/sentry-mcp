@@ -1,0 +1,66 @@
+{
+  "name": "@sentry/mcp-server",
+  "version": "0.0.1",
+  "type": "module",
+  "packageManager": "pnpm@10.3.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "FSL-1.1-ALv2",
+  "bin": {
+    "sentry-mcp": "./dist/bin.js"
+  },
+  "files": ["./dist/*"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./api-client": {
+      "types": "./dist/api-client/index.ts",
+      "default": "./dist/api-client/index.js"
+    },
+    "./transports/stdio": {
+      "types": "./dist/transports/stdio.ts",
+      "default": "./dist/transports/stdio.js"
+    },
+    "./server": {
+      "types": "./dist/server.ts",
+      "default": "./dist/server.js"
+    },
+    "./promptDefinitions": {
+      "types": "./dist/promptDefinitions.ts",
+      "default": "./dist/promptDefinitions.js"
+    },
+    "./resources": {
+      "types": "./dist/resources.ts",
+      "default": "./dist/resources.js"
+    },
+    "./toolDefinitions": {
+      "types": "./dist/toolDefinitions.ts",
+      "default": "./dist/toolDefinitions.js"
+    },
+    "./types": {
+      "types": "./dist/types.ts",
+      "default": "./dist/types.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -w",
+    "start": "tsx src/bin.ts",
+    "test": "vitest",
+    "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "vitest watch"
+  },
+  "devDependencies": {
+    "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "msw": "^2.7.4"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.9.0",
+    "@sentry/core": "^9.13.0",
+    "zod": "^3.24.3"
+  }
+}

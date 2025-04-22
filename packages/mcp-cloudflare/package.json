@@ -1,0 +1,54 @@
+{
+  "name": "@sentry/mcp-cloudflare",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "FSL-1.1-ALv2",
+  "files": ["./dist/*"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite",
+    "deploy": "npm exec wrangler deploy",
+    "preview": "vite preview",
+    "cf-typegen": "wrangler types",
+    "test": "vitest",
+    "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "vitest watch"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.0.8",
+    "@cloudflare/vitest-pool-workers": "^0.8.18",
+    "@cloudflare/workers-types": "^4.20250417.0",
+    "@sentry/vite-plugin": "^3.3.1",
+    "@sentry/mcp-server": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "@tailwindcss/typography": "^0.5.16",
+    "@tailwindcss/vite": "^4.1.4",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.0",
+    "better-sqlite3": "^11.9.1",
+    "tailwindcss": "^4.1.4",
+    "vite": "^6.3.1",
+    "wrangler": "^4.12.0"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.0.2",
+    "@modelcontextprotocol/sdk": "^1.9.0",
+    "@sentry/cloudflare": "^9.13.0",
+    "@sentry/react": "^9.13.0",
+    "agents": "~0.0.60",
+    "better-sqlite3": "^11.9.1",
+    "hono": "^4.7.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "workers-mcp": "0.1.0-3",
+    "zod": "^3.24.3"
+  }
+}

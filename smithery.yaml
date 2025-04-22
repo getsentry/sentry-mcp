@@ -1,0 +1,31 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - sentryAuthToken
+    properties:
+      sentryAuthToken:
+        type: string
+        description: Sentry authentication token with proper scopes.
+      sentryHost:
+        type: string
+        default: https://sentry.io
+        description: Optional override for the Sentry host URL.
+  commandFunction:
+    # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
+    |-
+    (config) => ({
+      command: 'npm',
+      args: ['run', 'start:stdio'],
+      env: {
+        SENTRY_AUTH_TOKEN: config.sentryAuthToken,
+        SENTRY_HOST: config.sentryHost
+      }
+    })
+  exampleConfig:
+    sentryAuthToken: your_sentry_auth_token_here
+    sentryHost: https://sentry.io

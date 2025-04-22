@@ -1,61 +1,50 @@
 {
-  "name": "mcp-github-oauth",
+  "name": "sentry-mcp",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.8.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "FSL-1.1-ALv2",
   "scripts": {
-    "build": "tsc",
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
-    "eval": "evalite",
-    "eval:ci": "evalite --threshold=100",
-    "eval:dev": "evalite watch",
+    "dev": "dotenv -e .env -e .env.local -- turbo dev",
+    "build": "turbo build after-build",
+    "deploy": "turbo deploy",
+    "eval": "dotenv -e .env -e .env.local -- turbo eval",
+    "eval:ci": "CI=true pnpm --stream -r run eval:ci",
     "format": "biome format --write",
     "lint": "biome lint",
     "lint:fix": "biome lint --fix",
     "inspector": "pnpx @modelcontextprotocol/inspector@latest",
-    "start": "wrangler dev",
-    "start:stdio": "tsx src/mcp/start-stdio.ts",
-    "cf-typegen": "wrangler types",
-    "postinstall": "simple-git-hooks",
-    "test": "vitest",
-    "test:ci": "vitest run --coverage --reporter=junit",
-    "test:watch": "vitest watch"
-  },
-  "devDependencies": {
-    "@ai-sdk/openai": "^1.3.9",
-    "@biomejs/biome": "^1.9.4",
-    "@cloudflare/vitest-pool-workers": "^0.8.14",
-    "@types/node": "^22.14.0",
-    "@vitest/coverage-v8": "^2.1.9",
-    "ai": "^4.3.4",
-    "autoevals": "^0.0.125",
-    "dotenv": "^16.4.7",
-    "evalite": "~0.10.0",
-    "lint-staged": "^15.5.0",
-    "msw": "^2.7.3",
-    "simple-git-hooks": "^2.12.1",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.3",
-    "vite": "^6.2.5",
-    "vitest": "^2.1.9",
-    "wrangler": "^4.9.1"
+    "prepare": "simple-git-hooks",
+    "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
+    "test": "dotenv -e .env -e .env.local -- turbo test",
+    "test:ci": "CI=true pnpm --stream -r run test:ci"
   },
   "dependencies": {
-    "@cloudflare/workers-oauth-provider": "^0.0.2",
-    "@modelcontextprotocol/sdk": "^1.9.0",
-    "@sentry/cloudflare": "^9.12.0",
-    "agents": "~0.0.57",
-    "better-sqlite3": "^11.9.1",
-    "hono": "^4.7.6",
-    "workers-mcp": "0.1.0-3",
-    "zod": "^3.24.2"
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.14.1",
+    "@vitest/coverage-v8": "^3.1.1",
+    "dotenv": "^16.5.0",
+    "dotenv-cli": "^8.0.0",
+    "lint-staged": "^15.5.1",
+    "simple-git-hooks": "^2.12.1",
+    "tsx": "^4.19.3",
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1",
+    "vitest-evals": "^0.1.5"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm exec lint-staged --concurrent false"
   },
   "lint-staged": {
-    "**/*.{ts,tsx,json}": ["biome format --write"],
-    "**/*.{ts,tsx}": ["biome lint --fix"]
+    "*": [
+      "biome format --write --no-errors-on-unmatched --files-ignore-unknown=true",
+      "biome lint --fix --no-errors-on-unmatched --files-ignore-unknown=true"
+    ]
   },
   "pnpm": {
     "onlyBuiltDependencies": [

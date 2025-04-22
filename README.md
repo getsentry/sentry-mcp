@@ -1,39 +1,53 @@
 # sentry-mcp
 
+[![codecov](https://codecov.io/gh/getsentry/sentry-mcp/graph/badge.svg?token=khVKvJP5Ig)](https://codecov.io/gh/getsentry/sentry-mcp)
+[![smithery badge](https://smithery.ai/badge/@getsentry/sentry-mcp)](https://smithery.ai/server/@getsentry/sentry-mcp)
+
 This is a prototype of a remote MCP sever, acting as a middleware to the upstream Sentry API provider.
 
 It is based on [Cloudflare's work towards remote MCPs](https://blog.cloudflare.com/remote-model-context-protocol-servers-mcp/).
 
 ## Getting Started
 
-https://mcp.sentry.dev
+You'll find everything you need to know by visiting the deployed service in production:
+
+<https://mcp.sentry.dev>
+
+If you're looking to contribute, learn how it works, or to run this for self-hosted Sentry, continue below..
 
 ### Stdio vs Remote
 
-While this repository is primarily servicing a remote MCP use-case, we also support a stdio transport.
+While this repository is focused on acting as an MCP service, we also support a `stdio` transport. This is still a work in progress, but is the easiest way to adapt run the MCP against a self-hosted Sentry install.
 
-Note: This is currently a draft and not available via a distribution.
-
-You will need to ensure your token is provisioned with the necessary scopes. As of writing this is:
+To utilize the `stdout` transport, you'll need to create an Personal API Token (PAT) in Sentry with the necessary scopes. As of writing this is:
 
 ```
-org:read project:read project:write team:read team:write event:read
+org:read
+project:read
+project:write
+team:read
+team:write
+event:read
 ```
 
-You can find the canonical reference to the needed scopes in the [source code](https://github.com/getsentry/sentry-mcp/blob/main/src/routes/auth.ts).
-
-Launching the stdio transport will just require you to bind `SENTRY_AUTH_TOKEN` and run the provided script:
+Clone the repository and set it up as you normally would:
 
 ```shell
-SENTRY_AUTH_TOKEN= npm run start:stdio
+pnpm install
+pnpm build
 ```
 
-### Self-Hosted Sentry
-
-You can override the `SENTRY_URL` env variable to set your base Sentry url:
+Launch the transport:
 
 ```shell
-SENTRY_URL=https://sentry.mycompany.com
+pnpm start:stdio --access-token=sentry-pat --host=sentry.example.com
+```
+
+Note: You can also use environment variables:
+
+```shell
+SENTRY_AUTH_TOKEN=
+SENTRY_HOST=
 ```
 
 ### MCP Inspector
@@ -107,13 +121,13 @@ pnpm test
 Evals will require a `.env` file with some config:
 
 ```shell
-OAUTH_API_TOKEN=
+OPENAI_API_KEY=
 ```
 
 Once thats done you can run them using:
 
 ```shell
-pnpm eval
+pnpm test
 ```
 
 ## Notes
