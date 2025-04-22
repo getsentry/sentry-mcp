@@ -290,16 +290,7 @@ export const AutofixRunStateSchema = z.object({
   autofix: z
     .object({
       run_id: z.number(),
-      request: z
-        .object({
-          project_id: z.number(),
-          issue: z
-            .object({
-              id: z.number(),
-            })
-            .passthrough(),
-        })
-        .passthrough(),
+      request: z.unknown(),
       updated_at: z.string(),
       status: z.enum(["NEED_MORE_INFORMATION", "PROCESSING"]),
       steps: z.array(AutofixRunStepSchema),

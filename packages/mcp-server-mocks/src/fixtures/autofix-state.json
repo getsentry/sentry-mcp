@@ -2,12 +2,7 @@
   "autofix": {
     "run_id": 21831,
     "request": {
-      "project_id": 4505138086019073,
-      "issue": {
-        "id": 8907376925,
-        "title": "Error: Tool list_organizations is already registered",
-        "short_id": "REMOTE-MCP-41"
-      }
+      "project_id": 4505138086019073
     },
     "status": "NEED_MORE_INFORMATION",
     "updated_at": "2025-04-09T22:39:50.778146",
