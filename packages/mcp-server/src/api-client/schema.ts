@@ -205,7 +205,13 @@ const AutofixRunStepBaseSchema = z.object({
   type: z.string(),
   key: z.string(),
   index: z.number(),
-  status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"]),
+  status: z.enum([
+    "PENDING",
+    "PROCESSING",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "FAILED",
+  ]),
   title: z.string(),
   output_stream: z.string().nullable(),
   progress: z.array(
