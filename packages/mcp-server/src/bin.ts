@@ -2,6 +2,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "./transports/stdio";
+import { wrapMcpServerWithSentry } from "@sentry/core";
 
 let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
 let host: string | undefined = process.env.SENTRY_HOST;
@@ -29,9 +30,11 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
+const instrumentedServer = wrapMcpServerWithSentry(server);
+
 // XXX: we could do what we're doing in routes/auth.ts and pass the context
 // identically, but we don't really need userId and userName yet
-startStdio(server, {
+startStdio(instrumentedServer, {
   accessToken,
   organizationSlug: null,
   host,

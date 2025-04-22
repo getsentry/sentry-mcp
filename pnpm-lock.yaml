@@ -56,6 +56,9 @@ importers:
       '@sentry/cloudflare':
         specifier: ^9.13.0
         version: 9.13.0(@cloudflare/workers-types@4.20250417.0)
+      '@sentry/core':
+        specifier: ^9.13.0
+        version: 9.13.0
       '@sentry/react':
         specifier: ^9.13.0
         version: 9.13.0(react@19.1.0)
