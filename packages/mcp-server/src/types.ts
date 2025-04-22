@@ -2,8 +2,10 @@ import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/proto
 import type { TOOL_DEFINITIONS } from "./toolDefinitions";
 import type { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import type { z } from "zod";
-import type { PromptCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  GetPromptResult,
+  Notification,
+} from "@modelcontextprotocol/sdk/types.js";
 
 type ZodifyRecord<T extends Record<string, any>> = {
   [K in keyof T]: z.infer<T[K]>;
@@ -49,7 +51,7 @@ export type ToolHandler<T extends ToolName> = (
 export type ToolHandlerExtended<T extends ToolName> = (
   context: ServerContext,
   params: ToolParams<T>,
-  extra: RequestHandlerExtra,
+  extra: RequestHandlerExtra<Request, Notification>,
 ) => Promise<string>;
 
 export type ToolHandlers = {

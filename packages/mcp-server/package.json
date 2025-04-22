@@ -56,10 +56,10 @@
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
-    "msw": "^2.7.4"
+    "msw": "^2.7.5"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.9.0",
+    "@modelcontextprotocol/sdk": "^1.10.2",
     "@sentry/core": "^9.13.0",
     "zod": "^3.24.3"
   }
