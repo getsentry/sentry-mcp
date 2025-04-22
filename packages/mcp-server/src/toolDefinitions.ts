@@ -395,6 +395,7 @@ export const TOOL_DEFINITIONS = [
       "</examples>",
       "",
       "<hints>",
+      "- Always check to see if an autofix is already in progress for the issue before calling this tool by using `get_autofix_status()`.",
       "- If the user provides the issueUrl, you can ignore the organizationSlug and issueId parameters.",
       "- If you're uncertain about which organization to query, you should call `list_organizations()` first. This especially important if an issueId is passed.",
       "</hints>",
