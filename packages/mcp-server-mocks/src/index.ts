@@ -1206,18 +1206,18 @@ export const restHandlers = [
   http.get("https://sentry.io/api/0/organizations/sentry-mcp-evals/tags/", () =>
     HttpResponse.json(TagsPayload),
   ),
-  http.get("https://sentry.io/api/0/issues/8907376925/autofix/", () => {
+  http.get("https://us.sentry.io/api/0/issues/8907376925/autofix/", () => {
     return HttpResponse.json(autofixStateFixture);
   }),
-  http.get("https://sentry.io/api/0/issues/PEATED-A8/autofix/", () => {
+  http.get("https://us.sentry.io/api/0/issues/PEATED-A8/autofix/", () => {
     return HttpResponse.json(autofixStateFixture);
   }),
-  http.post("https://sentry.io/api/0/issues/8907376925/autofix/", () => {
+  http.post("https://us.sentry.io/api/0/issues/8907376925/autofix/", () => {
     return HttpResponse.json({
       run_id: 123,
     });
   }),
-  http.post("https://sentry.io/api/0/issues/PEATED-A8/autofix/", () => {
+  http.post("https://us.sentry.io/api/0/issues/PEATED-A8/autofix/", () => {
     return HttpResponse.json({
       run_id: 123,
     });

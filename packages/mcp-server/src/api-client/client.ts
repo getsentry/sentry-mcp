@@ -64,8 +64,11 @@ export class SentryApiService {
   private async request(
     path: string,
     options: RequestInit = {},
+    { host }: { host?: string } = {},
   ): Promise<Response> {
-    const url = `${this.apiPrefix}${path}`;
+    const url = host
+      ? new URL(`/api/0${path}`, `https://${host}`).href
+      : `${this.apiPrefix}${path}`;
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -453,13 +456,19 @@ export class SentryApiService {
     eventId?: string;
     instruction?: string;
   }): Promise<AutofixRun> {
-    const response = await this.request(`/issues/${issueId}/autofix/`, {
-      method: "POST",
-      body: JSON.stringify({
-        event_id: eventId,
-        instruction,
-      }),
-    });
+    const response = await this.request(
+      `/issues/${issueId}/autofix/`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          event_id: eventId,
+          instruction,
+        }),
+      },
+      {
+        host: "us.sentry.io",
+      },
+    );
     const body = await response.json();
     return AutofixRunSchema.parse(body);
   }
@@ -472,7 +481,11 @@ export class SentryApiService {
     organizationSlug: string;
     issueId: string;
   }): Promise<AutofixRunState> {
-    const response = await this.request(`/issues/${issueId}/autofix/`);
+    const response = await this.request(
+      `/issues/${issueId}/autofix/`,
+      undefined,
+      { host: "us.sentry.io" },
+    );
     const body = await response.json();
     return AutofixRunStateSchema.parse(body);
   }

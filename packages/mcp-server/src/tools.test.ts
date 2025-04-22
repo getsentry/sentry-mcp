@@ -582,3 +582,328 @@ describe("list_dsn", () => {
     `);
   });
 });
+
+describe("begin_autofix", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.begin_autofix;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "PEATED-A8",
+        issueUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Autofix Started for Issue PEATED-A8
+
+      **Run ID:**: 123
+
+      This operation may take some time, so you should call \`get_autofix_status()\` to check the status of the analysis, and repeat the process until its finished.
+
+      You should also inform the user that the operation may take some time, and give them updates whenever you check the status of the operation..
+
+      \`\`\`
+      get_autofix_status(organizationSlug="sentry-mcp-evals", issueId="PEATED-A8")
+      \`\`\`"
+    `);
+  });
+});
+
+describe("get_autofix_status", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.get_autofix_status;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "PEATED-A8",
+        issueUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Autofix Status for Issue PEATED-A8
+
+      ## Analyzing the Issue
+
+      **The \`bottleById\` query fails because the input ID (3216) doesn't exist in the database.
+      **
+      The exception details show that the \`input\` value at the time of the \`TRPCError\` in \`bottleById.ts\` was 3216, and the query likely failed because a bottle with ID 3216 was not found in the database.
+
+      \`\`\`
+      Variable values at the time of the exception::
+      {
+        "input": 3216
+      }
+      \`\`\`
+
+
+      **However, the request also includes a different ID (16720) for \`bottlePriceList\`.
+      **
+      The root cause is likely a mismatch of input IDs within the batched TRPC request, where \`bottlePriceList\` expects bottle ID 16720, but \`bottleById\` receives a different ID (3216) leading to the "Bottle not found" error.
+
+      \`\`\`
+      GET http://api.peated.com/trpc/bottlePriceList,bottleById
+      \`\`\`
+
+      \`\`\`json
+      {
+        "input": 3216
+      }
+      \`\`\`
+
+      \`\`\`
+      TRPCError: Bottle not found. (occurred in: GET /trpc/bottlePriceList,bottleById)
+      \`\`\`
+
+
+      **This suggests a data consistency issue or incorrect client-side request.
+      **
+      The \`TRPCError\` originates from \`bottleById.ts\` with the input value being \`3216\`, indicating the procedure failed to find a bottle with that specific ID in the database.
+
+      \`\`\`
+       <anonymous> in file /app/apps/server/src/trpc/routes/bottleById.ts [Line 33, column 13] (In app)
+            .select({
+              ...getTableColumns(bottles),
+            })
+            .from(bottleTombstones)
+            .innerJoin(bottles, eq(bottleTombstones.newBottleId, bottles.id))
+            .where(eq(bottleTombstones.bottleId, input));
+          if (!bottle) {
+            throw new TRPCError({  <-- SUSPECT LINE
+              message: "Bottle not found.",
+              code: "NOT_FOUND",
+            });
+          }
+        }
+
+        const createdBy = await db.query.users.findFirst({
+      ---
+      Variable values at the time of the exception::
+      {
+        "input": 3216
+      }
+      \`\`\`
+
+
+
+      ## Root Cause Analysis
+
+      **The client initiates a batched TRPC request to the \`/trpc/bottlePriceList,bottleById\` endpoint, intending to fetch both the price list and details for a specific bottle.**
+
+      This is the entry point where the client requests data from two different procedures in a single HTTP request. The server needs to correctly route and process the parameters for each procedure.
+
+      **The TRPC server receives the batched request and begins processing the \`bottlePriceList\` procedure, intending to fetch the price list for bottle ID 16720.**
+
+      \`\`\`typescript
+      // apps/server/src/trpc/routes/bottlePriceList.ts
+      .input(z.object({ bottle: z.number(), onlyValid: z.boolean().optional() }))
+      .query(async function ({ input, ctx }) {
+        const [bottle] = await db.select().from(bottles).where(eq(bottles.id, input.bottle));
+        if (!bottle) { ... }
+      \`\`\`
+      This procedure expects a 'bottle' parameter in the input, which is used to query the database.
+
+      **The TRPC server also processes the \`bottleById\` procedure, but due to a parameter mapping issue or client-side error, it receives bottle ID 3216 as input instead of 16720.**
+
+      \`\`\`typescript
+      // apps/server/src/trpc/routes/bottleById.ts
+      export default publicProcedure.input(z.number()).query(async function ({ input, ctx }) {
+        let [bottle] = await db.select().from(bottles).where(eq(bottles.id, input));
+        if (!bottle) { ... }
+      \`\`\`
+      This procedure expects a numerical ID as input to find the bottle.
+
+      **The \`bottleById\` procedure queries the \`bottles\` table for a bottle with ID 3216, but no such bottle exists.**
+
+      The database query returns no results because bottle ID 3216 is not present in the \`bottles\` table.
+
+      **The \`bottleById\` procedure then checks the \`bottleTombstones\` table to see if bottle ID 3216 has been tombstoned (redirected to a new ID), but no such tombstone exists.**
+
+      The query to \`bottleTombstones\` also returns no results, indicating that bottle ID 3216 has not been redirected.
+
+      **Since the \`bottleById\` procedure cannot find a bottle with ID 3216 in either the \`bottles\` or \`bottleTombstones\` tables, it throws a \`TRPCError\` with the message "Bottle not found."**
+
+      \`\`\`typescript
+      // apps/server/src/trpc/routes/bottleById.ts
+      if (!bottle) {
+        throw new TRPCError({ message: "Bottle not found.", code: "NOT_FOUND" });
+      }
+      \`\`\`
+      This is where the error is thrown, indicating that the bottle could not be found.
+
+
+      ## Planning Solution
+
+      **The discrepancy between inputs suggests a potential issue with batch request handling.
+      **
+      The \`TRPCError\` occurred in \`bottleById.ts\` with an input of \`3216\`, while the request was initiated with a bottle ID of \`16720\`, indicating a mismatch in the bottle ID being processed.
+
+      \`\`\`
+      Variable values at the time of the exception::
+      {
+        "input": 3216
+      }
+      \`\`\`
+
+      \`\`\`
+      GET http://api.peated.com/trpc/bottlePriceList,bottleById
+      \`\`\`
+
+
+      **The client-side batch request construction is the most likely source of error.
+      **
+      The discrepancy between the bottle ID in the error message (16720) and the ID being processed (3216) strongly suggests a client-side parameter mapping issue in the batched TRPC request.
+
+      To fix this, I propose the following steps:
+
+      1.  **Inspect the Client-Side Code:** Identify the code responsible for constructing the TRPC batch request to \`/trpc/bottlePriceList,bottleById\`.
+
+      2.  **Verify Parameter Mapping:** Ensure that both \`bottlePriceList\` and \`bottleById\` are receiving the correct bottle ID (which should be 16720 in this case).
+
+      3.  **Correct Parameter Assignment:** If the parameters are being incorrectly assigned, modify the client-side code to ensure that both procedures receive the same, correct bottle ID.
+
+      4.  **Add Logging (Client-Side):** Add temporary logging to the client-side code to confirm the parameters being sent to each procedure in the batch request. This will help verify the fix.
+
+          \`\`\`typescript
+          // Example logging (add to the client-side code where the batch request is created)
+          console.log("bottlePriceList input:", { bottle: 16720 }); // Replace 16720 with the actual ID
+          console.log("bottleById input:", { bottle: 16720 }); // Replace 16720 with the actual ID
+          \`\`\`
+
+      5.  **Test the Fix:** After applying the fix, test the affected functionality to ensure that the "Bottle not found" error is resolved and that both procedures are working correctly.
+
+      6.  **Remove Logging:** Once the fix is verified, remove the temporary logging.
+
+      This approach directly addresses the most likely cause of the issue and provides a clear path to resolution.
+
+
+      **Ensuring consistent bottle IDs will likely resolve this inconsistency.
+      **
+      The error message references bottle ID 16720, but the exception details show the procedure was actually processing ID 3216, indicating a parameter mismatch in the batch request.
+
+      To fix this, I recommend the following steps:
+
+      1.  **Client-Side Investigation**:
+
+          *   Examine the client-side code where the TRPC batch request is constructed.
+          *   Verify that the same \`bottleId\` parameter is being passed to both \`bottlePriceList\` and \`bottleById\` procedures.
+          *   If the IDs are being passed correctly, inspect the network request payload to confirm the correct structure of the batched request.
+
+          \`\`\`typescript
+          // Example (Hypothetical) Client-Side Code
+          const bottleId = 16720; // Example bottle ID
+
+          // Ensure both procedures receive the same bottleId
+          const [priceList, bottleDetails] = await trpc.batch(() => [
+            trpc.bottlePriceList.fetch({ bottle: bottleId }),
+            trpc.bottleById.fetch(bottleId),
+          ]);
+          \`\`\`
+
+      2.  **Server-Side Logging (Temporary)**:
+
+          *   Add temporary logging to both \`bottlePriceList\` and \`bottleById\` procedures to log the received \`input\` value.
+          *   This will help confirm whether the server is receiving the correct IDs from the client.
+          *   **Important**: Remove these logs after debugging to avoid unnecessary overhead.
+
+          \`\`\`typescript
+          // apps/server/src/trpc/routes/bottlePriceList.ts
+          export default publicProcedure
+            .input(
+              z.object({
+                bottle: z.number(),
+                onlyValid: z.boolean().optional(),
+              }),
+            )
+            .query(async function ({ input, ctx }) {
+              console.log("bottlePriceList input:", input); // Add this line
+              // ... rest of the code
+            });
+
+          // apps/server/src/trpc/routes/bottleById.ts
+          export default publicProcedure.input(z.number()).query(async function ({
+            input,
+            ctx,
+          }) {
+            console.log("bottleById input:", input); // Add this line
+            // ... rest of the code
+          });
+          \`\`\`
+
+      3.  **TRPC Batch Request Configuration**:
+
+          *   Review the TRPC batch link configuration on the client-side.
+          *   Ensure that the batching logic is correctly mapping parameters to the corresponding procedures.
+          *   If using a custom batching implementation, verify its correctness.
+
+      4.  **Data Integrity Check**:
+
+          *   If the client-side code appears correct, investigate whether bottle ID 3216 should exist in the database.
+          *   Check the \`bottles\` table and \`bottleTombstones\` table for any entries related to bottle ID 3216.
+          *   If the bottle should exist but is missing, investigate potential data deletion or migration issues.
+
+      5.  **Tombstone Logic**:
+
+          *   Double-check the logic for creating and using tombstones.
+          *   Ensure that when a bottle is deleted, a tombstone entry is created correctly, pointing to the new bottle (if any).
+
+      6.  **Error Handling**:
+
+          *   While this isn't the primary fix, consider improving the error message in \`bottleById.ts\` to include more context.
+          *   Include the original requested bottle ID (if available) in the error message to aid debugging.
+
+      7.  **Client-Side Retries**:
+
+          *   Implement a retry mechanism on the client-side for TRPC requests.
+          *   If a "Bottle not found" error occurs, retry the request a few times before giving up. This can help mitigate transient issues.
+
+      By following these steps, you should be able to identify the root cause of the parameter mismatch and implement a fix that ensures consistent bottle IDs are passed to both TRPC procedures in the batch request.
+
+
+
+      ## Solution
+
+      Consolidate bottle and price data fetching into a single batched TRPC request using \`Promise.all\` to ensure ID consistency.
+
+      **Create a shared utility function to fetch bottle details and price data together.**
+      \`\`\`typescript
+      // In a shared utility function or component
+      export async function getBottleWithPrices(bottleId: number) {
+        const trpcClient = await getTrpcClient();
+        
+        // Use Promise.all to ensure both requests are part of the same batch
+        // and receive the same parameters
+        const [bottle, priceList] = await Promise.all([
+          trpcClient.bottleById.fetch(bottleId),
+          trpcClient.bottlePriceList.fetch({ bottle: bottleId }),
+        ]);
+        
+        return { bottle, priceList };
+      }
+      \`\`\`
+      This code creates a function that uses \`Promise.all\` to fetch both bottle details and price data concurrently. This ensures that both TRPC procedures are part of the same batch and receive the same \`bottleId\`.
+
+      **Modify the page components to use the shared utility function.**
+      \`\`\`typescript
+      // Then in the page components:
+      const { bottle, priceList } = await getBottleWithPrices(Number(bottleId));
+      \`\`\`
+      This code replaces the separate calls to \`bottleById\` and \`bottlePriceList\` with a single call to the \`getBottleWithPrices\` function, ensuring that both components receive data for the same bottle.
+
+      **Add a unit test that reproduces the issue.**
+      null
+
+
+      "
+    `);
+  });
+});

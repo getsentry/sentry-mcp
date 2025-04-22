@@ -735,9 +735,11 @@ function getOutputForAutofixStep(step: z.infer<typeof AutofixRunStepSchema>) {
     >;
 
     for (const cause of typedStep.causes) {
-      output += `${typedStep.description}\n\n`;
+      if (typedStep.description) {
+        output += `${typedStep.description}\n\n`;
+      }
       for (const entry of cause.root_cause_reproduction) {
-        output += `**${entry.title}**\n`;
+        output += `**${entry.title}**\n\n`;
         output += `${entry.code_snippet_and_analysis}\n\n`;
       }
     }
