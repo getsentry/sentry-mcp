@@ -450,7 +450,7 @@ export class SentryApiService {
   }: {
     organizationSlug: string;
     issueId: string;
-    eventId: string;
+    eventId?: string;
     instruction?: string;
   }): Promise<AutofixRun> {
     const response = await this.request(`/issues/${issueId}/autofix/`, {

@@ -1,4 +1,11 @@
-import { type ClientKey, SentryApiService } from "./api-client/index";
+import type { z } from "zod";
+import {
+  type AutofixRunStepRootCauseAnalysisSchema,
+  type AutofixRunStepSchema,
+  type AutofixRunStepSolutionSchema,
+  type ClientKey,
+  SentryApiService,
+} from "./api-client/index";
 import { formatEventOutput } from "./internal/formatting";
 import { extractIssueId } from "./internal/issue-helpers";
 import { logError } from "./logging";
@@ -692,13 +699,70 @@ export const TOOL_HANDLERS = {
       throw new Error("Organization slug is required");
     }
 
-    const data = await apiService.getAutofixState({
+    const { autofix } = await apiService.getAutofixState({
       organizationSlug,
       issueId,
     });
 
-    const output = `# Autofix Status for Issue ${issueId}\n\n`;
+    let output = `# Autofix Status for Issue ${issueId}\n\n`;
+
+    for (const step of autofix.steps) {
+      output += getOutputForAutofixStep(step);
+      output += "\n";
+    }
 
     return output;
   },
 } satisfies ToolHandlers;
+
+function getOutputForAutofixStep(step: z.infer<typeof AutofixRunStepSchema>) {
+  let output = `## ${step.title}\n\n`;
+
+  if (step.status === "FAILED") {
+    output += `**Sentry hit an error completing this step.\n\n`;
+    return output;
+  }
+
+  if (step.status !== "COMPLETED") {
+    output += `**Sentry is still working on this step. Please check back in a minute.**\n\n`;
+    return output;
+  }
+
+  if (step.type === "root_cause_analysis") {
+    const typedStep = step as z.infer<
+      typeof AutofixRunStepRootCauseAnalysisSchema
+    >;
+
+    for (const cause of typedStep.causes) {
+      output += `${typedStep.description}\n\n`;
+      for (const repro of cause.root_cause_reproduction) {
+        output += `**${repro.title}**\n`;
+        output += `${repro.code_snippet_and_analysis}\n\n`;
+      }
+    }
+    return output;
+  }
+
+  if (step.type === "solution") {
+    const typedStep = step as z.infer<typeof AutofixRunStepSolutionSchema>;
+    output += `${typedStep.description}\n\n`;
+    for (const entry of typedStep.solution) {
+      output += `**${entry.title}**\n`;
+      output += `${entry.code_snippet_and_analysis}\n\n`;
+    }
+
+    if (typedStep.status === "FAILED") {
+      output += `**Sentry hit an error completing this step.\n\n`;
+    } else if (typedStep.status !== "COMPLETED") {
+      output += `**Sentry is still working on this step.**\n\n`;
+    }
+
+    return output;
+  }
+
+  if (step.output_stream) {
+    output += `${step.output_stream}\n`;
+  }
+
+  return output;
+}

@@ -197,19 +197,13 @@ export const SpansSearchResponseSchema = EventsResponseSchema.extend({
 
 export const AutofixRunSchema = z
   .object({
-    run_id: z.number(),
+    run_id: z.union([z.string(), z.number()]),
   })
   .passthrough();
 
 const AutofixRunStepBaseSchema = z.object({
   type: z.string(),
-  key: z.union([
-    z.literal("root_cause_analysis_processing"),
-    z.literal("root_cause_analysis"),
-    z.literal("solution_processing"),
-    z.literal("solution"),
-    z.string(),
-  ]),
+  key: z.string(),
   index: z.number(),
   status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"]),
   title: z.string(),
@@ -279,6 +273,13 @@ export const AutofixRunStepSolutionSchema = AutofixRunStepBaseSchema.extend({
   ),
 }).passthrough();
 
+export const AutofixRunStepSchema = z.union([
+  AutofixRunStepDefaultSchema,
+  AutofixRunStepRootCauseAnalysisSchema,
+  AutofixRunStepSolutionSchema,
+  AutofixRunStepBaseSchema.passthrough(),
+]);
+
 export const AutofixRunStateSchema = z.object({
   autofix: z
     .object({
@@ -295,14 +296,7 @@ export const AutofixRunStateSchema = z.object({
         .passthrough(),
       updated_at: z.string().datetime(),
       status: z.enum(["NEED_MORE_INFORMATION", "PROCESSING"]),
-      steps: z.array(
-        z.union([
-          AutofixRunStepDefaultSchema,
-          AutofixRunStepRootCauseAnalysisSchema,
-          AutofixRunStepSolutionSchema,
-          AutofixRunStepBaseSchema.passthrough(),
-        ]),
-      ),
+      steps: z.array(AutofixRunStepSchema),
     })
     .passthrough(),
 });

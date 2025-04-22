@@ -1,10 +1,7 @@
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
-import { readFileSync } from "node:fs";
 
-function loadFixture(name: string) {
-  return JSON.parse(readFileSync(`./fixtures/${name}.json`, "utf8"));
-}
+import autofixStateFixture from "./fixtures/autofix-state.json";
 
 const TagsPayload = [
   { key: "transaction", name: "Transaction", totalValues: 1080 },
@@ -1210,13 +1207,20 @@ export const restHandlers = [
     HttpResponse.json(TagsPayload),
   ),
   http.get("https://sentry.io/api/0/issues/6507376925/autofix/", () => {
+    return HttpResponse.json(autofixStateFixture);
+  }),
+  http.get("https://sentry.io/api/0/issues/CLOUDFLARE-MCP-41/autofix/", () => {
+    return HttpResponse.json(autofixStateFixture);
+  }),
+  http.post("https://sentry.io/api/0/issues/6507376925/autofix/", () => {
     return HttpResponse.json({
       run_id: 123,
     });
   }),
-  // this mock here isnt ideal as its unrelated to the above
-  http.post("https://sentry.io/api/0/issues/6507376925/autofix/", () => {
-    return HttpResponse.json(loadFixture("autofix-state"));
+  http.post("https://sentry.io/api/0/issues/CLOUDFLARE-MCP-41/autofix/", () => {
+    return HttpResponse.json({
+      run_id: 123,
+    });
   }),
 ];
 

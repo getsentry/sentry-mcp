@@ -12,6 +12,8 @@ export const FIXTURES = {
   organizationSlug: "sentry-mcp-evals",
   teamSlug: "the-goats",
   projectSlug: "cloudflare-mcp",
+  issueId: "CLOUDFLARE-MCP-41",
+  issueUrl: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41/",
   dsn: "https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945",
 };
 
