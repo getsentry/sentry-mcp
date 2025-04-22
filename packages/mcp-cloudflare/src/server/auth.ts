@@ -8,7 +8,7 @@ export const SENTRY_AUTH_URL = "/oauth/authorize/";
 export const SENTRY_TOKEN_URL = "/oauth/token/";
 // https://docs.sentry.io/api/permissions/
 export const SCOPES =
-  "org:read project:read project:write team:read team:write event:read";
+  "org:read project:read project:write team:read team:write event:write";
 
 export default new Hono<{
   Bindings: Env;
