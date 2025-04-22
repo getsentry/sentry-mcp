@@ -1,0 +1,27 @@
+import { describeEval } from "vitest-evals";
+import { Factuality, FIXTURES, TaskRunner } from "./utils";
+
+describeEval("begin-autofix", {
+  data: async () => {
+    return [
+      {
+        input: `Can you root cause this issue in Sentry?\n${FIXTURES.issueUrl}\n\nJust kick off the process and give me the Run ID.`,
+        expected: "The analysis has started\n.Run ID: 123",
+      },
+      {
+        input: `Whats the status on rooting causing this issue in Sentry?\n${FIXTURES.issueUrl}`,
+        expected:
+          'Batched TRPC request incorrectly passed bottle ID 3216 to `bottleById`, instead of 16720, resulting in a "Bottle not found" error.',
+      },
+      {
+        input: `Can you root cause this issue and retrieve the analysis?\n${FIXTURES.issueUrl}`,
+        expected:
+          'Batched TRPC request incorrectly passed bottle ID 3216 to `bottleById`, instead of 16720, resulting in a "Bottle not found" error.',
+      },
+    ];
+  },
+  task: TaskRunner(),
+  scorers: [Factuality()],
+  threshold: 0.6,
+  timeout: 30000,
+});

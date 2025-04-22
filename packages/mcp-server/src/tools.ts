@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import {
+  type AutofixRunStepDefaultSchema,
   type AutofixRunStepRootCauseAnalysisSchema,
   type AutofixRunStepSchema,
   type AutofixRunStepSolutionSchema,
@@ -735,9 +736,9 @@ function getOutputForAutofixStep(step: z.infer<typeof AutofixRunStepSchema>) {
 
     for (const cause of typedStep.causes) {
       output += `${typedStep.description}\n\n`;
-      for (const repro of cause.root_cause_reproduction) {
-        output += `**${repro.title}**\n`;
-        output += `${repro.code_snippet_and_analysis}\n\n`;
+      for (const entry of cause.root_cause_reproduction) {
+        output += `**${entry.title}**\n`;
+        output += `${entry.code_snippet_and_analysis}\n\n`;
       }
     }
     return output;
@@ -760,9 +761,15 @@ function getOutputForAutofixStep(step: z.infer<typeof AutofixRunStepSchema>) {
     return output;
   }
 
-  if (step.output_stream) {
-    output += `${step.output_stream}\n`;
+  const typedStep = step as z.infer<typeof AutofixRunStepDefaultSchema>;
+  for (const entry of typedStep.insights) {
+    output += `**${entry.insight}**\n`;
+    output += `${entry.justification}\n\n`;
   }
+
+  // if (step.output_stream) {
+  //   output += `${step.output_stream}\n`;
+  // }
 
   return output;
 }

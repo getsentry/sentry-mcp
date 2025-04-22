@@ -212,7 +212,7 @@ const AutofixRunStepBaseSchema = z.object({
     z.object({
       data: z.unknown().nullable(),
       message: z.string(),
-      timestamp: z.string().datetime(),
+      timestamp: z.string(),
       type: z.enum(["INFO", "WARNING", "ERROR"]),
     }),
   ),
@@ -294,7 +294,7 @@ export const AutofixRunStateSchema = z.object({
             .passthrough(),
         })
         .passthrough(),
-      updated_at: z.string().datetime(),
+      updated_at: z.string(),
       status: z.enum(["NEED_MORE_INFORMATION", "PROCESSING"]),
       steps: z.array(AutofixRunStepSchema),
     })
