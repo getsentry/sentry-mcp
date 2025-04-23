@@ -1,8 +1,10 @@
 import { z } from "zod";
 
-export const ApiErrorSchema = z.object({
-  detail: z.string(),
-});
+export const ApiErrorSchema = z
+  .object({
+    detail: z.string(),
+  })
+  .passthrough();
 
 export const OrganizationSchema = z.object({
   id: z.union([z.string(), z.number()]),
