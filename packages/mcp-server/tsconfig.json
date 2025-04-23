@@ -1,8 +1,10 @@
 {
   "extends": "@sentry/mcp-server-tsconfig/tsconfig.base.json",
   "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo",
     "outDir": "dist",
     "rootDir": "src"
+
   },
   "include": ["src"],
 }
