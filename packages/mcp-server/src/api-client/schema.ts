@@ -201,17 +201,20 @@ export const AutofixRunSchema = z
   })
   .passthrough();
 
+const AutofixStatusSchema = z.enum([
+  "PENDING",
+  "PROCESSING",
+  "IN_PROGRESS",
+  "NEED_MORE_INFORMATION",
+  "COMPLETED",
+  "FAILED",
+]);
+
 const AutofixRunStepBaseSchema = z.object({
   type: z.string(),
   key: z.string(),
   index: z.number(),
-  status: z.enum([
-    "PENDING",
-    "PROCESSING",
-    "IN_PROGRESS",
-    "COMPLETED",
-    "FAILED",
-  ]),
+  status: AutofixStatusSchema,
   title: z.string(),
   output_stream: z.string().nullable(),
   progress: z.array(
@@ -292,7 +295,7 @@ export const AutofixRunStateSchema = z.object({
       run_id: z.number(),
       request: z.unknown(),
       updated_at: z.string(),
-      status: z.enum(["NEED_MORE_INFORMATION", "PROCESSING"]),
+      status: AutofixStatusSchema,
       steps: z.array(AutofixRunStepSchema),
     })
     .passthrough(),
