@@ -457,16 +457,13 @@ export class SentryApiService {
     instruction?: string;
   }): Promise<AutofixRun> {
     const response = await this.request(
-      `/issues/${issueId}/autofix/`,
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
       {
         method: "POST",
         body: JSON.stringify({
           event_id: eventId,
           instruction,
         }),
-      },
-      {
-        host: "us.sentry.io",
       },
     );
     const body = await response.json();
@@ -482,9 +479,7 @@ export class SentryApiService {
     issueId: string;
   }): Promise<AutofixRunState> {
     const response = await this.request(
-      `/issues/${issueId}/autofix/`,
-      undefined,
-      { host: "us.sentry.io" },
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
     );
     const body = await response.json();
     return AutofixRunStateSchema.parse(body);
