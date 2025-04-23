@@ -57,6 +57,7 @@
     "build": "tsdown",
     "dev": "tsc -w",
     "start": "tsx src/index.ts",
+    "prepare": "npm run build",
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "vitest watch"
