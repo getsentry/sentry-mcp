@@ -1,12 +1,23 @@
 {
   "name": "@sentry/mcp-server",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "type": "module",
   "packageManager": "pnpm@10.3.0",
   "engines": {
     "node": ">=20"
   },
   "license": "FSL-1.1-ALv2",
+  "author": "Sentry",
+  "description": "Sentry MCP Server",
+  "homepage": "https://github.com/getsentry/sentry-mcp",
+  "keywords": ["sentry"],
+  "bugs": {
+    "url": "https://github.com/getsentry/sentry-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:getsentry/sentry-mcp.git"
+  },
   "files": ["./dist/*"],
   "exports": {
     ".": {

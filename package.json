@@ -8,6 +8,17 @@
     "node": ">=20"
   },
   "license": "FSL-1.1-ALv2",
+  "author": "Sentry",
+  "description": "Sentry MCP Server",
+  "homepage": "https://github.com/getsentry/sentry-mcp",
+  "keywords": ["sentry"],
+  "bugs": {
+    "url": "https://github.com/getsentry/sentry-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:getsentry/sentry-mcp.git"
+  },
   "scripts": {
     "dev": "dotenv -e .env -e .env.local -- turbo dev",
     "build": "turbo build after-build",
@@ -31,6 +42,7 @@
     "dotenv-cli": "^8.0.0",
     "lint-staged": "^15.5.1",
     "simple-git-hooks": "^2.12.1",
+    "tsdown": "^0.9.5",
     "tsx": "^4.19.3",
     "turbo": "^2.5.0",
     "typescript": "^5.8.3",
@@ -55,8 +67,5 @@
       "simple-git-hooks",
       "workerd"
     ]
-  },
-  "devDependencies": {
-    "tsdown": "^0.9.5"
   }
 }
