@@ -40,7 +40,7 @@ pnpm build
 Launch the transport:
 
 ```shell
-pnpm start:stdio --access-token=sentry-pat --host=sentry.example.com
+node packages/mcp-server/dist/index.js --access-token=sentry-pat --host=sentry.example.com
 ```
 
 Note: You can also use environment variables:

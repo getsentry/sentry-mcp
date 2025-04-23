@@ -43,7 +43,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsdown",
     "dev": "tsc -w",
     "start": "tsx src/index.ts",
     "test": "vitest",

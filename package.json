@@ -55,5 +55,8 @@
       "simple-git-hooks",
       "workerd"
     ]
+  },
+  "devDependencies": {
+    "tsdown": "^0.9.5"
   }
 }
