@@ -229,15 +229,17 @@ const AutofixRunStepBaseSchema = z.object({
 
 export const AutofixRunStepDefaultSchema = AutofixRunStepBaseSchema.extend({
   type: z.literal("default"),
-  insights: z.array(
-    z.object({
-      change_diff: z.unknown().nullable(),
-      generated_at_memory_index: z.number(),
-      insight: z.string(),
-      justification: z.string(),
-      type: z.literal("insight"),
-    }),
-  ),
+  insights: z
+    .array(
+      z.object({
+        change_diff: z.unknown().nullable(),
+        generated_at_memory_index: z.number(),
+        insight: z.string(),
+        justification: z.string(),
+        type: z.literal("insight"),
+      }),
+    )
+    .nullable(),
 }).passthrough();
 
 export const AutofixRunStepRootCauseAnalysisSchema =

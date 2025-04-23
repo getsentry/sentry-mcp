@@ -764,14 +764,14 @@ function getOutputForAutofixStep(step: z.infer<typeof AutofixRunStepSchema>) {
   }
 
   const typedStep = step as z.infer<typeof AutofixRunStepDefaultSchema>;
-  for (const entry of typedStep.insights) {
-    output += `**${entry.insight}**\n`;
-    output += `${entry.justification}\n\n`;
+  if (typedStep.insights && typedStep.insights.length > 0) {
+    for (const entry of typedStep.insights) {
+      output += `**${entry.insight}**\n`;
+      output += `${entry.justification}\n\n`;
+    }
+  } else if (step.output_stream) {
+    output += `${step.output_stream}\n`;
   }
-
-  // if (step.output_stream) {
-  //   output += `${step.output_stream}\n`;
-  // }
 
   return output;
 }
