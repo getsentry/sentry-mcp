@@ -7,9 +7,6 @@
     "node": ">=20"
   },
   "license": "FSL-1.1-ALv2",
-  "bin": {
-    "sentry-mcp": "./dist/bin.js"
-  },
   "files": ["./dist/*"],
   "exports": {
     ".": {
@@ -48,7 +45,7 @@
   "scripts": {
     "build": "tsc -b",
     "dev": "tsc -w",
-    "start": "tsx src/bin.ts",
+    "start": "tsx src/index.ts",
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "vitest watch"
