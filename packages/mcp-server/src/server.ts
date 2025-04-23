@@ -9,14 +9,19 @@ import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
 
+function isApiError(error: unknown) {
+  return error instanceof ApiError || Object.hasOwn(error as any, "status");
+}
+
 async function logAndFormatError(error: unknown) {
   const eventId = logError(error);
 
-  if (error instanceof ApiError) {
+  if (isApiError(error)) {
+    const typedError = error as ApiError;
     return [
       "**Error**",
-      `There was an ${error.status} error with the your request to the Sentry API.`,
-      `${error.message}`,
+      `There was a ${typedError.status} error with the your request to the Sentry API.`,
+      `${typedError.message}`,
       "If you believe this was a genuine error, please report the following to the user for the Sentry team:",
       `**Event ID**: ${eventId}`,
     ].join("\n\n");
