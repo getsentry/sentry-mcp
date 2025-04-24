@@ -6,4 +6,4 @@ targets:
     tagOnly: false
   - name: npm
     id: "@sentry/mcp-server"
-    includeNames: /^mcp-server-\d.*\.tgz$/
+    includeNames: /^sentry-mcp-server-\d.*\.tgz$/
