@@ -7,21 +7,25 @@ import { wrapMcpServerWithSentry } from "@sentry/core";
 let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
 let host: string | undefined = process.env.SENTRY_HOST;
 
+const command = "@sentry/mcp-server";
+
 for (const arg of process.argv.slice(2)) {
   if (arg.startsWith("--access-token=")) {
     accessToken = arg.split("=")[1];
   } else if (arg.startsWith("--host=")) {
     host = arg.split("=")[1];
   } else {
-    console.error("Invalid argument:", arg);
-    console.error("Usage: start-stdio --access-token=<token> [--host=<host>]");
+    console.error("Error: Invalid argument:", arg);
+    console.error(`Usage: ${command} --access-token=<token> [--host=<host>]`);
     process.exit(1);
   }
 }
 
 if (!accessToken) {
-  console.error("SENTRY_AUTH_TOKEN is not set");
-  console.error("Usage: start-stdio --access-token=<token> [--host=<host>]");
+  console.error(
+    "Error: No access token was provided. Pass one with `--access-token` or via `SENTRY_AUTH_TOKEN`.",
+  );
+  console.error(`Usage: ${command} --access-token=<token> [--host=<host>]`);
   process.exit(1);
 }
 
