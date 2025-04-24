@@ -33,7 +33,7 @@ event:read
 Launch the transport:
 
 ```shell
-npx @sentry/mcp-server --access-token=sentry-pat --host=sentry.example.com
+npx @sentry/mcp-server@latest --access-token=sentry-pat --host=sentry.example.com
 ```
 
 Note: You can also use environment variables:
