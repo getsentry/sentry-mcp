@@ -331,7 +331,7 @@ export const TOOL_DEFINITIONS = [
   {
     name: "create_dsn" as const,
     description: [
-      "Create a new DSN for a specific project.",
+      "Create a new Sentry DSN for a specific project.",
       "",
       "Use this tool when you need to:",
       "- Create a new DSN for a specific project",
@@ -359,7 +359,7 @@ export const TOOL_DEFINITIONS = [
   {
     name: "list_dsns" as const,
     description: [
-      "List all DSNs for a specific project.",
+      "List all Sentry DSNs for a specific project.",
       "",
       "Use this tool when you need to:",
       "- Retrieve a SENTRY_DSN for a specific project",
