@@ -18,6 +18,9 @@
     "type": "git",
     "url": "git@github.com:getsentry/sentry-mcp.git"
   },
+  "bin": {
+    "sentry-mcp": "./dist/index.js"
+  },
   "files": ["./dist/*"],
   "exports": {
     ".": {
