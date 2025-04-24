@@ -19,7 +19,7 @@ If you're looking to contribute, learn how it works, or to run this for self-hos
 
 While this repository is focused on acting as an MCP service, we also support a `stdio` transport. This is still a work in progress, but is the easiest way to adapt run the MCP against a self-hosted Sentry install.
 
-To utilize the `stdout` transport, you'll need to create an Personal API Token (PAT) in Sentry with the necessary scopes. As of writing this is:
+To utilize the `stdoio` transport, you'll need to create an Personal API Token (PAT) in Sentry with the necessary scopes. As of writing this is:
 
 ```
 org:read
@@ -30,17 +30,10 @@ team:write
 event:read
 ```
 
-Clone the repository and set it up as you normally would:
-
-```shell
-pnpm install
-pnpm build
-```
-
 Launch the transport:
 
 ```shell
-node packages/mcp-server/dist/index.js --access-token=sentry-pat --host=sentry.example.com
+npx @sentry/mcp-server --access-token=sentry-pat --host=sentry.example.com
 ```
 
 Note: You can also use environment variables:
