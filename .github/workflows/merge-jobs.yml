@@ -52,8 +52,6 @@ jobs:
       - name: Package mcp-server
         working-directory: packages/mcp-server
         run: |
-          pnpm install
-          pnpm build
           pnpm pack --pack-destination dist
 
       - name: Archive artifacts
@@ -61,5 +59,4 @@ jobs:
         with:
           name: ${{ github.sha }}
           path: |
-            ${{ github.workspace }}/dist/**
-            ${{ github.workspace }}/**/dist/*.tgz
+            ${{ github.workspace }}/packages/mcp-server/dist/*.tgz
