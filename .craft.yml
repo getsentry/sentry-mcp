@@ -2,8 +2,6 @@ changelogPolicy: none
 preReleaseCommand: bash bin/bump-version.sh
 targets:
   - name: github
-    previewReleases: true
-    tagOnly: false
   - name: npm
     id: "@sentry/mcp-server"
     includeNames: /^sentry-mcp-server-\d.*\.tgz$/
