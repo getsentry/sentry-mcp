@@ -1,10 +1,12 @@
 {
   "name": "@sentry/mcp-cloudflare",
-  "version": "0.0.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": ["./dist/*"],
+  "files": [
+    "./dist/*"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.ts",

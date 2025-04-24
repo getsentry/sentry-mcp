@@ -1,6 +1,9 @@
 {
   "name": "@sentry/mcp-server-tsconfig",
-  "version": "0.0.0",
+  "version": "0.2.1",
   "private": true,
-  "files": ["tsconfig.base.json", "tsconfig.vite.json"]
+  "files": [
+    "tsconfig.base.json",
+    "tsconfig.vite.json"
+  ]
 }
