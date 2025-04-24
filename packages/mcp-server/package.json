@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=20"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "FSL-1.1-ALv2",
   "author": "Sentry",
   "description": "Sentry MCP Server",
