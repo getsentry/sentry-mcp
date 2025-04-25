@@ -40,14 +40,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build
+        run: pnpm build
+
       - name: Run linter
         run: pnpm lint
 
       - name: Run tests
         run: pnpm test:ci
-
-      - name: Build
-        run: pnpm build
 
       - name: Package mcp-server
         working-directory: packages/mcp-server
