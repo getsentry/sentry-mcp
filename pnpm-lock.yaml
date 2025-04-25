@@ -53,9 +53,6 @@ importers:
       '@cloudflare/workers-oauth-provider':
         specifier: ^0.0.2
         version: 0.0.2
-      '@heroicons/react':
-        specifier: ^2.2.0
-        version: 2.2.0(react@19.1.0)
       '@modelcontextprotocol/sdk':
         specifier: ^1.10.2
         version: 1.10.2
@@ -654,11 +651,6 @@ packages:
   '@hattip/walk@0.0.49':
     resolution: {integrity: sha512-AgJgKLooZyQnzMfoFg5Mo/aHM+HGBC9ExpXIjNqGimYTRgNbL/K7X5EM1kR2JY90BNKk9lo6Usq1T/nWFdT7TQ==}
     hasBin: true
-
-  '@heroicons/react@2.2.0':
-    resolution: {integrity: sha512-LMcepvRaS9LYHJGsF0zzmgKCUim/X3N/DQKc4jepAXJ7l8QxJ1PmxJzqplF2Z3FE4PqBAIGyJAQ/w4B5dsqbtQ==}
-    peerDependencies:
-      react: '>= 16 || ^19.0.0-rc'
 
   '@img/sharp-darwin-arm64@0.33.5':
     resolution: {integrity: sha512-UT4p+iz/2H4twwAoLCqfA9UH5pI6DggwKEGuaPy7nCVQ8ZsiY5PIcrRvD1DzuY3qYL07NtIQcWnBSY/heikIFQ==}
@@ -4058,10 +4050,6 @@ snapshots:
       '@hattip/headers': 0.0.49
       cac: 6.7.14
       mime-types: 2.1.35
-
-  '@heroicons/react@2.2.0(react@19.1.0)':
-    dependencies:
-      react: 19.1.0
 
   '@img/sharp-darwin-arm64@0.33.5':
     optionalDependencies:
