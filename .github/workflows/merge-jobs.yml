@@ -62,3 +62,10 @@ jobs:
           name: ${{ github.sha }}
           path: |
             ${{ github.workspace }}/packages/mcp-server/dist/*.tgz
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: ${{ !cancelled() }}
+        with:
+          report_paths: "**/*.junit.xml"
+          comment: false
