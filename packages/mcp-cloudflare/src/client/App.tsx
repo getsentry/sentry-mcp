@@ -11,7 +11,7 @@ import {
 import Note from "./components/ui/note";
 import { ChevronRight } from "lucide-react";
 import CodeSnippet from "./components/ui/code-snippet";
-import { Header } from "./components/header";
+import { Header } from "./components/ui/header";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 

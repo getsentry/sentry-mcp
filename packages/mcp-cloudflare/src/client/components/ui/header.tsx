@@ -10,9 +10,6 @@ export const Header: React.FC = () => {
           <SentryIcon className="h-8 w-8 text-violet-400" />
           <div className="flex items-baseline gap-2">
             <h1 className="text-2xl font-bold whitespace-nowrap">Sentry MCP</h1>
-            <span className="text-sm text-gray-400">
-              v{import.meta.env.VITE_APP_VERSION}
-            </span>
           </div>
         </div>
         <a
