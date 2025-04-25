@@ -45,8 +45,8 @@ importers:
         specifier: ^3.1.2
         version: 3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1)
       vitest-evals:
-        specifier: ^0.1.5
-        version: 0.1.5(vitest@3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1))
+        specifier: ^0.2.0
+        version: 0.2.0(tinyrainbow@2.0.0)(vitest@3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1))
 
   packages/mcp-cloudflare:
     dependencies:
@@ -200,8 +200,8 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
       vitest-evals:
-        specifier: ^0.1.5
-        version: 0.1.5(vitest@3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1))
+        specifier: ^0.2.0
+        version: 0.2.0(tinyrainbow@2.0.0)(vitest@3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1))
       zod:
         specifier: ^3.24.3
         version: 3.24.3
@@ -3491,9 +3491,10 @@ packages:
       yaml:
         optional: true
 
-  vitest-evals@0.1.5:
-    resolution: {integrity: sha512-D5afgH60nkENzOJTpbvPE2RPtlVPx7E5YGwDuWCZKkv0CIhxjSwIM0jMJNDk3VLFg4rsetglgN/l3Tgoh+h2ng==}
+  vitest-evals@0.2.0:
+    resolution: {integrity: sha512-PxZDwkmzXn9a6fS2hqXRYbgLFaGDUdjDmwxBR5EYA0FcYNo+IHsd+Eynkf3yWIdAh2wL6ohpat78jHy6qTG3sQ==}
     peerDependencies:
+      tinyrainbow: '*'
       vitest: '*'
 
   vitest@3.1.2:
@@ -6745,8 +6746,9 @@ snapshots:
       tsx: 4.19.3
       yaml: 2.7.1
 
-  vitest-evals@0.1.5(vitest@3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1)):
+  vitest-evals@0.2.0(tinyrainbow@2.0.0)(vitest@3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1)):
     dependencies:
+      tinyrainbow: 2.0.0
       vitest: 3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1)
 
   vitest@3.1.2(@types/node@22.14.1)(jiti@2.4.2)(lightningcss@1.29.2)(msw@2.7.5(@types/node@22.14.1)(typescript@5.8.3))(tsx@4.19.3)(yaml@2.7.1):
