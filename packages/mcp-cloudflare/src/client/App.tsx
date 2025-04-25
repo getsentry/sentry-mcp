@@ -61,7 +61,7 @@ export default function App() {
   );
 
   return (
-    <div className="sm:p-8 p-4 min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white text-lg">
+    <div className="sm:p-8 p-4 min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white text-lg flex flex-col items-center">
       <header className="mb-6">
         <h1 className="text-4xl font-bold">Sentry MCP</h1>
       </header>
