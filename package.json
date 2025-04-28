@@ -24,7 +24,7 @@
     "build": "turbo build after-build",
     "deploy": "turbo deploy",
     "eval": "dotenv -e .env -e .env.local -- turbo eval",
-    "eval:ci": "CI=true pnpm --stream -r run eval:ci",
+    "eval:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run eval:ci",
     "format": "biome format --write",
     "lint": "biome lint",
     "lint:fix": "biome lint --fix",
@@ -32,7 +32,7 @@
     "prepare": "simple-git-hooks",
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
     "test": "dotenv -e .env -e .env.local -- turbo test",
-    "test:ci": "CI=true pnpm --stream -r run test:ci"
+    "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci"
   },
   "dependencies": {
     "@biomejs/biome": "^1.9.4",
