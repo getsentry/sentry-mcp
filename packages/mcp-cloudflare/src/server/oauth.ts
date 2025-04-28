@@ -1,5 +1,5 @@
 import { z } from "zod";
-
+import { logError } from "@sentry/mcp-server/logging";
 export const TokenResponseSchema = z.object({
   access_token: z.string(),
   refresh_token: z.string(),
@@ -70,7 +70,17 @@ export async function exchangeCodeForAccessToken({
   client_id: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!code) {
-    return [null, new Response("Missing code", { status: 400 })];
+    logError("[oauth] Missing code in token exchange", {
+      oauth: {
+        client_id,
+      },
+    });
+    return [
+      null,
+      new Response("Invalid request: missing authorization code", {
+        status: 400,
+      }),
+    ];
   }
 
   const resp = await fetch(upstream_url, {
@@ -86,7 +96,14 @@ export async function exchangeCodeForAccessToken({
     }).toString(),
   });
   if (!resp.ok) {
-    console.warn(await resp.text());
+    logError(
+      `[oauth] Failed to exchange code for access token: ${await resp.text()}`,
+      {
+        oauth: {
+          client_id,
+        },
+      },
+    );
     return [
       null,
       new Response(
@@ -103,7 +120,16 @@ export async function exchangeCodeForAccessToken({
 
     return [output, null];
   } catch (e) {
-    console.error("Failed to parse token response", e);
+    logError(
+      new Error("Failed to parse token response", {
+        cause: e,
+      }),
+      {
+        oauth: {
+          client_id,
+        },
+      },
+    );
     return [
       null,
       new Response(
