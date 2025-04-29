@@ -25,7 +25,6 @@ export default withSentry(
     dsn: env.SENTRY_DSN,
     tracesSampleRate: 1,
     sendDefaultPii: true,
-    environment: env.NODE_ENV === "production" ? "production" : "development",
   }),
   oAuthProvider,
 ) satisfies ExportedHandler<Env>;
