@@ -62,14 +62,25 @@ export default function App() {
             <section className="space-y-4 mb-6">
               <Heading>
                 <div className="flex-1">Getting Started</div>
-                <Button
-                  className="self-justify-end cursor-pointer"
-                  onClick={() => setStdio(!stdio)}
-                >
-                  {stdio
-                    ? "Show Remote Configuration"
-                    : "Show Stdio Configuration"}
-                </Button>
+                <div className="flex self-justify-end items-center gap-1 text-xs text-neutral-600">
+                  <Button
+                    variant="link"
+                    size="xs"
+                    onClick={() => setStdio(false)}
+                    active={!stdio}
+                  >
+                    Remote
+                  </Button>
+                  <span>/</span>
+                  <Button
+                    variant="link"
+                    size="xs"
+                    onClick={() => setStdio(true)}
+                    active={stdio}
+                  >
+                    Stdio
+                  </Button>
+                </div>
               </Heading>
 
               {stdio ? <StdioSetup /> : <RemoteSetup />}
