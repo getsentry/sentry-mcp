@@ -162,10 +162,11 @@ export const EventSchema = z.object({
 
 export const EventsResponseSchema = z.object({
   data: z.array(z.unknown()),
-  meta: z.object({
-    fields: z.record(z.string(), z.string()),
-    units: z.record(z.string(), z.string().nullable()),
-  }),
+  meta: z
+    .object({
+      fields: z.record(z.string(), z.string()),
+    })
+    .passthrough(),
 });
 
 // https://us.sentry.io/api/0/organizations/sentry/events/?dataset=errors&field=issue&field=title&field=project&field=timestamp&field=trace&per_page=5&query=event.type%3Aerror&referrer=sentry-mcp&sort=-timestamp&statsPeriod=1w
