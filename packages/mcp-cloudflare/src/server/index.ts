@@ -14,9 +14,9 @@ const oAuthProvider = new OAuthProvider({
   apiHandler: SentryMCP.mount("/sse"),
   // @ts-ignore
   defaultHandler: app,
-  authorizeEndpoint: "/authorize",
-  tokenEndpoint: "/token",
-  clientRegistrationEndpoint: "/register",
+  authorizeEndpoint: "/oauth/authorize",
+  tokenEndpoint: "/oauth/token",
+  clientRegistrationEndpoint: "/oauth/register",
   scopesSupported: SCOPES.split(" "),
 });
 

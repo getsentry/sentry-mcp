@@ -23,7 +23,7 @@ export default new Hono<{
    * parameters so the user can authenticate and grant permissions.
    */
   // TODO: this needs to deauthorize if props are not correct (e.g. wrong org slug)
-  .get("/authorize", async (c) => {
+  .get("/oauth/authorize", async (c) => {
     const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
     if (!oauthReqInfo.clientId) {
       return c.text("Invalid request", 400);
@@ -37,7 +37,7 @@ export default new Hono<{
         ).href,
         scope: SCOPES,
         client_id: c.env.SENTRY_CLIENT_ID,
-        redirect_uri: new URL("/callback", c.req.url).href,
+        redirect_uri: new URL("/oauth/callback", c.req.url).href,
         state: btoa(JSON.stringify(oauthReqInfo)),
       }),
     );
@@ -51,7 +51,7 @@ export default new Hono<{
    * user metadata & the auth token as part of the 'props' on the token passed
    * down to the client. It ends by redirecting the client back to _its_ callback URL
    */
-  .get("/callback", async (c) => {
+  .get("/oauth/callback", async (c) => {
     // Get the oathReqInfo out of KV
     const oauthReqInfo = JSON.parse(
       atob(c.req.query("state") as string),
