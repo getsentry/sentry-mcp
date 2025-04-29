@@ -61,9 +61,14 @@
     "./types": {
       "types": "./dist/types.ts",
       "default": "./dist/types.js"
+    },
+    "./version": {
+      "types": "./dist/version.ts",
+      "default": "./dist/version.js"
     }
   },
   "scripts": {
+    "prebuild": "node -p \"'export const LIB_VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
     "build": "tsdown",
     "dev": "tsc -w",
     "start": "tsx src/index.ts",

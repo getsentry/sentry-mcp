@@ -4,17 +4,21 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "./transports/stdio";
 import { wrapMcpServerWithSentry } from "@sentry/core";
 import * as Sentry from "@sentry/node";
-
+import { LIB_VERSION } from "./version";
 let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
 let host: string | undefined = process.env.SENTRY_HOST;
 let sentryDsn: string | undefined = process.env.SENTRY_DSN;
 
-const command = "@sentry/mcp-server";
+const packageName = "@sentry/mcp-server";
 function getUsage() {
-  return `Usage: ${command} --access-token=<token> [--host=<host>] [--sentry-dsn=<dsn>]`;
+  return `Usage: ${packageName} --access-token=<token> [--host=<host>] [--sentry-dsn=<dsn>]`;
 }
 
 for (const arg of process.argv.slice(2)) {
+  if (arg === "--version" || arg === "-v") {
+    console.log(`${packageName} ${LIB_VERSION}`);
+    process.exit(0);
+  }
   if (arg.startsWith("--access-token=")) {
     accessToken = arg.split("=")[1];
   } else if (arg.startsWith("--host=")) {
@@ -43,7 +47,7 @@ Sentry.init({
 
 const server = new McpServer({
   name: "Sentry MCP",
-  version: "0.1.0",
+  version: LIB_VERSION,
 });
 
 const instrumentedServer = wrapMcpServerWithSentry(server);

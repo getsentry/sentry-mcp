@@ -2,6 +2,7 @@ import type React from "react";
 import { SentryIcon } from "./icons/sentry";
 import { Github } from "lucide-react";
 import { Button } from "./button";
+import { LIB_VERSION } from "@sentry/mcp-server/version";
 
 export const Header: React.FC = () => {
   return (
@@ -11,6 +12,7 @@ export const Header: React.FC = () => {
           <SentryIcon className="h-8 w-8 text-violet-400" />
           <div className="flex items-baseline gap-2">
             <h1 className="text-2xl font-bold whitespace-nowrap">Sentry MCP</h1>
+            <span className="text-sm text-muted-foreground">{LIB_VERSION}</span>
           </div>
         </div>
         <Button variant="outline" asChild>

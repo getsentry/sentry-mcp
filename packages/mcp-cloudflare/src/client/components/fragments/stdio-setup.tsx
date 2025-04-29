@@ -6,7 +6,7 @@ import SetupGuide from "./setup-guide";
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
 export default function RemoteSetup() {
-  const mcpStdioSnippet = `npx @sentry/mcp-server`;
+  const mcpStdioSnippet = `npx @sentry/mcp-server@latest`;
 
   return (
     <>
@@ -40,7 +40,7 @@ export default function RemoteSetup() {
                     mcpServers: {
                       sentry: {
                         command: "npx",
-                        args: ["@sentry/mcp-server"],
+                        args: ["@sentry/mcp-server@latest"],
                         env: {
                           SENTRY_AUTH_TOKEN: "sentry-pat",
                           SENTRY_HOST: "sentry.io",
@@ -98,7 +98,7 @@ export default function RemoteSetup() {
                     [mcpServerName]: {
                       type: "stdio",
                       command: "npx",
-                      args: ["@sentry/mcp-server"],
+                      args: ["@sentry/mcp-server@latest"],
                       env: {
                         SENTRY_AUTH_TOKEN: "sentry-pat",
                         SENTRY_HOST: "sentry.io",
@@ -133,7 +133,7 @@ export default function RemoteSetup() {
                     context_servers: {
                       [mcpServerName]: {
                         command: "npx",
-                        args: ["@sentry/mcp-server"],
+                        args: ["@sentry/mcp-server@latest"],
                         env: {
                           SENTRY_AUTH_TOKEN: "sentry-pat",
                           SENTRY_HOST: "sentry.io",
