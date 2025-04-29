@@ -1,5 +1,5 @@
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
-import type SentryMCP from "./mcp-transport";
+import type SentryMCP from "./lib/mcp-transport";
 import type { ServerContext } from "@sentry/mcp-server/types";
 
 export type WorkerProps = ServerContext & {

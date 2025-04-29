@@ -1,7 +1,7 @@
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
-import type { Env, WorkerProps } from "./types.js";
+import type { Env, WorkerProps } from "../types.js";
 import { flush } from "@sentry/cloudflare";
 import { wrapMcpServerWithSentry } from "@sentry/core";
 

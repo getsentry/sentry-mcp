@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import authHandler from "./auth";
+import authHandler from "./routes/oauth";
 import type { Env } from "./types";
 
 export default new Hono<{

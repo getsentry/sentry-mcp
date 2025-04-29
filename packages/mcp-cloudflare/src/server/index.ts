@@ -1,7 +1,7 @@
 import { withSentry } from "@sentry/cloudflare";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
-import SentryMCP from "./mcp-transport";
-import { SCOPES } from "./auth";
+import SentryMCP from "./lib/mcp-transport";
+import { SCOPES } from "./routes/oauth";
 import app from "./app";
 import type { Env } from "./types";
 
