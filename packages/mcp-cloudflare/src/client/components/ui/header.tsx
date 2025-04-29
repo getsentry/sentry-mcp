@@ -1,6 +1,7 @@
 import type React from "react";
 import { SentryIcon } from "./icons/sentry";
 import { Github } from "lucide-react";
+import { Button } from "./button";
 
 export const Header: React.FC = () => {
   return (
@@ -12,15 +13,16 @@ export const Header: React.FC = () => {
             <h1 className="text-2xl font-bold whitespace-nowrap">Sentry MCP</h1>
           </div>
         </div>
-        <a
-          href="https://github.com/getsentry/sentry-mcp"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-800 rounded-md hover:bg-gray-700 transition-colors flex-shrink-0"
-        >
-          <Github className="h-5 w-5" />
-          <span>GitHub</span>
-        </a>
+        <Button variant="outline" asChild>
+          <a
+            href="https://github.com/getsentry/sentry-mcp"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Github className="h-5 w-5" />
+            <span>GitHub</span>
+          </a>
+        </Button>
       </div>
     </header>
   );

@@ -12,14 +12,11 @@ export function Heading({
   const Tag = as || "h2";
   return (
     <Tag
-      className={cn(
-        "text-2xl font-bold mb-6 text-white inline-flex flex-col gap-2 items-center",
-        className,
-      )}
+      className={cn("text-2xl font-bold mb-6 text-white", className)}
       {...props}
     >
-      {children}
-      <span className="block h-[2px] bg-gradient-to-b from-violet-200 to-violet-500 w-full" />
+      <div className="flex flex-row gap-2">{children}</div>
+      <div className="h-[2px] mt-1 bg-violet-300 w-full" />
     </Tag>
   );
 }
