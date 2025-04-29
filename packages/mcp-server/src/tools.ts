@@ -197,7 +197,7 @@ export const TOOL_HANDLERS = {
           );
         }
         if (release.lastCommit) {
-          releaseInfo.push(`### Last Commit`, "");
+          releaseInfo.push("", `### Last Commit`, "");
           releaseInfo.push(`**Commit ID**: ${release.lastCommit.id}`);
           releaseInfo.push(`**Commit Message**: ${release.lastCommit.message}`);
           releaseInfo.push(
@@ -209,7 +209,7 @@ export const TOOL_HANDLERS = {
         }
 
         if (release.lastDeploy) {
-          releaseInfo.push(`### Last Deploy`, "");
+          releaseInfo.push("", `### Last Deploy`, "");
           releaseInfo.push(`**Deploy ID**: ${release.lastDeploy.id}`);
           releaseInfo.push(
             `**Environment**: ${release.lastDeploy.environment}`,
