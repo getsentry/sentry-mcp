@@ -45,10 +45,10 @@ export default function App() {
                 <h3>What is a Model Context Provider?</h3>
                 <p>
                   Simply put, its a way to plug Sentry's API into an LLM,
-                  letting you ask questions about your data in the a local
-                  context to the LLM itself. This lets you take an agent that
-                  you already use, like Cursor, and pull in context from Sentry
-                  to help with tasks like debugging, code generation, and more.
+                  letting you ask questions about your data in context of the
+                  LLM itself. This lets you take an agent that you already use,
+                  like Cursor, and pull in additional information from Sentry to
+                  help with tasks like debugging, code generation, and more.
                 </p>
                 <img src={flowImage} alt="Flow" className="w-full mb-6" />
                 <p>
