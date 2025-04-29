@@ -7,7 +7,8 @@ import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "./version";
 let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
 let host: string | undefined = process.env.SENTRY_HOST;
-let sentryDsn: string | undefined = process.env.SENTRY_DSN;
+let sentryDsn: string | undefined =
+  process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
 
 const packageName = "@sentry/mcp-server";
 function getUsage() {
