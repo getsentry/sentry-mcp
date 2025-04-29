@@ -17,7 +17,9 @@ export default function RemoteSetup() {
         </Link>
         .
       </Paragraph>
-      <CodeSnippet snippet={mcpStdioSnippet} />
+      <CodeSnippet
+        snippet={`${mcpStdioSnippet} --access-token=sentry-pat --host=sentry.io`}
+      />
       <Paragraph>Use the following setup guides to get started.</Paragraph>
       <Accordion type="single" collapsible className="w-full">
         <SetupGuide id="cursor" title="Cursor">
