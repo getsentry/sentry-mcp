@@ -12,7 +12,7 @@ import Note from "./components/ui/note";
 import { ChevronRight } from "lucide-react";
 import CodeSnippet from "./components/ui/code-snippet";
 import { Header } from "./components/ui/header";
-
+import flowImage from "./flow.png";
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
 function SetupGuide({
@@ -75,33 +75,29 @@ export default function App() {
                 <a href="https://docs.sentry.io/api/">Sentry's API</a>.
               </Paragraph>
               <Paragraph>
-                What is a Model Context Provider? Simply put, its a way to plug
-                Sentry's API into an LLM, letting you ask questions about your
-                data in the a local context to the LLM itself. This lets you
-                take an agent that you already use, like Cursor, and pull in
-                context from Sentry to help with tasks like debugging, code
-                generation, and more.
+                <strong>What is a Model Context Provider?</strong> Simply put,
+                its a way to plug Sentry's API into an LLM, letting you ask
+                questions about your data in the a local context to the LLM
+                itself. This lets you take an agent that you already use, like
+                Cursor, and pull in context from Sentry to help with tasks like
+                debugging, code generation, and more.
               </Paragraph>
-              <Paragraph>
-                For an example, this showcases using Cursor to help with
-                debugging an issue using Sentry's Seer functionality:
-              </Paragraph>
-              <iframe
-                width="560"
-                height="315"
-                src="https://www.youtube.com/embed/n4v0fR6mVTU?si=R-TtWXbVugTTZfOH"
-                title="YouTube video player"
-                className="border border-gray-800 mb-6"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-              <Note>
-                <strong>Note:</strong> While this service is maintained by
-                Sentry, it is very much still a proof-of-concept as the protocol
-                is still in development (as is our own thinking around its
-                usage).
-              </Note>
+              <img src={flowImage} alt="Flow" className="w-full mb-6" />
+              <Paragraph>Interested in learning more?</Paragraph>
+              <div className="prose prose-invert">
+                <ul>
+                  <li>
+                    <Link href="https://www.youtube.com/watch?v=n4v0fR6mVTU">
+                      Using Sentry's Seer via MCP
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="https://www.youtube.com/watch?v=m3IE6JygT1o">
+                      Building Sentry's MCP on Cloudflare
+                    </Link>
+                  </li>
+                </ul>
+              </div>
             </section>
 
             <section className="space-y-4 mb-6">

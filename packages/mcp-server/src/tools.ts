@@ -108,7 +108,7 @@ export const TOOL_HANDLERS = {
       organizationSlug,
       projectSlug,
       query,
-      sortBy: sortByMap[sortBy as keyof typeof sortByMap],
+      sortBy: sortBy ? sortByMap[sortBy as keyof typeof sortByMap] : undefined,
     });
 
     let output = `# Issues in **${organizationSlug}${projectSlug ? `/${projectSlug}` : ""}**\n\n`;

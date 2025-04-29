@@ -30,6 +30,7 @@ jspm_packages/
 dist
 .turbo/
 *.tsbuildinfo
+.DS_Store
 
 # dotenv environment variable files
 
