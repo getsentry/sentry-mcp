@@ -27,23 +27,39 @@ export default function App() {
         <main className="flex gap-4 max-w-3xl">
           <article>
             <div id="top" />
-            <section className="space-y-4 mb-6">
-              <Paragraph>
-                This service provides a Model Context Provider (MCP) for
-                interacting with{" "}
-                <a href="https://docs.sentry.io/api/">Sentry's API</a>.
-              </Paragraph>
-              <Paragraph>
-                <strong>What is a Model Context Provider?</strong> Simply put,
-                its a way to plug Sentry's API into an LLM, letting you ask
-                questions about your data in the a local context to the LLM
-                itself. This lets you take an agent that you already use, like
-                Cursor, and pull in context from Sentry to help with tasks like
-                debugging, code generation, and more.
-              </Paragraph>
-              <img src={flowImage} alt="Flow" className="w-full mb-6" />
-              <Paragraph>Interested in learning more?</Paragraph>
-              <div className="prose prose-invert">
+            <section className="space-y-4 mb-10">
+              <div className="prose prose-a:text-violet-300 prose-invert max-w-none">
+                <p>
+                  This service provides a Model Context Provider (MCP) for
+                  interacting with{" "}
+                  <a href="https://docs.sentry.io/api/">Sentry's API</a>.
+                </p>
+                <blockquote>
+                  <p>
+                    MCP is pretty sweet. Cloudflare's support of MCP is pretty
+                    sweet. Sentry is pretty sweet. So we made an MCP for Sentry
+                    on top of Cloudflare.
+                  </p>
+                  <cite>David Cramer, Sentry</cite>
+                </blockquote>
+                <h3>What is a Model Context Provider?</h3>
+                <p>
+                  Simply put, its a way to plug Sentry's API into an LLM,
+                  letting you ask questions about your data in the a local
+                  context to the LLM itself. This lets you take an agent that
+                  you already use, like Cursor, and pull in context from Sentry
+                  to help with tasks like debugging, code generation, and more.
+                </p>
+                <img src={flowImage} alt="Flow" className="w-full mb-6" />
+                <p>
+                  This project is still in its infancy as development of the MCP
+                  specification is ongoing. If you find any problems, or have an
+                  idea for how we can improve it, please let us know on{" "}
+                  <Link href="https://github.com/getsentry/sentry-mcp/issues">
+                    GitHub
+                  </Link>
+                </p>
+                <h3>Interested in learning more?</h3>
                 <ul>
                   <li>
                     <Link href="https://www.youtube.com/watch?v=n4v0fR6mVTU">
@@ -59,7 +75,7 @@ export default function App() {
               </div>
             </section>
 
-            <section className="space-y-4 mb-6">
+            <section className="space-y-4 mb-10">
               <Heading>
                 <div className="flex-1">Getting Started</div>
                 <div className="flex self-justify-end items-center gap-1 text-xs text-neutral-600">
@@ -86,7 +102,7 @@ export default function App() {
               {stdio ? <StdioSetup /> : <RemoteSetup />}
             </section>
 
-            <section className="space-y-4 mb-6" id="workflows">
+            <section className="space-y-4 mb-10" id="workflows">
               <Heading>Workflows</Heading>
               <Paragraph>
                 Here's a few sample workflows (prompts) that we've tried to
@@ -112,7 +128,7 @@ export default function App() {
               </ul>
             </section>
 
-            <section id="tools" className="space-y-4 mb-6">
+            <section id="tools" className="space-y-4 mb-10">
               <Heading>Available Tools</Heading>
               <Paragraph>
                 Tools are pre-configured functions that can be used to help with
@@ -162,7 +178,7 @@ export default function App() {
               </Accordion>
             </section>
 
-            <section id="prompts" className="space-y-4 mb-6">
+            <section id="prompts" className="space-y-4 mb-10">
               <Heading>Available Prompts</Heading>
               <Paragraph>
                 Prompts are pre-configured workflows that can be used to help
@@ -188,7 +204,7 @@ export default function App() {
               </Accordion>
             </section>
 
-            <section id="resources" className="space-y-4 mb-6">
+            <section id="resources" className="space-y-4 mb-10">
               <Heading>Available Resources</Heading>
               <Paragraph>
                 Generally speaking, resources that are made available can also
@@ -218,7 +234,7 @@ export default function App() {
               </Accordion>
             </section>
 
-            <section id="more-information" className="space-y-4 mb-6">
+            <section id="more-information" className="space-y-4 mb-10">
               <Heading>More Information</Heading>
               <ul className="list-disc list-inside">
                 <li>
