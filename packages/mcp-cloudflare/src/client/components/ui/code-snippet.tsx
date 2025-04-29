@@ -17,7 +17,12 @@ export default function CodeSnippet({ snippet }: { snippet: string }) {
           <span className="sr-only">Copy Snippet</span>
         </Button>
       </div>
-      <pre className="p-4 overflow-x-auto text-gray-200 text-sm">{snippet}</pre>
+      <pre
+        className="p-4 overflow-x-auto text-gray-200 text-sm"
+        style={{ margin: 0 }}
+      >
+        {snippet}
+      </pre>
     </div>
   );
 }

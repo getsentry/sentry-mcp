@@ -130,6 +130,22 @@ export default function App() {
                     <li>
                       Select <strong>Add new global MCP server</strong>.
                     </li>
+                    <li>
+                      <CodeSnippet
+                        snippet={JSON.stringify(
+                          {
+                            mcpServers: {
+                              sentry: {
+                                command: "npx",
+                                args: ["-y", "mcp-remote", sseUrl],
+                              },
+                            },
+                          },
+                          undefined,
+                          2,
+                        )}
+                      />
+                    </li>
                   </ol>
                 </SetupGuide>
 
@@ -172,18 +188,7 @@ export default function App() {
                     </li>
                     <li>
                       Enter the following configuration, and hit enter.
-                      <div className="snippet">
-                        <button
-                          className="btn"
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(zedInstructions);
-                          }}
-                        >
-                          Copy
-                        </button>
-                        <pre>{mcpRemoteSnippet}</pre>
-                      </div>
+                      <CodeSnippet snippet={mcpRemoteSnippet} />
                     </li>
                     <li>
                       Enter the name <strong>Sentry</strong> and hit enter.
@@ -208,18 +213,7 @@ export default function App() {
                       <strong>CMD + ,</strong> to open Zed settings.
                     </li>
                     <li>
-                      <div className="snippet">
-                        <button
-                          className="btn"
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(zedInstructions);
-                          }}
-                        >
-                          Copy
-                        </button>
-                        <pre>{zedInstructions}</pre>
-                      </div>
+                      <CodeSnippet snippet={zedInstructions} />
                     </li>
                   </ol>
                 </SetupGuide>
