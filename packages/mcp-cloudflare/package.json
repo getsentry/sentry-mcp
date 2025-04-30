@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -45,9 +43,9 @@
     "@modelcontextprotocol/sdk": "^1.10.2",
     "@radix-ui/react-accordion": "^1.2.8",
     "@radix-ui/react-slot": "^1.2.0",
-    "@sentry/cloudflare": "^9.15.0",
-    "@sentry/core": "^9.15.0",
-    "@sentry/react": "^9.15.0",
+    "@sentry/cloudflare": "9.14.0",
+    "@sentry/core": "9.14.0",
+    "@sentry/react": "9.14.0",
     "agents": "~0.0.75",
     "better-sqlite3": "^11.9.1",
     "class-variance-authority": "^0.7.1",

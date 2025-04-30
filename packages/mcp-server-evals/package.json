@@ -15,12 +15,12 @@
     "eval:ci": "vitest run --coverage --reporter=vitest-evals/reporter --reporter=junit --outputFile=eval.junit.xml"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^1.3.21",
+    "@ai-sdk/openai": "^1.3.20",
     "@modelcontextprotocol/sdk": "^1.10.2",
     "@sentry/mcp-server": "workspace:*",
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
-    "ai": "^4.3.12",
+    "ai": "^4.3.10",
     "msw": "^2.7.5",
     "typescript": "^5.8.3",
     "vitest-evals": "^0.2.0",
