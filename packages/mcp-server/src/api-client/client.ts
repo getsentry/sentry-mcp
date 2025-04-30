@@ -85,15 +85,28 @@ export class SentryApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let parsed: unknown | undefined;
       try {
-        const { data, success } = ApiErrorSchema.safeParse(
-          JSON.parse(errorText),
+        parsed = JSON.parse(errorText);
+      } catch (error) {
+        console.error(
+          `[sentryApi] Failed to parse error response: ${errorText}`,
+          error,
         );
+      }
+
+      if (parsed) {
+        const { data, success, error } = ApiErrorSchema.safeParse(parsed);
 
         if (success) {
           throw new ApiError(data.detail, response.status);
         }
-      } catch (err) {}
+
+        console.error(
+          `[sentryApi] Failed to parse error response: ${errorText}`,
+          error,
+        );
+      }
 
       throw new Error(
         `API request failed: ${response.status} ${response.statusText}\n${errorText}`,
