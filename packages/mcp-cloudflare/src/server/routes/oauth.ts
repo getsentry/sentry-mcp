@@ -32,6 +32,17 @@ export default new Hono<{
       return c.text("Invalid request", 400);
     }
 
+    const client = await c.env.OAUTH_PROVIDER.lookupClient(
+      oauthReqInfo.clientId,
+    );
+    if (!client) {
+      return c.text("Client not found", 400);
+    }
+
+    if (!client.redirectUris.includes(oauthReqInfo.redirectUri)) {
+      return c.text("Invalid redirect URI", 400);
+    }
+
     return Response.redirect(
       getUpstreamAuthorizeUrl({
         upstream_url: new URL(
