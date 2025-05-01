@@ -5,12 +5,14 @@ import { startStdio } from "./transports/stdio";
 import { wrapMcpServerWithSentry } from "@sentry/core";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "./version";
+
 let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
 let host: string | undefined = process.env.SENTRY_HOST;
 let sentryDsn: string | undefined =
   process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
 
 const packageName = "@sentry/mcp-server";
+
 function getUsage() {
   return `Usage: ${packageName} --access-token=<token> [--host=<host>] [--sentry-dsn=<dsn>]`;
 }
@@ -44,6 +46,9 @@ if (!accessToken) {
 Sentry.init({
   dsn: sentryDsn,
   sendDefaultPii: true,
+  environment:
+    process.env.SENTRY_ENVIRONMENT ??
+    (process.env.NODE_ENV !== "production" ? "development" : "production"),
 });
 
 const server = new McpServer({
