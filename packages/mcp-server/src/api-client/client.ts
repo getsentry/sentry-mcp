@@ -401,6 +401,8 @@ export class SentryApiService {
     const response = await this.request(apiUrl);
 
     const body = await response.json();
+    // TODO(dcramer): If you're using an older version of Sentry this API had a breaking change
+    // meaning this endpoint will error.
     return ErrorsSearchResponseSchema.parse(body).data;
   }
 

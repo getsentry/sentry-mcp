@@ -303,5 +303,6 @@ export const AutofixRunStateSchema = z.object({
       status: AutofixStatusSchema,
       steps: z.array(AutofixRunStepSchema),
     })
-    .passthrough(),
+    .passthrough()
+    .nullable(),
 });

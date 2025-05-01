@@ -17,6 +17,12 @@ export default function RemoteSetup() {
         </Link>
         .
       </Paragraph>
+      <Paragraph>
+        <strong>Note:</strong> The MCP is developed against the cloud service of
+        Sentry. If you are self-hosting Sentry you may find some tool calls are
+        either using outdated APIs, or otherwise using APIs not available in
+        self-hosted.
+      </Paragraph>
       <CodeSnippet
         snippet={`${mcpStdioSnippet} --access-token=sentry-pat --host=sentry.io`}
       />

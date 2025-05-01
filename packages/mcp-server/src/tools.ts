@@ -707,6 +707,11 @@ export const TOOL_HANDLERS = {
 
     let output = `# Autofix Status for Issue ${issueId}\n\n`;
 
+    if (!autofix) {
+      output += `No autofix run found for ${issueId}.\n\nYou can initiate a new autofix run using the \`begin_autofix\` tool.`;
+      return output;
+    }
+
     for (const step of autofix.steps) {
       output += getOutputForAutofixStep(step);
       output += "\n";
