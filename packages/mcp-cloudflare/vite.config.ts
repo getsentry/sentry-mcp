@@ -12,7 +12,7 @@ export default defineConfig({
     tailwindcss(),
     sentryVitePlugin({
       org: "sentry",
-      project: "remote-mcp",
+      project: "mcp-server",
     }),
   ],
   resolve: {
