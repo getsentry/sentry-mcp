@@ -1,1 +1,1 @@
-export const LIB_VERSION = "0.3.1";
+export const LIB_VERSION = process.env.npm_package_version;

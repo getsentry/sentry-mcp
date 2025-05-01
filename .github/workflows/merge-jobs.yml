@@ -13,29 +13,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-
-      # pnpm/action-setup@v4
-      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
-        name: Install pnpm
-        with:
-          run_install: false
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - uses: actions/cache@v4
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          node-version-file: 'package.json'
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install
@@ -51,10 +36,7 @@ jobs:
 
       - name: Package mcp-server
         working-directory: packages/mcp-server
-        run: |
-          pnpm install
-          pnpm build
-          pnpm pack --pack-destination dist
+        run: pnpm pack --pack-destination dist
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v4

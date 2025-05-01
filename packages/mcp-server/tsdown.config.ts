@@ -1,4 +1,5 @@
 import { defineConfig } from "tsdown";
+import { readFileSync } from "fs";
 
 export default defineConfig({
   entry: ["src/**/*.ts"],
@@ -10,5 +11,8 @@ export default defineConfig({
     DEFAULT_SENTRY_DSN:
       "https://7f7bbaad9504b727cdf8edc378c6d1de@o1.ingest.us.sentry.io/4509062593708032",
     SENTRY_ENVIRONMENT: "stdio",
+    npm_package_version:
+      process.env.npm_package_version ??
+      JSON.parse(readFileSync("./package.json")).version,
   },
 });
