@@ -24,10 +24,10 @@ export default function RemoteSetup() {
         self-hosted.
       </Paragraph>
       <CodeSnippet
-        snippet={`${mcpStdioSnippet} --access-token=sentry-pat --host=sentry.io`}
+        snippet={`${mcpStdioSnippet} \\\n  --access-token=sentry-pat \\\n  --host=sentry.io`}
       />
       <Paragraph>Use the following setup guides to get started.</Paragraph>
-      <Accordion type="single" collapsible className="w-full">
+      <Accordion type="single" collapsible className="max-w-full">
         <SetupGuide id="cursor" title="Cursor">
           <ol>
             <li>

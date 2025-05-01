@@ -87,4 +87,8 @@
     background: linear-gradient(to bottom, #2d1b69, #171717, #000000);
     min-height: 100vh;
   }
+
+  pre {
+    white-space: pre-wrap;
+  }
 }
