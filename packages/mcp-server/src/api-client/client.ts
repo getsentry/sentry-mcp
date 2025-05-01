@@ -40,7 +40,18 @@ export class ApiError extends Error {
     message: string,
     public status: number,
   ) {
-    super(message);
+    // HACK: improving this error message for the LLMs
+    let finalMessage = message;
+    if (
+      message.includes(
+        "You do not have the multi project stream feature enabled",
+      ) ||
+      message.includes("You cannot view events from multiple projects")
+    ) {
+      finalMessage =
+        "You do not have access to query across multiple projects. Please select a project for your query.";
+    }
+    super(finalMessage);
   }
 }
 
