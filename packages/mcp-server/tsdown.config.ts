@@ -1,5 +1,5 @@
 import { defineConfig } from "tsdown";
-import { readFileSync } from "fs";
+import { readFileSync } from "node:fs";
 
 export default defineConfig({
   entry: ["src/**/*.ts"],
