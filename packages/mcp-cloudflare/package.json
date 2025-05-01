@@ -39,7 +39,7 @@
     "wrangler": "~4.13.2"
   },
   "dependencies": {
-    "@cloudflare/workers-oauth-provider": "^0.0.5",
+    "@cloudflare/workers-oauth-provider": "^0.0.3",
     "@modelcontextprotocol/sdk": "^1.10.2",
     "@radix-ui/react-accordion": "^1.2.8",
     "@radix-ui/react-slot": "^1.2.0",
