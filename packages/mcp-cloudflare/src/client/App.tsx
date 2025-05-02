@@ -30,7 +30,7 @@ export default function App() {
           <article>
             <div id="top" />
             <Section className="space-y-4 mb-10">
-              <div className="prose prose-a:text-violet-300 prose-invert max-w-none">
+              <Prose>
                 <p>
                   This service provides a Model Context Provider (MCP) for
                   interacting with{" "}
@@ -74,7 +74,7 @@ export default function App() {
                     </Link>
                   </li>
                 </ul>
-              </div>
+              </Prose>
             </Section>
 
             <Section
@@ -140,13 +140,13 @@ export default function App() {
                   Tools are pre-configured functions that can be used to help
                   with common tasks.
                 </p>
-                <Note>
-                  <strong>Note:</strong> Any tool that takes an{" "}
-                  <code>organization_slug</code> parameter will try to infer a
-                  default organization, otherwise you should mention it in the
-                  prompt.
-                </Note>
               </Prose>
+              <Note>
+                <strong>Note:</strong> Any tool that takes an{" "}
+                <code>organization_slug</code> parameter will try to infer a
+                default organization, otherwise you should mention it in the
+                prompt.
+              </Note>
               <Accordion type="single" collapsible className="w-full space-y-4">
                 {TOOL_DEFINITIONS.map((tool) => (
                   <AccordionItem
@@ -250,13 +250,15 @@ export default function App() {
             </Section>
 
             <Section heading="More Information" id="more-information">
-              <ul className="list-disc list-inside">
-                <li>
-                  <Link href="https://github.com/getsentry/sentry-mcp">
-                    sentry-mcp on GitHub
-                  </Link>
-                </li>
-              </ul>
+              <Prose>
+                <ul>
+                  <li>
+                    <Link href="https://github.com/getsentry/sentry-mcp">
+                      sentry-mcp on GitHub
+                    </Link>
+                  </li>
+                </ul>
+              </Prose>
             </Section>
           </article>
         </main>
