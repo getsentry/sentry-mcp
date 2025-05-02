@@ -6,12 +6,10 @@ import {
 } from "../lib/oauth";
 import type { Env, WorkerProps } from "../types";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
+import { SCOPES } from "../../constants";
 
 export const SENTRY_AUTH_URL = "/oauth/authorize/";
 export const SENTRY_TOKEN_URL = "/oauth/token/";
-// https://docs.sentry.io/api/permissions/
-export const SCOPES =
-  "org:read project:read project:write team:read team:write event:write";
 
 export default new Hono<{
   Bindings: Env;
@@ -38,7 +36,7 @@ export default new Hono<{
           SENTRY_AUTH_URL,
           `https://${c.env.SENTRY_HOST || "sentry.io"}`,
         ).href,
-        scope: SCOPES,
+        scope: Object.keys(SCOPES).join(" "),
         client_id: c.env.SENTRY_CLIENT_ID,
         redirect_uri: new URL("/oauth/callback", c.req.url).href,
         state: btoa(JSON.stringify(oauthReqInfo)),

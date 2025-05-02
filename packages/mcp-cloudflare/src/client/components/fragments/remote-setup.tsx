@@ -1,7 +1,7 @@
-import { Paragraph } from "../ui/base";
 import { Accordion } from "../ui/accordion";
 import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
+import { Prose } from "../ui/prose";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -34,14 +34,14 @@ export default function RemoteSetup() {
 
   return (
     <>
-      <Paragraph>
-        If you've got a client that natively supports the current MCP
-        specification, including OAuth, you can connect directly.
-      </Paragraph>
-      <CodeSnippet snippet={sseUrl} />
-      <Paragraph>
-        Otherwise, you can use the following setup guides to get started.
-      </Paragraph>
+      <Prose>
+        <p>
+          If you've got a client that natively supports the current MCP
+          specification, including OAuth, you can connect directly.
+        </p>
+        <CodeSnippet snippet={sseUrl} />
+        <h3>Integration Guides</h3>
+      </Prose>
       <Accordion type="single" collapsible className="w-full">
         <SetupGuide id="cursor" title="Cursor">
           <ol>

@@ -1,7 +1,7 @@
 import { TOOL_DEFINITIONS } from "@sentry/mcp-server/toolDefinitions";
 import { RESOURCES } from "@sentry/mcp-server/resources";
 import { PROMPT_DEFINITIONS } from "@sentry/mcp-server/promptDefinitions";
-import { Paragraph, Heading, Link } from "./components/ui/base";
+import { Heading, Link } from "./components/ui/base";
 import {
   Accordion,
   AccordionContent,
@@ -16,18 +16,20 @@ import { Button } from "./components/ui/button";
 import RemoteSetup from "./components/fragments/remote-setup";
 import { useState } from "react";
 import StdioSetup from "./components/fragments/stdio-setup";
+import Section from "./components/ui/section";
+import { Prose } from "./components/ui/prose";
 
 export default function App() {
   const [stdio, setStdio] = useState(false);
 
   return (
-    <div className="sm:p-8 p-4 min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white text-lg flex flex-col items-center">
+    <div className="sm:p-8 p-4 min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white flex flex-col items-center">
       <div className="max-w-3xl w-full">
         <Header />
         <main className="flex gap-4 max-w-3xl">
           <article>
             <div id="top" />
-            <section className="space-y-4 mb-10">
+            <Section className="space-y-4 mb-10">
               <div className="prose prose-a:text-violet-300 prose-invert max-w-none">
                 <p>
                   This service provides a Model Context Provider (MCP) for
@@ -73,46 +75,50 @@ export default function App() {
                   </li>
                 </ul>
               </div>
-            </section>
+            </Section>
 
-            <section className="space-y-4 mb-10">
-              <Heading>
-                <div className="flex-1">Getting Started</div>
-                <div className="flex self-justify-end items-center gap-1 text-xs text-neutral-600">
-                  <Button
-                    variant="link"
-                    size="xs"
-                    onClick={() => setStdio(false)}
-                    active={!stdio}
-                  >
-                    Remote
-                  </Button>
-                  <span>/</span>
-                  <Button
-                    variant="link"
-                    size="xs"
-                    onClick={() => setStdio(true)}
-                    active={stdio}
-                  >
-                    Stdio
-                  </Button>
-                </div>
-              </Heading>
-
+            <Section
+              heading={
+                <>
+                  <div className="flex-1">Getting Started</div>
+                  <div className="flex self-justify-end items-center gap-1 text-xs text-neutral-600">
+                    <Button
+                      variant="link"
+                      size="xs"
+                      onClick={() => setStdio(false)}
+                      active={!stdio}
+                    >
+                      Remote
+                    </Button>
+                    <span>/</span>
+                    <Button
+                      variant="link"
+                      size="xs"
+                      onClick={() => setStdio(true)}
+                      active={stdio}
+                    >
+                      Stdio
+                    </Button>
+                  </div>
+                </>
+              }
+            >
               {stdio ? <StdioSetup /> : <RemoteSetup />}
-            </section>
+            </Section>
 
-            <section className="space-y-4 mb-10" id="workflows">
-              <Heading>Workflows</Heading>
-              <Paragraph>
-                Here's a few sample workflows (prompts) that we've tried to
-                design around within the provider:
-              </Paragraph>
+            <Section heading="Workflows" id="workflows">
+              <Prose>
+                <p>
+                  Here's a few sample workflows (prompts) that we've tried to
+                  design around within the provider:
+                </p>
+              </Prose>
               <ul className="space-y-4 text-base">
                 {[
                   "Check Sentry for errors in file.tsx and propose solutions.",
                   "Diagnose issue ISSUE_URL and propose solutions.",
-                  "Create a new project in Sentry for service-name and setup local instrumentation using it.",
+                  "What are my latest issues in ORG/PROJECT?",
+                  "Create a new project in Sentry for PROJECT and setup local instrumentation using it.",
                   "Use Sentry's autofix feature, and help me analyze and propose a solution for ISSUE_URL.",
                 ].map((prompt) => (
                   <li
@@ -126,20 +132,21 @@ export default function App() {
                   </li>
                 ))}
               </ul>
-            </section>
+            </Section>
 
-            <section id="tools" className="space-y-4 mb-10">
-              <Heading>Available Tools</Heading>
-              <Paragraph>
-                Tools are pre-configured functions that can be used to help with
-                common tasks.
-              </Paragraph>
-              <Note>
-                <strong>Note:</strong> Any tool that takes an{" "}
-                <code>organization_slug</code> parameter will try to infer a
-                default organization, otherwise you should mention it in the
-                prompt.
-              </Note>
+            <Section heading="Available Tools" id="tools">
+              <Prose>
+                <p>
+                  Tools are pre-configured functions that can be used to help
+                  with common tasks.
+                </p>
+                <Note>
+                  <strong>Note:</strong> Any tool that takes an{" "}
+                  <code>organization_slug</code> parameter will try to infer a
+                  default organization, otherwise you should mention it in the
+                  prompt.
+                </Note>
+              </Prose>
               <Accordion type="single" collapsible className="w-full space-y-4">
                 {TOOL_DEFINITIONS.map((tool) => (
                   <AccordionItem
@@ -147,13 +154,15 @@ export default function App() {
                     key={tool.name}
                     className="border last:border-b px-4 border-gray-800"
                   >
-                    <AccordionTrigger className="text-lg text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
+                    <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
                       {tool.name}
                     </AccordionTrigger>
                     <AccordionContent className="text-gray-300">
-                      <Paragraph className="mb-0">
-                        {tool.description.split("\n")[0]}
-                      </Paragraph>
+                      <Prose>
+                        <p className="mb-0">
+                          {tool.description.split("\n")[0]}
+                        </p>
+                      </Prose>
                       {tool.paramsSchema ? (
                         <dl className="space-y-3 mt-6">
                           {Object.entries(tool.paramsSchema).map(
@@ -176,14 +185,15 @@ export default function App() {
                   </AccordionItem>
                 ))}
               </Accordion>
-            </section>
+            </Section>
 
-            <section id="prompts" className="space-y-4 mb-10">
-              <Heading>Available Prompts</Heading>
-              <Paragraph>
-                Prompts are pre-configured workflows that can be used to help
-                with common tasks.
-              </Paragraph>
+            <Section heading="Available Prompts" id="prompts">
+              <Prose>
+                <p>
+                  Prompts are pre-configured workflows that can be used to help
+                  with common tasks.
+                </p>
+              </Prose>
               <Accordion type="single" collapsible className="w-full space-y-4">
                 {PROMPT_DEFINITIONS.map((prompt) => (
                   <AccordionItem
@@ -191,29 +201,32 @@ export default function App() {
                     key={prompt.name}
                     className="border last:border-b px-4 border-gray-800"
                   >
-                    <AccordionTrigger className="text-lg text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
+                    <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
                       {prompt.name}
                     </AccordionTrigger>
-                    <AccordionContent className="text-gray-300 prose prose-invert">
-                      <Paragraph className="mb-0">
-                        {prompt.description.split("\n")[0]}
-                      </Paragraph>
+                    <AccordionContent className="text-gray-300 prose prose-invert max-w-none">
+                      <Prose>
+                        <p className="mb-0">
+                          {prompt.description.split("\n")[0]}
+                        </p>
+                      </Prose>
                     </AccordionContent>
                   </AccordionItem>
                 ))}
               </Accordion>
-            </section>
+            </Section>
 
-            <section id="resources" className="space-y-4 mb-10">
-              <Heading>Available Resources</Heading>
-              <Paragraph>
-                Generally speaking, resources that are made available can also
-                be found{" "}
-                <Link href="https://github.com/getsentry/sentry-ai-rules">
-                  on GitHub in the sentry-ai-rules repository
-                </Link>
-                .
-              </Paragraph>
+            <Section heading="Available Resources" id="resources">
+              <Prose>
+                <p>
+                  Generally speaking, resources that are made available can also
+                  be found{" "}
+                  <a href="https://github.com/getsentry/sentry-ai-rules">
+                    on GitHub in the sentry-ai-rules repository
+                  </a>
+                  .
+                </p>
+              </Prose>
               <Accordion type="single" collapsible className="w-full space-y-4">
                 {RESOURCES.map((resource) => (
                   <AccordionItem
@@ -221,21 +234,22 @@ export default function App() {
                     key={resource.name}
                     className="border last:border-b px-4 border-gray-800"
                   >
-                    <AccordionTrigger className="text-lg text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
+                    <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
                       {resource.name}
                     </AccordionTrigger>
-                    <AccordionContent className="text-gray-300 prose prose-invert">
-                      <Paragraph className="mb-0">
-                        {resource.description.split("\n")[0]}
-                      </Paragraph>
+                    <AccordionContent className="text-gray-300 prose prose-invert max-w-none">
+                      <Prose>
+                        <p className="mb-0">
+                          {resource.description.split("\n")[0]}
+                        </p>
+                      </Prose>
                     </AccordionContent>
                   </AccordionItem>
                 ))}
               </Accordion>
-            </section>
+            </Section>
 
-            <section id="more-information" className="space-y-4 mb-10">
-              <Heading>More Information</Heading>
+            <Section heading="More Information" id="more-information">
               <ul className="list-disc list-inside">
                 <li>
                   <Link href="https://github.com/getsentry/sentry-mcp">
@@ -243,7 +257,7 @@ export default function App() {
                   </Link>
                 </li>
               </ul>
-            </section>
+            </Section>
           </article>
         </main>
       </div>

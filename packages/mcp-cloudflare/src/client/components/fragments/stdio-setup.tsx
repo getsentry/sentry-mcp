@@ -1,7 +1,10 @@
 import { Accordion } from "../ui/accordion";
-import { Link, Paragraph } from "../ui/base";
+import { Link } from "../ui/base";
 import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
+import { SCOPES } from "../../../constants";
+import { Prose } from "../ui/prose";
+import Note from "../ui/note";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -10,23 +13,41 @@ export default function RemoteSetup() {
 
   return (
     <>
-      <Paragraph>
-        The stdio client is made available on npm at{" "}
-        <Link href="https://www.npmjs.com/package/@sentry/mcp-server">
-          @sentry/mcp-server
-        </Link>
-        .
-      </Paragraph>
-      <Paragraph>
-        <strong>Note:</strong> The MCP is developed against the cloud service of
-        Sentry. If you are self-hosting Sentry you may find some tool calls are
-        either using outdated APIs, or otherwise using APIs not available in
-        self-hosted.
-      </Paragraph>
-      <CodeSnippet
-        snippet={`${mcpStdioSnippet} \\\n  --access-token=sentry-pat \\\n  --host=sentry.io`}
-      />
-      <Paragraph>Use the following setup guides to get started.</Paragraph>
+      <Prose>
+        <p>
+          The stdio client is made available on npm at{" "}
+          <Link href="https://www.npmjs.com/package/@sentry/mcp-server">
+            @sentry/mcp-server
+          </Link>
+          .
+        </p>
+        <p>
+          <strong>Note:</strong> The MCP is developed against the cloud service
+          of Sentry. If you are self-hosting Sentry you may find some tool calls
+          are either using outdated APIs, or otherwise using APIs not available
+          in self-hosted.
+        </p>
+
+        <p>
+          Create a Personal Access Token in your account settings with the
+          following scopes:
+        </p>
+        <ul>
+          {Object.entries(SCOPES).map(([scope, description]) => (
+            <li key={scope}>
+              <strong>{scope}</strong> - {description}
+            </li>
+          ))}
+        </ul>
+        <p>
+          You'll then bind that to your MCP instance using the following
+          command:
+        </p>
+        <CodeSnippet
+          snippet={`${mcpStdioSnippet} \\\n  --access-token=sentry-pat \\\n  --host=sentry.io`}
+        />
+        <h3>Integration Guides</h3>
+      </Prose>
       <Accordion type="single" collapsible className="max-w-full">
         <SetupGuide id="cursor" title="Cursor">
           <ol>
