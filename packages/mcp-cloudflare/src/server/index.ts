@@ -17,7 +17,7 @@ const oAuthProvider = new OAuthProvider({
   authorizeEndpoint: "/oauth/authorize",
   tokenEndpoint: "/oauth/token",
   clientRegistrationEndpoint: "/oauth/register",
-  scopesSupported: SCOPES,
+  scopesSupported: Object.keys(SCOPES),
 });
 
 export default Sentry.withSentry(
