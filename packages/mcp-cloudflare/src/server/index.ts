@@ -1,7 +1,7 @@
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import SentryMCP from "./lib/mcp-transport";
-import { SCOPES } from "./routes/oauth";
 import app from "./app";
+import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import * as Sentry from "@sentry/cloudflare";
 
@@ -17,7 +17,7 @@ const oAuthProvider = new OAuthProvider({
   authorizeEndpoint: "/oauth/authorize",
   tokenEndpoint: "/oauth/token",
   clientRegistrationEndpoint: "/oauth/register",
-  scopesSupported: SCOPES.split(" "),
+  scopesSupported: Object.keys(SCOPES),
 });
 
 export default Sentry.withSentry(

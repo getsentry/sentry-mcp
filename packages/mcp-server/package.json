@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-server",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "type": "module",
   "packageManager": "pnpm@10.3.0",
   "engines": {

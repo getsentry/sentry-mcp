@@ -58,6 +58,8 @@ const server = new McpServer({
 
 const instrumentedServer = wrapMcpServerWithSentry(server);
 
+const SENTRY_TIMEOUT = 5000; // 5 seconds
+
 // XXX: we could do what we're doing in routes/auth.ts and pass the context
 // identically, but we don't really need userId and userName yet
 startStdio(instrumentedServer, {
@@ -66,5 +68,10 @@ startStdio(instrumentedServer, {
   host,
 }).catch((err) => {
   console.error("Server error:", err);
+  // ensure we've flushed all events
+  Sentry.flush(SENTRY_TIMEOUT);
   process.exit(1);
 });
+
+// ensure we've flushed all events
+Sentry.flush(SENTRY_TIMEOUT);

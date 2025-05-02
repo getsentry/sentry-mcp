@@ -21,18 +21,6 @@ export function Heading({
   );
 }
 
-export function Paragraph({
-  children,
-  className,
-  ...props
-}: { children: React.ReactNode } & React.HTMLAttributes<HTMLParagraphElement>) {
-  return (
-    <p className={cn("mb-6", className)} {...props}>
-      {children}
-    </p>
-  );
-}
-
 export function Link({
   children,
   className,
