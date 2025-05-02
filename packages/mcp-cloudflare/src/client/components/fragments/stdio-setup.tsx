@@ -44,8 +44,17 @@ export default function RemoteSetup() {
           command:
         </p>
         <CodeSnippet
-          snippet={`${mcpStdioSnippet} \\\n  --access-token=sentry-pat \\\n  --host=sentry.io`}
+          snippet={[
+            `${mcpStdioSnippet}`,
+            "--access-token=sentry-pat",
+            "--host=sentry.io",
+          ].join(" \\\n  ")}
         />
+        <p>
+          <strong>Note:</strong> We enable Sentry reporting by default (to
+          sentry.io). If you wish to disable it, pass <code>--sentry-dsn=</code>{" "}
+          with an empty value.
+        </p>
         <h3>Integration Guides</h3>
       </Prose>
       <Accordion type="single" collapsible className="max-w-full">
