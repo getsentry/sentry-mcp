@@ -96,7 +96,7 @@ export const IssueSchema = z.object({
   platform: z.string(),
   status: z.string(),
   culprit: z.string(),
-  type: z.union([z.literal("error"), z.string()]),
+  type: z.union([z.literal("error"), z.literal("transaction"), z.unknown()]),
 });
 
 export const IssueListSchema = z.array(IssueSchema);
@@ -138,13 +138,12 @@ export const ErrorEntrySchema = z.object({
   value: ExceptionInterface.nullable().optional(),
 });
 
-export const EventSchema = z.object({
+const BaseEventSchema = z.object({
   id: z.string(),
   title: z.string(),
   message: z.string().nullable(),
-  dateCreated: z.string().datetime(),
-  culprit: z.string().nullable(),
   platform: z.string().nullable(),
+  type: z.union([z.literal("error"), z.literal("transaction"), z.unknown()]),
   entries: z.array(
     z.union([
       // TODO: there are other types
@@ -153,12 +152,57 @@ export const EventSchema = z.object({
         data: ErrorEntrySchema,
       }),
       z.object({
+        type: z.literal("spans"),
+        data: z.unknown(),
+      }),
+      z.object({
+        type: z.literal("request"),
+        data: z.unknown(),
+      }),
+      z.object({
+        type: z.literal("breadcrumbs"),
+        data: z.unknown(),
+      }),
+      z.object({
         type: z.string(),
         data: z.unknown(),
       }),
     ]),
   ),
 });
+
+export const ErrorEventSchema = BaseEventSchema.omit({
+  type: true,
+}).extend({
+  type: z.literal("error"),
+  culprit: z.string().nullable(),
+  dateCreated: z.string().datetime(),
+});
+
+export const TransactionEventSchema = BaseEventSchema.omit({
+  type: true,
+}).extend({
+  type: z.literal("transaction"),
+  occurrence: z.object({
+    issueTitle: z.string(),
+    culprit: z.string().nullable(),
+  }),
+});
+
+export const UnknownEventSchema = BaseEventSchema.omit({
+  type: true,
+}).extend({
+  type: z.unknown(),
+});
+
+// XXX: This API response is kind of a disaster. We are not propagating the appropriate
+// columns and it makes this really hard to work with. Errors and Transaction-based issues
+// are completely different, for example.
+export const EventSchema = z.union([
+  ErrorEventSchema,
+  TransactionEventSchema,
+  UnknownEventSchema,
+]);
 
 export const EventsResponseSchema = z.object({
   data: z.array(z.unknown()),

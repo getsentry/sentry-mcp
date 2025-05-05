@@ -365,7 +365,10 @@ export const TOOL_HANDLERS = {
     output += "\n";
 
     output += "## Event Specifics\n\n";
-    output += `**Occurred At**: ${new Date(event.dateCreated).toISOString()}\n`;
+    if (event.type === "error") {
+      output += `**Occurred At**: ${new Date(event.dateCreated).toISOString()}\n`;
+    }
+
     if (event.message) {
       output += `**Message**:\n${event.message}\n`;
     }
