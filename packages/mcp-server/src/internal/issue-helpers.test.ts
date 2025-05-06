@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { extractIssueId } from "./issue-helpers";
+import {
+  extractIssueId,
+  parseIssueId,
+  parseIssueParams,
+} from "./issue-helpers";
 
 describe("extractIssueId", () => {
   it("should extract issue ID from a full Sentry URL", () => {
@@ -91,6 +95,66 @@ describe("extractIssueId", () => {
 
   it("should throw error for non-numeric standalone ID", () => {
     expect(() => extractIssueId("abc")).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Invalid Sentry issue URL. Must start with http:// or https://]`,
+    );
+  });
+});
+
+describe("parseIssueId", () => {
+  it("should remove trailing punctuation from issue ID", () => {
+    expect(
+      // trailing period and exclamation
+      parseIssueId("CLOUDFLARE-MCP-41.!"),
+    ).toBe("CLOUDFLARE-MCP-41");
+  });
+
+  it("should not modify a clean issue ID", () => {
+    expect(parseIssueId("CLOUDFLARE-MCP-41")).toBe("CLOUDFLARE-MCP-41");
+  });
+
+  it("should remove special characters except dash and underscore", () => {
+    expect(parseIssueId("ID_123-456!@#")).toBe("ID_123-456");
+  });
+});
+
+describe("parseIssueParams", () => {
+  it("should parse from issueUrl", () => {
+    expect(
+      parseIssueParams({
+        issueUrl: "https://sentry.io/sentry/issues/123",
+      }),
+    ).toEqual({ organizationSlug: "sentry", issueId: "123" });
+  });
+
+  it("should parse from issueId and organizationSlug", () => {
+    expect(
+      parseIssueParams({
+        issueId: "CLOUDFLARE-MCP-41.!",
+        organizationSlug: "cloudflare",
+      }),
+    ).toEqual({ organizationSlug: "cloudflare", issueId: "CLOUDFLARE-MCP-41" });
+  });
+
+  it("should throw if neither issueId nor issueUrl is provided", () => {
+    expect(() =>
+      parseIssueParams({ organizationSlug: "foo" }),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Either issueId or issueUrl must be provided]`,
+    );
+  });
+
+  it("should throw if organizationSlug is missing and no issueUrl", () => {
+    expect(() =>
+      parseIssueParams({ issueId: "123" }),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Organization slug is required]`,
+    );
+  });
+
+  it("should throw if issueUrl is invalid", () => {
+    expect(() =>
+      parseIssueParams({ issueUrl: "not-a-url" }),
+    ).toThrowErrorMatchingInlineSnapshot(
       `[Error: Invalid Sentry issue URL. Must start with http:// or https://]`,
     );
   });

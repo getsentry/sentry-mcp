@@ -52,3 +52,65 @@ export function extractIssueId(url: string): {
 
   return { issueId, organizationSlug };
 }
+
+/**
+ * Sometimes the LLM will pass in a funky issue shortId. For example it might pass
+ * in "CLOUDFLARE-MCP-41." instead of "CLOUDFLARE-MCP-41". This function attempts to
+ * fix common issues.
+ *
+ * @param issueId - The issue ID to parse
+ * @returns The parsed issue ID
+ */
+export function parseIssueId(issueId: string) {
+  let finalIssueId = issueId;
+  // remove trailing punctuation
+  finalIssueId = finalIssueId.replace(/[^\w-]/g, "");
+
+  return finalIssueId;
+}
+
+/**
+ * Parses issue parameters from a variety of formats.
+ *
+ * @param params - Object containing issue URL, issue ID, and organization slug
+ * @returns Object containing the parsed organization slug and issue ID
+ * @throws Error if the input is invalid
+ */
+export function parseIssueParams({
+  issueUrl,
+  issueId,
+  organizationSlug,
+}: {
+  issueUrl?: string | null;
+  issueId?: string | null;
+  organizationSlug?: string | null;
+}): {
+  organizationSlug: string;
+  issueId: string;
+} {
+  if (issueUrl) {
+    const resolved = extractIssueId(issueUrl);
+    if (!resolved) {
+      throw new Error(
+        "Invalid Sentry issue URL. Path should contain '/issues/{issue_id}'",
+      );
+    }
+    return {
+      ...resolved,
+      issueId: parseIssueId(resolved.issueId),
+    };
+  }
+
+  if (!organizationSlug) {
+    throw new Error("Organization slug is required");
+  }
+
+  if (issueId) {
+    return {
+      organizationSlug,
+      issueId: parseIssueId(issueId),
+    };
+  }
+
+  throw new Error("Either issueId or issueUrl must be provided");
+}

@@ -143,7 +143,7 @@ const BaseEventSchema = z.object({
   title: z.string(),
   message: z.string().nullable(),
   platform: z.string().nullable(),
-  type: z.union([z.literal("error"), z.literal("transaction"), z.unknown()]),
+  type: z.unknown(),
   entries: z.array(
     z.union([
       // TODO: there are other types

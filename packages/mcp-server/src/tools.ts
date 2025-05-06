@@ -5,10 +5,11 @@ import {
   type AutofixRunStepSchema,
   type AutofixRunStepSolutionSchema,
   type ClientKey,
+  type ErrorEventSchema,
   SentryApiService,
 } from "./api-client/index";
 import { formatEventOutput } from "./internal/formatting";
-import { extractIssueId } from "./internal/issue-helpers";
+import { extractIssueId, parseIssueParams } from "./internal/issue-helpers";
 import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 
@@ -265,32 +266,13 @@ export const TOOL_HANDLERS = {
 
     return output;
   },
-  get_issue_summary: async (
-    context,
-    { issueId, issueUrl, organizationSlug },
-  ) => {
+  get_issue_summary: async (context, params) => {
     const apiService = apiServiceFromContext(context);
 
-    if (issueUrl) {
-      const resolved = extractIssueId(issueUrl);
-      if (!resolved) {
-        throw new Error(
-          "Invalid Sentry issue URL. Path should contain '/issues/{issue_id}'",
-        );
-      }
-      organizationSlug = resolved.organizationSlug;
-      issueId = resolved.issueId;
-    } else if (!issueId) {
-      throw new Error("Either issueId or issueUrl must be provided");
-    }
-
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const { organizationSlug, issueId } = parseIssueParams({
+      ...params,
+      organizationSlug: params.organizationSlug ?? context.organizationSlug,
+    });
 
     const issue = await apiService.getIssue({
       organizationSlug,
@@ -314,32 +296,13 @@ export const TOOL_HANDLERS = {
 
     return output;
   },
-  get_issue_details: async (
-    context,
-    { issueId, issueUrl, organizationSlug },
-  ) => {
+  get_issue_details: async (context, params) => {
     const apiService = apiServiceFromContext(context);
 
-    if (issueUrl) {
-      const resolved = extractIssueId(issueUrl);
-      if (!resolved) {
-        throw new Error(
-          "Invalid Sentry issue URL. Path should contain '/issues/{issue_id}'",
-        );
-      }
-      organizationSlug = resolved.organizationSlug;
-      issueId = resolved.issueId;
-    } else if (!issueId) {
-      throw new Error("Either issueId or issueUrl must be provided");
-    }
-
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const { organizationSlug, issueId } = parseIssueParams({
+      ...params,
+      organizationSlug: params.organizationSlug ?? context.organizationSlug,
+    });
 
     const [issue, event] = await Promise.all([
       apiService.getIssue({
@@ -366,7 +329,7 @@ export const TOOL_HANDLERS = {
 
     output += "## Event Specifics\n\n";
     if (event.type === "error") {
-      output += `**Occurred At**: ${new Date(event.dateCreated).toISOString()}\n`;
+      output += `**Occurred At**: ${new Date((event as z.infer<typeof ErrorEventSchema>).dateCreated).toISOString()}\n`;
     }
 
     if (event.message) {
