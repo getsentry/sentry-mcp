@@ -12,7 +12,15 @@ describe("list_organizations", () => {
     expect(result).toMatchInlineSnapshot(`
       "# Organizations
 
-      - sentry-mcp-evals
+      ## **sentry-mcp-evals**
+
+      **Web URL:** https://sentry.io/sentry-mcp-evals
+      **Region URL:** https://us.sentry.io
+
+      # Using this information
+
+      - The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.
+      - If a tool supports passing in the \`regionUrl\`, you should also pass in the correct value there.
       "
     `);
   });
@@ -56,7 +64,7 @@ describe("list_projects", () => {
     expect(result).toMatchInlineSnapshot(`
       "# Projects in **sentry-mcp-evals**
 
-      - cloudflare-mcp
+      - **cloudflare-mcp**
       "
     `);
   });

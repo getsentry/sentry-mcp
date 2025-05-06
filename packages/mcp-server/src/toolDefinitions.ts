@@ -8,6 +8,7 @@ import {
   ParamProjectSlug,
   ParamQuery,
   ParamTransaction,
+  ParamRegionUrl,
 } from "./schema";
 import { z } from "zod";
 
@@ -37,6 +38,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
     },
   },
   {
@@ -54,6 +56,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
     },
   },
   {
@@ -89,6 +92,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       projectSlug: ParamProjectSlug.optional(),
       query: ParamQuery.optional(),
       sortBy: z
@@ -115,6 +119,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       projectSlug: ParamProjectSlug.optional(),
     },
   },
@@ -132,6 +137,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
     },
   },
   {
@@ -151,6 +157,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
       issueUrl: z
         .string()
@@ -175,6 +182,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
       issueUrl: z
         .string()
@@ -219,6 +227,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       projectSlug: ParamProjectSlug.optional(),
       filename: z
         .string()
@@ -266,6 +275,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       projectSlug: ParamProjectSlug.optional(),
       transaction: ParamTransaction.optional(),
       query: ParamQuery.optional(),
@@ -292,6 +302,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       name: z.string().describe("The name of the team to create."),
     },
   },
@@ -319,6 +330,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       teamSlug: z.string().describe("The team's slug."),
       name: z
         .string()
@@ -352,6 +364,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       projectSlug: z.string().describe("The project's slug."),
       name: z.string().describe("The name of the DSN to create."),
     },
@@ -371,6 +384,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       projectSlug: z.string().describe("The project's slug."),
     },
   },
@@ -402,6 +416,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
       issueUrl: z
         .string()
@@ -435,6 +450,7 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
       issueUrl: z
         .string()

@@ -10,6 +10,10 @@ export const OrganizationSchema = z.object({
   id: z.union([z.string(), z.number()]),
   slug: z.string(),
   name: z.string(),
+  links: z.object({
+    regionUrl: z.string().url(),
+    organizationUrl: z.string().url(),
+  }),
 });
 
 export const OrganizationListSchema = z.array(OrganizationSchema);

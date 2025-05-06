@@ -55,6 +55,10 @@ export class ApiError extends Error {
   }
 }
 
+type RequestOptions = {
+  host?: string;
+};
+
 export class SentryApiService {
   private accessToken: string | null;
   protected host: string;
@@ -69,6 +73,11 @@ export class SentryApiService {
   }) {
     this.accessToken = accessToken;
     this.host = host || "sentry.io";
+    this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
+  }
+
+  setHost(host: string) {
+    this.host = host;
     this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
   }
 
@@ -139,60 +148,77 @@ export class SentryApiService {
       : `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`;
   }
 
-  async listOrganizations(): Promise<OrganizationList> {
-    const response = await this.request("/organizations/");
+  async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
+    const response = await this.request("/organizations/", undefined, opts);
 
     const body = await response.json();
     return OrganizationListSchema.parse(body);
   }
 
-  async listTeams(organizationSlug: string): Promise<TeamList> {
+  async listTeams(
+    organizationSlug: string,
+    opts?: RequestOptions,
+  ): Promise<TeamList> {
     const response = await this.request(
       `/organizations/${organizationSlug}/teams/`,
+      undefined,
+      opts,
     );
 
     const body = await response.json();
     return TeamListSchema.parse(body);
   }
 
-  async createTeam({
-    organizationSlug,
-    name,
-  }: {
-    organizationSlug: string;
-    name: string;
-  }): Promise<Team> {
+  async createTeam(
+    {
+      organizationSlug,
+      name,
+    }: {
+      organizationSlug: string;
+      name: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Team> {
     const response = await this.request(
       `/organizations/${organizationSlug}/teams/`,
       {
         method: "POST",
         body: JSON.stringify({ name }),
       },
+      opts,
     );
 
     return TeamSchema.parse(await response.json());
   }
 
-  async listProjects(organizationSlug: string): Promise<ProjectList> {
+  async listProjects(
+    organizationSlug: string,
+    opts?: RequestOptions,
+  ): Promise<ProjectList> {
     const response = await this.request(
       `/organizations/${organizationSlug}/projects/`,
+      undefined,
+      opts,
     );
 
     const body = await response.json();
     return ProjectListSchema.parse(body);
   }
 
-  async createProject({
-    organizationSlug,
-    teamSlug,
-    name,
-    platform,
-  }: {
-    organizationSlug: string;
-    teamSlug: string;
-    name: string;
-    platform?: string;
-  }): Promise<Project> {
+  async createProject(
+    {
+      organizationSlug,
+      teamSlug,
+      name,
+      platform,
+    }: {
+      organizationSlug: string;
+      teamSlug: string;
+      name: string;
+      platform?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Project> {
     const response = await this.request(
       `/teams/${organizationSlug}/${teamSlug}/projects/`,
       {
@@ -202,19 +228,23 @@ export class SentryApiService {
           platform,
         }),
       },
+      opts,
     );
     return ProjectSchema.parse(await response.json());
   }
 
-  async createClientKey({
-    organizationSlug,
-    projectSlug,
-    name,
-  }: {
-    organizationSlug: string;
-    projectSlug: string;
-    name?: string;
-  }): Promise<ClientKey> {
+  async createClientKey(
+    {
+      organizationSlug,
+      projectSlug,
+      name,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      name?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ClientKey> {
     const response = await this.request(
       `/projects/${organizationSlug}/${projectSlug}/keys/`,
       {
@@ -223,47 +253,61 @@ export class SentryApiService {
           name,
         }),
       },
+      opts,
     );
     return ClientKeySchema.parse(await response.json());
   }
 
-  async listClientKeys({
-    organizationSlug,
-    projectSlug,
-  }: {
-    organizationSlug: string;
-    projectSlug: string;
-  }): Promise<ClientKeyList> {
+  async listClientKeys(
+    {
+      organizationSlug,
+      projectSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ClientKeyList> {
     const response = await this.request(
       `/projects/${organizationSlug}/${projectSlug}/keys/`,
+      undefined,
+      opts,
     );
     return ClientKeyListSchema.parse(await response.json());
   }
 
-  async listReleases({
-    organizationSlug,
-    projectSlug,
-  }: {
-    organizationSlug: string;
-    projectSlug?: string;
-  }): Promise<ReleaseList> {
+  async listReleases(
+    {
+      organizationSlug,
+      projectSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReleaseList> {
     const response = await this.request(
       projectSlug
         ? `/projects/${organizationSlug}/${projectSlug}/releases/`
         : `/organizations/${organizationSlug}/releases/`,
+      undefined,
+      opts,
     );
 
     const body = await response.json();
     return ReleaseListSchema.parse(body);
   }
 
-  async listTags({
-    organizationSlug,
-    dataset,
-  }: {
-    organizationSlug: string;
-    dataset?: "errors" | "search_issues";
-  }): Promise<TagList> {
+  async listTags(
+    {
+      organizationSlug,
+      dataset,
+    }: {
+      organizationSlug: string;
+      dataset?: "errors" | "search_issues";
+    },
+    opts?: RequestOptions,
+  ): Promise<TagList> {
     // TODO: this supports project in the query, but needs fixed
     // to accept slugs
     const searchQuery = new URLSearchParams();
@@ -273,23 +317,28 @@ export class SentryApiService {
 
     const response = await this.request(
       `/organizations/${organizationSlug}/tags/${searchQuery.toString()}`,
+      undefined,
+      opts,
     );
 
     const body = await response.json();
     return TagListSchema.parse(body);
   }
 
-  async listIssues({
-    organizationSlug,
-    projectSlug,
-    query,
-    sortBy,
-  }: {
-    organizationSlug: string;
-    projectSlug?: string;
-    query?: string;
-    sortBy?: "user" | "freq" | "date" | "new";
-  }): Promise<IssueList> {
+  async listIssues(
+    {
+      organizationSlug,
+      projectSlug,
+      query,
+      sortBy,
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      query?: string;
+      sortBy?: "user" | "freq" | "date" | "new";
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueList> {
     const sentryQuery: string[] = [];
     if (query) {
       sentryQuery.push(query);
@@ -308,36 +357,46 @@ export class SentryApiService {
       ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
       : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
 
-    const response = await this.request(apiUrl);
+    const response = await this.request(apiUrl, undefined, opts);
 
     const body = await response.json();
     return IssueListSchema.parse(body);
   }
 
-  async getIssue({
-    organizationSlug,
-    issueId,
-  }: {
-    organizationSlug: string;
-    issueId: string;
-  }): Promise<Issue> {
+  async getIssue(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Issue> {
     const response = await this.request(
       `/organizations/${organizationSlug}/issues/${issueId}/`,
+      undefined,
+      opts,
     );
 
     const body = await response.json();
     return IssueSchema.parse(body);
   }
 
-  async getLatestEventForIssue({
-    organizationSlug,
-    issueId,
-  }: {
-    organizationSlug: string;
-    issueId: string;
-  }): Promise<Event> {
+  async getLatestEventForIssue(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Event> {
     const response = await this.request(
       `/organizations/${organizationSlug}/issues/${issueId}/events/latest/`,
+      undefined,
+      opts,
     );
 
     const body = await response.json();
@@ -360,21 +419,24 @@ export class SentryApiService {
   //   return SentryIssueSchema.parse(body);
   // }
 
-  async searchErrors({
-    organizationSlug,
-    projectSlug,
-    filename,
-    transaction,
-    query,
-    sortBy = "last_seen",
-  }: {
-    organizationSlug: string;
-    projectSlug?: string;
-    filename?: string;
-    transaction?: string;
-    query?: string;
-    sortBy?: "last_seen" | "count";
-  }) {
+  async searchErrors(
+    {
+      organizationSlug,
+      projectSlug,
+      filename,
+      transaction,
+      query,
+      sortBy = "last_seen",
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      filename?: string;
+      transaction?: string;
+      query?: string;
+      sortBy?: "last_seen" | "count";
+    },
+    opts?: RequestOptions,
+  ) {
     const sentryQuery: string[] = [];
     if (filename) {
       sentryQuery.push(`stack.filename:"*${filename.replace(/"/g, '\\"')}"`);
@@ -408,7 +470,7 @@ export class SentryApiService {
 
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
 
-    const response = await this.request(apiUrl);
+    const response = await this.request(apiUrl, undefined, opts);
 
     const body = await response.json();
     // TODO(dcramer): If you're using an older version of Sentry this API had a breaking change
@@ -416,19 +478,22 @@ export class SentryApiService {
     return ErrorsSearchResponseSchema.parse(body).data;
   }
 
-  async searchSpans({
-    organizationSlug,
-    projectSlug,
-    transaction,
-    query,
-    sortBy = "timestamp",
-  }: {
-    organizationSlug: string;
-    projectSlug?: string;
-    transaction?: string;
-    query?: string;
-    sortBy?: "timestamp" | "duration";
-  }) {
+  async searchSpans(
+    {
+      organizationSlug,
+      projectSlug,
+      transaction,
+      query,
+      sortBy = "timestamp",
+    }: {
+      organizationSlug: string;
+      projectSlug?: string;
+      transaction?: string;
+      query?: string;
+      sortBy?: "timestamp" | "duration";
+    },
+    opts?: RequestOptions,
+  ) {
     const sentryQuery: string[] = ["is_transaction:true"];
     if (transaction) {
       sentryQuery.push(`transaction:"${transaction.replace(/"/g, '\\"')}"`);
@@ -463,24 +528,27 @@ export class SentryApiService {
 
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
 
-    const response = await this.request(apiUrl);
+    const response = await this.request(apiUrl, undefined, opts);
 
     const body = await response.json();
     return SpansSearchResponseSchema.parse(body).data;
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
-  async startAutofix({
-    organizationSlug,
-    issueId,
-    eventId,
-    instruction = "",
-  }: {
-    organizationSlug: string;
-    issueId: string;
-    eventId?: string;
-    instruction?: string;
-  }): Promise<AutofixRun> {
+  async startAutofix(
+    {
+      organizationSlug,
+      issueId,
+      eventId,
+      instruction = "",
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      eventId?: string;
+      instruction?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<AutofixRun> {
     const response = await this.request(
       `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
       {
@@ -490,21 +558,27 @@ export class SentryApiService {
           instruction,
         }),
       },
+      opts,
     );
     const body = await response.json();
     return AutofixRunSchema.parse(body);
   }
 
   // GET https://us.sentry.io/api/0/issues/5485083130/autofix/
-  async getAutofixState({
-    organizationSlug,
-    issueId,
-  }: {
-    organizationSlug: string;
-    issueId: string;
-  }): Promise<AutofixRunState> {
+  async getAutofixState(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<AutofixRunState> {
     const response = await this.request(
       `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      undefined,
+      opts,
     );
     const body = await response.json();
     return AutofixRunStateSchema.parse(body);

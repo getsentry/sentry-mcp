@@ -39,3 +39,7 @@ export const ParamQuery = z
   .describe(
     `The search query to apply. Use the \`help(subject="query_syntax")\` tool to get more information about the query syntax rather than guessing.`,
   );
+
+export const ParamRegionUrl = z
+  .string()
+  .describe("The region URL for the organization you're querying, if known.");

@@ -3,6 +3,16 @@ import { http, HttpResponse } from "msw";
 
 import autofixStateFixture from "./fixtures/autofix-state.json";
 
+const OrganizationPayload = {
+  id: "4509106740723712",
+  slug: "sentry-mcp-evals",
+  name: "sentry-mcp-evals",
+  links: {
+    regionUrl: "https://us.sentry.io",
+    organizationUrl: "https://sentry.io/sentry-mcp-evals",
+  },
+};
+
 const TagsPayload = [
   { key: "transaction", name: "Transaction", totalValues: 1080 },
   { key: "runtime.name", name: "Runtime.Name", totalValues: 1080 },
@@ -790,13 +800,10 @@ const EventsSpansPayload = {
 
 export const restHandlers = [
   http.get("https://sentry.io/api/0/organizations/", () => {
-    return HttpResponse.json([
-      {
-        id: "4509106740723712",
-        slug: "sentry-mcp-evals",
-        name: "sentry-mcp-evals",
-      },
-    ]);
+    return HttpResponse.json([OrganizationPayload]);
+  }),
+  http.get("https://sentry.io/api/0/organizations/sentry-mcp-evals/", () => {
+    return HttpResponse.json(OrganizationPayload);
   }),
   http.get(
     "https://sentry.io/api/0/organizations/sentry-mcp-evals/teams/",
