@@ -348,7 +348,7 @@ export class SentryApiService {
     queryParams.set("per_page", "10");
     queryParams.set("referrer", "sentry-mcp");
     if (sortBy) queryParams.set("sort", sortBy);
-    queryParams.set("statsPeriod", "1w");
+    queryParams.set("statsPeriod", "24h");
     queryParams.set("query", sentryQuery.join(" "));
 
     queryParams.append("collapse", "unhandled");
@@ -459,7 +459,7 @@ export class SentryApiService {
       "sort",
       `-${sortBy === "last_seen" ? "last_seen" : "count"}`,
     );
-    queryParams.set("statsPeriod", "1w");
+    queryParams.set("statsPeriod", "24h");
     queryParams.append("field", "issue");
     queryParams.append("field", "title");
     queryParams.append("field", "project");
