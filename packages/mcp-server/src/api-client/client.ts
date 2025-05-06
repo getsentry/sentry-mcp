@@ -294,9 +294,6 @@ export class SentryApiService {
     if (query) {
       sentryQuery.push(query);
     }
-    if (projectSlug) {
-      sentryQuery.push(`project:${projectSlug}`);
-    }
 
     const queryParams = new URLSearchParams();
     queryParams.set("per_page", "10");
@@ -307,7 +304,9 @@ export class SentryApiService {
 
     queryParams.append("collapse", "unhandled");
 
-    const apiUrl = `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
+    const apiUrl = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
+      : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
 
     const response = await this.request(apiUrl);
 

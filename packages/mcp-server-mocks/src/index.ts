@@ -1103,6 +1103,59 @@ export const restHandlers = [
     },
   ),
   http.get(
+    "https://sentry.io/api/0/projects/sentry-mcp-evals/foobar/issues/",
+    () => HttpResponse.json([]),
+  ),
+  http.get(
+    "https://sentry.io/api/0/projects/sentry-mcp-evals/cloudflare-mcp/issues/",
+    ({ request }) => {
+      const url = new URL(request.url);
+      const sort = url.searchParams.get("sort");
+
+      if (![null, "user", "freq", "date", "new", null].includes(sort)) {
+        return HttpResponse.json(
+          `Invalid sort: ${url.searchParams.get("sort")}`,
+          {
+            status: 400,
+          },
+        );
+      }
+
+      const collapse = url.searchParams.getAll("collapse");
+      if (collapse.includes("stats")) {
+        return HttpResponse.json(`Invalid collapse: ${collapse.join(",")}`, {
+          status: 400,
+        });
+      }
+
+      const query = url.searchParams.get("query");
+      const queryTokens = query?.split(" ").sort() ?? [];
+      const sortedQuery = queryTokens ? queryTokens.join(" ") : null;
+      if (
+        ![
+          null,
+          "",
+          "is:unresolved",
+          "error.handled:false is:unresolved",
+          "error.unhandled:true is:unresolved",
+          "user.email:david@sentry.io",
+        ].includes(sortedQuery)
+      ) {
+        return HttpResponse.json([]);
+      }
+
+      if (queryTokens.includes("user.email:david@sentry.io")) {
+        return HttpResponse.json([IssuePayload]);
+      }
+
+      if (sort === "date") {
+        return HttpResponse.json([IssuePayload, IssuePayload2]);
+      }
+      return HttpResponse.json([IssuePayload2, IssuePayload]);
+    },
+  ),
+
+  http.get(
     "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/",
     ({ request }) => {
       const url = new URL(request.url);
