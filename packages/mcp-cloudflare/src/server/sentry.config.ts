@@ -21,7 +21,10 @@ export default function getSentryConfig(env: Env): SentryConfig {
     _experiments: {
       enableLogs: true,
     },
-    integrations: [Sentry.consoleLoggingIntegration()],
+    integrations: [
+      Sentry.consoleLoggingIntegration(),
+      Sentry.zodErrorsIntegration(),
+    ],
   };
 }
 
