@@ -14,18 +14,17 @@ function isApiError(error: unknown) {
 }
 
 async function logAndFormatError(error: unknown) {
-  const eventId = logError(error);
-
   if (isApiError(error)) {
     const typedError = error as ApiError;
     return [
       "**Error**",
-      `There was a ${typedError.status} error with the your request to the Sentry API.`,
+      `There was an HTTP ${typedError.status} error with the your request to the Sentry API.`,
       `${typedError.message}`,
-      "If you believe this was a genuine error, please report the following to the user for the Sentry team:",
-      `**Event ID**: ${eventId}`,
+      `You may be able to resolve the issue by addressing the concern and trying again.`,
     ].join("\n\n");
   }
+
+  const eventId = logError(error);
 
   return [
     "**Error**",
