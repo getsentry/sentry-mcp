@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import authHandler from "./routes/oauth";
 import type { Env } from "./types";
+import sentryOauth from "./routes/sentry-oauth";
 
 export default new Hono<{
   Bindings: Env;
@@ -20,4 +20,4 @@ export default new Hono<{
       ].join("\n"),
     );
   })
-  .route("/", authHandler);
+  .route("/oauth", sentryOauth);

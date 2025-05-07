@@ -84,7 +84,11 @@
 
   body {
     @apply bg-background text-foreground;
-    background: linear-gradient(to bottom, #2d1b69, #171717, #000000);
+    background: linear-gradient(
+      oklch(0.13 0.028 261.692) 0%,
+      oklch(0.21 0.034 264.665) 50%,
+      oklch(0.13 0.028 261.692) 100%
+    );
     min-height: 100vh;
   }
 

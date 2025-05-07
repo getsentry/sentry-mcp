@@ -7,9 +7,38 @@ import {
 import type { Env, WorkerProps } from "../types";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
 import { SCOPES } from "../../constants";
+import {
+  renderApprovalDialog,
+  clientIdAlreadyApproved,
+  parseRedirectApproval,
+} from "../lib/approval-dialog";
 
 export const SENTRY_AUTH_URL = "/oauth/authorize/";
 export const SENTRY_TOKEN_URL = "/oauth/token/";
+
+async function redirectToUpstream(
+  env: Env,
+  request: Request,
+  oauthReqInfo: AuthRequest,
+  headers: Record<string, string> = {},
+) {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      ...headers,
+      location: getUpstreamAuthorizeUrl({
+        upstream_url: new URL(
+          SENTRY_AUTH_URL,
+          `https://${env.SENTRY_HOST || "sentry.io"}`,
+        ).href,
+        scope: Object.keys(SCOPES).join(" "),
+        client_id: env.SENTRY_CLIENT_ID,
+        redirect_uri: new URL("/oauth/callback", request.url).href,
+        state: btoa(JSON.stringify(oauthReqInfo)),
+      }),
+    },
+  });
+}
 
 export default new Hono<{
   Bindings: Env;
@@ -24,24 +53,45 @@ export default new Hono<{
    * parameters so the user can authenticate and grant permissions.
    */
   // TODO: this needs to deauthorize if props are not correct (e.g. wrong org slug)
-  .get("/oauth/authorize", async (c) => {
+  .get("/authorize", async (c) => {
     const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
-    if (!oauthReqInfo.clientId) {
+    const { clientId } = oauthReqInfo;
+    if (!clientId) {
       return c.text("Invalid request", 400);
     }
 
-    return Response.redirect(
-      getUpstreamAuthorizeUrl({
-        upstream_url: new URL(
-          SENTRY_AUTH_URL,
-          `https://${c.env.SENTRY_HOST || "sentry.io"}`,
-        ).href,
-        scope: Object.keys(SCOPES).join(" "),
-        client_id: c.env.SENTRY_CLIENT_ID,
-        redirect_uri: new URL("/oauth/callback", c.req.url).href,
-        state: btoa(JSON.stringify(oauthReqInfo)),
-      }),
+    // because we share a clientId with the upstream provider, we need to ensure that the
+    // downstream client has been approved by the end-user (e.g. for a new client)
+    // https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/265
+    const isApproved = await clientIdAlreadyApproved(
+      c.req.raw,
+      clientId,
+      c.env.COOKIE_SECRET,
     );
+    if (!isApproved) {
+      return renderApprovalDialog(c.req.raw, {
+        client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
+        server: {
+          name: "Sentry MCP",
+        },
+        state: { oauthReqInfo }, // arbitrary data that flows through the form submission below
+      });
+    }
+
+    return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
+  })
+
+  .post("/authorize", async (c) => {
+    // Validates form submission, extracts state, and generates Set-Cookie headers to skip approval dialog next time
+    const { state, headers } = await parseRedirectApproval(
+      c.req.raw,
+      c.env.COOKIE_SECRET,
+    );
+    if (!state.oauthReqInfo) {
+      return c.text("Invalid request", 400);
+    }
+
+    return redirectToUpstream(c.env, c.req.raw, state.oauthReqInfo, headers);
   })
 
   /**
@@ -52,7 +102,7 @@ export default new Hono<{
    * user metadata & the auth token as part of the 'props' on the token passed
    * down to the client. It ends by redirecting the client back to _its_ callback URL
    */
-  .get("/oauth/callback", async (c) => {
+  .get("/callback", async (c) => {
     // Get the oathReqInfo out of KV
     const oauthReqInfo = JSON.parse(
       atob(c.req.query("state") as string),

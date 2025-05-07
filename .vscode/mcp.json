@@ -3,12 +3,12 @@
     "sentry-dev": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "mcp-remote", "http://localhost:5173/sse"]
+      "args": ["-y", "mcp-remote@latest", "http://localhost:5173/sse"]
     },
     "sentry": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://mcp.sentry.dev/sse"]
+      "args": ["-y", "mcp-remote@latest", "https://mcp.sentry.dev/sse"]
     }
   }
 }

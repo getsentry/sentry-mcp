@@ -8,14 +8,14 @@ const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 export default function RemoteSetup() {
   const sseUrl = new URL("/sse", window.location.href).href;
 
-  const mcpRemoteSnippet = `npx mcp-remote ${sseUrl}`;
+  const mcpRemoteSnippet = `npx mcp-remote@latest ${sseUrl}`;
 
   // https://code.visualstudio.com/docs/copilot/chat/mcp-servers
   const vsCodeHandler = `code:mcp/install?${encodeURIComponent(
     JSON.stringify({
       name: mcpServerName,
       command: "npx",
-      args: ["-y", "mcp-remote", sseUrl],
+      args: ["-y", "mcp-remote@latest", sseUrl],
     }),
   )}`;
   const zedInstructions = JSON.stringify(
@@ -23,7 +23,7 @@ export default function RemoteSetup() {
       context_servers: {
         [mcpServerName]: {
           command: "npx",
-          args: ["-y", "mcp-remote", sseUrl],
+          args: ["-y", "mcp-remote@latest", sseUrl],
         },
         settings: {},
       },
@@ -61,7 +61,7 @@ export default function RemoteSetup() {
                     mcpServers: {
                       sentry: {
                         command: "npx",
-                        args: ["-y", "mcp-remote", sseUrl],
+                        args: ["-y", "mcp-remote@latest", sseUrl],
                       },
                     },
                   },

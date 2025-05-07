@@ -7,7 +7,10 @@
   "name": "sentry-mcp",
   "main": "./src/server/index.ts",
   "compatibility_date": "2025-03-21",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
   "migrations": [
     {
       "new_sqlite_classes": ["SentryMCP"],
