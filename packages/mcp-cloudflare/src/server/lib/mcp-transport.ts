@@ -45,9 +45,12 @@ export default Sentry.instrumentDurableObjectWithSentry(
     dsn: env.SENTRY_DSN,
     tracesSampleRate: 1,
     sendDefaultPii: true,
-    environment:
-      env.SENTRY_ENVIRONMENT ??
-      (process.env.NODE_ENV !== "production" ? "development" : "production"),
+    initialScope: {
+      tags: {
+        durable_object: true,
+        mcp_server_version: LIB_VERSION,
+      },
+    },
     _experiments: {
       enableLogs: true,
     },

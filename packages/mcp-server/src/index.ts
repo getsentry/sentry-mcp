@@ -45,6 +45,11 @@ if (!accessToken) {
 Sentry.init({
   dsn: sentryDsn,
   sendDefaultPii: true,
+  initialScope: {
+    tags: {
+      mcp_server_version: LIB_VERSION,
+    },
+  },
   environment:
     process.env.SENTRY_ENVIRONMENT ??
     (process.env.NODE_ENV !== "production" ? "development" : "production"),
