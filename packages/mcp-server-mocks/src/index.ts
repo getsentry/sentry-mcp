@@ -171,15 +171,16 @@ const IssuePayload = {
   lastSeen: "2025-04-12T11:34:11Z",
   firstRelease: null,
   lastRelease: null,
-  tags: [
-    { key: "environment", name: "Environment", totalValues: 25 },
-    { key: "handled", name: "Handled", totalValues: 25 },
-    { key: "level", name: "Level", totalValues: 25 },
-    { key: "mechanism", name: "Mechanism", totalValues: 25 },
-    { key: "runtime.name", name: "Runtime.Name", totalValues: 25 },
-    { key: "url", name: "URL", totalValues: 25 },
-    { key: "user", name: "User", totalValues: 25 },
-  ],
+  // this requires an inclusion
+  // tags: [
+  //   { key: "environment", name: "Environment", totalValues: 25 },
+  //   { key: "handled", name: "Handled", totalValues: 25 },
+  //   { key: "level", name: "Level", totalValues: 25 },
+  //   { key: "mechanism", name: "Mechanism", totalValues: 25 },
+  //   { key: "runtime.name", name: "Runtime.Name", totalValues: 25 },
+  //   { key: "url", name: "URL", totalValues: 25 },
+  //   { key: "user", name: "User", totalValues: 25 },
+  // ],
   activity: [
     {
       id: "4633815464",
