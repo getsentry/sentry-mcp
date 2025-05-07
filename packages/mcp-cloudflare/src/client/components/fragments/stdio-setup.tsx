@@ -102,12 +102,27 @@ export default function RemoteSetup() {
             <li>
               Select <strong>Add Server</strong>.
             </li>
+            <li>
+              <CodeSnippet
+                snippet={JSON.stringify(
+                  {
+                    mcpServers: {
+                      sentry: {
+                        command: "npx",
+                        args: ["@sentry/mcp-server@latest"],
+                        env: {
+                          SENTRY_AUTH_TOKEN: "sentry-pat",
+                          SENTRY_HOST: "sentry.io",
+                        },
+                      },
+                    },
+                  },
+                  undefined,
+                  2,
+                )}
+              />
+            </li>
           </ol>
-          <p>
-            <small>
-              Note: Windsurf requires an enterprise account to utilize MCP. 😕
-            </small>
-          </p>
         </SetupGuide>
 
         <SetupGuide id="vscode" title="Visual Studio Code">
