@@ -1,12 +1,8 @@
+import * as Sentry from "@sentry/cloudflare";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "../types";
-import {
-  flush,
-  instrumentDurableObjectWithSentry,
-  wrapMcpServerWithSentry,
-} from "@sentry/cloudflare";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 
 // Context from the auth process, encrypted & stored in the auth token
@@ -38,17 +34,24 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
         userId: this.props.id,
       },
       onToolComplete: () => {
-        this.ctx.waitUntil(flush(2000));
+        this.ctx.waitUntil(Sentry.flush(2000));
       },
     });
   }
 }
 
-export default instrumentDurableObjectWithSentry(
+export default Sentry.instrumentDurableObjectWithSentry(
   (env) => ({
     dsn: env.SENTRY_DSN,
     tracesSampleRate: 1,
     sendDefaultPii: true,
+    environment:
+      env.SENTRY_ENVIRONMENT ??
+      (process.env.NODE_ENV !== "production" ? "development" : "production"),
+    _experiments: {
+      enableLogs: true,
+    },
+    integrations: [Sentry.consoleLoggingIntegration()],
   }),
   SentryMCPBase,
 );
