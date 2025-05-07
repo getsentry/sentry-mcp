@@ -13,9 +13,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Server",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -26,9 +24,7 @@
   "bin": {
     "sentry-mcp": "./dist/index.js"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -83,12 +79,12 @@
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
-    "msw": "^2.7.5"
+    "msw": "^2.7.6"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.10.2",
+    "@modelcontextprotocol/sdk": "^1.11.0",
     "@sentry/core": "^9.16.1",
     "@sentry/node": "^9.16.1",
-    "zod": "^3.24.3"
+    "zod": "^3.24.4"
   }
 }
