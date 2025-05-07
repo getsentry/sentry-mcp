@@ -50,6 +50,7 @@ Sentry.init({
       mcp_server_version: LIB_VERSION,
     },
   },
+  integrations: [Sentry.zodErrorsIntegration()],
   environment:
     process.env.SENTRY_ENVIRONMENT ??
     (process.env.NODE_ENV !== "production" ? "development" : "production"),
