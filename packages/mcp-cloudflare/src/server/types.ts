@@ -14,6 +14,7 @@ export interface Env {
   COOKIE_SECRET: string;
   SENTRY_CLIENT_ID: string;
   SENTRY_CLIENT_SECRET: string;
+  SENTRY_ENVIRONMENT?: string;
   SENTRY_DSN?: string;
   SENTRY_HOST?: string;
   MCP_OBJECT: DurableObjectNamespace;

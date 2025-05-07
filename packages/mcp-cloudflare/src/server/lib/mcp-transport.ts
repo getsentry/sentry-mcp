@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "../types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
+import getSentryConfig from "../sentry.config";
 
 // Context from the auth process, encrypted & stored in the auth token
 // and provided to the DurableMCP as this.props
@@ -41,20 +42,13 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
 }
 
 export default Sentry.instrumentDurableObjectWithSentry(
-  (env) => ({
-    dsn: env.SENTRY_DSN,
-    tracesSampleRate: 1,
-    sendDefaultPii: true,
+  getSentryConfig.partial({
     initialScope: {
       tags: {
         durable_object: true,
         mcp_server_version: LIB_VERSION,
       },
     },
-    _experiments: {
-      enableLogs: true,
-    },
-    integrations: [Sentry.consoleLoggingIntegration()],
   }),
   SentryMCPBase,
 );

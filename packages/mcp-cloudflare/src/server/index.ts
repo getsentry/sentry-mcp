@@ -4,6 +4,7 @@ import SentryMCP from "./lib/mcp-transport";
 import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
+import getSentryConfig from "./sentry.config";
 
 // required for Durable Objects
 export { SentryMCP };
@@ -22,17 +23,6 @@ const oAuthProvider = new OAuthProvider({
 });
 
 export default Sentry.withSentry(
-  (env) => ({
-    dsn: env.SENTRY_DSN,
-    tracesSampleRate: 1,
-    sendDefaultPii: true,
-    environment:
-      env.SENTRY_ENVIRONMENT ??
-      (process.env.NODE_ENV !== "production" ? "development" : "production"),
-    _experiments: {
-      enableLogs: true,
-    },
-    integrations: [Sentry.consoleLoggingIntegration()],
-  }),
+  getSentryConfig,
   oAuthProvider,
 ) satisfies ExportedHandler<Env>;
