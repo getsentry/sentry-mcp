@@ -45,12 +45,16 @@ if (!accessToken) {
 Sentry.init({
   dsn: sentryDsn,
   sendDefaultPii: true,
+  tracesSampleRate: 1,
   initialScope: {
     tags: {
       mcp_server_version: LIB_VERSION,
     },
   },
-  integrations: [Sentry.zodErrorsIntegration()],
+  integrations: [
+    Sentry.consoleLoggingIntegration(),
+    Sentry.zodErrorsIntegration(),
+  ],
   environment:
     process.env.SENTRY_ENVIRONMENT ??
     (process.env.NODE_ENV !== "production" ? "development" : "production"),
