@@ -97,6 +97,9 @@ export async function configureServer({
                     id: context.userId,
                   });
                 }
+                if (context.clientId) {
+                  setTag("client.id", context.clientId);
+                }
 
                 // TODO(dcramer): I'm too dumb to figure this out
                 // @ts-ignore
@@ -128,6 +131,9 @@ export async function configureServer({
                   setUser({
                     id: context.userId,
                   });
+                }
+                if (context.clientId) {
+                  setTag("client.id", context.clientId);
                 }
 
                 try {
