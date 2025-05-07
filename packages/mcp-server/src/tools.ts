@@ -12,6 +12,7 @@ import { formatEventOutput, formatIssueOutput } from "./internal/formatting";
 import { extractIssueId, parseIssueParams } from "./internal/issue-helpers";
 import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
+import { setTag } from "@sentry/core";
 
 function apiServiceFromContext(
   context: ServerContext,
@@ -63,6 +64,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const teams = await apiService.listTeams(organizationSlug);
     let output = `# Teams in **${organizationSlug}**\n\n`;
     if (teams.length === 0) {
@@ -83,6 +86,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const projects = await apiService.listProjects(organizationSlug);
     let output = `# Projects in **${organizationSlug}**\n\n`;
     if (projects.length === 0) {
@@ -103,6 +108,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const sortByMap = {
       last_seen: "date" as const,
       first_seen: "new" as const,
@@ -152,6 +159,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const releases = await apiService.listReleases({
       organizationSlug,
       projectSlug: params.projectSlug,
@@ -239,6 +248,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const tagList = await apiService.listTags({ organizationSlug }, {});
     let output = `# Tags in **${organizationSlug}**\n\n`;
     if (tagList.length === 0) {
@@ -261,6 +272,8 @@ export const TOOL_HANDLERS = {
         issueId: params.issueId,
         issueUrl: params.issueUrl,
       });
+    setTag("organization.slug", orgSlug);
+
     const issue = await apiService.getIssue({
       organizationSlug: orgSlug,
       issueId: parsedIssueId,
@@ -288,6 +301,7 @@ export const TOOL_HANDLERS = {
       if (!orgSlug) {
         throw new Error("Organization slug is required");
       }
+      setTag("organization.slug", orgSlug);
       const [issue] = await apiService.listIssues({
         organizationSlug: orgSlug,
         query: params.eventId,
@@ -314,6 +328,7 @@ export const TOOL_HANDLERS = {
         issueId: params.issueId,
         issueUrl: params.issueUrl,
       });
+    setTag("organization.slug", orgSlug);
 
     const [issue, event] = await Promise.all([
       apiService.getIssue({
@@ -344,6 +359,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const eventList = await apiService.searchErrors({
       organizationSlug,
       projectSlug: params.projectSlug,
@@ -388,6 +405,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const eventList = await apiService.searchSpans({
       organizationSlug,
       projectSlug: params.projectSlug,
@@ -430,6 +449,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const team = await apiService.createTeam({
       organizationSlug,
       name: params.name,
@@ -453,6 +474,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const project = await apiService.createProject({
       organizationSlug,
       teamSlug: params.teamSlug,
@@ -494,6 +517,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const clientKey = await apiService.createClientKey({
       organizationSlug,
       projectSlug: params.projectSlug,
@@ -518,6 +543,8 @@ export const TOOL_HANDLERS = {
     if (!organizationSlug) {
       throw new Error("Organization slug is required");
     }
+    setTag("organization.slug", organizationSlug);
+
     const clientKeys = await apiService.listClientKeys({
       organizationSlug,
       projectSlug: params.projectSlug,
@@ -542,32 +569,20 @@ export const TOOL_HANDLERS = {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    let issueId = params.issueId;
-    if (params.issueUrl) {
-      const resolved = extractIssueId(params.issueUrl);
-      if (!resolved) {
-        throw new Error(
-          "Invalid Sentry issue URL. Path should contain '/issues/{issue_id}'",
-        );
-      }
-      organizationSlug = resolved.organizationSlug;
-      issueId = resolved.issueId;
-    } else if (!issueId) {
-      throw new Error("Either issueId or issueUrl must be provided");
-    }
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const { organizationSlug: orgSlug, issueId: parsedIssueId } =
+      parseIssueParams({
+        organizationSlug: params.organizationSlug ?? context.organizationSlug,
+        issueId: params.issueId,
+        issueUrl: params.issueUrl,
+      });
+    setTag("organization.slug", orgSlug);
+
     const data = await apiService.startAutofix({
-      organizationSlug,
-      issueId,
+      organizationSlug: orgSlug,
+      issueId: parsedIssueId,
     });
     return [
-      `# Autofix Started for Issue ${issueId}`,
+      `# Autofix Started for Issue ${parsedIssueId}`,
       "",
       `**Run ID:**: ${data.run_id}`,
       "",
@@ -578,7 +593,7 @@ export const TOOL_HANDLERS = {
       "```",
       params.issueUrl
         ? `get_autofix_status(issueUrl="${params.issueUrl}")`
-        : `get_autofix_status(organizationSlug="${organizationSlug}", issueId="${issueId}")`,
+        : `get_autofix_status(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`,
       "```",
     ].join("\n");
   },
@@ -586,33 +601,20 @@ export const TOOL_HANDLERS = {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    let issueId = params.issueId;
-    if (params.issueUrl) {
-      const resolved = extractIssueId(params.issueUrl);
-      if (!resolved) {
-        throw new Error(
-          "Invalid Sentry issue URL. Path should contain '/issues/{issue_id}'",
-        );
-      }
-      organizationSlug = resolved.organizationSlug;
-      issueId = resolved.issueId;
-    } else if (!issueId) {
-      throw new Error("Either issueId or issueUrl must be provided");
-    }
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const { organizationSlug: orgSlug, issueId: parsedIssueId } =
+      parseIssueParams({
+        organizationSlug: params.organizationSlug ?? context.organizationSlug,
+        issueId: params.issueId,
+        issueUrl: params.issueUrl,
+      });
+    setTag("organization.slug", orgSlug);
     const { autofix } = await apiService.getAutofixState({
-      organizationSlug,
-      issueId,
+      organizationSlug: orgSlug,
+      issueId: parsedIssueId!,
     });
-    let output = `# Autofix Status for Issue ${issueId}\n\n`;
+    let output = `# Autofix Status for Issue ${parsedIssueId}\n\n`;
     if (!autofix) {
-      output += `No autofix run found for ${issueId}.\n\nYou can initiate a new autofix run using the \`begin_autofix\` tool.`;
+      output += `No autofix run found for ${parsedIssueId}.\n\nYou can initiate a new autofix run using the \`begin_autofix\` tool.`;
       return output;
     }
     for (const step of autofix.steps) {

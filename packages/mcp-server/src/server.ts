@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { TOOL_HANDLERS } from "./tools";
 import { TOOL_DEFINITIONS } from "./toolDefinitions";
 import type { ServerContext } from "./types";
-import { setUser, startNewTrace, startSpan } from "@sentry/core";
+import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
 import { logError } from "./logging";
 import { RESOURCES } from "./resources";
 import { PROMPT_DEFINITIONS } from "./promptDefinitions";
@@ -66,6 +66,9 @@ export async function configureServer({
                 setUser({
                   id: context.userId,
                 });
+              }
+              if (context.clientId) {
+                setTag("client.id", context.clientId);
               }
 
               return resource.handler(url);

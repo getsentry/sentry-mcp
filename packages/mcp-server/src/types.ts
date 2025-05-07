@@ -63,4 +63,5 @@ export type ServerContext = {
   accessToken: string;
   organizationSlug: string | null;
   userId?: string | null;
+  clientId?: string;
 };
