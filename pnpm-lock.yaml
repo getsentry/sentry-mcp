@@ -153,6 +153,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.10.2
         version: 1.10.2
+      '@sentry/core':
+        specifier: ^9.16.1
+        version: 9.16.1
       '@sentry/node':
         specifier: ^9.16.1
         version: 9.16.1
