@@ -48,7 +48,9 @@ Sentry.init({
   tracesSampleRate: 1,
   initialScope: {
     tags: {
-      mcp_server_version: LIB_VERSION,
+      "mcp.server_version": LIB_VERSION,
+      "mcp.transport": "stdio",
+      "sentry.host": host,
     },
   },
   integrations: [

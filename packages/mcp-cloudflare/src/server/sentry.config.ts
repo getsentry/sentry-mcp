@@ -11,8 +11,8 @@ export default function getSentryConfig(env: Env): SentryConfig {
     sendDefaultPii: true,
     initialScope: {
       tags: {
-        durable_object: true,
-        mcp_server_version: LIB_VERSION,
+        "mcp.server_version": LIB_VERSION,
+        "sentry.host": env.SENTRY_HOST,
       },
     },
     environment:
@@ -29,8 +29,20 @@ export default function getSentryConfig(env: Env): SentryConfig {
 }
 
 getSentryConfig.partial = (config: Partial<SentryConfig>) => {
-  return (env: Env) => ({
-    ...getSentryConfig(env),
-    ...config,
-  });
+  return (env: Env) => {
+    const defaultConfig = getSentryConfig(env);
+    return {
+      ...defaultConfig,
+      ...config,
+      initialScope: {
+        ...defaultConfig.initialScope,
+        ...config.initialScope,
+        tags: {
+          // idk I can't typescript
+          ...((defaultConfig.initialScope ?? {}) as any).tags,
+          ...((config.initialScope ?? {}) as any).tags,
+        },
+      },
+    };
+  };
 };

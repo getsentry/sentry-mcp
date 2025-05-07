@@ -46,7 +46,7 @@ export default Sentry.instrumentDurableObjectWithSentry(
     initialScope: {
       tags: {
         durable_object: true,
-        mcp_server_version: LIB_VERSION,
+        "mcp.server_version": LIB_VERSION,
       },
     },
   }),
