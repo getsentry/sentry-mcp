@@ -2,7 +2,6 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "./transports/stdio";
-import { wrapMcpServerWithSentry } from "@sentry/core";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "./version";
 
@@ -56,7 +55,7 @@ const server = new McpServer({
   version: LIB_VERSION,
 });
 
-const instrumentedServer = wrapMcpServerWithSentry(server);
+const instrumentedServer = Sentry.wrapMcpServerWithSentry(server);
 
 const SENTRY_TIMEOUT = 5000; // 5 seconds
 
