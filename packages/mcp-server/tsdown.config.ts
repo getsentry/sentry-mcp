@@ -9,7 +9,7 @@ export default defineConfig({
   clean: true,
   env: {
     DEFAULT_SENTRY_DSN:
-      "https://7f7bbaad9504b727cdf8edc378c6d1de@o1.ingest.us.sentry.io/4509062593708032",
+      "https://d0805acebb937435abcb5958da99cdab@o1.ingest.us.sentry.io/4509062593708032",
     SENTRY_ENVIRONMENT: "stdio",
     npm_package_version:
       process.env.npm_package_version ??
