@@ -175,15 +175,31 @@ export const TOOL_DEFINITIONS = [
       "- Investigate a specific production error",
       "- Access detailed error information and stacktraces from Sentry",
       "",
+      "<examples>",
+      "### Get details for issue ID 'CLOUDFLARE-MCP-41'",
+      "",
+      "```",
+      "get_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')",
+      "```",
+      "",
+      "### Get details for event ID 'c49541c747cb4d8aa3efb70ca5aba243'",
+      "",
+      "```",
+      "get_event_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')",
+      "```",
+      "</examples>",
+
       "<hints>",
-      "- If the user provides the issueUrl, you can ignore the organizationSlug and issueId parameters.",
-      "- If you're uncertain about which organization to query, you should call `list_organizations()` first. This especially important if an issueId is passed.",
+      "- If the user provides the `issueUrl`, you can ignore the other parameters.",
+      "- If the user provides `issueId` or `eventId` (only one is needed), `organizationSlug` is required.",
+      "- If you're uncertain about which organization to query, you should call `list_organizations()` first.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
       regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
+      eventId: z.string().describe("The ID of the event.").optional(),
       issueUrl: z
         .string()
         .url()

@@ -442,6 +442,7 @@ describe("get_issue_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
         issueUrl: undefined,
         regionUrl: undefined,
       },
@@ -455,8 +456,9 @@ describe("get_issue_details", () => {
       **Last Seen**: 2025-04-12T11:34:11.000Z
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
 
-      ## Event Specifics
+      ## Event Details
 
+      **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
       **Occurred At**: 2025-04-08T21:15:04.000Z
       **Error:**
       \`\`\`
@@ -489,6 +491,7 @@ describe("get_issue_details", () => {
       {
         organizationSlug: undefined,
         issueId: undefined,
+        eventId: undefined,
         issueUrl: "https://sentry-mcp-evals.sentry.io/issues/6507376925",
         regionUrl: undefined,
       },
@@ -503,8 +506,9 @@ describe("get_issue_details", () => {
       **Last Seen**: 2025-04-12T11:34:11.000Z
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
 
-      ## Event Specifics
+      ## Event Details
 
+      **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
       **Occurred At**: 2025-04-08T21:15:04.000Z
       **Error:**
       \`\`\`
@@ -520,7 +524,55 @@ describe("get_issue_details", () => {
 
       # Using this information
 
-      - You can reference the IssueID in commit messages (e.g. \`Fixes 6507376925\`) to automatically close the issue when the commit is merged.
+      - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
+      - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
+      "
+    `);
+  });
+  it("serializes with eventId", async () => {
+    const tool = TOOL_HANDLERS.get_issue_details;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: undefined,
+        issueUrl: undefined,
+        eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
+
+      **Description**: Error: Tool list_organizations is already registered
+      **Culprit**: Object.fetch(index)
+      **First Seen**: 2025-04-03T22:51:19.403Z
+      **Last Seen**: 2025-04-12T11:34:11.000Z
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Event Details
+
+      **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
+      **Occurred At**: 2025-04-08T21:15:04.000Z
+      **Error:**
+      \`\`\`
+      Error: Tool list_organizations is already registered
+      \`\`\`
+
+      **Stacktrace:**
+      \`\`\`
+      index.js:7809:27
+      index.js:8029:24 (OAuthProviderImpl.fetch)
+      index.js:19631:28 (Object.fetch)
+      \`\`\`
+
+      # Using this information
+
+      - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
       - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
       "
     `);

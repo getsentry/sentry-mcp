@@ -383,6 +383,28 @@ export class SentryApiService {
     return IssueSchema.parse(body);
   }
 
+  async getEventForIssue(
+    {
+      organizationSlug,
+      issueId,
+      eventId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      eventId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Event> {
+    const response = await this.request(
+      `/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/`,
+      undefined,
+      opts,
+    );
+
+    const body = await response.json();
+    return EventSchema.parse(body);
+  }
+
   async getLatestEventForIssue(
     {
       organizationSlug,
@@ -393,14 +415,14 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Event> {
-    const response = await this.request(
-      `/organizations/${organizationSlug}/issues/${issueId}/events/latest/`,
-      undefined,
+    return this.getEventForIssue(
+      {
+        organizationSlug,
+        issueId,
+        eventId: "latest",
+      },
       opts,
     );
-
-    const body = await response.json();
-    return EventSchema.parse(body);
   }
 
   // TODO: Sentry is not yet exposing a reasonable API to fetch trace data

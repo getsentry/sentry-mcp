@@ -1188,6 +1188,9 @@ export const restHandlers = [
       const query = url.searchParams.get("query");
       const queryTokens = query?.split(" ").sort() ?? [];
       const sortedQuery = queryTokens ? queryTokens.join(" ") : null;
+      if (query === "7ca573c0f4814912aaa9bdc77d1a7d51") {
+        return HttpResponse.json([IssuePayload]);
+      }
       if (
         ![
           null,
@@ -1211,7 +1214,6 @@ export const restHandlers = [
         }
         return HttpResponse.json([]);
       }
-
       if (queryTokens.includes("user.email:david@sentry.io")) {
         return HttpResponse.json([IssuePayload]);
       }
@@ -1239,7 +1241,15 @@ export const restHandlers = [
     () => HttpResponse.json(IssuePayload2),
   ),
   http.get(
+    "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
+    () => HttpResponse.json(EventPayload),
+  ),
+  http.get(
     "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+    () => HttpResponse.json(EventPayload),
+  ),
+  http.get(
+    "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
     () => HttpResponse.json(EventPayload),
   ),
   http.get(

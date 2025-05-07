@@ -8,7 +8,7 @@ import {
   type ErrorEventSchema,
   SentryApiService,
 } from "./api-client/index";
-import { formatEventOutput } from "./internal/formatting";
+import { formatEventOutput, formatIssueOutput } from "./internal/formatting";
 import { extractIssueId, parseIssueParams } from "./internal/issue-helpers";
 import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
@@ -282,12 +282,39 @@ export const TOOL_HANDLERS = {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
+
+    if (params.eventId) {
+      const orgSlug = params.organizationSlug ?? context.organizationSlug;
+      if (!orgSlug) {
+        throw new Error("Organization slug is required");
+      }
+      const [issue] = await apiService.listIssues({
+        organizationSlug: orgSlug,
+        query: params.eventId,
+      });
+      if (!issue) {
+        return `# Event Not Found\n\nNo issue found for Event ID: ${params.eventId}`;
+      }
+      const event = await apiService.getEventForIssue({
+        organizationSlug: orgSlug,
+        issueId: issue.shortId,
+        eventId: params.eventId,
+      });
+      return formatIssueOutput({
+        organizationSlug: orgSlug,
+        issue,
+        event,
+        apiService,
+      });
+    }
+
     const { organizationSlug: orgSlug, issueId: parsedIssueId } =
       parseIssueParams({
         organizationSlug: params.organizationSlug ?? context.organizationSlug,
         issueId: params.issueId,
         issueUrl: params.issueUrl,
       });
+
     const [issue, event] = await Promise.all([
       apiService.getIssue({
         organizationSlug: orgSlug,
@@ -298,26 +325,13 @@ export const TOOL_HANDLERS = {
         issueId: parsedIssueId!,
       }),
     ]);
-    let output = `# Issue ${issue.shortId} in **${orgSlug}**\n\n`;
-    output += `**Description**: ${issue.title}\n`;
-    output += `**Culprit**: ${issue.culprit}\n`;
-    output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
-    output += `**Last Seen**: ${new Date(issue.lastSeen).toISOString()}\n`;
-    output += `**URL**: ${apiService.getIssueUrl(orgSlug, issue.shortId)}\n`;
-    output += "\n";
-    output += "## Event Specifics\n\n";
-    if (event.type === "error") {
-      output += `**Occurred At**: ${new Date((event as z.infer<typeof ErrorEventSchema>).dateCreated).toISOString()}\n`;
-    }
-    if (event.message) {
-      output += `**Message**:\n${event.message}\n`;
-    }
-    output += formatEventOutput(event);
-    output += "# Using this information\n\n";
-    output += `- You can reference the IssueID in commit messages (e.g. \`Fixes ${parsedIssueId}\`) to automatically close the issue when the commit is merged.\n`;
-    output +=
-      "- The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.\n";
-    return output;
+
+    return formatIssueOutput({
+      organizationSlug: orgSlug,
+      issue,
+      event,
+      apiService,
+    });
   },
   search_errors: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
