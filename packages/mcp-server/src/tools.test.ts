@@ -37,6 +37,7 @@ describe("list_teams", () => {
       },
       {
         organizationSlug: "sentry-mcp-evals",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -59,6 +60,7 @@ describe("list_projects", () => {
       },
       {
         organizationSlug: "sentry-mcp-evals",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -84,6 +86,7 @@ describe("list_issues", () => {
         projectSlug: "cloudflare-mcp",
         query: undefined,
         sortBy: "last_seen",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -126,6 +129,7 @@ describe("list_issues", () => {
         projectSlug: undefined,
         query: undefined,
         sortBy: "last_seen",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -168,6 +172,7 @@ describe("list_releases", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: undefined,
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -199,6 +204,7 @@ describe("list_releases", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -233,6 +239,7 @@ describe("list_tags", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: undefined,
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -282,6 +289,7 @@ describe("search_errors", () => {
         transaction: undefined,
         query: undefined,
         sortBy: "count",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -321,6 +329,7 @@ describe("search_transactions", () => {
         transaction: undefined,
         query: undefined,
         sortBy: "duration",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -367,6 +376,7 @@ describe("get_issue_summary", () => {
         organizationSlug: "sentry-mcp-evals",
         issueId: "CLOUDFLARE-MCP-41",
         issueUrl: undefined,
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -398,6 +408,7 @@ describe("get_issue_summary", () => {
         organizationSlug: undefined,
         issueId: undefined,
         issueUrl: "https://sentry-mcp-evals.sentry.io/issues/6507376925",
+        regionUrl: undefined,
       },
     );
 
@@ -432,6 +443,7 @@ describe("get_issue_details", () => {
         organizationSlug: "sentry-mcp-evals",
         issueId: "CLOUDFLARE-MCP-41",
         issueUrl: undefined,
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -478,6 +490,7 @@ describe("get_issue_details", () => {
         organizationSlug: undefined,
         issueId: undefined,
         issueUrl: "https://sentry-mcp-evals.sentry.io/issues/6507376925",
+        regionUrl: undefined,
       },
     );
 
@@ -526,6 +539,7 @@ describe("create_team", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         name: "the-goats",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -556,6 +570,7 @@ describe("create_project", () => {
         teamSlug: "the-goats",
         name: "cloudflare-mcp",
         platform: "javascript",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -588,6 +603,7 @@ describe("create_dsn", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
         name: "Default",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -616,6 +632,7 @@ describe("list_dsn", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -646,6 +663,7 @@ describe("begin_autofix", () => {
         organizationSlug: "sentry-mcp-evals",
         issueId: "PEATED-A8",
         issueUrl: undefined,
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -677,6 +695,7 @@ describe("get_autofix_status", () => {
         organizationSlug: "sentry-mcp-evals",
         issueId: "PEATED-A8",
         issueUrl: undefined,
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
