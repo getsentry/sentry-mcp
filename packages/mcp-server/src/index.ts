@@ -53,6 +53,7 @@ Sentry.init({
       "sentry.host": host,
     },
   },
+  release: process.env.SENTRY_RELEASE,
   integrations: [
     Sentry.consoleLoggingIntegration(),
     Sentry.zodErrorsIntegration(),
