@@ -204,7 +204,7 @@
         "progress": [
           {
             "data": null,
-            "message": "Here is Autofix's proposed root cause.",
+            "message": "Here is Seer's proposed root cause.",
             "timestamp": "2025-04-09T22:37:40.934397",
             "type": "INFO"
           }
@@ -404,7 +404,7 @@
         "progress": [
           {
             "data": null,
-            "message": "Here is Autofix's proposed solution.",
+            "message": "Here is Seer's proposed solution.",
             "timestamp": "2025-04-09T22:39:50.191715",
             "type": "INFO"
           }

@@ -564,7 +564,7 @@ export const TOOL_HANDLERS = {
       "- The `SENTRY_DSN` value is a URL that you can use to initialize Sentry's SDKs.\n";
     return output;
   },
-  begin_autofix: async (context, params) => {
+  begin_issue_fix: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
@@ -581,22 +581,22 @@ export const TOOL_HANDLERS = {
       issueId: parsedIssueId,
     });
     return [
-      `# Autofix Started for Issue ${parsedIssueId}`,
+      `# Issue Fix Started for Issue ${parsedIssueId}`,
       "",
       `**Run ID:**: ${data.run_id}`,
       "",
-      "This operation may take some time, so you should call `get_autofix_status()` to check the status of the analysis, and repeat the process until its finished.",
+      "This operation may take some time, so you should call `get_issue_fix_status()` to check the status of the analysis, and repeat the process until its finished.",
       "",
       "You should also inform the user that the operation may take some time, and give them updates whenever you check the status of the operation..",
       "",
       "```",
       params.issueUrl
-        ? `get_autofix_status(issueUrl="${params.issueUrl}")`
-        : `get_autofix_status(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`,
+        ? `get_issue_fix_status(issueUrl="${params.issueUrl}")`
+        : `get_issue_fix_status(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`,
       "```",
     ].join("\n");
   },
-  get_autofix_status: async (context, params) => {
+  get_issue_fix_status: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
@@ -611,9 +611,9 @@ export const TOOL_HANDLERS = {
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
     });
-    let output = `# Autofix Status for Issue ${parsedIssueId}\n\n`;
+    let output = `# Issue Fix Status for Issue ${parsedIssueId}\n\n`;
     if (!autofix) {
-      output += `No autofix run found for ${parsedIssueId}.\n\nYou can initiate a new autofix run using the \`begin_autofix\` tool.`;
+      output += `No issue fix process found for ${parsedIssueId}.\n\nYou can initiate a new issue fix execution using the \`begin_issue_fix\` tool.`;
       return output;
     }
     for (const step of autofix.steps) {

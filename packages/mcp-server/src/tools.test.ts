@@ -702,9 +702,9 @@ describe("list_dsn", () => {
   });
 });
 
-describe("begin_autofix", () => {
+describe("begin_issue_fix", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.begin_autofix;
+    const tool = TOOL_HANDLERS.begin_issue_fix;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -719,24 +719,24 @@ describe("begin_autofix", () => {
       },
     );
     expect(result).toMatchInlineSnapshot(`
-      "# Autofix Started for Issue PEATED-A8
+      "# Issue Fix Started for Issue PEATED-A8
 
       **Run ID:**: 123
 
-      This operation may take some time, so you should call \`get_autofix_status()\` to check the status of the analysis, and repeat the process until its finished.
+      This operation may take some time, so you should call \`get_issue_fix_status()\` to check the status of the analysis, and repeat the process until its finished.
 
       You should also inform the user that the operation may take some time, and give them updates whenever you check the status of the operation..
 
       \`\`\`
-      get_autofix_status(organizationSlug="sentry-mcp-evals", issueId="PEATED-A8")
+      get_issue_fix_status(organizationSlug="sentry-mcp-evals", issueId="PEATED-A8")
       \`\`\`"
     `);
   });
 });
 
-describe("get_autofix_status", () => {
+describe("get_issue_fix_status", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.get_autofix_status;
+    const tool = TOOL_HANDLERS.get_issue_fix_status;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -751,7 +751,7 @@ describe("get_autofix_status", () => {
       },
     );
     expect(result).toMatchInlineSnapshot(`
-      "# Autofix Status for Issue PEATED-A8
+      "# Issue Fix Status for Issue PEATED-A8
 
       ## Analyzing the Issue
 

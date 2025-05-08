@@ -119,7 +119,7 @@ export default function App() {
                   "Diagnose issue ISSUE_URL and propose solutions.",
                   "What are my latest issues in ORG/PROJECT?",
                   "Create a new project in Sentry for PROJECT and setup local instrumentation using it.",
-                  "Use Sentry's autofix feature, and help me analyze and propose a solution for ISSUE_URL.",
+                  "Use Sentry's Seer and help me analyze and propose a solution for ISSUE_URL.",
                 ].map((prompt) => (
                   <li
                     key={prompt}
