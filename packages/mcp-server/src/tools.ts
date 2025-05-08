@@ -5,11 +5,10 @@ import {
   type AutofixRunStepSchema,
   type AutofixRunStepSolutionSchema,
   type ClientKey,
-  type ErrorEventSchema,
   SentryApiService,
 } from "./api-client/index";
-import { formatEventOutput, formatIssueOutput } from "./internal/formatting";
-import { extractIssueId, parseIssueParams } from "./internal/issue-helpers";
+import { formatIssueOutput } from "./internal/formatting";
+import { parseIssueParams } from "./internal/issue-helpers";
 import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
@@ -19,7 +18,7 @@ function apiServiceFromContext(
   opts: { regionUrl?: string } = {},
 ) {
   return new SentryApiService({
-    host: opts.regionUrl || context.host,
+    host: opts.regionUrl ? new URL(opts.regionUrl).host : context.host,
     accessToken: context.accessToken,
   });
 }
