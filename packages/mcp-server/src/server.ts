@@ -46,7 +46,7 @@ async function logAndFormatError(error: unknown) {
 function extractMcpParameters(args: Record<string, any>) {
   return Object.fromEntries(
     Object.entries(args).map(([key, value]) => {
-      return [`mcp.param.${key}`, String(value)];
+      return [`mcp.param.${key}`, JSON.stringify(value)];
     }),
   );
 }
