@@ -69,8 +69,8 @@ importers:
         specifier: 9.16.1
         version: 9.16.1(react@19.1.0)
       agents:
-        specifier: ~0.0.79
-        version: 0.0.79(@cloudflare/workers-types@4.20250507.0)(react@19.1.0)
+        specifier: ~0.0.82
+        version: 0.0.82(@cloudflare/workers-types@4.20250507.0)(react@19.1.0)
       better-sqlite3:
         specifier: ^11.9.1
         version: 11.9.1
@@ -2050,8 +2050,8 @@ packages:
     resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
     engines: {node: '>= 6.0.0'}
 
-  agents@0.0.79:
-    resolution: {integrity: sha512-9083lUQoDilru/ng5tyAnyQll88DaU84T9/ncw6y9kfhGzA8aVCjCLkBvPDIkdApAUMVJcz8qFlDK0IOVedrmw==}
+  agents@0.0.82:
+    resolution: {integrity: sha512-qi2/EWIpzYTEUek+A/qBnavA7cmw4apzNEKIsuUy7MVT4H9Ukh5Llrz34FQkUA1LH5Yd6yhPkmVm6YMxQ+ycWg==}
     peerDependencies:
       react: '*'
 
@@ -5844,7 +5844,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  agents@0.0.79(@cloudflare/workers-types@4.20250507.0)(react@19.1.0):
+  agents@0.0.82(@cloudflare/workers-types@4.20250507.0)(react@19.1.0):
     dependencies:
       '@modelcontextprotocol/sdk': 1.11.0
       ai: 4.3.15(react@19.1.0)(zod@3.24.4)
