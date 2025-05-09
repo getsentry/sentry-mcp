@@ -10,9 +10,10 @@ import getSentryConfig from "./sentry.config";
 export { SentryMCP };
 
 const oAuthProvider = new OAuthProvider({
-  apiRoute: "/sse",
-  // @ts-ignore
-  apiHandler: SentryMCP.mount("/sse"),
+  apiHandlers: {
+    "/sse": SentryMCP.mount("/sse"),
+    "/mcp": SentryMCP.mount("/mcp"),
+  },
   // @ts-ignore
   defaultHandler: app,
   // must match the routes registered in `app.ts`
