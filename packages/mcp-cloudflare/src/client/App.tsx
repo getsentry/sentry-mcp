@@ -11,7 +11,6 @@ import {
 import Note from "./components/ui/note";
 import { ChevronRight } from "lucide-react";
 import { Header } from "./components/ui/header";
-import flowImage from "./flow.png";
 import { Button } from "./components/ui/button";
 import RemoteSetup from "./components/fragments/remote-setup";
 import { useState } from "react";
@@ -52,7 +51,7 @@ export default function App() {
                   like Cursor, and pull in additional information from Sentry to
                   help with tasks like debugging, code generation, and more.
                 </p>
-                <img src={flowImage} alt="Flow" className="w-full mb-6" />
+                <img src="/flow.png" alt="Flow" className="w-full mb-6" />
                 <p>
                   This project is still in its infancy as development of the MCP
                   specification is ongoing. If you find any problems, or have an
