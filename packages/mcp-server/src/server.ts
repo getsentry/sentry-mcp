@@ -39,6 +39,18 @@ async function logAndFormatError(error: unknown) {
   ].join("\n\n");
 }
 
+/**
+ * Take the arguments from something like an MCP tool call and format
+ * them in an OTel-safe way.
+ */
+function extractMcpParameters(args: Record<string, any>) {
+  return Object.fromEntries(
+    Object.entries(args).map(([key, value]) => {
+      return [`mcp.param.${key}`, String(value)];
+    }),
+  );
+}
+
 export async function configureServer({
   server,
   context,
@@ -90,8 +102,11 @@ export async function configureServer({
         try {
           return await startNewTrace(async () => {
             return await startSpan(
-              { name: `mcp.prompt/${prompt.name}` },
-              async () => {
+              {
+                name: `mcp.prompt/${prompt.name}`,
+                attributes: extractMcpParameters(args),
+              },
+              async (span) => {
                 if (context.userId) {
                   setUser({
                     id: context.userId,
@@ -100,10 +115,20 @@ export async function configureServer({
                 if (context.clientId) {
                   setTag("client.id", context.clientId);
                 }
-
-                // TODO(dcramer): I'm too dumb to figure this out
-                // @ts-ignore
-                return await handler(...args);
+                try {
+                  // TODO(dcramer): I'm too dumb to figure this out
+                  // @ts-ignore
+                  const result = await handler(...args);
+                  span.setStatus({
+                    code: 1, // ok
+                  });
+                  return result;
+                } catch (error) {
+                  span.setStatus({
+                    code: 2, // error
+                  });
+                  throw error;
+                }
               },
             );
           });
@@ -125,8 +150,11 @@ export async function configureServer({
         try {
           return await startNewTrace(async () => {
             return await startSpan(
-              { name: `mcp.tool/${tool.name}` },
-              async () => {
+              {
+                name: `mcp.tool/${tool.name}`,
+                attributes: extractMcpParameters(args),
+              },
+              async (span) => {
                 if (context.userId) {
                   setUser({
                     id: context.userId,
@@ -140,7 +168,9 @@ export async function configureServer({
                   // TODO(dcramer): I'm too dumb to figure this out
                   // @ts-ignore
                   const output = await handler(context, ...args);
-
+                  span.setStatus({
+                    code: 1, // ok
+                  });
                   return {
                     content: [
                       {
@@ -150,6 +180,9 @@ export async function configureServer({
                     ],
                   };
                 } catch (error) {
+                  span.setStatus({
+                    code: 2, // error
+                  });
                   return {
                     content: [
                       {
