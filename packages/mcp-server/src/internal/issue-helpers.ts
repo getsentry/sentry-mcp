@@ -66,6 +66,16 @@ export function parseIssueId(issueId: string) {
   // remove trailing punctuation
   finalIssueId = finalIssueId.replace(/[^\w-]/g, "");
 
+  // Validate against common Sentry issue ID patterns
+  // Either numeric IDs or PROJECT-123 format 
+  const validFormatRegex = /^(\d+|[A-Za-z][\w-]*-\d+)$/;
+  
+  if (!validFormatRegex.test(finalIssueId)) {
+    throw new Error(
+      `Invalid issue ID format: "${finalIssueId}". Expected either a numeric ID or a project code followed by a number (e.g., "PROJECT-123").`
+    );
+  }
+
   return finalIssueId;
 }
 
