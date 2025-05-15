@@ -9,12 +9,17 @@ import getSentryConfig from "../sentry.config";
 // Context from the auth process, encrypted & stored in the auth token
 // and provided to the DurableMCP as this.props
 class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
-  server = Sentry.wrapMcpServerWithSentry(
-    new McpServer({
-      name: "Sentry MCP",
-      version: LIB_VERSION,
-    }),
-  );
+  server = new McpServer({
+    name: "Sentry MCP",
+    version: LIB_VERSION,
+  });
+  // Note: This does not work locally with miniflare so we are not using it
+  // server = wrapMcpServerWithSentry(
+  //   new McpServer({
+  //     name: "Sentry MCP",
+  //     version: LIB_VERSION,
+  //   }),
+  // );
 
   // biome-ignore lint/complexity/noUselessConstructor: Need the constructor to match the durable object types.
   constructor(state: DurableObjectState, env: Env) {
