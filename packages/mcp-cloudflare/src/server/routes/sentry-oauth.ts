@@ -12,6 +12,7 @@ import {
   clientIdAlreadyApproved,
   parseRedirectApproval,
 } from "../lib/approval-dialog";
+import { logger } from "@sentry/cloudflare";
 
 export const SENTRY_AUTH_URL = "/oauth/authorize/";
 export const SENTRY_TOKEN_URL = "/oauth/token/";
@@ -104,9 +105,17 @@ export default new Hono<{
    */
   .get("/callback", async (c) => {
     // Get the oathReqInfo out of KV
-    const oauthReqInfo = JSON.parse(
-      atob(c.req.query("state") as string),
-    ) as AuthRequest;
+    let oauthReqInfo: AuthRequest;
+    try {
+      oauthReqInfo = JSON.parse(
+        atob(c.req.query("state") as string),
+      ) as AuthRequest;
+    } catch (err) {
+      logger.warn(`Invalid state: ${c.req.query("state") as string}`, {
+        error: String(err),
+      });
+      return c.text("Invalid state", 400);
+    }
     if (!oauthReqInfo.clientId) {
       return c.text("Invalid state", 400);
     }
