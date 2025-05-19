@@ -259,6 +259,9 @@ const AutofixStatusSchema = z.enum([
   "NEED_MORE_INFORMATION",
   "COMPLETED",
   "FAILED",
+  "ERROR",
+  "CANCELLED",
+  "WAITING_FOR_USER_RESPONSE",
 ]);
 
 const AutofixRunStepBaseSchema = z.object({
