@@ -27,8 +27,13 @@ export type PromptHandler<T extends PromptName> = (
   params: PromptParams<T>,
 ) => Promise<GetPromptResult>;
 
+export type PromptHandlerExtended<T extends PromptName> = (
+  context: ServerContext,
+  params: PromptParams<T>,
+) => Promise<string>;
+
 export type PromptHandlers = {
-  [K in PromptName]: PromptHandler<K>;
+  [K in PromptName]: PromptHandlerExtended<K>;
 };
 
 export type ToolName = (typeof TOOL_DEFINITIONS)[number]["name"];

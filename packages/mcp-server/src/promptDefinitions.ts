@@ -12,4 +12,16 @@ export const PROMPT_DEFINITIONS = [
       filename: z.string(),
     },
   },
+  {
+    name: "fix_issue_with_seer" as const,
+    description: [
+      "Use this prompt when you need to fix an issue with Seer.",
+      "You can pass in either an `issueId` and `organizationSlug`, or an `issueUrl`.",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug.optional(),
+      issueId: z.string().optional(),
+      issueUrl: z.string().optional(),
+    },
+  },
 ];

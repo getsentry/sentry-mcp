@@ -702,9 +702,9 @@ describe("list_dsn", () => {
   });
 });
 
-describe("begin_issue_fix", () => {
+describe("begin_seer_issue_fix", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.begin_issue_fix;
+    const tool = TOOL_HANDLERS.begin_seer_issue_fix;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -723,20 +723,20 @@ describe("begin_issue_fix", () => {
 
       **Run ID:**: 123
 
-      This operation may take some time, so you should call \`get_issue_fix_status()\` to check the status of the analysis, and repeat the process until its finished.
+      This operation may take some time, so you should call \`get_seer_issue_fix_status()\` to check the status of the analysis, and repeat the process until its finished.
 
       You should also inform the user that the operation may take some time, and give them updates whenever you check the status of the operation..
 
       \`\`\`
-      get_issue_fix_status(organizationSlug="sentry-mcp-evals", issueId="PEATED-A8")
+      get_seer_issue_fix_status(organizationSlug="sentry-mcp-evals", issueId="PEATED-A8")
       \`\`\`"
     `);
   });
 });
 
-describe("get_issue_fix_status", () => {
+describe("get_seer_issue_fix_status", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.get_issue_fix_status;
+    const tool = TOOL_HANDLERS.get_seer_issue_fix_status;
     const result = await tool(
       {
         accessToken: "access-token",

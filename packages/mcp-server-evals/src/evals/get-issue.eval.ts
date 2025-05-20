@@ -20,8 +20,7 @@ describeEval("get-issue", {
         ].join("\n"),
       },
       {
-        input:
-          "Explain the event with ID 7ca573c0f4814912aaa9bdc77d1a7d51 from Sentry.",
+        input: `Explain the event with ID 7ca573c0f4814912aaa9bdc77d1a7d51 from Sentry in ${FIXTURES.organizationSlug}.`,
         expected: [
           "## 7ca573c0f4814912aaa9bdc77d1a7d51",
           "- **Error**: Tool list_organizations is already registered",

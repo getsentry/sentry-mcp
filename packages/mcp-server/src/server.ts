@@ -97,7 +97,7 @@ export async function configureServer({
     server.prompt(
       prompt.name,
       prompt.description,
-      prompt.paramsSchema,
+      prompt.paramsSchema ? prompt.paramsSchema : {},
       async (...args) => {
         try {
           return await startNewTrace(async () => {
@@ -118,11 +118,21 @@ export async function configureServer({
                 try {
                   // TODO(dcramer): I'm too dumb to figure this out
                   // @ts-ignore
-                  const result = await handler(...args);
+                  const output = await handler(context, ...args);
                   span.setStatus({
                     code: 1, // ok
                   });
-                  return result;
+                  return {
+                    messages: [
+                      {
+                        role: "user",
+                        content: {
+                          type: "text",
+                          text: output,
+                        },
+                      },
+                    ],
+                  };
                 } catch (error) {
                   span.setStatus({
                     code: 2, // error
