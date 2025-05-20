@@ -347,7 +347,7 @@ export const TOOL_DEFINITIONS = [
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
       regionUrl: ParamRegionUrl.optional(),
-      teamSlug: z.string().describe("The team's slug."),
+      teamSlug: z.string().toLowerCase().describe("The team's slug."),
       name: z
         .string()
         .describe(
@@ -381,7 +381,7 @@ export const TOOL_DEFINITIONS = [
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
       regionUrl: ParamRegionUrl.optional(),
-      projectSlug: z.string().describe("The project's slug."),
+      projectSlug: z.string().toLowerCase().describe("The project's slug."),
       name: z.string().describe("The name of the DSN to create."),
     },
   },
@@ -401,7 +401,7 @@ export const TOOL_DEFINITIONS = [
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
       regionUrl: ParamRegionUrl.optional(),
-      projectSlug: z.string().describe("The project's slug."),
+      projectSlug: z.string().toLowerCase().describe("The project's slug."),
     },
   },
   {

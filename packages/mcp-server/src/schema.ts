@@ -2,28 +2,33 @@ import { z } from "zod";
 
 export const ParamOrganizationSlug = z
   .string()
+  .toLowerCase()
   .describe(
     "The organization's slug. This will default to the first org you have access to.",
   );
 
 export const ParamTeamSlug = z
   .string()
+  .toLowerCase()
   .describe(
     "The team's slug. This will default to the first team you have access to.",
   );
 
 export const ParamProjectSlug = z
   .string()
+  .toLowerCase()
   .describe(
     "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
   );
 
 export const ParamIssueShortId = z
   .string()
+  .toUpperCase()
   .describe("The Issue ID. e.g. `PROJECT-1Z43`");
 
 export const ParamPlatform = z
   .string()
+  .toLowerCase()
   .describe(
     "The platform for the project (e.g., python, javascript, react, etc.)",
   );
