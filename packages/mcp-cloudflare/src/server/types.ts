@@ -1,4 +1,5 @@
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+import type { WorkerVersionMetadata } from "@cloudflare/workers-types";
 import type { ServerContext } from "@sentry/mcp-server/types";
 
 export type WorkerProps = ServerContext & {
@@ -20,4 +21,5 @@ export interface Env {
   MCP_OBJECT: DurableObjectNamespace;
   OAUTH_PROVIDER: OAuthHelpers;
   AI: Ai;
+  CF_VERSION_METADATA: WorkerVersionMetadata;
 }

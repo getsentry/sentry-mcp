@@ -24,6 +24,9 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
   "vars": {},
   "durable_objects": {
     "bindings": [
@@ -33,6 +36,7 @@
       }
     ]
   },
+
   "kv_namespaces": [
     {
       "binding": "OAUTH_KV",

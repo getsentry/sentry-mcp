@@ -5,6 +5,8 @@ import * as Sentry from "@sentry/cloudflare";
 type SentryConfig = ReturnType<Parameters<typeof Sentry.withSentry>[0]>;
 
 export default function getSentryConfig(env: Env): SentryConfig {
+  const { id: versionId } = env.CF_VERSION_METADATA;
+
   return {
     dsn: env.SENTRY_DSN,
     tracesSampleRate: 1,
@@ -15,6 +17,7 @@ export default function getSentryConfig(env: Env): SentryConfig {
         "sentry.host": env.SENTRY_HOST,
       },
     },
+    release: versionId,
     environment:
       env.SENTRY_ENVIRONMENT ??
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
