@@ -22,7 +22,7 @@
     "test:watch": "vitest watch"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.1.1",
+    "@cloudflare/vite-plugin": "^1.2.4",
     "@cloudflare/vitest-pool-workers": "^0.8.26",
     "@cloudflare/workers-types": "^4.20250507.0",
     "@sentry/mcp-server": "workspace:*",

@@ -35,7 +35,7 @@ import type {
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
-import { logger } from "@sentry/node";
+// import { logger } from "@sentry/node";
 
 export class ApiError extends Error {
   constructor(
@@ -99,7 +99,7 @@ export class SentryApiService {
       headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
-    logger.info(logger.fmt`[sentryApi] ${options.method || "GET"} ${url}`);
+    // logger.info(logger.fmt`[sentryApi] ${options.method || "GET"} ${url}`);
     const response = await fetch(url, {
       ...options,
       headers,
