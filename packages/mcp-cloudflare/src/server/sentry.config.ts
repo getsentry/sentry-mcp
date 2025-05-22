@@ -21,6 +21,7 @@ export default function getSentryConfig(env: Env): SentryConfig {
     environment:
       env.SENTRY_ENVIRONMENT ??
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
+    spotlight: process.env.NODE_ENV === "development",
     _experiments: {
       enableLogs: true,
     },

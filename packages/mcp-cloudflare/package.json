@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -30,6 +28,7 @@
     "@sentry/mcp-server": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "@sentry/vite-plugin": "^3.4.0",
+    "@spotlightjs/spotlight": "^2.13.3",
     "@tailwindcss/typography": "^0.5.16",
     "@tailwindcss/vite": "^4.1.5",
     "@types/react": "^19.1.3",
