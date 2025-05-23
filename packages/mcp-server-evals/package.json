@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.3.22",
-    "@modelcontextprotocol/sdk": "^1.11.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
     "@sentry/mcp-server": "workspace:*",
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
