@@ -6,13 +6,11 @@ This package is primarily for running the `stdio` MCP server. If you do not know
 
 <https://mcp.sentry.dev>
 
-To utilize the `stdoio` transport, you'll need to create an Personal API Token (PAT) in Sentry with the necessary scopes. As of writing this is:
+To utilize the `stdio` transport, you'll need to create an Personal API Token (PAT) in Sentry with the necessary scopes. As of writing this is:
 
 ```
 org:read
-project:read
 project:write
-team:read
 team:write
 event:read
 ```
@@ -28,4 +26,14 @@ Note: You can also use environment variables:
 ```shell
 SENTRY_AUTH_TOKEN=
 SENTRY_HOST=
+```
+
+By default we also enable Sentry reporting (traces, errors) upstream to our cloud service. You can disable that, or send it to a different Sentry instance by using the `--sentry-dsn` flag:
+
+```shell
+# disable sentry reporting
+npx @sentry/mcp-server@latest --sentry-dsn=
+
+# disable sentry reporting
+npx @sentry/mcp-server@latest --sentry-dsn=https://publicKey@mysentry.example.com/...
 ```
