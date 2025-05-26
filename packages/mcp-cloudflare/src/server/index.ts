@@ -11,8 +11,8 @@ export { SentryMCP };
 
 const oAuthProvider = new OAuthProvider({
   apiHandlers: {
-    "/sse": SentryMCP.mount("/sse"),
-    "/mcp": SentryMCP.mount("/mcp"),
+    "/sse": SentryMCP.serveSSE("/sse"),
+    "/mcp": SentryMCP.serve("/mcp"),
   },
   // @ts-ignore
   defaultHandler: app,

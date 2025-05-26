@@ -1,10 +1,7 @@
 {
   "servers": {
-    "sentry-dev": {
-      "url": "http://localhost:5173/mcp"
-    },
     "sentry": {
-      "url": "https://mcp.sentry.dev/sse"
+      "url": "https://mcp.sentry.dev/mcp"
     }
   }
 }
