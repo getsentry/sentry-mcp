@@ -26,7 +26,7 @@ export function TaskRunner(model: LanguageModel = defaultModel) {
       command: "npm",
       args: ["run", "start"],
       env: {
-        SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN!,
+        SENTRY_ACCESS_TOKEN: process.env.SENTRY_ACCESS_TOKEN!,
       },
     });
     const mcpClient = await experimental_createMCPClient({

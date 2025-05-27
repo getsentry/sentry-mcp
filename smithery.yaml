@@ -6,9 +6,9 @@ startCommand:
     # JSON Schema defining the configuration options for the MCP.
     type: object
     required:
-      - sentryAuthToken
+      - sentryAccessToken
     properties:
-      sentryAuthToken:
+      sentryAccessToken:
         type: string
         description: Sentry authentication token with proper scopes.
       sentryHost:
@@ -22,10 +22,10 @@ startCommand:
       command: 'npm',
       args: ['run', 'start:stdio'],
       env: {
-        SENTRY_AUTH_TOKEN: config.sentryAuthToken,
+        SENTRY_ACCESS_TOKEN: config.sentryAccessToken,
         SENTRY_HOST: config.sentryHost
       }
     })
   exampleConfig:
-    sentryAuthToken: your_sentry_auth_token_here
+    sentryAuthToken: your_sentry_user_access_token_here
     sentryHost: https://sentry.io

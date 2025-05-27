@@ -11,6 +11,11 @@ const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 export default function RemoteSetup() {
   const mcpStdioSnippet = `npx @sentry/mcp-server@latest`;
 
+  const defaultEnv = {
+    SENTRY_ACCESS_TOKEN: "sentry-user-token",
+    SENTRY_HOST: "sentry.io",
+  };
+
   return (
     <>
       <Prose>
@@ -29,8 +34,8 @@ export default function RemoteSetup() {
         </p>
 
         <p>
-          Create a Personal Access Token in your account settings with the
-          following scopes:
+          Create a User Auth Token in your account settings with the following
+          scopes:
         </p>
         <ul>
           {Object.entries(SCOPES).map(([scope, description]) => (
@@ -46,7 +51,7 @@ export default function RemoteSetup() {
         <CodeSnippet
           snippet={[
             `${mcpStdioSnippet}`,
-            "--access-token=sentry-pat",
+            "--access-token=sentry-user-token",
             "--host=sentry.io",
           ].join(" \\\n  ")}
         />
@@ -77,10 +82,7 @@ export default function RemoteSetup() {
                       sentry: {
                         command: "npx",
                         args: ["@sentry/mcp-server@latest"],
-                        env: {
-                          SENTRY_AUTH_TOKEN: "sentry-pat",
-                          SENTRY_HOST: "sentry.io",
-                        },
+                        env: defaultEnv,
                       },
                     },
                   },
@@ -110,10 +112,7 @@ export default function RemoteSetup() {
                       sentry: {
                         command: "npx",
                         args: ["@sentry/mcp-server@latest"],
-                        env: {
-                          SENTRY_AUTH_TOKEN: "sentry-pat",
-                          SENTRY_HOST: "sentry.io",
-                        },
+                        env: defaultEnv,
                       },
                     },
                   },
@@ -150,10 +149,7 @@ export default function RemoteSetup() {
                       type: "stdio",
                       command: "npx",
                       args: ["@sentry/mcp-server@latest"],
-                      env: {
-                        SENTRY_AUTH_TOKEN: "sentry-pat",
-                        SENTRY_HOST: "sentry.io",
-                      },
+                      env: defaultEnv,
                     },
                   },
                   undefined,
@@ -185,10 +181,7 @@ export default function RemoteSetup() {
                       [mcpServerName]: {
                         command: "npx",
                         args: ["@sentry/mcp-server@latest"],
-                        env: {
-                          SENTRY_AUTH_TOKEN: "sentry-pat",
-                          SENTRY_HOST: "sentry.io",
-                        },
+                        env: defaultEnv,
                       },
                       settings: {},
                     },

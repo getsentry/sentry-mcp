@@ -5,7 +5,9 @@ import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "./version";
 
-let accessToken: string | undefined = process.env.SENTRY_AUTH_TOKEN;
+// SENTRY_AUTH_TOKEN is deprecated, but we support it for backwards compatibility
+let accessToken: string | undefined =
+  process.env.SENTRY_ACCESS_TOKEN ?? process.env.SENTRY_AUTH_TOKEN;
 let host: string | undefined = process.env.SENTRY_HOST;
 let sentryDsn: string | undefined =
   process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
@@ -36,7 +38,7 @@ for (const arg of process.argv.slice(2)) {
 
 if (!accessToken) {
   console.error(
-    "Error: No access token was provided. Pass one with `--access-token` or via `SENTRY_AUTH_TOKEN`.",
+    "Error: No access token was provided. Pass one with `--access-token` or via `SENTRY_ACCESS_TOKEN`.",
   );
   console.error(getUsage());
   process.exit(1);
