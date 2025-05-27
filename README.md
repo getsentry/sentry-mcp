@@ -57,16 +57,18 @@ Note: If you have issues with your OAuth flow when accessing the inspector on `1
 
 ## Local Development
 
-If you'd like to iterate and test your MCP server, you can do so in local development. This will require you to create another OAuth App in Sentry (Settings => API => [Applications](https://sentry.io/settings/account/api/applications/)):
+To contribute changes against the server, you'll need to set things up in in local development. This will require you to create another OAuth App in Sentry (Settings => API => [Applications](https://sentry.io/settings/account/api/applications/)):
 
-- For the Homepage URL, specify `http://localhost:8788`
-- For the Authorized Redirect URIs, specify `http://localhost:8788/callback`
+- For the Homepage URL, specify `http://localhost:5173`
+- For the Authorized Redirect URIs, specify `http://localhost:5173/callback`
 - Note your Client ID and generate a Client secret.
-- Create a `.dev.vars` file in your project root with:
+- Create a `.dev.vars` file in `packages/mcp-cloudflare/` root with:
 
 ```shell
+# packages/mcp-cloudflare/.dev.vars
 SENTRY_CLIENT_ID=your_development_sentry_client_id
 SENTRY_CLIENT_SECRET=your_development_sentry_client_secret
+COOKIE_SECRET=my-super-secret-cookie
 ```
 
 ### Verify
