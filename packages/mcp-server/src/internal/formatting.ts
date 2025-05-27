@@ -3,6 +3,7 @@ import type { Event, Issue } from "../api-client/types";
 import type {
   ErrorEntrySchema,
   ErrorEventSchema,
+  EventSchema,
   FrameInterface,
   RequestEntrySchema,
   SentryApiService,
@@ -40,6 +41,7 @@ export function formatEventOutput(event: Event) {
       );
     }
   }
+  output += formatContexts(event.contexts);
   return output;
 }
 
@@ -53,7 +55,7 @@ function formatExceptionInterfaceOutput(
   if (!firstError) {
     return "";
   }
-  output += `**Error:**\n${"```"}\n${firstError.type}: ${
+  output += `### Error\n\n${"```"}\n${firstError.type}: ${
     firstError.value
   }\n${"```"}\n\n`;
   if (!firstError.stacktrace || !firstError.stacktrace.frames) {
@@ -81,7 +83,26 @@ function formatRequestInterfaceOutput(
   if (!data.method || !data.url) {
     return "";
   }
-  return `**HTTP Method:** ${data.method}\n**URL:** ${data.url}\n`;
+  return `### HTTP Request\n\n**Method:** ${data.method}\n**URL:** ${data.url}\n\n`;
+}
+
+function formatContexts(contexts: z.infer<typeof EventSchema>["contexts"]) {
+  if (!contexts) {
+    return "";
+  }
+  return `### Additional Context\n\nThese are additional context provided by the user when they're instrumenting their application.\n\n${Object.entries(
+    contexts,
+  )
+    .map(
+      ([name, data]) =>
+        `**${name}**\n${Object.entries(data)
+          .filter(([key, _]) => key !== "type")
+          .map(([key, value]) => {
+            return `${key}: ${JSON.stringify(value, undefined, 2)}`;
+          })
+          .join("\n")}`,
+    )
+    .join("\n\n")}\n\n`;
 }
 
 export function formatIssueOutput({
@@ -115,6 +136,7 @@ export function formatIssueOutput({
   if (event.message) {
     output += `**Message**:\n${event.message}\n`;
   }
+  output += "\n";
   output += formatEventOutput(event);
   output += "# Using this information\n\n";
   output += `- You can reference the IssueID in commit messages (e.g. \`Fixes ${issue.shortId}\`) to automatically close the issue when the commit is merged.\n`;

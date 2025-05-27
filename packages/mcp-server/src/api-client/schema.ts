@@ -182,6 +182,22 @@ const BaseEventSchema = z.object({
       }),
     ]),
   ),
+  contexts: z
+    .record(
+      z.string(),
+      z
+        .object({
+          type: z.union([
+            z.literal("default"),
+            z.literal("runtime"),
+            z.literal("os"),
+            z.literal("trace"),
+            z.unknown(),
+          ]),
+        })
+        .passthrough(),
+    )
+    .optional(),
 });
 
 export const ErrorEventSchema = BaseEventSchema.omit({

@@ -398,7 +398,9 @@ describe("get_issue_details", () => {
 
       **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
       **Occurred At**: 2025-04-08T21:15:04.000Z
-      **Error:**
+
+      ### Error
+
       \`\`\`
       Error: Tool list_organizations is already registered
       \`\`\`
@@ -410,8 +412,31 @@ describe("get_issue_details", () => {
       index.js:19631:28 (Object.fetch)
       \`\`\`
 
-      **HTTP Method:** GET
+      ### HTTP Request
+
+      **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
+
+      ### Additional Context
+
+      These are additional context provided by the user when they're instrumenting their application.
+
+      **cloud_resource**
+      cloud.provider: "cloudflare"
+
+      **culture**
+      timezone: "Europe/London"
+
+      **runtime**
+      name: "cloudflare"
+
+      **trace**
+      trace_id: "3032af8bcdfe4423b937fc5c041d5d82"
+      span_id: "953da703d2a6f4c7"
+      status: "unknown"
+      client_sample_rate: 1
+      sampled: true
+
       # Using this information
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
@@ -455,7 +480,9 @@ describe("get_issue_details", () => {
 
       **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
       **Occurred At**: 2025-04-08T21:15:04.000Z
-      **Error:**
+
+      ### Error
+
       \`\`\`
       Error: Tool list_organizations is already registered
       \`\`\`
@@ -467,8 +494,31 @@ describe("get_issue_details", () => {
       index.js:19631:28 (Object.fetch)
       \`\`\`
 
-      **HTTP Method:** GET
+      ### HTTP Request
+
+      **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
+
+      ### Additional Context
+
+      These are additional context provided by the user when they're instrumenting their application.
+
+      **cloud_resource**
+      cloud.provider: "cloudflare"
+
+      **culture**
+      timezone: "Europe/London"
+
+      **runtime**
+      name: "cloudflare"
+
+      **trace**
+      trace_id: "3032af8bcdfe4423b937fc5c041d5d82"
+      span_id: "953da703d2a6f4c7"
+      status: "unknown"
+      client_sample_rate: 1
+      sampled: true
+
       # Using this information
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
@@ -510,7 +560,9 @@ describe("get_issue_details", () => {
 
       **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
       **Occurred At**: 2025-04-08T21:15:04.000Z
-      **Error:**
+
+      ### Error
+
       \`\`\`
       Error: Tool list_organizations is already registered
       \`\`\`
@@ -522,8 +574,31 @@ describe("get_issue_details", () => {
       index.js:19631:28 (Object.fetch)
       \`\`\`
 
-      **HTTP Method:** GET
+      ### HTTP Request
+
+      **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
+
+      ### Additional Context
+
+      These are additional context provided by the user when they're instrumenting their application.
+
+      **cloud_resource**
+      cloud.provider: "cloudflare"
+
+      **culture**
+      timezone: "Europe/London"
+
+      **runtime**
+      name: "cloudflare"
+
+      **trace**
+      trace_id: "3032af8bcdfe4423b937fc5c041d5d82"
+      span_id: "953da703d2a6f4c7"
+      status: "unknown"
+      client_sample_rate: 1
+      sampled: true
+
       # Using this information
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
