@@ -5,8 +5,7 @@ describeEval("list-issues", {
   data: async () => {
     return [
       {
-        input:
-          "Can you you give me a list of common production errors, with their stacktrace and a url for more information?",
+        input: `Can you you give me a list of common production errors, with their stacktrace and a url for more information in ${FIXTURES.organizationSlug}?`,
         expected: [
           "## CLOUDFLARE-MCP-41",
           "- **Error**: Tool list_organizations is already registered",

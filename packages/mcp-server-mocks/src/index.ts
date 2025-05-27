@@ -760,6 +760,11 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
+    fetch: () => HttpResponse.json(issueFixture2),
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
     fetch: () => HttpResponse.json(issueFixture2),
   },

@@ -8,9 +8,14 @@ import {
 import { Experimental_StdioMCPTransport } from "ai/mcp-stdio";
 import { z } from "zod";
 
-const SYSTEM_PROMPT = `You are an assistant responsible for evaluating the results of calling various tools. Given the user's query, use the tools available to you to answer the question.
+const SYSTEM_PROMPT = `You are an assistant responsible for evaluating the results of calling various tools. 
 
-You are emulating the behavior of an LLM-based Agent which is utilizing the set of tools provided to it, and you should use as few tools as possible to answer the question.`;
+You a general purpose LLM-based Agent. Your purpose is to answer the user's query using the tools provided.
+
+- You should ONLY use the tools available to answer the user's query.
+- Use as few tool calls as possible to get to the answer.
+- Using multiple tool calls to get to the answer is allowed when needed.
+`;
 
 export const FIXTURES = {
   organizationSlug: "sentry-mcp-evals",

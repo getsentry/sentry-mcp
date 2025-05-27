@@ -130,6 +130,7 @@ export const TOOL_DEFINITIONS = [
       projectSlug: ParamProjectSlugOrAll.optional(),
       query: z
         .string()
+        .trim()
         .describe("Search for versions which contain the provided string.")
         .optional(),
     },
@@ -179,7 +180,7 @@ export const TOOL_DEFINITIONS = [
       organizationSlug: ParamOrganizationSlug.optional(),
       regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
-      eventId: z.string().describe("The ID of the event.").optional(),
+      eventId: z.string().trim().describe("The ID of the event.").optional(),
       issueUrl: ParamIssueUrl.optional(),
     },
   },
@@ -223,6 +224,7 @@ export const TOOL_DEFINITIONS = [
       projectSlug: ParamProjectSlugOrAll.optional(),
       filename: z
         .string()
+        .trim()
         .describe("The filename to search for errors in.")
         .optional(),
       transaction: ParamTransaction.optional(),
@@ -297,7 +299,7 @@ export const TOOL_DEFINITIONS = [
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
-      name: z.string().describe("The name of the team to create."),
+      name: z.string().trim().describe("The name of the team to create."),
     },
   },
   {
@@ -330,6 +332,7 @@ export const TOOL_DEFINITIONS = [
       teamSlug: ParamTeamSlug,
       name: z
         .string()
+        .trim()
         .describe(
           "The name of the project to create. Typically this is commonly the name of the repository or service. It is only used as a visual label in Sentry.",
         ),
@@ -366,6 +369,7 @@ export const TOOL_DEFINITIONS = [
       projectSlug: ParamProjectSlug,
       name: z
         .string()
+        .trim()
         .describe("The name of the DSN to create, for example 'Production'."),
     },
   },
