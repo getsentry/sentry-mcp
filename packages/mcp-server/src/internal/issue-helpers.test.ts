@@ -130,9 +130,12 @@ describe("parseIssueParams", () => {
     expect(
       parseIssueParams({
         issueId: "CLOUDFLARE-MCP-41.!",
-        organizationSlug: "cloudflare",
+        organizationSlug: "sentry-mcp-evals",
       }),
-    ).toEqual({ organizationSlug: "cloudflare", issueId: "CLOUDFLARE-MCP-41" });
+    ).toEqual({
+      organizationSlug: "sentry-mcp-evals",
+      issueId: "CLOUDFLARE-MCP-41",
+    });
   });
 
   it("should throw if neither issueId nor issueUrl is provided", () => {

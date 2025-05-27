@@ -4,17 +4,24 @@ export const ParamOrganizationSlug = z
   .string()
   .toLowerCase()
   .describe(
-    "The organization's slug. This will default to the first org you have access to.",
+    "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool.",
   );
 
 export const ParamTeamSlug = z
   .string()
   .toLowerCase()
   .describe(
-    "The team's slug. This will default to the first team you have access to.",
+    "The team's slug. You can find a list of existing teams in an organization using the `find_teams()` tool.",
   );
 
 export const ParamProjectSlug = z
+  .string()
+  .toLowerCase()
+  .describe(
+    "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool.",
+  );
+
+export const ParamProjectSlugOrAll = z
   .string()
   .toLowerCase()
   .describe(
@@ -26,18 +33,23 @@ export const ParamIssueShortId = z
   .toUpperCase()
   .describe("The Issue ID. e.g. `PROJECT-1Z43`");
 
+export const ParamIssueUrl = z
+  .string()
+  .url()
+  .describe(
+    "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43",
+  );
+
 export const ParamPlatform = z
   .string()
   .toLowerCase()
   .describe(
-    "The platform for the project (e.g., python, javascript, react, etc.)",
+    "The platform for the project. e.g., python, javascript, react, etc.",
   );
 
 export const ParamTransaction = z
   .string()
-  .describe(
-    "The transaction name (also known as the endpoint, or route name).",
-  );
+  .describe("The transaction name. Also known as the endpoint, or route name.");
 
 export const ParamQuery = z
   .string()

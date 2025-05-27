@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { ParamOrganizationSlug } from "./schema";
+import {
+  ParamIssueShortId,
+  ParamIssueUrl,
+  ParamOrganizationSlug,
+} from "./schema";
 
 export const PROMPT_DEFINITIONS = [
   {
@@ -9,7 +13,7 @@ export const PROMPT_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug,
-      filename: z.string(),
+      filename: z.string().describe("The filename to search for errors in."),
     },
   },
   {
@@ -20,8 +24,8 @@ export const PROMPT_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
-      issueId: z.string().optional(),
-      issueUrl: z.string().optional(),
+      issueId: ParamIssueShortId,
+      issueUrl: ParamIssueUrl,
     },
   },
 ];

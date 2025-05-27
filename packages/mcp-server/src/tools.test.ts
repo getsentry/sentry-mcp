@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { TOOL_HANDLERS } from "./tools";
 
-describe("list_organizations", () => {
+describe("find_organizations", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.list_organizations;
+    const tool = TOOL_HANDLERS.find_organizations;
     const result = await tool({
       accessToken: "access-token",
       userId: "1",
@@ -26,9 +26,9 @@ describe("list_organizations", () => {
   });
 });
 
-describe("list_teams", () => {
+describe("find_teams", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.list_teams;
+    const tool = TOOL_HANDLERS.find_teams;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -49,9 +49,9 @@ describe("list_teams", () => {
   });
 });
 
-describe("list_projects", () => {
+describe("find_projects", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.list_projects;
+    const tool = TOOL_HANDLERS.find_projects;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -72,9 +72,9 @@ describe("list_projects", () => {
   });
 });
 
-describe("list_issues", () => {
+describe("find_issues", () => {
   it("serializes with project", async () => {
-    const tool = TOOL_HANDLERS.list_issues;
+    const tool = TOOL_HANDLERS.find_issues;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -117,7 +117,7 @@ describe("list_issues", () => {
   });
 
   it("serializes without project", async () => {
-    const tool = TOOL_HANDLERS.list_issues;
+    const tool = TOOL_HANDLERS.find_issues;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -160,9 +160,9 @@ describe("list_issues", () => {
   });
 });
 
-describe("list_releases", () => {
+describe("find_releases", () => {
   it("works without project", async () => {
-    const tool = TOOL_HANDLERS.list_releases;
+    const tool = TOOL_HANDLERS.find_releases;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -173,6 +173,7 @@ describe("list_releases", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: undefined,
         regionUrl: undefined,
+        query: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -189,12 +190,12 @@ describe("list_releases", () => {
       # Using this information
 
       - You can reference the Release version in commit messages or documentation.
-      - You can search for issues in a specific release using the \`search_errors()\` tool with the query \`release:8ce89484-0fec-4913-a2cd-e8e2d41dee36\`.
+      - You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:8ce89484-0fec-4913-a2cd-e8e2d41dee36\`.
       "
     `);
   });
   it("works with project", async () => {
-    const tool = TOOL_HANDLERS.list_releases;
+    const tool = TOOL_HANDLERS.find_releases;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -205,6 +206,7 @@ describe("list_releases", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
         regionUrl: undefined,
+        query: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -221,15 +223,15 @@ describe("list_releases", () => {
       # Using this information
 
       - You can reference the Release version in commit messages or documentation.
-      - You can search for issues in a specific release using the \`search_errors()\` tool with the query \`release:8ce89484-0fec-4913-a2cd-e8e2d41dee36\`.
+      - You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:8ce89484-0fec-4913-a2cd-e8e2d41dee36\`.
       "
     `);
   });
 });
 
-describe("list_tags", () => {
+describe("find_tags", () => {
   it("works", async () => {
-    const tool = TOOL_HANDLERS.list_tags;
+    const tool = TOOL_HANDLERS.find_tags;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -273,9 +275,9 @@ describe("list_tags", () => {
   });
 });
 
-describe("search_errors", () => {
+describe("find_errors", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.search_errors;
+    const tool = TOOL_HANDLERS.find_errors;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -314,9 +316,9 @@ describe("search_errors", () => {
   });
 });
 
-describe("search_transactions", () => {
+describe("find_transactions", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.search_transactions;
+    const tool = TOOL_HANDLERS.find_transactions;
     const result = await tool(
       {
         accessToken: "access-token",
@@ -701,9 +703,9 @@ describe("create_dsn", () => {
   });
 });
 
-describe("list_dsn", () => {
+describe("find_dsns", () => {
   it("serializes", async () => {
-    const tool = TOOL_HANDLERS.list_dsns;
+    const tool = TOOL_HANDLERS.find_dsns;
     const result = await tool(
       {
         accessToken: "access-token",

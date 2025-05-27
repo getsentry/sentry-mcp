@@ -282,16 +282,25 @@ export class SentryApiService {
     {
       organizationSlug,
       projectSlug,
+      query,
     }: {
       organizationSlug: string;
       projectSlug?: string;
+      query?: string;
     },
     opts?: RequestOptions,
   ): Promise<ReleaseList> {
+    const searchQuery = new URLSearchParams();
+    if (query) {
+      searchQuery.set("query", query);
+    }
+
+    const path = projectSlug
+      ? `/projects/${organizationSlug}/${projectSlug}/releases/`
+      : `/organizations/${organizationSlug}/releases/`;
+
     const response = await this.request(
-      projectSlug
-        ? `/projects/${organizationSlug}/${projectSlug}/releases/`
-        : `/organizations/${organizationSlug}/releases/`,
+      `${path}${searchQuery.toString()}`,
       undefined,
       opts,
     );

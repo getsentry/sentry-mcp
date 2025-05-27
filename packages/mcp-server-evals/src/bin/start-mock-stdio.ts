@@ -11,7 +11,7 @@ mswServer.listen({
     }
 
     print.warning();
-    throw new Error("Unhandled request");
+    throw new Error(`Unhandled request: ${req.url}`);
   },
   // onUnhandledRequest: "error"
 });

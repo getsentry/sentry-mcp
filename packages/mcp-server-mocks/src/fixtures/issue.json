@@ -1,0 +1,195 @@
+{
+  "id": "6507376925",
+  "shareId": null,
+  "shortId": "CLOUDFLARE-MCP-41",
+  "title": "Error: Tool list_organizations is already registered",
+  "culprit": "Object.fetch(index)",
+  "permalink": "https://sentry-mcp-evals.sentry.io/issues/6507376925/",
+  "logger": null,
+  "level": "error",
+  "status": "unresolved",
+  "statusDetails": {},
+  "substatus": "ongoing",
+  "isPublic": false,
+  "platform": "javascript",
+  "project": {
+    "id": "4509062593708032",
+    "name": "CLOUDFLARE-MCP",
+    "slug": "CLOUDFLARE-MCP",
+    "platform": "bun"
+  },
+  "type": "error",
+  "metadata": {
+    "value": "Tool list_organizations is already registered",
+    "type": "Error",
+    "filename": "index.js",
+    "function": "Object.fetch",
+    "in_app_frame_mix": "in-app-only",
+    "sdk": {
+      "name": "sentry.javascript.cloudflare",
+      "name_normalized": "sentry.javascript.cloudflare"
+    },
+    "severity": 0,
+    "severity_reason": "ml",
+    "initial_priority": 50,
+    "title": null
+  },
+  "numComments": 0,
+  "assignedTo": null,
+  "isBookmarked": false,
+  "isSubscribed": false,
+  "subscriptionDetails": null,
+  "hasSeen": true,
+  "annotations": [],
+  "issueType": "error",
+  "issueCategory": "error",
+  "priority": "medium",
+  "priorityLockedAt": null,
+  "isUnhandled": true,
+  "count": "25",
+  "userCount": 1,
+  "firstSeen": "2025-04-03T22:51:19.403000Z",
+  "lastSeen": "2025-04-12T11:34:11Z",
+  "firstRelease": null,
+  "lastRelease": null,
+  "activity": [
+    {
+      "id": "4633815464",
+      "user": null,
+      "type": "auto_set_ongoing",
+      "data": {
+        "after_days": 7
+      },
+      "dateCreated": "2025-04-10T22:55:22.411699Z"
+    },
+    {
+      "id": "0",
+      "user": null,
+      "type": "first_seen",
+      "data": {
+        "priority": "medium"
+      },
+      "dateCreated": "2025-04-03T22:51:19.403000Z"
+    }
+  ],
+  "openPeriods": [
+    {
+      "start": "2025-04-03T22:51:19.403000Z",
+      "end": null,
+      "duration": null,
+      "isOpen": true,
+      "lastChecked": "2025-04-12T11:34:11.310000Z"
+    }
+  ],
+  "seenBy": [
+    {
+      "id": "1",
+      "name": "David Cramer",
+      "username": "david@example.com",
+      "email": "david@example.com",
+      "avatarUrl": null,
+      "isActive": true,
+      "hasPasswordAuth": true,
+      "isManaged": false,
+      "dateJoined": "2012-01-14T22:08:29.270831Z",
+      "lastLogin": "2025-04-13T14:00:11.516852Z",
+      "has2fa": true,
+      "lastActive": "2025-04-13T18:10:49.177605Z",
+      "isSuperuser": true,
+      "isStaff": true,
+      "experiments": {},
+      "emails": [
+        {
+          "id": "87429",
+          "email": "david@example.com",
+          "is_verified": true
+        }
+      ],
+      "options": {
+        "theme": "light",
+        "language": "en",
+        "stacktraceOrder": 2,
+        "defaultIssueEvent": "recommended",
+        "timezone": "US/Pacific",
+        "clock24Hours": false
+      },
+      "flags": {
+        "newsletter_consent_prompt": false
+      },
+      "avatar": {
+        "avatarType": "upload",
+        "avatarUuid": "51e63edabf31412aa2a955e9cf2c1ca0",
+        "avatarUrl": "https://sentry.io/avatar/51e63edabf31412aa2a955e9cf2c1ca0/"
+      },
+      "identities": [],
+      "lastSeen": "2025-04-08T23:15:26.569455Z"
+    }
+  ],
+  "pluginActions": [],
+  "pluginIssues": [],
+  "pluginContexts": [],
+  "userReportCount": 0,
+  "stats": {
+    "24h": [
+      [1744480800, 0],
+      [1744484400, 0],
+      [1744488000, 0],
+      [1744491600, 0],
+      [1744495200, 0],
+      [1744498800, 0],
+      [1744502400, 0],
+      [1744506000, 0],
+      [1744509600, 0],
+      [1744513200, 0],
+      [1744516800, 0],
+      [1744520400, 0],
+      [1744524000, 0],
+      [1744527600, 0],
+      [1744531200, 0],
+      [1744534800, 0],
+      [1744538400, 0],
+      [1744542000, 0],
+      [1744545600, 0],
+      [1744549200, 0],
+      [1744552800, 0],
+      [1744556400, 0],
+      [1744560000, 0],
+      [1744563600, 0],
+      [1744567200, 0]
+    ],
+    "30d": [
+      [1741910400, 0],
+      [1741996800, 0],
+      [1742083200, 0],
+      [1742169600, 0],
+      [1742256000, 0],
+      [1742342400, 0],
+      [1742428800, 0],
+      [1742515200, 0],
+      [1742601600, 0],
+      [1742688000, 0],
+      [1742774400, 0],
+      [1742860800, 0],
+      [1742947200, 0],
+      [1743033600, 0],
+      [1743120000, 0],
+      [1743206400, 0],
+      [1743292800, 0],
+      [1743379200, 0],
+      [1743465600, 0],
+      [1743552000, 0],
+      [1743638400, 1],
+      [1743724800, 0],
+      [1743811200, 0],
+      [1743897600, 0],
+      [1743984000, 0],
+      [1744070400, 20],
+      [1744156800, 1],
+      [1744243200, 1],
+      [1744329600, 0],
+      [1744416000, 2],
+      [1744502400, 0]
+    ]
+  },
+  "participants": []
+}

@@ -1,0 +1,344 @@
+{
+  "id": "7ca573c0f4814912aaa9bdc77d1a7d51",
+  "groupID": "6507376925",
+  "eventID": "7ca573c0f4814912aaa9bdc77d1a7d51",
+  "projectID": "4509062593708032",
+  "size": 5891,
+  "entries": [
+    {
+      "data": {
+        "values": [
+          {
+            "type": "Error",
+            "value": "Tool list_organizations is already registered",
+            "mechanism": {
+              "type": "cloudflare",
+              "handled": false
+            },
+            "threadId": null,
+            "module": null,
+            "stacktrace": {
+              "frames": [
+                {
+                  "filename": "index.js",
+                  "absPath": "/index.js",
+                  "module": "index",
+                  "package": null,
+                  "platform": null,
+                  "instructionAddr": null,
+                  "symbolAddr": null,
+                  "function": null,
+                  "rawFunction": null,
+                  "symbol": null,
+                  "context": [],
+                  "lineNo": 7809,
+                  "colNo": 27,
+                  "inApp": true,
+                  "trust": null,
+                  "errors": null,
+                  "lock": null,
+                  "sourceLink": null,
+                  "vars": null
+                },
+                {
+                  "filename": "index.js",
+                  "absPath": "/index.js",
+                  "module": "index",
+                  "package": null,
+                  "platform": null,
+                  "instructionAddr": null,
+                  "symbolAddr": null,
+                  "function": "OAuthProviderImpl.fetch",
+                  "rawFunction": null,
+                  "symbol": null,
+                  "context": [],
+                  "lineNo": 8029,
+                  "colNo": 24,
+                  "inApp": true,
+                  "trust": null,
+                  "errors": null,
+                  "lock": null,
+                  "sourceLink": null,
+                  "vars": null
+                },
+                {
+                  "filename": "index.js",
+                  "absPath": "/index.js",
+                  "module": "index",
+                  "package": null,
+                  "platform": null,
+                  "instructionAddr": null,
+                  "symbolAddr": null,
+                  "function": "Object.fetch",
+                  "rawFunction": null,
+                  "symbol": null,
+                  "context": [],
+                  "lineNo": 19631,
+                  "colNo": 28,
+                  "inApp": true,
+                  "trust": null,
+                  "errors": null,
+                  "lock": null,
+                  "sourceLink": null,
+                  "vars": null
+                }
+              ],
+              "framesOmitted": null,
+              "registers": null,
+              "hasSystemFrames": true
+            },
+            "rawStacktrace": {
+              "frames": [
+                {
+                  "filename": "index.js",
+                  "absPath": "/index.js",
+                  "module": "index",
+                  "package": null,
+                  "platform": null,
+                  "instructionAddr": null,
+                  "symbolAddr": null,
+                  "function": null,
+                  "rawFunction": null,
+                  "symbol": null,
+                  "context": [],
+                  "lineNo": 7809,
+                  "colNo": 27,
+                  "inApp": true,
+                  "trust": null,
+                  "errors": null,
+                  "lock": null,
+                  "sourceLink": null,
+                  "vars": null
+                },
+                {
+                  "filename": "index.js",
+                  "absPath": "/index.js",
+                  "module": "index",
+                  "package": null,
+                  "platform": null,
+                  "instructionAddr": null,
+                  "symbolAddr": null,
+                  "function": "OAuthProviderImpl.fetch",
+                  "rawFunction": null,
+                  "symbol": null,
+                  "context": [],
+                  "lineNo": 8029,
+                  "colNo": 24,
+                  "inApp": true,
+                  "trust": null,
+                  "errors": null,
+                  "lock": null,
+                  "sourceLink": null,
+                  "vars": null
+                },
+                {
+                  "filename": "index.js",
+                  "absPath": "/index.js",
+                  "module": "index",
+                  "package": null,
+                  "platform": null,
+                  "instructionAddr": null,
+                  "symbolAddr": null,
+                  "function": "Object.fetch",
+                  "rawFunction": null,
+                  "symbol": null,
+                  "context": [],
+                  "lineNo": 19631,
+                  "colNo": 28,
+                  "inApp": true,
+                  "trust": null,
+                  "errors": null,
+                  "lock": null,
+                  "sourceLink": null,
+                  "vars": null
+                }
+              ],
+              "framesOmitted": null,
+              "registers": null,
+              "hasSystemFrames": true
+            }
+          }
+        ],
+        "hasSystemFrames": true,
+        "excOmitted": null
+      },
+      "type": "exception"
+    },
+    {
+      "data": {
+        "apiTarget": null,
+        "method": "GET",
+        "url": "https://mcp.sentry.dev/sse",
+        "query": [],
+        "fragment": null,
+        "data": null,
+        "headers": [
+          ["Accept", "text/event-stream"],
+          ["Accept-Encoding", "gzip, br"],
+          ["Accept-Language", "*"],
+          ["Authorization", "[Filtered]"],
+          ["Cache-Control", "no-cache"],
+          ["Cf-Ipcountry", "GB"],
+          ["Cf-Ray", "92d4c7266c8f48c9"],
+          ["Cf-Visitor", "{\"scheme\":\"https\"}"],
+          ["Connection", "Keep-Alive"],
+          ["Host", "mcp.sentry.dev"],
+          ["Pragma", "no-cache"],
+          ["Sec-Fetch-Mode", "cors"],
+          ["User-Agent", "node"],
+          ["X-Forwarded-Proto", "https"]
+        ],
+        "cookies": [],
+        "env": null,
+        "inferredContentType": null
+      },
+      "type": "request"
+    }
+  ],
+  "dist": null,
+  "message": "",
+  "title": "Error: Tool list_organizations is already registered",
+  "location": "index.js",
+  "user": {
+    "id": null,
+    "email": null,
+    "username": null,
+    "ip_address": "2a06:98c0:3600::103",
+    "name": null,
+    "geo": {
+      "country_code": "US",
+      "region": "United States"
+    },
+    "data": null
+  },
+  "contexts": {
+    "cloud_resource": {
+      "cloud.provider": "cloudflare",
+      "type": "default"
+    },
+    "culture": {
+      "timezone": "Europe/London",
+      "type": "default"
+    },
+    "runtime": {
+      "name": "cloudflare",
+      "type": "runtime"
+    },
+    "trace": {
+      "trace_id": "3032af8bcdfe4423b937fc5c041d5d82",
+      "span_id": "953da703d2a6f4c7",
+      "status": "unknown",
+      "client_sample_rate": 1,
+      "sampled": true,
+      "type": "trace"
+    }
+  },
+  "sdk": {
+    "name": "sentry.javascript.cloudflare",
+    "version": "9.12.0"
+  },
+  "context": {},
+  "packages": {},
+  "type": "error",
+  "metadata": {
+    "filename": "index.js",
+    "function": "Object.fetch",
+    "in_app_frame_mix": "in-app-only",
+    "type": "Error",
+    "value": "Tool list_organizations is already registered"
+  },
+  "tags": [
+    {
+      "key": "environment",
+      "value": "development"
+    },
+    {
+      "key": "handled",
+      "value": "no"
+    },
+    {
+      "key": "level",
+      "value": "error"
+    },
+    {
+      "key": "mechanism",
+      "value": "cloudflare"
+    },
+    {
+      "key": "runtime.name",
+      "value": "cloudflare"
+    },
+    {
+      "key": "url",
+      "value": "https://mcp.sentry.dev/sse"
+    }
+  ],
+  "platform": "javascript",
+  "dateReceived": "2025-04-08T21:15:04.700878Z",
+  "errors": [
+    {
+      "type": "js_no_source",
+      "message": "Source code was not found",
+      "data": {
+        "symbolicator_type": "missing_source",
+        "url": "/index.js"
+      }
+    }
+  ],
+  "occurrence": null,
+  "_meta": {
+    "entries": {
+      "1": {
+        "data": {
+          "": null,
+          "apiTarget": null,
+          "method": null,
+          "url": null,
+          "query": null,
+          "data": null,
+          "headers": {
+            "3": {
+              "1": {
+                "": {
+                  "rem": [["@password:filter", "s", 0, 10]],
+                  "len": 64,
+                  "chunks": [
+                    {
+                      "type": "redaction",
+                      "text": "[Filtered]",
+                      "rule_id": "@password:filter",
+                      "remark": "s"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "cookies": null,
+          "env": null
+        }
+      }
+    },
+    "message": null,
+    "user": null,
+    "contexts": null,
+    "sdk": null,
+    "context": null,
+    "packages": null,
+    "tags": {}
+  },
+  "crashFile": null,
+  "culprit": "Object.fetch(index)",
+  "dateCreated": "2025-04-08T21:15:04Z",
+  "fingerprints": ["60d1c667b173018c004e399b29dc927d"],
+  "groupingConfig": {
+    "enhancements": "KLUv_SAYwQAAkwKRs25ld3N0eWxlOjIwMjMtMDEtMTGQ",
+    "id": "newstyle:2023-01-11"
+  },
+  "release": null,
+  "userReport": null,
+  "sdkUpdates": [],
+  "resolvedWith": [null],
+  "nextEventID": null,
+  "previousEventID": "b7ed18493f4f4817a217b03839d4c017"
+}

@@ -24,7 +24,7 @@ function apiServiceFromContext(
 }
 
 export const TOOL_HANDLERS = {
-  list_organizations: async (context) => {
+  find_organizations: async (context) => {
     const apiService = apiServiceFromContext(context);
     const organizations = await apiService.listOrganizations();
 
@@ -52,17 +52,12 @@ export const TOOL_HANDLERS = {
 
     return output;
   },
-  list_teams: async (context, params) => {
+  find_teams: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
 
     const teams = await apiService.listTeams(organizationSlug);
@@ -74,17 +69,12 @@ export const TOOL_HANDLERS = {
     output += teams.map((team) => `- ${team.slug}\n`).join("");
     return output;
   },
-  list_projects: async (context, params) => {
+  find_projects: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
 
     const projects = await apiService.listProjects(organizationSlug);
@@ -96,17 +86,12 @@ export const TOOL_HANDLERS = {
     output += projects.map((project) => `- **${project.slug}**\n`).join("");
     return output;
   },
-  list_issues: async (context, params) => {
+  find_issues: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
 
     const sortByMap = {
@@ -147,22 +132,18 @@ export const TOOL_HANDLERS = {
     output += `- You can get more details about a specific issue by using the tool: \`get_issue_details(organizationSlug="${organizationSlug}", issueId=<issueID>)\`\n`;
     return output;
   },
-  list_releases: async (context, params) => {
+  find_releases: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
 
     const releases = await apiService.listReleases({
       organizationSlug,
       projectSlug: params.projectSlug,
+      query: params.query,
     });
     let output = `# Releases in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
     if (releases.length === 0) {
@@ -233,20 +214,15 @@ export const TOOL_HANDLERS = {
     output += "\n\n";
     output += "# Using this information\n\n";
     output += `- You can reference the Release version in commit messages or documentation.\n`;
-    output += `- You can search for issues in a specific release using the \`search_errors()\` tool with the query \`release:${releases.length ? releases[0]!.version : "VERSION"}\`.\n`;
+    output += `- You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:${releases.length ? releases[0]!.version : "VERSION"}\`.\n`;
     return output;
   },
-  list_tags: async (context, params) => {
+  find_tags: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
 
     const tagList = await apiService.listTags({ organizationSlug }, {});
@@ -267,10 +243,13 @@ export const TOOL_HANDLERS = {
     });
 
     if (params.eventId) {
-      const orgSlug = params.organizationSlug ?? context.organizationSlug;
+      const orgSlug = params.organizationSlug;
       if (!orgSlug) {
-        throw new Error("Organization slug is required");
+        throw new Error(
+          "`organizationSlug` is required without passing `issueUrl`",
+        );
       }
+
       setTag("organization.slug", orgSlug);
       const [issue] = await apiService.listIssues({
         organizationSlug: orgSlug,
@@ -294,7 +273,7 @@ export const TOOL_HANDLERS = {
 
     const { organizationSlug: orgSlug, issueId: parsedIssueId } =
       parseIssueParams({
-        organizationSlug: params.organizationSlug ?? context.organizationSlug,
+        organizationSlug: params.organizationSlug,
         issueId: params.issueId,
         issueUrl: params.issueUrl,
       });
@@ -318,18 +297,14 @@ export const TOOL_HANDLERS = {
       apiService,
     });
   },
-  search_errors: async (context, params) => {
+  find_errors: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
+    if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
     const eventList = await apiService.searchErrors({
       organizationSlug,
@@ -364,18 +339,14 @@ export const TOOL_HANDLERS = {
     output += `- You can get more details about an error by using the tool: \`get_issue_details(organizationSlug="${organizationSlug}", issueId=<issueID>)\`\n`;
     return output;
   },
-  search_transactions: async (context, params) => {
+  find_transactions: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
+    if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
     const eventList = await apiService.searchSpans({
       organizationSlug,
@@ -412,13 +383,8 @@ export const TOOL_HANDLERS = {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
 
     const team = await apiService.createTeam({
@@ -437,14 +403,10 @@ export const TOOL_HANDLERS = {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
+    setTag("team.slug", params.teamSlug);
 
     const project = await apiService.createProject({
       organizationSlug,
@@ -480,14 +442,10 @@ export const TOOL_HANDLERS = {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
+    setTag("project.slug", params.projectSlug);
 
     const clientKey = await apiService.createClientKey({
       organizationSlug,
@@ -502,18 +460,14 @@ export const TOOL_HANDLERS = {
       "- The `SENTRY_DSN` value is a URL that you can use to initialize Sentry's SDKs.\n";
     return output;
   },
-  list_dsns: async (context, params) => {
+  find_dsns: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
-    let organizationSlug = params.organizationSlug;
-    if (!organizationSlug && context.organizationSlug) {
-      organizationSlug = context.organizationSlug;
-    }
-    if (!organizationSlug) {
-      throw new Error("Organization slug is required");
-    }
+    const organizationSlug = params.organizationSlug;
+
     setTag("organization.slug", organizationSlug);
+    setTag("project.slug", params.projectSlug);
 
     const clientKeys = await apiService.listClientKeys({
       organizationSlug,
@@ -541,10 +495,11 @@ export const TOOL_HANDLERS = {
     });
     const { organizationSlug: orgSlug, issueId: parsedIssueId } =
       parseIssueParams({
-        organizationSlug: params.organizationSlug ?? context.organizationSlug,
+        organizationSlug: params.organizationSlug,
         issueId: params.issueId,
         issueUrl: params.issueUrl,
       });
+
     setTag("organization.slug", orgSlug);
 
     const data = await apiService.startAutofix({
@@ -573,7 +528,7 @@ export const TOOL_HANDLERS = {
     });
     const { organizationSlug: orgSlug, issueId: parsedIssueId } =
       parseIssueParams({
-        organizationSlug: params.organizationSlug ?? context.organizationSlug,
+        organizationSlug: params.organizationSlug,
         issueId: params.issueId,
         issueUrl: params.issueUrl,
       });

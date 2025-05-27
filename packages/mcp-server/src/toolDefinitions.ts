@@ -8,14 +8,17 @@ import {
   ParamQuery,
   ParamTransaction,
   ParamRegionUrl,
+  ParamProjectSlugOrAll,
+  ParamIssueUrl,
+  ParamTeamSlug,
 } from "./schema";
 import { z } from "zod";
 
 export const TOOL_DEFINITIONS = [
   {
-    name: "list_organizations" as const,
+    name: "find_organizations" as const,
     description: [
-      "List all organizations that the user has access to in Sentry.",
+      "Find organizations that the user has access to in Sentry.",
       "",
       "Use this tool when you need to:",
       "- View all organizations in Sentry",
@@ -23,74 +26,65 @@ export const TOOL_DEFINITIONS = [
     ].join("\n"),
   },
   {
-    name: "list_teams" as const,
+    name: "find_teams" as const,
     description: [
-      "List all teams in an organization in Sentry.",
+      "Find teams in an organization in Sentry.",
       "",
       "Use this tool when you need to:",
       "- View all teams in a Sentry organization",
-      "- Find an team's slug to aid other tool requests",
-      "",
-      "<hints>",
-      "- If you're uncertain about which organization to query, you should call `list_organizations()` first.",
-      "</hints>",
+      "- Find a team's slug to aid other tool requests",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
     },
   },
   {
-    name: "list_projects" as const,
+    name: "find_projects" as const,
     description: [
-      "Retrieve a list of projects in Sentry.",
+      "Find projects in Sentry.",
       "",
       "Use this tool when you need to:",
       "- View all projects in a Sentry organization",
-      "- Find an project's slug to aid other tool requests",
-      "",
-      "<hints>",
-      "- If you're uncertain about which organization to query, you should call `list_organizations()` first.",
-      "</hints>",
+      "- Find a project's slug to aid other tool requests",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
     },
   },
   {
-    name: "list_issues" as const,
+    name: "find_issues" as const,
     description: [
-      "List all issues in Sentry.",
+      "Find issues in Sentry.",
       "",
       "Use this tool when you need to:",
       "- View all issues in a Sentry organization",
       "",
-      "If you're looking for more granular data beyond a summary of identified problems, you should use the `search_errors()` or `search_transactions()` tools instead.",
+      "If you're looking for more granular data beyond a summary of identified problems, you should use the `find_errors()` or `find_transactions()` tools instead.",
       "",
       "<examples>",
       "### Find the newest unresolved issues across 'my-organization'",
       "",
       "```",
-      "list_issues(organizationSlug='my-organization', query='is:unresolved', sortBy='last_seen')",
+      "find_issues(organizationSlug='my-organization', query='is:unresolved', sortBy='last_seen')",
       "```",
       "",
       "### Find the most frequently occurring crashes in the 'my-project' project",
       "",
       "```",
-      "list_issues(organizationSlug='my-organization', projectSlug='my-project', query='is:unresolved error.handled:false', sortBy='count')",
+      "find_issues(organizationSlug='my-organization', projectSlug='my-project', query='is:unresolved error.handled:false', sortBy='count')",
       "```",
       "",
       "</examples>",
       "",
       "<hints>",
       "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
-      "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you should call `list_organizations()` first.",
-      "- You can use the `list_tags()` tool to see what user-defined tags are available.",
+      "- You can use the `find_tags()` tool to see what user-defined tags are available.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
       projectSlug: ParamProjectSlug.optional(),
       query: ParamQuery.optional(),
@@ -103,39 +97,53 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
-    name: "list_releases" as const,
+    name: "find_releases" as const,
     description: [
-      "List all releases in Sentry.",
+      "Find releases in Sentry.",
       "",
       "Use this tool when you need to:",
       "- Find recent releases in a Sentry organization",
       "- Find the most recent version released of a specific project",
       "- Determine when a release was deployed to an environment",
+      "",
+      "<examples>",
+      "### Find the most recent releases in the 'my-organization' organization",
+      "",
+      "```",
+      "find_releases(organizationSlug='my-organization')",
+      "```",
+      "",
+      "### Find releases matching '2ce6a27' in the 'my-organization' organization",
+      "",
+      "```",
+      "find_releases(organizationSlug='my-organization', query='2ce6a27')",
+      "```",
+      "</examples>",
+      "",
       "<hints>",
       "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
-      "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you should call `list_organizations()` first.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
-      projectSlug: ParamProjectSlug.optional(),
+      projectSlug: ParamProjectSlugOrAll.optional(),
+      query: z
+        .string()
+        .describe("Search for versions which contain the provided string.")
+        .optional(),
     },
   },
   {
-    name: "list_tags" as const,
+    name: "find_tags" as const,
     description: [
-      "List all tags in Sentry.",
+      "Find tags in Sentry.",
       "",
       "Use this tool when you need to:",
-      "- Find tags available to use in searches",
-      "",
-      "<hints>",
-      "- If you're uncertain about which organization to query, you should call `list_organizations()` first.",
-      "</hints>",
+      "- Find tags available to use in search queries (such as `find_issues()` or `find_errors()`)",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
     },
   },
@@ -165,7 +173,6 @@ export const TOOL_DEFINITIONS = [
       "<hints>",
       "- If the user provides the `issueUrl`, you can ignore the other parameters.",
       "- If the user provides `issueId` or `eventId` (only one is needed), `organizationSlug` is required.",
-      "- If you're uncertain about which organization to query, you should call `list_organizations()` first.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
@@ -173,17 +180,13 @@ export const TOOL_DEFINITIONS = [
       regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
       eventId: z.string().describe("The ID of the event.").optional(),
-      issueUrl: z
-        .string()
-        .url()
-        .describe("The URL of the issue to retrieve details for.")
-        .optional(),
+      issueUrl: ParamIssueUrl.optional(),
     },
   },
   {
-    name: "search_errors" as const,
+    name: "find_errors" as const,
     description: [
-      "Query Sentry for errors using advanced search syntax.",
+      "Find errors in Sentry using advanced search syntax.",
       "",
       "Use this tool when you need to:",
       "- Search for production errors in a specific file.",
@@ -196,28 +199,28 @@ export const TOOL_DEFINITIONS = [
       "To find common errors within a file, you can use the `filename` parameter. This is a suffix based search, so only using the filename or the direct parent folder of the file. The parent folder is preferred when the filename is in a subfolder or a common filename. If you provide generic filenames like `index.js` you're going to end up finding errors that are might be from completely different projects.",
       "",
       "```",
-      "search_errors(organizationSlug='my-organization', filename='index.js', sortBy='count')",
+      "find_errors(organizationSlug='my-organization', filename='index.js', sortBy='count')",
       "```",
       "",
       "### Find recent crashes from the 'peated' project",
       "",
       "```",
-      "search_errors(organizationSlug='my-organization', query='is:unresolved error.handled:false', projectSlug='peated', sortBy='last_seen')",
+      "find_errors(organizationSlug='my-organization', query='is:unresolved error.handled:false', projectSlug='peated', sortBy='last_seen')",
       "```",
       "",
       "</examples>",
       "",
       "<hints>",
       "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
-      "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you should call `list_organizations()` first.",
-      "- If you are looking for issues, in a way that you might be looking for something like 'unresolved errors', you should use the `list_issues()` tool",
-      "- You can use the `list_tags()` tool to see what user-defined tags are available.",
+      "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you should call `find_organizations()` first.",
+      "- If you are looking for issues, in a way that you might be looking for something like 'unresolved errors', you should use the `find_issues()` tool",
+      "- You can use the `find_tags()` tool to see what user-defined tags are available.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
-      projectSlug: ParamProjectSlug.optional(),
+      projectSlug: ParamProjectSlugOrAll.optional(),
       filename: z
         .string()
         .describe("The filename to search for errors in.")
@@ -234,9 +237,9 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
-    name: "search_transactions" as const,
+    name: "find_transactions" as const,
     description: [
-      "Query Sentry for transactions using advanced search syntax.",
+      "Find transactions in Sentry using advanced search syntax.",
       "",
       "Transactions are segments of traces that are associated with a specific route or endpoint.",
       "",
@@ -251,21 +254,21 @@ export const TOOL_DEFINITIONS = [
       "...",
       "",
       "```",
-      "search_transactions(organizationSlug='my-organization', transaction='/checkout', sortBy='latency')",
+      "find_transactions(organizationSlug='my-organization', transaction='/checkout', sortBy='latency')",
       "```",
       "",
       "</examples>",
       "",
       "<hints>",
       "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
-      "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `list_organizations()` first.",
-      "- You can use the `list_tags()` tool to see what user-defined tags are available.",
+      "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `find_organizations()` first.",
+      "- You can use the `find_tags()` tool to see what user-defined tags are available.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
-      projectSlug: ParamProjectSlug.optional(),
+      projectSlug: ParamProjectSlugOrAll.optional(),
       transaction: ParamTransaction.optional(),
       query: ParamQuery.optional(),
       sortBy: z
@@ -282,6 +285,8 @@ export const TOOL_DEFINITIONS = [
     description: [
       "Create a new team in Sentry.",
       "",
+      "Be careful when using this tool!",
+      "",
       "Use this tool when you need to:",
       "- Create a new team in a Sentry organization",
       "",
@@ -290,7 +295,7 @@ export const TOOL_DEFINITIONS = [
       "</hints>",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
       name: z.string().describe("The name of the team to create."),
     },
@@ -299,6 +304,8 @@ export const TOOL_DEFINITIONS = [
     name: "create_project" as const,
     description: [
       "Create a new project in Sentry, giving you access to a new SENTRY_DSN.",
+      "",
+      "Be careful when using this tool!",
       "",
       "Use this tool when you need to:",
       "- Create a new project in a Sentry organization",
@@ -318,9 +325,9 @@ export const TOOL_DEFINITIONS = [
       "</hints>",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
-      teamSlug: z.string().toLowerCase().describe("The team's slug."),
+      teamSlug: ParamTeamSlug,
       name: z
         .string()
         .describe(
@@ -334,6 +341,8 @@ export const TOOL_DEFINITIONS = [
     description: [
       "Create a new Sentry DSN for a specific project.",
       "",
+      "Be careful when using this tool!",
+      "",
       "Use this tool when you need to:",
       "- Create a new DSN for a specific project",
       "",
@@ -341,7 +350,7 @@ export const TOOL_DEFINITIONS = [
       "### Create a new DSN for the 'my-project' project",
       "",
       "```",
-      "create_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Default')",
+      "create_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')",
       "```",
       "",
       "</examples>",
@@ -352,14 +361,16 @@ export const TOOL_DEFINITIONS = [
       "</hints>",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
-      projectSlug: z.string().toLowerCase().describe("The project's slug."),
-      name: z.string().describe("The name of the DSN to create."),
+      projectSlug: ParamProjectSlug,
+      name: z
+        .string()
+        .describe("The name of the DSN to create, for example 'Production'."),
     },
   },
   {
-    name: "list_dsns" as const,
+    name: "find_dsns" as const,
     description: [
       "List all Sentry DSNs for a specific project.",
       "",
@@ -368,13 +379,13 @@ export const TOOL_DEFINITIONS = [
       "",
       "<hints>",
       "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
-      "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `list_organizations()` first.",
+      "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `find_organizations()` first.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
+      organizationSlug: ParamOrganizationSlug,
       regionUrl: ParamRegionUrl.optional(),
-      projectSlug: z.string().toLowerCase().describe("The project's slug."),
+      projectSlug: ParamProjectSlug,
     },
   },
   {
@@ -400,18 +411,13 @@ export const TOOL_DEFINITIONS = [
       "<hints>",
       "- Always check to see if an issue fix is already in progress for before calling this tool by using `get_seer_issue_fix_status()`.",
       "- If the user provides the issueUrl, you can ignore the organizationSlug and issueId parameters.",
-      "- If you're uncertain about which organization to query, you should call `list_organizations()` first. This especially important if an issueId is passed.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
       regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
-      issueUrl: z
-        .string()
-        .url()
-        .describe("The URL of the issue to retrieve details for.")
-        .optional(),
+      issueUrl: ParamIssueUrl.optional(),
     },
   },
   {
@@ -434,18 +440,13 @@ export const TOOL_DEFINITIONS = [
       "",
       "<hints>",
       "- If the user provides the issueUrl, you can ignore the organizationSlug and issueId parameters.",
-      "- If you're uncertain about which organization to query, you should call `list_organizations()` first. This especially important if an issueId is passed.",
       "</hints>",
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
       regionUrl: ParamRegionUrl.optional(),
       issueId: ParamIssueShortId.optional(),
-      issueUrl: z
-        .string()
-        .url()
-        .describe("The URL of the issue to retrieve details for.")
-        .optional(),
+      issueUrl: ParamIssueUrl.optional(),
     },
   },
 ];
