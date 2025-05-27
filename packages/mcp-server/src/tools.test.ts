@@ -410,6 +410,8 @@ describe("get_issue_details", () => {
       index.js:19631:28 (Object.fetch)
       \`\`\`
 
+      **HTTP Method:** GET
+      **URL:** https://mcp.sentry.dev/sse
       # Using this information
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
@@ -465,6 +467,8 @@ describe("get_issue_details", () => {
       index.js:19631:28 (Object.fetch)
       \`\`\`
 
+      **HTTP Method:** GET
+      **URL:** https://mcp.sentry.dev/sse
       # Using this information
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
@@ -518,6 +522,8 @@ describe("get_issue_details", () => {
       index.js:19631:28 (Object.fetch)
       \`\`\`
 
+      **HTTP Method:** GET
+      **URL:** https://mcp.sentry.dev/sse
       # Using this information
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.

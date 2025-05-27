@@ -4,6 +4,7 @@ import type {
   ErrorEntrySchema,
   ErrorEventSchema,
   FrameInterface,
+  RequestEntrySchema,
   SentryApiService,
 } from "../api-client";
 
@@ -27,32 +28,60 @@ export function formatEventOutput(event: Event) {
   let output = "";
   for (const entry of event.entries) {
     if (entry.type === "exception") {
-      const data = entry.data as z.infer<typeof ErrorEntrySchema>;
-      const firstError = data.value ?? data.values[0];
-      if (!firstError) {
-        continue;
-      }
-      output += `**Error:**\n${"```"}\n${firstError.type}: ${
-        firstError.value
-      }\n${"```"}\n\n`;
-      if (!firstError.stacktrace || !firstError.stacktrace.frames) {
-        continue;
-      }
-      output += `**Stacktrace:**\n${"```"}\n${firstError.stacktrace.frames
-        .map((frame) => {
-          const context = frame.context?.length
-            ? `${frame.context
-                .filter(([lineno, _]) => lineno === frame.lineNo)
-                .map(([_, code]) => `\n${code}`)
-                .join("")}`
-            : "";
-
-          return `${formatFrameHeader(frame, event.platform)}${context}`;
-        })
-        .join("\n")}\n${"```"}\n\n`;
+      output += formatExceptionInterfaceOutput(
+        event,
+        entry.data as z.infer<typeof ErrorEntrySchema>,
+      );
+    }
+    if (entry.type === "request") {
+      output += formatRequestInterfaceOutput(
+        event,
+        entry.data as z.infer<typeof RequestEntrySchema>,
+      );
     }
   }
   return output;
+}
+
+function formatExceptionInterfaceOutput(
+  event: Event,
+  data: z.infer<typeof ErrorEntrySchema>,
+) {
+  let output = "";
+  // TODO: support chained exceptions
+  const firstError = data.value ?? data.values[0];
+  if (!firstError) {
+    return "";
+  }
+  output += `**Error:**\n${"```"}\n${firstError.type}: ${
+    firstError.value
+  }\n${"```"}\n\n`;
+  if (!firstError.stacktrace || !firstError.stacktrace.frames) {
+    return output;
+  }
+  output += `**Stacktrace:**\n${"```"}\n${firstError.stacktrace.frames
+    .map((frame) => {
+      const context = frame.context?.length
+        ? `${frame.context
+            .filter(([lineno, _]) => lineno === frame.lineNo)
+            .map(([_, code]) => `\n${code}`)
+            .join("")}`
+        : "";
+
+      return `${formatFrameHeader(frame, event.platform)}${context}`;
+    })
+    .join("\n")}\n${"```"}\n\n`;
+  return output;
+}
+
+function formatRequestInterfaceOutput(
+  event: Event,
+  data: z.infer<typeof RequestEntrySchema>,
+) {
+  if (!data.method || !data.url) {
+    return "";
+  }
+  return `**HTTP Method:** ${data.method}\n**URL:** ${data.url}\n`;
 }
 
 export function formatIssueOutput({

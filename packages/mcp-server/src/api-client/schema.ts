@@ -142,6 +142,15 @@ export const ErrorEntrySchema = z.object({
   value: ExceptionInterface.nullable().optional(),
 });
 
+export const RequestEntrySchema = z.object({
+  method: z.string().nullable(),
+  url: z.string().url().nullable(),
+  // TODO:
+  // query: z.array(z.tuple([z.string(), z.string()])).nullable(),
+  // data: z.unknown().nullable(),
+  // headers: z.array(z.tuple([z.string(), z.string()])).nullable(),
+});
+
 const BaseEventSchema = z.object({
   id: z.string(),
   title: z.string(),
