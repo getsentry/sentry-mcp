@@ -16,7 +16,7 @@ const app = new Hono<{
         "",
         "This service provides a Model Context Provider for interacting with Sentry's API (https://sentry.io).",
         "",
-        `The MCP's server address is: ${new URL("/sse", c.req.url).href}`,
+        `The MCP's server address is: ${new URL("/mcp", c.req.url).href}`,
         "",
       ].join("\n"),
     );

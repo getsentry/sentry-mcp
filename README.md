@@ -73,13 +73,13 @@ COOKIE_SECRET=my-super-secret-cookie
 
 ### Verify
 
-Run the server locally to make it available at `http://localhost:8788`
+Run the server locally to make it available at `http://localhost:5173`
 
 ```shell
 pnpm dev
 ```
 
-To test the local server, enter `http://localhost:8788/sse` into Inspector and hit connect. Once you follow the prompts, you'll be able to "List Tools".
+To test the local server, enter `http://localhost:5173/mcp` into Inspector and hit connect. Once you follow the prompts, you'll be able to "List Tools".
 
 ### Tests
 
@@ -102,17 +102,3 @@ Once thats done you can run them using:
 ```shell
 pnpm test
 ```
-
-## Notes
-
-### Using Claude and other MCP Clients
-
-When using Claude to connect to your remote MCP server, you may see some error messages. This is because Claude Desktop doesn't yet support remote MCP servers, so it sometimes gets confused. To verify whether the MCP server is connected, hover over the 🔨 icon in the bottom right corner of Claude's interface. You should see your tools available there.
-
-### Using Cursor and other MCP Clients
-
-To connect Cursor with your MCP server, choose `Type`: "Command" and in the `Command` field, combine the command and args fields into one (e.g. `npx mcp-remote@latest https://<your-worker-name>.<your-subdomain>.workers.dev/sse`).
-
-Note that while Cursor supports HTTP+SSE servers, it doesn't support authentication, so you still need to use `mcp-remote` (and to use a STDIO server, not an HTTP one).
-
-You can connect your MCP server to other MCP clients like Windsurf by opening the client's configuration file, adding the same JSON that was used for the Claude setup, and restarting the MCP client.

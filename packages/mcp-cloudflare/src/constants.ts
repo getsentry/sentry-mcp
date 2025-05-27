@@ -5,3 +5,7 @@ export const SCOPES = {
   "team:write": "Write team data",
   "event:write": "Write event data",
 };
+
+export const NPM_PACKAGE_NAME = "@sentry/mcp-server";
+
+export const NPM_REMOTE_NAME = "mcp-remote";
