@@ -363,73 +363,6 @@ describe("search_transactions", () => {
   });
 });
 
-describe("get_issue_summary", () => {
-  it("serializes with issueId", async () => {
-    const tool = TOOL_HANDLERS.get_issue_summary;
-    const result = await tool(
-      {
-        accessToken: "access-token",
-        userId: "1",
-        organizationSlug: null,
-      },
-      {
-        organizationSlug: "sentry-mcp-evals",
-        issueId: "CLOUDFLARE-MCP-41",
-        issueUrl: undefined,
-        regionUrl: undefined,
-      },
-    );
-    expect(result).toMatchInlineSnapshot(`
-      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
-
-      **Description**: Error: Tool list_organizations is already registered
-      **Culprit**: Object.fetch(index)
-      **First Seen**: 2025-04-03T22:51:19.403Z
-      **Last Seen**: 2025-04-12T11:34:11.000Z
-      **Occurrences**: 25
-      **Users Impacted**: 1
-      **Status**: unresolved
-      **Platform**: javascript
-      **Project**: CLOUDFLARE-MCP
-      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
-      "
-    `);
-  });
-
-  it("serializes with issueUrl", async () => {
-    const tool = TOOL_HANDLERS.get_issue_summary;
-    const result = await tool(
-      {
-        accessToken: "access-token",
-        userId: "1",
-        organizationSlug: null,
-      },
-      {
-        organizationSlug: undefined,
-        issueId: undefined,
-        issueUrl: "https://sentry-mcp-evals.sentry.io/issues/6507376925",
-        regionUrl: undefined,
-      },
-    );
-
-    expect(result).toMatchInlineSnapshot(`
-      "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**
-
-      **Description**: Error: Tool list_organizations is already registered
-      **Culprit**: Object.fetch(index)
-      **First Seen**: 2025-04-03T22:51:19.403Z
-      **Last Seen**: 2025-04-12T11:34:11.000Z
-      **Occurrences**: 25
-      **Users Impacted**: 1
-      **Status**: unresolved
-      **Platform**: javascript
-      **Project**: CLOUDFLARE-MCP
-      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
-      "
-    `);
-  });
-});
-
 describe("get_issue_details", () => {
   it("serializes with issueId", async () => {
     const tool = TOOL_HANDLERS.get_issue_details;
@@ -454,6 +387,11 @@ describe("get_issue_details", () => {
       **Culprit**: Object.fetch(index)
       **First Seen**: 2025-04-03T22:51:19.403Z
       **Last Seen**: 2025-04-12T11:34:11.000Z
+      **Occurrences**: 25
+      **Users Impacted**: 1
+      **Status**: unresolved
+      **Platform**: javascript
+      **Project**: CLOUDFLARE-MCP
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
 
       ## Event Details
@@ -504,6 +442,11 @@ describe("get_issue_details", () => {
       **Culprit**: Object.fetch(index)
       **First Seen**: 2025-04-03T22:51:19.403Z
       **Last Seen**: 2025-04-12T11:34:11.000Z
+      **Occurrences**: 25
+      **Users Impacted**: 1
+      **Status**: unresolved
+      **Platform**: javascript
+      **Project**: CLOUDFLARE-MCP
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
 
       ## Event Details
@@ -552,6 +495,11 @@ describe("get_issue_details", () => {
       **Culprit**: Object.fetch(index)
       **First Seen**: 2025-04-03T22:51:19.403Z
       **Last Seen**: 2025-04-12T11:34:11.000Z
+      **Occurrences**: 25
+      **Users Impacted**: 1
+      **Status**: unresolved
+      **Platform**: javascript
+      **Project**: CLOUDFLARE-MCP
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
 
       ## Event Details

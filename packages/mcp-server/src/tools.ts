@@ -261,35 +261,6 @@ export const TOOL_HANDLERS = {
     output += `- You can reference tags in the \`query\` parameter of various tools: \`tagName:tagValue\`.\n`;
     return output;
   },
-  get_issue_summary: async (context, params) => {
-    const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
-    });
-    const { organizationSlug: orgSlug, issueId: parsedIssueId } =
-      parseIssueParams({
-        organizationSlug: params.organizationSlug ?? context.organizationSlug,
-        issueId: params.issueId,
-        issueUrl: params.issueUrl,
-      });
-    setTag("organization.slug", orgSlug);
-
-    const issue = await apiService.getIssue({
-      organizationSlug: orgSlug,
-      issueId: parsedIssueId,
-    });
-    let output = `# Issue ${issue.shortId} in **${orgSlug}**\n\n`;
-    output += `**Description**: ${issue.title}\n`;
-    output += `**Culprit**: ${issue.culprit}\n`;
-    output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
-    output += `**Last Seen**: ${new Date(issue.lastSeen).toISOString()}\n`;
-    output += `**Occurrences**: ${issue.count}\n`;
-    output += `**Users Impacted**: ${issue.userCount}\n`;
-    output += `**Status**: ${issue.status}\n`;
-    output += `**Platform**: ${issue.platform}\n`;
-    output += `**Project**: ${issue.project.name}\n`;
-    output += `**URL**: ${apiService.getIssueUrl(orgSlug, issue.shortId)}\n`;
-    return output;
-  },
   get_issue_details: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

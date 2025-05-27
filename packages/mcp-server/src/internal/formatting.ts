@@ -71,6 +71,11 @@ export function formatIssueOutput({
   output += `**Culprit**: ${issue.culprit}\n`;
   output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
   output += `**Last Seen**: ${new Date(issue.lastSeen).toISOString()}\n`;
+  output += `**Occurrences**: ${issue.count}\n`;
+  output += `**Users Impacted**: ${issue.userCount}\n`;
+  output += `**Status**: ${issue.status}\n`;
+  output += `**Platform**: ${issue.platform}\n`;
+  output += `**Project**: ${issue.project.name}\n`;
   output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue.shortId)}\n`;
   output += "\n";
   output += "## Event Details\n\n";

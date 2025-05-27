@@ -140,32 +140,6 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
-    name: "get_issue_summary" as const,
-    description: [
-      "Retrieve a summary of an issue in Sentry.",
-      "",
-      "Use this tool when you need to:",
-      "- View a summary of an issue in Sentry",
-      "",
-      "If the issue is an error, or you want additional information like the stacktrace, you should use `get_issue_details()` tool instead.",
-      "",
-      "<hints>",
-      "- If the user provides the issueUrl, you can ignore the organizationSlug and issueId parameters.",
-      "- If you're uncertain about which organization to query, you should call `list_organizations()` first. This especially important if an issueId is passed.",
-      "</hints>",
-    ].join("\n"),
-    paramsSchema: {
-      organizationSlug: ParamOrganizationSlug.optional(),
-      regionUrl: ParamRegionUrl.optional(),
-      issueId: ParamIssueShortId.optional(),
-      issueUrl: z
-        .string()
-        .url()
-        .describe("The URL of the issue to retrieve details for.")
-        .optional(),
-    },
-  },
-  {
     name: "get_issue_details" as const,
     description: [
       "Retrieve issue details from Sentry for a specific Issue ID, including the stacktrace and error message if available. Either issueId or issueUrl MUST be provided.",
