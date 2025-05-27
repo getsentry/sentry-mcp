@@ -1,6 +1,6 @@
 # sentry-mcp
 
-This is a prototype of an MCP sever, acting as a middleware to the upstream Sentry API provider.
+This is a prototype of an MCP server, acting as a middleware to the upstream Sentry API provider.
 
 This package is primarily for running the `stdio` MCP server. If you do not know what that is, or do not need it, we suggest using the public remote service:
 
