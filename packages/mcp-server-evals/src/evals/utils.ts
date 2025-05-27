@@ -8,6 +8,10 @@ import {
 import { Experimental_StdioMCPTransport } from "ai/mcp-stdio";
 import { z } from "zod";
 
+const SYSTEM_PROMPT = `You are an assistant responsible for evaluating the results of calling various tools. Given the user's query, use the tools available to you to answer the question.
+
+You are emulating the behavior of an LLM-based Agent which is utilizing the set of tools provided to it, and you should use as few tools as possible to answer the question.`;
+
 export const FIXTURES = {
   organizationSlug: "sentry-mcp-evals",
   teamSlug: "the-goats",
@@ -39,8 +43,7 @@ export function TaskRunner(model: LanguageModel = defaultModel) {
       const result = streamText({
         model,
         tools,
-        system:
-          "You are an assistant responsible for evaluating the results of calling various tools. Given the user's query, use the tools available to you to answer the question.",
+        system: SYSTEM_PROMPT,
         prompt: input,
         maxRetries: 1,
         maxSteps: 10,
