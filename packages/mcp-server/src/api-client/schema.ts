@@ -6,6 +6,11 @@ export const ApiErrorSchema = z
   })
   .passthrough();
 
+export const UserSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+});
+
 export const OrganizationSchema = z.object({
   id: z.union([z.string(), z.number()]),
   slug: z.string(),

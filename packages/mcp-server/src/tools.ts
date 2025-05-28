@@ -24,6 +24,11 @@ function apiServiceFromContext(
 }
 
 export const TOOL_HANDLERS = {
+  whoami: async (context) => {
+    const apiService = apiServiceFromContext(context);
+    const user = await apiService.getAuthenticatedUser();
+    return `You are authenticated as ${user.name} (${user.email})`;
+  },
   find_organizations: async (context) => {
     const apiService = apiServiceFromContext(context);
     const organizations = await apiService.listOrganizations();

@@ -16,6 +16,15 @@ import { z } from "zod";
 
 export const TOOL_DEFINITIONS = [
   {
+    name: "whoami" as const,
+    description: [
+      "Identify the authenticated user in Sentry.",
+      "",
+      "Use this tool when you need to:",
+      "- Get the user's name and email address.",
+    ].join("\n"),
+  },
+  {
     name: "find_organizations" as const,
     description: [
       "Find organizations that the user has access to in Sentry.",
