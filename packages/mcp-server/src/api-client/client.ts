@@ -16,6 +16,7 @@ import {
   ClientKeyListSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
+  UserSchema,
 } from "./schema";
 import type {
   AutofixRun,
@@ -32,6 +33,7 @@ import type {
   TagList,
   Team,
   TeamList,
+  User,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -148,6 +150,12 @@ export class SentryApiService {
     return this.host !== "sentry.io"
       ? `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`
       : `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`;
+  }
+
+  async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
+    const response = await this.request("/auth/", undefined, opts);
+    const body = await response.json();
+    return UserSchema.parse(body);
   }
 
   async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {

@@ -1,6 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { TOOL_HANDLERS } from "./tools";
 
+describe("whoami", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.whoami;
+    const result = await tool({
+      accessToken: "access-token",
+      userId: "1",
+      organizationSlug: null,
+    });
+    expect(result).toMatchInlineSnapshot(
+      `
+      "You are authenticated as John Doe (john.doe@example.com).
+
+      Your Sentry User ID is 1."
+    `,
+    );
+  });
+});
+
 describe("find_organizations", () => {
   it("serializes", async () => {
     const tool = TOOL_HANDLERS.find_organizations;

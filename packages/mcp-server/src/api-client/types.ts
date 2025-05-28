@@ -17,8 +17,10 @@ import type {
   TagSchema,
   TeamListSchema,
   TeamSchema,
+  UserSchema,
 } from "./schema";
 
+export type User = z.infer<typeof UserSchema>;
 export type Organization = z.infer<typeof OrganizationSchema>;
 export type Team = z.infer<typeof TeamSchema>;
 export type Project = z.infer<typeof ProjectSchema>;

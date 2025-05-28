@@ -308,6 +308,17 @@ function buildHandlers(
 export const restHandlers = buildHandlers([
   {
     method: "get",
+    path: "/api/0/auth/",
+    fetch: () => {
+      return HttpResponse.json({
+        id: "1",
+        name: "John Doe",
+        email: "john.doe@example.com",
+      });
+    },
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/",
     fetch: () => {
       return HttpResponse.json([OrganizationPayload]);
