@@ -24,13 +24,17 @@ function apiServiceFromContext(
 }
 
 export const TOOL_HANDLERS = {
-  whoami: async (context) => {
-    const apiService = apiServiceFromContext(context);
+  whoami: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
     const user = await apiService.getAuthenticatedUser();
     return `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
   },
-  find_organizations: async (context) => {
-    const apiService = apiServiceFromContext(context);
+  find_organizations: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
     const organizations = await apiService.listOrganizations();
 
     let output = "# Organizations\n\n";

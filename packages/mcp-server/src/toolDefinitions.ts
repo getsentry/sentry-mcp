@@ -23,6 +23,9 @@ export const TOOL_DEFINITIONS = [
       "Use this tool when you need to:",
       "- Get the user's name and email address.",
     ].join("\n"),
+    paramsSchema: {
+      regionUrl: ParamRegionUrl.optional(),
+    },
   },
   {
     name: "find_organizations" as const,
@@ -33,6 +36,9 @@ export const TOOL_DEFINITIONS = [
       "- View all organizations in Sentry",
       "- Find an organization's slug to aid other tool requests",
     ].join("\n"),
+    paramsSchema: {
+      regionUrl: ParamRegionUrl.optional(),
+    },
   },
   {
     name: "find_teams" as const,
