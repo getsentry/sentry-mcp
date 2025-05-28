@@ -7,6 +7,7 @@ export const ApiErrorSchema = z
   .passthrough();
 
 export const UserSchema = z.object({
+  id: z.union([z.string(), z.number()]),
   name: z.string(),
   email: z.string(),
 });

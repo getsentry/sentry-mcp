@@ -1,10 +1,5 @@
 import { setupServer } from "msw/node";
-import {
-  http,
-  type HttpHandler,
-  type HttpRequestHandler,
-  HttpResponse,
-} from "msw";
+import { http, HttpResponse } from "msw";
 
 import autofixStateFixture from "./fixtures/autofix-state.json";
 import issueFixture from "./fixtures/issue.json";
@@ -311,6 +306,7 @@ export const restHandlers = buildHandlers([
     path: "/api/0/auth/",
     fetch: () => {
       return HttpResponse.json({
+        id: "1",
         name: "John Doe",
         email: "john.doe@example.com",
       });

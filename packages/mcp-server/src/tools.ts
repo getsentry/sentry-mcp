@@ -27,7 +27,7 @@ export const TOOL_HANDLERS = {
   whoami: async (context) => {
     const apiService = apiServiceFromContext(context);
     const user = await apiService.getAuthenticatedUser();
-    return `You are authenticated as ${user.name} (${user.email})`;
+    return `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
   },
   find_organizations: async (context) => {
     const apiService = apiServiceFromContext(context);

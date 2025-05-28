@@ -33,6 +33,7 @@ import type {
   TagList,
   Team,
   TeamList,
+  User,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
