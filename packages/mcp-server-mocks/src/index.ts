@@ -314,6 +314,15 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/users/me/regions/",
+    fetch: () => {
+      return HttpResponse.json({
+        regions: [{ name: "us", url: "https://us.sentry.io" }],
+      });
+    },
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/",
     fetch: () => {
       return HttpResponse.json([OrganizationPayload]);

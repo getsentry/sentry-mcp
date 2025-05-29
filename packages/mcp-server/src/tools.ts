@@ -57,7 +57,7 @@ export const TOOL_HANDLERS = {
 
     output += "\n\n# Using this information\n\n";
     output += `- The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.\n`;
-    output += `- If a tool supports passing in the \`regionUrl\`, you should also pass in the correct value there.\n`;
+    output += `- If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value there.\n`;
 
     return output;
   },

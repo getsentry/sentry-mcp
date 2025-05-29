@@ -17,6 +17,7 @@ import {
   AutofixRunSchema,
   AutofixRunStateSchema,
   UserSchema,
+  UserRegionsSchema,
 } from "./schema";
 import type {
   AutofixRun,
@@ -159,10 +160,26 @@ export class SentryApiService {
   }
 
   async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
-    const response = await this.request("/organizations/", undefined, opts);
+    // TODO: Sentry is currently not returning all orgs without hitting region endpoints
+    const regionResponse = await this.request(
+      "/users/me/regions/",
+      undefined,
+      opts,
+    );
+    const regionData = UserRegionsSchema.parse(await regionResponse.json());
 
-    const body = await response.json();
-    return OrganizationListSchema.parse(body);
+    return (
+      await Promise.all(
+        regionData.regions.map(async (region) =>
+          this.request(`/organizations/`, undefined, {
+            ...opts,
+            host: new URL(region.url).host,
+          }).then((response) => response.json()),
+        ),
+      )
+    )
+      .map((data) => OrganizationListSchema.parse(data))
+      .reduce((acc, curr) => acc.concat(curr), []);
   }
 
   async listTeams(

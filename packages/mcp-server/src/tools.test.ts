@@ -48,7 +48,7 @@ describe("find_organizations", () => {
       # Using this information
 
       - The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.
-      - If a tool supports passing in the \`regionUrl\`, you should also pass in the correct value there.
+      - If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value there.
       "
     `);
   });

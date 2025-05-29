@@ -12,6 +12,15 @@ export const UserSchema = z.object({
   email: z.string(),
 });
 
+export const UserRegionsSchema = z.object({
+  regions: z.array(
+    z.object({
+      name: z.string(),
+      url: z.string().url(),
+    }),
+  ),
+});
+
 export const OrganizationSchema = z.object({
   id: z.union([z.string(), z.number()]),
   slug: z.string(),
