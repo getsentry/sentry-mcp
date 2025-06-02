@@ -21,6 +21,6 @@
     "@sentry/mcp-server-tsconfig": "workspace:*"
   },
   "dependencies": {
-    "msw": "^2.7.6"
+    "msw": "^2.8.7"
   }
 }
