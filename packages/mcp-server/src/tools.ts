@@ -17,8 +17,20 @@ function apiServiceFromContext(
   context: ServerContext,
   opts: { regionUrl?: string } = {},
 ) {
+  let host = context.host;
+
+  if (opts.regionUrl) {
+    try {
+      host = new URL(opts.regionUrl).host;
+    } catch (error) {
+      throw new Error(
+        `Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`,
+      );
+    }
+  }
+
   return new SentryApiService({
-    host: opts.regionUrl ? new URL(opts.regionUrl).host : context.host,
+    host,
     accessToken: context.accessToken,
   });
 }
@@ -67,6 +79,12 @@ export const TOOL_HANDLERS = {
     });
     const organizationSlug = params.organizationSlug;
 
+    if (!organizationSlug) {
+      throw new Error(
+        "Organization slug is required. Please provide an organizationSlug parameter.",
+      );
+    }
+
     setTag("organization.slug", organizationSlug);
 
     const teams = await apiService.listTeams(organizationSlug);
@@ -84,6 +102,12 @@ export const TOOL_HANDLERS = {
     });
     const organizationSlug = params.organizationSlug;
 
+    if (!organizationSlug) {
+      throw new Error(
+        "Organization slug is required. Please provide an organizationSlug parameter.",
+      );
+    }
+
     setTag("organization.slug", organizationSlug);
 
     const projects = await apiService.listProjects(organizationSlug);
@@ -100,6 +124,12 @@ export const TOOL_HANDLERS = {
       regionUrl: params.regionUrl,
     });
     const organizationSlug = params.organizationSlug;
+
+    if (!organizationSlug) {
+      throw new Error(
+        "Organization slug is required. Please provide an organizationSlug parameter.",
+      );
+    }
 
     setTag("organization.slug", organizationSlug);
 
@@ -255,7 +285,7 @@ export const TOOL_HANDLERS = {
       const orgSlug = params.organizationSlug;
       if (!orgSlug) {
         throw new Error(
-          "`organizationSlug` is required without passing `issueUrl`",
+          "`organizationSlug` is required when providing `eventId`",
         );
       }
 
@@ -278,6 +308,17 @@ export const TOOL_HANDLERS = {
         event,
         apiService,
       });
+    }
+
+    // Validate that we have the minimum required parameters
+    if (!params.issueUrl && !params.issueId) {
+      throw new Error("Either `issueId` or `issueUrl` must be provided");
+    }
+
+    if (!params.issueUrl && !params.organizationSlug) {
+      throw new Error(
+        "`organizationSlug` is required when providing `issueId`",
+      );
     }
 
     const { organizationSlug: orgSlug, issueId: parsedIssueId } =

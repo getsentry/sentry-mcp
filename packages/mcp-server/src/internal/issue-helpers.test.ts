@@ -70,7 +70,7 @@ describe("extractIssueId", () => {
 
   it("should throw error for empty input", () => {
     expect(() => extractIssueId("")).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Invalid Sentry issue URL. Must start with http:// or https://]`,
+      `[Error: Invalid Sentry issue URL. URL must be a non-empty string.]`,
     );
   });
 

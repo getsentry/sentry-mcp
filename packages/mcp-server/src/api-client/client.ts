@@ -102,6 +102,13 @@ export class SentryApiService {
       headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
+    // Check if fetch is available, otherwise provide a helpful error message
+    if (typeof globalThis.fetch === "undefined") {
+      throw new Error(
+        "fetch is not available. Please use Node.js >= 18 or ensure fetch is available in your environment.",
+      );
+    }
+
     // logger.info(logger.fmt`[sentryApi] ${options.method || "GET"} ${url}`);
     const response = await fetch(url, {
       ...options,

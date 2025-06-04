@@ -9,13 +9,24 @@ export function extractIssueId(url: string): {
   issueId: string;
   organizationSlug: string;
 } {
+  if (!url || typeof url !== "string") {
+    throw new Error(
+      "Invalid Sentry issue URL. URL must be a non-empty string.",
+    );
+  }
+
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
     throw new Error(
       "Invalid Sentry issue URL. Must start with http:// or https://",
     );
   }
 
-  const parsedUrl = new URL(url);
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch (error) {
+    throw new Error(`Invalid Sentry issue URL. Unable to parse URL: ${url}`);
+  }
 
   const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
   if (pathParts.length < 2 || !pathParts.includes("issues")) {
@@ -69,10 +80,10 @@ export function parseIssueId(issueId: string) {
   // Validate against common Sentry issue ID patterns
   // Either numeric IDs or PROJECT-ABC123 format
   const validFormatRegex = /^(\d+|[A-Za-z][\w-]*-[A-Za-z0-9]+)$/;
-  
+
   if (!validFormatRegex.test(finalIssueId)) {
     throw new Error(
-      `Invalid issue ID format: "${finalIssueId}". Expected either a numeric ID or a project code followed by an alphanumeric identifier (e.g., "PROJECT-ABC123").`
+      `Invalid issue ID format: "${finalIssueId}". Expected either a numeric ID or a project code followed by an alphanumeric identifier (e.g., "PROJECT-ABC123").`,
     );
   }
 
