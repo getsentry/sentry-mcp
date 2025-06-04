@@ -12,6 +12,7 @@ import { parseIssueParams } from "./internal/issue-helpers";
 import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
+import { UserInputError } from "./errors";
 
 function apiServiceFromContext(
   context: ServerContext,
@@ -23,7 +24,7 @@ function apiServiceFromContext(
     try {
       host = new URL(opts.regionUrl).host;
     } catch (error) {
-      throw new Error(
+      throw new UserInputError(
         `Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`,
       );
     }
@@ -80,7 +81,7 @@ export const TOOL_HANDLERS = {
     const organizationSlug = params.organizationSlug;
 
     if (!organizationSlug) {
-      throw new Error(
+      throw new UserInputError(
         "Organization slug is required. Please provide an organizationSlug parameter.",
       );
     }
@@ -103,7 +104,7 @@ export const TOOL_HANDLERS = {
     const organizationSlug = params.organizationSlug;
 
     if (!organizationSlug) {
-      throw new Error(
+      throw new UserInputError(
         "Organization slug is required. Please provide an organizationSlug parameter.",
       );
     }
@@ -126,7 +127,7 @@ export const TOOL_HANDLERS = {
     const organizationSlug = params.organizationSlug;
 
     if (!organizationSlug) {
-      throw new Error(
+      throw new UserInputError(
         "Organization slug is required. Please provide an organizationSlug parameter.",
       );
     }
@@ -284,7 +285,7 @@ export const TOOL_HANDLERS = {
     if (params.eventId) {
       const orgSlug = params.organizationSlug;
       if (!orgSlug) {
-        throw new Error(
+        throw new UserInputError(
           "`organizationSlug` is required when providing `eventId`",
         );
       }
@@ -312,11 +313,13 @@ export const TOOL_HANDLERS = {
 
     // Validate that we have the minimum required parameters
     if (!params.issueUrl && !params.issueId) {
-      throw new Error("Either `issueId` or `issueUrl` must be provided");
+      throw new UserInputError(
+        "Either `issueId` or `issueUrl` must be provided",
+      );
     }
 
     if (!params.issueUrl && !params.organizationSlug) {
-      throw new Error(
+      throw new UserInputError(
         "`organizationSlug` is required when providing `issueId`",
       );
     }

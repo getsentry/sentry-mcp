@@ -8,12 +8,27 @@ import { RESOURCES } from "./resources";
 import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
+import { UserInputError } from "./errors";
 
 function isApiError(error: unknown) {
   return error instanceof ApiError || Object.hasOwn(error as any, "status");
 }
 
+function isUserInputError(error: unknown) {
+  return error instanceof UserInputError;
+}
+
 async function logAndFormatError(error: unknown) {
+  if (isUserInputError(error)) {
+    const typedError = error as UserInputError;
+    return [
+      "**Input Error**",
+      "It looks like there was a problem with the input you provided.",
+      typedError.message,
+      `You may be able to resolve the issue by addressing the concern and trying again.`,
+    ].join("\n\n");
+  }
+
   if (isApiError(error)) {
     const typedError = error as ApiError;
     return [
