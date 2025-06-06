@@ -182,7 +182,7 @@ export const TOOL_DEFINITIONS = [
       "### Get details for event ID 'c49541c747cb4d8aa3efb70ca5aba243'",
       "",
       "```",
-      "get_event_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')",
+      "get_issue_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')",
       "```",
       "</examples>",
 
@@ -271,7 +271,7 @@ export const TOOL_DEFINITIONS = [
       "...",
       "",
       "```",
-      "find_transactions(organizationSlug='my-organization', transaction='/checkout', sortBy='latency')",
+      "find_transactions(organizationSlug='my-organization', transaction='/checkout', sortBy='duration')",
       "```",
       "",
       "</examples>",
