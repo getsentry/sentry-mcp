@@ -254,7 +254,7 @@ export const TOOL_HANDLERS = {
     output += "\n\n";
     output += "# Using this information\n\n";
     output += `- You can reference the Release version in commit messages or documentation.\n`;
-    output += `- You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:${releases.length ? releases[0]!.version : "VERSION"}\`.\n`;
+    output += `- You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:${releases.length ? releases[0]!.shortVersion : "VERSION"}\`.\n`;
     return output;
   },
   find_tags: async (context, params) => {
