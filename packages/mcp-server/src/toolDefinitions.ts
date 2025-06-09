@@ -422,7 +422,7 @@ export const TOOL_DEFINITIONS = [
       "</examples>",
       "",
       "<hints>",
-      "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
+      "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.",
       "- Team assignment is handled separately from other project settings",
       "- If any parameter is ambiguous, you should clarify with the user what they meant.",
       "- When updating the slug, the project will be accessible at the new slug after the update",
