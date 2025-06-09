@@ -5,6 +5,7 @@ import autofixStateFixture from "./fixtures/autofix-state.json";
 import issueFixture from "./fixtures/issue.json";
 import eventsFixture from "./fixtures/event.json";
 import tagsFixture from "./fixtures/tags.json";
+import projectFixture from "./fixtures/project.json";
 
 const OrganizationPayload = {
   id: "4509106740723712",
@@ -280,83 +281,6 @@ const EventsSpansPayload = {
   ],
 };
 
-// Shared project fixture factory
-function createProjectFixture(overrides: Record<string, any> = {}) {
-  const baseProject = {
-    team: {
-      id: "4509106733776896",
-      slug: "the-goats",
-      name: "the-goats",
-    },
-    teams: [
-      {
-        id: "4509106733776896",
-        slug: "the-goats",
-        name: "the-goats",
-      },
-    ],
-    id: "4509109104082945",
-    name: "cloudflare-mcp",
-    slug: "cloudflare-mcp",
-    isBookmarked: false,
-    isMember: true,
-    access: [
-      "event:admin",
-      "alerts:read",
-      "project:write",
-      "org:integrations",
-      "alerts:write",
-      "member:read",
-      "team:write",
-      "project:read",
-      "event:read",
-      "event:write",
-      "project:admin",
-      "org:read",
-      "team:admin",
-      "project:releases",
-      "team:read",
-    ],
-    hasAccess: true,
-    dateCreated: "2025-04-06T14:13:37.825970Z",
-    environments: [],
-    eventProcessing: { symbolicationDegraded: false },
-    features: [
-      "discard-groups",
-      "alert-filters",
-      "similarity-embeddings",
-      "similarity-indexing",
-      "similarity-view",
-    ],
-    firstEvent: null,
-    firstTransactionEvent: false,
-    hasSessions: false,
-    hasProfiles: false,
-    hasReplays: false,
-    hasFeedbacks: false,
-    hasNewFeedbacks: false,
-    hasMonitors: false,
-    hasMinifiedStackTrace: false,
-    hasInsightsHttp: false,
-    hasInsightsDb: false,
-    hasInsightsAssets: false,
-    hasInsightsAppStart: false,
-    hasInsightsScreenLoad: false,
-    hasInsightsVitals: false,
-    hasInsightsCaches: false,
-    hasInsightsQueues: false,
-    hasInsightsLlmMonitoring: false,
-    platform: "node",
-    platforms: [],
-    latestRelease: null,
-    hasUserReports: false,
-    hasFlags: false,
-    latestDeploys: null,
-  };
-
-  return { ...baseProject, ...overrides };
-}
-
 function buildHandlers(
   handlers: {
     method: keyof typeof http;
@@ -457,9 +381,10 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/projects/",
     fetch: () => {
       return HttpResponse.json([
-        createProjectFixture({
-          id: "4509106749636608",
-        }),
+        {
+          ...projectFixture,
+          id: "4509106749636608", // Different ID for GET endpoint
+        },
       ]);
     },
   },
@@ -511,13 +436,12 @@ export const restHandlers = buildHandlers([
     fetch: async ({ request }) => {
       // TODO: validate payload (only accept 'cloudflare-mcp' for project name)
       const body = (await request.json()) as any;
-      return HttpResponse.json(
-        createProjectFixture({
-          name: body?.name || "cloudflare-mcp",
-          slug: body?.slug || "cloudflare-mcp",
-          platform: body?.platform || "node",
-        }),
-      );
+      return HttpResponse.json({
+        ...projectFixture,
+        name: body?.name || "cloudflare-mcp",
+        slug: body?.slug || "cloudflare-mcp",
+        platform: body?.platform || "node",
+      });
     },
   },
   {
@@ -525,13 +449,12 @@ export const restHandlers = buildHandlers([
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
     fetch: async ({ request }) => {
       const body = (await request.json()) as any;
-      return HttpResponse.json(
-        createProjectFixture({
-          slug: body?.slug || "cloudflare-mcp",
-          name: body?.name || "cloudflare-mcp",
-          platform: body?.platform || "node",
-        }),
-      );
+      return HttpResponse.json({
+        ...projectFixture,
+        slug: body?.slug || "cloudflare-mcp",
+        name: body?.name || "cloudflare-mcp",
+        platform: body?.platform || "node",
+      });
     },
   },
   {

@@ -1,0 +1,73 @@
+{
+  "team": {
+    "id": "4509106733776896",
+    "slug": "the-goats",
+    "name": "the-goats"
+  },
+  "teams": [
+    {
+      "id": "4509106733776896",
+      "slug": "the-goats",
+      "name": "the-goats"
+    }
+  ],
+  "id": "4509109104082945",
+  "name": "cloudflare-mcp",
+  "slug": "cloudflare-mcp",
+  "isBookmarked": false,
+  "isMember": true,
+  "access": [
+    "event:admin",
+    "alerts:read",
+    "project:write",
+    "org:integrations",
+    "alerts:write",
+    "member:read",
+    "team:write",
+    "project:read",
+    "event:read",
+    "event:write",
+    "project:admin",
+    "org:read",
+    "team:admin",
+    "project:releases",
+    "team:read"
+  ],
+  "hasAccess": true,
+  "dateCreated": "2025-04-06T14:13:37.825970Z",
+  "environments": [],
+  "eventProcessing": {
+    "symbolicationDegraded": false
+  },
+  "features": [
+    "discard-groups",
+    "alert-filters",
+    "similarity-embeddings",
+    "similarity-indexing",
+    "similarity-view"
+  ],
+  "firstEvent": null,
+  "firstTransactionEvent": false,
+  "hasSessions": false,
+  "hasProfiles": false,
+  "hasReplays": false,
+  "hasFeedbacks": false,
+  "hasNewFeedbacks": false,
+  "hasMonitors": false,
+  "hasMinifiedStackTrace": false,
+  "hasInsightsHttp": false,
+  "hasInsightsDb": false,
+  "hasInsightsAssets": false,
+  "hasInsightsAppStart": false,
+  "hasInsightsScreenLoad": false,
+  "hasInsightsVitals": false,
+  "hasInsightsCaches": false,
+  "hasInsightsQueues": false,
+  "hasInsightsLlmMonitoring": false,
+  "platform": "node",
+  "platforms": [],
+  "latestRelease": null,
+  "hasUserReports": false,
+  "hasFlags": false,
+  "latestDeploys": null
+}
