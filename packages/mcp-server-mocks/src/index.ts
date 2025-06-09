@@ -6,6 +6,7 @@ import issueFixture from "./fixtures/issue.json";
 import eventsFixture from "./fixtures/event.json";
 import tagsFixture from "./fixtures/tags.json";
 import projectFixture from "./fixtures/project.json";
+import teamFixture from "./fixtures/team.json";
 
 const OrganizationPayload = {
   id: "4509106740723712",
@@ -340,40 +341,7 @@ export const restHandlers = buildHandlers([
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/teams/",
     fetch: () => {
-      return HttpResponse.json([
-        {
-          id: "4509106740854784",
-          slug: "the-goats",
-          name: "the-goats",
-          dateCreated: "2025-04-06T14:11:23.961739Z",
-          isMember: true,
-          teamRole: "admin",
-          flags: { "idp:provisioned": false },
-          access: [
-            "team:read",
-            "alerts:read",
-            "event:write",
-            "team:write",
-            "team:admin",
-            "event:read",
-            "org:read",
-            "member:read",
-            "project:admin",
-            "project:write",
-            "org:integrations",
-            "project:releases",
-            "alerts:write",
-            "event:admin",
-            "project:read",
-          ],
-          hasAccess: true,
-          isPending: false,
-          memberCount: 1,
-          avatar: { avatarType: "letter_avatar", avatarUuid: null },
-          externalTeams: [],
-          projects: [],
-        },
-      ]);
+      return HttpResponse.json([teamFixture]);
     },
   },
   {
@@ -395,13 +363,9 @@ export const restHandlers = buildHandlers([
       // TODO: validate payload (only accept 'the-goats' for team name)
       return HttpResponse.json(
         {
+          ...teamFixture,
           id: "4509109078196224",
-          slug: "the-goats",
-          name: "the-goats",
           dateCreated: "2025-04-07T00:05:48.196710Z",
-          isMember: true,
-          teamRole: "admin",
-          flags: { "idp:provisioned": false },
           access: [
             "event:read",
             "org:integrations",
@@ -419,12 +383,6 @@ export const restHandlers = buildHandlers([
             "project:admin",
             "alerts:read",
           ],
-          hasAccess: true,
-          isPending: false,
-          memberCount: 1,
-          avatar: { avatarType: "letter_avatar", avatarUuid: null },
-          externalTeams: [],
-          projects: [],
         },
         { status: 201 },
       );
@@ -754,8 +712,15 @@ export const restHandlers = buildHandlers([
   {
     method: "post",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/the-goats/",
-    fetch: () => {
-      return HttpResponse.json({});
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      return HttpResponse.json({
+        ...teamFixture,
+        id: "4509109078196224",
+        slug: body?.slug || "the-goats",
+        name: body?.name || "the-goats",
+        dateCreated: "2025-04-07T00:05:48.196710Z",
+      });
     },
   },
 ]);

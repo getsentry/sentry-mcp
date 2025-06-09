@@ -1,0 +1,32 @@
+{
+  "id": "4509106740854784",
+  "slug": "the-goats",
+  "name": "the-goats",
+  "dateCreated": "2025-04-06T14:11:23.961739Z",
+  "isMember": true,
+  "teamRole": "admin",
+  "flags": { "idp:provisioned": false },
+  "access": [
+    "team:read",
+    "alerts:read",
+    "event:write",
+    "team:write",
+    "team:admin",
+    "event:read",
+    "org:read",
+    "member:read",
+    "project:admin",
+    "project:write",
+    "org:integrations",
+    "project:releases",
+    "alerts:write",
+    "event:admin",
+    "project:read"
+  ],
+  "hasAccess": true,
+  "isPending": false,
+  "memberCount": 1,
+  "avatar": { "avatarType": "letter_avatar", "avatarUuid": null },
+  "externalTeams": [],
+  "projects": []
+}
