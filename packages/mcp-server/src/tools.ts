@@ -5,6 +5,7 @@ import {
   type AutofixRunStepSchema,
   type AutofixRunStepSolutionSchema,
   type ClientKey,
+  type Project,
   SentryApiService,
 } from "./api-client/index";
 import { formatIssueOutput } from "./internal/formatting";
@@ -520,7 +521,7 @@ export const TOOL_HANDLERS = {
     // Update project settings if any are provided
     const hasProjectUpdates = params.name || params.slug || params.platform;
 
-    let project: Project;
+    let project: Project | undefined;
     if (hasProjectUpdates) {
       try {
         project = await apiService.updateProject({
@@ -549,8 +550,8 @@ export const TOOL_HANDLERS = {
     output += `**ID**: ${project.id}\n`;
     output += `**Slug**: ${project.slug}\n`;
     output += `**Name**: ${project.name}\n`;
-    if ((project as any).platform) {
-      output += `**Platform**: ${(project as any).platform}\n`;
+    if (project.platform) {
+      output += `**Platform**: ${project.platform}\n`;
     }
 
     // Display what was updated
