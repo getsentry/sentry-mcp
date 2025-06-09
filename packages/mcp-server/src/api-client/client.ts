@@ -274,18 +274,12 @@ export class SentryApiService {
       name,
       slug,
       platform,
-      resolveAge,
-      subjectPrefix,
-      subjectTemplate,
     }: {
       organizationSlug: string;
       projectSlug: string;
       name?: string;
       slug?: string;
       platform?: string;
-      resolveAge?: number;
-      subjectPrefix?: string;
-      subjectTemplate?: string;
     },
     opts?: RequestOptions,
   ): Promise<Project> {
@@ -293,10 +287,6 @@ export class SentryApiService {
     if (name !== undefined) updateData.name = name;
     if (slug !== undefined) updateData.slug = slug;
     if (platform !== undefined) updateData.platform = platform;
-    if (resolveAge !== undefined) updateData.resolveAge = resolveAge;
-    if (subjectPrefix !== undefined) updateData.subjectPrefix = subjectPrefix;
-    if (subjectTemplate !== undefined)
-      updateData.subjectTemplate = subjectTemplate;
 
     const response = await this.request(
       `/projects/${organizationSlug}/${projectSlug}/`,

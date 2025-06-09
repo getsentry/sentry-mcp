@@ -399,13 +399,12 @@ export const TOOL_DEFINITIONS = [
       "- Update a project's name or slug to fix onboarding mistakes",
       "- Change the platform assigned to a project",
       "- Update team assignment for a project",
-      "- Modify other project settings like auto-resolve age",
       "",
       "<examples>",
       "### Update a project's name and slug",
       "",
       "```",
-      "update_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', newSlug='new-project-slug')",
+      "update_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')",
       "```",
       "",
       "### Assign a project to a different team",
@@ -414,10 +413,10 @@ export const TOOL_DEFINITIONS = [
       "update_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')",
       "```",
       "",
-      "### Update platform and auto-resolve settings",
+      "### Update platform",
       "",
       "```",
-      "update_project(organizationSlug='my-organization', projectSlug='my-project', platform='python', resolveAge=168)",
+      "update_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')",
       "```",
       "",
       "</examples>",
@@ -438,7 +437,7 @@ export const TOOL_DEFINITIONS = [
         .trim()
         .describe("The new name for the project")
         .optional(),
-      newSlug: z
+      slug: z
         .string()
         .toLowerCase()
         .trim()
@@ -448,26 +447,6 @@ export const TOOL_DEFINITIONS = [
       teamSlug: ParamTeamSlug.optional().describe(
         "The team to assign this project to. Note: this will replace the current team assignment.",
       ),
-      resolveAge: z
-        .number()
-        .int()
-        .min(0)
-        .describe(
-          "Automatically resolve an issue if it hasn't been seen for this many hours. Set to 0 to disable auto-resolve.",
-        )
-        .optional(),
-      subjectPrefix: z
-        .string()
-        .trim()
-        .describe("Custom prefix for emails from this project")
-        .optional(),
-      subjectTemplate: z
-        .string()
-        .trim()
-        .describe(
-          "The email subject template to use (excluding the prefix) for individual alerts",
-        )
-        .optional(),
     },
   },
   {

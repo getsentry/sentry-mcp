@@ -519,9 +519,6 @@ export const restHandlers = buildHandlers([
         slug: body.slug || "cloudflare-mcp",
         name: body.name || "cloudflare-mcp",
         platform: body.platform || "node",
-        resolveAge: body.resolveAge || 0,
-        subjectPrefix: body.subjectPrefix || "",
-        subjectTemplate: body.subjectTemplate || "$shortID - $title",
       };
       return HttpResponse.json(updatedProject);
     },

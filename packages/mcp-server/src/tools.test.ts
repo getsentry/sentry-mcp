@@ -702,7 +702,7 @@ describe("create_project", () => {
 });
 
 describe("update_project", () => {
-  it("updates project name and slug", async () => {
+  it("updates project settings", async () => {
     const tool = TOOL_HANDLERS.update_project;
     const result = await tool(
       {
@@ -714,7 +714,9 @@ describe("update_project", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
         name: "Updated Project Name",
-        newSlug: "updated-project-slug",
+        slug: "updated-project-slug",
+        platform: "python",
+        teamSlug: undefined,
         regionUrl: undefined,
       },
     );
@@ -724,19 +726,21 @@ describe("update_project", () => {
       **ID**: 4509109104082945
       **Slug**: updated-project-slug
       **Name**: Updated Project Name
-      **Platform**: node
+      **Platform**: python
 
-      **Updated**: name to "Updated Project Name", slug to "updated-project-slug"
+      ## Updates Applied
+      - Updated name to "Updated Project Name"
+      - Updated slug to "updated-project-slug"
+      - Updated platform to "python"
 
       # Using this information
 
       - The project is now accessible at slug: \`updated-project-slug\`
-      - The project URL has changed due to the slug update
       "
     `);
   });
 
-  it("assigns team to project", async () => {
+  it("assigns project to team", async () => {
     const tool = TOOL_HANDLERS.update_project;
     const result = await tool(
       {
@@ -754,12 +758,13 @@ describe("update_project", () => {
     expect(result).toMatchInlineSnapshot(`
       "# Updated Project in **sentry-mcp-evals**
 
-      **ID**: 4509106749636608
+      **ID**: 4509109104082945
       **Slug**: cloudflare-mcp
       **Name**: cloudflare-mcp
       **Platform**: node
 
-      **Updated**: team assignment to "the-goats"
+      ## Updates Applied
+      - Updated team assignment to "the-goats"
 
       # Using this information
 

@@ -518,13 +518,7 @@ export const TOOL_HANDLERS = {
     }
 
     // Update project settings if any are provided
-    const hasProjectUpdates =
-      params.name ||
-      params.newSlug ||
-      params.platform ||
-      params.resolveAge !== undefined ||
-      params.subjectPrefix ||
-      params.subjectTemplate;
+    const hasProjectUpdates = params.name || params.slug || params.platform;
 
     let project: Project;
     if (hasProjectUpdates) {
@@ -533,11 +527,8 @@ export const TOOL_HANDLERS = {
           organizationSlug,
           projectSlug: params.projectSlug,
           name: params.name,
-          slug: params.newSlug,
+          slug: params.slug,
           platform: params.platform,
-          resolveAge: params.resolveAge,
-          subjectPrefix: params.subjectPrefix,
-          subjectTemplate: params.subjectTemplate,
         });
       } catch (err) {
         logError(err);
@@ -565,26 +556,19 @@ export const TOOL_HANDLERS = {
     // Display what was updated
     const updates: string[] = [];
     if (params.name) updates.push(`name to "${params.name}"`);
-    if (params.newSlug) updates.push(`slug to "${params.newSlug}"`);
+    if (params.slug) updates.push(`slug to "${params.slug}"`);
     if (params.platform) updates.push(`platform to "${params.platform}"`);
     if (params.teamSlug)
       updates.push(`team assignment to "${params.teamSlug}"`);
-    if (params.resolveAge !== undefined)
-      updates.push(`auto-resolve age to ${params.resolveAge} hours`);
-    if (params.subjectPrefix)
-      updates.push(`email subject prefix to "${params.subjectPrefix}"`);
-    if (params.subjectTemplate)
-      updates.push(`email subject template to "${params.subjectTemplate}"`);
 
     if (updates.length > 0) {
-      output += `\n**Updated**: ${updates.join(", ")}\n`;
+      output += `\n## Updates Applied\n`;
+      output += updates.map((update) => `- Updated ${update}`).join("\n");
+      output += `\n`;
     }
 
     output += "\n# Using this information\n\n";
     output += `- The project is now accessible at slug: \`${project.slug}\`\n`;
-    if (params.newSlug) {
-      output += `- The project URL has changed due to the slug update\n`;
-    }
     if (params.teamSlug) {
       output += `- The project is now assigned to the \`${params.teamSlug}\` team\n`;
     }
