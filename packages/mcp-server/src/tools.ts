@@ -491,6 +491,105 @@ export const TOOL_HANDLERS = {
     output += `- You should always inform the user of the **SENTRY_DSN** and Project Slug values.\n`;
     return output;
   },
+  update_project: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    const organizationSlug = params.organizationSlug;
+
+    setTag("organization.slug", organizationSlug);
+    setTag("project.slug", params.projectSlug);
+
+    // Handle team assignment separately if provided
+    if (params.teamSlug) {
+      setTag("team.slug", params.teamSlug);
+      try {
+        await apiService.addTeamToProject({
+          organizationSlug,
+          projectSlug: params.projectSlug,
+          teamSlug: params.teamSlug,
+        });
+      } catch (err) {
+        logError(err);
+        throw new Error(
+          `Failed to assign team ${params.teamSlug} to project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
+        );
+      }
+    }
+
+    // Update project settings if any are provided
+    const hasProjectUpdates =
+      params.name ||
+      params.newSlug ||
+      params.platform ||
+      params.resolveAge !== undefined ||
+      params.subjectPrefix ||
+      params.subjectTemplate;
+
+    let project: Project;
+    if (hasProjectUpdates) {
+      try {
+        project = await apiService.updateProject({
+          organizationSlug,
+          projectSlug: params.projectSlug,
+          name: params.name,
+          slug: params.newSlug,
+          platform: params.platform,
+          resolveAge: params.resolveAge,
+          subjectPrefix: params.subjectPrefix,
+          subjectTemplate: params.subjectTemplate,
+        });
+      } catch (err) {
+        logError(err);
+        throw new Error(
+          `Failed to update project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
+        );
+      }
+    } else {
+      // If only team assignment, fetch current project data for display
+      const projects = await apiService.listProjects(organizationSlug);
+      project = projects.find((p) => p.slug === params.projectSlug);
+      if (!project) {
+        throw new Error(`Project ${params.projectSlug} not found`);
+      }
+    }
+
+    let output = `# Updated Project in **${organizationSlug}**\n\n`;
+    output += `**ID**: ${project.id}\n`;
+    output += `**Slug**: ${project.slug}\n`;
+    output += `**Name**: ${project.name}\n`;
+    if ((project as any).platform) {
+      output += `**Platform**: ${(project as any).platform}\n`;
+    }
+
+    // Display what was updated
+    const updates: string[] = [];
+    if (params.name) updates.push(`name to "${params.name}"`);
+    if (params.newSlug) updates.push(`slug to "${params.newSlug}"`);
+    if (params.platform) updates.push(`platform to "${params.platform}"`);
+    if (params.teamSlug)
+      updates.push(`team assignment to "${params.teamSlug}"`);
+    if (params.resolveAge !== undefined)
+      updates.push(`auto-resolve age to ${params.resolveAge} hours`);
+    if (params.subjectPrefix)
+      updates.push(`email subject prefix to "${params.subjectPrefix}"`);
+    if (params.subjectTemplate)
+      updates.push(`email subject template to "${params.subjectTemplate}"`);
+
+    if (updates.length > 0) {
+      output += `\n**Updated**: ${updates.join(", ")}\n`;
+    }
+
+    output += "\n# Using this information\n\n";
+    output += `- The project is now accessible at slug: \`${project.slug}\`\n`;
+    if (params.newSlug) {
+      output += `- The project URL has changed due to the slug update\n`;
+    }
+    if (params.teamSlug) {
+      output += `- The project is now assigned to the \`${params.teamSlug}\` team\n`;
+    }
+    return output;
+  },
   create_dsn: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

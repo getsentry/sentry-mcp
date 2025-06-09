@@ -389,6 +389,88 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "update_project" as const,
+    description: [
+      "Update project settings in Sentry, such as name, slug, platform, and team assignment.",
+      "",
+      "Be careful when using this tool!",
+      "",
+      "Use this tool when you need to:",
+      "- Update a project's name or slug to fix onboarding mistakes",
+      "- Change the platform assigned to a project",
+      "- Update team assignment for a project",
+      "- Modify other project settings like auto-resolve age",
+      "",
+      "<examples>",
+      "### Update a project's name and slug",
+      "",
+      "```",
+      "update_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', newSlug='new-project-slug')",
+      "```",
+      "",
+      "### Assign a project to a different team",
+      "",
+      "```",
+      "update_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')",
+      "```",
+      "",
+      "### Update platform and auto-resolve settings",
+      "",
+      "```",
+      "update_project(organizationSlug='my-organization', projectSlug='my-project', platform='python', resolveAge=168)",
+      "```",
+      "",
+      "</examples>",
+      "",
+      "<hints>",
+      "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
+      "- Team assignment is handled separately from other project settings",
+      "- If any parameter is ambiguous, you should clarify with the user what they meant.",
+      "- When updating the slug, the project will be accessible at the new slug after the update",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug,
+      regionUrl: ParamRegionUrl.optional(),
+      projectSlug: ParamProjectSlug,
+      name: z
+        .string()
+        .trim()
+        .describe("The new name for the project")
+        .optional(),
+      newSlug: z
+        .string()
+        .toLowerCase()
+        .trim()
+        .describe("The new slug for the project (must be unique)")
+        .optional(),
+      platform: ParamPlatform.optional(),
+      teamSlug: ParamTeamSlug.optional().describe(
+        "The team to assign this project to. Note: this will replace the current team assignment.",
+      ),
+      resolveAge: z
+        .number()
+        .int()
+        .min(0)
+        .describe(
+          "Automatically resolve an issue if it hasn't been seen for this many hours. Set to 0 to disable auto-resolve.",
+        )
+        .optional(),
+      subjectPrefix: z
+        .string()
+        .trim()
+        .describe("Custom prefix for emails from this project")
+        .optional(),
+      subjectTemplate: z
+        .string()
+        .trim()
+        .describe(
+          "The email subject template to use (excluding the prefix) for individual alerts",
+        )
+        .optional(),
+    },
+  },
+  {
     name: "find_dsns" as const,
     description: [
       "List all Sentry DSNs for a specific project.",
