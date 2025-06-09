@@ -726,6 +726,7 @@ describe("update_project", () => {
       **ID**: 4509109104082945
       **Slug**: updated-project-slug
       **Name**: Updated Project Name
+      **Platform**: python
 
       ## Updates Applied
       - Updated name to "Updated Project Name"
@@ -760,6 +761,7 @@ describe("update_project", () => {
       **ID**: 4509106749636608
       **Slug**: cloudflare-mcp
       **Name**: cloudflare-mcp
+      **Platform**: node
 
       ## Updates Applied
       - Updated team assignment to "the-goats"
