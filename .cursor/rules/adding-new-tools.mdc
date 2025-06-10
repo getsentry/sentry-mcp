@@ -1,0 +1,380 @@
+---
+description: This guide covers the workflow for adding new tools to the Sentry MCP server package.
+globs: 
+alwaysApply: false
+---
+# Adding New Tools to the MCP Server
+
+This guide covers the workflow for adding new tools to the Sentry MCP server package.
+
+## Overview
+
+Each tool consists of:
+
+1. **Definition** - Schema and metadata in `toolDefinitions.ts`
+2. **Handler** - Implementation logic in `tools.ts`
+3. **Tests** - Unit tests in `tools.test.ts`
+4. **Evals** - Integration tests in `mcp-server-evals`
+5. **Mocks** - API response mocks in `mcp-server-mocks`
+
+## Step 1: Define the Tool
+
+Add your tool definition to `packages/mcp-server/src/toolDefinitions.ts`:
+
+````typescript
+{
+  name: "your_tool_name" as const,
+  description: [
+    "One-line summary of what this tool does.",
+    "",
+    "Use this tool when you need to:",
+    "- Specific use case 1",
+    "- Specific use case 2",
+    "",
+    "<examples>",
+    "### Example usage description",
+    "",
+    "```",
+    "your_tool_name(organizationSlug='my-org', param='value')",
+    "```",
+    "</examples>",
+    "",
+    "<hints>",
+    "- Helpful hint about parameter interpretation",
+    "</hints>",
+  ].join("\n"),
+  paramsSchema: {
+    organizationSlug: ParamOrganizationSlug,
+    regionUrl: ParamRegionUrl.optional(),
+    yourParam: z.string().trim().describe("Description of this parameter"),
+  },
+}
+````
+
+### Writing LLM-Friendly Tool Definitions
+
+**Tool descriptions are critical for LLM success**. They determine when and how LLMs will use your tool. Follow these principles:
+
+1. **Be explicit about use cases** - Start with "Use this tool when you need to:" followed by specific scenarios
+2. **Include concrete examples** - Show actual tool invocations with realistic parameters
+3. **Provide hints** - Add guidance about common parameter patterns (e.g., "name/otherName format usually means organizationSlug/projectSlug")
+4. **Explain relationships** - Reference other tools that might be used before/after yours
+
+**Parameter descriptions are equally important**:
+
+- Each parameter's `.describe()` should explain what values are expected
+- Reference other tools that can provide the parameter value
+- Be explicit about formats, constraints, and defaults
+- Example: `.describe("The project's slug. You can find a list of existing projects using the find_projects() tool.")`
+
+## Step 2: Implement the Handler
+
+Add your handler to `packages/mcp-server/src/tools.ts`:
+
+```typescript
+your_tool_name: async (context, params) => {
+  const apiService = apiServiceFromContext(context, {
+    regionUrl: params.regionUrl,
+  });
+
+  // Validate required parameters
+  if (!params.organizationSlug) {
+    throw new UserInputError(
+      "Organization slug is required. Please provide an organizationSlug parameter."
+    );
+  }
+
+  // Set tags for monitoring
+  setTag("organization.slug", params.organizationSlug);
+
+  // Make API calls
+  const data = await apiService.yourMethod({
+    organizationSlug: params.organizationSlug,
+    // other params
+  });
+
+  // Format output as markdown
+  let output = `# Results in **${params.organizationSlug}**\n\n`;
+
+  if (data.length === 0) {
+    output += "No results found.\n";
+    return output;
+  }
+
+  // Format results
+  output += data.map((item) => `- ${item.name}\n`).join("");
+
+  // Add usage instructions
+  output += "\n\n# Using this information\n\n";
+  output += "- Explain how to use these results\n";
+
+  return output;
+};
+```
+
+### Writing LLM-Friendly Response Formatting
+
+**Your tool's response is consumed directly by LLMs**, so clarity and context are essential:
+
+1. **Structure with markdown** - Use headers, lists, and code blocks for clear hierarchy
+2. **Include all relevant context** - Don't assume the LLM remembers previous calls
+3. **Provide actionable next steps** - Always include a "Using this information" section
+4. **Format identifiers clearly** - Use consistent formatting for IDs, URLs, slugs
+5. **Include examples of follow-up actions** - Show how to use the data in subsequent tool calls
+
+**Response patterns that work well**:
+
+```typescript
+// Include the full context in headers
+`# Issues in **${organizationSlug}/${projectSlug}**\n\n` // Make IDs and important values stand out
+`**Issue ID**: ${issue.shortId}\n``**URL**: ${apiService.getIssueUrl(
+  organizationSlug,
+  issue.shortId
+)}\n`;
+
+// Always suggest next steps
+"# Using this information\n\n" +
+  "- You can get more details using: `get_issue_details(organizationSlug='...', issueId='...')`\n" +
+  "- Reference Issue IDs in commits: `Fixes ISSUE-123`\n";
+```
+
+## Step 3: Add Parameter Schemas
+
+If you need custom parameter types, add them to `packages/mcp-server/src/schema.ts`:
+
+```typescript
+export const ParamYourCustomType = z
+  .string()
+  .trim()
+  .describe("Clear description of what this parameter expects");
+```
+
+## Step 4: Extend API Client (if needed)
+
+If your tool requires new API endpoints, add methods to `packages/mcp-server/src/api-client/client.ts`:
+
+```typescript
+async yourMethod(params: { organizationSlug: string }) {
+  const response = await this.fetch(
+    `/api/0/organizations/${params.organizationSlug}/your-endpoint/`
+  );
+  return YourResponseSchema.parse(response);
+}
+```
+
+Add response schemas to `packages/mcp-server/src/api-client/schema.ts`:
+
+```typescript
+export const YourResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  // other fields
+});
+```
+
+## Step 5: Add Unit Tests
+
+Add tests to `packages/mcp-server/src/tools.test.ts`:
+
+```typescript
+describe("your_tool_name", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.your_tool_name;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: undefined,
+        yourParam: "test-value",
+      }
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Results in **sentry-mcp-evals**
+      
+      - Expected output here
+      
+      # Using this information
+      
+      - Usage instructions here
+      "
+    `);
+  });
+});
+```
+
+## Step 6: Add Mock Responses
+
+Add mock API responses to `packages/mcp-server-mocks/src/index.ts`:
+
+```typescript
+// Import fixture files at the top
+import yourDataFixture from "./fixtures/your-data.json";
+
+// Add to the handlers array
+{
+  method: "get",
+  path: "/api/0/organizations/sentry-mcp-evals/your-endpoint/",
+  fetch: async ({ request }) => {
+    // Validate request parameters
+    const url = new URL(request.url);
+    const query = url.searchParams.get("query");
+    const sort = url.searchParams.get("sort");
+
+    // Check for required parameters
+    if (!["date", "count", null].includes(sort)) {
+      return HttpResponse.json("Invalid sort parameter", { status: 400 });
+    }
+
+    // Return different responses based on query
+    if (query === "specific-search") {
+      return HttpResponse.json([]);  // Empty results
+    }
+
+    // Return fixture data for valid requests
+    return HttpResponse.json(yourDataFixture);
+  },
+}
+```
+
+### Creating Fixture Files
+
+Store test data in `packages/mcp-server-mocks/src/fixtures/your-data.json`:
+
+```json
+[
+  {
+    "id": "123",
+    "name": "Test Item",
+    "slug": "test-item",
+    "dateCreated": "2025-04-07T00:12:23.143074Z"
+    // Match your schema exactly
+  }
+]
+```
+
+### Mock Response Best Practices
+
+1. **Validate request parameters** - Check query params, headers, and body
+2. **Return appropriate errors** - Use 400 for bad requests, match real API behavior
+3. **Use fixture files** - Store complex responses as JSON files for maintainability
+4. **Handle edge cases** - Empty results, pagination, filtering
+5. **Match real API behavior** - Study actual Sentry API responses for accuracy
+
+Example parameter validation patterns:
+
+```typescript
+// Validate organization slug in path
+if (request.url.includes("/organizations/invalid-org/")) {
+  return HttpResponse.json(
+    { detail: "Organization not found" },
+    { status: 404 }
+  );
+}
+
+// Check required query parameters
+const fields = url.searchParams.getAll("field");
+if (!fields.includes("required_field")) {
+  return HttpResponse.json("Missing required field", { status: 400 });
+}
+
+// Handle different query patterns
+const sortedQuery = query?.split(" ").sort().join(" ") || "";
+if (!["is:unresolved", "project:test", ""].includes(sortedQuery)) {
+  return HttpResponse.json([]); // Empty results for unknown queries
+}
+```
+
+## Step 7: Add Evaluation Tests
+
+Create `packages/mcp-server-evals/src/evals/your-tool.eval.ts`:
+
+```typescript
+import { describeEval } from "vitest-evals";
+import { Factuality, FIXTURES, TaskRunner } from "./utils";
+
+describeEval("your-tool", {
+  data: async () => {
+    return [
+      {
+        input: `Natural language request using your tool in ${FIXTURES.organizationSlug}`,
+        expected: "Expected natural language response",
+      },
+      {
+        input: `Another scenario for ${FIXTURES.organizationSlug}`,
+        expected: "Another expected response",
+      },
+    ];
+  },
+  task: TaskRunner(),
+  scorers: [Factuality()],
+  threshold: 0.6,
+  timeout: 30000,
+});
+```
+
+## Step 8: Test Your Tool
+
+```bash
+# Run unit tests
+pnpm test tools.test.ts
+
+# Run evaluation tests
+pnpm test:evals your-tool.eval.ts
+
+# Test the full server
+pnpm dev
+```
+
+## Error Handling Patterns
+
+- Use `UserInputError` for parameter validation errors
+- The framework automatically handles API errors and formats them
+- Always validate required parameters early
+- Use descriptive error messages that help users fix the issue
+
+## Output Formatting Guidelines
+
+1. Start with a markdown heading describing the results
+2. Show "No results found" for empty responses
+3. Use consistent formatting (bullets, tables, etc.)
+4. End with "Using this information" section explaining next steps
+5. Include tool invocation examples where helpful
+
+## Common Patterns
+
+### Pagination
+
+Most Sentry APIs support pagination. Use the existing patterns from `find_issues` or similar tools.
+
+### URL Generation
+
+Use `apiService.getIssueUrl()`, `apiService.getTraceUrl()` etc. for generating Sentry URLs.
+
+### Parameter Validation
+
+```typescript
+if (!params.requiredParam) {
+  throw new UserInputError(
+    "Required parameter is missing. Please provide requiredParam."
+  );
+}
+```
+
+### Region Support
+
+Always accept optional `regionUrl` parameter and pass it to `apiServiceFromContext()`.
+
+## Checklist
+
+- [ ] Tool definition added to `toolDefinitions.ts`
+- [ ] Handler implemented in `tools.ts`
+- [ ] Custom schemas added to `schema.ts` (if needed)
+- [ ] API client extended (if needed)
+- [ ] Unit tests written
+- [ ] Mock responses added
+- [ ] Evaluation tests written
+- [ ] Tool tested end-to-end

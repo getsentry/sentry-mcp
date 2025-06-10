@@ -1,0 +1,4 @@
+<agent_requestable_workspace_rules>
+- adding-new-tools: This guide covers the workflow for adding new tools to the Sentry MCP server package.
+- adding-new-prompts: This guide covers the workflow for adding new prompts to the Sentry MCP server package.
+</agent_requestable_workspace_rules> 

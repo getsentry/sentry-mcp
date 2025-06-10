@@ -1,0 +1,319 @@
+---
+description: This guide covers the workflow for adding new prompts to the Sentry MCP server package.
+globs:
+alwaysApply: false
+---
+
+# Adding New Prompts to the MCP Server
+
+This guide covers the workflow for adding new prompts to the Sentry MCP server package.
+
+## Overview
+
+Prompts are pre-configured workflows that guide LLMs through complex tasks. Each prompt consists of:
+
+1. **Definition** - Schema and metadata in `promptDefinitions.ts`
+2. **Handler** - Implementation logic in `prompts.ts`
+3. **Tests** - Unit tests in `prompts.test.ts` (to be created)
+4. **Evals** - Integration tests in `mcp-server-evals`
+5. **Documentation** - User-facing documentation
+
+## Step 1: Define the Prompt
+
+Add your prompt definition to `packages/mcp-server/src/promptDefinitions.ts`:
+
+```typescript
+{
+  name: "your_prompt_name" as const,
+  description: [
+    "One-line summary of what this prompt helps accomplish.",
+    "Additional context about when to use this prompt.",
+  ].join("\n"),
+  paramsSchema: {
+    organizationSlug: ParamOrganizationSlug,
+    yourParam: z.string().trim().describe("Description of this parameter"),
+  },
+}
+```
+
+### Writing LLM-Friendly Prompt Definitions
+
+**Prompt descriptions are critical** - they help users understand when to use your prompt:
+
+1. **Be specific about the workflow** - Clearly state what task the prompt will guide through
+2. **Mention required parameters** - If users need specific information ready, mention it
+3. **Reference related prompts** - If this prompt is part of a larger workflow
+
+## Step 2: Implement the Handler
+
+Add your handler to `packages/mcp-server/src/prompts.ts`:
+
+```typescript
+your_prompt_name: async (context, { organizationSlug, yourParam }) => {
+  // Validate parameters if needed
+  if (!organizationSlug && !yourParam) {
+    throw new Error(
+      "Either organizationSlug or yourParam must be provided"
+    );
+  }
+
+  // Build the prompt instructions
+  return [
+    `I want to ${describe_the_goal} in ${organizationSlug}.`,
+    "",
+    "Here's how to accomplish this:",
+    "",
+    "1. First, use the `tool_name` tool to gather initial information.",
+    "   - Pass parameter X as: value",
+    "   - This will give you Y data",
+    "",
+    "2. Next, analyze the results and determine if:",
+    "   a. Condition A: Take action X using `another_tool`",
+    "   b. Condition B: Take action Y using `different_tool`",
+    "",
+    "3. Finally, synthesize the results and present them clearly.",
+    "",
+    "**Important considerations:**",
+    "- Always validate the data before proceeding",
+    "- If you encounter errors, explain them clearly",
+    "- Reference specific values in your explanations",
+  ].join("\n");
+},
+```
+
+### Writing Effective Prompt Instructions
+
+**Your prompt's instructions directly guide the LLM**, so clarity and structure are essential:
+
+1. **Start with context** - State the goal and include parameter values for clarity
+2. **Use numbered steps** - Break complex workflows into clear, sequential steps
+3. **Reference specific tools** - Use backticks around tool names: `tool_name`
+4. **Include decision points** - Use conditional logic for different scenarios
+5. **Add guardrails** - Include warnings, validations, and error handling guidance
+6. **Provide examples** - When relevant, show example tool invocations
+
+**Instruction patterns that work well**:
+
+```typescript
+// Clear goal statement with parameters
+`I want to diagnose performance issues for ${projectSlug} in ${organizationSlug}.`;
+
+// Specific tool instructions with parameters
+"1. Call `find_issues` with these parameters:" +
+  "   - organizationSlug: " +
+  organizationSlug +
+  "   - query: 'is:unresolved project:" +
+  projectSlug +
+  "'";
+
+// Conditional logic
+"2a. If issues are found, get details using `get_issue_details`" +
+  "2b. If no issues found, check `get_project_stats` for anomalies";
+
+// Iterative workflows
+("3. Repeat step 2 until all critical issues are analyzed");
+
+// Synthesis instructions
+"4. Summarize findings with:" +
+  "   - Root causes identified" +
+  "   - Recommended fixes" +
+  "   - Priority ordering";
+```
+
+## Step 3: Add Parameter Validation
+
+Include proper error handling for missing or invalid parameters:
+
+```typescript
+your_prompt_name: async (context, { organizationSlug, issueId, issueUrl }) => {
+  // Handle multiple parameter options
+  let contextMessage: string;
+  if (issueUrl) {
+    contextMessage = `The issue URL is ${issueUrl}`;
+  } else if (organizationSlug && issueId) {
+    contextMessage = `The issue ${issueId} in organization ${organizationSlug}`;
+  } else {
+    throw new Error(
+      "Either issueUrl or both organizationSlug and issueId must be provided"
+    );
+  }
+
+  // Rest of implementation...
+};
+```
+
+## Step 4: Add Unit Tests
+
+Create tests in `packages/mcp-server/src/prompts.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { PROMPT_HANDLERS } from "./prompts";
+
+describe("your_prompt_name", () => {
+  it("generates correct instructions with all parameters", async () => {
+    const prompt = PROMPT_HANDLERS.your_prompt_name;
+    const result = await prompt(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "my-org",
+        yourParam: "test-value",
+      }
+    );
+
+    expect(result).toContain("I want to");
+    expect(result).toContain("my-org");
+    expect(result).toContain("test-value");
+    expect(result).toContain("`tool_name`");
+  });
+
+  it("handles missing required parameters", async () => {
+    const prompt = PROMPT_HANDLERS.your_prompt_name;
+
+    await expect(
+      prompt({}, { organizationSlug: null, yourParam: null })
+    ).rejects.toThrow("Either organizationSlug or yourParam must be provided");
+  });
+});
+```
+
+## Step 5: Add Evaluation Tests
+
+Create `packages/mcp-server-evals/src/evals/your-prompt.eval.ts`:
+
+```typescript
+import { describeEval } from "vitest-evals";
+import { Factuality, FIXTURES, PromptRunner } from "./utils";
+
+describeEval("your-prompt", {
+  data: async () => {
+    return [
+      {
+        // Test the prompt with typical parameters
+        input: `Use the your_prompt_name prompt for ${FIXTURES.organizationSlug}`,
+        expected: "Expected outcome description",
+      },
+      {
+        // Test edge cases
+        input: `Run your_prompt_name with minimal information`,
+        expected: "Should guide user to provide required parameters",
+      },
+    ];
+  },
+  task: PromptRunner("your_prompt_name"),
+  scorers: [Factuality()],
+  threshold: 0.8,
+  timeout: 45000,
+});
+```
+
+## Step 6: Document the Prompt
+
+Update the UI documentation to include your prompt:
+
+1. Add to the prompts list in `packages/mcp-cloudflare/src/client/App.tsx`
+2. Update any workflow documentation
+3. Add example use cases
+
+## Step 7: Test Your Prompt
+
+```bash
+# Run unit tests
+pnpm test prompts.test.ts
+
+# Run evaluation tests
+pnpm test:evals your-prompt.eval.ts
+
+# Test interactively
+pnpm dev
+# Then in your MCP client, try:
+# "Use the your_prompt_name prompt for my-org"
+```
+
+## Common Prompt Patterns
+
+### Multi-Step Analysis
+
+```typescript
+return [
+  `I need to analyze ${subject} in ${organizationSlug}.`,
+  "",
+  "## Step 1: Gather Information",
+  "- Use `list_items` to get an overview",
+  "- Note any patterns or anomalies",
+  "",
+  "## Step 2: Deep Dive",
+  "- For each significant item, use `get_item_details`",
+  "- Look for correlations between items",
+  "",
+  "## Step 3: Synthesize Findings",
+  "- Identify root causes",
+  "- Propose actionable solutions",
+].join("\n");
+```
+
+### Conditional Workflows
+
+```typescript
+return [
+  `I'll help you ${action} for ${resource}.`,
+  "",
+  "1. First, check current status with `get_status`",
+  "",
+  "2. Based on the status:",
+  "   - If ACTIVE: Proceed with `update_resource`",
+  "   - If PENDING: Wait and check again with `get_status`",
+  "   - If ERROR: Diagnose with `get_error_details`",
+  "",
+  "3. Verify the outcome and report results",
+].join("\n");
+```
+
+### Iterative Processing
+
+```typescript
+return [
+  `Processing ${items} in ${organizationSlug}.`,
+  "",
+  "For each item:",
+  "1. Call `validate_item` to check if processing is needed",
+  "2. If validation passes, use `process_item`",
+  "3. Track results and continue to next item",
+  "",
+  "After processing all items:",
+  "- Summarize successes and failures",
+  "- Suggest follow-up actions if needed",
+].join("\n");
+```
+
+## Best Practices
+
+1. **Keep prompts focused** - Each prompt should guide through one specific workflow
+2. **Make steps explicit** - Don't assume the LLM will infer steps
+3. **Include error handling** - Tell the LLM what to do when things go wrong
+4. **Reference actual tool names** - Use the exact tool names with backticks
+5. **Provide context in responses** - Include parameter values in the instructions
+6. **Test with variations** - Ensure prompts work with different parameter combinations
+
+## Anti-Patterns to Avoid
+
+1. **Vague instructions** - "Figure out what's wrong" vs "Use `find_issues` to identify problems"
+2. **Missing error guidance** - Always include what to do if a step fails
+3. **Assuming tool knowledge** - Specify which tools to use and their parameters
+4. **Complex branching** - Keep conditional logic simple and clear
+5. **Forgetting validation** - Always validate results before proceeding
+
+## Checklist
+
+- [ ] Prompt definition added to `promptDefinitions.ts`
+- [ ] Handler implemented in `prompts.ts`
+- [ ] Parameter validation included
+- [ ] Unit tests written in `prompts.test.ts`
+- [ ] Evaluation tests written
+- [ ] Documentation updated
+- [ ] Tested end-to-end with MCP client
+- [ ] Workflow produces expected results

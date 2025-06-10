@@ -1,0 +1,517 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Sentry MCP Server Coding Practices
+
+This guide outlines the best practices and conventions for contributing to the Sentry MCP (Model Context Protocol) server codebase. Following these guidelines ensures consistency, maintainability, and optimal LLM interaction.
+
+## Table of Contents
+
+1. [Project Architecture](mdc:#project-architecture)
+2. [TypeScript Patterns](mdc:#typescript-patterns)
+3. [Tool Development](mdc:#tool-development)
+4. [Prompt Development](mdc:#prompt-development)
+5. [API Client Patterns](mdc:#api-client-patterns)
+6. [Testing Strategy](mdc:#testing-strategy)
+7. [Error Handling](mdc:#error-handling)
+8. [LLM-Friendly Design](mdc:#llm-friendly-design)
+9. [Code Style](mdc:#code-style)
+10. [Performance Considerations](mdc:#performance-considerations)
+
+## Project Architecture
+
+### Monorepo Structure
+
+```
+packages/
+├── mcp-server/          # Core MCP server implementation
+├── mcp-cloudflare/      # Cloudflare deployment wrapper
+├── mcp-server-evals/    # Integration tests
+├── mcp-server-mocks/    # Mock API responses
+└── mcp-server-tsconfig/ # Shared TypeScript config
+```
+
+### Key Design Principles
+
+1. **Separation of Concerns**: Keep definitions, implementations, and tests separate
+2. **Type Safety**: Leverage TypeScript's type system for compile-time safety
+3. **LLM-First Design**: Every output should be optimized for LLM consumption
+4. **Testability**: All components should be easily testable in isolation
+
+## TypeScript Patterns
+
+### Type Generation and Safety
+
+```typescript
+// Use const assertions for literal types
+export const TOOL_DEFINITIONS = [
+  {
+    name: "tool_name" as const, // Enables literal type inference
+    // ...
+  }
+] as const;
+
+// Derive types from definitions
+export type ToolName = (typeof TOOL_DEFINITIONS)[number]["name"];
+
+// Use discriminated unions for type narrowing
+export type ToolDefinition<T extends ToolName> = Extract<
+  (typeof TOOL_DEFINITIONS)[number],
+  { name: T }
+>;
+```
+
+### Zod Schema Patterns
+
+```typescript
+// Create reusable parameter schemas
+export const ParamOrganizationSlug = z
+  .string()
+  .toLowerCase()
+  .trim()
+  .describe(
+    "The organization's slug. You can find a list using the `find_organizations()` tool."
+  );
+
+// Use .optional() for optional parameters
+regionUrl: ParamRegionUrl.optional(),
+
+// Chain transformations for normalization
+.toLowerCase().trim()
+```
+
+### Generic Type Helpers
+
+```typescript
+// Type helper for extracting Zod schema types
+type ZodifyRecord<T extends Record<string, any>> = {
+  [K in keyof T]: z.infer<T[K]>;
+};
+
+// Type-safe parameter extraction
+export type ToolParams<T extends ToolName> = ToolDefinition<T> extends {
+  paramsSchema: Record<string, any>;
+}
+  ? ZodifyRecord<ToolDefinition<T>["paramsSchema"]>
+  : Record<string, never>;
+```
+
+## Tool Development
+
+### Tool Definition Structure
+
+```typescript
+{
+  name: "tool_name" as const,
+  description: [
+    "One-line summary of what this tool does.",
+    "",
+    "Use this tool when you need to:",
+    "- Specific use case 1",
+    "- Specific use case 2",
+    "",
+    "<examples>",
+    "### Example usage description",
+    "",
+    "```",
+    "tool_name(organizationSlug='my-org', param='value')",
+    "```",
+    "</examples>",
+    "",
+    "<hints>",
+    "- Parameter interpretation hints",
+    "- Common patterns or gotchas",
+    "</hints>",
+  ].join("\n"),
+  paramsSchema: {
+    // Parameters with clear descriptions
+  },
+}
+```
+
+### Tool Handler Implementation
+
+```typescript
+tool_name: async (context, params) => {
+  // 1. Initialize API service with proper region
+  const apiService = apiServiceFromContext(context, {
+    regionUrl: params.regionUrl,
+  });
+
+  // 2. Validate required parameters early
+  if (!params.organizationSlug) {
+    throw new UserInputError(
+      "Organization slug is required. Please provide an organizationSlug parameter."
+    );
+  }
+
+  // 3. Set monitoring tags
+  setTag("organization.slug", params.organizationSlug);
+
+  // 4. Make API calls with proper error handling
+  const data = await apiService.method(params);
+
+  // 5. Format output as structured markdown
+  let output = `# Tool Results in **${params.organizationSlug}**\n\n`;
+
+  if (data.length === 0) {
+    output += "No results found.\n";
+    return output;
+  }
+
+  // 6. Format data clearly
+  output += formatResults(data);
+
+  // 7. Always include usage instructions
+  output += "\n\n# Using this information\n\n";
+  output += "- How to use these results\n";
+  output += "- Example follow-up commands\n";
+
+  return output;
+};
+```
+
+### Output Formatting Best Practices
+
+```typescript
+// Use markdown headers for structure
+`# Section Title\n\n`
+`## Subsection\n\n`
+
+// Make important values stand out
+`**Issue ID**: ${issue.shortId}\n`
+`**Status**: ${issue.status}\n`
+
+// Use code blocks for identifiers
+`\`${issueId}\``
+
+// Format URLs consistently
+`**URL**: ${apiService.getIssueUrl(organizationSlug, issueId)}\n`
+
+// Group related information
+[
+  `**Field 1**: ${value1}`,
+  `**Field 2**: ${value2}`,
+].join("\n")
+```
+
+## Prompt Development
+
+### Prompt Definition Pattern
+
+```typescript
+{
+  name: "prompt_name" as const,
+  description: [
+    "Clear one-line summary of the workflow.",
+    "When to use this prompt.",
+  ].join("\n"),
+  paramsSchema: {
+    // Minimal required parameters
+  },
+}
+```
+
+### Prompt Handler Structure
+
+```typescript
+prompt_name: async (context, params) => {
+  // Validate parameter combinations
+  if (!params.param1 && !params.param2) {
+    throw new Error("Either param1 or param2 must be provided");
+  }
+
+  // Build step-by-step instructions
+  return [
+    `I want to ${describe_goal} for ${params.organizationSlug}.`,
+    "",
+    "Here's how to accomplish this:",
+    "",
+    "1. First step with specific tool:",
+    "   - Use `tool_name` with these parameters",
+    "   - Expected outcome",
+    "",
+    "2. Conditional logic:",
+    "   a. If condition A: Use `tool_a`",
+    "   b. If condition B: Use `tool_b`",
+    "",
+    "**Important considerations:**",
+    "- Validation steps",
+    "- Error handling guidance",
+  ].join("\n");
+};
+```
+
+## API Client Patterns
+
+### API Service Factory
+
+```typescript
+function apiServiceFromContext(
+  context: ServerContext,
+  opts: { regionUrl?: string } = {},
+) {
+  let host = context.host;
+
+  if (opts.regionUrl) {
+    try {
+      host = new URL(opts.regionUrl).host;
+    } catch (error) {
+      throw new UserInputError(
+        `Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`,
+      );
+    }
+  }
+
+  return new SentryApiService({
+    host,
+    accessToken: context.accessToken,
+  });
+}
+```
+
+### API Method Pattern
+
+```typescript
+async listItems(params: { organizationSlug: string }) {
+  const response = await this.fetch(
+    `/api/0/organizations/${params.organizationSlug}/items/`,
+    {
+      // Additional options
+    }
+  );
+  return ItemListSchema.parse(response);
+}
+```
+
+### Schema Definition
+
+```typescript
+export const ItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  dateCreated: z.string(), // ISO 8601 format
+  // Nested objects
+  metadata: z.object({
+    key: z.string(),
+    value: z.unknown(),
+  }).optional(),
+});
+
+export type Item = z.infer<typeof ItemSchema>;
+```
+
+## Testing Strategy
+
+### Unit Test Structure
+
+```typescript
+describe("tool_name", () => {
+  it("handles successful case", async () => {
+    const tool = TOOL_HANDLERS.tool_name;
+    const result = await tool(mockContext, {
+      organizationSlug: "test-org",
+      param: "value",
+    });
+    
+    expect(result).toMatchInlineSnapshot(`
+      "Expected markdown output"
+    `);
+  });
+
+  it("validates required parameters", async () => {
+    const tool = TOOL_HANDLERS.tool_name;
+    
+    await expect(
+      tool(mockContext, { organizationSlug: null })
+    ).rejects.toThrow(UserInputError);
+  });
+});
+```
+
+### Mock Response Pattern
+
+```typescript
+{
+  method: "get",
+  path: "/api/0/organizations/:org/endpoint/",
+  fetch: async ({ request, params }) => {
+    // Validate path parameters
+    if (params.org === "invalid-org") {
+      return HttpResponse.json(
+        { detail: "Organization not found" },
+        { status: 404 }
+      );
+    }
+
+    // Validate query parameters
+    const url = new URL(request.url);
+    const sort = url.searchParams.get("sort");
+    
+    if (sort && !["date", "count"].includes(sort)) {
+      return HttpResponse.json("Invalid sort parameter", { status: 400 });
+    }
+
+    // Return appropriate fixture
+    return HttpResponse.json(fixtureData);
+  },
+}
+```
+
+### Evaluation Test Pattern
+
+```typescript
+describeEval("feature-name", {
+  data: async () => [
+    {
+      input: `Natural language request in ${FIXTURES.organizationSlug}`,
+      expected: "Expected natural language response",
+    },
+  ],
+  task: TaskRunner(),
+  scorers: [Factuality()],
+  threshold: 0.6,
+  timeout: 30000,
+});
+```
+
+## Error Handling
+
+### Error Types
+
+```typescript
+// User input errors (don't log to Sentry)
+throw new UserInputError(
+  "Clear message explaining what's wrong and how to fix it"
+);
+
+// API errors are handled automatically by the framework
+// They include status codes and are formatted for users
+
+// Unexpected errors are logged to Sentry with event IDs
+```
+
+### Error Message Guidelines
+
+1. Be specific about what went wrong
+2. Suggest how to fix the issue
+3. Reference tool names for obtaining missing data
+4. Use consistent formatting
+
+```typescript
+throw new UserInputError(
+  "Organization slug is required. Please provide an organizationSlug parameter. " +
+  "You can find available organizations using the `find_organizations()` tool."
+);
+```
+
+## LLM-Friendly Design
+
+### Description Writing
+
+1. **Start with purpose**: One-line summary of functionality
+2. **List use cases**: "Use this tool when you need to:" with bullets
+3. **Provide examples**: Show actual invocations with realistic data
+4. **Include hints**: Common patterns, parameter formats, gotchas
+5. **Reference relationships**: Link to related tools
+
+### Response Formatting
+
+1. **Structured markdown**: Use headers, lists, and formatting
+2. **Contextual headers**: Include parameters in section titles
+3. **Highlight key data**: Bold important fields, use code blocks
+4. **Action-oriented footer**: Always include "Using this information"
+5. **Example follow-ups**: Show next tool invocations
+
+### Parameter Descriptions
+
+```typescript
+.describe(
+  "The project's slug. You can find a list of existing projects " +
+  "in an organization using the `find_projects()` tool."
+)
+```
+
+## Code Style
+
+### Formatting Rules (via Biome)
+
+- 2 space indentation
+- No semicolons (inferred)
+- Double quotes for strings
+- Organized imports
+- No unused variables in production
+
+### Naming Conventions
+
+- **Tools**: `snake_case` (e.g., `find_issues`, `get_issue_details`)
+- **Parameters**: `camelCase` (e.g., `organizationSlug`, `issueId`)
+- **Types**: `PascalCase` (e.g., `ToolHandler`, `ServerContext`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `TOOL_DEFINITIONS`)
+
+### File Organization
+
+```
+toolDefinitions.ts  // Tool schemas and metadata
+tools.ts           // Tool handler implementations
+tools.test.ts      // Tool unit tests
+schema.ts          // Shared Zod schemas
+types.ts           // TypeScript type definitions
+```
+
+## Performance Considerations
+
+### Parallel API Calls
+
+```typescript
+// Good: Parallel requests when independent
+const [issues, events] = await Promise.all([
+  apiService.getIssue({ issueId }),
+  apiService.getLatestEvent({ issueId }),
+]);
+
+// Bad: Sequential when could be parallel
+const issues = await apiService.getIssue({ issueId });
+const events = await apiService.getLatestEvent({ issueId });
+```
+
+### Response Size Management
+
+1. Limit result sets appropriately
+2. Summarize large datasets
+3. Provide pagination hints
+4. Focus on actionable information
+
+### Caching Considerations
+
+- MCP servers are stateless
+- Don't cache between requests
+- Let clients handle caching
+
+## Best Practices Summary
+
+1. **Type Everything**: Leverage TypeScript for safety
+2. **Fail Fast**: Validate inputs early with clear errors
+3. **Document for LLMs**: Every string is LLM documentation
+4. **Test Exhaustively**: Unit, integration, and eval tests
+5. **Format Consistently**: Structured markdown everywhere
+6. **Handle Errors Gracefully**: User-friendly error messages
+7. **Design for Discovery**: Tools should guide their own use
+8. **Keep It Simple**: Clarity over cleverness
+9. **Monitor Everything**: Use tags for observability
+10. **Think in Workflows**: Tools and prompts work together
+
+## Common Pitfalls to Avoid
+
+1. **Vague Descriptions**: Always be specific about use cases
+2. **Missing Examples**: Every tool needs concrete examples
+3. **Poor Error Messages**: Always explain how to fix issues
+4. **Inconsistent Formatting**: Follow established patterns
+5. **Forgetting Edge Cases**: Handle empty results, errors
+6. **Complex Logic in Prompts**: Keep instructions clear
+7. **Assuming Context**: Each response should stand alone
+8. **Ignoring Region URLs**: Always support multi-region
+9. **Sequential When Parallel**: Optimize API call patterns
+10. **Breaking Changes**: Maintain backward compatibility
