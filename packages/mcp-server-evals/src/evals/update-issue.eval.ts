@@ -6,17 +6,17 @@ describeEval("update-issue", {
     return [
       // Core use case: Resolve an issue
       {
-        input: `Resolve the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug}. Output **only** the new status in the format:\n<STATUS>`,
+        input: `Resolve the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug}. Output only the new status as a single word.`,
         expected: "resolved",
       },
       // Core use case: Assign an issue
       {
-        input: `Assign the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug} to 'john.doe'. Output **only** the assigned user in the format:\n<ASSIGNED_TO>`,
+        input: `Assign the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug} to 'john.doe'. Output only the assigned username.`,
         expected: "john.doe",
       },
       // Core use case: Using issue URL (alternative input method)
       {
-        input: `Resolve the issue at ${FIXTURES.issueUrl}. Output **only** the new status in the format:\n<STATUS>`,
+        input: `Resolve the issue at ${FIXTURES.issueUrl}. Output only the new status as a single word.`,
         expected: "resolved",
       },
     ];
