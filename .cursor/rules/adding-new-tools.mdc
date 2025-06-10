@@ -206,6 +206,27 @@ describe("your_tool_name", () => {
 });
 ```
 
+### Important: Updating Snapshots After Tool Output Changes
+
+**When you change tool output formatting or content, you MUST run tests to update snapshots:**
+
+```bash
+# Run tests and update snapshots
+cd packages/mcp-server
+pnpm vitest --run -u
+```
+
+This ensures that:
+- Unit tests pass with the new output format
+- Snapshots accurately reflect the current tool behavior
+- Changes are properly documented in test files
+
+**Always run this after modifying:**
+- Tool response formatting
+- Output structure changes
+- New data fields in responses
+- Error message modifications
+
 ## Step 6: Add Mock Responses
 
 Add mock API responses to `packages/mcp-server-mocks/src/index.ts`:

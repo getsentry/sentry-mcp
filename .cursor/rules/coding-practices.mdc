@@ -331,6 +331,23 @@ describe("tool_name", () => {
 });
 ```
 
+### Updating Snapshots After Tool Output Changes
+
+**Critical: When you modify tool output formatting or content, always run tests to update snapshots:**
+
+```bash
+cd packages/mcp-server
+pnpm vitest --run -u
+```
+
+This is required after any changes to:
+- Tool response formatting or structure
+- Output content or data fields  
+- Error message text
+- Markdown formatting in responses
+
+Failing to update snapshots will cause unit tests to fail and break the build. Always run this command after modifying tool handlers that change output format.
+
 ### Mock Response Pattern
 
 ```typescript
