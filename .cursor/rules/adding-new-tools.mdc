@@ -290,6 +290,16 @@ if (!["is:unresolved", "project:test", ""].includes(sortedQuery)) {
 
 ## Step 7: Add Evaluation Tests
 
+⚠️ **Important: Keep evaluation tests minimal!**
+
+Each eval test takes 30+ seconds to run and costs API credits. Only create evaluation tests for the **core use cases** of each tool:
+
+- **Primary functionality** (e.g., resolving an issue)
+- **Alternative input methods** (e.g., using issue URL vs org+issueId)
+- **One complex workflow example** if applicable
+
+**Avoid testing** edge cases, error conditions, or minor variations in evals. Use unit tests (`tools.test.ts`) for comprehensive coverage instead.
+
 Create `packages/mcp-server-evals/src/evals/your-tool.eval.ts`:
 
 ```typescript
@@ -299,14 +309,17 @@ import { Factuality, FIXTURES, TaskRunner } from "./utils";
 describeEval("your-tool", {
   data: async () => {
     return [
+      // Core use case: Primary functionality
       {
         input: `Natural language request using your tool in ${FIXTURES.organizationSlug}`,
         expected: "Expected natural language response",
       },
+      // Core use case: Alternative input method (if applicable)
       {
         input: `Another scenario for ${FIXTURES.organizationSlug}`,
         expected: "Another expected response",
       },
+      // Keep to 2-3 scenarios maximum!
     ];
   },
   task: TaskRunner(),

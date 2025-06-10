@@ -8,6 +8,19 @@ import {
 import { Experimental_StdioMCPTransport } from "ai/mcp-stdio";
 import { z } from "zod";
 
+/**
+ * IMPORTANT: Keep evaluation tests minimal!
+ *
+ * Each eval test takes 30+ seconds to run and costs API credits.
+ * Only create evaluation tests for the core use cases of each tool:
+ * - Primary functionality (e.g., resolving an issue)
+ * - Alternative input methods (e.g., using issue URL vs org+issueId)
+ * - One complex workflow example if applicable
+ *
+ * Avoid testing edge cases, error conditions, or minor variations in evals.
+ * Use unit tests (tools.test.ts) for comprehensive coverage instead.
+ */
+
 const SYSTEM_PROMPT = `You are an assistant responsible for evaluating the results of calling various tools. 
 
 You a general purpose LLM-based Agent. Your purpose is to answer the user's query using the tools provided.
