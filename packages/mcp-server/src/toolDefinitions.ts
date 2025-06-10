@@ -529,4 +529,87 @@ export const TOOL_DEFINITIONS = [
       issueUrl: ParamIssueUrl.optional(),
     },
   },
+  {
+    name: "update_issue" as const,
+    description: [
+      "Update an issue's state, assignment, or other properties in Sentry.",
+      "",
+      "Use this tool when you need to:",
+      "- Mark an issue as resolved, unresolved, or ignored",
+      "- Assign an issue to a user or team",
+      "- Update an issue's visibility or subscription status",
+      "- Mark an issue as resolved in a specific release or commit",
+      "",
+      "<examples>",
+      "### Mark an issue as resolved",
+      "",
+      "```",
+      "update_issue(organizationSlug='my-organization', issueId='ISSUE-123', status='resolved')",
+      "```",
+      "",
+      "### Mark an issue as resolved in the next release",
+      "",
+      "```",
+      "update_issue(organizationSlug='my-organization', issueId='ISSUE-123', status='resolved', statusDetails={'inNextRelease': true})",
+      "```",
+      "",
+      "### Assign an issue to a user",
+      "",
+      "```",
+      "update_issue(organizationSlug='my-organization', issueId='ISSUE-123', assignedTo='user@example.com')",
+      "```",
+      "",
+      "### Mark an issue as ignored",
+      "",
+      "```",
+      "update_issue(organizationSlug='my-organization', issueId='ISSUE-123', status='ignored')",
+      "```",
+      "",
+      "</examples>",
+      "",
+      "<hints>",
+      "- If the user provides the issueUrl, you can ignore the organizationSlug and issueId parameters.",
+      "- Valid status values are: 'resolved', 'resolvedInNextRelease', 'unresolved', 'ignored'",
+      "- statusDetails can include: 'inRelease', 'inNextRelease', 'inCommit', 'ignoreDuration', 'ignoreCount', 'ignoreWindow', 'ignoreUserCount', 'ignoreUserWindow'",
+      "- assignedTo can be a user ID, username, or team slug",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug.optional(),
+      regionUrl: ParamRegionUrl.optional(),
+      issueId: ParamIssueShortId.optional(),
+      issueUrl: ParamIssueUrl.optional(),
+      status: z
+        .enum(["resolved", "resolvedInNextRelease", "unresolved", "ignored"])
+        .describe("The new status for the issue")
+        .optional(),
+      statusDetails: z
+        .record(z.any())
+        .describe(
+          "Additional details about the resolution. Common keys: inRelease, inNextRelease, inCommit, ignoreDuration, ignoreCount, ignoreWindow, ignoreUserCount, ignoreUserWindow",
+        )
+        .optional(),
+      assignedTo: z
+        .string()
+        .trim()
+        .describe("The actor ID, username, or team slug to assign the issue to")
+        .optional(),
+      hasSeen: z
+        .boolean()
+        .describe("Mark the issue as seen by the current user")
+        .optional(),
+      isBookmarked: z
+        .boolean()
+        .describe("Bookmark or unbookmark the issue for the current user")
+        .optional(),
+      isSubscribed: z
+        .boolean()
+        .describe("Subscribe or unsubscribe from workflow notifications for this issue")
+        .optional(),
+      isPublic: z
+        .boolean()
+        .describe("Set the issue to public or private")
+        .optional(),
+    },
+  },
 ];

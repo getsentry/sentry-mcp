@@ -1161,3 +1161,36 @@ describe("get_seer_issue_fix_status", () => {
     `);
   });
 });
+
+describe("update_issue", () => {
+  it("serializes", async () => {
+    expect(
+      await TOOL_HANDLERS.update_issue(
+        mockServerContext,
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "SENTRY-MCP-41",
+          status: "resolved",
+          regionUrl: undefined,
+        },
+        mockRequestHandlerExtra,
+      ),
+    ).toMatchInlineSnapshot(`
+      "# Updated Issue SENTRY-MCP-41
+
+      **Issue ID**: SENTRY-MCP-41
+      **Title**: Test Issue
+      **Status**: resolved
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/SENTRY-MCP-41
+
+      ## Updates Applied
+      - Updated status to "resolved"
+
+      # Using this information
+
+      - The issue is now accessible at: https://sentry-mcp-evals.sentry.io/issues/SENTRY-MCP-41
+      - Current status: resolved
+      "
+    `);
+  });
+});

@@ -685,6 +685,80 @@ export const TOOL_HANDLERS = {
     }
     return output;
   },
+  update_issue: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+
+    // Validate that we have the minimum required parameters
+    if (!params.issueUrl && !params.issueId) {
+      throw new UserInputError(
+        "Either `issueId` or `issueUrl` must be provided",
+      );
+    }
+
+    if (!params.issueUrl && !params.organizationSlug) {
+      throw new UserInputError(
+        "`organizationSlug` is required when providing `issueId`",
+      );
+    }
+
+    const { organizationSlug: orgSlug, issueId: parsedIssueId } =
+      parseIssueParams({
+        organizationSlug: params.organizationSlug,
+        issueId: params.issueId,
+        issueUrl: params.issueUrl,
+      });
+    setTag("organization.slug", orgSlug);
+
+    const updatedIssue = await apiService.updateIssue({
+      organizationSlug: orgSlug,
+      issueId: parsedIssueId!,
+      status: params.status,
+      statusDetails: params.statusDetails,
+      assignedTo: params.assignedTo,
+      hasSeen: params.hasSeen,
+      isBookmarked: params.isBookmarked,
+      isSubscribed: params.isSubscribed,
+      isPublic: params.isPublic,
+    });
+
+    let output = `# Updated Issue ${parsedIssueId}\n\n`;
+    output += `**Issue ID**: ${updatedIssue.shortId}\n`;
+    output += `**Title**: ${updatedIssue.title}\n`;
+    output += `**Status**: ${updatedIssue.status}\n`;
+    
+    if (updatedIssue.assignedTo) {
+      output += `**Assigned To**: ${updatedIssue.assignedTo.name || updatedIssue.assignedTo.email || updatedIssue.assignedTo.id}\n`;
+    }
+    
+    if (updatedIssue.statusDetails && Object.keys(updatedIssue.statusDetails).length > 0) {
+      output += `**Status Details**: ${JSON.stringify(updatedIssue.statusDetails)}\n`;
+    }
+    
+    output += `**URL**: ${apiService.getIssueUrl(orgSlug, updatedIssue.shortId)}\n`;
+    
+    // Display what was updated
+    const updates: string[] = [];
+    if (params.status) updates.push(`status to "${params.status}"`);
+    if (params.assignedTo) updates.push(`assigned to "${params.assignedTo}"`);
+    if (params.hasSeen !== undefined) updates.push(`marked as ${params.hasSeen ? "seen" : "unseen"}`);
+    if (params.isBookmarked !== undefined) updates.push(`${params.isBookmarked ? "bookmarked" : "unbookmarked"}`);
+    if (params.isSubscribed !== undefined) updates.push(`${params.isSubscribed ? "subscribed to" : "unsubscribed from"} notifications`);
+    if (params.isPublic !== undefined) updates.push(`visibility set to ${params.isPublic ? "public" : "private"}`);
+
+    if (updates.length > 0) {
+      output += `\n## Updates Applied\n`;
+      output += updates.map((update) => `- Updated ${update}`).join("\n");
+      output += `\n`;
+    }
+
+    output += "\n# Using this information\n\n";
+    output += `- The issue is now accessible at: ${apiService.getIssueUrl(orgSlug, updatedIssue.shortId)}\n`;
+    output += `- Current status: ${updatedIssue.status}\n`;
+    
+    return output;
+  },
 } satisfies ToolHandlers;
 
 function getOutputForAutofixStep(step: z.infer<typeof AutofixRunStepSchema>) {

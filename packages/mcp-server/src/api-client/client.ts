@@ -702,4 +702,48 @@ export class SentryApiService {
     const body = await response.json();
     return AutofixRunStateSchema.parse(body);
   }
+
+  async updateIssue(
+    {
+      organizationSlug,
+      issueId,
+      status,
+      statusDetails,
+      assignedTo,
+      hasSeen,
+      isBookmarked,
+      isSubscribed,
+      isPublic,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      status?: "resolved" | "resolvedInNextRelease" | "unresolved" | "ignored";
+      statusDetails?: Record<string, any>;
+      assignedTo?: string;
+      hasSeen?: boolean;
+      isBookmarked?: boolean;
+      isSubscribed?: boolean;
+      isPublic?: boolean;
+    },
+    opts?: RequestOptions,
+  ): Promise<Issue> {
+    const updateData: Record<string, any> = {};
+    if (status !== undefined) updateData.status = status;
+    if (statusDetails !== undefined) updateData.statusDetails = statusDetails;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+    if (hasSeen !== undefined) updateData.hasSeen = hasSeen;
+    if (isBookmarked !== undefined) updateData.isBookmarked = isBookmarked;
+    if (isSubscribed !== undefined) updateData.isSubscribed = isSubscribed;
+    if (isPublic !== undefined) updateData.isPublic = isPublic;
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/issues/${issueId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      opts,
+    );
+    return IssueSchema.parse(await response.json());
+  }
 }
