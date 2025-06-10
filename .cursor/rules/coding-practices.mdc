@@ -13,6 +13,7 @@ For specific workflows, refer to these dedicated guides:
 
 - **adding-new-tools**: Comprehensive guide for adding new tools to the MCP server, including definitions, handlers, tests, and evaluations
 - **adding-new-prompts**: Complete workflow for adding new prompts, including implementation patterns and best practices
+- **using-api-mocks**: Complete guide for working with the MSW-based mock system, including fixtures, route handlers, and validation patterns
 
 These guides contain detailed step-by-step instructions, code examples, and specific patterns for their respective areas.
 
