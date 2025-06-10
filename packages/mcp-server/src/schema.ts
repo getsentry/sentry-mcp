@@ -70,3 +70,16 @@ export const ParamRegionUrl = z
   .string()
   .trim()
   .describe("The region URL for the organization you're querying, if known.");
+
+export const ParamIssueStatus = z
+  .enum(["resolved", "resolvedInNextRelease", "unresolved", "ignored"])
+  .describe(
+    "The new status for the issue. Valid values are 'resolved', 'resolvedInNextRelease', 'unresolved', and 'ignored'.",
+  );
+
+export const ParamAssignedTo = z
+  .string()
+  .trim()
+  .describe(
+    "The username or team slug to assign the issue to. Use 'me' to assign to yourself, or provide a username/team slug.",
+  );

@@ -1161,3 +1161,240 @@ describe("get_seer_issue_fix_status", () => {
     `);
   });
 });
+
+describe("update_issue", () => {
+  it("updates issue status", async () => {
+    const tool = TOOL_HANDLERS.update_issue;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
+
+      **Issue**: Error: Tool list_organizations is already registered
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Changes Made
+
+      **Status**: unresolved → **resolved**
+
+      ## Current Status
+
+      **Status**: resolved
+      **Assigned To**: Unassigned
+
+      # Using this information
+
+      - The issue has been successfully updated in Sentry
+      - You can view the issue details using: \`get_issue_details(organizationSlug="sentry-mcp-evals", issueId="CLOUDFLARE-MCP-41")\`
+      - The issue is now marked as resolved and will no longer generate alerts
+      "
+    `);
+  });
+
+  it("updates issue assignment", async () => {
+    const tool = TOOL_HANDLERS.update_issue;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: undefined,
+        assignedTo: "john.doe",
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
+
+      **Issue**: Error: Tool list_organizations is already registered
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Changes Made
+
+      **Assigned To**: Unassigned → **john.doe**
+
+      ## Current Status
+
+      **Status**: unresolved
+      **Assigned To**: john.doe
+
+      # Using this information
+
+      - The issue has been successfully updated in Sentry
+      - You can view the issue details using: \`get_issue_details(organizationSlug="sentry-mcp-evals", issueId="CLOUDFLARE-MCP-41")\`
+      "
+    `);
+  });
+
+  it("updates both status and assignment", async () => {
+    const tool = TOOL_HANDLERS.update_issue;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "ignored",
+        assignedTo: "me",
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
+
+      **Issue**: Error: Tool list_organizations is already registered
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Changes Made
+
+      **Status**: unresolved → **ignored**
+      **Assigned To**: Unassigned → **You**
+
+      ## Current Status
+
+      **Status**: ignored
+      **Assigned To**: me
+
+      # Using this information
+
+      - The issue has been successfully updated in Sentry
+      - You can view the issue details using: \`get_issue_details(organizationSlug="sentry-mcp-evals", issueId="CLOUDFLARE-MCP-41")\`
+      - The issue is now ignored and will not generate alerts until it escalates
+      "
+    `);
+  });
+
+  it("works with issueUrl", async () => {
+    const tool = TOOL_HANDLERS.update_issue;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: undefined,
+        issueId: undefined,
+        status: "resolved",
+        assignedTo: undefined,
+        issueUrl: "https://sentry-mcp-evals.sentry.io/issues/6507376925",
+        regionUrl: undefined,
+      },
+    );
+
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
+
+      **Issue**: Error: Tool list_organizations is already registered
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Changes Made
+
+      **Status**: unresolved → **resolved**
+
+      ## Current Status
+
+      **Status**: resolved
+      **Assigned To**: Unassigned
+
+      # Using this information
+
+      - The issue has been successfully updated in Sentry
+      - You can view the issue details using: \`get_issue_details(organizationSlug="sentry-mcp-evals", issueId="CLOUDFLARE-MCP-41")\`
+      - The issue is now marked as resolved and will no longer generate alerts
+      "
+    `);
+  });
+
+  it("validates required parameters", async () => {
+    const tool = TOOL_HANDLERS.update_issue;
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: undefined,
+          issueId: undefined,
+          status: undefined,
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Either `issueId` or `issueUrl` must be provided");
+  });
+
+  it("validates organization slug when using issueId", async () => {
+    const tool = TOOL_HANDLERS.update_issue;
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: undefined,
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "resolved",
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow(
+      "`organizationSlug` is required when providing `issueId`",
+    );
+  });
+
+  it("validates update parameters", async () => {
+    const tool = TOOL_HANDLERS.update_issue;
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: undefined,
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow(
+      "At least one of `status` or `assignedTo` must be provided to update the issue",
+    );
+  });
+});

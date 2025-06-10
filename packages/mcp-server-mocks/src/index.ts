@@ -723,6 +723,58 @@ export const restHandlers = buildHandlers([
       });
     },
   },
+  {
+    method: "put",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      const updatedIssue = {
+        ...issueFixture,
+        status: body?.status || issueFixture.status,
+        assignedTo: body?.assignedTo || issueFixture.assignedTo,
+      };
+      return HttpResponse.json(updatedIssue);
+    },
+  },
+  {
+    method: "put",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      const updatedIssue = {
+        ...issueFixture,
+        status: body?.status || issueFixture.status,
+        assignedTo: body?.assignedTo || issueFixture.assignedTo,
+      };
+      return HttpResponse.json(updatedIssue);
+    },
+  },
+  {
+    method: "put",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      const updatedIssue = {
+        ...issueFixture2,
+        status: body?.status || issueFixture2.status,
+        assignedTo: body?.assignedTo || issueFixture2.assignedTo,
+      };
+      return HttpResponse.json(updatedIssue);
+    },
+  },
+  {
+    method: "put",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      const updatedIssue = {
+        ...issueFixture2,
+        status: body?.status || issueFixture2.status,
+        assignedTo: body?.assignedTo || issueFixture2.assignedTo,
+      };
+      return HttpResponse.json(updatedIssue);
+    },
+  },
 ]);
 
 export const mswServer = setupServer(...restHandlers);

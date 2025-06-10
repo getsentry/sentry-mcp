@@ -522,6 +522,37 @@ export class SentryApiService {
     );
   }
 
+  async updateIssue(
+    {
+      organizationSlug,
+      issueId,
+      status,
+      assignedTo,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      status?: string;
+      assignedTo?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Issue> {
+    const updateData: Record<string, any> = {};
+    if (status !== undefined) updateData.status = status;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+
+    const response = await this.request(
+      `/organizations/${organizationSlug}/issues/${issueId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      opts,
+    );
+
+    const body = await response.json();
+    return IssueSchema.parse(body);
+  }
+
   // TODO: Sentry is not yet exposing a reasonable API to fetch trace data
   // async getTrace({
   //   organizationSlug,
