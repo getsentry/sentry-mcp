@@ -1,3 +1,8 @@
+---
+description: This guide covers how to work with API mocks in the Sentry MCP server project using MSW, including fixtures, route handlers, and validation patterns.
+globs: 
+alwaysApply: false
+---
 # Using API Mocks
 
 This guide covers how to work with API mocks in the Sentry MCP server project. The mock system uses Mock Service Worker (MSW) to intercept API calls and return realistic responses for testing and development.
