@@ -1,3 +1,25 @@
+/**
+ * Prompt definitions for the Sentry MCP server.
+ *
+ * Declarative definitions for all MCP prompts that provide multi-step workflows
+ * and guided interactions with Sentry. Prompts orchestrate sequences of tool calls
+ * with structured guidance for complex tasks.
+ *
+ * @example Prompt Definition Structure
+ * ```typescript
+ * {
+ *   name: "prompt_name" as const,
+ *   description: [
+ *     "Brief prompt description and purpose.",
+ *     "Additional context about when to use this prompt.",
+ *   ].join("\n"),
+ *   paramsSchema: {
+ *     organizationSlug: ParamOrganizationSlug,
+ *     optionalParam: ParamSchema.optional(),
+ *   },
+ * }
+ * ```
+ */
 import { z } from "zod";
 import {
   ParamIssueShortId,
@@ -5,6 +27,13 @@ import {
   ParamOrganizationSlug,
 } from "./schema";
 
+/**
+ * All MCP prompt definitions for the Sentry server.
+ *
+ * Used by server.ts to register prompts with the MCP server and by prompts.ts
+ * for implementation handlers. Each definition includes name, description, and
+ * Zod parameter schema for multi-step workflows.
+ */
 export const PROMPT_DEFINITIONS = [
   {
     name: "find_errors_in_file" as const,

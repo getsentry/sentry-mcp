@@ -1,0 +1,765 @@
+---
+description: This guide covers the workflow for adding new resources to the Sentry MCP server package.
+globs: 
+alwaysApply: false
+---
+---
+# Adding New Resources
+
+This guide covers how to add new MCP resources to the Sentry MCP server. Resources are **application-controlled** content that provide context management, live system data, and reference materials that LLMs can access during conversations.
+
+## Understanding MCP Resources: Beyond Documentation
+
+MCP resources represent a fundamental shift from static documentation retrieval to **dynamic context management**. The community recognizes resources as solving critical challenges:
+
+- **Context Window Management**: Efficiently utilize limited LLM context space
+- **Stateful Conversations**: Maintain conversation context across interactions  
+- **Live System Integration**: Provide real-time data and system state
+- **Application-Controlled Access**: Client determines when/how content is provided
+- **Multi-Modal Content**: Support text, binary data, and structured information
+
+## Resource Architecture Overview
+
+### Application-Controlled vs Model-Controlled
+
+**Key Distinction**: 
+- **Resources (Application-Controlled)**: Client provides context proactively
+- **Tools (Model-Controlled)**: LLM decides when to call functions
+
+```typescript
+// Resource: Client provides user session context
+{
+  name: "user-session-context",
+  uri: "sentry://session/current",
+  description: "Current user's recent activity, preferences, and investigation context"
+}
+
+// Tool: LLM decides when to search for issues  
+async function find_issues(params) { /* LLM-triggered action */ }
+```
+
+### Resource Categories
+
+1. **Context Management Resources**: Session state, user preferences, recent activity
+2. **Live System Data**: Real-time metrics, health snapshots, alert status
+3. **Static Documentation**: Reference guides, API docs, troubleshooting 
+4. **Binary Content**: Screenshots, logs, attachments, images
+5. **Dynamic Templates**: Pattern-based resources with variable URIs
+
+## Table of Contents
+
+1. [Context Management Resources](mdc:#context-management-resources)
+2. [Live System Data Resources](mdc:#live-system-data-resources)
+3. [Binary Content Resources](mdc:#binary-content-resources)
+4. [Static Documentation Resources](mdc:#static-documentation-resources)
+5. [Resource Templates](mdc:#resource-templates)
+6. [Handler Implementation](mdc:#handler-implementation)
+7. [Testing Resources](mdc:#testing-resources)
+8. [Best Practices](mdc:#best-practices)
+
+## Context Management Resources
+
+### User Session Context
+
+```typescript
+// packages/mcp-server/src/resources.ts
+
+{
+  name: "user-session-context",
+  uri: "sentry://session/current",
+  mimeType: "application/json", 
+  description: "Current user's session including recent searches, preferences, and investigation patterns. Enables personalized and context-aware responses.",
+  handler: async (url: URL) => {
+    const session = await getUserSession(getCurrentUserId());
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          recent_searches: session.recentQueries,
+          preferred_organization: session.defaultOrg,
+          preferred_time_range: session.defaultTimeRange,
+          favorite_projects: session.favoriteProjects,
+          investigation_patterns: session.workflowPatterns,
+          alert_preferences: session.alertSettings,
+          last_accessed: session.lastAccessTime,
+          user_expertise_level: session.derivedExpertiseLevel
+        })
+      }]
+    };
+  }
+}
+```
+
+### Recent Activity Digest
+
+```typescript
+{
+  name: "recent-activity-digest",
+  uri: "sentry://activity/recent",
+  mimeType: "text/markdown",
+  description: "Summary of recent organizational activity including new issues, resolved problems, and trending errors. Provides context for current investigations.",
+  handler: async (url: URL) => {
+    const activity = await getRecentActivity();
+    const markdown = formatActivityDigest(activity);
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "text/markdown", 
+        text: markdown
+      }]
+    };
+  }
+}
+```
+
+### Cross-Session Context Continuity
+
+```typescript
+{
+  name: "investigation-thread",
+  uri: "sentry://investigation/{threadId}",
+  mimeType: "application/json",
+  description: "Maintains investigation context across sessions, tracking hypotheses, findings, and next steps.",
+  handler: async (url: URL) => {
+    const threadId = extractThreadId(url);
+    const thread = await getInvestigationThread(threadId);
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          thread_id: thread.id,
+          investigation_focus: thread.focus,
+          hypotheses: thread.hypotheses,
+          findings: thread.findings,
+          next_steps: thread.plannedActions,
+          related_issues: thread.relatedIssues,
+          team_members_involved: thread.collaborators
+        })
+      }]
+    };
+  }
+}
+```
+
+## Live System Data Resources
+
+### Project Health Snapshots
+
+```typescript
+{
+  name: "project-health-snapshot", 
+  uri: "sentry://health/{organizationSlug}/{projectSlug}",
+  mimeType: "application/json",
+  description: "Real-time project health metrics including error rates, performance data, active alerts, and system status.",
+  handler: async (url: URL) => {
+    const { orgSlug, projectSlug } = extractParams(url);
+    const health = await getProjectHealth(orgSlug, projectSlug);
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          error_rate: health.errorRate,
+          error_rate_trend: health.errorRateTrend,
+          apdex_score: health.apdexScore,
+          active_alerts: health.activeAlerts,
+          recent_deployments: health.recentDeployments,
+          performance_metrics: health.performanceMetrics,
+          top_issues: health.topIssues,
+          system_health_indicators: health.systemHealth,
+          last_updated: new Date().toISOString()
+        })
+      }]
+    };
+  }
+}
+```
+
+### Organization Trends
+
+```typescript
+{
+  name: "organization-trends",
+  uri: "sentry://trends/{organizationSlug}",
+  mimeType: "text/markdown",
+  description: "Weekly trend analysis showing error patterns, performance changes, and emerging issues across the organization.",
+  handler: async (url: URL) => {
+    const orgSlug = extractOrgSlug(url);
+    const trends = await analyzeTrends(orgSlug);
+    
+    const markdown = `# Weekly Trends for ${orgSlug}
+
+## 📈 Trending Up (Needs Attention)
+${trends.increasing.map(t => `- **${t.issue}**: +${t.change}% (${t.current} events)`).join('\n')}
+
+## 📉 Trending Down (Improving)
+${trends.decreasing.map(t => `- **${t.issue}**: -${t.change}% (${t.current} events)`).join('\n')}
+
+## 🆕 New This Week
+${trends.new.map(t => `- **${t.issue}**: ${t.count} events since ${t.firstSeen}`).join('\n')}
+
+## 🔄 Pattern Analysis
+${trends.patterns.map(p => `- **${p.type}**: ${p.description}`).join('\n')}
+`;
+
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "text/markdown",
+        text: markdown
+      }]
+    };
+  }
+}
+```
+
+### Team Configuration Context
+
+```typescript
+{
+  name: "team-configuration",
+  uri: "sentry://team/{organizationSlug}/{teamSlug}",
+  mimeType: "application/json",
+  description: "Team-specific configuration including owned projects, alert thresholds, on-call schedules, and expertise areas.",
+  handler: async (url: URL) => {
+    const { orgSlug, teamSlug } = extractParams(url);
+    const team = await getTeamConfiguration(orgSlug, teamSlug);
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          team_name: team.name,
+          owned_projects: team.ownedProjects,
+          alert_thresholds: team.alertConfig,
+          on_call_schedule: team.onCallSchedule,
+          expertise_areas: team.expertiseAreas,
+          escalation_paths: team.escalationPaths,
+          team_preferences: team.workflowPreferences,
+          integration_settings: team.integrations
+        })
+      }]
+    };
+  }
+}
+```
+
+## Binary Content Resources
+
+### Issue Attachments and Screenshots
+
+```typescript
+{
+  name: "issue-attachments",
+  uri: "sentry://issue/{issueId}/attachments",
+  mimeType: "application/json",
+  description: "Screenshots, log files, and other attachments associated with a specific issue. Enables visual analysis and comprehensive debugging.",
+  handler: async (url: URL) => {
+    const issueId = extractIssueId(url);
+    const attachments = await getIssueAttachments(issueId);
+    
+    // Return multiple content items for different attachment types
+    const contents = await Promise.all(
+      attachments.map(async (attachment) => {
+        if (attachment.type === 'image') {
+          const imageData = await fetchAttachmentData(attachment.id);
+          return {
+            uri: `sentry://attachment/${attachment.id}`,
+            mimeType: attachment.mimeType,
+            blob: Buffer.from(imageData).toString('base64') // Binary as base64
+          };
+        } else if (attachment.type === 'log') {
+          const logData = await fetchAttachmentData(attachment.id);
+          return {
+            uri: `sentry://attachment/${attachment.id}`,
+            mimeType: 'text/plain',
+            text: logData
+          };
+        } else {
+          const textData = await fetchAttachmentData(attachment.id);
+          return {
+            uri: `sentry://attachment/${attachment.id}`,
+            mimeType: attachment.mimeType,
+            text: textData
+          };
+        }
+      })
+    );
+    
+    return { contents };
+  }
+}
+```
+
+### System Screenshots
+
+```typescript
+{
+  name: "system-screenshots",
+  uri: "sentry://screenshots/{scope}",
+  mimeType: "application/json",
+  description: "Live system screenshots for visual analysis of UI state, error dialogs, and system status displays.",
+  handler: async (url: URL) => {
+    const scope = extractScope(url);
+    const screenshots = await captureSystemScreenshots(scope);
+    
+    const contents = screenshots.map(screenshot => ({
+      uri: `${url.toString()}/${screenshot.id}`,
+      mimeType: 'image/png',
+      blob: screenshot.data // Base64 encoded PNG
+    }));
+    
+    return { contents };
+  }
+}
+```
+
+## Static Documentation Resources
+
+### Reference Documentation
+
+```typescript
+{
+  name: "sentry-query-syntax",
+  uri: "https://github.com/getsentry/sentry-ai-rules/blob/main/api/query-syntax.mdc",
+  mimeType: "text/plain",
+  description: "Comprehensive Sentry search query syntax reference for filtering issues and events. Essential for constructing effective search queries.",
+  handler: defaultGitHubHandler,
+}
+```
+
+### Troubleshooting Guides
+
+```typescript
+{
+  name: "error-troubleshooting-guide",
+  uri: "https://github.com/getsentry/sentry-ai-rules/blob/main/troubleshooting/common-errors.mdc",
+  mimeType: "text/markdown",
+  description: "Common error patterns and resolution strategies. Includes step-by-step debugging workflows and known solutions.",
+  handler: defaultGitHubHandler,
+}
+```
+
+## Resource Templates
+
+### Dynamic Resource Patterns
+
+```typescript
+// Template-based resources for scalable access
+{
+  name: "issue-patterns",
+  uriTemplate: "sentry://patterns/{issueId}", // RFC 6570 URI template
+  mimeType: "text/markdown",
+  description: "Historical analysis of similar issues, related patterns, and resolution strategies for better debugging context.",
+  handler: async (url: URL) => {
+    const issueId = extractIssueId(url);
+    const patterns = await analyzeSimilarIssues(issueId);
+    
+    const markdown = `# Pattern Analysis for Issue ${issueId}
+
+## Similar Issues Found
+${patterns.similar.map(p => `- **${p.title}** (${p.similarity}% similar) - ${p.resolution || 'Unresolved'}`).join('\n')}
+
+## Common Stack Trace Patterns
+${patterns.stackTracePatterns.map(p => `- ${p.pattern} (seen ${p.frequency} times)`).join('\n')}
+
+## Related Release Issues
+${patterns.releaseCorrelations.map(r => `- Release ${r.version}: ${r.issueCount} similar issues`).join('\n')}
+
+## Recommended Actions
+${patterns.recommendedActions.map(a => `- ${a.action}: ${a.rationale}`).join('\n')}
+`;
+
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "text/markdown",
+        text: markdown
+      }]
+    };
+  }
+}
+```
+
+### Project-Scoped Resources
+
+```typescript
+{
+  name: "project-configuration",
+  uriTemplate: "sentry://config/{organizationSlug}/{projectSlug}",
+  mimeType: "application/json",
+  description: "Current project configuration including alert rules, integrations, team assignments, and SDK settings.",
+  handler: async (url: URL) => {
+    const { orgSlug, projectSlug } = extractParams(url);
+    const config = await getProjectConfiguration(orgSlug, projectSlug);
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          alert_rules: config.alertRules,
+          integrations: config.activeIntegrations,
+          team_assignments: config.teamAssignments,
+          sdk_configuration: config.sdkSettings,
+          performance_settings: config.performanceConfig,
+          release_settings: config.releaseConfig,
+          notification_settings: config.notifications
+        })
+      }]
+    };
+  }
+}
+```
+
+## Handler Implementation
+
+### Context Management Handler Pattern
+
+```typescript
+async function contextHandler(url: URL): Promise<ReadResourceResult> {
+  try {
+    // 1. Extract context identifiers
+    const contextId = extractContextId(url);
+    
+    // 2. Fetch current context state
+    const context = await getContextState(contextId);
+    
+    // 3. Apply privacy filtering
+    const filteredContext = applyPrivacyFilters(context);
+    
+    // 4. Return structured context
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify(filteredContext)
+      }]
+    };
+  } catch (error) {
+    // Graceful fallback for context unavailability
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({ 
+          context_unavailable: true,
+          fallback_mode: true,
+          message: "Context temporarily unavailable"
+        })
+      }]
+    };
+  }
+}
+```
+
+### Live Data Handler Pattern
+
+```typescript
+async function liveDataHandler(url: URL): Promise<ReadResourceResult> {
+  const cacheKey = url.toString();
+  const cached = await getCache(cacheKey);
+  
+  // Use cache for frequently accessed live data (short TTL)
+  if (cached && !isCacheExpired(cached, 30000)) { // 30 second TTL
+    return cached.data;
+  }
+  
+  // Fetch fresh data
+  const liveData = await fetchLiveSystemData(url);
+  const result = {
+    contents: [{
+      uri: url.toString(),
+      mimeType: "application/json",
+      text: JSON.stringify({
+        ...liveData,
+        timestamp: new Date().toISOString(),
+        cache_status: "fresh"
+      })
+    }]
+  };
+  
+  // Cache for next request
+  await setCache(cacheKey, result, 30000);
+  return result;
+}
+```
+
+### Binary Content Handler Pattern
+
+```typescript
+async function binaryContentHandler(url: URL): Promise<ReadResourceResult> {
+  const contentType = detectContentType(url);
+  
+  if (contentType === 'image') {
+    const imageData = await fetchImageData(url);
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: detectImageMimeType(imageData),
+        blob: Buffer.from(imageData).toString('base64')
+      }]
+    };
+  } else if (contentType === 'text') {
+    const textData = await fetchTextData(url);
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "text/plain",
+        text: textData
+      }]
+    };
+  }
+  
+  throw new Error(`Unsupported content type: ${contentType}`);
+}
+```
+
+### Multi-Content Resource Handler
+
+```typescript
+async function multiContentHandler(url: URL): Promise<ReadResourceResult> {
+  // Resources can return multiple content items
+  const baseId = extractBaseId(url);
+  const relatedContent = await getRelatedContent(baseId);
+  
+  const contents = await Promise.all([
+    // Primary content
+    {
+      uri: url.toString(),
+      mimeType: "application/json",
+      text: JSON.stringify(relatedContent.primary)
+    },
+    
+    // Related images
+    ...relatedContent.images.map(async (img) => ({
+      uri: `${url.toString()}/image/${img.id}`,
+      mimeType: img.mimeType,
+      blob: await fetchImageAsBase64(img.id)
+    })),
+    
+    // Related text documents  
+    ...relatedContent.documents.map(async (doc) => ({
+      uri: `${url.toString()}/doc/${doc.id}`,
+      mimeType: "text/plain",
+      text: await fetchDocumentText(doc.id)
+    }))
+  ]);
+  
+  return { contents };
+}
+```
+
+## Testing Resources
+
+### Context Resource Testing
+
+```typescript
+describe("Context Management Resources", () => {
+  it("should provide user session context", async () => {
+    const resource = RESOURCES.find(r => r.name === "user-session-context");
+    const url = new URL(resource.uri);
+    const result = await resource.handler(url);
+    
+    const context = JSON.parse(result.contents[0].text);
+    expect(context.recent_searches).toBeDefined();
+    expect(context.preferred_organization).toBeDefined();
+    expect(context.investigation_patterns).toBeDefined();
+  });
+  
+  it("should handle missing context gracefully", async () => {
+    // Test fallback behavior when context unavailable
+    const invalidUrl = new URL("sentry://session/nonexistent");
+    const result = await contextHandler(invalidUrl);
+    
+    const context = JSON.parse(result.contents[0].text);
+    expect(context.context_unavailable).toBe(true);
+    expect(context.fallback_mode).toBe(true);
+  });
+});
+```
+
+### Live Data Resource Testing
+
+```typescript
+describe("Live System Data Resources", () => {
+  it("should provide real-time project health", async () => {
+    const resource = RESOURCES.find(r => r.name === "project-health-snapshot");
+    const url = new URL("sentry://health/test-org/test-project");
+    const result = await resource.handler(url);
+    
+    const health = JSON.parse(result.contents[0].text);
+    expect(health.error_rate).toBeDefined();
+    expect(health.last_updated).toBeDefined();
+    expect(new Date(health.last_updated)).toBeInstanceOf(Date);
+  });
+  
+  it("should cache live data appropriately", async () => {
+    // Test that live data caching works correctly
+    const url = new URL("sentry://health/test-org/test-project");
+    
+    const result1 = await liveDataHandler(url);
+    const result2 = await liveDataHandler(url);
+    
+    // Should get same cached data within TTL
+    expect(result1.contents[0].text).toEqual(result2.contents[0].text);
+  });
+});
+```
+
+### Binary Content Testing
+
+```typescript
+describe("Binary Content Resources", () => {
+  it("should handle image attachments", async () => {
+    const resource = RESOURCES.find(r => r.name === "issue-attachments");
+    const url = new URL("sentry://issue/TEST-123/attachments");
+    const result = await resource.handler(url);
+    
+    // Should have multiple content items
+    expect(result.contents.length).toBeGreaterThan(0);
+    
+    // Find image content
+    const imageContent = result.contents.find(c => c.mimeType?.startsWith('image/'));
+    expect(imageContent).toBeDefined();
+    expect(imageContent.blob).toBeDefined();
+    expect(typeof imageContent.blob).toBe('string'); // Base64 encoded
+  });
+});
+```
+
+## Best Practices
+
+### 1. Context Management
+
+- **Session Awareness**: Always consider user session state and preferences
+- **Context Window Optimization**: Prioritize essential context for LLM efficiency
+- **Privacy Filtering**: Apply appropriate privacy controls to sensitive context
+- **Graceful Degradation**: Handle missing context without breaking functionality
+
+### 2. Live Data Integration
+
+- **Caching Strategy**: Cache live data appropriately to balance freshness and performance
+- **Error Resilience**: Provide fallbacks when live systems are unavailable
+- **Data Freshness**: Include timestamps to help LLMs understand data currency
+- **Rate Limiting**: Respect API limits and implement backoff strategies
+
+### 3. Binary Content Handling
+
+- **Format Support**: Support common formats (PNG, JPEG, PDF, logs)
+- **Size Limits**: Implement reasonable size limits for binary content
+- **Base64 Encoding**: Properly encode binary data for MCP transport
+- **MIME Type Detection**: Accurately detect and set content types
+
+### 4. Resource Discovery
+
+- **Descriptive Names**: Use clear, searchable resource names
+- **Rich Metadata**: Provide comprehensive descriptions for LLM understanding
+- **Template Documentation**: Clearly document URI template patterns
+- **Dependency Management**: Document resource dependencies and relationships
+
+### 5. Security and Privacy
+
+- **Access Control**: Implement appropriate authorization for sensitive resources
+- **Data Filtering**: Remove sensitive information from context resources
+- **Audit Logging**: Log resource access for security monitoring
+- **Content Validation**: Validate external content before serving
+
+### 6. Performance Optimization
+
+- **Lazy Loading**: Load resource content only when requested
+- **Parallel Loading**: Fetch multiple resources concurrently when possible
+- **Connection Pooling**: Reuse connections for external resource fetching
+- **Compression**: Compress large text content when appropriate
+
+## Advanced Patterns
+
+### Context Window Management
+
+```typescript
+// Resource that helps manage LLM context window efficiently
+{
+  name: "context-priority-manager",
+  uri: "sentry://context/priority",
+  mimeType: "application/json",
+  description: "Manages context priority and compression for optimal LLM context window utilization.",
+  handler: async (url: URL) => {
+    const context = await getCurrentContext();
+    const prioritized = prioritizeContextElements(context);
+    const compressed = compressLowPriorityContext(prioritized);
+    
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          high_priority_context: compressed.highPriority,
+          compressed_history: compressed.compressedHistory,
+          context_window_usage: compressed.windowUtilization,
+          recommended_pruning: compressed.pruningRecommendations
+        })
+      }]
+    };
+  }
+}
+```
+
+### Cross-Session Continuity
+
+```typescript
+// Resource that maintains investigation threads across sessions
+{
+  name: "investigation-continuity",
+  uri: "sentry://continuity/{sessionId}",
+  mimeType: "application/json", 
+  description: "Maintains investigation context across sessions for continuous debugging workflows.",
+  handler: async (url: URL) => {
+    const sessionId = extractSessionId(url);
+    const continuity = await getInvestigationContinuity(sessionId);
+    
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "application/json",
+        text: JSON.stringify({
+          previous_session_summary: continuity.previousSummary,
+          outstanding_questions: continuity.outstandingQuestions,
+          working_hypotheses: continuity.workingHypotheses,
+          next_steps: continuity.plannedNextSteps,
+          team_handoff_notes: continuity.handoffNotes
+        })
+      }]
+    };
+  }
+}
+```
+
+### Adaptive Context Resources
+
+```typescript
+// Resource that adapts content based on user expertise and context
+{
+  name: "adaptive-guidance",
+  uri: "sentry://guidance/adaptive",
+  mimeType: "text/markdown",
+  description: "Provides guidance adapted to user expertise level and current investigation context.",
+  handler: async (url: URL) => {
+    const user = await getCurrentUser();
+    const context = await getCurrentInvestigationContext();
+    const expertise = await assessUserExpertise(user);
+    
+    const guidance = adaptGuidanceToExpertise(context, expertise);
+    
+    return {
+      contents: [{
+        uri: url.toString(),
+        mimeType: "text/markdown",
+        text: guidance
+      }]
+    };
+  }
+}
+```
+
+This comprehensive resource system transforms MCP from a simple documentation access tool into a powerful **context management and live system integration platform** that enables truly intelligent, context-aware AI interactions.

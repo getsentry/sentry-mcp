@@ -1,22 +1,20 @@
 ---
 description: This guide covers the workflow for adding new prompts to the Sentry MCP server package.
-globs:
+globs: 
 alwaysApply: false
 ---
-
 # Adding New Prompts to the MCP Server
 
-This guide covers the workflow for adding new prompts to the Sentry MCP server package.
+Workflow for adding new prompts to the Sentry MCP server package.
 
 ## Overview
 
-Prompts are pre-configured workflows that guide LLMs through complex tasks. Each prompt consists of:
+Prompts are pre-configured workflows that guide LLMs through complex tasks by orchestrating tools and resources. Each prompt consists of:
 
 1. **Definition** - Schema and metadata in `promptDefinitions.ts`
 2. **Handler** - Implementation logic in `prompts.ts`
-3. **Tests** - Unit tests in `prompts.test.ts` (to be created)
+3. **Tests** - Unit tests in `prompts.test.ts`
 4. **Evals** - Integration tests in `mcp-server-evals`
-5. **Documentation** - User-facing documentation
 
 ## Step 1: Define the Prompt
 
@@ -28,28 +26,23 @@ Add your prompt definition to `packages/mcp-server/src/promptDefinitions.ts`:
   description: [
     "One-line summary of what this prompt helps accomplish.",
     "Additional context about when to use this prompt.",
+    "Mention if it leverages specific resources or requires particular context.",
   ].join("\n"),
   paramsSchema: {
     organizationSlug: ParamOrganizationSlug,
     yourParam: z.string().trim().describe("Description of this parameter"),
+    includeHistoricalContext: z.boolean().optional().describe("Include user's recent activity and preferences"),
+    timeRange: z.string().optional().describe("Time range for analysis (e.g., '24h', '7d', '30d')"),
   },
 }
 ```
-
-### Writing LLM-Friendly Prompt Definitions
-
-**Prompt descriptions are critical** - they help users understand when to use your prompt:
-
-1. **Be specific about the workflow** - Clearly state what task the prompt will guide through
-2. **Mention required parameters** - If users need specific information ready, mention it
-3. **Reference related prompts** - If this prompt is part of a larger workflow
 
 ## Step 2: Implement the Handler
 
 Add your handler to `packages/mcp-server/src/prompts.ts`:
 
 ```typescript
-your_prompt_name: async (context, { organizationSlug, yourParam }) => {
+your_prompt_name: async (context, { organizationSlug, yourParam, includeHistoricalContext, timeRange }) => {
   // Validate parameters if needed
   if (!organizationSlug && !yourParam) {
     throw new Error(
@@ -57,92 +50,55 @@ your_prompt_name: async (context, { organizationSlug, yourParam }) => {
     );
   }
 
-  // Build the prompt instructions
-  return [
+  // Build context-aware instructions
+  const instructions = [
     `I want to ${describe_the_goal} in ${organizationSlug}.`,
     "",
-    "Here's how to accomplish this:",
+    "## Phase 1: Gather Context",
     "",
-    "1. First, use the `tool_name` tool to gather initial information.",
-    "   - Pass parameter X as: value",
-    "   - This will give you Y data",
-    "",
-    "2. Next, analyze the results and determine if:",
-    "   a. Condition A: Take action X using `another_tool`",
-    "   b. Condition B: Take action Y using `different_tool`",
-    "",
-    "3. Finally, synthesize the results and present them clearly.",
-    "",
-    "**Important considerations:**",
-    "- Always validate the data before proceeding",
-    "- If you encounter errors, explain them clearly",
-    "- Reference specific values in your explanations",
-  ].join("\n");
-},
-```
+    "Before taking actions, review available context resources:",
+  ];
 
-### Writing Effective Prompt Instructions
-
-**Your prompt's instructions directly guide the LLM**, so clarity and structure are essential:
-
-1. **Start with context** - State the goal and include parameter values for clarity
-2. **Use numbered steps** - Break complex workflows into clear, sequential steps
-3. **Reference specific tools** - Use backticks around tool names: `tool_name`
-4. **Include decision points** - Use conditional logic for different scenarios
-5. **Add guardrails** - Include warnings, validations, and error handling guidance
-6. **Provide examples** - When relevant, show example tool invocations
-
-**Instruction patterns that work well**:
-
-```typescript
-// Clear goal statement with parameters
-`I want to diagnose performance issues for ${projectSlug} in ${organizationSlug}.`;
-
-// Specific tool instructions with parameters
-"1. Call `find_issues` with these parameters:" +
-  "   - organizationSlug: " +
-  organizationSlug +
-  "   - query: 'is:unresolved project:" +
-  projectSlug +
-  "'";
-
-// Conditional logic
-"2a. If issues are found, get details using `get_issue_details`" +
-  "2b. If no issues found, check `get_project_stats` for anomalies";
-
-// Iterative workflows
-("3. Repeat step 2 until all critical issues are analyzed");
-
-// Synthesis instructions
-"4. Summarize findings with:" +
-  "   - Root causes identified" +
-  "   - Recommended fixes" +
-  "   - Priority ordering";
-```
-
-## Step 3: Add Parameter Validation
-
-Include proper error handling for missing or invalid parameters:
-
-```typescript
-your_prompt_name: async (context, { organizationSlug, issueId, issueUrl }) => {
-  // Handle multiple parameter options
-  let contextMessage: string;
-  if (issueUrl) {
-    contextMessage = `The issue URL is ${issueUrl}`;
-  } else if (organizationSlug && issueId) {
-    contextMessage = `The issue ${issueId} in organization ${organizationSlug}`;
-  } else {
-    throw new Error(
-      "Either issueUrl or both organizationSlug and issueId must be provided"
+  // Add resource instructions based on parameters
+  if (includeHistoricalContext) {
+    instructions.push(
+      "1. Check the `user-session-context` resource for:",
+      "   - Recent searches and activity patterns",
+      "   - User preferences and default filters", 
+      "   - Previously visited projects and issues",
+      "",
+      "2. Review the `recent-activity-digest` resource for:",
+      "   - Trending issues in this organization",
+      "   - Recently resolved problems that might be related",
+      ""
     );
   }
 
-  // Rest of implementation...
-};
+  instructions.push(
+    "## Phase 2: Execute Actions",
+    "",
+    "Based on the context gathered, take appropriate actions:",
+    "",
+    "1. Use the `tool_name` tool to gather specific information:",
+    `   - organizationSlug: "${organizationSlug}"`,
+    timeRange ? `   - timeRange: "${timeRange}"` : "",
+    "   - Apply any relevant filters from user session context",
+    "",
+    "2. Analyze the results in context of the background information",
+    "",
+    "## Phase 3: Synthesize Results",
+    "",
+    "Provide results with context awareness:",
+    "- Reference user's typical workflow patterns",
+    "- Connect findings to recent organizational trends", 
+    "- Suggest actions based on user's role and permissions",
+  );
+
+  return instructions.join("\n");
+},
 ```
 
-## Step 4: Add Unit Tests
+## Step 3: Add Unit Tests
 
 Create tests in `packages/mcp-server/src/prompts.test.ts`:
 
@@ -151,7 +107,7 @@ import { describe, it, expect } from "vitest";
 import { PROMPT_HANDLERS } from "./prompts";
 
 describe("your_prompt_name", () => {
-  it("generates correct instructions with all parameters", async () => {
+  it("generates context-aware instructions with all parameters", async () => {
     const prompt = PROMPT_HANDLERS.your_prompt_name;
     const result = await prompt(
       {
@@ -162,13 +118,32 @@ describe("your_prompt_name", () => {
       {
         organizationSlug: "my-org",
         yourParam: "test-value",
+        includeHistoricalContext: true,
+        timeRange: "24h",
       }
     );
 
     expect(result).toContain("I want to");
     expect(result).toContain("my-org");
     expect(result).toContain("test-value");
-    expect(result).toContain("`tool_name`");
+    expect(result).toContain("`user-session-context`");
+    expect(result).toContain("Phase 1: Gather Context");
+    expect(result).toContain("Phase 2: Execute Actions");
+  });
+
+  it("adapts instructions based on context preferences", async () => {
+    const prompt = PROMPT_HANDLERS.your_prompt_name;
+    const resultWithContext = await prompt({}, { 
+      organizationSlug: "org",
+      includeHistoricalContext: true 
+    });
+    const resultWithoutContext = await prompt({}, { 
+      organizationSlug: "org",
+      includeHistoricalContext: false 
+    });
+
+    expect(resultWithContext).toContain("user-session-context");
+    expect(resultWithoutContext).not.toContain("user-session-context");
   });
 
   it("handles missing required parameters", async () => {
@@ -181,7 +156,7 @@ describe("your_prompt_name", () => {
 });
 ```
 
-## Step 5: Add Evaluation Tests
+## Step 4: Add Evaluation Tests
 
 Create `packages/mcp-server-evals/src/evals/your-prompt.eval.ts`:
 
@@ -189,18 +164,16 @@ Create `packages/mcp-server-evals/src/evals/your-prompt.eval.ts`:
 import { describeEval } from "vitest-evals";
 import { Factuality, FIXTURES, PromptRunner } from "./utils";
 
-describeEval("your-prompt", {
+describeEval("your-prompt-context-management", {
   data: async () => {
     return [
       {
-        // Test the prompt with typical parameters
-        input: `Use the your_prompt_name prompt for ${FIXTURES.organizationSlug}`,
-        expected: "Expected outcome description",
+        input: `Use the your_prompt_name prompt for ${FIXTURES.organizationSlug} with full context`,
+        expected: "Should reference user session context and recent activity before taking actions",
       },
       {
-        // Test edge cases
-        input: `Run your_prompt_name with minimal information`,
-        expected: "Should guide user to provide required parameters",
+        input: `Run your_prompt_name with visual analysis for issue ISSUE-123`,
+        expected: "Should mention checking issue-attachments resource for screenshots and logs",
       },
     ];
   },
@@ -211,109 +184,92 @@ describeEval("your-prompt", {
 });
 ```
 
-## Step 6: Document the Prompt
-
-Update the UI documentation to include your prompt:
-
-1. Add to the prompts list in `packages/mcp-cloudflare/src/client/App.tsx`
-2. Update any workflow documentation
-3. Add example use cases
-
-## Step 7: Test Your Prompt
-
-```bash
-# Run unit tests
-pnpm test prompts.test.ts
-
-# Run evaluation tests
-pnpm test:evals your-prompt.eval.ts
-
-# Test interactively
-pnpm dev
-# Then in your MCP client, try:
-# "Use the your_prompt_name prompt for my-org"
-```
-
 ## Common Prompt Patterns
 
-### Multi-Step Analysis
+### Session-Aware Investigation
 
 ```typescript
 return [
-  `I need to analyze ${subject} in ${organizationSlug}.`,
+  `I'll investigate ${issueType} issues in ${organizationSlug}, leveraging your recent activity for context.`,
   "",
-  "## Step 1: Gather Information",
-  "- Use `list_items` to get an overview",
-  "- Note any patterns or anomalies",
+  "## Context Foundation",
+  "1. Review `user-session-context` resource:",
+  "   - Your recent search patterns and focus areas",
+  "   - Preferred time ranges and filter settings",
   "",
-  "## Step 2: Deep Dive",
-  "- For each significant item, use `get_item_details`",
-  "- Look for correlations between items",
+  "## Contextual Analysis",
+  "2. Use `find_issues` with context-informed parameters:",
+  "   - Apply your typical filters as defaults",
+  "   - Focus on projects matching your recent activity",
   "",
-  "## Step 3: Synthesize Findings",
-  "- Identify root causes",
-  "- Propose actionable solutions",
+  "## Pattern Recognition",
+  "3. Cross-reference findings with `organization-trends`:",
+  "   - Note if this fits recent organizational patterns",
+  "   - Flag if this represents a new or escalating issue",
 ].join("\n");
 ```
 
-### Conditional Workflows
+### Multi-Modal Error Analysis
 
 ```typescript
 return [
-  `I'll help you ${action} for ${resource}.`,
+  `I'll perform comprehensive error analysis including visual content for ${issueId}.`,
   "",
-  "1. First, check current status with `get_status`",
+  "## Multi-Source Data Gathering",
+  "1. Get structured error data with `get_issue_details`",
+  "2. Access `issue-attachments` resource for:",
+  "   - Screenshots: Analyze UI state, error dialogs, console outputs",
+  "   - Log files: Parse for timing patterns, error cascades, system state",
   "",
-  "2. Based on the status:",
-  "   - If ACTIVE: Proceed with `update_resource`",
-  "   - If PENDING: Wait and check again with `get_status`",
-  "   - If ERROR: Diagnose with `get_error_details`",
+  "## Live System Context",
+  "3. Check `project-health-snapshot` for:",
+  "   - Current system performance metrics",
+  "   - Active alerts that might be related",
   "",
-  "3. Verify the outcome and report results",
+  "## Synthesis with Visual Evidence",
+  "4. Combine all data sources for comprehensive diagnosis:",
+  "   - Reference specific UI elements from screenshots",
+  "   - Quote relevant log entries with timing context",
 ].join("\n");
 ```
 
-### Iterative Processing
+### Parameter Validation Pattern
 
 ```typescript
-return [
-  `Processing ${items} in ${organizationSlug}.`,
-  "",
-  "For each item:",
-  "1. Call `validate_item` to check if processing is needed",
-  "2. If validation passes, use `process_item`",
-  "3. Track results and continue to next item",
-  "",
-  "After processing all items:",
-  "- Summarize successes and failures",
-  "- Suggest follow-up actions if needed",
-].join("\n");
+your_prompt_name: async (context, { organizationSlug, issueId, issueUrl, includeVisualAnalysis }) => {
+  // Handle multiple parameter options
+  let contextMessage: string;
+  if (issueUrl) {
+    contextMessage = `The issue URL is ${issueUrl}`;
+  } else if (organizationSlug && issueId) {
+    contextMessage = `The issue ${issueId} in organization ${organizationSlug}`;
+  } else {
+    throw new Error(
+      "Either issueUrl or both organizationSlug and issueId must be provided"
+    );
+  }
+
+  // Resource availability guidance
+  const instructions = [contextMessage];
+  
+  if (includeVisualAnalysis) {
+    instructions.push(
+      "",
+      "Note: Visual analysis requested. I'll check the `issue-attachments` resource for screenshots and images to analyze alongside the error data."
+    );
+  }
+
+  // Rest of implementation...
+};
 ```
 
 ## Best Practices
 
-1. **Keep prompts focused** - Each prompt should guide through one specific workflow
-2. **Make steps explicit** - Don't assume the LLM will infer steps
-3. **Include error handling** - Tell the LLM what to do when things go wrong
-4. **Reference actual tool names** - Use the exact tool names with backticks
-5. **Provide context in responses** - Include parameter values in the instructions
-6. **Test with variations** - Ensure prompts work with different parameter combinations
-
-## Anti-Patterns to Avoid
-
-1. **Vague instructions** - "Figure out what's wrong" vs "Use `find_issues` to identify problems"
-2. **Missing error guidance** - Always include what to do if a step fails
-3. **Assuming tool knowledge** - Specify which tools to use and their parameters
-4. **Complex branching** - Keep conditional logic simple and clear
-5. **Forgetting validation** - Always validate results before proceeding
-
-## Checklist
-
-- [ ] Prompt definition added to `promptDefinitions.ts`
-- [ ] Handler implemented in `prompts.ts`
-- [ ] Parameter validation included
-- [ ] Unit tests written in `prompts.test.ts`
-- [ ] Evaluation tests written
-- [ ] Documentation updated
-- [ ] Tested end-to-end with MCP client
-- [ ] Workflow produces expected results
+- **Leverage resource context first**: Always check available context before taking actions
+- **Make context usage explicit**: Tell the LLM which resources to check and why
+- **Adapt to context availability**: Gracefully handle missing or limited context
+- **Reference context in explanations**: Connect findings back to user's patterns and preferences
+- **Build structured workflows**: Use clear phases (Gather Context, Execute Actions, Synthesize)
+- **Handle parameter flexibility**: Support multiple input patterns (URL vs org+id)
+- **Include visual analysis**: Support screenshot and log file analysis when appropriate
+- **Provide actionable guidance**: End with specific next steps and tool recommendations

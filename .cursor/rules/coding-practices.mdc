@@ -13,7 +13,12 @@ For specific workflows, refer to these dedicated guides:
 
 - **adding-new-tools**: Comprehensive guide for adding new tools to the MCP server, including definitions, handlers, tests, and evaluations
 - **adding-new-prompts**: Complete workflow for adding new prompts, including implementation patterns and best practices
+- **adding-new-resources**: Complete workflow for adding new MCP resources, including context management, live system data, and reference materials
 - **using-api-mocks**: Complete guide for working with the MSW-based mock system, including fixtures, route handlers, and validation patterns
+- **api-client-patterns**: Patterns for building against the Sentry API using SentryApiService client, Zod schemas, error handling, multi-region support, and MSW-based testing
+- **security-and-authentication**: Security and authentication patterns using OAuth proxy pattern, client approval dialogs, token management, and multi-tenant security
+- **deployment-and-infrastructure**: Infrastructure patterns and configuration for the mcp-cloudflare package running on Cloudflare Workers
+- **observability-and-monitoring**: Sentry instrumentation patterns and observability practices across the Sentry MCP server codebase
 
 These guides contain detailed step-by-step instructions, code examples, and specific patterns for their respective areas.
 

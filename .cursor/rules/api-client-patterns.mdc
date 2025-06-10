@@ -1,0 +1,576 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# API Client Patterns
+
+Patterns for building against the Sentry API using SentryApiService client, Zod schemas, error handling, multi-region support, and MSW-based testing.
+
+## SentryApiService Usage
+
+### Basic Client Creation
+
+```typescript
+import { SentryApiService } from "@sentry/mcp-server/api-client";
+
+// Standard SaaS usage
+const apiService = new SentryApiService({
+  accessToken: "your-oauth-token",
+  host: "sentry.io" // default
+});
+
+// Self-hosted instance
+const selfHosted = new SentryApiService({
+  accessToken: "your-token",
+  host: "sentry.company.com"
+});
+
+// Without authentication (limited endpoints)
+const public = new SentryApiService({});
+```
+
+### Common API Patterns
+
+```typescript
+// List organizations (multi-region aware)
+const organizations = await apiService.listOrganizations();
+
+// List resources with filtering
+const issues = await apiService.listIssues({
+  organizationSlug: "my-org",
+  query: "is:unresolved level:error",
+  sortBy: "date"
+});
+
+// Get specific resource
+const issue = await apiService.getIssue({
+  organizationSlug: "my-org", 
+  issueId: "PROJ-123"
+});
+
+// Create resources
+const team = await apiService.createTeam({
+  organizationSlug: "my-org",
+  name: "Backend Team"
+});
+
+// Update resources
+const updated = await apiService.updateIssue({
+  organizationSlug: "my-org",
+  issueId: "PROJ-123", 
+  status: "resolved",
+  assignedTo: "jane.doe"
+});
+```
+
+### Authentication Context Pattern
+
+```typescript
+// From tools.ts - create API service from MCP context
+function apiServiceFromContext(
+  context: ServerContext,
+  opts: { regionUrl?: string } = {},
+) {
+  let host = context.host;
+  
+  if (opts.regionUrl) {
+    try {
+      host = new URL(opts.regionUrl).host;
+    } catch (error) {
+      throw new UserInputError(
+        `Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`
+      );
+    }
+  }
+  
+  return new SentryApiService({
+    host,
+    accessToken: context.accessToken, // Always from authenticated context
+  });
+}
+```
+
+## Schema Design Patterns
+
+### Core Schema Structure
+
+```typescript
+// packages/mcp-server/src/api-client/schema.ts
+
+// Basic resource schema pattern
+export const ProjectSchema = z.object({
+  id: z.union([z.string(), z.number()]), // Support both legacy/modern IDs
+  slug: z.string(),
+  name: z.string(),
+  platform: z.string().nullable(), // Nullable for optional fields
+});
+
+// List schema pattern
+export const ProjectListSchema = z.array(ProjectSchema);
+
+// Nested object with validation
+export const OrganizationSchema = z.object({
+  id: z.union([z.string(), z.number()]),
+  slug: z.string(),
+  name: z.string(),
+  links: z.object({
+    regionUrl: z.string().url(),
+    organizationUrl: z.string().url(),
+  }),
+});
+```
+
+### Handling Sentry's Flexible Data Model
+
+```typescript
+// Use .passthrough() for objects that may contain unknown fields
+export const ApiErrorSchema = z
+  .object({
+    detail: z.string(),
+  })
+  .passthrough();
+
+// Handle polymorphic data with unions
+export const AssignedToSchema = z.union([
+  z.null(),
+  z.string(), // username or actor ID
+  z.object({
+    type: z.enum(["user", "team"]),
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    email: z.string().optional(), // only for users
+  }).passthrough(),
+]);
+
+// Complex nested structures with partial validation
+export const ExceptionInterface = z
+  .object({
+    mechanism: z.object({
+      type: z.string().nullable(),
+      handled: z.boolean().nullable(),
+    }).partial(),
+    type: z.string().nullable(),
+    value: z.string().nullable(),
+    stacktrace: z.object({
+      frames: z.array(FrameInterface),
+    }),
+  })
+  .partial(); // Most fields optional due to Sentry's data model
+```
+
+### Event Schema Complexity
+
+```typescript
+// Handle different event types with discriminated unions
+export const ErrorEventSchema = BaseEventSchema.omit({ type: true }).extend({
+  type: z.literal("error"),
+  culprit: z.string().nullable(),
+  dateCreated: z.string().datetime(),
+});
+
+export const TransactionEventSchema = BaseEventSchema.omit({ type: true }).extend({
+  type: z.literal("transaction"), 
+  occurrence: z.object({
+    issueTitle: z.string(),
+    culprit: z.string().nullable(),
+  }),
+});
+
+export const EventSchema = z.union([
+  ErrorEventSchema,
+  TransactionEventSchema,
+  UnknownEventSchema,
+]);
+```
+
+### Search Response Patterns
+
+```typescript
+// Search responses have flexible meta/data structure
+export const EventsResponseSchema = z.object({
+  data: z.array(z.unknown()),
+  meta: z.object({
+    fields: z.record(z.string(), z.string()),
+  }).passthrough(),
+});
+
+// Extend for specific search types
+export const ErrorsSearchResponseSchema = EventsResponseSchema.extend({
+  data: z.array(
+    z.object({
+      issue: z.string(),
+      "issue.id": z.union([z.string(), z.number()]),
+      project: z.string(),
+      title: z.string(),
+      "count()": z.number(),
+      "last_seen()": z.string(),
+    }),
+  ),
+});
+```
+
+## Type Safety and Validation
+
+### Type Derivation Pattern
+
+```typescript
+// packages/mcp-server/src/api-client/types.ts
+
+// Derive all types from schemas for perfect sync
+export type User = z.infer<typeof UserSchema>;
+export type Organization = z.infer<typeof OrganizationSchema>;
+export type Issue = z.infer<typeof IssueSchema>;
+
+// List types follow consistent pattern
+export type OrganizationList = z.infer<typeof OrganizationListSchema>;
+export type IssueList = z.infer<typeof IssueListSchema>;
+```
+
+### Runtime Validation in API Methods
+
+```typescript
+// All API methods validate responses
+async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
+  const response = await this.request("/organizations/", undefined, opts);
+  const body = await response.json();
+  return OrganizationListSchema.parse(body); // Runtime validation
+}
+
+// Handle validation errors gracefully
+async getIssue({ organizationSlug, issueId }: {
+  organizationSlug: string;
+  issueId: string;
+}): Promise<Issue> {
+  const response = await this.request(
+    `/organizations/${organizationSlug}/issues/${issueId}/`
+  );
+  const body = await response.json();
+  
+  try {
+    return IssueSchema.parse(body);
+  } catch (error) {
+    console.error("Failed to parse issue response:", error);
+    throw new Error("Invalid issue data received from API");
+  }
+}
+```
+
+### Safe Parsing for Error Handling
+
+```typescript
+// Use safeParse for potentially invalid data
+const { data, success, error } = ApiErrorSchema.safeParse(parsed);
+
+if (success) {
+  throw new ApiError(data.detail, response.status);
+}
+
+console.error(`Failed to parse error response: ${errorText}`, error);
+```
+
+## Error Handling Patterns
+
+### ApiError Class Design
+
+```typescript
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    // Enhanced error messages for LLM consumption
+    let finalMessage = message;
+    if (
+      message.includes("You do not have the multi project stream feature enabled") ||
+      message.includes("You cannot view events from multiple projects")
+    ) {
+      finalMessage = 
+        "You do not have access to query across multiple projects. Please select a project for your query.";
+    }
+    super(finalMessage);
+  }
+}
+```
+
+### Request Error Handling Pattern
+
+```typescript
+private async request(path: string, options: RequestInit = {}): Promise<Response> {
+  const response = await fetch(url, { ...options, headers });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let parsed: unknown | undefined;
+    
+    try {
+      parsed = JSON.parse(errorText);
+    } catch (error) {
+      console.error(`[sentryApi] Failed to parse error response: ${errorText}`, error);
+    }
+
+    if (parsed) {
+      const { data, success, error } = ApiErrorSchema.safeParse(parsed);
+
+      if (success) {
+        throw new ApiError(data.detail, response.status);
+      }
+
+      console.error(`[sentryApi] Failed to parse error response: ${errorText}`, error);
+    }
+
+    throw new Error(
+      `API request failed: ${response.status} ${response.statusText}\n${errorText}`,
+    );
+  }
+
+  return response;
+}
+```
+
+## Multi-Region Support
+
+### Automatic Region Detection
+
+```typescript
+async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
+  // Fetch available regions first
+  const regionResponse = await this.request("/users/me/regions/", undefined, opts);
+  const regionData = UserRegionsSchema.parse(await regionResponse.json());
+
+  // Query all regions in parallel
+  return (
+    await Promise.all(
+      regionData.regions.map(async (region) =>
+        this.request(`/organizations/`, undefined, {
+          ...opts,
+          host: new URL(region.url).host,
+        }).then((response) => response.json()),
+      ),
+    )
+  )
+    .map((data) => OrganizationListSchema.parse(data))
+    .reduce((acc, curr) => acc.concat(curr), []); // Combine results
+}
+```
+
+### Host Override Pattern
+
+```typescript
+type RequestOptions = {
+  host?: string;
+};
+
+// Support per-request host override
+const response = await this.request(path, options, { host: "eu.sentry.io" });
+```
+
+### URL Construction
+
+```typescript
+private async request(
+  path: string, 
+  options: RequestInit = {}, 
+  { host }: { host?: string } = {}
+): Promise<Response> {
+  const url = host
+    ? new URL(`/api/0${path}`, `https://${host}`).href
+    : `${this.apiPrefix}${path}`;
+  
+  // ... rest of method
+}
+```
+
+## URL Generation
+
+### Issue URL Generation
+
+```typescript
+getIssueUrl(organizationSlug: string, issueId: string): string {
+  return this.host !== "sentry.io"
+    ? `https://${this.host}/organizations/${organizationSlug}/issues/${issueId}`
+    : `https://${organizationSlug}.${this.host}/issues/${issueId}`;
+}
+```
+
+### Trace URL Generation
+
+```typescript
+getTraceUrl(organizationSlug: string, traceId: string): string {
+  return this.host !== "sentry.io"
+    ? `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`
+    : `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`;
+}
+```
+
+## Mock Server Guidelines
+
+### MSW Handler Structure
+
+```typescript
+// packages/mcp-server-mocks/src/index.ts
+
+// Use buildHandlers for multi-host support
+function buildHandlers(
+  handlers: {
+    method: keyof typeof http;
+    path: string;
+    fetch: Parameters<(typeof http)[keyof typeof http]>[1];
+  }[],
+) {
+  return [
+    ...handlers.map((handler) =>
+      http[handler.method](mdc:`https:/us.sentry.io${handler.path}`, handler.fetch),
+    ),
+    ...handlers.map((handler) =>
+      http[handler.method](mdc:`https:/sentry.io${handler.path}`, handler.fetch),
+    ),
+  ];
+}
+```
+
+### Mock Handler Patterns
+
+```typescript
+export const restHandlers = buildHandlers([
+  {
+    method: "get",
+    path: "/api/0/organizations/",
+    fetch: () => {
+      return HttpResponse.json([OrganizationPayload]);
+    },
+  },
+  
+  // Parameter validation in handlers
+  {
+    method: "get", 
+    path: "/api/0/organizations/:org/issues/",
+    fetch: ({ request, params }) => {
+      const url = new URL(request.url);
+      const sort = url.searchParams.get("sort");
+
+      // Validate sort parameter
+      if (![null, "user", "freq", "date", "new"].includes(sort)) {
+        return HttpResponse.json(`Invalid sort: ${sort}`, { status: 400 });
+      }
+
+      // Validate query parameter
+      const query = url.searchParams.get("query");
+      if (query?.includes("invalid-syntax")) {
+        return HttpResponse.json("Invalid query syntax", { status: 400 });
+      }
+
+      return HttpResponse.json(IssueListPayload);
+    },
+  },
+]);
+```
+
+### Fixture Management
+
+```typescript
+// packages/mcp-server-mocks/src/fixtures.ts
+
+export const FIXTURES = {
+  organizationSlug: "test-org",
+  projectSlug: "test-project",
+  issueId: "TEST-1",
+  
+  user: {
+    id: "123456",
+    name: "Test User",
+    email: "test@example.com",
+  },
+  
+  organization: {
+    id: "123",
+    slug: "test-org",
+    name: "Test Organization",
+    links: {
+      regionUrl: "https://us.sentry.io/",
+      organizationUrl: "https://test-org.sentry.io/",
+    },
+  },
+};
+
+// Use fixtures in handlers
+export const OrganizationPayload = FIXTURES.organization;
+```
+
+## Testing Strategies
+
+### API Client Testing
+
+```typescript
+// packages/mcp-server/src/api-client/client.test.ts
+
+describe("SentryApiService", () => {
+  beforeEach(() => {
+    server.use(...restHandlers);
+  });
+
+  it("lists organizations", async () => {
+    const client = new SentryApiService({ accessToken: "test-token" });
+    const orgs = await client.listOrganizations();
+    
+    expect(orgs).toHaveLength(1);
+    expect(orgs[0].slug).toBe("test-org");
+  });
+
+  it("handles API errors", async () => {
+    server.use(
+      http.get("https://sentry.io/api/0/organizations/", () => {
+        return HttpResponse.json({ detail: "Authentication required" }, { status: 401 });
+      })
+    );
+
+    const client = new SentryApiService({});
+    
+    await expect(client.listOrganizations()).rejects.toThrow("Authentication required");
+  });
+});
+```
+
+### Schema Validation Testing
+
+```typescript
+describe("Schema validation", () => {
+  it("validates organization schema", () => {
+    const validOrg = {
+      id: "123",
+      slug: "test-org",
+      name: "Test Org",
+      links: {
+        regionUrl: "https://us.sentry.io/",
+        organizationUrl: "https://test-org.sentry.io/",
+      },
+    };
+
+    expect(() => OrganizationSchema.parse(validOrg)).not.toThrow();
+  });
+
+  it("handles missing optional fields", () => {
+    const orgWithNulls = {
+      id: "123",
+      slug: "test-org",
+      name: "Test Org",
+      platform: null,
+    };
+
+    expect(() => ProjectSchema.parse(orgWithNulls)).not.toThrow();
+  });
+});
+```
+
+## Best Practices
+
+- **Schema-first design**: Define Zod schemas before implementation
+- **Runtime validation**: Always validate API responses 
+- **Graceful error handling**: Transform API errors for LLM consumption
+- **Multi-region awareness**: Support region-specific API calls
+- **Type safety**: Derive TypeScript types from Zod schemas
+- **Mock consistency**: Keep fixtures in sync with real API responses
+- **Host flexibility**: Support both SaaS and self-hosted instances
+- **Parallel requests**: Use Promise.all for independent API calls
+- **Cache appropriately**: Cache expensive or stable data requests
+- **Test edge cases**: Handle malformed responses and network failures

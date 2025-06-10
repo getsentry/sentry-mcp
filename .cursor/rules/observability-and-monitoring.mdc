@@ -1,0 +1,559 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Observability and Monitoring
+
+Sentry instrumentation patterns and observability practices across the Sentry MCP server codebase.
+
+## Package Overview
+
+Each package has different Sentry integration patterns based on their runtime environment:
+
+- **`packages/mcp-server/`** - Core server with `@sentry/core` for platform-agnostic instrumentation
+- **`packages/mcp-cloudflare/`** - Cloudflare Workers with `@sentry/cloudflare` and `@sentry/react` for client
+
+## Core Server Instrumentation
+
+### Using @sentry/core
+
+```typescript
+// packages/mcp-server/src/logging.ts
+import { captureException, captureMessage, withScope } from "@sentry/core";
+
+export function logError(
+  error: string | Error | unknown,
+  contexts?: Record<string, Record<string, any>>,
+  attachments?: Record<string, string | Uint8Array>,
+): string | undefined {
+  const level = "error";
+  console.error(error);
+
+  const eventId = withScope((scope) => {
+    if (attachments) {
+      for (const [key, data] of Object.entries(attachments)) {
+        scope.addAttachment({
+          data,
+          filename: key,
+        });
+      }
+    }
+
+    return typeof error === "string"
+      ? captureMessage(error, { contexts, level })
+      : captureException(error, { contexts, level });
+  });
+
+  return eventId;
+}
+```
+
+### Tracing and Context Management
+
+```typescript
+// packages/mcp-server/src/server.ts
+import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
+
+export async function configureServer({
+  server,
+  context,
+  onToolComplete,
+}: { 
+  server: McpServer; 
+  context: ServerContext; 
+  onToolComplete?: () => void 
+}) {
+  // Global error handler
+  server.server.onerror = (error) => {
+    logError(error);
+  };
+
+  // Tool instrumentation with tracing
+  for (const tool of TOOL_DEFINITIONS) {
+    const handler = TOOL_HANDLERS[tool.name];
+
+    server.tool(tool.name, tool.description, tool.paramsSchema, async (...args) => {
+      try {
+        return await startNewTrace(async () => {
+          return await startSpan(
+            {
+              name: `mcp.tool/${tool.name}`,
+              attributes: extractMcpParameters(args),
+            },
+            async (span) => {
+              // Set user context
+              if (context.userId) {
+                setUser({ id: context.userId });
+              }
+              
+              // Set client context
+              if (context.clientId) {
+                setTag("client.id", context.clientId);
+              }
+
+              try {
+                const output = await handler(context, ...args);
+                span.setStatus({ code: 1 }); // ok
+                return {
+                  content: [{ type: "text", text: output }],
+                };
+              } catch (error) {
+                span.setStatus({ code: 2 }); // error
+                return {
+                  content: [{ type: "text", text: await logAndFormatError(error) }],
+                  isError: true,
+                };
+              }
+            },
+          );
+        });
+      } finally {
+        onToolComplete?.();
+      }
+    });
+  }
+}
+```
+
+### Parameter Extraction for Tracing
+
+```typescript
+/**
+ * Take the arguments from something like an MCP tool call and format
+ * them in an OTel-safe way.
+ */
+function extractMcpParameters(args: Record<string, any>) {
+  return Object.fromEntries(
+    Object.entries(args).map(([key, value]) => {
+      return [`mcp.param.${key}`, JSON.stringify(value)];
+    }),
+  );
+}
+```
+
+## Cloudflare Workers Integration
+
+### Sentry Configuration
+
+```typescript
+// packages/mcp-cloudflare/src/server/sentry.config.ts
+import * as Sentry from "@sentry/cloudflare";
+import type { Env } from "./types";
+import { LIB_VERSION } from "@sentry/mcp-server/version";
+
+type SentryConfig = ReturnType<Parameters<typeof Sentry.withSentry>[0]>;
+
+export default function getSentryConfig(env: Env): SentryConfig {
+  const { id: versionId } = env.CF_VERSION_METADATA;
+
+  return {
+    dsn: env.SENTRY_DSN,
+    tracesSampleRate: 1,
+    sendDefaultPii: true,
+    initialScope: {
+      tags: {
+        "mcp.server_version": LIB_VERSION,
+        "sentry.host": env.SENTRY_HOST,
+      },
+    },
+    release: versionId, // Use Cloudflare version metadata
+    environment: env.SENTRY_ENVIRONMENT ?? 
+      (process.env.NODE_ENV !== "production" ? "development" : "production"),
+    _experiments: {
+      enableLogs: true, // Enable CloudFlare logs integration
+    },
+    integrations: [
+      Sentry.consoleLoggingIntegration(),
+      Sentry.zodErrorsIntegration(),
+    ],
+  };
+}
+
+// Helper for partial configuration
+getSentryConfig.partial = (config: Partial<SentryConfig>) => {
+  return (env: Env) => {
+    const defaultConfig = getSentryConfig(env);
+    return {
+      ...defaultConfig,
+      ...config,
+      initialScope: {
+        ...defaultConfig.initialScope,
+        ...config.initialScope,
+        tags: {
+          ...((defaultConfig.initialScope ?? {}) as any).tags,
+          ...((config.initialScope ?? {}) as any).tags,
+        },
+      },
+    };
+  };
+};
+```
+
+### Worker Entry Point
+
+```typescript
+// packages/mcp-cloudflare/src/server/index.ts
+import * as Sentry from "@sentry/cloudflare";
+import OAuthProvider from "@cloudflare/workers-oauth-provider";
+import SentryMCP from "./lib/mcp-transport";
+import app from "./app";
+import getSentryConfig from "./sentry.config";
+
+const oAuthProvider = new OAuthProvider({
+  apiHandlers: {
+    "/sse": SentryMCP.serveSSE("/sse"),
+    "/mcp": SentryMCP.serve("/mcp"),
+  },
+  defaultHandler: app,
+  authorizeEndpoint: "/oauth/authorize",
+  tokenEndpoint: "/oauth/token",
+  clientRegistrationEndpoint: "/oauth/register",
+  scopesSupported: Object.keys(SCOPES),
+});
+
+// Wrap entire worker with Sentry
+export default Sentry.withSentry(
+  getSentryConfig,
+  oAuthProvider,
+) satisfies ExportedHandler<Env>;
+```
+
+### Durable Object Instrumentation
+
+```typescript
+// packages/mcp-cloudflare/src/server/lib/mcp-transport.ts
+import * as Sentry from "@sentry/cloudflare";
+import { McpAgent } from "agents/mcp";
+import { configureServer } from "@sentry/mcp-server/server";
+import getSentryConfig from "../sentry.config";
+
+class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
+  async init() {
+    await configureServer({
+      server: this.server,
+      context: {
+        accessToken: this.props.accessToken,
+        organizationSlug: this.props.organizationSlug,
+        userId: this.props.id,
+      },
+      onToolComplete: () => {
+        // Ensure Sentry events are flushed before Durable Object hibernates
+        this.ctx.waitUntil(Sentry.flush(2000));
+      },
+    });
+  }
+}
+
+// Instrument Durable Object with Sentry
+export default Sentry.instrumentDurableObjectWithSentry(
+  getSentryConfig.partial({
+    initialScope: {
+      tags: {
+        durable_object: true,
+        "mcp.server_version": LIB_VERSION,
+      },
+    },
+  }),
+  SentryMCPBase,
+);
+```
+
+### Hono Error Integration
+
+```typescript
+// packages/mcp-cloudflare/src/server/app.ts
+import { Hono } from "hono";
+import { logError } from "@sentry/mcp-server/logging";
+
+const app = new Hono<{ Bindings: Env }>()
+  .get("/robots.txt", (c) => {
+    return c.text(["User-agent: *", "Allow: /$", "Disallow: /"].join("\n"));
+  })
+  .route("/oauth", sentryOauth);
+
+// Global error handler for Hono
+app.onError((err, c) => {
+  logError(err);
+  return c.text("Internal Server Error", 500);
+});
+```
+
+## React Client Monitoring
+
+### Client Instrumentation
+
+```typescript
+// packages/mcp-cloudflare/src/client/instrument.ts
+import * as Sentry from "@sentry/react";
+
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN,
+  sendDefaultPii: true,
+  tracesSampleRate: 1,
+  environment: import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.NODE_ENV,
+});
+```
+
+### React Error Boundaries
+
+```typescript
+// packages/mcp-cloudflare/src/client/main.tsx
+import "./instrument"; // Must be first import
+import * as Sentry from "@sentry/react";
+
+const root = createRoot(container!, {
+  // Callback for uncaught errors
+  onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
+    console.warn("Uncaught error", error, errorInfo.componentStack);
+  }),
+  // Callback for caught errors in ErrorBoundary
+  onCaughtError: Sentry.reactErrorHandler(),
+  // Callback for recoverable errors
+  onRecoverableError: Sentry.reactErrorHandler(),
+});
+```
+
+### Build Integration
+
+```typescript
+// packages/mcp-cloudflare/vite.config.ts
+import { sentryVitePlugin } from "@sentry/vite-plugin";
+
+export default defineConfig({
+  plugins: [
+    react(),
+    cloudflare(),
+    tailwindcss(),
+    sentryVitePlugin({
+      org: "sentry",
+      project: "mcp-server",
+    }),
+  ],
+  build: {
+    sourcemap: true, // Required for Sentry source maps
+  },
+});
+```
+
+## Stdio Server Setup
+
+### Node.js Initialization
+
+```typescript
+// packages/mcp-server/src/index.ts
+import * as Sentry from "@sentry/node";
+import { LIB_VERSION } from "./version";
+
+Sentry.init({
+  dsn: sentryDsn,
+  sendDefaultPii: true,
+  tracesSampleRate: 1,
+  initialScope: {
+    tags: {
+      "mcp.server_version": LIB_VERSION,
+      "mcp.transport": "stdio", // Different from CloudFlare
+      "sentry.host": host,
+    },
+  },
+  release: process.env.SENTRY_RELEASE,
+  integrations: [
+    Sentry.consoleLoggingIntegration(),
+    Sentry.zodErrorsIntegration(),
+  ],
+  environment: process.env.SENTRY_ENVIRONMENT ?? 
+    (process.env.NODE_ENV !== "production" ? "development" : "production"),
+});
+
+const server = new McpServer({
+  name: "Sentry MCP",
+  version: LIB_VERSION,
+});
+
+// Wrap MCP server with Sentry instrumentation
+const instrumentedServer = Sentry.wrapMcpServerWithSentry(server);
+
+startStdio(instrumentedServer, { accessToken, organizationSlug: null, host })
+  .catch((err) => {
+    console.error("Server error:", err);
+    Sentry.flush(5000); // Ensure events are sent before exit
+    process.exit(1);
+  });
+```
+
+## Tracing and Spans
+
+### Span Structure
+
+Every tool and prompt call creates a new trace with spans:
+
+```typescript
+// Structure: startNewTrace -> startSpan -> tool execution
+await startNewTrace(async () => {
+  return await startSpan(
+    {
+      name: `mcp.tool/${tool.name}`,
+      attributes: extractMcpParameters(args),
+    },
+    async (span) => {
+      // Set context
+      if (context.userId) setUser({ id: context.userId });
+      if (context.clientId) setTag("client.id", context.clientId);
+      
+      try {
+        const output = await handler(context, ...args);
+        span.setStatus({ code: 1 }); // Success
+        return output;
+      } catch (error) {
+        span.setStatus({ code: 2 }); // Error
+        throw error;
+      }
+    },
+  );
+});
+```
+
+### Span Naming Convention
+
+- **Tools**: `mcp.tool/${toolName}` (e.g., `mcp.tool/find_issues`)
+- **Prompts**: `mcp.prompt/${promptName}` 
+- **Resources**: `mcp.resource/${resourceName}`
+
+### Span Attributes
+
+```typescript
+{
+  name: `mcp.tool/find_issues`,
+  attributes: {
+    "mcp.param.organizationSlug": "\"my-org\"",
+    "mcp.param.query": "\"is:unresolved\"",
+    "mcp.param.sortBy": "\"last_seen\""
+  }
+}
+```
+
+## Error Handling Patterns
+
+### Error Classification
+
+Different error types are handled differently:
+
+```typescript
+async function logAndFormatError(error: unknown) {
+  // User input errors - don't log to Sentry
+  if (isUserInputError(error)) {
+    const typedError = error as UserInputError;
+    return [
+      "**Input Error**",
+      "It looks like there was a problem with the input you provided.",
+      typedError.message,
+      "You may be able to resolve the issue by addressing the concern and trying again.",
+    ].join("\n\n");
+  }
+
+  // API errors - formatted but not logged to Sentry
+  if (isApiError(error)) {
+    const typedError = error as ApiError;
+    return [
+      "**Error**",
+      `There was an HTTP ${typedError.status} error with your request to the Sentry API.`,
+      typedError.message,
+      "You may be able to resolve the issue by addressing the concern and trying again.",
+    ].join("\n\n");
+  }
+
+  // Unexpected errors - log to Sentry and return event ID
+  const eventId = logError(error);
+  return [
+    "**Unexpected Error**",
+    "An unexpected error occurred while processing your request.",
+    `Event ID: ${eventId}`,
+    "This issue has been logged automatically.",
+  ].join("\n\n");
+}
+```
+
+### Context and Tagging
+
+```typescript
+// Set user context
+if (context.userId) {
+  setUser({ id: context.userId });
+}
+
+// Set operation context
+if (context.clientId) {
+  setTag("client.id", context.clientId);
+}
+
+if (context.organizationSlug) {
+  setTag("organization.slug", context.organizationSlug);
+}
+
+// Set tool-specific tags
+setTag("mcp.tool", tool.name);
+setTag("mcp.transport", "cloudflare");
+```
+
+## Performance Monitoring
+
+### Transaction and Span Setup
+
+```typescript
+// Each MCP operation gets its own transaction
+const transaction = Sentry.startTransaction({
+  name: `mcp.tool/${tool.name}`,
+  data: extractMcpParameters(args),
+});
+
+// API calls get their own spans
+const apiSpan = transaction.startChild({
+  op: "http.client",
+  description: `Sentry API: ${endpoint}`,
+});
+
+try {
+  const result = await apiCall();
+  apiSpan.setStatus("ok");
+  return result;
+} catch (error) {
+  apiSpan.setStatus("internal_error");
+  throw error;
+} finally {
+  apiSpan.finish();
+}
+```
+
+### CloudFlare Specific Monitoring
+
+```typescript
+// Monitor Durable Object hibernation
+export default Sentry.instrumentDurableObjectWithSentry(
+  getSentryConfig.partial({
+    initialScope: {
+      tags: {
+        durable_object: true,
+      },
+    },
+  }),
+  SentryMCPBase,
+);
+
+// Flush before hibernation
+onToolComplete: () => {
+  this.ctx.waitUntil(Sentry.flush(2000));
+}
+```
+
+## Best Practices
+
+- **Initialize early**: Import Sentry instrumentation before other modules
+- **Use appropriate SDKs**: `@sentry/core` for platform-agnostic, specific SDKs for runtime environments
+- **Set context appropriately**: Use `setUser`, `setTag`, and `setContext` for debugging
+- **Don't log user input errors**: Only log unexpected errors to Sentry
+- **Use spans for API calls**: Track external API performance
+- **Flush before exit**: Ensure events are sent before process/hibernation
+- **Include source maps**: Enable source maps for better error tracking
+- **Tag by operation type**: Use consistent naming for tools, prompts, resources
+- **Set environment correctly**: Distinguish between development, staging, production
+- **Use attachments for debugging**: Include relevant data with error reports

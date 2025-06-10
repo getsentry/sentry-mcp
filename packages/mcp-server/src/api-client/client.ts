@@ -40,6 +40,23 @@ import type {
 // logger isnt exposed (or rather, it is, but its not the right logger)
 // import { logger } from "@sentry/node";
 
+/**
+ * Custom error class for Sentry API responses.
+ *
+ * Provides enhanced error messages for LLM consumption and handles
+ * common API error scenarios with user-friendly messaging.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await apiService.listIssues({ organizationSlug: "invalid" });
+ * } catch (error) {
+ *   if (error instanceof ApiError) {
+ *     console.log(`API Error ${error.status}: ${error.message}`);
+ *   }
+ * }
+ * ```
+ */
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -64,11 +81,61 @@ type RequestOptions = {
   host?: string;
 };
 
+/**
+ * Sentry API client service for interacting with Sentry's REST API.
+ *
+ * This service provides a comprehensive interface to Sentry's API endpoints,
+ * handling authentication, error processing, multi-region support, and
+ * response validation through Zod schemas.
+ *
+ * Key Features:
+ * - Multi-region support for Sentry SaaS and self-hosted instances
+ * - Automatic schema validation with Zod
+ * - Enhanced error handling with LLM-friendly messages
+ * - URL generation for Sentry resources (issues, traces)
+ * - Bearer token authentication
+ *
+ * @example Basic Usage
+ * ```typescript
+ * const apiService = new SentryApiService({
+ *   accessToken: "your-token",
+ *   host: "sentry.io"
+ * });
+ *
+ * const orgs = await apiService.listOrganizations();
+ * const issues = await apiService.listIssues({
+ *   organizationSlug: "my-org",
+ *   query: "is:unresolved"
+ * });
+ * ```
+ *
+ * @example Multi-Region Support
+ * ```typescript
+ * // Self-hosted instance
+ * const selfHosted = new SentryApiService({
+ *   accessToken: "token",
+ *   host: "sentry.company.com"
+ * });
+ *
+ * // Regional endpoint override
+ * const issues = await apiService.listIssues(
+ *   { organizationSlug: "org" },
+ *   { host: "eu.sentry.io" }
+ * );
+ * ```
+ */
 export class SentryApiService {
   private accessToken: string | null;
   protected host: string;
   protected apiPrefix: string;
 
+  /**
+   * Creates a new Sentry API service instance.
+   *
+   * @param config Configuration object
+   * @param config.accessToken OAuth access token for authentication (optional for some endpoints)
+   * @param config.host Sentry host (defaults to sentry.io)
+   */
   constructor({
     accessToken = null,
     host = process.env.SENTRY_HOST,
@@ -81,11 +148,34 @@ export class SentryApiService {
     this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
   }
 
+  /**
+   * Updates the host for API requests.
+   *
+   * Used for multi-region support or switching between Sentry instances.
+   *
+   * @param host New host to use for API requests
+   */
   setHost(host: string) {
     this.host = host;
     this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
   }
 
+  /**
+   * Internal method for making authenticated requests to Sentry API.
+   *
+   * Handles:
+   * - Bearer token authentication
+   * - Error response parsing and enhancement
+   * - Multi-region host overrides
+   * - Fetch availability validation
+   *
+   * @param path API endpoint path (without /api/0 prefix)
+   * @param options Fetch options
+   * @param requestOptions Additional request configuration
+   * @returns Promise resolving to Response object
+   * @throws {ApiError} Enhanced API errors with user-friendly messages
+   * @throws {Error} Network or parsing errors
+   */
   private async request(
     path: string,
     options: RequestInit = {},
@@ -148,24 +238,79 @@ export class SentryApiService {
     return response;
   }
 
+  /**
+   * Generates a Sentry issue URL for browser navigation.
+   *
+   * Handles both SaaS (subdomain-based) and self-hosted URL formats.
+   *
+   * @param organizationSlug Organization identifier
+   * @param issueId Issue identifier (short ID or numeric ID)
+   * @returns Full HTTPS URL to the issue in Sentry UI
+   *
+   * @example
+   * ```typescript
+   * // SaaS: https://my-org.sentry.io/issues/PROJ-123
+   * apiService.getIssueUrl("my-org", "PROJ-123")
+   *
+   * // Self-hosted: https://sentry.company.com/organizations/my-org/issues/PROJ-123
+   * apiService.getIssueUrl("my-org", "PROJ-123")
+   * ```
+   */
   getIssueUrl(organizationSlug: string, issueId: string): string {
     return this.host !== "sentry.io"
       ? `https://${this.host}/organizations/${organizationSlug}/issues/${issueId}`
       : `https://${organizationSlug}.${this.host}/issues/${issueId}`;
   }
 
+  /**
+   * Generates a Sentry trace URL for performance investigation.
+   *
+   * @param organizationSlug Organization identifier
+   * @param traceId Trace identifier (hex string)
+   * @returns Full HTTPS URL to the trace in Sentry UI
+   *
+   * @example
+   * ```typescript
+   * const traceUrl = apiService.getTraceUrl("my-org", "6a477f5b0f31ef7b6b9b5e1dea66c91d");
+   * // https://my-org.sentry.io/explore/traces/trace/6a477f5b0f31ef7b6b9b5e1dea66c91d
+   * ```
+   */
   getTraceUrl(organizationSlug: string, traceId: string): string {
     return this.host !== "sentry.io"
       ? `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`
       : `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`;
   }
 
+  /**
+   * Retrieves the authenticated user's profile information.
+   *
+   * @param opts Request options including host override
+   * @returns User profile data
+   * @throws {ApiError} If authentication fails or user not found
+   */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
     const response = await this.request("/auth/", undefined, opts);
     const body = await response.json();
     return UserSchema.parse(body);
   }
 
+  /**
+   * Lists all organizations accessible to the authenticated user.
+   *
+   * Automatically handles multi-region queries by fetching from all
+   * available regions and combining results.
+   *
+   * @param opts Request options
+   * @returns Array of organizations across all accessible regions
+   *
+   * @example
+   * ```typescript
+   * const orgs = await apiService.listOrganizations();
+   * orgs.forEach(org => {
+   *   console.log(`${org.name} (${org.slug}) - ${org.links.regionUrl}`);
+   * });
+   * ```
+   */
   async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
     // TODO: Sentry is currently not returning all orgs without hitting region endpoints
     const regionResponse = await this.request(
@@ -189,6 +334,13 @@ export class SentryApiService {
       .reduce((acc, curr) => acc.concat(curr), []);
   }
 
+  /**
+   * Lists teams within an organization.
+   *
+   * @param organizationSlug Organization identifier
+   * @param opts Request options including host override
+   * @returns Array of teams in the organization
+   */
   async listTeams(
     organizationSlug: string,
     opts?: RequestOptions,
@@ -203,6 +355,16 @@ export class SentryApiService {
     return TeamListSchema.parse(body);
   }
 
+  /**
+   * Creates a new team within an organization.
+   *
+   * @param params Team creation parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.name Team name
+   * @param opts Request options
+   * @returns Created team data
+   * @throws {ApiError} If team creation fails (e.g., name conflicts)
+   */
   async createTeam(
     {
       organizationSlug,
@@ -225,6 +387,13 @@ export class SentryApiService {
     return TeamSchema.parse(await response.json());
   }
 
+  /**
+   * Lists projects within an organization.
+   *
+   * @param organizationSlug Organization identifier
+   * @param opts Request options
+   * @returns Array of projects in the organization
+   */
   async listProjects(
     organizationSlug: string,
     opts?: RequestOptions,
@@ -239,6 +408,17 @@ export class SentryApiService {
     return ProjectListSchema.parse(body);
   }
 
+  /**
+   * Creates a new project within a team.
+   *
+   * @param params Project creation parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.teamSlug Team identifier
+   * @param params.name Project name
+   * @param params.platform Platform identifier (e.g., "javascript", "python")
+   * @param opts Request options
+   * @returns Created project data
+   */
   async createProject(
     {
       organizationSlug,
@@ -267,6 +447,18 @@ export class SentryApiService {
     return ProjectSchema.parse(await response.json());
   }
 
+  /**
+   * Updates an existing project's configuration.
+   *
+   * @param params Project update parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Current project identifier
+   * @param params.name New project name (optional)
+   * @param params.slug New project slug (optional)
+   * @param params.platform New platform identifier (optional)
+   * @param opts Request options
+   * @returns Updated project data
+   */
   async updateProject(
     {
       organizationSlug,
@@ -299,6 +491,15 @@ export class SentryApiService {
     return ProjectSchema.parse(await response.json());
   }
 
+  /**
+   * Assigns a team to a project.
+   *
+   * @param params Assignment parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.teamSlug Team identifier to assign
+   * @param opts Request options
+   */
   async addTeamToProject(
     {
       organizationSlug,
@@ -321,6 +522,28 @@ export class SentryApiService {
     );
   }
 
+  /**
+   * Creates a new client key (DSN) for a project.
+   *
+   * Client keys are used to identify and authenticate SDK requests to Sentry.
+   *
+   * @param params Key creation parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.name Human-readable name for the key (optional)
+   * @param opts Request options
+   * @returns Created client key with DSN information
+   *
+   * @example
+   * ```typescript
+   * const key = await apiService.createClientKey({
+   *   organizationSlug: "my-org",
+   *   projectSlug: "my-project",
+   *   name: "Production"
+   * });
+   * console.log(`DSN: ${key.dsn.public}`);
+   * ```
+   */
   async createClientKey(
     {
       organizationSlug,
@@ -346,6 +569,15 @@ export class SentryApiService {
     return ClientKeySchema.parse(await response.json());
   }
 
+  /**
+   * Lists all client keys (DSNs) for a project.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param opts Request options
+   * @returns Array of client keys with DSN information
+   */
   async listClientKeys(
     {
       organizationSlug,
@@ -364,6 +596,30 @@ export class SentryApiService {
     return ClientKeyListSchema.parse(await response.json());
   }
 
+  /**
+   * Lists releases for an organization or specific project.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier (optional, scopes to specific project)
+   * @param params.query Search query for filtering releases
+   * @param opts Request options
+   * @returns Array of releases with deployment and commit information
+   *
+   * @example
+   * ```typescript
+   * // All releases for organization
+   * const releases = await apiService.listReleases({
+   *   organizationSlug: "my-org"
+   * });
+   *
+   * // Search for specific version
+   * const filtered = await apiService.listReleases({
+   *   organizationSlug: "my-org",
+   *   query: "v1.2.3"
+   * });
+   * ```
+   */
   async listReleases(
     {
       organizationSlug,
@@ -395,6 +651,26 @@ export class SentryApiService {
     return ReleaseListSchema.parse(body);
   }
 
+  /**
+   * Lists available tags for search queries.
+   *
+   * Tags represent indexed fields that can be used in Sentry search queries.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.dataset Dataset to query tags for ("errors" or "search_issues")
+   * @param opts Request options
+   * @returns Array of available tags with metadata
+   *
+   * @example
+   * ```typescript
+   * const tags = await apiService.listTags({
+   *   organizationSlug: "my-org",
+   *   dataset: "errors"
+   * });
+   * tags.forEach(tag => console.log(`${tag.key}: ${tag.name}`));
+   * ```
+   */
   async listTags(
     {
       organizationSlug,
@@ -422,6 +698,38 @@ export class SentryApiService {
     return TagListSchema.parse(body);
   }
 
+  /**
+   * Lists issues within an organization or project.
+   *
+   * Issues represent groups of similar errors or problems in your application.
+   * Supports Sentry's powerful query syntax for filtering and sorting.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier (optional, scopes to specific project)
+   * @param params.query Sentry search query (e.g., "is:unresolved browser:chrome")
+   * @param params.sortBy Sort order ("user", "freq", "date", "new")
+   * @param opts Request options
+   * @returns Array of issues with metadata and statistics
+   *
+   * @example
+   * ```typescript
+   * // Recent unresolved issues
+   * const issues = await apiService.listIssues({
+   *   organizationSlug: "my-org",
+   *   query: "is:unresolved",
+   *   sortBy: "date"
+   * });
+   *
+   * // High-frequency errors in specific project
+   * const critical = await apiService.listIssues({
+   *   organizationSlug: "my-org",
+   *   projectSlug: "backend",
+   *   query: "level:error",
+   *   sortBy: "freq"
+   * });
+   * ```
+   */
   async listIssues(
     {
       organizationSlug,

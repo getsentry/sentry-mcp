@@ -1,0 +1,604 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Security and Authentication
+
+Security and authentication patterns for the Sentry MCP server using OAuth proxy pattern, client approval dialogs, token management, and multi-tenant security.
+
+## OAuth Flow Implementation
+
+### Three-Party OAuth Flow
+
+The MCP server acts as an OAuth proxy between MCP clients and Sentry:
+
+```
+MCP Client → MCP Server → Sentry OAuth → Sentry API
+```
+
+### Flow Implementation
+
+```typescript
+// packages/mcp-cloudflare/src/server/routes/sentry-oauth.ts
+
+export default new Hono<{ Bindings: Env }>()
+  .get("/authorize", async (c) => {
+    // Parse OAuth request from MCP client
+    const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+    const { clientId } = oauthReqInfo;
+    
+    if (!clientId) {
+      return c.text("Invalid request", 400);
+    }
+
+    // Check if client is already approved (via signed cookie)
+    const isApproved = await clientIdAlreadyApproved(
+      c.req.raw,
+      clientId,
+      c.env.COOKIE_SECRET,
+    );
+    
+    if (!isApproved) {
+      // Show approval dialog for new clients
+      return renderApprovalDialog(c.req.raw, {
+        client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
+        server: { name: "Sentry MCP" },
+        state: { oauthReqInfo },
+      });
+    }
+
+    // Redirect to upstream Sentry OAuth
+    return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
+  })
+
+  .get("/callback", async (c) => {
+    // Handle callback from Sentry OAuth
+    const [payload, errResponse] = await exchangeCodeForAccessToken({
+      upstream_url: new URL(SENTRY_TOKEN_URL, `https://${c.env.SENTRY_HOST || "sentry.io"}`).href,
+      client_id: c.env.SENTRY_CLIENT_ID,
+      client_secret: c.env.SENTRY_CLIENT_SECRET,
+      code: c.req.query("code"),
+    });
+    
+    if (errResponse) return errResponse;
+
+    // Fetch user's organizations for context
+    const apiService = new SentryApiService({
+      host: c.env.SENTRY_HOST,
+      accessToken: payload.access_token,
+    });
+    const orgsList = await apiService.listOrganizations();
+
+    // Complete authorization with OAuth Provider
+    const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
+      request: oauthReqInfo,
+      userId: payload.user.id,
+      metadata: { label: payload.user.name },
+      scope: oauthReqInfo.scope,
+      props: {
+        id: payload.user.id,
+        name: payload.user.name,
+        accessToken: payload.access_token,
+        organizationSlug: orgsList.length ? orgsList[0].slug : null,
+        clientId: oauthReqInfo.clientId,
+        scope: oauthReqInfo.scope.join(" "),
+      } as WorkerProps,
+    });
+
+    return Response.redirect(redirectTo);
+  });
+```
+
+### Upstream Integration
+
+```typescript
+// OAuth URL construction for Sentry
+export function getUpstreamAuthorizeUrl({
+  upstream_url,
+  client_id,
+  scope,
+  redirect_uri,
+  state,
+}: {
+  upstream_url: string;
+  client_id: string;
+  scope: string;
+  redirect_uri: string;
+  state?: string;
+}) {
+  const upstream = new URL(upstream_url);
+  upstream.searchParams.set("client_id", client_id);
+  upstream.searchParams.set("redirect_uri", redirect_uri);
+  upstream.searchParams.set("scope", scope);
+  upstream.searchParams.set("response_type", "code");
+  if (state) upstream.searchParams.set("state", state);
+  return upstream.href;
+}
+```
+
+### Required Scopes
+
+```typescript
+// packages/mcp-cloudflare/src/constants.ts
+export const SCOPES = {
+  "org:read": "Read organization data",
+  "project:write": "Write project data", 
+  "team:write": "Write team data",
+  "event:write": "Write event data",
+};
+```
+
+## Client Approval System
+
+### Approval Dialog
+
+```typescript
+// packages/mcp-cloudflare/src/server/lib/approval-dialog.ts
+
+export function renderApprovalDialog(
+  request: Request,
+  options: ApprovalDialogOptions,
+): Response {
+  const { client, server, state } = options;
+  
+  // Encode state for form submission
+  const encodedState = btoa(JSON.stringify(state));
+  
+  // Sanitize all user-provided content
+  const serverName = sanitizeHtml(server.name);
+  const clientName = client?.clientName ? sanitizeHtml(client.clientName) : "Unknown MCP Client";
+  
+  const htmlContent = generateApprovalHtml({
+    clientName,
+    serverName,
+    encodedState,
+  });
+  
+  return new Response(htmlContent, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+```
+
+### Content Sanitization
+
+```typescript
+function sanitizeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+```
+
+### Form Processing
+
+```typescript
+export async function parseRedirectApproval(
+  request: Request,
+  cookieSecret: string,
+): Promise<ParsedApprovalResult> {
+  const formData = await request.formData();
+  const action = formData.get("action") as string;
+  const encodedState = formData.get("state") as string;
+  
+  if (action !== "approve") {
+    throw new Error("Authorization denied by user");
+  }
+  
+  // Decode and validate state
+  const state = decodeState(encodedState);
+  
+  // Generate signed cookie for future approvals
+  const headers = await generateApprovalCookie(
+    state.oauthReqInfo.clientId,
+    cookieSecret
+  );
+  
+  return { state, headers };
+}
+```
+
+## Token Management
+
+### Token Exchange
+
+```typescript
+// packages/mcp-cloudflare/src/server/lib/oauth.ts
+
+export const TokenResponseSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string(),
+  token_type: z.string(),
+  expires_in: z.number(),
+  expires_at: z.string().datetime(),
+  user: z.object({
+    email: z.string().email(),
+    id: z.string(),
+    name: z.string(),
+  }),
+  scope: z.string(),
+});
+
+export async function exchangeCodeForAccessToken({
+  client_id,
+  client_secret,
+  code,
+  upstream_url,
+}: {
+  code: string | undefined;
+  upstream_url: string;
+  client_secret: string;
+  client_id: string;
+}): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
+  if (!code) {
+    logError("[oauth] Missing code in token exchange", {
+      oauth: { client_id },
+    });
+    return [null, new Response("Invalid request: missing authorization code", { status: 400 })];
+  }
+
+  const resp = await fetch(upstream_url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id,
+      client_secret,
+      code,
+    }).toString(),
+  });
+
+  if (!resp.ok) {
+    logError(`[oauth] Failed to exchange code for access token: ${await resp.text()}`, {
+      oauth: { client_id },
+    });
+    return [null, new Response("Authentication failed", { status: 400 })];
+  }
+
+  try {
+    const body = await resp.json();
+    const output = TokenResponseSchema.parse(body);
+    return [output, null];
+  } catch (e) {
+    logError(new Error("Failed to parse token response", { cause: e }), {
+      oauth: { client_id },
+    });
+    return [null, new Response("Authentication failed", { status: 500 })];
+  }
+}
+```
+
+## Authentication Context
+
+### Server Context Structure
+
+```typescript
+// packages/mcp-server/src/types.ts
+export type ServerContext = {
+  host?: string;                    // Sentry instance host
+  accessToken: string;              // Sentry API token
+  organizationSlug: string | null;  // Current organization context
+  userId?: string | null;           // Authenticated user ID
+  clientId?: string;                // MCP client identifier
+};
+
+// packages/mcp-cloudflare/src/server/types.ts  
+export type WorkerProps = ServerContext & {
+  id: string;      // User ID from Sentry OAuth
+  name: string;    // User display name
+  scope: string;   // OAuth scopes granted
+};
+```
+
+### Context Propagation
+
+```typescript
+// packages/mcp-cloudflare/src/server/lib/mcp-transport.ts
+class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
+  async init() {
+    await configureServer({
+      server: this.server,
+      context: {
+        // Props from OAuth flow become server context
+        accessToken: this.props.accessToken,
+        organizationSlug: this.props.organizationSlug,
+        userId: this.props.id,
+        host: env.SENTRY_HOST,
+        clientId: this.props.clientId,
+      },
+    });
+  }
+}
+```
+
+### Multi-Tenant Organization Selection
+
+```typescript
+// During OAuth callback, automatically select first available organization
+const apiService = new SentryApiService({
+  host: c.env.SENTRY_HOST,
+  accessToken: payload.access_token,
+});
+const orgsList = await apiService.listOrganizations();
+
+const props = {
+  // Default to first organization user has access to
+  organizationSlug: orgsList.length ? orgsList[0].slug : null,
+  // ... other props
+};
+```
+
+## Security Patterns
+
+### State Parameter Security
+
+```typescript
+// CSRF protection via state parameter
+async function redirectToUpstream(
+  env: Env,
+  request: Request,  
+  oauthReqInfo: AuthRequest,
+) {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: getUpstreamAuthorizeUrl({
+        upstream_url: new URL(SENTRY_AUTH_URL, `https://${env.SENTRY_HOST || "sentry.io"}`).href,
+        scope: Object.keys(SCOPES).join(" "),
+        client_id: env.SENTRY_CLIENT_ID,
+        redirect_uri: new URL("/oauth/callback", request.url).href,
+        state: btoa(JSON.stringify(oauthReqInfo)), // Encode OAuth request for verification
+      }),
+    },
+  });
+}
+
+// State validation in callback
+.get("/callback", async (c) => {
+  let oauthReqInfo: AuthRequest;
+  try {
+    oauthReqInfo = JSON.parse(atob(c.req.query("state") as string)) as AuthRequest;
+  } catch (err) {
+    logger.warn(`Invalid state: ${c.req.query("state") as string}`, { error: String(err) });
+    return c.text("Invalid state", 400);
+  }
+  
+  if (!oauthReqInfo.clientId) {
+    return c.text("Invalid state", 400);
+  }
+  // ... continue with token exchange
+});
+```
+
+### Input Validation
+
+```typescript
+// Validate all OAuth parameters
+if (!clientId) {
+  return c.text("Invalid request", 400);
+}
+
+if (!code) {
+  return c.text("Invalid request: missing authorization code", 400);
+}
+
+// Validate token response structure
+const output = TokenResponseSchema.parse(body);
+```
+
+### Error Handling with Context
+
+```typescript
+// Log security-relevant errors with context
+logError("[oauth] Missing code in token exchange", {
+  oauth: { client_id },
+});
+
+logError(`[oauth] Failed to exchange code for access token: ${await resp.text()}`, {
+  oauth: { client_id },
+});
+```
+
+## Cookie Security
+
+### Signed Cookies for Client Approval
+
+```typescript
+// packages/mcp-cloudflare/src/server/lib/approval-cookies.ts
+
+export async function generateApprovalCookie(
+  clientId: string,
+  cookieSecret: string,
+): Promise<Headers> {
+  const headers = new Headers();
+  
+  // Create signed cookie with expiration
+  const cookieValue = await signCookieValue(clientId, cookieSecret);
+  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+  
+  headers.set(
+    "Set-Cookie",
+    `mcp_approval_${clientId}=${cookieValue}; HttpOnly; Secure; SameSite=Strict; Expires=${expires.toUTCString()}`
+  );
+  
+  return headers;
+}
+
+export async function clientIdAlreadyApproved(
+  request: Request,
+  clientId: string,
+  cookieSecret: string,
+): Promise<boolean> {
+  const cookies = parseCookies(request.headers.get("Cookie") || "");
+  const cookieValue = cookies[`mcp_approval_${clientId}`];
+  
+  if (!cookieValue) return false;
+  
+  return await verifyCookieSignature(cookieValue, clientId, cookieSecret);
+}
+```
+
+### HMAC Signing
+
+```typescript
+async function signCookieValue(clientId: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(clientId)
+  );
+  
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+async function verifyCookieSignature(
+  cookieValue: string,
+  clientId: string,
+  secret: string,
+): Promise<boolean> {
+  try {
+    const expectedSignature = await signCookieValue(clientId, secret);
+    return cookieValue === expectedSignature;
+  } catch {
+    return false;
+  }
+}
+```
+
+## Multi-Tenant Security
+
+### Organization Scope Enforcement
+
+```typescript
+// packages/mcp-server/src/tools.ts
+export const TOOL_HANDLERS: ToolHandlers = {
+  find_issues: async (context, params) => {
+    // Always use organization from authenticated context
+    const organizationSlug = params.organizationSlug;
+    
+    // Set telemetry tags for monitoring
+    setTag("organization.slug", organizationSlug);
+    
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    
+    // API service uses authenticated context's access token
+    const issues = await apiService.listIssues({
+      organizationSlug,
+    });
+    
+    return formatIssueOutput(issues, organizationSlug);
+  },
+};
+```
+
+### API Service Context
+
+```typescript
+// packages/mcp-server/src/tools.ts
+function apiServiceFromContext(
+  context: ServerContext,
+  opts: { regionUrl?: string } = {},
+) {
+  let host = context.host;
+  
+  if (opts.regionUrl) {
+    try {
+      host = new URL(opts.regionUrl).host;
+    } catch (error) {
+      throw new UserInputError(`Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`);
+    }
+  }
+  
+  return new SentryApiService({
+    host,
+    accessToken: context.accessToken, // Always from authenticated context
+  });
+}
+```
+
+## Testing Security
+
+### OAuth Flow Testing
+
+```typescript
+// packages/mcp-cloudflare/src/server/routes/sentry-oauth.test.ts
+
+describe("OAuth Flow", () => {
+  it("requires valid client ID", async () => {
+    const request = new Request("https://test.com/oauth/authorize");
+    const response = await oauthHandler(request, env);
+    
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("Invalid request");
+  });
+
+  it("shows approval dialog for new clients", async () => {
+    const request = new Request("https://test.com/oauth/authorize?client_id=test-client");
+    const response = await oauthHandler(request, env);
+    
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+  });
+
+  it("validates state parameter in callback", async () => {
+    const request = new Request("https://test.com/oauth/callback?state=invalid");
+    const response = await oauthHandler(request, env);
+    
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("Invalid state");
+  });
+});
+```
+
+### Cookie Security Testing
+
+```typescript
+describe("Cookie Security", () => {
+  it("generates secure cookies", async () => {
+    const headers = await generateApprovalCookie("test-client", "secret");
+    const cookie = headers.get("Set-Cookie");
+    
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Secure");
+    expect(cookie).toContain("SameSite=Strict");
+  });
+
+  it("verifies cookie signatures", async () => {
+    const isApproved = await clientIdAlreadyApproved(
+      mockRequestWithCookie,
+      "test-client",
+      "secret"
+    );
+    
+    expect(isApproved).toBe(true);
+  });
+});
+```
+
+## Best Practices
+
+- **Validate all inputs**: Check OAuth parameters, state, and cookies
+- **Use signed cookies**: HMAC-sign approval cookies with secure flags
+- **Sanitize HTML**: Escape all user-provided content in approval dialogs
+- **Log security events**: Monitor OAuth flows and authentication failures
+- **Implement CSRF protection**: Use state parameter for OAuth flow validation
+- **Scope enforcement**: Always validate organization access in tool handlers
+- **Secure token storage**: Let OAuth Provider handle token encryption
+- **Multi-tenant isolation**: Enforce organization boundaries in API calls
+- **Error context**: Log security errors with appropriate context for monitoring
+- **Cookie security**: Use HttpOnly, Secure, and SameSite flags

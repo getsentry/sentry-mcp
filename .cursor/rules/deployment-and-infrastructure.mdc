@@ -1,0 +1,574 @@
+---
+description: Infrastructure patterns and configuration for the mcp-cloudflare package running on Cloudflare Workers
+globs: 
+alwaysApply: false
+---
+# Deployment and Infrastructure
+
+Infrastructure patterns and configuration for the `mcp-cloudflare` package running on Cloudflare Workers.
+
+## Package Overview
+
+The `mcp-cloudflare` package imports and configures the core `mcp-server` for Cloudflare Workers deployment with OAuth authentication and Durable Objects.
+
+- **`packages/mcp-server/`** - Core MCP server implementation (platform-agnostic)
+- **`packages/mcp-cloudflare/`** - Cloudflare Workers deployment wrapper
+- **`packages/mcp-server-mocks/`** - API response mocks for testing
+- **`packages/mcp-server-evals/`** - Integration tests
+- **`packages/mcp-server-tsconfig/`** - Shared TypeScript configuration
+
+## Worker Configuration
+
+### Basic wrangler.jsonc Setup
+
+```jsonc
+{
+  "name": "your-worker-name",
+  "main": "./src/server/index.ts",
+  "compatibility_date": "2025-03-21",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "keep_vars": true
+}
+```
+
+### Main Worker Export
+
+```typescript
+import * as Sentry from "@sentry/cloudflare";
+import OAuthProvider from "@cloudflare/workers-oauth-provider";
+import SentryMCP from "./lib/mcp-transport";
+import app from "./app";
+import { SCOPES } from "../constants";
+import getSentryConfig from "./sentry.config";
+
+// Export Durable Object class for wrangler
+export { SentryMCP };
+
+const oAuthProvider = new OAuthProvider({
+  apiHandlers: {
+    "/sse": SentryMCP.serveSSE("/sse"),
+    "/mcp": SentryMCP.serve("/mcp"),
+  },
+  defaultHandler: app,
+  authorizeEndpoint: "/oauth/authorize",
+  tokenEndpoint: "/oauth/token",
+  clientRegistrationEndpoint: "/oauth/register",
+  scopesSupported: Object.keys(SCOPES),
+});
+
+// Worker is wrapped with Sentry instrumentation
+export default Sentry.withSentry(
+  getSentryConfig,
+  oAuthProvider,
+) satisfies ExportedHandler<Env>;
+```
+
+### Binding Patterns
+
+**KV Storage:**
+```jsonc
+"kv_namespaces": [
+  {
+    "binding": "OAUTH_KV",
+    "id": "production-kv-id",
+    "preview_id": "preview-kv-id"
+  }
+]
+```
+
+**Durable Objects:**
+```jsonc
+"durable_objects": {
+  "bindings": [
+    {
+      "class_name": "SentryMCP",
+      "name": "MCP_OBJECT"
+    }
+  ]
+}
+```
+
+### Environment Interface
+
+```typescript
+export interface Env {
+  NODE_ENV: string;
+  ASSETS: Fetcher;
+  OAUTH_KV: KVNamespace;
+  COOKIE_SECRET: string;
+  SENTRY_CLIENT_ID: string;
+  SENTRY_CLIENT_SECRET: string;
+  SENTRY_HOST?: string;
+  MCP_OBJECT: DurableObjectNamespace;
+  OAUTH_PROVIDER: OAuthHelpers;
+  CF_VERSION_METADATA: WorkerVersionMetadata;
+}
+
+// Use Hono for routing and access bindings through context
+const app = new Hono<{
+  Bindings: Env;
+}>()
+  .get("/health", async (c) => {
+    // Access KV through context
+    await c.env.OAUTH_KV.put('health-check', 'ok', { expirationTtl: 60 });
+    
+    // Access environment variables
+    const environment = c.env.NODE_ENV;
+    
+    return c.json({ status: 'healthy', environment });
+  });
+```
+
+## Environment Management
+
+### Development Environment Setup
+
+**Local development files in `packages/mcp-cloudflare/`:**
+- `.dev.vars` - Local environment variables (never commit)
+- `wrangler.jsonc` - Worker configuration
+- `.env` - Shared development variables (careful what you include)
+
+**`.dev.vars` structure:**
+```bash
+# OAuth Configuration
+SENTRY_CLIENT_ID=your_development_client_id
+SENTRY_CLIENT_SECRET=your_development_client_secret
+COOKIE_SECRET=local-development-secret
+
+# Optional: Override default hosts
+SENTRY_HOST=your-sentry-instance.com
+```
+
+### Production Environment
+
+**Use Cloudflare secrets for sensitive data:**
+```bash
+# Set production secrets
+wrangler secret put SENTRY_CLIENT_ID
+wrangler secret put SENTRY_CLIENT_SECRET
+wrangler secret put COOKIE_SECRET
+
+# Verify secrets are set
+wrangler secret list
+```
+
+### Environment Validation
+
+```typescript
+function validateEnvironment(env: Env): void {
+  const required = [
+    'SENTRY_CLIENT_ID',
+    'SENTRY_CLIENT_SECRET', 
+    'COOKIE_SECRET'
+  ];
+  
+  const missing = required.filter(key => !env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
+```
+
+## Durable Objects and Storage
+
+### Durable Object Pattern
+
+```typescript
+import { McpAgent } from "agents/mcp";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { configureServer } from "@sentry/mcp-server/server";
+import { LIB_VERSION } from "@sentry/mcp-server/version";
+
+export default class SentryMCP extends McpAgent<Env, unknown, WorkerProps> {
+  server = new McpServer({
+    name: "Sentry MCP",
+    version: LIB_VERSION,
+  });
+
+  constructor(state: DurableObjectState, env: Env) {
+    super(state, env);
+  }
+
+  async init() {
+    // Configure the MCP server with authentication context from OAuth props
+    await configureServer({
+      server: this.server,
+      context: {
+        accessToken: this.props.accessToken,
+        organizationSlug: this.props.organizationSlug,
+        userId: this.props.id,
+      },
+    });
+  }
+}
+```
+
+### KV Storage Patterns
+
+**OAuth token storage:**
+```typescript
+class OAuthTokenManager {
+  constructor(private kv: KVNamespace) {}
+
+  async storeTokens(userId: string, tokens: OAuthTokens): Promise<void> {
+    await this.kv.put(
+      `oauth:${userId}`, 
+      JSON.stringify(tokens),
+      { 
+        expirationTtl: tokens.expires_in || 3600,
+        metadata: { userId, timestamp: Date.now() }
+      }
+    );
+  }
+
+  async getTokens(userId: string): Promise<OAuthTokens | null> {
+    const data = await this.kv.get(`oauth:${userId}`, 'json');
+    return data as OAuthTokens | null;
+  }
+
+  async revokeTokens(userId: string): Promise<void> {
+    await this.kv.delete(`oauth:${userId}`);
+  }
+}
+```
+
+**Caching patterns:**
+```typescript
+async function withCache<T>(
+  kv: KVNamespace,
+  key: string,
+  fetcher: () => Promise<T>,
+  ttl: number = 300
+): Promise<T> {
+  // Try cache first
+  const cached = await kv.get(key, 'json');
+  if (cached) {
+    return cached as T;
+  }
+
+  // Fetch and cache
+  const fresh = await fetcher();
+  await kv.put(key, JSON.stringify(fresh), { expirationTtl: ttl });
+  
+  return fresh;
+}
+```
+
+## OAuth Integration
+
+### CloudFlare Workers OAuth Provider
+
+```typescript
+import OAuthProvider from "@cloudflare/workers-oauth-provider";
+import SentryMCP from "./lib/mcp-transport";
+import app from "./app";
+
+const oAuthProvider = new OAuthProvider({
+  apiHandlers: {
+    "/sse": SentryMCP.serveSSE("/sse"),
+    "/mcp": SentryMCP.serve("/mcp"),
+  },
+  defaultHandler: app, // Your Hono app
+  authorizeEndpoint: "/oauth/authorize",
+  tokenEndpoint: "/oauth/token",
+  clientRegistrationEndpoint: "/oauth/register",
+  scopesSupported: Object.keys(SCOPES),
+});
+```
+
+### OAuth Flow Implementation
+
+```typescript
+const sentryOauth = new Hono<{ Bindings: Env }>()
+  .get("/authorize", async (c) => {
+    const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+    
+    // Check if client is already approved
+    const isApproved = await clientIdAlreadyApproved(
+      c.req.raw,
+      oauthReqInfo.clientId,
+      c.env.COOKIE_SECRET,
+    );
+    
+    if (!isApproved) {
+      return renderApprovalDialog(c.req.raw, {
+        client: await c.env.OAUTH_PROVIDER.lookupClient(oauthReqInfo.clientId),
+        server: { name: "Sentry MCP" },
+        state: { oauthReqInfo },
+      });
+    }
+    
+    // Redirect to upstream Sentry OAuth
+    return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
+  })
+  
+  .get("/callback", async (c) => {
+    // Exchange code for access token
+    const [payload, errResponse] = await exchangeCodeForAccessToken({
+      upstream_url: new URL(SENTRY_TOKEN_URL, `https://${c.env.SENTRY_HOST || "sentry.io"}`).href,
+      client_id: c.env.SENTRY_CLIENT_ID,
+      client_secret: c.env.SENTRY_CLIENT_SECRET,
+      code: c.req.query("code"),
+    });
+    
+    if (errResponse) return errResponse;
+    
+    // Complete authorization with user metadata
+    const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
+      request: oauthReqInfo,
+      userId: payload.user.id,
+      metadata: { label: payload.user.name },
+      scope: oauthReqInfo.scope,
+      props: {
+        id: payload.user.id,
+        name: payload.user.name,
+        accessToken: payload.access_token,
+        organizationSlug: orgsList.length ? orgsList[0].slug : null,
+        // ... other WorkerProps
+      } as WorkerProps,
+    });
+    
+    return Response.redirect(redirectTo);
+  });
+```
+
+## Asset Management
+
+### Single Page Application Setup
+
+```jsonc
+{
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  }
+}
+```
+
+**Static Asset Routes:**
+
+```typescript
+const app = new Hono<{ Bindings: Env }>()
+  .get("/robots.txt", (c) => {
+    return c.text(["User-agent: *", "Allow: /$", "Disallow: /"].join("\n"));
+  })
+  .get("/llms.txt", (c) => {
+    return c.text([
+      "# sentry-mcp",
+      "",
+      "This service provides a Model Context Provider for interacting with Sentry's API.",
+      "",
+      `The MCP's server address is: ${new URL("/mcp", c.req.url).href}`,
+    ].join("\n"));
+  });
+```
+
+### Build Integration
+
+```json
+{
+  "scripts": {
+    "build:client": "vite build",
+    "build:worker": "wrangler deploy --dry-run", 
+    "build": "pnpm build:client && pnpm build:worker",
+    "deploy": "pnpm build && wrangler deploy"
+  }
+}
+```
+
+**File structure in `packages/mcp-cloudflare/`:**
+```
+src/
+├── client/     # React client application
+├── server/     # Worker server code  
+│   ├── index.ts       # Worker entry point
+│   ├── app.ts         # Hono application
+│   ├── types.ts       # Environment interface
+│   └── routes/        # OAuth and other routes
+└── constants.ts       # Shared constants
+```
+
+## Performance Optimization
+
+### Edge-First Patterns
+
+**Minimize cold start times:**
+```typescript
+// Initialize expensive resources lazily
+let apiClient: SentryApiService | null = null;
+
+function getApiClient(env: Env): SentryApiService {
+  if (!apiClient) {
+    apiClient = new SentryApiService({
+      host: env.SENTRY_HOST,
+      accessToken: env.SENTRY_ACCESS_TOKEN,
+    });
+  }
+  return apiClient;
+}
+```
+
+**Request coalescing:**
+```typescript
+const requestCache = new Map<string, Promise<any>>();
+
+async function dedupedRequest<T>(
+  key: string, 
+  fetcher: () => Promise<T>
+): Promise<T> {
+  if (requestCache.has(key)) {
+    return requestCache.get(key)!;
+  }
+  
+  const promise = fetcher().finally(() => {
+    requestCache.delete(key);
+  });
+  
+  requestCache.set(key, promise);
+  return promise;
+}
+```
+
+### Resource Optimization
+
+**Memory management:**
+```typescript
+// Clean up resources after request
+addEventListener('fetch', (event) => {
+  event.respondWith(handleRequest(event.request).finally(() => {
+    // Clean up any request-scoped resources
+    requestCache.clear();
+  }));
+});
+```
+
+**Bundle optimization:**
+```typescript
+// Use dynamic imports for large dependencies
+const { heavyLibrary } = await import('./heavy-library');
+```
+
+## Migration Patterns
+
+### Database Migration Pattern
+
+```typescript
+// packages/mcp-cloudflare/src/server/lib/migrations.ts
+
+export class MigrationManager {
+  constructor(private kv: KVNamespace) {}
+
+  async runMigrations(): Promise<void> {
+    const currentVersion = await this.getCurrentVersion();
+    const migrations = this.getMigrations();
+    
+    for (const migration of migrations) {
+      if (migration.version > currentVersion) {
+        await migration.up(this.kv);
+        await this.setVersion(migration.version);
+      }
+    }
+  }
+
+  private getMigrations() {
+    return [
+      {
+        version: 1,
+        name: "initial_schema",
+        up: async (kv: KVNamespace) => {
+          // Set up initial KV structure
+          await kv.put("schema:version", "1");
+        }
+      },
+      {
+        version: 2,
+        name: "add_user_preferences",
+        up: async (kv: KVNamespace) => {
+          // Migration logic
+        }
+      }
+    ];
+  }
+}
+```
+
+### Configuration Migration
+
+```typescript
+// Handle environment variable changes
+function migrateEnvironment(env: Env): Env {
+  // Legacy environment variable mapping
+  if (!env.SENTRY_HOST && env.LEGACY_SENTRY_URL) {
+    env.SENTRY_HOST = new URL(env.LEGACY_SENTRY_URL).host;
+  }
+  
+  return env;
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**OAuth Provider Issues:**
+```typescript
+// Debug OAuth flow
+console.log("OAuth request info:", oauthReqInfo);
+console.log("Client lookup result:", await c.env.OAUTH_PROVIDER.lookupClient(clientId));
+```
+
+**Durable Object Issues:**
+```typescript
+// Check Durable Object state
+const id = c.env.MCP_OBJECT.idFromName("user-session");
+const stub = c.env.MCP_OBJECT.get(id);
+const response = await stub.fetch(request);
+```
+
+**KV Storage Issues:**
+```typescript
+// Verify KV operations
+const testKey = "health-check";
+await c.env.OAUTH_KV.put(testKey, "test-value");
+const retrieved = await c.env.OAUTH_KV.get(testKey);
+console.log("KV test:", { stored: "test-value", retrieved });
+```
+
+### Debugging Tools
+
+**Request tracing:**
+```typescript
+// Add request ID for tracing
+const requestId = crypto.randomUUID();
+console.log(`[${requestId}] Request started:`, request.url);
+
+// Pass requestId through context
+c.set('requestId', requestId);
+```
+
+**Performance monitoring:**
+```typescript
+// Monitor execution time
+const start = Date.now();
+const result = await expensiveOperation();
+const duration = Date.now() - start;
+
+console.log(`Operation took ${duration}ms`);
+```
+
+## Best Practices
+
+- **Use latest compatibility date**: Ensure access to newest Worker features
+- **Enable Node.js compatibility**: Required for MCP server functionality  
+- **Lazy initialization**: Initialize expensive resources only when needed
+- **Request coalescing**: Deduplicate identical requests in flight
+- **Proper error handling**: Return appropriate HTTP status codes
+- **Environment validation**: Check required variables at startup
+- **Use KV for caching**: Cache expensive operations with appropriate TTLs
+- **Monitor performance**: Track cold start times and execution duration
+- **Clean up resources**: Clear request-scoped caches after completion
+- **Version migrations**: Handle schema and configuration changes gracefully

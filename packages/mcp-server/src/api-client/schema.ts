@@ -1,5 +1,48 @@
+/**
+ * Zod schemas for Sentry API response validation.
+ *
+ * This module contains comprehensive Zod schemas that validate and type-check
+ * responses from Sentry's REST API. All schemas are designed to handle Sentry's
+ * flexible data model where most fields can be null or optional.
+ *
+ * Key Design Principles:
+ * - Use .passthrough() for objects that may contain additional fields
+ * - Support both string and number IDs (Sentry's legacy/modern ID formats)
+ * - Handle nullable fields gracefully throughout the schema hierarchy
+ * - Use union types for polymorphic data (events, assignedTo, etc.)
+ *
+ * Schema Categories:
+ * - **Core Resources**: Users, Organizations, Teams, Projects
+ * - **Issue Management**: Issues, Events, Assignments
+ * - **Release Management**: Releases, Commits, Deployments
+ * - **Search & Discovery**: Tags, Error Search, Span Search
+ * - **Integrations**: Client Keys (DSNs), Autofix
+ *
+ * @example Schema Usage
+ * ```typescript
+ * import { IssueListSchema } from "./schema";
+ *
+ * const response = await fetch("/api/0/organizations/my-org/issues/");
+ * const issues = IssueListSchema.parse(await response.json());
+ * // TypeScript now knows the exact shape of issues
+ * ```
+ *
+ * @example Error Handling
+ * ```typescript
+ * const { data, success, error } = ApiErrorSchema.safeParse(response);
+ * if (success) {
+ *   throw new ApiError(data.detail, statusCode);
+ * }
+ * ```
+ */
 import { z } from "zod";
 
+/**
+ * Schema for Sentry API error responses.
+ *
+ * Uses .passthrough() to allow additional fields that may be present
+ * in different error scenarios.
+ */
 export const ApiErrorSchema = z
   .object({
     detail: z.string(),

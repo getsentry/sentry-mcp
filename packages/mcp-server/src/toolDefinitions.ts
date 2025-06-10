@@ -1,3 +1,29 @@
+/**
+ * Tool definitions for the Sentry MCP server.
+ *
+ * Declarative definitions for all MCP tools that interface with Sentry's API.
+ * Each tool definition includes its name, description, parameter schema, and
+ * documentation for LLM consumption.
+ *
+ * @example Tool Definition Structure
+ * ```typescript
+ * {
+ *   name: "tool_name" as const,
+ *   description: [
+ *     "Brief tool description.",
+ *     "",
+ *     "Use this tool when you need to:",
+ *     "- Specific use case 1",
+ *     "- Specific use case 2",
+ *   ].join("\n"),
+ *   paramsSchema: {
+ *     organizationSlug: ParamOrganizationSlug,
+ *     optionalParam: ParamSchema.optional(),
+ *   },
+ * }
+ * ```
+ */
+
 // TODO: this gets imported by the client code and thus is separated from server code
 // to avoid bundling issues. We'd like to find a better solution that isnt so brittle and keeps this code co-located w/ its tool calls.
 import {
@@ -16,6 +42,13 @@ import {
 } from "./schema";
 import { z } from "zod";
 
+/**
+ * All MCP tool definitions for the Sentry server.
+ *
+ * Used by server.ts to register tools with the MCP server and by tools.ts
+ * to validate parameters. Each definition includes name, description, and
+ * Zod parameter schema.
+ */
 export const TOOL_DEFINITIONS = [
   {
     name: "whoami" as const,

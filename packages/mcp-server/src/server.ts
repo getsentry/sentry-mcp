@@ -1,3 +1,22 @@
+/**
+ * MCP Server Configuration and Request Handling Infrastructure.
+ *
+ * This module orchestrates tool execution, prompt handling, resource management,
+ * and telemetry collection in a unified server interface for LLMs.
+ *
+ * **Configuration Example:**
+ * ```typescript
+ * const server = new McpServer();
+ * const context: ServerContext = {
+ *   accessToken: "your-sentry-token",
+ *   host: "sentry.io",
+ *   userId: "user-123",
+ *   clientId: "mcp-client"
+ * };
+ *
+ * await configureServer({ server, context });
+ * ```
+ */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { TOOL_HANDLERS } from "./tools";
 import { TOOL_DEFINITIONS } from "./toolDefinitions";
@@ -10,14 +29,37 @@ import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
 import { UserInputError } from "./errors";
 
+/**
+ * Type guard to identify Sentry API errors.
+ */
 function isApiError(error: unknown) {
   return error instanceof ApiError || Object.hasOwn(error as any, "status");
 }
 
+/**
+ * Type guard to identify user input validation errors.
+ */
 function isUserInputError(error: unknown) {
   return error instanceof UserInputError;
 }
 
+/**
+ * Formats errors for LLM consumption with appropriate telemetry handling.
+ *
+ * **Error Types:**
+ * - User Input Errors: Clear guidance without telemetry
+ * - API Errors: Enhanced messaging with HTTP status context
+ * - System Errors: Full telemetry capture with event IDs
+ *
+ * @example User Input Error Response
+ * ```markdown
+ * **Input Error**
+ *
+ * It looks like there was a problem with the input you provided.
+ * Organization slug is required. Please provide an organizationSlug parameter.
+ * You may be able to resolve the issue by addressing the concern and trying again.
+ * ```
+ */
 async function logAndFormatError(error: unknown) {
   if (isUserInputError(error)) {
     const typedError = error as UserInputError;
@@ -55,8 +97,14 @@ async function logAndFormatError(error: unknown) {
 }
 
 /**
- * Take the arguments from something like an MCP tool call and format
- * them in an OTel-safe way.
+ * Extracts MCP request parameters for OpenTelemetry attributes.
+ *
+ * @example Parameter Transformation
+ * ```typescript
+ * const input = { organizationSlug: "my-org", query: "is:unresolved" };
+ * const output = extractMcpParameters(input);
+ * // { "mcp.param.organizationSlug": "\"my-org\"", "mcp.param.query": "\"is:unresolved\"" }
+ * ```
  */
 function extractMcpParameters(args: Record<string, any>) {
   return Object.fromEntries(
@@ -66,6 +114,25 @@ function extractMcpParameters(args: Record<string, any>) {
   );
 }
 
+/**
+ * Configures an MCP server with all tools, prompts, resources, and telemetry.
+ *
+ * Transforms a bare MCP server instance into a fully-featured Sentry integration
+ * with comprehensive observability, error handling, and handler registration.
+ *
+ * @example Basic Configuration
+ * ```typescript
+ * const server = new McpServer();
+ * const context = {
+ *   accessToken: process.env.SENTRY_TOKEN,
+ *   host: "sentry.io",
+ *   userId: "user-123",
+ *   clientId: "cursor-ide"
+ * };
+ *
+ * await configureServer({ server, context });
+ * ```
+ */
 export async function configureServer({
   server,
   context,

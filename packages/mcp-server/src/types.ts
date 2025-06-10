@@ -1,3 +1,10 @@
+/**
+ * Core type system for MCP tools and prompts.
+ *
+ * Defines TypeScript types derived from tool/prompt definitions, handler signatures,
+ * and server context. Uses advanced TypeScript patterns for type-safe parameter
+ * extraction and handler registration.
+ */
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { TOOL_DEFINITIONS } from "./toolDefinitions";
 import type { PROMPT_DEFINITIONS } from "./promptDefinitions";

@@ -1,3 +1,26 @@
+/**
+ * MSW-based Mock Server for Sentry MCP Development and Testing.
+ *
+ * Provides comprehensive mock responses for all Sentry API endpoints used by the
+ * MCP server. Built with MSW (Mock Service Worker) for realistic HTTP interception
+ * and response handling during development and testing.
+ *
+ * **Usage in Tests:**
+ * ```typescript
+ * import { mswServer } from "@sentry/mcp-server-mocks";
+ *
+ * beforeAll(() => mswServer.listen());
+ * afterEach(() => mswServer.resetHandlers());
+ * afterAll(() => mswServer.close());
+ * ```
+ *
+ * **Usage in Development:**
+ * ```typescript
+ * // Start mock server for local development
+ * mswServer.listen();
+ * // Now all Sentry API calls will be intercepted
+ * ```
+ */
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 
@@ -8,6 +31,10 @@ import tagsFixture from "./fixtures/tags.json";
 import projectFixture from "./fixtures/project.json";
 import teamFixture from "./fixtures/team.json";
 
+/**
+ * Standard organization payload for mock responses.
+ * Used across multiple endpoints for consistency.
+ */
 const OrganizationPayload = {
   id: "4509106740723712",
   slug: "sentry-mcp-evals",
@@ -18,6 +45,10 @@ const OrganizationPayload = {
   },
 };
 
+/**
+ * Standard release payload for mock responses.
+ * Includes typical metadata and project associations.
+ */
 const ReleasePayload = {
   id: 1402755016,
   version: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
@@ -282,6 +313,29 @@ const EventsSpansPayload = {
   ],
 };
 
+/**
+ * Builds MSW handlers for both SaaS and self-hosted Sentry instances.
+ *
+ * Creates duplicate handlers for us.sentry.io and sentry.io to support
+ * multi-region testing and both SaaS and self-hosted configurations.
+ *
+ * @param handlers - Array of handler definitions with method, path, and fetch function
+ * @returns Array of MSW http handlers for both hosts
+ *
+ * @example Handler Definition
+ * ```typescript
+ * buildHandlers([
+ *   {
+ *     method: "get",
+ *     path: "/api/0/organizations/",
+ *     fetch: () => HttpResponse.json([OrganizationPayload])
+ *   }
+ * ]);
+ * // Creates handlers for both:
+ * // - https://us.sentry.io/api/0/organizations/
+ * // - https://sentry.io/api/0/organizations/
+ * ```
+ */
 function buildHandlers(
   handlers: {
     method: keyof typeof http;
@@ -302,6 +356,12 @@ function buildHandlers(
   ];
 }
 
+/**
+ * Complete set of Sentry API mock handlers.
+ *
+ * Covers all endpoints used by the MCP server with realistic responses,
+ * parameter validation, and error scenarios.
+ */
 export const restHandlers = buildHandlers([
   {
     method: "get",
@@ -777,4 +837,32 @@ export const restHandlers = buildHandlers([
   },
 ]);
 
+/**
+ * Configured MSW server instance with all Sentry API mock handlers.
+ *
+ * Ready-to-use mock server for testing and development. Includes all endpoints
+ * with realistic data, parameter validation, and error scenarios.
+ *
+ * @example Test Setup
+ * ```typescript
+ * import { mswServer } from "@sentry/mcp-server-mocks";
+ *
+ * beforeAll(() => mswServer.listen({ onUnhandledRequest: 'error' }));
+ * afterEach(() => mswServer.resetHandlers());
+ * afterAll(() => mswServer.close());
+ * ```
+ *
+ * @example Development Usage
+ * ```typescript
+ * import { mswServer } from "@sentry/mcp-server-mocks";
+ *
+ * // Start intercepting requests
+ * mswServer.listen();
+ *
+ * // Your MCP server will now use mock responses
+ * const apiService = new SentryApiService({ host: "sentry.io" });
+ * const orgs = await apiService.listOrganizations();
+ * console.log(orgs); // Returns mock organization data
+ * ```
+ */
 export const mswServer = setupServer(...restHandlers);

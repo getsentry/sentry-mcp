@@ -1,3 +1,10 @@
+/**
+ * Reusable Zod parameter schemas for MCP tools.
+ *
+ * Shared validation schemas used across tool definitions to ensure consistent
+ * parameter handling and validation. Each schema includes transformation
+ * (e.g., toLowerCase, trim) and LLM-friendly descriptions.
+ */
 import { z } from "zod";
 
 export const ParamOrganizationSlug = z

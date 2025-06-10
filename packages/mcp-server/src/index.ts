@@ -1,5 +1,18 @@
 #!/usr/bin/env node
 
+/**
+ * Main CLI entry point for the Sentry MCP server.
+ *
+ * Handles command-line argument parsing, environment configuration, Sentry
+ * initialization, and starts the MCP server with stdio transport. Requires
+ * a Sentry access token and optionally accepts host and DSN configuration.
+ *
+ * @example CLI Usage
+ * ```bash
+ * npx @sentry/mcp-server --access-token=TOKEN --host=sentry.io
+ * ```
+ */
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";

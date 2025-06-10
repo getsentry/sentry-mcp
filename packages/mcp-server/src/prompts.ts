@@ -1,3 +1,25 @@
+/**
+ * Prompt implementation handlers for the Sentry MCP server.
+ *
+ * Contains runtime implementations for all MCP prompts defined in `promptDefinitions.ts`.
+ * Each handler generates context-aware instructions that guide LLMs through
+ * complex multi-step workflows involving Sentry operations.
+ *
+ * @example Basic Handler Pattern
+ * ```typescript
+ * prompt_name: async (context, params) => {
+ *   const instructions = [
+ *     "Primary objective and context",
+ *     "",
+ *     "1. First step with specific tool call",
+ *     "2. Second step with conditional logic",
+ *     "3. Final step with recommendations",
+ *   ];
+ *   return instructions.join("\n");
+ * },
+ * ```
+ */
+import { UserInputError } from "./errors";
 import type { PromptHandlers } from "./types";
 
 export const PROMPT_HANDLERS = {
@@ -20,8 +42,7 @@ export const PROMPT_HANDLERS = {
     } else if (organizationSlug && issueId) {
       issueMessage = `The Sentry issue is ${issueId} in the organization ${organizationSlug}`;
     } else {
-      // TODO: this should be some kind of error message I imagine...
-      throw new Error(
+      throw new UserInputError(
         "Either issueUrl or organizationSlug and issueId must be provided",
       );
     }

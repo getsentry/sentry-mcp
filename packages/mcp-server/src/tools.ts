@@ -1,3 +1,27 @@
+/**
+ * Tool implementation handlers for the Sentry MCP server.
+ *
+ * Contains runtime implementations for all MCP tools defined in `toolDefinitions.ts`.
+ * Each handler processes tool invocations, validates parameters, calls the Sentry API,
+ * and returns markdown-formatted responses.
+ *
+ * @example Basic Handler Pattern
+ * ```typescript
+ * tool_name: async (context, params) => {
+ *   if (!params.organizationSlug) {
+ *     throw new UserInputError("Organization slug is required");
+ *   }
+ *
+ *   const apiService = apiServiceFromContext(context, {
+ *     regionUrl: params.regionUrl,
+ *   });
+ *   setTag("organization.slug", params.organizationSlug);
+ *
+ *   const results = await apiService.someMethod(params);
+ *   return `# Results\n\n${formatResults(results)}`;
+ * },
+ * ```
+ */
 import type { z } from "zod";
 import {
   type AutofixRunStepDefaultSchema,
@@ -626,7 +650,7 @@ export const TOOL_HANDLERS = {
       const projects = await apiService.listProjects(organizationSlug);
       project = projects.find((p) => p.slug === params.projectSlug);
       if (!project) {
-        throw new Error(`Project ${params.projectSlug} not found`);
+        throw new UserInputError(`Project ${params.projectSlug} not found`);
       }
     }
 

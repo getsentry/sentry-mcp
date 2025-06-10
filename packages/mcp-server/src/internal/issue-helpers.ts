@@ -1,4 +1,13 @@
 /**
+ * Issue parameter parsing and validation utilities.
+ *
+ * Handles flexible input formats for Sentry issues (URLs vs explicit parameters),
+ * extracts organization and issue identifiers, and validates issue ID formats.
+ * Provides robust parsing for LLM-generated parameters that may contain formatting
+ * inconsistencies.
+ */
+
+/**
  * Extracts the Sentry issue ID and organization slug from a full URL
  *
  * @param url - A full Sentry issue URL
