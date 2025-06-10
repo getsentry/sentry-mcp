@@ -400,9 +400,9 @@ export const TOOL_HANDLERS = {
       assignedTo: params.assignedTo,
     });
 
-    let output = `# Issue ${parsedIssueId} Updated in **${orgSlug}**\n\n`;
+    let output = `# Issue ${updatedIssue.shortId} Updated in **${orgSlug}**\n\n`;
     output += `**Issue**: ${updatedIssue.title}\n`;
-    output += `**URL**: ${apiService.getIssueUrl(orgSlug, parsedIssueId!)}\n\n`;
+    output += `**URL**: ${apiService.getIssueUrl(orgSlug, updatedIssue.shortId)}\n\n`;
 
     // Show what changed
     output += "## Changes Made\n\n";
@@ -412,7 +412,7 @@ export const TOOL_HANDLERS = {
     }
 
     if (params.assignedTo) {
-      const oldAssignee = formatAssignedTo(currentIssue.assignedTo);
+      const oldAssignee = formatAssignedTo(currentIssue.assignedTo ?? null);
       const newAssignee =
         params.assignedTo === "me" ? "You" : params.assignedTo;
       output += `**Assigned To**: ${oldAssignee} → **${newAssignee}**\n`;
@@ -420,12 +420,12 @@ export const TOOL_HANDLERS = {
 
     output += "\n## Current Status\n\n";
     output += `**Status**: ${updatedIssue.status}\n`;
-    const currentAssignee = formatAssignedTo(updatedIssue.assignedTo);
+    const currentAssignee = formatAssignedTo(updatedIssue.assignedTo ?? null);
     output += `**Assigned To**: ${currentAssignee}\n`;
 
     output += "\n# Using this information\n\n";
     output += `- The issue has been successfully updated in Sentry\n`;
-    output += `- You can view the issue details using: \`get_issue_details(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")\`\n`;
+    output += `- You can view the issue details using: \`get_issue_details(organizationSlug="${orgSlug}", issueId="${updatedIssue.shortId}")\`\n`;
 
     if (params.status === "resolved") {
       output += `- The issue is now marked as resolved and will no longer generate alerts\n`;
