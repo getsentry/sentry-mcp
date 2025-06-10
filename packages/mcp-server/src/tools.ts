@@ -505,7 +505,7 @@ export const TOOL_HANDLERS = {
       return output;
     }
     for (const eventSummary of eventList) {
-      output += `## ${eventSummary.transaction}\n\n`;
+      output += `## \`${eventSummary.transaction}\`\n\n`;
       output += `**Span ID**: ${eventSummary.id}\n`;
       output += `**Trace ID**: ${eventSummary.trace}\n`;
       output += `**Span Operation**: ${eventSummary["span.op"]}\n`;
