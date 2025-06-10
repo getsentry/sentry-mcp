@@ -1169,27 +1169,93 @@ describe("update_issue", () => {
         mockServerContext,
         {
           organizationSlug: "sentry-mcp-evals",
-          issueId: "SENTRY-MCP-41",
+          issueId: "CLOUDFLARE-MCP-41",
           status: "resolved",
           regionUrl: undefined,
         },
         mockRequestHandlerExtra,
       ),
     ).toMatchInlineSnapshot(`
-      "# Updated Issue SENTRY-MCP-41
+      "# Updated Issue CLOUDFLARE-MCP-41
 
-      **Issue ID**: SENTRY-MCP-41
-      **Title**: Test Issue
+      **Issue ID**: CLOUDFLARE-MCP-41
+      **Title**: Error: Tool list_organizations is already registered
       **Status**: resolved
-      **URL**: https://sentry-mcp-evals.sentry.io/issues/SENTRY-MCP-41
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
 
       ## Updates Applied
       - Updated status to "resolved"
 
       # Using this information
 
-      - The issue is now accessible at: https://sentry-mcp-evals.sentry.io/issues/SENTRY-MCP-41
+      - The issue is now accessible at: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
       - Current status: resolved
+      "
+    `);
+  });
+
+  it("updates assignment", async () => {
+    expect(
+      await TOOL_HANDLERS.update_issue(
+        mockServerContext,
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          assignedTo: "user@example.com",
+          regionUrl: undefined,
+        },
+        mockRequestHandlerExtra,
+      ),
+    ).toMatchInlineSnapshot(`
+      "# Updated Issue CLOUDFLARE-MCP-41
+
+      **Issue ID**: CLOUDFLARE-MCP-41
+      **Title**: Error: Tool list_organizations is already registered
+      **Status**: unresolved
+      **Assigned To**: user@example.com
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Updates Applied
+      - Updated assigned to "user@example.com"
+
+      # Using this information
+
+      - The issue is now accessible at: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+      - Current status: unresolved
+      "
+    `);
+  });
+
+  it("updates both status and assignment", async () => {
+    expect(
+      await TOOL_HANDLERS.update_issue(
+        mockServerContext,
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "ignored",
+          assignedTo: "test@example.com",
+          regionUrl: undefined,
+        },
+        mockRequestHandlerExtra,
+      ),
+    ).toMatchInlineSnapshot(`
+      "# Updated Issue CLOUDFLARE-MCP-41
+
+      **Issue ID**: CLOUDFLARE-MCP-41
+      **Title**: Error: Tool list_organizations is already registered
+      **Status**: ignored
+      **Assigned To**: test@example.com
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+
+      ## Updates Applied
+      - Updated status to "ignored"
+      - Updated assigned to "test@example.com"
+
+      # Using this information
+
+      - The issue is now accessible at: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
+      - Current status: ignored
       "
     `);
   });

@@ -723,6 +723,38 @@ export const restHandlers = buildHandlers([
       });
     },
   },
+  {
+    method: "put",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      return HttpResponse.json({
+        ...issueFixture,
+        status: body?.status || issueFixture.status,
+        assignedTo: body?.assignedTo ? { 
+          id: "1", 
+          name: "Test User", 
+          email: body.assignedTo.includes("@") ? body.assignedTo : "test@example.com" 
+        } : issueFixture.assignedTo,
+      });
+    },
+  },
+  {
+    method: "put",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      return HttpResponse.json({
+        ...issueFixture,
+        status: body?.status || issueFixture.status,
+        assignedTo: body?.assignedTo ? { 
+          id: "1", 
+          name: "Test User", 
+          email: body.assignedTo.includes("@") ? body.assignedTo : "test@example.com" 
+        } : issueFixture.assignedTo,
+      });
+    },
+  },
 ]);
 
 export const mswServer = setupServer(...restHandlers);

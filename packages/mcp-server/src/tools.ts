@@ -715,12 +715,7 @@ export const TOOL_HANDLERS = {
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
       status: params.status,
-      statusDetails: params.statusDetails,
       assignedTo: params.assignedTo,
-      hasSeen: params.hasSeen,
-      isBookmarked: params.isBookmarked,
-      isSubscribed: params.isSubscribed,
-      isPublic: params.isPublic,
     });
 
     let output = `# Updated Issue ${parsedIssueId}\n\n`;
@@ -732,20 +727,12 @@ export const TOOL_HANDLERS = {
       output += `**Assigned To**: ${updatedIssue.assignedTo.name || updatedIssue.assignedTo.email || updatedIssue.assignedTo.id}\n`;
     }
     
-    if (updatedIssue.statusDetails && Object.keys(updatedIssue.statusDetails).length > 0) {
-      output += `**Status Details**: ${JSON.stringify(updatedIssue.statusDetails)}\n`;
-    }
-    
     output += `**URL**: ${apiService.getIssueUrl(orgSlug, updatedIssue.shortId)}\n`;
     
     // Display what was updated
     const updates: string[] = [];
     if (params.status) updates.push(`status to "${params.status}"`);
     if (params.assignedTo) updates.push(`assigned to "${params.assignedTo}"`);
-    if (params.hasSeen !== undefined) updates.push(`marked as ${params.hasSeen ? "seen" : "unseen"}`);
-    if (params.isBookmarked !== undefined) updates.push(`${params.isBookmarked ? "bookmarked" : "unbookmarked"}`);
-    if (params.isSubscribed !== undefined) updates.push(`${params.isSubscribed ? "subscribed to" : "unsubscribed from"} notifications`);
-    if (params.isPublic !== undefined) updates.push(`visibility set to ${params.isPublic ? "public" : "private"}`);
 
     if (updates.length > 0) {
       output += `\n## Updates Applied\n`;
