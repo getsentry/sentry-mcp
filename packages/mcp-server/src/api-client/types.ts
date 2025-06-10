@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type {
+  AssignedToSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   ClientKeyListSchema,
@@ -31,6 +32,7 @@ export type Event = z.infer<typeof EventSchema>;
 export type Tag = z.infer<typeof TagSchema>;
 export type AutofixRun = z.infer<typeof AutofixRunSchema>;
 export type AutofixRunState = z.infer<typeof AutofixRunStateSchema>;
+export type AssignedTo = z.infer<typeof AssignedToSchema>;
 
 export type OrganizationList = z.infer<typeof OrganizationListSchema>;
 export type TeamList = z.infer<typeof TeamListSchema>;

@@ -136,9 +136,6 @@ export const IssueSchema = z.object({
 
 export const IssueListSchema = z.array(IssueSchema);
 
-export type Issue = z.infer<typeof IssueSchema>;
-export type AssignedTo = z.infer<typeof AssignedToSchema>;
-
 export const FrameInterface = z
   .object({
     filename: z.string().nullable(),

@@ -7,6 +7,7 @@ import {
   type ClientKey,
   type Project,
   SentryApiService,
+  type AssignedTo,
 } from "./api-client/index";
 import { formatIssueOutput } from "./internal/formatting";
 import { parseIssueParams } from "./internal/issue-helpers";
@@ -14,7 +15,6 @@ import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
 import { UserInputError } from "./errors";
-import type { AssignedTo } from "./api-client/schema";
 
 function apiServiceFromContext(
   context: ServerContext,
