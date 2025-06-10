@@ -366,7 +366,7 @@ describe("find_transactions", () => {
       "# Transactions in **sentry-mcp-evals**
 
 
-      ## GET /trpc/bottleList
+      ## \`GET /trpc/bottleList\`
 
       **Span ID**: 07752c6aeb027c8f
       **Trace ID**: 6a477f5b0f31ef7b6b9b5e1dea66c91d
@@ -377,7 +377,7 @@ describe("find_transactions", () => {
       **Project**: peated
       **URL**: https://sentry-mcp-evals.sentry.io/explore/traces/trace/6a477f5b0f31ef7b6b9b5e1dea66c91d
 
-      ## GET /trpc/bottleList
+      ## \`GET /trpc/bottleList\`
 
       **Span ID**: 7ab5edf5b3ba42c9
       **Trace ID**: 54177131c7b192a446124daba3136045
