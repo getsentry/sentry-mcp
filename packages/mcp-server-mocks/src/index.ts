@@ -728,14 +728,30 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
     fetch: async ({ request }) => {
       const body = (await request.json()) as any;
+      
+      let assignedTo = issueFixture.assignedTo;
+      if (body?.assignedTo) {
+        if (body.assignedTo.includes("@")) {
+          // Email assignment
+          assignedTo = {
+            id: "1",
+            name: body.assignedTo.split("@")[0].replace(".", " "),
+            email: body.assignedTo,
+          };
+        } else {
+          // Team assignment  
+          assignedTo = {
+            id: "2",
+            name: body.assignedTo,
+            email: null,
+          };
+        }
+      }
+      
       return HttpResponse.json({
         ...issueFixture,
         status: body?.status || issueFixture.status,
-        assignedTo: body?.assignedTo ? { 
-          id: "1", 
-          name: "Test User", 
-          email: body.assignedTo.includes("@") ? body.assignedTo : "test@example.com" 
-        } : issueFixture.assignedTo,
+        assignedTo,
       });
     },
   },
@@ -744,14 +760,30 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
     fetch: async ({ request }) => {
       const body = (await request.json()) as any;
+      
+      let assignedTo = issueFixture.assignedTo;
+      if (body?.assignedTo) {
+        if (body.assignedTo.includes("@")) {
+          // Email assignment
+          assignedTo = {
+            id: "1",
+            name: body.assignedTo.split("@")[0].replace(".", " "),
+            email: body.assignedTo,
+          };
+        } else {
+          // Team assignment  
+          assignedTo = {
+            id: "2",
+            name: body.assignedTo,
+            email: null,
+          };
+        }
+      }
+      
       return HttpResponse.json({
         ...issueFixture,
         status: body?.status || issueFixture.status,
-        assignedTo: body?.assignedTo ? { 
-          id: "1", 
-          name: "Test User", 
-          email: body.assignedTo.includes("@") ? body.assignedTo : "test@example.com" 
-        } : issueFixture.assignedTo,
+        assignedTo,
       });
     },
   },
