@@ -14,6 +14,7 @@ import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
 import { UserInputError } from "./errors";
+import type { AssignedTo } from "./api-client/schema";
 
 function apiServiceFromContext(
   context: ServerContext,
@@ -411,13 +412,7 @@ export const TOOL_HANDLERS = {
     }
 
     if (params.assignedTo) {
-      const oldAssignee = currentIssue.assignedTo
-        ? typeof currentIssue.assignedTo === "string"
-          ? currentIssue.assignedTo
-          : (currentIssue.assignedTo as any).name ||
-            (currentIssue.assignedTo as any).email ||
-            "Unknown"
-        : "Unassigned";
+      const oldAssignee = formatAssignedTo(currentIssue.assignedTo);
       const newAssignee =
         params.assignedTo === "me" ? "You" : params.assignedTo;
       output += `**Assigned To**: ${oldAssignee} → **${newAssignee}**\n`;
@@ -425,17 +420,8 @@ export const TOOL_HANDLERS = {
 
     output += "\n## Current Status\n\n";
     output += `**Status**: ${updatedIssue.status}\n`;
-    if (updatedIssue.assignedTo) {
-      const assignee =
-        typeof updatedIssue.assignedTo === "string"
-          ? updatedIssue.assignedTo
-          : (updatedIssue.assignedTo as any).name ||
-            (updatedIssue.assignedTo as any).email ||
-            "Unknown";
-      output += `**Assigned To**: ${assignee}\n`;
-    } else {
-      output += `**Assigned To**: Unassigned\n`;
-    }
+    const currentAssignee = formatAssignedTo(updatedIssue.assignedTo);
+    output += `**Assigned To**: ${currentAssignee}\n`;
 
     output += "\n# Using this information\n\n";
     output += `- The issue has been successfully updated in Sentry\n`;
@@ -843,4 +829,23 @@ function getOutputForAutofixStep(step: z.infer<typeof AutofixRunStepSchema>) {
   }
 
   return output;
+}
+
+/**
+ * Helper function to format assignedTo field for display
+ */
+function formatAssignedTo(assignedTo: AssignedTo): string {
+  if (!assignedTo) {
+    return "Unassigned";
+  }
+
+  if (typeof assignedTo === "string") {
+    return assignedTo;
+  }
+
+  if (typeof assignedTo === "object" && assignedTo.name) {
+    return assignedTo.name;
+  }
+
+  return "Unknown";
 }

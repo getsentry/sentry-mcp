@@ -103,6 +103,20 @@ export const TagSchema = z.object({
 
 export const TagListSchema = z.array(TagSchema);
 
+// Schema for assignedTo field - can be a user object, team object, string, or null
+export const AssignedToSchema = z.union([
+  z.null(),
+  z.string(), // username or actor ID
+  z
+    .object({
+      type: z.enum(["user", "team"]),
+      id: z.union([z.string(), z.number()]),
+      name: z.string(),
+      email: z.string().optional(), // only for users
+    })
+    .passthrough(), // Allow additional fields we might not know about
+]);
+
 export const IssueSchema = z.object({
   id: z.union([z.string(), z.number()]),
   shortId: z.string(),
@@ -117,9 +131,13 @@ export const IssueSchema = z.object({
   status: z.string(),
   culprit: z.string(),
   type: z.union([z.literal("error"), z.literal("transaction"), z.unknown()]),
+  assignedTo: AssignedToSchema.optional(),
 });
 
 export const IssueListSchema = z.array(IssueSchema);
+
+export type Issue = z.infer<typeof IssueSchema>;
+export type AssignedTo = z.infer<typeof AssignedToSchema>;
 
 export const FrameInterface = z
   .object({
