@@ -7,6 +7,15 @@ alwaysApply: true
 
 This guide outlines the best practices and conventions for contributing to the Sentry MCP (Model Context Protocol) server codebase. Following these guidelines ensures consistency, maintainability, and optimal LLM interaction.
 
+## Related Guidelines
+
+For specific workflows, refer to these dedicated guides:
+
+- **adding-new-tools**: Comprehensive guide for adding new tools to the MCP server, including definitions, handlers, tests, and evaluations
+- **adding-new-prompts**: Complete workflow for adding new prompts, including implementation patterns and best practices
+
+These guides contain detailed step-by-step instructions, code examples, and specific patterns for their respective areas.
+
 ## Table of Contents
 
 1. [Project Architecture](mdc:#project-architecture)
@@ -100,149 +109,23 @@ export type ToolParams<T extends ToolName> = ToolDefinition<T> extends {
 
 ## Tool Development
 
-### Tool Definition Structure
+For comprehensive guidance on adding new tools, see the **adding-new-tools** guide which covers:
 
-```typescript
-{
-  name: "tool_name" as const,
-  description: [
-    "One-line summary of what this tool does.",
-    "",
-    "Use this tool when you need to:",
-    "- Specific use case 1",
-    "- Specific use case 2",
-    "",
-    "<examples>",
-    "### Example usage description",
-    "",
-    "```",
-    "tool_name(organizationSlug='my-org', param='value')",
-    "```",
-    "</examples>",
-    "",
-    "<hints>",
-    "- Parameter interpretation hints",
-    "- Common patterns or gotchas",
-    "</hints>",
-  ].join("\n"),
-  paramsSchema: {
-    // Parameters with clear descriptions
-  },
-}
-```
-
-### Tool Handler Implementation
-
-```typescript
-tool_name: async (context, params) => {
-  // 1. Initialize API service with proper region
-  const apiService = apiServiceFromContext(context, {
-    regionUrl: params.regionUrl,
-  });
-
-  // 2. Validate required parameters early
-  if (!params.organizationSlug) {
-    throw new UserInputError(
-      "Organization slug is required. Please provide an organizationSlug parameter."
-    );
-  }
-
-  // 3. Set monitoring tags
-  setTag("organization.slug", params.organizationSlug);
-
-  // 4. Make API calls with proper error handling
-  const data = await apiService.method(params);
-
-  // 5. Format output as structured markdown
-  let output = `# Tool Results in **${params.organizationSlug}**\n\n`;
-
-  if (data.length === 0) {
-    output += "No results found.\n";
-    return output;
-  }
-
-  // 6. Format data clearly
-  output += formatResults(data);
-
-  // 7. Always include usage instructions
-  output += "\n\n# Using this information\n\n";
-  output += "- How to use these results\n";
-  output += "- Example follow-up commands\n";
-
-  return output;
-};
-```
-
-### Output Formatting Best Practices
-
-```typescript
-// Use markdown headers for structure
-`# Section Title\n\n`
-`## Subsection\n\n`
-
-// Make important values stand out
-`**Issue ID**: ${issue.shortId}\n`
-`**Status**: ${issue.status}\n`
-
-// Use code blocks for identifiers
-`\`${issueId}\``
-
-// Format URLs consistently
-`**URL**: ${apiService.getIssueUrl(organizationSlug, issueId)}\n`
-
-// Group related information
-[
-  `**Field 1**: ${value1}`,
-  `**Field 2**: ${value2}`,
-].join("\n")
-```
+- Tool definition structure and schema patterns
+- Handler implementation with proper error handling
+- Output formatting best practices for LLM consumption
+- Testing strategies including unit tests, mocks, and evaluations
+- Step-by-step workflow from definition to deployment
 
 ## Prompt Development
 
-### Prompt Definition Pattern
+For detailed instructions on creating new prompts, see the **adding-new-prompts** guide which covers:
 
-```typescript
-{
-  name: "prompt_name" as const,
-  description: [
-    "Clear one-line summary of the workflow.",
-    "When to use this prompt.",
-  ].join("\n"),
-  paramsSchema: {
-    // Minimal required parameters
-  },
-}
-```
-
-### Prompt Handler Structure
-
-```typescript
-prompt_name: async (context, params) => {
-  // Validate parameter combinations
-  if (!params.param1 && !params.param2) {
-    throw new Error("Either param1 or param2 must be provided");
-  }
-
-  // Build step-by-step instructions
-  return [
-    `I want to ${describe_goal} for ${params.organizationSlug}.`,
-    "",
-    "Here's how to accomplish this:",
-    "",
-    "1. First step with specific tool:",
-    "   - Use `tool_name` with these parameters",
-    "   - Expected outcome",
-    "",
-    "2. Conditional logic:",
-    "   a. If condition A: Use `tool_a`",
-    "   b. If condition B: Use `tool_b`",
-    "",
-    "**Important considerations:**",
-    "- Validation steps",
-    "- Error handling guidance",
-  ].join("\n");
-};
-```
+- Prompt definition patterns and parameter handling
+- Handler structure for multi-step workflows
+- LLM-friendly instruction writing
+- Testing and evaluation strategies
+- Common prompt patterns and anti-patterns
 
 ## API Client Patterns
 
