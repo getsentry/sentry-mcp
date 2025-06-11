@@ -336,7 +336,7 @@ export const SpansSearchResponseSchema = EventsResponseSchema.extend({
       id: z.string(),
       trace: z.string(),
       "span.op": z.string(),
-      "span.description": z.string(),
+      "span.description": z.string().nullable(),
       "span.duration": z.number(),
       transaction: z.string(),
       project: z.string(),
