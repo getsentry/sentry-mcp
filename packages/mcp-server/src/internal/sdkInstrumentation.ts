@@ -679,7 +679,7 @@ export class SdkInstrumentationOrchestrator {
     // Handle warnings for missing config
     const warnings: string[] = [];
     if (!config.dsn) {
-      warnings.push("DSN is required for error reporting");
+      warnings.push("DSN is required");
       environmentVariables.SENTRY_DSN = "";
     }
     
@@ -691,7 +691,7 @@ export class SdkInstrumentationOrchestrator {
       environmentVariables,
       postInstallationSteps: template.postInstallationSteps,
       verificationSteps: template.verificationSteps,
-      warnings: warnings.length > 0 ? warnings : undefined,
+      warnings,
     };
   }
 
@@ -751,7 +751,7 @@ export const INSTRUMENTATION_TEMPLATES = {
       REACT_APP_SENTRY_DSN: "Your Sentry DSN",
     },
     postInstallationSteps: [
-      "Add Sentry initialization to your main React entry point",
+      "Add Sentry initialization",
       "Configure environment variables for your Sentry DSN", 
       "Test error reporting by triggering a test error",
     ],
@@ -1312,7 +1312,7 @@ export function generateInstrumentationPlan(
   // Handle warnings for missing config
   const warnings: string[] = [];
   if (!sentryConfig.dsn) {
-    warnings.push("DSN is required for error reporting");
+    warnings.push("DSN is required");
     environmentVariables.SENTRY_DSN = "";
   }
   
@@ -1324,7 +1324,7 @@ export function generateInstrumentationPlan(
     environmentVariables,
     postInstallationSteps: template.postInstallationSteps,
     verificationSteps: template.verificationSteps,
-    warnings: warnings.length > 0 ? warnings : undefined,
+    warnings,
   };
 }
 
