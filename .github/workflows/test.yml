@@ -52,7 +52,6 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          directory: ./coverage/
           flags: unittests
           name: codecov-unittests
           fail_ci_if_error: false
