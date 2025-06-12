@@ -25,6 +25,8 @@ import {
   ParamIssueShortId,
   ParamIssueUrl,
   ParamOrganizationSlug,
+  ParamProjectSlug,
+  ParamTargetDirectory,
 } from "./schema";
 
 /**
@@ -55,6 +57,25 @@ export const PROMPT_DEFINITIONS = [
       organizationSlug: ParamOrganizationSlug.optional(),
       issueId: ParamIssueShortId,
       issueUrl: ParamIssueUrl,
+    },
+  },
+  {
+    name: "setup_sentry_instrumentation" as const,
+    description: [
+      "Use this prompt when you need to set up Sentry SDK instrumentation for a project.",
+      "This prompt will automatically detect your project's language and framework, then guide you through",
+      "installing and configuring the appropriate Sentry SDK with error tracking and performance monitoring.",
+      "It can work with existing Sentry projects or help create new ones as needed.",
+      "",
+      "Example usage:",
+      "- 'Help me set up Sentry for my project'",
+      "- 'Add Sentry instrumentation to my React app'", 
+      "- 'Configure Sentry SDK for my Python Django project'",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug.optional(),
+      projectSlug: ParamProjectSlug.optional(),
+      targetDirectory: ParamTargetDirectory.optional(),
     },
   },
 ];
