@@ -30,6 +30,7 @@ import eventsFixture from "./fixtures/event.json";
 import tagsFixture from "./fixtures/tags.json";
 import projectFixture from "./fixtures/project.json";
 import teamFixture from "./fixtures/team.json";
+import sdkContextFixture from "./fixtures/sdk-context.json";
 
 /**
  * Standard organization payload for mock responses.
@@ -835,7 +836,166 @@ export const restHandlers = buildHandlers([
       return HttpResponse.json(updatedIssue);
     },
   },
+  // SDK Context endpoints for instrumentation guidance
+  {
+    method: "get",
+    path: "/sdk/context/:framework",
+    fetch: async ({ params }) => {
+      const framework = params.framework as string;
+      
+      // Validate framework parameter
+      if (!framework || typeof framework !== "string") {
+        return HttpResponse.json(
+          { error: "Framework parameter is required" },
+          { status: 400 }
+        );
+      }
+
+      // Check if framework exists in fixtures
+      const normalizedFramework = framework.toLowerCase();
+      const contextData = (sdkContextFixture as any)[normalizedFramework];
+      
+      if (!contextData) {
+        return HttpResponse.json(
+          { 
+            error: `Unsupported framework: ${framework}`,
+            supportedFrameworks: Object.keys(sdkContextFixture)
+          },
+          { status: 404 }
+        );
+      }
+
+      return HttpResponse.json(contextData);
+    },
+  },
+  {
+    method: "get", 
+    path: "/sdk/contexts",
+    fetch: () => {
+      // Return list of all supported frameworks
+      return HttpResponse.json({
+        supportedFrameworks: Object.keys(sdkContextFixture),
+        contexts: sdkContextFixture
+      });
+    },
+  },
+  {
+    method: "get",
+    path: "/sdk/installation/:framework/:packageManager",
+    fetch: async ({ params }) => {
+      const framework = params.framework as string;
+      const packageManager = params.packageManager as string;
+      
+      if (!framework || !packageManager) {
+        return HttpResponse.json(
+          { error: "Framework and package manager parameters are required" },
+          { status: 400 }
+        );
+      }
+
+      const normalizedFramework = framework.toLowerCase();
+      const contextData = (sdkContextFixture as any)[normalizedFramework];
+      
+      if (!contextData) {
+        return HttpResponse.json(
+          { error: `Unsupported framework: ${framework}` },
+          { status: 404 }
+        );
+      }
+
+      const installationCommand = contextData.installation?.[packageManager];
+      if (!installationCommand) {
+        return HttpResponse.json(
+          { 
+            error: `Unsupported package manager: ${packageManager} for ${framework}`,
+            supportedManagers: Object.keys(contextData.installation || {})
+          },
+          { status: 404 }
+        );
+      }
+
+      return HttpResponse.json({
+        framework,
+        packageManager,
+        command: installationCommand,
+        sdkPackage: contextData.sdkPackage,
+        version: contextData.version
+      });
+    },
+  },
 ]);
+
+/**
+ * Additional non-Sentry endpoints for external SDK context fetching.
+ * These endpoints simulate external services that provide SDK-specific guidelines.
+ */
+export const externalSdkHandlers = [
+  // Mock GitHub raw content for SDK guidelines
+  http.get("https://raw.githubusercontent.com/getsentry/sentry-docs/master/src/platforms/javascript/guides/react/index.mdx", () => {
+    return HttpResponse.text(`# React SDK Installation Guide
+
+## Installation
+
+\`\`\`bash
+npm install @sentry/react
+\`\`\`
+
+## Configuration
+
+\`\`\`javascript
+import * as Sentry from '@sentry/react';
+
+Sentry.init({
+  dsn: "YOUR_DSN",
+  environment: "development",
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    Sentry.replayIntegration(),
+  ],
+  tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+});
+\`\`\`
+`);
+  }),
+  
+  // Mock docs.sentry.io endpoints
+  http.get("https://docs.sentry.io/api/sdk-context/:framework", ({ params }) => {
+    const framework = params.framework as string;
+    const normalizedFramework = framework.toLowerCase();
+    const contextData = (sdkContextFixture as any)[normalizedFramework];
+    
+    if (!contextData) {
+      return HttpResponse.json(
+        { error: `Framework not supported: ${framework}` },
+        { status: 404 }
+      );
+    }
+    
+    return HttpResponse.json(contextData);
+  }),
+
+  // Mock generic SDK guidelines endpoint  
+  http.get("https://sentry.io/api/sdk-guidelines/:language/:framework", ({ params }) => {
+    const language = params.language as string;
+    const framework = params.framework as string;
+    
+    // Find matching SDK context by language and framework
+    const matchingContext = Object.values(sdkContextFixture).find(
+      (context: any) => 
+        context.language === language && context.framework === framework
+    );
+    
+    if (!matchingContext) {
+      return HttpResponse.json(
+        { error: `No guidelines found for ${language}/${framework}` },
+        { status: 404 }
+      );
+    }
+    
+    return HttpResponse.json(matchingContext);
+  }),
+];
 
 /**
  * Configured MSW server instance with all Sentry API mock handlers.
@@ -865,4 +1025,4 @@ export const restHandlers = buildHandlers([
  * console.log(orgs); // Returns mock organization data
  * ```
  */
-export const mswServer = setupServer(...restHandlers);
+export const mswServer = setupServer(...restHandlers, ...externalSdkHandlers);

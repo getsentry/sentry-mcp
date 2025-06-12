@@ -1,0 +1,252 @@
+{
+  "react": {
+    "framework": "react",
+    "language": "javascript",
+    "sdkPackage": "@sentry/react",
+    "version": "8.42.0",
+    "installation": {
+      "npm": "npm install @sentry/react",
+      "yarn": "yarn add @sentry/react",
+      "pnpm": "pnpm add @sentry/react"
+    },
+    "configuration": {
+      "initFile": "src/main.tsx",
+      "initCode": "import * as Sentry from '@sentry/react';\n\nSentry.init({\n  dsn: process.env.REACT_APP_SENTRY_DSN,\n  environment: process.env.NODE_ENV,\n  integrations: [\n    Sentry.browserTracingIntegration(),\n    Sentry.replayIntegration(),\n  ],\n  tracesSampleRate: 1.0,\n  replaysSessionSampleRate: 0.1,\n  replaysOnErrorSampleRate: 1.0,\n});",
+      "environmentVariables": {
+        "REACT_APP_SENTRY_DSN": "Your Sentry DSN"
+      }
+    },
+    "postInstallSteps": [
+      "Add Sentry initialization to your main React entry point",
+      "Configure environment variables for your Sentry DSN",
+      "Test error reporting by triggering a test error",
+      "Set up source maps for better error tracking"
+    ],
+    "verificationSteps": [
+      "Trigger a test error to ensure Sentry captures it",
+      "Check your Sentry dashboard for the test error",
+      "Verify performance monitoring is working",
+      "Test session replay functionality"
+    ],
+    "documentation": "https://docs.sentry.io/platforms/javascript/guides/react/"
+  },
+  "next": {
+    "framework": "next",
+    "language": "javascript",
+    "sdkPackage": "@sentry/nextjs",
+    "version": "8.42.0",
+    "installation": {
+      "npm": "npm install @sentry/nextjs",
+      "yarn": "yarn add @sentry/nextjs",
+      "pnpm": "pnpm add @sentry/nextjs"
+    },
+    "configuration": {
+      "files": [
+        {
+          "path": "sentry.client.config.js",
+          "content": "import * as Sentry from '@sentry/nextjs';\n\nSentry.init({\n  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,\n  environment: process.env.NODE_ENV,\n  integrations: [\n    Sentry.replayIntegration(),\n  ],\n  tracesSampleRate: 1.0,\n  replaysSessionSampleRate: 0.1,\n  replaysOnErrorSampleRate: 1.0,\n});"
+        },
+        {
+          "path": "sentry.server.config.js",
+          "content": "import * as Sentry from '@sentry/nextjs';\n\nSentry.init({\n  dsn: process.env.SENTRY_DSN,\n  environment: process.env.NODE_ENV,\n  tracesSampleRate: 1.0,\n});"
+        },
+        {
+          "path": "next.config.js",
+          "content": "const { withSentryConfig } = require('@sentry/nextjs');\n\nconst nextConfig = {\n  // Your existing Next.js config\n};\n\nmodule.exports = withSentryConfig(nextConfig, {\n  silent: true,\n  org: process.env.SENTRY_ORG,\n  project: process.env.SENTRY_PROJECT,\n});"
+        }
+      ],
+      "environmentVariables": {
+        "NEXT_PUBLIC_SENTRY_DSN": "Your Sentry DSN (client-side)",
+        "SENTRY_DSN": "Your Sentry DSN (server-side)",
+        "SENTRY_ORG": "Your Sentry organization slug",
+        "SENTRY_PROJECT": "Your Sentry project slug"
+      }
+    },
+    "postInstallSteps": [
+      "Create sentry.client.config.js for client-side initialization",
+      "Create sentry.server.config.js for server-side initialization",
+      "Update next.config.js with Sentry configuration",
+      "Configure environment variables for both client and server",
+      "Test both client and server error reporting"
+    ],
+    "verificationSteps": [
+      "Trigger a client-side error and verify it appears in Sentry",
+      "Trigger a server-side error and verify it appears in Sentry",
+      "Check that source maps are uploaded correctly",
+      "Verify performance monitoring for both client and server"
+    ],
+    "documentation": "https://docs.sentry.io/platforms/javascript/guides/nextjs/"
+  },
+  "django": {
+    "framework": "django",
+    "language": "python",
+    "sdkPackage": "sentry-sdk",
+    "version": "2.19.0",
+    "installation": {
+      "pip": "pip install sentry-sdk[django]",
+      "poetry": "poetry add sentry-sdk[django]",
+      "pipenv": "pipenv install sentry-sdk[django]"
+    },
+    "configuration": {
+      "initFile": "settings.py",
+      "initCode": "import sentry_sdk\nfrom sentry_sdk.integrations.django import DjangoIntegration\nfrom sentry_sdk.integrations.logging import LoggingIntegration\n\nsentry_logging = LoggingIntegration(\n    level=logging.INFO,\n    event_level=logging.ERROR\n)\n\nsentry_sdk.init(\n    dsn=os.environ.get('SENTRY_DSN'),\n    environment=os.environ.get('DJANGO_ENV', 'development'),\n    integrations=[\n        DjangoIntegration(\n            transaction_style='url',\n        ),\n        sentry_logging,\n    ],\n    traces_sample_rate=1.0,\n    send_default_pii=True,\n)",
+      "environmentVariables": {
+        "SENTRY_DSN": "Your Sentry DSN",
+        "DJANGO_ENV": "development"
+      }
+    },
+    "postInstallSteps": [
+      "Add Sentry initialization to your Django settings.py",
+      "Configure environment variables for your Sentry DSN",
+      "Add SENTRY_DSN to your environment configuration",
+      "Test error reporting with a view that raises an exception",
+      "Configure logging integration for better error context"
+    ],
+    "verificationSteps": [
+      "Create a view that raises a test exception",
+      "Visit the error view and check Sentry for the captured error",
+      "Verify performance monitoring is capturing requests",
+      "Check that user context is being captured correctly"
+    ],
+    "documentation": "https://docs.sentry.io/platforms/python/guides/django/"
+  },
+  "flask": {
+    "framework": "flask",
+    "language": "python",
+    "sdkPackage": "sentry-sdk",
+    "version": "2.19.0",
+    "installation": {
+      "pip": "pip install sentry-sdk[flask]",
+      "poetry": "poetry add sentry-sdk[flask]",
+      "pipenv": "pipenv install sentry-sdk[flask]"
+    },
+    "configuration": {
+      "initFile": "app.py",
+      "initCode": "import sentry_sdk\nfrom sentry_sdk.integrations.flask import FlaskIntegration\nfrom sentry_sdk.integrations.logging import LoggingIntegration\nfrom flask import Flask\n\nsentry_logging = LoggingIntegration(\n    level=logging.INFO,\n    event_level=logging.ERROR\n)\n\nsentry_sdk.init(\n    dsn=os.environ.get('SENTRY_DSN'),\n    environment=os.environ.get('FLASK_ENV', 'development'),\n    integrations=[\n        FlaskIntegration(\n            transaction_style='endpoint',\n        ),\n        sentry_logging,\n    ],\n    traces_sample_rate=1.0,\n)\n\napp = Flask(__name__)",
+      "environmentVariables": {
+        "SENTRY_DSN": "Your Sentry DSN",
+        "FLASK_ENV": "development"
+      }
+    },
+    "postInstallSteps": [
+      "Add Sentry initialization to your Flask app.py",
+      "Configure environment variables for your Sentry DSN",
+      "Test error reporting with a route that raises an exception",
+      "Configure logging integration for better error context",
+      "Set up performance monitoring for Flask routes"
+    ],
+    "verificationSteps": [
+      "Create a route that raises a test exception",
+      "Visit the error route and check Sentry for the captured error",
+      "Verify performance monitoring is capturing requests",
+      "Check that request context is being captured correctly"
+    ],
+    "documentation": "https://docs.sentry.io/platforms/python/guides/flask/"
+  },
+  "gin": {
+    "framework": "gin",
+    "language": "go",
+    "sdkPackage": "github.com/getsentry/sentry-go",
+    "version": "v0.29.1",
+    "installation": {
+      "go": "go get github.com/getsentry/sentry-go github.com/getsentry/sentry-go/gin"
+    },
+    "configuration": {
+      "initFile": "main.go",
+      "initCode": "package main\n\nimport (\n\t\"log\"\n\t\"net/http\"\n\t\"os\"\n\t\"time\"\n\n\t\"github.com/getsentry/sentry-go\"\n\tsentrygin \"github.com/getsentry/sentry-go/gin\"\n\t\"github.com/gin-gonic/gin\"\n)\n\nfunc main() {\n\tif err := sentry.Init(sentry.ClientOptions{\n\t\tDsn: os.Getenv(\"SENTRY_DSN\"),\n\t\tEnvironment: os.Getenv(\"GO_ENV\"),\n\t\tTracesSampleRate: 1.0,\n\t}); err != nil {\n\t\tlog.Fatalf(\"sentry.Init: %s\", err)\n\t}\n\n\tdefer sentry.Flush(2 * time.Second)\n\n\tr := gin.Default()\n\tr.Use(sentrygin.New(sentrygin.Options{}))\n\n\tr.GET(\"/\", func(c *gin.Context) {\n\t\tc.JSON(http.StatusOK, gin.H{\"message\": \"Hello World\"})\n\t})\n\n\tr.Run(\":8080\")\n}",
+      "environmentVariables": {
+        "SENTRY_DSN": "Your Sentry DSN",
+        "GO_ENV": "development"
+      }
+    },
+    "postInstallSteps": [
+      "Add Sentry initialization to your Go main.go file",
+      "Configure the Gin middleware for automatic error and performance tracking",
+      "Set up environment variables for your Sentry DSN",
+      "Test error reporting with a handler that panics",
+      "Configure performance monitoring for HTTP requests"
+    ],
+    "verificationSteps": [
+      "Create a route that panics and check Sentry for the captured error",
+      "Verify performance monitoring is capturing HTTP requests",
+      "Check that request context is being captured correctly",
+      "Test that the Gin middleware is working as expected"
+    ],
+    "documentation": "https://docs.sentry.io/platforms/go/"
+  },
+  "spring-boot": {
+    "framework": "spring-boot",
+    "language": "java",
+    "sdkPackage": "io.sentry:sentry-spring-boot-starter",
+    "version": "7.19.1",
+    "installation": {
+      "maven": "<dependency>\n  <groupId>io.sentry</groupId>\n  <artifactId>sentry-spring-boot-starter</artifactId>\n  <version>7.19.1</version>\n</dependency>",
+      "gradle": "implementation 'io.sentry:sentry-spring-boot-starter:7.19.1'"
+    },
+    "configuration": {
+      "files": [
+        {
+          "path": "src/main/resources/application.properties",
+          "content": "# Sentry Configuration\nsentry.dsn=${SENTRY_DSN}\nsentry.environment=${SPRING_PROFILES_ACTIVE:development}\nsentry.traces-sample-rate=1.0\nsentry.debug=true\nsentry.logging.minimum-event-level=error\nsentry.logging.minimum-breadcrumb-level=info"
+        }
+      ],
+      "environmentVariables": {
+        "SENTRY_DSN": "Your Sentry DSN",
+        "SPRING_PROFILES_ACTIVE": "development"
+      }
+    },
+    "postInstallSteps": [
+      "Add Sentry Spring Boot starter dependency to your build file",
+      "Configure Sentry properties in application.properties",
+      "Set up environment variables for your Sentry DSN",
+      "Test error reporting with a controller that throws an exception",
+      "Configure logging levels for better error context"
+    ],
+    "verificationSteps": [
+      "Create a controller endpoint that throws an exception",
+      "Call the error endpoint and check Sentry for the captured error",
+      "Verify performance monitoring is capturing HTTP requests",
+      "Check that Spring context is being captured correctly"
+    ],
+    "documentation": "https://docs.sentry.io/platforms/java/guides/spring-boot/"
+  },
+  "rust": {
+    "framework": "rust",
+    "language": "rust",
+    "sdkPackage": "sentry",
+    "version": "0.34.0",
+    "installation": {
+      "cargo": "cargo add sentry"
+    },
+    "configuration": {
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "content": "[dependencies]\nsentry = \"0.34.0\""
+        },
+        {
+          "path": "src/main.rs",
+          "content": "use std::env;\n\nfn main() {\n    let _guard = sentry::init((\n        env::var(\"SENTRY_DSN\").unwrap_or_default(),\n        sentry::ClientOptions {\n            release: sentry::release_name!(),\n            environment: Some(env::var(\"RUST_ENV\").unwrap_or_else(|_| \"development\".into()).into()),\n            traces_sample_rate: 1.0,\n            ..Default::default()\n        },\n    ));\n\n    // Your application code here\n    println!(\"Hello, world!\");\n}"
+        }
+      ],
+      "environmentVariables": {
+        "SENTRY_DSN": "Your Sentry DSN",
+        "RUST_ENV": "development"
+      }
+    },
+    "postInstallSteps": [
+      "Add sentry dependency to your Cargo.toml",
+      "Initialize Sentry in your main.rs file",
+      "Set up environment variables for your Sentry DSN",
+      "Test error reporting with a panic or custom error",
+      "Configure release information for better tracking"
+    ],
+    "verificationSteps": [
+      "Trigger a panic and check Sentry for the captured error",
+      "Verify custom errors are being captured correctly",
+      "Check that environment and release information is set",
+      "Test breadcrumb functionality"
+    ],
+    "documentation": "https://docs.sentry.io/platforms/rust/"
+  }
+} 

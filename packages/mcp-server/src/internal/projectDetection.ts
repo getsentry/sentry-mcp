@@ -6,8 +6,8 @@
  * Sentry SDK selection and configuration.
  */
 import { z } from "zod";
-import * as fs from "fs/promises";
-import * as path from "path";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 
 /**
  * Supported project languages and their associated frameworks
@@ -160,7 +160,7 @@ export class FileSystemUtils {
     while (currentPath !== rootPath) {
       for (const indicator of rootIndicators) {
         const indicatorPath = path.join(currentPath, indicator);
-        if (await this.fileExists(indicatorPath)) {
+        if (await FileSystemUtils.fileExists(indicatorPath)) {
           return currentPath;
         }
       }

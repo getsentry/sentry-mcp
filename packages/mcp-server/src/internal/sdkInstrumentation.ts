@@ -545,28 +545,16 @@ sentry.environment=\${SENTRY_ENVIRONMENT}
 
     const fileModifications: FileModification[] = [
       {
-        filePath: path.join(projectRoot, "src/main.rs"),
-        operation: "modify",
-        content: `use std::env;
-
-fn main() {
-    let _guard = sentry::init(sentry::ClientOptions {
-        dsn: env::var("SENTRY_DSN").ok(),
-        environment: Some(env::var("SENTRY_ENVIRONMENT").unwrap_or_else(|_| "${environment}".into()).into()),
-        sample_rate: ${tracesSampleRate},
-        ..Default::default()
-    });
-
-    // Your application code here
-}`,
-        description: "Add Sentry initialization to main.rs",
+        filePath: path.join(projectRoot, "Cargo.toml"),
+        operation: "append",
+        content: "\n[dependencies]\nsentry = \"0.32\"",
+        description: "Add Sentry dependency to Cargo.toml",
       },
       {
-        filePath: path.join(projectRoot, "Cargo.toml"),
-        operation: "modify",
-        content: `[dependencies]
-sentry = "0.31"`,
-        description: "Add sentry dependency to Cargo.toml",
+        filePath: path.join(projectRoot, "src/main.rs"),
+        operation: "prepend",
+        content: "use std::env;\n\nfn main() {\n    let _guard = sentry::init(env::var(\"SENTRY_DSN\").unwrap_or_default());\n}",
+        description: "Add Sentry initialization to Rust main.rs",
       },
     ];
 
@@ -909,6 +897,32 @@ export const INSTRUMENTATION_TEMPLATES = {
       "Verify performance monitoring is capturing HTTP requests",
     ],
   },
+  echo: {
+    dependencies: {
+      production: ["github.com/getsentry/sentry-go", "github.com/getsentry/sentry-go/echo"],
+      development: [],
+    },
+    fileModifications: [
+      {
+        path: "main.go",
+        operation: "prepend",
+        content: "import (\n    \"github.com/getsentry/sentry-go\"\n    sentryecho \"github.com/getsentry/sentry-go/echo\"\n)\n\nfunc main() {\n    sentry.Init(sentry.ClientOptions{\n        Dsn: os.Getenv(\"SENTRY_DSN\"),\n    })\n    e := echo.New()\n    e.Use(sentryecho.New(sentryecho.Options{}))\n}",
+        description: "Add Sentry initialization to Go Echo app",
+      },
+    ],
+    environmentVariables: {
+      SENTRY_DSN: "Your Sentry DSN",
+    },
+    postInstallationSteps: [
+      "Add Sentry initialization to your Go main.go file",
+      "Configure the Echo middleware for automatic error and performance tracking",
+      "Test error reporting with a handler that panics",
+    ],
+    verificationSteps: [
+      "Create a route that panics and check Sentry for the captured error",
+      "Verify performance monitoring is capturing HTTP requests",
+    ],
+  },
   "spring-boot": {
     dependencies: {
       production: ["io.sentry:sentry-spring-boot-starter"],
@@ -1019,6 +1033,12 @@ export const INSTRUMENTATION_TEMPLATES = {
       development: [],
     },
     fileModifications: [
+      {
+        path: "Cargo.toml",
+        operation: "append",
+        content: "\n[dependencies]\nsentry = \"0.32\"",
+        description: "Add Sentry dependency to Cargo.toml",
+      },
       {
         path: "src/main.rs",
         operation: "prepend",

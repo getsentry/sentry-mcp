@@ -1,0 +1,417 @@
+{
+  "react-typescript": {
+    "name": "React TypeScript Project",
+    "language": "javascript",
+    "frameworks": ["react"],
+    "files": [
+      "package.json",
+      "tsconfig.json",
+      "src/main.tsx",
+      "src/App.tsx",
+      "index.html"
+    ],
+    "packageJson": {
+      "name": "react-typescript-app",
+      "version": "0.1.0",
+      "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
+      },
+      "devDependencies": {
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.2.0",
+        "typescript": "^5.0.0",
+        "vite": "^5.0.0"
+      }
+    },
+    "expectedDetection": {
+      "language": "javascript",
+      "frameworks": ["react"],
+      "confidence": 0.95,
+      "evidence": ["react dependency", "@types/react dependency"]
+    }
+  },
+  "nextjs-app": {
+    "name": "Next.js Application",
+    "language": "javascript", 
+    "frameworks": ["next"],
+    "files": [
+      "package.json",
+      "next.config.js",
+      "app/page.tsx",
+      "app/layout.tsx"
+    ],
+    "packageJson": {
+      "name": "nextjs-app",
+      "version": "0.1.0",
+      "dependencies": {
+        "next": "^14.0.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
+      },
+      "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/react": "^18.2.0",
+        "typescript": "^5.0.0"
+      }
+    },
+    "expectedDetection": {
+      "language": "javascript",
+      "frameworks": ["next", "react"],
+      "confidence": 0.95,
+      "evidence": ["next dependency", "react dependency"]
+    }
+  },
+  "vue-spa": {
+    "name": "Vue.js Single Page Application",
+    "language": "javascript",
+    "frameworks": ["vue"],
+    "files": [
+      "package.json",
+      "vue.config.js",
+      "src/main.js",
+      "src/App.vue"
+    ],
+    "packageJson": {
+      "name": "vue-spa",
+      "version": "0.1.0",
+      "dependencies": {
+        "vue": "^3.3.0"
+      },
+      "devDependencies": {
+        "@vue/cli-service": "^5.0.0",
+        "vue-router": "^4.2.0"
+      }
+    },
+    "expectedDetection": {
+      "language": "javascript",
+      "frameworks": ["vue"],
+      "confidence": 0.95,
+      "evidence": ["vue dependency"]
+    }
+  },
+  "angular-app": {
+    "name": "Angular Application",
+    "language": "javascript",
+    "frameworks": ["angular"],
+    "files": [
+      "package.json",
+      "angular.json",
+      "src/main.ts",
+      "src/app/app.component.ts"
+    ],
+    "packageJson": {
+      "name": "angular-app",
+      "version": "0.0.0",
+      "dependencies": {
+        "@angular/core": "^16.0.0",
+        "@angular/common": "^16.0.0",
+        "@angular/platform-browser": "^16.0.0"
+      },
+      "devDependencies": {
+        "@angular/cli": "^16.0.0",
+        "typescript": "^5.0.0"
+      }
+    },
+    "expectedDetection": {
+      "language": "javascript",
+      "frameworks": ["angular"],
+      "confidence": 0.95,
+      "evidence": ["@angular/core dependency"]
+    }
+  },
+  "express-api": {
+    "name": "Express.js API",
+    "language": "javascript",
+    "frameworks": ["express"],
+    "files": [
+      "package.json",
+      "server.js",
+      "routes/api.js"
+    ],
+    "packageJson": {
+      "name": "express-api",
+      "version": "1.0.0",
+      "main": "server.js",
+      "dependencies": {
+        "express": "^4.18.0",
+        "cors": "^2.8.5",
+        "helmet": "^7.0.0"
+      },
+      "devDependencies": {
+        "nodemon": "^3.0.0"
+      }
+    },
+    "expectedDetection": {
+      "language": "javascript",
+      "frameworks": ["express"],
+      "confidence": 0.9,
+      "evidence": ["express dependency"]
+    }
+  },
+  "django-webapp": {
+    "name": "Django Web Application",
+    "language": "python",
+    "frameworks": ["django"],
+    "files": [
+      "requirements.txt",
+      "manage.py",
+      "myproject/settings.py",
+      "myproject/urls.py",
+      "myapp/views.py"
+    ],
+    "requirementsTxt": "Django==4.2.0\npsycopg2-binary==2.9.0\ndjango-environ==0.10.0\ncelery==5.3.0",
+    "expectedDetection": {
+      "language": "python",
+      "frameworks": ["django"],
+      "confidence": 0.95,
+      "evidence": ["django in requirements.txt"]
+    }
+  },
+  "flask-api": {
+    "name": "Flask API",
+    "language": "python",
+    "frameworks": ["flask"],
+    "files": [
+      "requirements.txt",
+      "app.py",
+      "models.py",
+      "routes.py"
+    ],
+    "requirementsTxt": "Flask==2.3.0\nFlask-SQLAlchemy==3.0.0\nFlask-CORS==4.0.0\ngunicorn==21.0.0",
+    "expectedDetection": {
+      "language": "python",
+      "frameworks": ["flask"],
+      "confidence": 0.95,
+      "evidence": ["flask in requirements.txt"]
+    }
+  },
+  "fastapi-service": {
+    "name": "FastAPI Service",
+    "language": "python",
+    "frameworks": ["fastapi"],
+    "files": [
+      "requirements.txt",
+      "main.py",
+      "models.py",
+      "routers/items.py"
+    ],
+    "requirementsTxt": "fastapi==0.104.0\nuvicorn[standard]==0.24.0\npydantic==2.5.0\nsqlalchemy==2.0.0",
+    "expectedDetection": {
+      "language": "python",
+      "frameworks": ["fastapi"],
+      "confidence": 0.95,
+      "evidence": ["fastapi in requirements.txt"]
+    }
+  },
+  "poetry-django": {
+    "name": "Django with Poetry",
+    "language": "python",
+    "frameworks": ["django"],
+    "files": [
+      "pyproject.toml",
+      "poetry.lock",
+      "manage.py",
+      "myproject/settings.py"
+    ],
+    "pyprojectToml": "[tool.poetry]\nname = \"django-poetry-app\"\nversion = \"0.1.0\"\ndescription = \"\"\n\n[tool.poetry.dependencies]\npython = \"^3.11\"\nDjango = \"^4.2.0\"\npsycopg2 = \"^2.9.0\"\n\n[tool.poetry.group.dev.dependencies]\npytest = \"^7.4.0\"",
+    "expectedDetection": {
+      "language": "python",
+      "frameworks": ["django"],
+      "confidence": 0.95,
+      "evidence": ["pyproject.toml detected", "poetry.lock detected"]
+    }
+  },
+  "gin-microservice": {
+    "name": "Gin Microservice",
+    "language": "go",
+    "frameworks": ["gin"],
+    "files": [
+      "go.mod",
+      "go.sum",
+      "main.go",
+      "handlers/user.go",
+      "middleware/auth.go"
+    ],
+    "goMod": "module gin-microservice\n\ngo 1.21\n\nrequire (\n\tgithub.com/gin-gonic/gin v1.9.1\n\tgithub.com/golang-jwt/jwt/v5 v5.0.0\n\tgorm.io/gorm v1.25.0\n\tgorm.io/driver/postgres v1.5.0\n)",
+    "expectedDetection": {
+      "language": "go",
+      "frameworks": ["gin"],
+      "confidence": 0.95,
+      "evidence": ["gin framework in go.mod"]
+    }
+  },
+  "echo-api": {
+    "name": "Echo API Server",
+    "language": "go",
+    "frameworks": ["echo"],
+    "files": [
+      "go.mod",
+      "go.sum",
+      "main.go",
+      "handlers/api.go"
+    ],
+    "goMod": "module echo-api\n\ngo 1.21\n\nrequire (\n\tgithub.com/labstack/echo/v4 v4.11.1\n\tgithub.com/golang-jwt/jwt v3.2.2\n\tgorm.io/gorm v1.25.0\n)",
+    "expectedDetection": {
+      "language": "go",
+      "frameworks": ["echo"],
+      "confidence": 0.95,
+      "evidence": ["echo framework in go.mod"]
+    }
+  },
+  "spring-boot-api": {
+    "name": "Spring Boot REST API",
+    "language": "java",
+    "frameworks": ["spring-boot"],
+    "files": [
+      "pom.xml",
+      "src/main/java/com/example/Application.java",
+      "src/main/java/com/example/controller/UserController.java",
+      "src/main/resources/application.properties"
+    ],
+    "pomXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\">\n    <groupId>com.example</groupId>\n    <artifactId>spring-boot-api</artifactId>\n    <version>0.0.1-SNAPSHOT</version>\n    <packaging>jar</packaging>\n    \n    <parent>\n        <groupId>org.springframework.boot</groupId>\n        <artifactId>spring-boot-starter-parent</artifactId>\n        <version>3.1.0</version>\n    </parent>\n    \n    <dependencies>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-web</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-data-jpa</artifactId>\n        </dependency>\n    </dependencies>\n</project>",
+    "expectedDetection": {
+      "language": "java",
+      "frameworks": ["spring-boot"],
+      "confidence": 0.95,
+      "evidence": ["spring-boot-starter-web in pom.xml"]
+    }
+  },
+  "gradle-spring": {
+    "name": "Spring Boot with Gradle",
+    "language": "java",
+    "frameworks": ["spring-boot"],
+    "files": [
+      "build.gradle",
+      "gradle.properties",
+      "src/main/java/com/example/Application.java"
+    ],
+    "buildGradle": "plugins {\n    id 'org.springframework.boot' version '3.1.0'\n    id 'io.spring.dependency-management' version '1.1.0'\n    id 'java'\n}\n\ngroup = 'com.example'\nversion = '0.0.1-SNAPSHOT'\njava.sourceCompatibility = JavaVersion.VERSION_17\n\ndependencies {\n    implementation 'org.springframework.boot:spring-boot-starter-web'\n    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'\n    testImplementation 'org.springframework.boot:spring-boot-starter-test'\n}",
+    "expectedDetection": {
+      "language": "java",
+      "frameworks": ["spring-boot"],
+      "confidence": 0.95,
+      "evidence": ["spring-boot plugin in build.gradle"]
+    }
+  },
+  "rust-cli": {
+    "name": "Rust CLI Application",
+    "language": "rust",
+    "frameworks": ["rust"],
+    "files": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "src/main.rs",
+      "src/lib.rs"
+    ],
+    "cargoToml": "[package]\nname = \"rust-cli\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\nclap = { version = \"4.4\", features = [\"derive\"] }\nserde = { version = \"1.0\", features = [\"derive\"] }\nserde_json = \"1.0\"\ntokio = { version = \"1\", features = [\"full\"] }",
+    "expectedDetection": {
+      "language": "rust",
+      "frameworks": ["rust"],
+      "confidence": 0.9,
+      "evidence": ["Cargo.toml detected"]
+    }
+  },
+  "monorepo-fullstack": {
+    "name": "Monorepo Fullstack (React + Express)",
+    "language": "javascript",
+    "frameworks": ["react", "express"],
+    "files": [
+      "package.json",
+      "frontend/package.json",
+      "backend/package.json",
+      "frontend/src/App.tsx",
+      "backend/server.js"
+    ],
+    "packageJson": {
+      "name": "fullstack-monorepo",
+      "version": "1.0.0",
+      "workspaces": ["frontend", "backend"],
+      "devDependencies": {
+        "lerna": "^7.0.0"
+      }
+    },
+    "frontendPackageJson": {
+      "name": "frontend",
+      "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
+      }
+    },
+    "backendPackageJson": {
+      "name": "backend",
+      "dependencies": {
+        "express": "^4.18.0",
+        "cors": "^2.8.5"
+      }
+    },
+    "expectedDetection": {
+      "language": "javascript",
+      "frameworks": ["react", "express"],
+      "confidence": 0.9,
+      "evidence": ["react dependency", "express dependency", "monorepo structure"]
+    }
+  },
+  "ambiguous-project": {
+    "name": "Ambiguous Project (Multiple Frameworks)",
+    "language": "javascript",
+    "frameworks": ["react", "vue", "angular"],
+    "files": [
+      "package.json"
+    ],
+    "packageJson": {
+      "name": "confused-project",
+      "dependencies": {
+        "react": "^18.2.0",
+        "vue": "^3.3.0",
+        "@angular/core": "^16.0.0"
+      }
+    },
+    "expectedDetection": {
+      "language": "javascript",
+      "frameworks": ["react", "vue", "angular"],
+      "confidence": 0.8,
+      "evidence": ["react dependency", "vue dependency", "@angular/core dependency"],
+      "ambiguity": "multiple_frameworks"
+    }
+  },
+  "low-confidence-project": {
+    "name": "Low Confidence Project",
+    "language": "javascript",
+    "frameworks": [],
+    "files": [
+      "package.json"
+    ],
+    "packageJson": {
+      "name": "unknown-project",
+      "dependencies": {
+        "lodash": "^4.17.21",
+        "axios": "^1.5.0"
+      }
+    },
+    "expectedDetection": {
+      "language": "javascript",
+      "frameworks": [],
+      "confidence": 0.3,
+      "evidence": [],
+      "ambiguity": "low_confidence"
+    }
+  },
+  "no-project-files": {
+    "name": "No Recognizable Project Files",
+    "language": null,
+    "frameworks": [],
+    "files": [
+      "README.md",
+      "LICENSE",
+      "some-random-file.txt"
+    ],
+    "expectedDetection": {
+      "language": null,
+      "frameworks": [],
+      "confidence": 0.0,
+      "evidence": [],
+      "ambiguity": "no_detection"
+    }
+  }
+} 

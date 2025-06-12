@@ -1,1 +1,0 @@
-import { UserInputError } from "../errors"; export class ProjectDetectionError extends Error { constructor(message: string, public readonly path: string) { super(message); this.name = "ProjectDetectionError"; } }
