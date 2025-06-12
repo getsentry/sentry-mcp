@@ -793,6 +793,407 @@ export const TOOL_HANDLERS = {
     }
     return output;
   },
+  find_issue_alert_rules: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    const organizationSlug = params.organizationSlug;
+    const projectSlug = params.projectSlug;
+
+    if (!organizationSlug) {
+      throw new UserInputError(
+        "Organization slug is required. Please provide an organizationSlug parameter.",
+      );
+    }
+
+    if (!projectSlug) {
+      throw new UserInputError(
+        "Project slug is required. Please provide a projectSlug parameter.",
+      );
+    }
+
+    setTag("organization.slug", organizationSlug);
+    setTag("project.slug", projectSlug);
+
+    const alertRules = await apiService.listIssueAlertRules({
+      organizationSlug,
+      projectSlug,
+    });
+
+    let output = `# Issue Alert Rules in **${organizationSlug}/${projectSlug}**\n\n`;
+
+    if (alertRules.length === 0) {
+      output += "No issue alert rules found.\n";
+      return output;
+    }
+
+    output += alertRules
+      .map((rule) => {
+        const conditionsText =
+          rule.conditions.length > 0
+            ? rule.conditions
+                .map((c) => c.name || c.id.split(".").pop() || c.id)
+                .join(", ")
+            : "None";
+        const filtersText =
+          rule.filters.length > 0
+            ? rule.filters
+                .map(
+                  (f) =>
+                    f.name || `${f.id.split(".").pop() || f.id}: ${f.value}`,
+                )
+                .join(", ")
+            : "None";
+        const actionsText =
+          rule.actions.length > 0
+            ? rule.actions
+                .map((a) => a.name || a.id.split(".").pop() || a.id)
+                .join(", ")
+            : "None";
+
+        return [
+          `## ${rule.name}`,
+          "",
+          `**ID**: ${rule.id}`,
+          `**Status**: ${rule.status}`,
+          `**Frequency**: ${rule.frequency} minutes`,
+          `**Environment**: ${rule.environment || "All environments"}`,
+          `**Owner**: ${rule.owner || "None"}`,
+          `**Conditions**: ${conditionsText}`,
+          `**Filters**: ${filtersText}`,
+          `**Actions**: ${actionsText}`,
+          `**Action Match**: ${rule.actionMatch}`,
+          `**Filter Match**: ${rule.filterMatch}`,
+          `**Created**: ${new Date(rule.dateCreated).toISOString()}`,
+          `**Snooze**: ${rule.snooze ? "Yes" : "No"}`,
+        ].join("\n");
+      })
+      .join("\n\n");
+
+    output += "\n\n# Using this information\n\n";
+    output += `- You can get more details about a specific rule using: \`get_issue_alert_rule_details(organizationSlug="${organizationSlug}", projectSlug="${projectSlug}", ruleId=<ruleId>)\`\n`;
+    output += `- You can delete a rule using: \`delete_issue_alert_rule(organizationSlug="${organizationSlug}", projectSlug="${projectSlug}", ruleId=<ruleId>)\`\n`;
+
+    return output;
+  },
+  get_issue_alert_rule_details: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    const organizationSlug = params.organizationSlug;
+    const projectSlug = params.projectSlug;
+    const ruleId = params.ruleId;
+
+    if (!organizationSlug) {
+      throw new UserInputError(
+        "Organization slug is required. Please provide an organizationSlug parameter.",
+      );
+    }
+
+    if (!projectSlug) {
+      throw new UserInputError(
+        "Project slug is required. Please provide a projectSlug parameter.",
+      );
+    }
+
+    if (!ruleId) {
+      throw new UserInputError(
+        "Rule ID is required. Please provide a ruleId parameter.",
+      );
+    }
+
+    setTag("organization.slug", organizationSlug);
+    setTag("project.slug", projectSlug);
+
+    const rule = await apiService.getIssueAlertRule({
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    });
+
+    const output = [
+      `# Issue Alert Rule: **${rule.name}**`,
+      "",
+      `**ID**: ${rule.id}`,
+      `**Project**: ${organizationSlug}/${projectSlug}`,
+      `**Status**: ${rule.status}`,
+      `**Frequency**: ${rule.frequency} minutes`,
+      `**Environment**: ${rule.environment || "All environments"}`,
+      `**Owner**: ${rule.owner || "None"}`,
+      `**Action Match**: ${rule.actionMatch}`,
+      `**Filter Match**: ${rule.filterMatch}`,
+      `**Snooze**: ${rule.snooze ? "Yes" : "No"}`,
+      "",
+    ];
+
+    if (rule.conditions.length > 0) {
+      output.push("## Conditions");
+      output.push("");
+      for (const condition of rule.conditions) {
+        const conditionName =
+          condition.name || condition.id.split(".").pop() || condition.id;
+        output.push(`- **${conditionName}**`);
+        if (condition.interval)
+          output.push(`  - Interval: ${condition.interval}`);
+        if (condition.value) output.push(`  - Value: ${condition.value}`);
+        if (condition.comparisonType)
+          output.push(`  - Comparison: ${condition.comparisonType}`);
+      }
+      output.push("");
+    }
+
+    if (rule.filters.length > 0) {
+      output.push("## Filters");
+      output.push("");
+      for (const filter of rule.filters) {
+        const filterName =
+          filter.name || `${filter.id.split(".").pop() || filter.id}`;
+        output.push(`- **${filterName}**`);
+        if (filter.value) output.push(`  - Value: ${filter.value}`);
+        if (filter.match) output.push(`  - Match: ${filter.match}`);
+        if (filter.key) output.push(`  - Key: ${filter.key}`);
+        if (filter.attribute) output.push(`  - Attribute: ${filter.attribute}`);
+      }
+      output.push("");
+    }
+
+    if (rule.actions.length > 0) {
+      output.push("## Actions");
+      output.push("");
+      for (const action of rule.actions) {
+        const actionName =
+          action.name || action.id.split(".").pop() || action.id;
+        output.push(`- **${actionName}**`);
+        if (action.targetType)
+          output.push(`  - Target Type: ${action.targetType}`);
+        if (action.targetIdentifier)
+          output.push(`  - Target: ${action.targetIdentifier}`);
+        if (action.fallthroughType)
+          output.push(`  - Fallthrough: ${action.fallthroughType}`);
+        if (action.workspace) output.push(`  - Workspace: ${action.workspace}`);
+        if (action.channel) output.push(`  - Channel: ${action.channel}`);
+        if (action.channel_id)
+          output.push(`  - Channel ID: ${action.channel_id}`);
+      }
+      output.push("");
+    }
+
+    output.push("## Metadata");
+    output.push("");
+    output.push(`**Created**: ${new Date(rule.dateCreated).toISOString()}`);
+    if (rule.createdBy) {
+      output.push(
+        `**Created By**: ${rule.createdBy.name} (${rule.createdBy.email})`,
+      );
+    }
+
+    return output.join("\n");
+  },
+  delete_issue_alert_rule: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    const organizationSlug = params.organizationSlug;
+    const projectSlug = params.projectSlug;
+    const ruleId = params.ruleId;
+
+    if (!organizationSlug) {
+      throw new UserInputError(
+        "Organization slug is required. Please provide an organizationSlug parameter.",
+      );
+    }
+
+    if (!projectSlug) {
+      throw new UserInputError(
+        "Project slug is required. Please provide a projectSlug parameter.",
+      );
+    }
+
+    if (!ruleId) {
+      throw new UserInputError(
+        "Rule ID is required. Please provide a ruleId parameter.",
+      );
+    }
+
+    setTag("organization.slug", organizationSlug);
+    setTag("project.slug", projectSlug);
+
+    await apiService.deleteIssueAlertRule({
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    });
+
+    return [
+      `# Issue Alert Rule Deleted`,
+      "",
+      `Successfully deleted issue alert rule **${ruleId}** from project **${organizationSlug}/${projectSlug}**.`,
+      "",
+      "The alert rule has been permanently removed and will no longer trigger alerts.",
+    ].join("\n");
+  },
+  update_issue_alert_rule: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    const organizationSlug = params.organizationSlug;
+    const projectSlug = params.projectSlug;
+    const ruleId = params.ruleId;
+
+    if (!organizationSlug) {
+      throw new UserInputError(
+        "Organization slug is required. Please provide an organizationSlug parameter.",
+      );
+    }
+
+    if (!projectSlug) {
+      throw new UserInputError(
+        "Project slug is required. Please provide a projectSlug parameter.",
+      );
+    }
+
+    if (!ruleId) {
+      throw new UserInputError(
+        "Rule ID is required. Please provide a ruleId parameter.",
+      );
+    }
+
+    setTag("organization.slug", organizationSlug);
+    setTag("project.slug", projectSlug);
+
+    // Build the update payload
+    const updatePayload: any = {};
+
+    if (params.name !== undefined) updatePayload.name = params.name;
+    if (params.frequency !== undefined)
+      updatePayload.frequency = params.frequency;
+    if (params.actionMatch !== undefined)
+      updatePayload.actionMatch = params.actionMatch;
+    if (params.filterMatch !== undefined)
+      updatePayload.filterMatch = params.filterMatch;
+    if (params.conditions !== undefined)
+      updatePayload.conditions = params.conditions;
+    if (params.filters !== undefined) updatePayload.filters = params.filters;
+    if (params.actions !== undefined) updatePayload.actions = params.actions;
+    if (params.owner !== undefined) updatePayload.owner = params.owner;
+    if (params.environment !== undefined)
+      updatePayload.environment = params.environment;
+
+    if (Object.keys(updatePayload).length === 0) {
+      throw new UserInputError(
+        "At least one field must be provided to update the alert rule.",
+      );
+    }
+
+    const updatedRule = await apiService.updateIssueAlertRule({
+      organizationSlug,
+      projectSlug,
+      ruleId,
+      ...updatePayload,
+    });
+
+    return [
+      `# Issue Alert Rule Updated`,
+      "",
+      `Successfully updated issue alert rule **${updatedRule.name}** (ID: ${updatedRule.id}) in project **${organizationSlug}/${projectSlug}**.`,
+      "",
+      `**Status**: ${updatedRule.status}`,
+      `**Frequency**: ${updatedRule.frequency} minutes`,
+      `**Environment**: ${updatedRule.environment || "All environments"}`,
+      `**Owner**: ${updatedRule.owner || "None"}`,
+      "",
+      "## Updated Configuration",
+      "",
+      `**Conditions**: ${updatedRule.conditions.length} configured`,
+      `**Filters**: ${updatedRule.filters.length} configured`,
+      `**Actions**: ${updatedRule.actions.length} configured`,
+      `**Action Match**: ${updatedRule.actionMatch}`,
+      `**Filter Match**: ${updatedRule.filterMatch}`,
+      "",
+      "The alert rule configuration has been successfully updated and is now active.",
+    ].join("\n");
+  },
+  create_issue_alert_rule: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    const organizationSlug = params.organizationSlug;
+    const projectSlug = params.projectSlug;
+
+    if (!organizationSlug) {
+      throw new UserInputError(
+        "Organization slug is required. Please provide an organizationSlug parameter.",
+      );
+    }
+
+    if (!projectSlug) {
+      throw new UserInputError(
+        "Project slug is required. Please provide a projectSlug parameter.",
+      );
+    }
+
+    if (!params.name) {
+      throw new UserInputError(
+        "Rule name is required. Please provide a name parameter.",
+      );
+    }
+
+    if (!params.conditions || params.conditions.length === 0) {
+      throw new UserInputError(
+        "At least one condition is required. Please provide conditions parameter.",
+      );
+    }
+
+    if (!params.actions || params.actions.length === 0) {
+      throw new UserInputError(
+        "At least one action is required. Please provide actions parameter.",
+      );
+    }
+
+    setTag("organization.slug", organizationSlug);
+    setTag("project.slug", projectSlug);
+
+    const newRule = await apiService.createIssueAlertRule({
+      organizationSlug,
+      projectSlug,
+      name: params.name,
+      frequency: params.frequency,
+      actionMatch: params.actionMatch,
+      filterMatch: params.filterMatch,
+      conditions: params.conditions,
+      filters: params.filters,
+      actions: params.actions,
+      owner: params.owner,
+      environment: params.environment,
+    });
+
+    return [
+      `# Issue Alert Rule Created`,
+      "",
+      `Successfully created issue alert rule **${newRule.name}** (ID: ${newRule.id}) in project **${organizationSlug}/${projectSlug}**.`,
+      "",
+      `**Status**: ${newRule.status}`,
+      `**Frequency**: ${newRule.frequency} minutes`,
+      `**Environment**: ${newRule.environment || "All environments"}`,
+      `**Owner**: ${newRule.owner || "None"}`,
+      "",
+      "## Configuration",
+      "",
+      `**Conditions**: ${newRule.conditions.length} configured`,
+      `**Filters**: ${newRule.filters.length} configured`,
+      `**Actions**: ${newRule.actions.length} configured`,
+      `**Action Match**: ${newRule.actionMatch}`,
+      `**Filter Match**: ${newRule.filterMatch}`,
+      "",
+      "The alert rule has been created and is now active. It will trigger alerts based on the configured conditions.",
+      "",
+      "# Using this information",
+      "",
+      `- You can view details using: \`get_issue_alert_rule_details(organizationSlug="${organizationSlug}", projectSlug="${projectSlug}", ruleId="${newRule.id}")\``,
+      `- You can update the rule using: \`update_issue_alert_rule(organizationSlug="${organizationSlug}", projectSlug="${projectSlug}", ruleId="${newRule.id}")\``,
+      `- You can delete the rule using: \`delete_issue_alert_rule(organizationSlug="${organizationSlug}", projectSlug="${projectSlug}", ruleId="${newRule.id}")\``,
+    ].join("\n");
+  },
 } satisfies ToolHandlers;
 
 function getOutputForAutofixStep(step: z.infer<typeof AutofixRunStepSchema>) {

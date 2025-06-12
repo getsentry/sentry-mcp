@@ -31,6 +31,8 @@ import tagsFixture from "./fixtures/tags.json";
 import projectFixture from "./fixtures/project.json";
 import teamFixture from "./fixtures/team.json";
 
+import issueAlertRulesFixture from "./fixtures/issue-alert-rules.json";
+
 /**
  * Standard organization payload for mock responses.
  * Used across multiple endpoints for consistency.
@@ -833,6 +835,111 @@ export const restHandlers = buildHandlers([
         assignedTo: body?.assignedTo || issueFixture2.assignedTo,
       };
       return HttpResponse.json(updatedIssue);
+    },
+  },
+  // Issue Alert endpoints
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/",
+    fetch: async ({ request }) => {
+      return HttpResponse.json(issueAlertRulesFixture);
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/3/",
+    fetch: async ({ request }) => {
+      return HttpResponse.json(issueAlertRulesFixture[0]);
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/4/",
+    fetch: async ({ request }) => {
+      return HttpResponse.json(issueAlertRulesFixture[1]);
+    },
+  },
+  {
+    method: "delete",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/3/",
+    fetch: async ({ request }) => {
+      return HttpResponse.json({}, { status: 204 });
+    },
+  },
+  {
+    method: "delete",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/4/",
+    fetch: async ({ request }) => {
+      return HttpResponse.json({}, { status: 204 });
+    },
+  },
+  {
+    method: "put",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/3/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      const updatedRule = {
+        ...issueAlertRulesFixture[0],
+        name: body?.name || issueAlertRulesFixture[0].name,
+        frequency: body?.frequency || issueAlertRulesFixture[0].frequency,
+        actionMatch: body?.actionMatch || issueAlertRulesFixture[0].actionMatch,
+        filterMatch: body?.filterMatch || issueAlertRulesFixture[0].filterMatch,
+        conditions: body?.conditions || issueAlertRulesFixture[0].conditions,
+        filters: body?.filters || issueAlertRulesFixture[0].filters,
+        actions: body?.actions || issueAlertRulesFixture[0].actions,
+        owner: body?.owner || issueAlertRulesFixture[0].owner,
+        environment: body?.environment || issueAlertRulesFixture[0].environment,
+      };
+      return HttpResponse.json(updatedRule);
+    },
+  },
+  {
+    method: "put",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/4/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      const updatedRule = {
+        ...issueAlertRulesFixture[1],
+        name: body?.name || issueAlertRulesFixture[1].name,
+        frequency: body?.frequency || issueAlertRulesFixture[1].frequency,
+        actionMatch: body?.actionMatch || issueAlertRulesFixture[1].actionMatch,
+        filterMatch: body?.filterMatch || issueAlertRulesFixture[1].filterMatch,
+        conditions: body?.conditions || issueAlertRulesFixture[1].conditions,
+        filters: body?.filters || issueAlertRulesFixture[1].filters,
+        actions: body?.actions || issueAlertRulesFixture[1].actions,
+        owner: body?.owner || issueAlertRulesFixture[1].owner,
+        environment: body?.environment || issueAlertRulesFixture[1].environment,
+      };
+      return HttpResponse.json(updatedRule);
+    },
+  },
+  {
+    method: "post",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/rules/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as any;
+      const newRule = {
+        id: "5",
+        conditions: body?.conditions || [],
+        filters: body?.filters || [],
+        actions: body?.actions || [],
+        actionMatch: body?.actionMatch || "any",
+        filterMatch: body?.filterMatch || "all",
+        frequency: body?.frequency || 1440,
+        name: body?.name || "New Alert Rule",
+        dateCreated: new Date().toISOString(),
+        owner: body?.owner || null,
+        createdBy: {
+          id: 24601,
+          name: "Jean Valjean",
+          email: "jean@example.com",
+        },
+        environment: body?.environment || null,
+        projects: ["cloudflare-mcp"],
+        status: "active",
+        snooze: false,
+      };
+      return HttpResponse.json(newRule);
     },
   },
 ]);

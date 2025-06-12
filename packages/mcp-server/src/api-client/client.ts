@@ -18,6 +18,8 @@ import {
   AutofixRunStateSchema,
   UserSchema,
   UserRegionsSchema,
+  IssueAlertRuleListSchema,
+  IssueAlertRuleSchema,
 } from "./schema";
 import type {
   AutofixRun,
@@ -35,6 +37,8 @@ import type {
   Team,
   TeamList,
   User,
+  IssueAlertRule,
+  IssueAlertRuleList,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -1040,5 +1044,235 @@ export class SentryApiService {
     );
     const body = await response.json();
     return AutofixRunStateSchema.parse(body);
+  }
+
+  /**
+   * Lists issue alert rules within a project.
+   *
+   * Issue alert rules trigger on new events for issues matching specific
+   * conditions. They are project-level configurations with triggers, filters,
+   * and actions.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param opts Request options
+   * @returns Array of issue alert rules with conditions and actions
+   *
+   * @example
+   * ```typescript
+   * const alertRules = await apiService.listIssueAlertRules({
+   *   organizationSlug: "my-org",
+   *   projectSlug: "my-project"
+   * });
+   * ```
+   */
+  async listIssueAlertRules(
+    {
+      organizationSlug,
+      projectSlug,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRuleList> {
+    const response = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/rules/`,
+      undefined,
+      opts,
+    );
+
+    const body = await response.json();
+    return IssueAlertRuleListSchema.parse(body);
+  }
+
+  /**
+   * Gets details of a specific issue alert rule.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.ruleId Alert rule ID
+   * @param opts Request options
+   * @returns Issue alert rule details
+   */
+  async getIssueAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      ruleId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const response = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/rules/${ruleId}/`,
+      undefined,
+      opts,
+    );
+
+    const body = await response.json();
+    return IssueAlertRuleSchema.parse(body);
+  }
+
+  /**
+   * Deletes an issue alert rule.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.ruleId Alert rule ID
+   * @param opts Request options
+   */
+  async deleteIssueAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      ruleId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      ruleId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/rules/${ruleId}/`,
+      {
+        method: "DELETE",
+      },
+      opts,
+    );
+  }
+
+  /**
+   * Updates an existing issue alert rule.
+   *
+   * @param params Query parameters and update data
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param params.ruleId Alert rule ID
+   * @param opts Request options
+   * @returns Updated issue alert rule
+   */
+  async updateIssueAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      ruleId,
+      name,
+      frequency,
+      actionMatch,
+      filterMatch,
+      conditions,
+      filters,
+      actions,
+      owner,
+      environment,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      ruleId: string;
+      name?: string;
+      frequency?: number;
+      actionMatch?: "any" | "all";
+      filterMatch?: "any" | "all";
+      conditions?: any[];
+      filters?: any[];
+      actions?: any[];
+      owner?: string;
+      environment?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const updateData: any = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (frequency !== undefined) updateData.frequency = frequency;
+    if (actionMatch !== undefined) updateData.actionMatch = actionMatch;
+    if (filterMatch !== undefined) updateData.filterMatch = filterMatch;
+    if (conditions !== undefined) updateData.conditions = conditions;
+    if (filters !== undefined) updateData.filters = filters;
+    if (actions !== undefined) updateData.actions = actions;
+    if (owner !== undefined) updateData.owner = owner;
+    if (environment !== undefined) updateData.environment = environment;
+
+    const response = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/rules/${ruleId}/`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      },
+      opts,
+    );
+
+    const body = await response.json();
+    return IssueAlertRuleSchema.parse(body);
+  }
+
+  /**
+   * Creates a new issue alert rule.
+   *
+   * @param params Query parameters and rule configuration
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlug Project identifier
+   * @param opts Request options
+   * @returns Created issue alert rule
+   */
+  async createIssueAlertRule(
+    {
+      organizationSlug,
+      projectSlug,
+      name,
+      frequency = 1440,
+      actionMatch = "any",
+      filterMatch = "all",
+      conditions,
+      filters = [],
+      actions,
+      owner,
+      environment,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      name: string;
+      frequency?: number;
+      actionMatch?: "any" | "all";
+      filterMatch?: "any" | "all";
+      conditions: any[];
+      filters?: any[];
+      actions: any[];
+      owner?: string;
+      environment?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueAlertRule> {
+    const ruleData = {
+      name,
+      frequency,
+      actionMatch,
+      filterMatch,
+      conditions,
+      filters,
+      actions,
+      ...(owner && { owner }),
+      ...(environment && { environment }),
+    };
+
+    const response = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/rules/`,
+      {
+        method: "POST",
+        body: JSON.stringify(ruleData),
+      },
+      opts,
+    );
+
+    const body = await response.json();
+    return IssueAlertRuleSchema.parse(body);
   }
 }

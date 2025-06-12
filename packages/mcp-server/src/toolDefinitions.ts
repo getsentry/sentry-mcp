@@ -39,6 +39,7 @@ import {
   ParamTeamSlug,
   ParamIssueStatus,
   ParamAssignedTo,
+  ParamRuleId,
 } from "./schema";
 import { z } from "zod";
 
@@ -618,4 +619,306 @@ export const TOOL_DEFINITIONS = [
       issueUrl: ParamIssueUrl.optional(),
     },
   },
-];
+
+  {
+    name: "find_issue_alert_rules" as const,
+    description: [
+      "Find issue alert rules in a Sentry project.",
+      "",
+      "Use this tool when you need to:",
+      "- View all issue alert rules configured for a project",
+      "- Check what alerts are triggered when new issues occur",
+      "- See notification configurations for issue events",
+      "",
+      "Issue alert rules trigger whenever a new event is received for any issue in a project that matches specified conditions. They can include triggers, filters, and actions.",
+      "",
+      "<examples>",
+      "### Find all issue alert rules for a project",
+      "",
+      "```",
+      "find_issue_alert_rules(organizationSlug='my-organization', projectSlug='my-project')",
+      "```",
+      "</examples>",
+      "",
+      "<hints>",
+      "- Issue alert rules are project-level configurations",
+      "- Rules have three parts: triggers (what to monitor), filters (when to alert), and actions (what to do)",
+      "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug,
+      projectSlug: ParamProjectSlug,
+      regionUrl: ParamRegionUrl.optional(),
+    },
+  },
+  {
+    name: "get_issue_alert_rule_details" as const,
+    description: [
+      "Get detailed information about a specific issue alert rule.",
+      "",
+      "Use this tool when you need to:",
+      "- View the configuration of a specific issue alert rule",
+      "- Check the conditions and filters for an alert rule",
+      "- See what actions are configured when an alert triggers",
+      "",
+      "<examples>",
+      "### Get details of a specific issue alert rule",
+      "",
+      "```",
+      "get_issue_alert_rule_details(organizationSlug='my-organization', projectSlug='my-project', ruleId='456')",
+      "```",
+      "</examples>",
+      "",
+      "<hints>",
+      "- You can find rule IDs using the `find_issue_alert_rules()` tool",
+      "- The response includes conditions, filters, actions, and rule status",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug,
+      projectSlug: ParamProjectSlug,
+      ruleId: ParamRuleId,
+      regionUrl: ParamRegionUrl.optional(),
+    },
+  },
+  {
+    name: "delete_issue_alert_rule" as const,
+    description: [
+      "Delete an issue alert rule from a Sentry project.",
+      "",
+      "Use this tool when you need to:",
+      "- Remove an outdated or unnecessary issue alert rule",
+      "- Clean up alert configurations for a project",
+      "- Disable notifications for specific issue conditions",
+      "",
+      "<examples>",
+      "### Delete a specific issue alert rule",
+      "",
+      "```",
+      "delete_issue_alert_rule(organizationSlug='my-organization', projectSlug='my-project', ruleId='456')",
+      "```",
+      "</examples>",
+      "",
+      "<hints>",
+      "- This action cannot be undone",
+      "- You can find rule IDs using the `find_issue_alert_rules()` tool",
+      "- Make sure you really want to delete the rule before proceeding",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug,
+      projectSlug: ParamProjectSlug,
+      ruleId: ParamRuleId,
+      regionUrl: ParamRegionUrl.optional(),
+    },
+  },
+  {
+    name: "update_issue_alert_rule" as const,
+    description: [
+      "Update an existing issue alert rule in a Sentry project.",
+      "",
+      "Be careful when using this tool!",
+      "",
+      "Use this tool when you need to:",
+      "- Modify the conditions, filters, or actions of an existing alert rule",
+      "- Change the name or frequency of an alert rule",
+      "- Update notification settings for an alert rule",
+      "",
+      "<examples>",
+      "### Update an alert rule name and frequency",
+      "",
+      "```",
+      "update_issue_alert_rule(organizationSlug='my-organization', projectSlug='my-project', ruleId='456', name='Updated Alert Rule', frequency=60)",
+      "```",
+      "",
+      "### Update alert rule conditions",
+      "",
+      "```",
+      "update_issue_alert_rule(organizationSlug='my-organization', projectSlug='my-project', ruleId='456', conditions=[{\"id\": \"sentry.rules.conditions.first_seen_event.FirstSeenEventCondition\"}])",
+      "```",
+      "</examples>",
+      "",
+      "<hints>",
+      "- You can find rule IDs using the `find_issue_alert_rules()` tool",
+      "- Use `get_issue_alert_rule_details()` to see the current configuration before updating",
+      "- The update will replace the entire rule configuration, so include all required fields",
+      "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug,
+      projectSlug: ParamProjectSlug,
+      ruleId: ParamRuleId,
+      regionUrl: ParamRegionUrl.optional(),
+      name: z.string().trim().describe("The name of the alert rule").optional(),
+      frequency: z
+        .number()
+        .int()
+        .positive()
+        .describe("Frequency in minutes between alert triggers")
+        .optional(),
+      actionMatch: z
+        .enum(["any", "all"])
+        .describe("Whether any or all actions must be triggered")
+        .optional(),
+      filterMatch: z
+        .enum(["any", "all"])
+        .describe("Whether any or all filters must match")
+        .optional(),
+      conditions: z
+        .array(
+          z
+            .object({
+              id: z.string(),
+              interval: z.string().optional(),
+              value: z.union([z.string(), z.number()]).optional(),
+              comparisonType: z.string().optional(),
+            })
+            .passthrough(),
+        )
+        .describe("Array of condition objects that trigger the alert")
+        .optional(),
+      filters: z
+        .array(
+          z
+            .object({
+              id: z.string(),
+              value: z.union([z.string(), z.number()]).optional(),
+              match: z.string().optional(),
+              key: z.string().optional(),
+              attribute: z.string().optional(),
+            })
+            .passthrough(),
+        )
+        .describe("Array of filter objects that refine when alerts trigger")
+        .optional(),
+      actions: z
+        .array(
+          z
+            .object({
+              id: z.string(),
+              targetType: z.string().optional(),
+              targetIdentifier: z.union([z.string(), z.number()]).optional(),
+              fallthroughType: z.string().optional(),
+            })
+            .passthrough(),
+        )
+        .describe(
+          "Array of action objects that define what happens when alert triggers",
+        )
+        .optional(),
+      owner: z
+        .string()
+        .describe("Team or user that owns this alert rule")
+        .optional(),
+      environment: z
+        .string()
+        .describe("Environment filter for the alert rule")
+        .optional(),
+    },
+  },
+  {
+    name: "create_issue_alert_rule" as const,
+    description: [
+      "Create a new issue alert rule for a Sentry project.",
+      "",
+      "Be careful when using this tool!",
+      "",
+      "Use this tool when you need to:",
+      "- Set up notifications for new issues in a project",
+      "- Create alerts for specific error conditions or frequencies",
+      "- Configure automated responses to issues",
+      "",
+      "<examples>",
+      "### Create a simple new issue alert",
+      "",
+      "```",
+      'create_issue_alert_rule(organizationSlug=\'my-organization\', projectSlug=\'my-project\', name=\'New Issue Alert\', conditions=[{"id": "sentry.rules.conditions.first_seen_event.FirstSeenEventCondition"}], actions=[{"id": "sentry.mail.actions.NotifyEmailAction", "targetType": "Member", "targetIdentifier": "123"}])',
+      "```",
+      "",
+      "### Create a frequency-based alert",
+      "",
+      "```",
+      'create_issue_alert_rule(organizationSlug=\'my-organization\', projectSlug=\'my-project\', name=\'High Frequency Alert\', conditions=[{"id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition", "value": 10, "interval": "1h"}], actions=[{"id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction", "workspace": "123", "channel": "alerts"}])',
+      "```",
+      "</examples>",
+      "",
+      "<hints>",
+      "- At minimum, you need name, conditions, and actions to create a rule",
+      "- Use common condition IDs like 'sentry.rules.conditions.first_seen_event.FirstSeenEventCondition' for new issues",
+      "- Use 'sentry.rules.conditions.event_frequency.EventFrequencyCondition' for frequency-based alerts",
+      "- Action IDs include 'sentry.mail.actions.NotifyEmailAction' for email and 'sentry.integrations.slack.notify_action.SlackNotifyServiceAction' for Slack",
+      "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      organizationSlug: ParamOrganizationSlug,
+      projectSlug: ParamProjectSlug,
+      regionUrl: ParamRegionUrl.optional(),
+      name: z.string().trim().describe("The name of the alert rule"),
+      frequency: z
+        .number()
+        .int()
+        .positive()
+        .describe("Frequency in minutes between alert triggers")
+        .default(1440),
+      actionMatch: z
+        .enum(["any", "all"])
+        .describe("Whether any or all actions must be triggered")
+        .default("any"),
+      filterMatch: z
+        .enum(["any", "all"])
+        .describe("Whether any or all filters must match")
+        .default("all"),
+      conditions: z
+        .array(
+          z
+            .object({
+              id: z.string(),
+              interval: z.string().optional(),
+              value: z.union([z.string(), z.number()]).optional(),
+              comparisonType: z.string().optional(),
+            })
+            .passthrough(),
+        )
+        .describe("Array of condition objects that trigger the alert"),
+      filters: z
+        .array(
+          z
+            .object({
+              id: z.string(),
+              value: z.union([z.string(), z.number()]).optional(),
+              match: z.string().optional(),
+              key: z.string().optional(),
+              attribute: z.string().optional(),
+            })
+            .passthrough(),
+        )
+        .describe("Array of filter objects that refine when alerts trigger")
+        .default([]),
+      actions: z
+        .array(
+          z
+            .object({
+              id: z.string(),
+              targetType: z.string().optional(),
+              targetIdentifier: z.union([z.string(), z.number()]).optional(),
+              fallthroughType: z.string().optional(),
+            })
+            .passthrough(),
+        )
+        .describe(
+          "Array of action objects that define what happens when alert triggers",
+        ),
+      owner: z
+        .string()
+        .describe("Team or user that owns this alert rule")
+        .optional(),
+      environment: z
+        .string()
+        .describe("Environment filter for the alert rule")
+        .optional(),
+    },
+  },
+] as const;

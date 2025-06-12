@@ -268,7 +268,6 @@ describe("find_tags", () => {
       },
       {
         organizationSlug: "sentry-mcp-evals",
-        projectSlug: undefined,
         regionUrl: undefined,
       },
     );
@@ -753,6 +752,9 @@ describe("update_project", () => {
         projectSlug: "cloudflare-mcp",
         teamSlug: "the-goats",
         regionUrl: undefined,
+        name: undefined,
+        slug: undefined,
+        platform: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -1396,5 +1398,635 @@ describe("update_issue", () => {
     ).rejects.toThrow(
       "At least one of `status` or `assignedTo` must be provided to update the issue",
     );
+  });
+});
+
+describe("find_issue_alert_rules", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.find_issue_alert_rules;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue Alert Rules in **sentry-mcp-evals/cloudflare-mcp**
+
+      ## High Frequency Error Alert
+
+      **ID**: 3
+      **Status**: active
+      **Frequency**: 60 minutes
+      **Environment**: production
+      **Owner**: team:63562
+      **Conditions**: The issue is seen more than 10 times in 1h
+      **Filters**: The event's issue category is Error
+      **Actions**: Send a notification to Team and if none can be found then send a notification to ActiveMembers
+      **Action Match**: any
+      **Filter Match**: any
+      **Created**: 2023-01-15T06:45:34.353Z
+      **Snooze**: No
+
+      ## New Error Alert
+
+      **ID**: 4
+      **Status**: active
+      **Frequency**: 30 minutes
+      **Environment**: All environments
+      **Owner**: user:123456
+      **Conditions**: A new issue is created
+      **Filters**: The event's level is equal to error
+      **Actions**: Send a notification to the Test Slack workspace to #alerts
+      **Action Match**: all
+      **Filter Match**: all
+      **Created**: 2023-02-20T14:30:22.123Z
+      **Snooze**: No
+
+      # Using this information
+
+      - You can get more details about a specific rule using: \`get_issue_alert_rule_details(organizationSlug="sentry-mcp-evals", projectSlug="cloudflare-mcp", ruleId=<ruleId>)\`
+      - You can delete a rule using: \`delete_issue_alert_rule(organizationSlug="sentry-mcp-evals", projectSlug="cloudflare-mcp", ruleId=<ruleId>)\`
+      "
+    `);
+  });
+
+  it("validates required parameters", async () => {
+    const tool = TOOL_HANDLERS.find_issue_alert_rules;
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: undefined,
+          projectSlug: "cloudflare-mcp",
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Organization slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: undefined,
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Project slug is required");
+  });
+});
+
+describe("get_issue_alert_rule_details", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.get_issue_alert_rule_details;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        ruleId: "123456",
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue Alert Rule: **High Priority Issues**
+
+      **ID**: 123456
+      **Project**: sentry-mcp-evals/cloudflare-mcp
+      **Status**: active
+      **Frequency**: 5 minutes
+      **Environment**: production
+      **Owner**: team:backend
+      **Action Match**: all
+      **Filter Match**: any
+      **Snooze**: No
+
+      ## Conditions
+
+      - **An event is seen**
+        - Interval: 1m
+        - Value: 1
+        - Comparison: count
+      - **The issue is first seen**
+
+      ## Filters
+
+      - **The issue is older or newer than**
+        - Value: 60
+        - Match: older
+        - Key: age
+      - **The event's level is equal to**
+        - Value: error
+        - Match: equal
+        - Attribute: level
+
+      ## Actions
+
+      - **Send a notification to Slack**
+        - Target Type: specific
+        - Target: #alerts
+        - Workspace: team-workspace
+        - Channel: alerts
+        - Channel ID: C1234567890
+      - **Send an email to Team**
+        - Target Type: team
+        - Target: backend-team
+        - Fallthrough: members
+
+      ## Metadata
+
+      **Created**: 2025-01-01T10:00:00.000Z
+      **Created By**: John Doe (john.doe@example.com)
+      "
+    `);
+  });
+
+  it("validates required parameters", async () => {
+    const tool = TOOL_HANDLERS.get_issue_alert_rule_details;
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: undefined,
+          projectSlug: "cloudflare-mcp",
+          ruleId: "123456",
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Organization slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: undefined,
+          ruleId: "123456",
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Project slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          ruleId: undefined,
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Rule ID is required");
+  });
+});
+
+describe("delete_issue_alert_rule", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.delete_issue_alert_rule;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        ruleId: "123456",
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue Alert Rule Deleted
+
+      Successfully deleted issue alert rule **123456** from project **sentry-mcp-evals/cloudflare-mcp**.
+
+      The alert rule has been permanently removed and will no longer trigger alerts.
+      "
+    `);
+  });
+
+  it("validates required parameters", async () => {
+    const tool = TOOL_HANDLERS.delete_issue_alert_rule;
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: undefined,
+          projectSlug: "cloudflare-mcp",
+          ruleId: "123456",
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Organization slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: undefined,
+          ruleId: "123456",
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Project slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          ruleId: undefined,
+          regionUrl: undefined,
+        },
+      ),
+    ).rejects.toThrow("Rule ID is required");
+  });
+});
+
+describe("update_issue_alert_rule", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.update_issue_alert_rule;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        ruleId: "123456",
+        name: "Updated High Priority Issues",
+        frequency: 10,
+        actionMatch: "any",
+        filterMatch: "all",
+        regionUrl: undefined,
+        conditions: undefined,
+        filters: undefined,
+        actions: undefined,
+        owner: undefined,
+        environment: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue Alert Rule Updated
+
+      Successfully updated issue alert rule **Updated High Priority Issues** (ID: 123456) in project **sentry-mcp-evals/cloudflare-mcp**.
+
+      **Status**: active
+      **Frequency**: 10 minutes
+      **Environment**: production
+      **Owner**: team:backend
+
+      ## Updated Configuration
+
+      **Conditions**: 2 configured
+      **Filters**: 2 configured
+      **Actions**: 2 configured
+      **Action Match**: any
+      **Filter Match**: all
+
+      The alert rule configuration has been successfully updated and is now active.
+      "
+    `);
+  });
+
+  it("validates required parameters", async () => {
+    const tool = TOOL_HANDLERS.update_issue_alert_rule;
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: undefined,
+          projectSlug: "cloudflare-mcp",
+          ruleId: "123456",
+          regionUrl: undefined,
+          name: undefined,
+          frequency: undefined,
+          actionMatch: undefined,
+          filterMatch: undefined,
+          conditions: undefined,
+          filters: undefined,
+          actions: undefined,
+          owner: undefined,
+          environment: undefined,
+        },
+      ),
+    ).rejects.toThrow("Organization slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: undefined,
+          ruleId: "123456",
+          regionUrl: undefined,
+          name: undefined,
+          frequency: undefined,
+          actionMatch: undefined,
+          filterMatch: undefined,
+          conditions: undefined,
+          filters: undefined,
+          actions: undefined,
+          owner: undefined,
+          environment: undefined,
+        },
+      ),
+    ).rejects.toThrow("Project slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          ruleId: undefined,
+          regionUrl: undefined,
+          name: undefined,
+          frequency: undefined,
+          actionMatch: undefined,
+          filterMatch: undefined,
+          conditions: undefined,
+          filters: undefined,
+          actions: undefined,
+          owner: undefined,
+          environment: undefined,
+        },
+      ),
+    ).rejects.toThrow("Rule ID is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          ruleId: "123456",
+          regionUrl: undefined,
+          name: undefined,
+          frequency: undefined,
+          actionMatch: undefined,
+          filterMatch: undefined,
+          conditions: undefined,
+          filters: undefined,
+          actions: undefined,
+          owner: undefined,
+          environment: undefined,
+        },
+      ),
+    ).rejects.toThrow(
+      "At least one field must be provided to update the alert rule",
+    );
+  });
+});
+
+describe("create_issue_alert_rule", () => {
+  it("serializes", async () => {
+    const tool = TOOL_HANDLERS.create_issue_alert_rule;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        name: "New Critical Alert Rule",
+        frequency: 5,
+        actionMatch: "all",
+        filterMatch: "any",
+        conditions: [
+          {
+            id: "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+            interval: "1m",
+            value: 100,
+            comparisonType: "count",
+          },
+        ],
+        filters: [
+          {
+            id: "sentry.rules.filters.level.LevelFilter",
+            match: "gte",
+            level: "40",
+            value: "40",
+          },
+        ],
+        actions: [
+          {
+            id: "sentry.mail.actions.NotifyEmailAction",
+            targetType: "Team",
+            targetIdentifier: "backend-team",
+          },
+        ],
+        owner: "team:backend",
+        environment: "production",
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue Alert Rule Created
+
+      Successfully created issue alert rule **New Critical Alert Rule** (ID: 5) in project **sentry-mcp-evals/cloudflare-mcp**.
+
+      **Status**: active
+      **Frequency**: 5 minutes
+      **Environment**: production
+      **Owner**: team:backend
+
+      ## Configuration
+
+      **Conditions**: 1 configured
+      **Filters**: 1 configured
+      **Actions**: 1 configured
+      **Action Match**: all
+      **Filter Match**: any
+
+      The alert rule has been created and is now active. It will trigger alerts based on the configured conditions.
+
+      # Using this information
+
+      - You can view details using: \`get_issue_alert_rule_details(organizationSlug="sentry-mcp-evals", projectSlug="cloudflare-mcp", ruleId="5")\`
+      - You can update the rule using: \`update_issue_alert_rule(organizationSlug="sentry-mcp-evals", projectSlug="cloudflare-mcp", ruleId="5")\`
+      - You can delete the rule using: \`delete_issue_alert_rule(organizationSlug="sentry-mcp-evals", projectSlug="cloudflare-mcp", ruleId="5")\`"
+    `);
+  });
+
+  it("validates required parameters", async () => {
+    const tool = TOOL_HANDLERS.create_issue_alert_rule;
+    const validParams = {
+      name: "Test Rule",
+      conditions: [
+        {
+          id: "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+          interval: "1m",
+          value: 1,
+        },
+      ],
+      actions: [
+        {
+          id: "sentry.mail.actions.NotifyEmailAction",
+          targetType: "Team",
+          targetIdentifier: "backend-team",
+        },
+      ],
+      frequency: undefined,
+      actionMatch: undefined,
+      filterMatch: undefined,
+      filters: undefined,
+      owner: undefined,
+      environment: undefined,
+    };
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: undefined,
+          projectSlug: "cloudflare-mcp",
+          regionUrl: undefined,
+          ...validParams,
+        },
+      ),
+    ).rejects.toThrow("Organization slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: undefined,
+          regionUrl: undefined,
+          ...validParams,
+        },
+      ),
+    ).rejects.toThrow("Project slug is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          regionUrl: undefined,
+          ...validParams,
+          name: undefined,
+        },
+      ),
+    ).rejects.toThrow("Rule name is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          regionUrl: undefined,
+          ...validParams,
+          conditions: undefined,
+        },
+      ),
+    ).rejects.toThrow("At least one condition is required");
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "cloudflare-mcp",
+          regionUrl: undefined,
+          ...validParams,
+          actions: undefined,
+        },
+      ),
+    ).rejects.toThrow("At least one action is required");
   });
 });

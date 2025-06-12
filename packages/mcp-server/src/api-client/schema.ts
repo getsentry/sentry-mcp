@@ -456,3 +456,70 @@ export const AutofixRunStateSchema = z.object({
     .passthrough()
     .nullable(),
 });
+
+/**
+ * Alert-related schemas for Sentry's alert rules API
+ */
+
+// Issue Alert Rule schemas
+export const IssueAlertRuleConditionSchema = z
+  .object({
+    interval: z.string().optional(),
+    id: z.string(),
+    value: z.union([z.string(), z.number()]).optional(),
+    name: z.string().optional(),
+    comparisonType: z.string().optional(),
+  })
+  .passthrough();
+
+export const IssueAlertRuleFilterSchema = z
+  .object({
+    value: z.union([z.string(), z.number()]),
+    id: z.string(),
+    name: z.string().optional(),
+    match: z.string().optional(),
+    key: z.string().optional(),
+    attribute: z.string().optional(),
+  })
+  .passthrough();
+
+export const IssueAlertRuleActionSchema = z
+  .object({
+    targetType: z.string().optional(),
+    fallthroughType: z.string().optional(),
+    id: z.string(),
+    targetIdentifier: z.union([z.string(), z.number()]).nullable().optional(),
+    name: z.string().optional(),
+    workspace: z.string().optional(),
+    channel: z.string().optional(),
+    uuid: z.string().optional(),
+    channel_id: z.string().optional(),
+    tags: z.string().optional(),
+  })
+  .passthrough();
+
+export const IssueAlertRuleSchema = z.object({
+  id: z.union([z.string(), z.number()]),
+  conditions: z.array(IssueAlertRuleConditionSchema),
+  filters: z.array(IssueAlertRuleFilterSchema),
+  actions: z.array(IssueAlertRuleActionSchema),
+  actionMatch: z.string(),
+  filterMatch: z.string(),
+  frequency: z.number(),
+  name: z.string(),
+  dateCreated: z.string().datetime(),
+  owner: z.string().nullable(),
+  createdBy: z
+    .object({
+      id: z.union([z.string(), z.number()]),
+      name: z.string(),
+      email: z.string(),
+    })
+    .nullable(),
+  environment: z.string().nullable(),
+  projects: z.array(z.string()),
+  status: z.string(),
+  snooze: z.boolean(),
+});
+
+export const IssueAlertRuleListSchema = z.array(IssueAlertRuleSchema);
