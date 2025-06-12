@@ -11,7 +11,6 @@ import {
 import Note from "./components/ui/note";
 import { ChevronRight } from "lucide-react";
 import { Header } from "./components/ui/header";
-import flowImage from "./flow.jpg";
 import { Button } from "./components/ui/button";
 import RemoteSetup from "./components/fragments/remote-setup";
 import { useState } from "react";
