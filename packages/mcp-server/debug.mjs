@@ -1,1 +1,1 @@
-import { INSTRUMENTATION_TEMPLATES } from "./src/internal/sdkInstrumentation.ts"; console.log("React steps:", JSON.stringify(INSTRUMENTATION_TEMPLATES.react.postInstallationSteps, null, 2));
+import { readFileSync } from "fs"; const content = readFileSync("src/internal/sdkInstrumentation.ts", "utf8"); const lines = content.split("\n"); console.log("React template lines around 754:"); for(let i = 750; i <= 760; i++) { console.log(`${i}: ${lines[i-1]}`); }
