@@ -52,7 +52,7 @@ export default function App() {
                   like Cursor, and pull in additional information from Sentry to
                   help with tasks like debugging, code generation, and more.
                 </p>
-                <img src={flowImage} alt="Flow" className="w-full mb-6" />
+                <img src="/flow.jpg" alt="Flow" className="w-full mb-6" />
                 <p>
                   This project is still in its infancy as development of the MCP
                   specification is ongoing. If you find any problems, or have an
