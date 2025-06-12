@@ -90,3 +90,10 @@ export const ParamAssignedTo = z
   .describe(
     "The username or team slug to assign the issue to. Use 'me' to assign to yourself, or provide a username/team slug.",
   );
+
+export const ParamTargetDirectory = z
+  .string()
+  .trim()
+  .describe(
+    "The target directory path where the project to be instrumented is located. Defaults to current working directory if not specified.",
+  );
