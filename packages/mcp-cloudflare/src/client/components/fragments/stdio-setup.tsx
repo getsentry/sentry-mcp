@@ -72,10 +72,10 @@ export default function RemoteSetup() {
               <strong>Cmd + Shift + J</strong> to open Cursor Settings.
             </li>
             <li>
-              Select <strong>MCP</strong>.
+              Select <strong>MCP Tools</strong>.
             </li>
             <li>
-              Select <strong>Add new global MCP server</strong>.
+              Select <strong>New MCP Server</strong>.
             </li>
             <li>
               <CodeSnippet
