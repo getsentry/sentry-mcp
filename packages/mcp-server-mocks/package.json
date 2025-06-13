@@ -15,10 +15,12 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "dev": "tsc -w"
+    "dev": "tsc -w",
+    "test": "vitest --run"
   },
   "devDependencies": {
-    "@sentry/mcp-server-tsconfig": "workspace:*"
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "vitest": "^2.0.0"
   },
   "dependencies": {
     "msw": "^2.8.7"

@@ -357,485 +357,527 @@ function buildHandlers(
 }
 
 /**
+ * Builds MSW handlers for endpoints that can ONLY be queried from the main host.
+ *
+ * Creates handlers only for sentry.io (not region-specific URLs like us.sentry.io)
+ * for endpoints that query user data which must always come from the main API server.
+ *
+ * @param handlers - Array of handler definitions with method, path, and fetch function
+ * @returns Array of MSW http handlers for main host only
+ *
+ * @example Handler Definition
+ * ```typescript
+ * buildMainHostOnlyHandlers([
+ *   {
+ *     method: "get",
+ *     path: "/api/0/auth/",
+ *     fetch: () => HttpResponse.json({ user: "data" })
+ *   }
+ * ]);
+ * // Creates handlers only for:
+ * // - https://sentry.io/api/0/auth/
+ * // (NOT for https://us.sentry.io/api/0/auth/)
+ * ```
+ */
+function buildMainHostOnlyHandlers(
+  handlers: {
+    method: keyof typeof http;
+    path: string;
+    fetch: Parameters<(typeof http)[keyof typeof http]>[1];
+  }[],
+) {
+  return handlers.map((handler) =>
+    http[handler.method](`https://sentry.io${handler.path}`, handler.fetch),
+  );
+}
+
+/**
  * Complete set of Sentry API mock handlers.
  *
  * Covers all endpoints used by the MCP server with realistic responses,
  * parameter validation, and error scenarios.
  */
-export const restHandlers = buildHandlers([
-  {
-    method: "get",
-    path: "/api/0/auth/",
-    fetch: () => {
-      return HttpResponse.json({
-        id: "1",
-        name: "John Doe",
-        email: "john.doe@example.com",
-      });
+export const restHandlers = [
+  // User data endpoints - these can ONLY be queried from the main host (sentry.io)
+  // and never from region-specific hosts (us.sentry.io, de.sentry.io, etc.)
+  ...buildMainHostOnlyHandlers([
+    {
+      method: "get",
+      path: "/api/0/auth/",
+      fetch: () => {
+        return HttpResponse.json({
+          id: "1",
+          name: "John Doe",
+          email: "john.doe@example.com",
+        });
+      },
     },
-  },
-  {
-    method: "get",
-    path: "/api/0/users/me/regions/",
-    fetch: () => {
-      return HttpResponse.json({
-        regions: [{ name: "us", url: "https://us.sentry.io" }],
-      });
+    {
+      method: "get",
+      path: "/api/0/users/me/regions/",
+      fetch: () => {
+        return HttpResponse.json({
+          regions: [{ name: "us", url: "https://us.sentry.io" }],
+        });
+      },
     },
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/",
-    fetch: () => {
-      return HttpResponse.json([OrganizationPayload]);
+  ]),
+  // All other endpoints - these can be queried from both main host and region-specific hosts
+  ...buildHandlers([
+    {
+      method: "get",
+      path: "/api/0/organizations/",
+      fetch: () => {
+        return HttpResponse.json([OrganizationPayload]);
+      },
     },
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/",
-    fetch: () => {
-      return HttpResponse.json(OrganizationPayload);
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/",
+      fetch: () => {
+        return HttpResponse.json(OrganizationPayload);
+      },
     },
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/teams/",
-    fetch: () => {
-      return HttpResponse.json([teamFixture]);
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/teams/",
+      fetch: () => {
+        return HttpResponse.json([teamFixture]);
+      },
     },
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/projects/",
-    fetch: () => {
-      return HttpResponse.json([
-        {
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/projects/",
+      fetch: () => {
+        return HttpResponse.json([
+          {
+            ...projectFixture,
+            id: "4509106749636608", // Different ID for GET endpoint
+          },
+        ]);
+      },
+    },
+    {
+      method: "post",
+      path: "/api/0/organizations/sentry-mcp-evals/teams/",
+      fetch: () => {
+        // TODO: validate payload (only accept 'the-goats' for team name)
+        return HttpResponse.json(
+          {
+            ...teamFixture,
+            id: "4509109078196224",
+            dateCreated: "2025-04-07T00:05:48.196710Z",
+            access: [
+              "event:read",
+              "org:integrations",
+              "org:read",
+              "member:read",
+              "alerts:write",
+              "event:admin",
+              "team:admin",
+              "project:releases",
+              "team:read",
+              "project:write",
+              "event:write",
+              "team:write",
+              "project:read",
+              "project:admin",
+              "alerts:read",
+            ],
+          },
+          { status: 201 },
+        );
+      },
+    },
+    {
+      method: "post",
+      path: "/api/0/teams/sentry-mcp-evals/the-goats/projects/",
+      fetch: async ({ request }) => {
+        // TODO: validate payload (only accept 'cloudflare-mcp' for project name)
+        const body = (await request.json()) as any;
+        return HttpResponse.json({
           ...projectFixture,
-          id: "4509106749636608", // Different ID for GET endpoint
-        },
-      ]);
+          name: body?.name || "cloudflare-mcp",
+          slug: body?.slug || "cloudflare-mcp",
+          platform: body?.platform || "node",
+        });
+      },
     },
-  },
-  {
-    method: "post",
-    path: "/api/0/organizations/sentry-mcp-evals/teams/",
-    fetch: () => {
-      // TODO: validate payload (only accept 'the-goats' for team name)
-      return HttpResponse.json(
-        {
-          ...teamFixture,
-          id: "4509109078196224",
-          dateCreated: "2025-04-07T00:05:48.196710Z",
-          access: [
-            "event:read",
-            "org:integrations",
-            "org:read",
-            "member:read",
-            "alerts:write",
-            "event:admin",
-            "team:admin",
-            "project:releases",
-            "team:read",
-            "project:write",
-            "event:write",
-            "team:write",
-            "project:read",
-            "project:admin",
-            "alerts:read",
-          ],
-        },
-        { status: 201 },
-      );
+    {
+      method: "put",
+      path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+      fetch: async ({ request }) => {
+        const body = (await request.json()) as any;
+        return HttpResponse.json({
+          ...projectFixture,
+          slug: body?.slug || "cloudflare-mcp",
+          name: body?.name || "cloudflare-mcp",
+          platform: body?.platform || "node",
+        });
+      },
     },
-  },
-  {
-    method: "post",
-    path: "/api/0/teams/sentry-mcp-evals/the-goats/projects/",
-    fetch: async ({ request }) => {
-      // TODO: validate payload (only accept 'cloudflare-mcp' for project name)
-      const body = (await request.json()) as any;
-      return HttpResponse.json({
-        ...projectFixture,
-        name: body?.name || "cloudflare-mcp",
-        slug: body?.slug || "cloudflare-mcp",
-        platform: body?.platform || "node",
-      });
+    {
+      method: "post",
+      path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+      fetch: () => {
+        // TODO: validate payload (only accept 'Default' for key name)
+        return HttpResponse.json(ClientKeyPayload);
+      },
     },
-  },
-  {
-    method: "put",
-    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
-    fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      return HttpResponse.json({
-        ...projectFixture,
-        slug: body?.slug || "cloudflare-mcp",
-        name: body?.name || "cloudflare-mcp",
-        platform: body?.platform || "node",
-      });
+    {
+      method: "get",
+      path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
+      fetch: () => {
+        return HttpResponse.json([ClientKeyPayload]);
+      },
     },
-  },
-  {
-    method: "post",
-    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
-    fetch: () => {
-      // TODO: validate payload (only accept 'Default' for key name)
-      return HttpResponse.json(ClientKeyPayload);
-    },
-  },
-  {
-    method: "get",
-    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
-    fetch: () => {
-      return HttpResponse.json([ClientKeyPayload]);
-    },
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/events/",
-    fetch: async ({ request }) => {
-      const url = new URL(request.url);
-      const dataset = url.searchParams.get("dataset");
-      const query = url.searchParams.get("query");
-      const fields = url.searchParams.getAll("field");
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/events/",
+      fetch: async ({ request }) => {
+        const url = new URL(request.url);
+        const dataset = url.searchParams.get("dataset");
+        const query = url.searchParams.get("query");
+        const fields = url.searchParams.getAll("field");
 
-      if (dataset === "spans") {
-        //[sentryApi] GET https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=spans&per_page=10&referrer=sentry-mcp&sort=-span.duration&allowAggregateConditions=0&useRpc=1&field=id&field=trace&field=span.op&field=span.description&field=span.duration&field=transaction&field=project&field=timestamp&query=is_transaction%3Atrue
-        if (query !== "is_transaction:true") {
-          return HttpResponse.json(EmptyEventsSpansPayload);
+        if (dataset === "spans") {
+          //[sentryApi] GET https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=spans&per_page=10&referrer=sentry-mcp&sort=-span.duration&allowAggregateConditions=0&useRpc=1&field=id&field=trace&field=span.op&field=span.description&field=span.duration&field=transaction&field=project&field=timestamp&query=is_transaction%3Atrue
+          if (query !== "is_transaction:true") {
+            return HttpResponse.json(EmptyEventsSpansPayload);
+          }
+
+          if (url.searchParams.get("useRpc") !== "1") {
+            return HttpResponse.json("Invalid useRpc", { status: 400 });
+          }
+
+          if (
+            !fields.includes("id") ||
+            !fields.includes("trace") ||
+            !fields.includes("span.op") ||
+            !fields.includes("span.description") ||
+            !fields.includes("span.duration")
+          ) {
+            return HttpResponse.json("Invalid fields", { status: 400 });
+          }
+          return HttpResponse.json(EventsSpansPayload);
+        }
+        if (dataset === "errors") {
+          //https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=errors&per_page=10&referrer=sentry-mcp&sort=-count&statsPeriod=1w&field=issue&field=title&field=project&field=last_seen%28%29&field=count%28%29&query=
+
+          if (
+            !fields.includes("issue") ||
+            !fields.includes("title") ||
+            !fields.includes("project") ||
+            !fields.includes("last_seen()") ||
+            !fields.includes("count()")
+          ) {
+            return HttpResponse.json("Invalid fields", { status: 400 });
+          }
+
+          if (
+            !["-count", "-last_seen"].includes(
+              url.searchParams.get("sort") as string,
+            )
+          ) {
+            return HttpResponse.json("Invalid sort", { status: 400 });
+          }
+
+          // TODO: this is not correct, but itll fix test flakiness for now
+          const sortedQuery = query ? query?.split(" ").sort().join(" ") : null;
+          if (
+            ![
+              null,
+              "",
+              "error.handled:false",
+              "error.unhandled:true",
+              "error.handled:false is:unresolved",
+              "error.unhandled:true is:unresolved",
+              "is:unresolved project:cloudflare-mcp",
+              "project:cloudflare-mcp",
+              "user.email:david@sentry.io",
+            ].includes(sortedQuery)
+          ) {
+            return HttpResponse.json(EmptyEventsErrorsPayload);
+          }
+
+          return HttpResponse.json(EventsErrorsPayload);
         }
 
-        if (url.searchParams.get("useRpc") !== "1") {
-          return HttpResponse.json("Invalid useRpc", { status: 400 });
+        return HttpResponse.json("Invalid dataset", { status: 400 });
+      },
+    },
+    {
+      method: "get",
+      path: "/api/0/projects/sentry-mcp-evals/foobar/issues/",
+      fetch: () => HttpResponse.json([]),
+    },
+    {
+      method: "get",
+      path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/issues/",
+      fetch: ({ request }) => {
+        const url = new URL(request.url);
+        const sort = url.searchParams.get("sort");
+
+        if (![null, "user", "freq", "date", "new", null].includes(sort)) {
+          return HttpResponse.json(
+            `Invalid sort: ${url.searchParams.get("sort")}`,
+            {
+              status: 400,
+            },
+          );
         }
 
-        if (
-          !fields.includes("id") ||
-          !fields.includes("trace") ||
-          !fields.includes("span.op") ||
-          !fields.includes("span.description") ||
-          !fields.includes("span.duration")
-        ) {
-          return HttpResponse.json("Invalid fields", { status: 400 });
-        }
-        return HttpResponse.json(EventsSpansPayload);
-      }
-      if (dataset === "errors") {
-        //https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=errors&per_page=10&referrer=sentry-mcp&sort=-count&statsPeriod=1w&field=issue&field=title&field=project&field=last_seen%28%29&field=count%28%29&query=
-
-        if (
-          !fields.includes("issue") ||
-          !fields.includes("title") ||
-          !fields.includes("project") ||
-          !fields.includes("last_seen()") ||
-          !fields.includes("count()")
-        ) {
-          return HttpResponse.json("Invalid fields", { status: 400 });
+        const collapse = url.searchParams.getAll("collapse");
+        if (collapse.includes("stats")) {
+          return HttpResponse.json(`Invalid collapse: ${collapse.join(",")}`, {
+            status: 400,
+          });
         }
 
-        if (
-          !["-count", "-last_seen"].includes(
-            url.searchParams.get("sort") as string,
-          )
-        ) {
-          return HttpResponse.json("Invalid sort", { status: 400 });
-        }
-
-        // TODO: this is not correct, but itll fix test flakiness for now
-        const sortedQuery = query ? query?.split(" ").sort().join(" ") : null;
+        const query = url.searchParams.get("query");
+        const queryTokens = query?.split(" ").sort() ?? [];
+        const sortedQuery = queryTokens ? queryTokens.join(" ") : null;
         if (
           ![
             null,
             "",
-            "error.handled:false",
-            "error.unhandled:true",
+            "is:unresolved",
             "error.handled:false is:unresolved",
             "error.unhandled:true is:unresolved",
-            "is:unresolved project:cloudflare-mcp",
-            "project:cloudflare-mcp",
             "user.email:david@sentry.io",
           ].includes(sortedQuery)
         ) {
-          return HttpResponse.json(EmptyEventsErrorsPayload);
+          return HttpResponse.json([]);
         }
 
-        return HttpResponse.json(EventsErrorsPayload);
-      }
+        if (queryTokens.includes("user.email:david@sentry.io")) {
+          return HttpResponse.json([issueFixture]);
+        }
 
-      return HttpResponse.json("Invalid dataset", { status: 400 });
+        if (sort === "date") {
+          return HttpResponse.json([issueFixture, issueFixture2]);
+        }
+        return HttpResponse.json([issueFixture2, issueFixture]);
+      },
     },
-  },
-  {
-    method: "get",
-    path: "/api/0/projects/sentry-mcp-evals/foobar/issues/",
-    fetch: () => HttpResponse.json([]),
-  },
-  {
-    method: "get",
-    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/issues/",
-    fetch: ({ request }) => {
-      const url = new URL(request.url);
-      const sort = url.searchParams.get("sort");
 
-      if (![null, "user", "freq", "date", "new", null].includes(sort)) {
-        return HttpResponse.json(
-          `Invalid sort: ${url.searchParams.get("sort")}`,
-          {
-            status: 400,
-          },
-        );
-      }
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/",
+      fetch: ({ request }) => {
+        const url = new URL(request.url);
+        const sort = url.searchParams.get("sort");
 
-      const collapse = url.searchParams.getAll("collapse");
-      if (collapse.includes("stats")) {
-        return HttpResponse.json(`Invalid collapse: ${collapse.join(",")}`, {
-          status: 400,
-        });
-      }
-
-      const query = url.searchParams.get("query");
-      const queryTokens = query?.split(" ").sort() ?? [];
-      const sortedQuery = queryTokens ? queryTokens.join(" ") : null;
-      if (
-        ![
-          null,
-          "",
-          "is:unresolved",
-          "error.handled:false is:unresolved",
-          "error.unhandled:true is:unresolved",
-          "user.email:david@sentry.io",
-        ].includes(sortedQuery)
-      ) {
-        return HttpResponse.json([]);
-      }
-
-      if (queryTokens.includes("user.email:david@sentry.io")) {
-        return HttpResponse.json([issueFixture]);
-      }
-
-      if (sort === "date") {
-        return HttpResponse.json([issueFixture, issueFixture2]);
-      }
-      return HttpResponse.json([issueFixture2, issueFixture]);
-    },
-  },
-
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/",
-    fetch: ({ request }) => {
-      const url = new URL(request.url);
-      const sort = url.searchParams.get("sort");
-
-      if (![null, "user", "freq", "date", "new", null].includes(sort)) {
-        return HttpResponse.json(
-          `Invalid sort: ${url.searchParams.get("sort")}`,
-          {
-            status: 400,
-          },
-        );
-      }
-
-      const collapse = url.searchParams.getAll("collapse");
-      if (collapse.includes("stats")) {
-        return HttpResponse.json(`Invalid collapse: ${collapse.join(",")}`, {
-          status: 400,
-        });
-      }
-
-      const query = url.searchParams.get("query");
-      const queryTokens = query?.split(" ").sort() ?? [];
-      const sortedQuery = queryTokens ? queryTokens.join(" ") : null;
-      if (query === "7ca573c0f4814912aaa9bdc77d1a7d51") {
-        return HttpResponse.json([issueFixture]);
-      }
-      if (
-        ![
-          null,
-          "",
-          "is:unresolved",
-          "error.handled:false is:unresolved",
-          "error.unhandled:true is:unresolved",
-          "project:cloudflare-mcp",
-          "is:unresolved project:cloudflare-mcp",
-          "user.email:david@sentry.io",
-        ].includes(sortedQuery)
-      ) {
-        if (queryTokens.includes("project:remote-mcp")) {
+        if (![null, "user", "freq", "date", "new", null].includes(sort)) {
           return HttpResponse.json(
+            `Invalid sort: ${url.searchParams.get("sort")}`,
             {
-              detail:
-                "Invalid query. Project(s) remote-mcp do not exist or are not actively selected.",
+              status: 400,
             },
-            { status: 400 },
           );
         }
-        return HttpResponse.json([]);
-      }
-      if (queryTokens.includes("user.email:david@sentry.io")) {
-        return HttpResponse.json([issueFixture]);
-      }
 
-      if (sort === "date") {
-        return HttpResponse.json([issueFixture, issueFixture2]);
-      }
-      return HttpResponse.json([issueFixture2, issueFixture]);
+        const collapse = url.searchParams.getAll("collapse");
+        if (collapse.includes("stats")) {
+          return HttpResponse.json(`Invalid collapse: ${collapse.join(",")}`, {
+            status: 400,
+          });
+        }
+
+        const query = url.searchParams.get("query");
+        const queryTokens = query?.split(" ").sort() ?? [];
+        const sortedQuery = queryTokens ? queryTokens.join(" ") : null;
+        if (query === "7ca573c0f4814912aaa9bdc77d1a7d51") {
+          return HttpResponse.json([issueFixture]);
+        }
+        if (
+          ![
+            null,
+            "",
+            "is:unresolved",
+            "error.handled:false is:unresolved",
+            "error.unhandled:true is:unresolved",
+            "project:cloudflare-mcp",
+            "is:unresolved project:cloudflare-mcp",
+            "user.email:david@sentry.io",
+          ].includes(sortedQuery)
+        ) {
+          if (queryTokens.includes("project:remote-mcp")) {
+            return HttpResponse.json(
+              {
+                detail:
+                  "Invalid query. Project(s) remote-mcp do not exist or are not actively selected.",
+              },
+              { status: 400 },
+            );
+          }
+          return HttpResponse.json([]);
+        }
+        if (queryTokens.includes("user.email:david@sentry.io")) {
+          return HttpResponse.json([issueFixture]);
+        }
+
+        if (sort === "date") {
+          return HttpResponse.json([issueFixture, issueFixture2]);
+        }
+        return HttpResponse.json([issueFixture2, issueFixture]);
+      },
     },
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
-    fetch: () => HttpResponse.json(issueFixture),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
-    fetch: () => HttpResponse.json(issueFixture),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
-    fetch: () => HttpResponse.json(issueFixture2),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
-    fetch: () => HttpResponse.json(issueFixture2),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
-    fetch: () => HttpResponse.json(eventsFixture),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
-    fetch: () => HttpResponse.json(eventsFixture),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
-    fetch: () => HttpResponse.json(eventsFixture),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
-    fetch: () => HttpResponse.json(eventsFixture),
-  },
-  // TODO: event payload should be tweaked to match issue
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/events/latest/",
-    fetch: () => HttpResponse.json(eventsFixture),
-  },
-  // TODO: event payload should be tweaked to match issue
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/events/latest/",
-    fetch: () => HttpResponse.json(eventsFixture),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/releases/",
-    fetch: () => HttpResponse.json([ReleasePayload]),
-  },
-  {
-    method: "get",
-    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/",
-    fetch: () => HttpResponse.json([ReleasePayload]),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/tags/",
-    fetch: () => HttpResponse.json(tagsFixture),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
-    fetch: () => HttpResponse.json(autofixStateFixture),
-  },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
-    fetch: () => HttpResponse.json(autofixStateFixture),
-  },
-  {
-    method: "post",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
-    fetch: () => HttpResponse.json({ run_id: 123 }),
-  },
-  {
-    method: "post",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
-    fetch: () => HttpResponse.json({ run_id: 123 }),
-  },
-  {
-    method: "post",
-    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/the-goats/",
-    fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      return HttpResponse.json({
-        ...teamFixture,
-        id: "4509109078196224",
-        slug: body?.slug || "the-goats",
-        name: body?.name || "the-goats",
-        dateCreated: "2025-04-07T00:05:48.196710Z",
-      });
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+      fetch: () => HttpResponse.json(issueFixture),
     },
-  },
-  {
-    method: "put",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
-    fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      const updatedIssue = {
-        ...issueFixture,
-        status: body?.status || issueFixture.status,
-        assignedTo: body?.assignedTo || issueFixture.assignedTo,
-      };
-      return HttpResponse.json(updatedIssue);
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
+      fetch: () => HttpResponse.json(issueFixture),
     },
-  },
-  {
-    method: "put",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
-    fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      const updatedIssue = {
-        ...issueFixture,
-        status: body?.status || issueFixture.status,
-        assignedTo: body?.assignedTo || issueFixture.assignedTo,
-      };
-      return HttpResponse.json(updatedIssue);
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
+      fetch: () => HttpResponse.json(issueFixture2),
     },
-  },
-  {
-    method: "put",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
-    fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      const updatedIssue = {
-        ...issueFixture2,
-        status: body?.status || issueFixture2.status,
-        assignedTo: body?.assignedTo || issueFixture2.assignedTo,
-      };
-      return HttpResponse.json(updatedIssue);
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
+      fetch: () => HttpResponse.json(issueFixture2),
     },
-  },
-  {
-    method: "put",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
-    fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      const updatedIssue = {
-        ...issueFixture2,
-        status: body?.status || issueFixture2.status,
-        assignedTo: body?.assignedTo || issueFixture2.assignedTo,
-      };
-      return HttpResponse.json(updatedIssue);
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
+      fetch: () => HttpResponse.json(eventsFixture),
     },
-  },
-]);
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+      fetch: () => HttpResponse.json(eventsFixture),
+    },
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
+      fetch: () => HttpResponse.json(eventsFixture),
+    },
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/events/latest/",
+      fetch: () => HttpResponse.json(eventsFixture),
+    },
+    // TODO: event payload should be tweaked to match issue
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/events/latest/",
+      fetch: () => HttpResponse.json(eventsFixture),
+    },
+    // TODO: event payload should be tweaked to match issue
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/events/latest/",
+      fetch: () => HttpResponse.json(eventsFixture),
+    },
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/releases/",
+      fetch: () => HttpResponse.json([ReleasePayload]),
+    },
+    {
+      method: "get",
+      path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/",
+      fetch: () => HttpResponse.json([ReleasePayload]),
+    },
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/tags/",
+      fetch: () => HttpResponse.json(tagsFixture),
+    },
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
+      fetch: () => HttpResponse.json(autofixStateFixture),
+    },
+    {
+      method: "get",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
+      fetch: () => HttpResponse.json(autofixStateFixture),
+    },
+    {
+      method: "post",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
+      fetch: () => HttpResponse.json({ run_id: 123 }),
+    },
+    {
+      method: "post",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
+      fetch: () => HttpResponse.json({ run_id: 123 }),
+    },
+    {
+      method: "post",
+      path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/the-goats/",
+      fetch: async ({ request }) => {
+        const body = (await request.json()) as any;
+        return HttpResponse.json({
+          ...teamFixture,
+          id: "4509109078196224",
+          slug: body?.slug || "the-goats",
+          name: body?.name || "the-goats",
+          dateCreated: "2025-04-07T00:05:48.196710Z",
+        });
+      },
+    },
+    {
+      method: "put",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+      fetch: async ({ request }) => {
+        const body = (await request.json()) as any;
+        const updatedIssue = {
+          ...issueFixture,
+          status: body?.status || issueFixture.status,
+          assignedTo: body?.assignedTo || issueFixture.assignedTo,
+        };
+        return HttpResponse.json(updatedIssue);
+      },
+    },
+    {
+      method: "put",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
+      fetch: async ({ request }) => {
+        const body = (await request.json()) as any;
+        const updatedIssue = {
+          ...issueFixture,
+          status: body?.status || issueFixture.status,
+          assignedTo: body?.assignedTo || issueFixture.assignedTo,
+        };
+        return HttpResponse.json(updatedIssue);
+      },
+    },
+    {
+      method: "put",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
+      fetch: async ({ request }) => {
+        const body = (await request.json()) as any;
+        const updatedIssue = {
+          ...issueFixture2,
+          status: body?.status || issueFixture2.status,
+          assignedTo: body?.assignedTo || issueFixture2.assignedTo,
+        };
+        return HttpResponse.json(updatedIssue);
+      },
+    },
+    {
+      method: "put",
+      path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
+      fetch: async ({ request }) => {
+        const body = (await request.json()) as any;
+        const updatedIssue = {
+          ...issueFixture2,
+          status: body?.status || issueFixture2.status,
+          assignedTo: body?.assignedTo || issueFixture2.assignedTo,
+        };
+        return HttpResponse.json(updatedIssue);
+      },
+    },
+  ]),
+];
 
 /**
  * Configured MSW server instance with all Sentry API mock handlers.
@@ -864,5 +906,14 @@ export const restHandlers = buildHandlers([
  * const orgs = await apiService.listOrganizations();
  * console.log(orgs); // Returns mock organization data
  * ```
+ *
+ * @note User Data Endpoint Restrictions
+ * The following endpoints are configured to work ONLY with the main host (sentry.io)
+ * and will NOT respond to requests from region-specific hosts (us.sentry.io, de.sentry.io):
+ * - `/api/0/auth/` (whoami endpoint)
+ * - `/api/0/users/me/regions/` (find_organizations endpoint)
+ *
+ * This matches the real Sentry API behavior where user data must always be queried
+ * from the main API server.
  */
 export const mswServer = setupServer(...restHandlers);
