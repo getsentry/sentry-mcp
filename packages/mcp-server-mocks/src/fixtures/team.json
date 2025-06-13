@@ -12,7 +12,6 @@
     "event:write",
     "team:write",
     "team:admin",
-    "event:read",
     "org:read",
     "member:read",
     "project:admin",

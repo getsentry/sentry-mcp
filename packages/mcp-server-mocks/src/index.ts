@@ -446,7 +446,6 @@ export const restHandlers = buildHandlers([
           id: "4509109078196224",
           dateCreated: "2025-04-07T00:05:48.196710Z",
           access: [
-            "event:read",
             "org:integrations",
             "org:read",
             "member:read",
