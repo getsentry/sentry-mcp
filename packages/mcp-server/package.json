@@ -2,7 +2,7 @@
   "name": "@sentry/mcp-server",
   "version": "0.12.0",
   "type": "module",
-  "packageManager": "pnpm@10.3.0",
+  "packageManager": "pnpm@10.8.1",
   "engines": {
     "node": ">=20"
   },
@@ -13,9 +13,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Server",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -26,9 +24,7 @@
   "bin": {
     "sentry-mcp": "./dist/index.js"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",

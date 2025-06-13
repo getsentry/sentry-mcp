@@ -97,8 +97,8 @@ Evals will require a `.env` file with some config:
 OPENAI_API_KEY=
 ```
 
-Once thats done you can run them using:
+Once that's done you can run them using:
 
 ```shell
-pnpm test
+pnpm eval
 ```

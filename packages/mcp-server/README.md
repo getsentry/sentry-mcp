@@ -10,7 +10,9 @@ To utilize the `stdio` transport, you'll need to create an User Auth Token in Se
 
 ```
 org:read
+project:read
 project:write
+team:read
 team:write
 event:write
 ```
@@ -34,6 +36,6 @@ By default we also enable Sentry reporting (traces, errors) upstream to our clou
 # disable sentry reporting
 npx @sentry/mcp-server@latest --sentry-dsn=
 
-# disable sentry reporting
+# use custom sentry instance
 npx @sentry/mcp-server@latest --sentry-dsn=https://publicKey@mysentry.example.com/...
 ```
