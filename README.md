@@ -27,7 +27,7 @@ project:read
 project:write
 team:read
 team:write
-event:read
+event:write
 ```
 
 Launch the transport:
@@ -51,7 +51,7 @@ MCP includes an [Inspector](https://modelcontextprotocol.io/docs/tools/inspector
 pnpm inspector
 ```
 
-Enter the MCP server URL (http://localhost:5173) and hit connect. This should trigger the authentication flow for you.
+Enter the MCP server URL (<http://localhost:5173>) and hit connect. This should trigger the authentication flow for you.
 
 Note: If you have issues with your OAuth flow when accessing the inspector on `127.0.0.1`, try using `localhost` instead by visiting `http://localhost:6274`.
 

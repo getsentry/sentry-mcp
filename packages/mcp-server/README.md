@@ -12,7 +12,7 @@ To utilize the `stdio` transport, you'll need to create an User Auth Token in Se
 org:read
 project:write
 team:write
-event:read
+event:write
 ```
 
 Launch the transport:
