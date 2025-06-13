@@ -40,13 +40,24 @@ import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
 import { UserInputError } from "./errors";
 
+/**
+ * Creates a SentryApiService instance from server context with optional region override.
+ *
+ * For self-hosted Sentry compatibility, empty regionUrl values are ignored gracefully.
+ * For Sentry's Cloud Service, regionUrl is used to route requests to the correct region.
+ *
+ * @param context - Server context containing default host and access token
+ * @param opts - Options object containing optional regionUrl override
+ * @returns Configured SentryApiService instance
+ * @throws {UserInputError} When regionUrl is provided but invalid
+ */
 function apiServiceFromContext(
   context: ServerContext,
   opts: { regionUrl?: string } = {},
 ) {
   let host = context.host;
 
-  if (opts.regionUrl) {
+  if (opts.regionUrl?.trim()) {
     try {
       host = new URL(opts.regionUrl).host;
     } catch (error) {
@@ -88,15 +99,26 @@ export const TOOL_HANDLERS = {
         [
           `## **${org.slug}**`,
           "",
-          `**Web URL:** ${org.links.organizationUrl}`,
-          `**Region URL:** ${org.links.regionUrl}`,
+          `**Web URL:** ${org.links?.organizationUrl || "Not available"}`,
+          `**Region URL:** ${org.links?.regionUrl || ""}`,
         ].join("\n"),
       )
       .join("\n\n");
 
     output += "\n\n# Using this information\n\n";
     output += `- The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.\n`;
-    output += `- If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value there.\n`;
+
+    const hasValidRegionUrls = organizations.some((org) =>
+      org.links?.regionUrl?.trim(),
+    );
+
+    if (hasValidRegionUrls) {
+      output += `- If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value shown above for each organization.\n`;
+      output += `- For Sentry's Cloud Service (sentry.io), always use the regionUrl to ensure requests go to the correct region.\n`;
+    } else {
+      output += `- This appears to be a self-hosted Sentry installation. You can omit the \`regionUrl\` parameter when using other tools.\n`;
+      output += `- For self-hosted Sentry, the regionUrl is typically empty and not needed for API calls.\n`;
+    }
 
     return output;
   },

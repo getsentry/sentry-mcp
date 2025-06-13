@@ -73,10 +73,26 @@ export const ParamQuery = z
     `The search query to apply. Use the \`help(subject="query_syntax")\` tool to get more information about the query syntax rather than guessing.`,
   );
 
+/**
+ * Region URL parameter for Sentry API requests.
+ *
+ * Handles region-specific URLs for Sentry's Cloud Service while gracefully
+ * supporting self-hosted Sentry installations that may return empty regionUrl values.
+ * This schema accepts both valid URLs and empty strings to ensure compatibility
+ * across different Sentry deployment types.
+ */
 export const ParamRegionUrl = z
   .string()
   .trim()
-  .describe("The region URL for the organization you're querying, if known.");
+  .refine((value) => !value || z.string().url().safeParse(value).success, {
+    message: "Must be a valid URL or empty string (for self-hosted Sentry)",
+  })
+  .describe(
+    "The region URL for the organization you're querying, if known. " +
+      "For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. " +
+      "For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. " +
+      "You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+  );
 
 export const ParamIssueStatus = z
   .enum(["resolved", "resolvedInNextRelease", "unresolved", "ignored"])

@@ -307,7 +307,8 @@ export class SentryApiService {
    * ```typescript
    * const orgs = await apiService.listOrganizations();
    * orgs.forEach(org => {
-   *   console.log(`${org.name} (${org.slug}) - ${org.links.regionUrl}`);
+   *   // regionUrl present for Cloud Service, empty for self-hosted
+   *   console.log(`${org.name} (${org.slug}) - ${org.links?.regionUrl || 'No region URL'}`);
    * });
    * ```
    */

@@ -48,9 +48,40 @@ describe("find_organizations", () => {
       # Using this information
 
       - The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.
-      - If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value there.
+      - If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value shown above for each organization.
+      - For Sentry's Cloud Service (sentry.io), always use the regionUrl to ensure requests go to the correct region.
       "
     `);
+  });
+
+  it("handles empty regionUrl parameter", async () => {
+    const tool = TOOL_HANDLERS.find_organizations;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        regionUrl: "", // Empty string - should be handled gracefully
+      },
+    );
+    expect(result).toContain("Organizations");
+  });
+
+  it("handles undefined regionUrl parameter", async () => {
+    const tool = TOOL_HANDLERS.find_organizations;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toContain("Organizations");
   });
 });
 
