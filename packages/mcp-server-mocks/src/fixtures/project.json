@@ -25,6 +25,7 @@
     "member:read",
     "team:write",
     "project:read",
+    "event:read",
     "event:write",
     "project:admin",
     "org:read",
