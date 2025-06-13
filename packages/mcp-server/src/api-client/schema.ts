@@ -68,17 +68,21 @@ export const OrganizationSchema = z.object({
   id: z.union([z.string(), z.number()]),
   slug: z.string(),
   name: z.string(),
-  links: z.object({
-    regionUrl: z
-      .string()
-      .refine(
-        (value) => value === "" || z.string().url().safeParse(value).success,
-        {
-          message: "Must be a valid URL or empty string for self-hosted Sentry",
-        },
-      ),
-    organizationUrl: z.string().url(),
-  }),
+  links: z
+    .object({
+      regionUrl: z
+        .string()
+        .refine(
+          (value) => value === "" || z.string().url().safeParse(value).success,
+          {
+            message:
+              "Must be a valid URL or empty string for self-hosted Sentry",
+          },
+        )
+        .optional(),
+      organizationUrl: z.string().url(),
+    })
+    .optional(),
 });
 
 export const OrganizationListSchema = z.array(OrganizationSchema);

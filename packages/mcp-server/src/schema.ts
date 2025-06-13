@@ -85,7 +85,7 @@ export const ParamRegionUrl = z
   )
   .describe(
     "The region URL for the organization you're querying, if known. " +
-      "For Sentry SaaS (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. " +
+      "For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. " +
       "For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. " +
       "You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
   );

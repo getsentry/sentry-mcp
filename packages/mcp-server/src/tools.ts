@@ -89,8 +89,8 @@ export const TOOL_HANDLERS = {
         [
           `## **${org.slug}**`,
           "",
-          `**Web URL:** ${org.links.organizationUrl}`,
-          `**Region URL:** ${org.links.regionUrl}`,
+          `**Web URL:** ${org.links?.organizationUrl || "Not available"}`,
+          `**Region URL:** ${org.links?.regionUrl || ""}`,
         ].join("\n"),
       )
       .join("\n\n");
@@ -100,12 +100,12 @@ export const TOOL_HANDLERS = {
 
     // Provide clear guidance about regionUrl usage based on the actual values returned
     const hasValidRegionUrls = organizations.some(
-      (org) => org.links.regionUrl && org.links.regionUrl !== "",
+      (org) => org.links?.regionUrl && org.links.regionUrl !== "",
     );
 
     if (hasValidRegionUrls) {
       output += `- If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value shown above for each organization.\n`;
-      output += `- For Sentry SaaS (sentry.io), always use the regionUrl to ensure requests go to the correct region.\n`;
+      output += `- For Sentry's Cloud Service (sentry.io), always use the regionUrl to ensure requests go to the correct region.\n`;
     } else {
       output += `- This appears to be a self-hosted Sentry installation. You can omit the \`regionUrl\` parameter when using other tools.\n`;
       output += `- For self-hosted Sentry, the regionUrl is typically empty and not needed for API calls.\n`;
