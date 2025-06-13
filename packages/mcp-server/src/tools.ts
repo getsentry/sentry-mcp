@@ -64,16 +64,16 @@ function apiServiceFromContext(
 
 export const TOOL_HANDLERS = {
   whoami: async (context, params) => {
-    const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
-    });
+    // User data endpoints (like /auth/) should never use regionUrl
+    // as they must always query the main API server, not region-specific servers
+    const apiService = apiServiceFromContext(context);
     const user = await apiService.getAuthenticatedUser();
     return `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
   },
   find_organizations: async (context, params) => {
-    const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
-    });
+    // User data endpoints (like /users/me/regions/) should never use regionUrl
+    // as they must always query the main API server, not region-specific servers
+    const apiService = apiServiceFromContext(context);
     const organizations = await apiService.listOrganizations();
 
     let output = "# Organizations\n\n";
