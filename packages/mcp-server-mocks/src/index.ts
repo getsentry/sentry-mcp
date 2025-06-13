@@ -316,24 +316,29 @@ const EventsSpansPayload = {
 /**
  * Builds MSW handlers for both SaaS and self-hosted Sentry instances.
  *
- * Creates duplicate handlers for us.sentry.io and sentry.io to support
- * multi-region testing and both SaaS and self-hosted configurations.
+ * Creates handlers based on the controlOnly flag:
+ * - controlOnly: false (default) - Creates handlers for both sentry.io and us.sentry.io
+ * - controlOnly: true - Creates handlers only for sentry.io (main host)
  *
- * @param handlers - Array of handler definitions with method, path, and fetch function
- * @returns Array of MSW http handlers for both hosts
+ * @param handlers - Array of handler definitions with method, path, fetch function, and optional controlOnly flag
+ * @returns Array of MSW http handlers
  *
- * @example Handler Definition
+ * @example Handler Definitions
  * ```typescript
  * buildHandlers([
  *   {
  *     method: "get",
+ *     path: "/api/0/auth/",
+ *     fetch: () => HttpResponse.json({ user: "data" }),
+ *     controlOnly: true  // Only available on sentry.io
+ *   },
+ *   {
+ *     method: "get",
  *     path: "/api/0/organizations/",
- *     fetch: () => HttpResponse.json([OrganizationPayload])
+ *     fetch: () => HttpResponse.json([OrganizationPayload]),
+ *     controlOnly: false  // Available on both sentry.io and us.sentry.io
  *   }
  * ]);
- * // Creates handlers for both:
- * // - https://us.sentry.io/api/0/organizations/
- * // - https://sentry.io/api/0/organizations/
  * ```
  */
 function buildHandlers(
@@ -341,19 +346,29 @@ function buildHandlers(
     method: keyof typeof http;
     path: string;
     fetch: Parameters<(typeof http)[keyof typeof http]>[1];
+    controlOnly?: boolean;
   }[],
 ) {
-  return [
-    ...handlers.map((handler) =>
-      http[handler.method](
-        `https://us.sentry.io${handler.path}`,
-        handler.fetch,
-      ),
-    ),
-    ...handlers.map((handler) =>
+  const result = [];
+
+  for (const handler of handlers) {
+    // Always add handler for main host (sentry.io)
+    result.push(
       http[handler.method](`https://sentry.io${handler.path}`, handler.fetch),
-    ),
-  ];
+    );
+
+    // Only add handler for region-specific host if not controlOnly
+    if (!handler.controlOnly) {
+      result.push(
+        http[handler.method](
+          `https://us.sentry.io${handler.path}`,
+          handler.fetch,
+        ),
+      );
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -363,9 +378,11 @@ function buildHandlers(
  * parameter validation, and error scenarios.
  */
 export const restHandlers = buildHandlers([
+  // User data endpoints - controlOnly: true (only available on sentry.io)
   {
     method: "get",
     path: "/api/0/auth/",
+    controlOnly: true,
     fetch: () => {
       return HttpResponse.json({
         id: "1",
@@ -377,12 +394,14 @@ export const restHandlers = buildHandlers([
   {
     method: "get",
     path: "/api/0/users/me/regions/",
+    controlOnly: true,
     fetch: () => {
       return HttpResponse.json({
         regions: [{ name: "us", url: "https://us.sentry.io" }],
       });
     },
   },
+  // All other endpoints - controlOnly: false (default, available on both hosts)
   {
     method: "get",
     path: "/api/0/organizations/",
@@ -864,5 +883,15 @@ export const restHandlers = buildHandlers([
  * const orgs = await apiService.listOrganizations();
  * console.log(orgs); // Returns mock organization data
  * ```
+ *
+ * @note User Data Endpoint Restrictions
+ * The following endpoints are configured with `controlOnly: true` to work ONLY
+ * with the main host (sentry.io) and will NOT respond to requests from
+ * region-specific hosts (us.sentry.io, de.sentry.io):
+ * - `/api/0/auth/` (whoami endpoint)
+ * - `/api/0/users/me/regions/` (find_organizations endpoint)
+ *
+ * This matches the real Sentry API behavior where user data must always be queried
+ * from the main API server.
  */
 export const mswServer = setupServer(...restHandlers);
