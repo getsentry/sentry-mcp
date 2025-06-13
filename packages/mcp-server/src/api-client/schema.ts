@@ -64,6 +64,13 @@ export const UserRegionsSchema = z.object({
   ),
 });
 
+/**
+ * Schema for Sentry organization API responses.
+ *
+ * Handles organizations from both Sentry's Cloud Service and self-hosted installations.
+ * The links object and regionUrl field are optional to support self-hosted Sentry
+ * instances that may not include these fields or return empty values.
+ */
 export const OrganizationSchema = z.object({
   id: z.union([z.string(), z.number()]),
   slug: z.string(),
@@ -73,10 +80,10 @@ export const OrganizationSchema = z.object({
       regionUrl: z
         .string()
         .refine(
-          (value) => value === "" || z.string().url().safeParse(value).success,
+          (value) => !value || z.string().url().safeParse(value).success,
           {
             message:
-              "Must be a valid URL or empty string for self-hosted Sentry",
+              "Must be a valid URL or empty string (for self-hosted Sentry)",
           },
         )
         .optional(),

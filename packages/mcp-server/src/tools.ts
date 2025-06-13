@@ -40,14 +40,24 @@ import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
 import { UserInputError } from "./errors";
 
+/**
+ * Creates a SentryApiService instance from server context with optional region override.
+ *
+ * For self-hosted Sentry compatibility, empty regionUrl values are ignored gracefully.
+ * For Sentry's Cloud Service, regionUrl is used to route requests to the correct region.
+ *
+ * @param context - Server context containing default host and access token
+ * @param opts - Options object containing optional regionUrl override
+ * @returns Configured SentryApiService instance
+ * @throws {UserInputError} When regionUrl is provided but invalid
+ */
 function apiServiceFromContext(
   context: ServerContext,
   opts: { regionUrl?: string } = {},
 ) {
   let host = context.host;
 
-  // Only use regionUrl if it's provided and not empty (for self-hosted compatibility)
-  if (opts.regionUrl && opts.regionUrl.trim() !== "") {
+  if (opts.regionUrl?.trim()) {
     try {
       host = new URL(opts.regionUrl).host;
     } catch (error) {
@@ -98,9 +108,8 @@ export const TOOL_HANDLERS = {
     output += "\n\n# Using this information\n\n";
     output += `- The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.\n`;
 
-    // Provide clear guidance about regionUrl usage based on the actual values returned
-    const hasValidRegionUrls = organizations.some(
-      (org) => org.links?.regionUrl && org.links.regionUrl !== "",
+    const hasValidRegionUrls = organizations.some((org) =>
+      org.links?.regionUrl?.trim(),
     );
 
     if (hasValidRegionUrls) {
