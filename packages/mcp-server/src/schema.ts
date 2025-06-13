@@ -76,7 +76,19 @@ export const ParamQuery = z
 export const ParamRegionUrl = z
   .string()
   .trim()
-  .describe("The region URL for the organization you're querying, if known.");
+  .refine(
+    (value) => value === "" || z.string().url().safeParse(value).success,
+    {
+      message:
+        "Must be a valid URL when provided, or empty for self-hosted Sentry",
+    },
+  )
+  .describe(
+    "The region URL for the organization you're querying, if known. " +
+      "For Sentry SaaS (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. " +
+      "For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. " +
+      "You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+  );
 
 export const ParamIssueStatus = z
   .enum(["resolved", "resolvedInNextRelease", "unresolved", "ignored"])

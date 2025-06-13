@@ -69,7 +69,14 @@ export const OrganizationSchema = z.object({
   slug: z.string(),
   name: z.string(),
   links: z.object({
-    regionUrl: z.string().url(),
+    regionUrl: z
+      .string()
+      .refine(
+        (value) => value === "" || z.string().url().safeParse(value).success,
+        {
+          message: "Must be a valid URL or empty string for self-hosted Sentry",
+        },
+      ),
     organizationUrl: z.string().url(),
   }),
 });

@@ -48,9 +48,79 @@ describe("find_organizations", () => {
       # Using this information
 
       - The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.
-      - If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value there.
+      - If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value shown above for each organization.
+      - For Sentry SaaS (sentry.io), always use the regionUrl to ensure requests go to the correct region.
       "
     `);
+  });
+
+  it("handles empty regionUrl parameter", async () => {
+    const tool = TOOL_HANDLERS.find_organizations;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        regionUrl: "", // Empty string - should be handled gracefully
+      },
+    );
+    expect(result).toContain("Organizations");
+  });
+
+  it("handles undefined regionUrl parameter", async () => {
+    const tool = TOOL_HANDLERS.find_organizations;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        regionUrl: undefined,
+      },
+    );
+    expect(result).toContain("Organizations");
+  });
+
+  it("shows appropriate guidance for self-hosted Sentry", async () => {
+    // Mock organizations with empty regionUrl (typical for self-hosted)
+    mswServer.use(
+      http.get("*/api/0/users/me/regions/", () => {
+        return HttpResponse.json({
+          regions: [{ name: "default", url: "https://selfhosted.example.com" }],
+        });
+      }),
+      http.get("*/api/0/organizations/", () => {
+        return HttpResponse.json([
+          {
+            id: 1,
+            slug: "self-hosted-org",
+            name: "Self-hosted Organization",
+            links: {
+              regionUrl: "", // Empty regionUrl for self-hosted
+              organizationUrl: "https://selfhosted.example.com/self-hosted-org",
+            },
+          },
+        ]);
+      }),
+    );
+
+    const tool = TOOL_HANDLERS.find_organizations;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+      {
+        regionUrl: undefined,
+      },
+    );
+
+    expect(result).toContain("self-hosted Sentry installation");
+    expect(result).toContain("regionUrl is typically empty");
   });
 });
 
@@ -970,7 +1040,10 @@ describe("get_seer_issue_fix_status", () => {
 
       \`\`\`typescript
       // apps/server/src/trpc/routes/bottleById.ts
-      export default publicProcedure.input(z.number()).query(async function ({ input, ctx }) {
+      export default publicProcedure.input(z.number()).query(async function ({
+        input,
+        ctx,
+      }) {
         let [bottle] = await db.select().from(bottles).where(eq(bottles.id, input));
         if (!bottle) { ... }
       \`\`\`

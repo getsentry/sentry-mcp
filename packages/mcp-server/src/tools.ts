@@ -46,7 +46,8 @@ function apiServiceFromContext(
 ) {
   let host = context.host;
 
-  if (opts.regionUrl) {
+  // Only use regionUrl if it's provided and not empty (for self-hosted compatibility)
+  if (opts.regionUrl && opts.regionUrl.trim() !== "") {
     try {
       host = new URL(opts.regionUrl).host;
     } catch (error) {
@@ -96,7 +97,19 @@ export const TOOL_HANDLERS = {
 
     output += "\n\n# Using this information\n\n";
     output += `- The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.\n`;
-    output += `- If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value there.\n`;
+
+    // Provide clear guidance about regionUrl usage based on the actual values returned
+    const hasValidRegionUrls = organizations.some(
+      (org) => org.links.regionUrl && org.links.regionUrl !== "",
+    );
+
+    if (hasValidRegionUrls) {
+      output += `- If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value shown above for each organization.\n`;
+      output += `- For Sentry SaaS (sentry.io), always use the regionUrl to ensure requests go to the correct region.\n`;
+    } else {
+      output += `- This appears to be a self-hosted Sentry installation. You can omit the \`regionUrl\` parameter when using other tools.\n`;
+      output += `- For self-hosted Sentry, the regionUrl is typically empty and not needed for API calls.\n`;
+    }
 
     return output;
   },
