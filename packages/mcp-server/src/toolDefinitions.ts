@@ -59,7 +59,7 @@ export const TOOL_DEFINITIONS = [
       "- Get the user's name and email address.",
     ].join("\n"),
     paramsSchema: {
-      regionUrl: ParamRegionUrl.optional(),
+      // No regionUrl parameter - user data must always come from the main API server
     },
   },
   {
@@ -72,7 +72,7 @@ export const TOOL_DEFINITIONS = [
       "- Find an organization's slug to aid other tool requests",
     ].join("\n"),
     paramsSchema: {
-      regionUrl: ParamRegionUrl.optional(),
+      // No regionUrl parameter - user data and region lists must always come from the main API server
     },
   },
   {

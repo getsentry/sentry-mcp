@@ -11,7 +11,7 @@ describe("whoami", () => {
         organizationSlug: null,
       },
       {
-        regionUrl: undefined,
+        // No regionUrl parameter - user data must always come from the main API server
       },
     );
     expect(result).toMatchInlineSnapshot(
@@ -34,7 +34,7 @@ describe("find_organizations", () => {
         organizationSlug: null,
       },
       {
-        regionUrl: undefined,
+        // No regionUrl parameter - user data and region lists must always come from the main API server
       },
     );
     expect(result).toMatchInlineSnapshot(`
