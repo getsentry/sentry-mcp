@@ -1,0 +1,85 @@
+[
+  {
+    "id": "3",
+    "conditions": [
+      {
+        "interval": "1h",
+        "id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+        "value": 10,
+        "name": "The issue is seen more than 10 times in 1h",
+        "comparisonType": "count"
+      }
+    ],
+    "filters": [
+      {
+        "value": "1",
+        "id": "sentry.rules.filters.issue_category.IssueCategoryFilter",
+        "name": "The event's issue category is Error"
+      }
+    ],
+    "actions": [
+      {
+        "targetType": "Team",
+        "fallthroughType": "ActiveMembers",
+        "id": "sentry.mail.actions.NotifyEmailAction",
+        "targetIdentifier": "4367234414355",
+        "name": "Send a notification to Team and if none can be found then send a notification to ActiveMembers"
+      }
+    ],
+    "actionMatch": "any",
+    "filterMatch": "any",
+    "frequency": 60,
+    "name": "High Frequency Error Alert",
+    "dateCreated": "2023-01-15T06:45:34.353346Z",
+    "owner": "team:63562",
+    "createdBy": {
+      "id": 2435786,
+      "name": "John Doe",
+      "email": "john.doe@example.com"
+    },
+    "environment": "production",
+    "projects": ["cloudflare-mcp"],
+    "status": "active",
+    "snooze": false
+  },
+  {
+    "id": "4",
+    "conditions": [
+      {
+        "id": "sentry.rules.conditions.first_seen_event.FirstSeenEventCondition",
+        "name": "A new issue is created"
+      }
+    ],
+    "filters": [
+      {
+        "value": "error",
+        "id": "sentry.rules.filters.level.LevelFilter",
+        "name": "The event's level is equal to error"
+      }
+    ],
+    "actions": [
+      {
+        "targetType": "Member",
+        "id": "sentry.integrations.slack.notify_action.SlackNotifyServiceAction",
+        "targetIdentifier": "123456",
+        "channel": "#alerts",
+        "name": "Send a notification to the Test Slack workspace to #alerts"
+      }
+    ],
+    "actionMatch": "all",
+    "filterMatch": "all",
+    "frequency": 30,
+    "name": "New Error Alert",
+    "dateCreated": "2023-02-20T14:30:22.123456Z",
+    "owner": "user:123456",
+    "createdBy": {
+      "id": 123456,
+      "name": "Jane Smith",
+      "email": "jane.smith@example.com"
+    },
+    "environment": null,
+    "projects": ["cloudflare-mcp"],
+    "status": "active",
+    "snooze": false
+  }
+]
