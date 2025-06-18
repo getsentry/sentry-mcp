@@ -90,6 +90,7 @@ OPENAI_API_KEY=your_openai_api_key
 1. **Unit Tests**: Located alongside source files, run with `pnpm test`
 2. **Evaluation Tests**: In packages/mcp-server-evals, test real Sentry operations, run with `pnpm eval`
 3. **Coverage**: Uses Vitest with V8 coverage provider
+4. **Snapshot Testing**: For testing formatted outputs (like error messages, stack traces), use `.toMatchInlineSnapshot()` instead of `.toContain()` to capture the exact output format
 
 ## Common Development Tasks
 
