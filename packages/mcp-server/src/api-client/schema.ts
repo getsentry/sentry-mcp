@@ -228,20 +228,70 @@ export const ExceptionInterface = z
   })
   .partial();
 
-export const ErrorEntrySchema = z.object({
-  // XXX: Sentry can return either of these. Not sure why we never normalized it.
-  values: z.array(ExceptionInterface.optional()),
-  value: ExceptionInterface.nullable().optional(),
-});
+export const ErrorEntrySchema = z
+  .object({
+    // XXX: Sentry can return either of these. Not sure why we never normalized it.
+    values: z.array(ExceptionInterface.optional()),
+    value: ExceptionInterface.nullable().optional(),
+  })
+  .partial();
 
-export const RequestEntrySchema = z.object({
-  method: z.string().nullable(),
-  url: z.string().url().nullable(),
-  // TODO:
-  // query: z.array(z.tuple([z.string(), z.string()])).nullable(),
-  // data: z.unknown().nullable(),
-  // headers: z.array(z.tuple([z.string(), z.string()])).nullable(),
-});
+export const RequestEntrySchema = z
+  .object({
+    method: z.string().nullable(),
+    url: z.string().url().nullable(),
+    // TODO:
+    // query: z.array(z.tuple([z.string(), z.string()])).nullable(),
+    // data: z.unknown().nullable(),
+    // headers: z.array(z.tuple([z.string(), z.string()])).nullable(),
+  })
+  .partial();
+
+export const MessageEntrySchema = z
+  .object({
+    formatted: z.string().nullable(),
+    message: z.string().nullable(),
+    params: z.array(z.unknown()).optional(),
+  })
+  .partial();
+
+export const ThreadEntrySchema = z
+  .object({
+    id: z.number().nullable(),
+    name: z.string().nullable(),
+    current: z.boolean().nullable(),
+    crashed: z.boolean().nullable(),
+    state: z.string().nullable(),
+    stacktrace: z
+      .object({
+        frames: z.array(FrameInterface),
+      })
+      .nullable(),
+  })
+  .partial();
+
+export const ThreadsEntrySchema = z
+  .object({
+    values: z.array(ThreadEntrySchema),
+  })
+  .partial();
+
+export const BreadcrumbSchema = z
+  .object({
+    timestamp: z.string().nullable(),
+    type: z.string().nullable(),
+    category: z.string().nullable(),
+    level: z.string().nullable(),
+    message: z.string().nullable(),
+    data: z.record(z.unknown()).nullable(),
+  })
+  .partial();
+
+export const BreadcrumbsEntrySchema = z
+  .object({
+    values: z.array(BreadcrumbSchema),
+  })
+  .partial();
 
 const BaseEventSchema = z.object({
   id: z.string(),
@@ -251,21 +301,28 @@ const BaseEventSchema = z.object({
   type: z.unknown(),
   entries: z.array(
     z.union([
-      // TODO: there are other types
       z.object({
         type: z.literal("exception"),
         data: ErrorEntrySchema,
       }),
       z.object({
-        type: z.literal("spans"),
-        data: z.unknown(),
+        type: z.literal("message"),
+        data: MessageEntrySchema,
+      }),
+      z.object({
+        type: z.literal("threads"),
+        data: ThreadsEntrySchema,
       }),
       z.object({
         type: z.literal("request"),
-        data: z.unknown(),
+        data: RequestEntrySchema,
       }),
       z.object({
         type: z.literal("breadcrumbs"),
+        data: BreadcrumbsEntrySchema,
+      }),
+      z.object({
+        type: z.literal("spans"),
         data: z.unknown(),
       }),
       z.object({
