@@ -182,6 +182,50 @@ export default function RemoteSetup() {
             </li>
           </ol>
         </SetupGuide>
+
+        <SetupGuide id="claude-code" title="Claude Code">
+          <ol>
+            <li>
+              Open Claude Code and run the following command:
+              <CodeSnippet
+                snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e SENTRY_HOST=sentry.io -- ${mcpStdioSnippet}`}
+              />
+            </li>
+            <li>
+              Replace <code>sentry-user-token</code> with your actual User Auth
+              Token.
+            </li>
+            <li>
+              If using self-hosted Sentry, replace <code>sentry.io</code> with
+              your Sentry host.
+            </li>
+            <li>
+              Choose the appropriate scope:
+              <ul>
+                <li>
+                  <strong>local</strong> (default): Project-specific
+                  configuration
+                </li>
+                <li>
+                  <strong>project</strong>: Shared configuration via{" "}
+                  <code>.mcp.json</code>
+                </li>
+                <li>
+                  <strong>user</strong>: Available across all projects
+                </li>
+              </ul>
+            </li>
+          </ol>
+          <p>
+            <small>
+              For more details, see the{" "}
+              <Link href="https://docs.anthropic.com/en/docs/claude-code/mcp">
+                Claude Code MCP documentation
+              </Link>
+              .
+            </small>
+          </p>
+        </SetupGuide>
       </Accordion>
     </>
   );
