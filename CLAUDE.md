@@ -155,3 +155,54 @@ pnpm test         # Run unit tests
 - Build outputs go to `dist/` directories (gitignored)
 - `.tsbuildinfo` files are for incremental builds (gitignored)
 - Turbo cache is stored in `.turbo/` (gitignored)
+
+## Integration Documentation
+
+The MCP server supports multiple AI assistant clients. Integration guides are provided in the web UI for both remote (OAuth) and stdio transport configurations.
+
+### Integration UI Components
+
+Integration documentation is implemented in `packages/mcp-cloudflare/src/client/components/fragments/`:
+- `remote-setup.tsx` - Instructions for OAuth-based remote connections
+- `stdio-setup.tsx` - Instructions for local stdio transport connections
+- `setup-guide.tsx` - Reusable component for individual integration guides
+
+### Supported Integrations
+
+Integrations are ordered by popularity:
+1. **Cursor** - Popular AI code editor
+2. **Claude Code** - Anthropic's official CLI
+3. **Windsurf** - Code editor with AI capabilities
+4. **Visual Studio Code** - Microsoft's editor with MCP extension
+5. **Zed** - Modern code editor
+
+### Adding a New Client Integration
+
+To add support for a new MCP client:
+
+1. Add a new `<SetupGuide>` component in both `remote-setup.tsx` and `stdio-setup.tsx`
+2. Include step-by-step instructions specific to that client
+3. Use `<CodeSnippet>` components for configuration examples
+4. Consider the integration's popularity when determining its order in the list
+5. Test the instructions with the actual client to ensure accuracy
+
+Example structure:
+```tsx
+<SetupGuide id="client-name" title="Client Name">
+  <ol>
+    <li>Step 1 instructions</li>
+    <li>Step 2 with <CodeSnippet snippet={configExample} /></li>
+  </ol>
+  <p><small>Additional notes or links</small></p>
+</SetupGuide>
+```
+
+### Integration Configuration Patterns
+
+Different clients use different configuration formats:
+- **Cursor/Windsurf**: Use `mcpServers` object in JSON config
+- **Claude Code**: Uses CLI commands with `claude mcp add`
+- **VS Code**: Supports both manual config and automatic setup via handler URL
+- **Zed**: Uses `context_servers` configuration
+
+When adding new integrations, follow the existing patterns and ensure configuration examples are consistent with the client's expected format.
