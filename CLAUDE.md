@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 sentry-mcp is a Model Context Protocol (MCP) server that provides access to Sentry's functionality. It supports both remote deployment via Cloudflare Workers and local stdio transport for self-hosted Sentry installations.
 
+### Directory Structure
+
+- **packages/mcp-server/src/**
+  - `api-client/` - Sentry API client implementation
+  - `internal/` - Internal utilities (formatting, validation) not exposed in public API
+  - `transports/` - Transport implementations (stdio)
+  - Root files: Core server logic, tool implementations, type definitions
+- **packages/mcp-cloudflare/** - Cloudflare Workers deployment with OAuth
+- **packages/mcp-server-evals/** - Evaluation tests for real Sentry operations
+- **packages/mcp-server-mocks/** - Shared mock data fixtures
+
 ## Essential Commands
 
 ### Development
@@ -33,6 +44,8 @@ pnpm format             # Format code with Biome
 ```bash
 pnpm deploy             # Deploy to Cloudflare (from packages/mcp-cloudflare)
 ```
+
+Note: Cloudflare deployment requires setting up Durable Objects and KV namespaces. These are configured in `wrangler.jsonc`.
 
 ### Debugging
 ```bash
@@ -78,6 +91,11 @@ For evaluation tests, create `.env` in the root:
 OPENAI_API_KEY=your_openai_api_key
 ```
 
+Additional environment variables used by the build system (set in CI or locally as needed):
+- `SENTRY_AUTH_TOKEN` - For Sentry telemetry/releases
+- `VITE_SENTRY_DSN` - Sentry DSN for error tracking
+- `VITE_SENTRY_ENVIRONMENT` - Environment name for Sentry
+
 ### Code Style
 
 - Uses Biome for formatting and linting
@@ -96,10 +114,17 @@ OPENAI_API_KEY=your_openai_api_key
 
 ### Adding a New Sentry Tool
 
-1. Implement the tool in `packages/mcp-server/src/tools/`
-2. Add corresponding tests
-3. Update the tool registry
-4. Add evaluation tests if applicable
+1. Add the tool implementation to `packages/mcp-server/src/tools.ts`
+2. Define the tool schema in `packages/mcp-server/src/toolDefinitions.ts`
+3. Add corresponding unit tests alongside the implementation
+4. Add evaluation tests in `packages/mcp-server-evals/src/evals/`
+5. If needed, add mock data to `packages/mcp-server-mocks/src/`
+
+### Error Handling
+
+- Use `UserInputError` from `packages/mcp-server/src/errors.ts` for invalid user input
+- This error type provides clear feedback to the LLM about what went wrong
+- Other errors will be treated as system errors
 
 ### Testing Changes Locally
 
@@ -114,3 +139,19 @@ Use pnpm to maintain consistency:
 pnpm add <package> -w              # Add to root
 pnpm add <package> --filter <pkg>  # Add to specific package
 ```
+
+### Pre-PR Checklist
+
+Before submitting a pull request:
+```bash
+pnpm lint:fix     # Fix any linting issues
+pnpm format       # Format code with Biome
+pnpm build        # Ensure everything builds
+pnpm test         # Run unit tests
+```
+
+### Build Artifacts
+
+- Build outputs go to `dist/` directories (gitignored)
+- `.tsbuildinfo` files are for incremental builds (gitignored)
+- Turbo cache is stored in `.turbo/` (gitignored)
