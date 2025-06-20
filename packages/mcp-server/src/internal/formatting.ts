@@ -18,6 +18,22 @@ import type {
   SentryApiService,
 } from "../api-client";
 
+// Language detection mappings
+const LANGUAGE_EXTENSIONS: Record<string, string> = {
+  ".java": "java",
+  ".py": "python",
+  ".js": "javascript",
+  ".jsx": "javascript",
+  ".ts": "javascript",
+  ".tsx": "javascript",
+  ".rb": "ruby",
+  ".php": "php",
+};
+
+const LANGUAGE_MODULE_PATTERNS: Array<[RegExp, string]> = [
+  [/^(java\.|com\.|org\.)/, "java"],
+];
+
 /**
  * Detects the programming language of a stack frame based on the file extension.
  * Falls back to the platform parameter if no filename is available or extension is unrecognized.
@@ -31,27 +47,23 @@ function detectLanguage(
   platform?: string | null,
 ): string {
   // Check filename extensions
-  if (frame.filename?.endsWith(".java")) {
-    return "java";
+  if (frame.filename) {
+    const ext = frame.filename.toLowerCase().match(/\.[^.]+$/)?.[0];
+    if (ext && LANGUAGE_EXTENSIONS[ext]) {
+      return LANGUAGE_EXTENSIONS[ext];
+    }
   }
 
-  if (frame.filename?.endsWith(".py")) {
-    return "python";
+  // Check module patterns
+  if (frame.module) {
+    for (const [pattern, language] of LANGUAGE_MODULE_PATTERNS) {
+      if (pattern.test(frame.module)) {
+        return language;
+      }
+    }
   }
 
-  if (frame.filename?.match(/\.(js|ts|jsx|tsx)$/)) {
-    return "javascript";
-  }
-
-  if (frame.filename?.endsWith(".rb")) {
-    return "ruby";
-  }
-
-  if (frame.filename?.endsWith(".php")) {
-    return "php";
-  }
-
-  // Fall back to platform if provided
+  // Fallback to platform or unknown
   return platform || "unknown";
 }
 
@@ -175,35 +187,114 @@ export function formatEventOutput(event: Event) {
   return output;
 }
 
+/**
+ * Extracts the context line matching the frame's line number for inline display.
+ * This is used in the full stacktrace view to show the actual line of code
+ * that caused the error inline with the stack frame.
+ *
+ * @param frame - The stack frame containing context lines
+ * @returns The line of code at the frame's line number, or empty string if not available
+ */
+function renderInlineContext(frame: z.infer<typeof FrameInterface>): string {
+  if (!frame.context?.length || !frame.lineNo) {
+    return "";
+  }
+
+  const contextLine = frame.context.find(([lineNo]) => lineNo === frame.lineNo);
+  return contextLine ? `\n${contextLine[1]}` : "";
+}
+
+/**
+ * Renders an enhanced view of a stack frame with context lines and variables.
+ * Used for the "Most Relevant Frame" section to provide detailed information
+ * about the most relevant application frame where the error occurred.
+ *
+ * @param frame - The stack frame to render with enhanced information
+ * @param event - The Sentry event containing platform information for language detection
+ * @returns Formatted string with frame header, context lines, and variables table
+ */
+function renderEnhancedFrame(
+  frame: z.infer<typeof FrameInterface>,
+  event: Event,
+): string {
+  const parts: string[] = [];
+
+  parts.push("**Most Relevant Frame:**");
+  parts.push("─────────────────────");
+  parts.push(formatFrameHeader(frame, undefined, event.platform));
+
+  // Add context lines if available
+  if (frame.context?.length) {
+    const contextLines = renderContextLines(frame);
+    if (contextLines) {
+      parts.push("");
+      parts.push(contextLines);
+    }
+  }
+
+  // Add variables table if available
+  if (frame.vars && Object.keys(frame.vars).length > 0) {
+    parts.push("");
+    parts.push(renderVariablesTable(frame.vars));
+  }
+
+  return parts.join("\n");
+}
+
 function formatExceptionInterfaceOutput(
   event: Event,
   data: z.infer<typeof ErrorEntrySchema>,
 ) {
-  let output = "";
+  const parts: string[] = [];
+
   // TODO: support chained exceptions
   const firstError = data.value ?? data.values[0];
   if (!firstError) {
     return "";
   }
-  output += `### Error\n\n${"```"}\n${firstError.type}: ${
-    firstError.value
-  }\n${"```"}\n\n`;
-  if (!firstError.stacktrace || !firstError.stacktrace.frames) {
-    return output;
-  }
-  output += `**Stacktrace:**\n${"```"}\n${firstError.stacktrace.frames
-    .map((frame) => {
-      const context = frame.context?.length
-        ? `${frame.context
-            .filter(([lineno, _]) => lineno === frame.lineNo)
-            .map(([_, code]) => `\n${code}`)
-            .join("")}`
-        : "";
 
-      return `${formatFrameHeader(frame, undefined, event.platform)}${context}`;
-    })
-    .join("\n")}\n${"```"}\n\n`;
-  return output;
+  parts.push("### Error");
+  parts.push("");
+  parts.push("```");
+  parts.push(`${firstError.type}: ${firstError.value}`);
+  parts.push("```");
+  parts.push("");
+
+  if (!firstError.stacktrace || !firstError.stacktrace.frames) {
+    return parts.join("\n");
+  }
+
+  const frames = firstError.stacktrace.frames;
+
+  // Find and format the first in-app frame with enhanced view
+  const firstInAppFrame = findFirstInAppFrame(frames);
+  if (
+    firstInAppFrame &&
+    (firstInAppFrame.context?.length || firstInAppFrame.vars)
+  ) {
+    parts.push(renderEnhancedFrame(firstInAppFrame, event));
+    parts.push("");
+    parts.push("**Full Stacktrace:**");
+    parts.push("────────────────");
+  } else {
+    parts.push("**Stacktrace:**");
+  }
+
+  parts.push("```");
+  parts.push(
+    frames
+      .map((frame) => {
+        const header = formatFrameHeader(frame, undefined, event.platform);
+        const context = renderInlineContext(frame);
+        return `${header}${context}`;
+      })
+      .join("\n"),
+  );
+  parts.push("```");
+  parts.push("");
+  parts.push("");
+
+  return parts.join("\n");
 }
 
 function formatRequestInterfaceOutput(
@@ -242,31 +333,181 @@ function formatThreadsInterfaceOutput(
     return "";
   }
 
-  let output = "";
+  const parts: string[] = [];
 
   // Include thread name if available
   if (crashedThread.name) {
-    output += `**Thread** (${crashedThread.name})\n\n`;
+    parts.push(`**Thread** (${crashedThread.name})`);
+    parts.push("");
   }
 
-  output += `**Stacktrace:**\n${"```"}\n${crashedThread.stacktrace.frames
-    .map((frame) => {
-      const context = frame.context?.length
-        ? `${frame.context
-            .filter(([lineno, _]) => lineno === frame.lineNo)
-            .map(([_, code]) => `\n${code}`)
-            .join("")}`
-        : "";
+  const frames = crashedThread.stacktrace.frames;
 
-      return `${formatFrameHeader(frame, undefined, event.platform)}${context}`;
-    })
-    .join("\n")}\n${"```"}\n\n`;
+  // Find and format the first in-app frame with enhanced view
+  const firstInAppFrame = findFirstInAppFrame(frames);
+  if (
+    firstInAppFrame &&
+    (firstInAppFrame.context?.length || firstInAppFrame.vars)
+  ) {
+    parts.push(renderEnhancedFrame(firstInAppFrame, event));
+    parts.push("");
+    parts.push("**Full Stacktrace:**");
+    parts.push("────────────────");
+  } else {
+    parts.push("**Stacktrace:**");
+  }
 
-  return output;
+  parts.push("```");
+  parts.push(
+    frames
+      .map((frame) => {
+        const header = formatFrameHeader(frame, undefined, event.platform);
+        const context = renderInlineContext(frame);
+        return `${header}${context}`;
+      })
+      .join("\n"),
+  );
+  parts.push("```");
+  parts.push("");
+
+  return parts.join("\n");
+}
+
+/**
+ * Renders surrounding source code context for a stack frame.
+ * Shows a window of code lines around the error line with visual indicators.
+ *
+ * @param frame - The stack frame containing context lines
+ * @param contextSize - Number of lines to show before and after the error line (default: 3)
+ * @returns Formatted context lines with line numbers and arrow indicator for the error line
+ */
+function renderContextLines(
+  frame: z.infer<typeof FrameInterface>,
+  contextSize = 3,
+): string {
+  if (!frame.context || frame.context.length === 0 || !frame.lineNo) {
+    return "";
+  }
+
+  const lines: string[] = [];
+  const errorLine = frame.lineNo;
+  const maxLineNoWidth = Math.max(
+    ...frame.context.map(([lineNo]) => lineNo.toString().length),
+  );
+
+  for (const [lineNo, code] of frame.context) {
+    const isErrorLine = lineNo === errorLine;
+    const lineNoStr = lineNo.toString().padStart(maxLineNoWidth, " ");
+
+    if (Math.abs(lineNo - errorLine) <= contextSize) {
+      if (isErrorLine) {
+        lines.push(`  → ${lineNoStr} │ ${code}`);
+      } else {
+        lines.push(`    ${lineNoStr} │ ${code}`);
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Formats a variable value for display in the variables table.
+ * Handles different types appropriately and safely, converting complex objects
+ * to readable representations and handling edge cases like circular references.
+ *
+ * @param value - The variable value to format (can be any type)
+ * @param maxLength - Maximum length for stringified objects/arrays (default: 80)
+ * @returns Human-readable string representation of the value
+ */
+function formatVariableValue(value: unknown, maxLength = 80): string {
+  try {
+    if (typeof value === "string") {
+      return `"${value}"`;
+    }
+    if (value === null) {
+      return "null";
+    }
+    if (value === undefined) {
+      return "undefined";
+    }
+    if (typeof value === "object") {
+      const stringified = JSON.stringify(value);
+      if (stringified.length > maxLength) {
+        // Leave room for ", ...]" or ", ...}"
+        const truncateAt = maxLength - 6;
+        let truncated = stringified.substring(0, truncateAt);
+
+        // Find the last complete element by looking for the last comma
+        const lastComma = truncated.lastIndexOf(",");
+        if (lastComma > 0) {
+          truncated = truncated.substring(0, lastComma);
+        }
+
+        // Add the appropriate ending
+        if (Array.isArray(value)) {
+          return `${truncated}, ...]`;
+        }
+        return `${truncated}, ...}`;
+      }
+      return stringified;
+    }
+    return String(value);
+  } catch {
+    // Handle circular references or other stringify errors
+    return `<${typeof value}>`;
+  }
+}
+
+/**
+ * Renders a table of local variables in a tree-like format.
+ * Uses box-drawing characters to create a visual hierarchy of variables
+ * and their values at the point where the error occurred.
+ *
+ * @param vars - Object containing variable names as keys and their values
+ * @returns Formatted variables table with tree-style prefix characters
+ */
+function renderVariablesTable(vars: Record<string, unknown>): string {
+  const entries = Object.entries(vars);
+  if (entries.length === 0) {
+    return "";
+  }
+
+  const lines: string[] = ["Local Variables:"];
+  const lastIndex = entries.length - 1;
+
+  entries.forEach(([key, value], index) => {
+    const prefix = index === lastIndex ? "└─" : "├─";
+    const valueStr = formatVariableValue(value);
+    lines.push(`${prefix} ${key}: ${valueStr}`);
+  });
+
+  return lines.join("\n");
+}
+
+/**
+ * Finds the first application frame (in_app) in a stack trace.
+ * Searches from the bottom of the stack (oldest frame) to find the first
+ * frame that belongs to the user's application code rather than libraries.
+ *
+ * @param frames - Array of stack frames, typically in reverse chronological order
+ * @returns The first in-app frame found, or undefined if none exist
+ */
+function findFirstInAppFrame(
+  frames: z.infer<typeof FrameInterface>[],
+): z.infer<typeof FrameInterface> | undefined {
+  // Frames are usually in reverse order (most recent first)
+  // We want the first in-app frame from the bottom
+  for (let i = frames.length - 1; i >= 0; i--) {
+    if (frames[i].inApp === true) {
+      return frames[i];
+    }
+  }
+  return undefined;
 }
 
 function formatContexts(contexts: z.infer<typeof EventSchema>["contexts"]) {
-  if (!contexts) {
+  if (!contexts || Object.keys(contexts).length === 0) {
     return "";
   }
   return `### Additional Context\n\nThese are additional context provided by the user when they're instrumenting their application.\n\n${Object.entries(

@@ -207,6 +207,8 @@ export const FrameInterface = z
     module: z.string().nullable(),
     // lineno, source code
     context: z.array(z.tuple([z.number(), z.string()])),
+    inApp: z.boolean().optional(),
+    vars: z.record(z.string(), z.unknown()).optional(),
   })
   .partial();
 
