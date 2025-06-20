@@ -41,6 +41,18 @@ import type {
 // import { logger } from "@sentry/node";
 
 /**
+ * Mapping of common network error codes to user-friendly messages.
+ * These help users understand and resolve connection issues.
+ */
+const NETWORK_ERROR_MESSAGES: Record<string, string> = {
+  EAI_AGAIN: "DNS temporarily unavailable. Check your internet connection.",
+  ENOTFOUND: "Hostname not found. Verify the URL is correct.",
+  ECONNREFUSED: "Connection refused. Ensure the service is accessible.",
+  ETIMEDOUT: "Connection timed out. Check network connectivity.",
+  ECONNRESET: "Connection reset. Try again in a moment.",
+};
+
+/**
  * Custom error class for Sentry API responses.
  *
  * Provides enhanced error messages for LLM consumption and handles
@@ -200,10 +212,37 @@ export class SentryApiService {
     }
 
     // logger.info(logger.fmt`[sentryApi] ${options.method || "GET"} ${url}`);
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+      });
+    } catch (error) {
+      // Extract the root cause from the error chain
+      let rootCause = error;
+      while (rootCause instanceof Error && rootCause.cause) {
+        rootCause = rootCause.cause;
+      }
+
+      const errorMessage =
+        rootCause instanceof Error ? rootCause.message : String(rootCause);
+
+      let friendlyMessage = `Unable to connect to ${url}`;
+
+      // Check if we have a specific message for this error
+      const errorCode = Object.keys(NETWORK_ERROR_MESSAGES).find((code) =>
+        errorMessage.includes(code),
+      );
+
+      if (errorCode) {
+        friendlyMessage += ` - ${NETWORK_ERROR_MESSAGES[errorCode]}`;
+      } else {
+        friendlyMessage += ` - ${errorMessage}`;
+      }
+
+      throw new Error(friendlyMessage, { cause: error });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
