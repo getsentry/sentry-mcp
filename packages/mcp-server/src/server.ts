@@ -23,7 +23,7 @@ import { TOOL_DEFINITIONS } from "./toolDefinitions";
 import type { ServerContext } from "./types";
 import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
 import { logError } from "./logging";
-import { RESOURCES } from "./resources";
+import { RESOURCES, isTemplateResource } from "./resources";
 import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
@@ -143,34 +143,47 @@ export async function configureServer({
   };
 
   for (const resource of RESOURCES) {
-    server.resource(
-      resource.name,
-      resource.uri,
-      {
-        description: resource.description,
-        mimeType: resource.mimeType,
-      },
-      // TODO: this doesnt support any error handling afaict via the spec
-      async (url) => {
-        return await startNewTrace(async () => {
-          return await startSpan(
-            { name: `mcp.resource/${resource.name}` },
-            async () => {
-              if (context.userId) {
-                setUser({
-                  id: context.userId,
-                });
-              }
-              if (context.clientId) {
-                setTag("client.id", context.clientId);
-              }
+    // Create the handler function once - it's the same for both resource types
+    const resourceHandler = async (url: URL) => {
+      return await startNewTrace(async () => {
+        return await startSpan(
+          { name: `mcp.resource/${resource.name}` },
+          async () => {
+            if (context.userId) {
+              setUser({
+                id: context.userId,
+              });
+            }
+            if (context.clientId) {
+              setTag("client.id", context.clientId);
+            }
 
-              return resource.handler(url);
-            },
-          );
-        });
-      },
-    );
+            return resource.handler(url);
+          },
+        );
+      });
+    };
+
+    // TODO: this doesnt support any error handling afaict via the spec
+    if (isTemplateResource(resource)) {
+      // Register template resource
+      server.resource(
+        resource.name,
+        resource, // The resource itself is a valid ResourceTemplate
+        resourceHandler,
+      );
+    } else {
+      // Register static resource
+      server.resource(
+        resource.name,
+        resource.uri,
+        {
+          description: resource.description,
+          mimeType: resource.mimeType,
+        },
+        resourceHandler,
+      );
+    }
   }
 
   for (const prompt of PROMPT_DEFINITIONS) {

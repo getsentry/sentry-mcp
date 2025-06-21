@@ -5,6 +5,8 @@
  * knowledge bases. Resources enable LLMs to access contextual information
  * during tool execution without embedding large documents in the codebase.
  *
+ * @see https://modelcontextprotocol.io/docs/concepts/resources - MCP Resources specification
+ *
  * @example Resource Definition
  * ```typescript
  * {
@@ -20,7 +22,26 @@ import type { ReadResourceCallback } from "@modelcontextprotocol/sdk/server/mcp.
 import type {
   ReadResourceResult,
   Resource,
+  ResourceTemplate,
 } from "@modelcontextprotocol/sdk/types.js";
+import { UserInputError } from "./errors";
+
+/**
+ * Resource configuration with handler function
+ */
+export type ResourceConfig = (Resource | ResourceTemplate) & {
+  handler: ReadResourceCallback;
+  description: string; // Make description required
+};
+
+/**
+ * Type guard to check if a resource uses a URI template
+ */
+export function isTemplateResource(
+  resource: ResourceConfig,
+): resource is ResourceTemplate & { handler: ReadResourceCallback } {
+  return "uriTemplate" in resource;
+}
 
 /**
  * Fetches raw content from GitHub repositories.
@@ -54,6 +75,44 @@ async function defaultGitHubHandler(url: URL): Promise<ReadResourceResult> {
 }
 
 /**
+ * Fetches Sentry documentation in markdown format.
+ * Converts docs.sentry.io URLs to their markdown equivalents.
+ *
+ * The handler receives the exact URI from the resource definition,
+ * but dynamically constructs the markdown URL based on the actual request.
+ */
+async function sentryDocsHandler(url: URL): Promise<ReadResourceResult> {
+  // The URL passed here is the actual docs.sentry.io URL being requested
+  // Transform it to fetch the markdown version
+  const path = `${url.pathname.replace(/\/$/, "")}.md`;
+  const mdUrl = `${url.origin}${path}`;
+
+  const response = await fetch(mdUrl);
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new UserInputError(
+        `Sentry documentation not found at ${url.pathname}. Please check the URL is correct.`,
+      );
+    }
+    throw new Error(
+      `Failed to fetch Sentry docs: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const content = await response.text();
+
+  return {
+    contents: [
+      {
+        uri: url.toString(),
+        mimeType: "text/markdown",
+        text: content,
+      },
+    ],
+  };
+}
+
+/**
  * Registry of all MCP resources available to LLMs.
  * Defines external documentation and reference materials with their handlers.
  */
@@ -62,7 +121,7 @@ async function defaultGitHubHandler(url: URL): Promise<ReadResourceResult> {
 // simply parse everything out, but given we're running the service on cloudflare
 // and the author barely knows TypeScript, we're opting for a solution we've
 // seen employed elsewhere (h/t Neon)
-export const RESOURCES = [
+export const RESOURCES: ResourceConfig[] = [
   {
     name: "sentry-query-syntax",
     uri: "https://github.com/getsentry/sentry-ai-rules/blob/main/api/query-syntax.mdc",
@@ -71,4 +130,20 @@ export const RESOURCES = [
       "Use these rules to understand common query parameters when searching Sentry for information.",
     handler: defaultGitHubHandler,
   },
-] satisfies (Resource & { handler: ReadResourceCallback })[];
+  // Platform documentation with dynamic segments
+  {
+    name: "sentry-docs-platform",
+    uriTemplate: "https://docs.sentry.io/platforms/{platform}/",
+    mimeType: "text/markdown",
+    description: "Sentry SDK documentation for {platform}",
+    handler: sentryDocsHandler,
+  },
+  {
+    name: "sentry-docs-platform-guide",
+    uriTemplate:
+      "https://docs.sentry.io/platforms/{platform}/guides/{framework}/",
+    mimeType: "text/markdown",
+    description: "Sentry integration guide for {framework} on {platform}",
+    handler: sentryDocsHandler,
+  },
+];

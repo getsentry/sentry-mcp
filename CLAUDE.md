@@ -120,6 +120,12 @@ Additional environment variables used by the build system (set in CI or locally 
 4. Add evaluation tests in `packages/mcp-server-evals/src/evals/`
 5. If needed, add mock data to `packages/mcp-server-mocks/src/`
 
+### Working with MCP Resources
+
+Resources provide access to external documentation and reference materials that LLMs can use during tool execution. The implementation follows the [MCP Resources specification](https://modelcontextprotocol.io/docs/concepts/resources).
+
+Resources are defined in `packages/mcp-server/src/resources.ts` and support both static URIs and URI templates with dynamic segments (e.g., `{platform}`, `{framework}`).
+
 ### Error Handling
 
 - Use `UserInputError` from `packages/mcp-server/src/errors.ts` for invalid user input
