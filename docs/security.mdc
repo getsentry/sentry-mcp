@@ -1,0 +1,168 @@
+# Security
+
+Authentication and security patterns for the Sentry MCP server.
+
+## OAuth Architecture
+
+The MCP server acts as an OAuth proxy between clients and Sentry:
+
+```
+MCP Client → MCP Server → Sentry OAuth → Sentry API
+```
+
+### Key Components
+
+1. **OAuth Provider** (Cloudflare Durable Object)
+   - Manages client authorization
+   - Stores tokens securely
+   - Handles state management
+
+2. **Client Approval**
+   - First-time clients require user approval
+   - Approved clients stored in signed cookies
+   - Per-organization access control
+
+3. **Token Management**
+   - Access tokens encrypted in KV storage
+   - Tokens scoped to organizations
+   - No refresh token support (Sentry limitation)
+
+## Implementation Patterns
+
+### OAuth Flow Handler
+
+See implementation: `packages/mcp-cloudflare/src/server/routes/sentry-oauth.ts`
+
+Key endpoints:
+- `/authorize` - Client approval and redirect to Sentry
+- `/callback` - Handle Sentry callback, store tokens
+- `/approve` - Process user approval
+
+### Required OAuth Scopes
+
+```typescript
+const REQUIRED_SCOPES = [
+  "org:read",
+  "project:read", 
+  "issue:read",
+  "issue:write"
+];
+```
+
+### Security Context
+
+```typescript
+interface ServerContext {
+  host: string;
+  accessToken: string;
+  organizationSlug?: string;
+}
+```
+
+Context propagated through:
+- Tool handlers
+- API client initialization
+- Error messages (sanitized)
+
+## Security Measures
+
+### State Parameter Protection
+
+```typescript
+// Generate secure state
+const state = encodeURIComponent(
+  jwt.sign({
+    oauthRequest: JSON.stringify(oauthReqInfo),
+    redirect_uri,
+    ts: Date.now()
+  }, COOKIE_SECRET)
+);
+
+// Verify on callback
+const decoded = jwt.verify(state, COOKIE_SECRET);
+if (Date.now() - decoded.ts > 600000) { // 10 min expiry
+  throw new Error("State expired");
+}
+```
+
+### Input Validation
+
+All user inputs sanitized:
+- HTML content escaped
+- URLs validated
+- OAuth parameters verified
+
+### Cookie Security
+
+```typescript
+// Signed cookie for approved clients
+const cookie = await signCookie(
+  `approved_clients=${JSON.stringify(approvedClients)}`,
+  COOKIE_SECRET
+);
+
+// Cookie attributes
+"HttpOnly; Secure; SameSite=Lax; Max-Age=2592000" // 30 days
+```
+
+## Error Handling
+
+Security-aware error responses:
+- No token/secret exposure in errors
+- Generic messages for auth failures
+- Detailed logging server-side only
+
+```typescript
+catch (error) {
+  if (error.message.includes("token")) {
+    return new Response("Authentication failed", { status: 401 });
+  }
+  // Log full error server-side
+  console.error("OAuth error:", error);
+  return new Response("An error occurred", { status: 500 });
+}
+```
+
+## Multi-Tenant Security
+
+### Organization Isolation
+
+- Tokens scoped to organizations
+- Users can switch organizations
+- Each organization requires separate approval
+
+### Access Control
+
+```typescript
+// Verify organization access
+const orgs = await apiService.listOrganizations();
+if (!orgs.find(org => org.slug === requestedOrg)) {
+  throw new UserInputError("No access to organization");
+}
+```
+
+## Environment Variables
+
+Required for OAuth:
+```bash
+SENTRY_CLIENT_ID=your_oauth_app_id
+SENTRY_CLIENT_SECRET=your_oauth_app_secret  
+COOKIE_SECRET=random_32_char_string
+```
+
+## CORS Configuration
+
+```typescript
+// Allowed origins for OAuth flow
+const ALLOWED_ORIGINS = [
+  "https://sentry.io",
+  "https://*.sentry.io"
+];
+```
+
+## References
+
+- OAuth implementation: `packages/mcp-cloudflare/src/server/routes/sentry-oauth.ts`
+- Cookie utilities: `packages/mcp-cloudflare/src/server/utils/cookies.ts`
+- OAuth Provider: `packages/mcp-cloudflare/src/server/bindings.ts`
+- Sentry OAuth docs: https://docs.sentry.io/api/guides/oauth/

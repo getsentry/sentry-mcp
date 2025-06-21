@@ -1,0 +1,234 @@
+# Monitoring
+
+Observability patterns using Sentry across the MCP server.
+
+## Architecture
+
+Different Sentry SDKs for different environments:
+- **Core server**: `@sentry/core` (platform-agnostic)
+- **Cloudflare Workers**: `@sentry/cloudflare`
+- **Node.js stdio**: `@sentry/node`
+- **React client**: `@sentry/react`
+
+## Core Server Instrumentation
+
+### Error Logging
+
+```typescript
+import { captureException, withScope } from "@sentry/core";
+
+export function logError(
+  error: Error | unknown,
+  contexts?: Record<string, any>,
+  attachments?: Record<string, any>
+): string | undefined {
+  // Skip UserInputErrors - these are expected
+  if (error instanceof UserInputError) {
+    return;
+  }
+
+  return withScope((scope) => {
+    if (contexts) scope.setContext("mcp", contexts);
+    if (attachments) {
+      for (const [key, data] of Object.entries(attachments)) {
+        scope.addAttachment({ data, filename: key });
+      }
+    }
+    return captureException(error);
+  });
+}
+```
+
+### Tracing Pattern
+
+```typescript
+export async function createTracedToolHandler<T extends ToolName>(
+  name: T,
+  handler: ToolHandlerFunction<T>
+): Promise<[T, ToolHandlerFunction<T>]> {
+  return [
+    name,
+    async (context: ServerContext, params: ToolParams<T>) => {
+      const attributes = {
+        "mcp.tool.name": name,
+        "mcp.tool.params": JSON.stringify(params),
+      };
+
+      return await withActiveSpan(
+        `mcp.tool.${name}`,
+        attributes,
+        async () => handler(context, params)
+      );
+    },
+  ];
+}
+```
+
+### Span Management
+
+```typescript
+async function withActiveSpan<T>(
+  name: string,
+  attributes: Record<string, any>,
+  fn: () => Promise<T>
+): Promise<T> {
+  const activeSpan = getActiveSpan();
+  const span = activeSpan?.startSpan(name) ?? startInactiveSpan({ name });
+  
+  span.setAttributes(attributes);
+  
+  try {
+    return await fn();
+  } catch (error) {
+    span.setStatus({ code: 2, message: error.message });
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+```
+
+## Cloudflare Workers Setup
+
+### Configuration
+
+```typescript
+// sentry.config.ts
+export default function getSentryConfig(env: Env, context: ExecutionContext) {
+  return {
+    dsn: env.VITE_SENTRY_DSN,
+    environment: env.VITE_SENTRY_ENVIRONMENT || "development",
+    context,
+    integrations: [
+      Sentry.rewriteFramesIntegration({ root: "/" }),
+    ],
+    beforeSend(event) {
+      // Redact sensitive data
+      if (event.request?.headers?.authorization) {
+        event.request.headers.authorization = "[REDACTED]";
+      }
+      return event;
+    },
+  };
+}
+```
+
+### Worker Instrumentation
+
+```typescript
+export default Sentry.withSentry(
+  (env) => getSentryConfig(env),
+  {
+    async fetch(request, env, ctx): Promise<Response> {
+      // Attach OAuth provider to request
+      request.OAUTH_PROVIDER = oAuthProvider.configure(/* ... */);
+      return app.fetch(request, env, ctx);
+    },
+  }
+);
+```
+
+## Node.js Stdio Setup
+
+```typescript
+// Init at startup
+import * as Sentry from "@sentry/node";
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV || "production",
+  integrations: [
+    Sentry.nodeProfilingIntegration(),
+  ],
+  tracesSampleRate: 0.1,
+  profilesSampleRate: 0.1,
+});
+
+// Handle uncaught errors
+process.on("uncaughtException", (error) => {
+  Sentry.captureException(error);
+  process.exit(1);
+});
+```
+
+## Span Conventions
+
+### Naming Pattern
+- Tools: `mcp.tool.{tool_name}`
+- API calls: `http.client.{method}`
+- Resources: `mcp.resource.{resource_name}`
+
+### Required Attributes
+```typescript
+{
+  "mcp.tool.name": "find_issues",
+  "mcp.tool.params": "{ organizationSlug: 'sentry' }",
+  "mcp.organization": "sentry",
+  "mcp.region": "us"
+}
+```
+
+## Error Classification
+
+### Skip Logging For:
+- `UserInputError` - Expected user errors
+- 4xx API responses (except 429)
+- Validation errors
+
+### Always Log:
+- 5xx errors
+- Network failures
+- Unexpected exceptions
+- Rate limit errors (429)
+
+## Performance Monitoring
+
+### Traces Configuration
+```typescript
+{
+  tracesSampleRate: 0.1,      // 10% in production
+  profilesSampleRate: 0.1,    // 10% of traces
+}
+```
+
+### Custom Metrics
+```typescript
+// Track tool usage
+Sentry.metrics.increment("mcp.tool.usage", 1, {
+  tags: { tool: toolName }
+});
+
+// Track response time
+Sentry.metrics.distribution("mcp.tool.duration", duration, {
+  tags: { tool: toolName },
+  unit: "millisecond"
+});
+```
+
+## Environment Variables
+
+### Required for Monitoring
+```bash
+# Cloudflare (build-time)
+VITE_SENTRY_DSN=https://...@sentry.io/...
+VITE_SENTRY_ENVIRONMENT=production
+
+# Node.js (runtime)
+SENTRY_DSN=https://...@sentry.io/...
+NODE_ENV=production
+```
+
+## Best Practices
+
+1. **Context is King**: Always include relevant context
+2. **Redact Secrets**: Never log tokens or sensitive data
+3. **Sample Wisely**: Use appropriate sampling rates
+4. **Tag Everything**: Use consistent tags for filtering
+5. **Skip Expected Errors**: Don't pollute with user errors
+
+## References
+
+- Core logging: `packages/mcp-server/src/logging.ts`
+- Worker config: `packages/mcp-cloudflare/src/server/sentry.config.ts`
+- Tracing helpers: `packages/mcp-server/src/tracing.ts`
+- Sentry docs: https://docs.sentry.io/

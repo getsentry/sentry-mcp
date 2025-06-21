@@ -1,0 +1,228 @@
+# Architecture
+
+System design and package interactions for the Sentry MCP server.
+
+## Overview
+
+Sentry MCP is a Model Context Protocol server that exposes Sentry's functionality to AI assistants. It provides tools, prompts, and resources that enable LLMs to interact with Sentry's error tracking, performance monitoring, and other features.
+
+## Package Structure
+
+The project is a pnpm monorepo with clear separation of concerns:
+
+```
+packages/
+├── mcp-server/          # Core MCP server (npm package)
+├── mcp-cloudflare/      # Cloudflare Workers deployment
+├── mcp-server-evals/    # Evaluation test suite
+└── mcp-server-mocks/    # Shared mock data
+```
+
+### packages/mcp-server
+
+The core MCP implementation and npm-publishable package.
+
+**Structure:**
+```
+src/
+├── api-client/         # Sentry API client
+├── internal/           # Utilities (not exposed)
+├── transports/         # Transport implementations
+├── tools.ts            # Tool handler implementations
+├── toolDefinitions.ts  # Tool schemas and metadata
+├── prompts.ts          # Prompt implementations
+├── resources.ts        # Resource handlers
+├── errors.ts           # Custom error types
+└── types.ts            # TypeScript definitions
+```
+
+**Key responsibilities:**
+- Implements MCP protocol using the official SDK
+- Provides tools for Sentry operations (issues, projects, etc.)
+- Handles authentication and API communication
+- Formats responses for LLM consumption
+
+### packages/mcp-cloudflare
+
+Cloudflare Workers deployment with OAuth authentication.
+
+**Key features:**
+- OAuth flow for Sentry authentication
+- React UI for setup instructions
+- Durable Objects for state management
+- KV storage for tokens
+- HTTP transport for remote access
+
+### packages/mcp-server-evals
+
+Evaluation tests that verify real Sentry operations.
+
+**Uses:**
+- Vercel AI SDK for LLM integration
+- Real Sentry API calls with mocked responses
+- Factuality scoring for output validation
+
+### packages/mcp-server-mocks
+
+Centralized mock data and MSW handlers.
+
+**Provides:**
+- Fixture data for all Sentry entities
+- MSW request handlers
+- Shared test utilities
+
+## Key Architectural Decisions
+
+### 1. Protocol Implementation
+
+Uses the official MCP SDK (`@modelcontextprotocol/sdk`) to ensure compatibility:
+
+```typescript
+const server = new Server({
+  name: "sentry-mcp",
+  version: "1.0.0"
+});
+
+server.setRequestHandler(ListToolsRequestSchema, () => ({
+  tools: TOOL_DEFINITIONS
+}));
+```
+
+### 2. Transport Layers
+
+**Stdio Transport** (Local/Self-hosted):
+- Direct process communication
+- Used by IDEs and local tools
+- Configured via command-line args
+
+**HTTP Transport** (Cloudflare):
+- Remote access via Workers
+- OAuth authentication
+- Stateless request handling
+
+### 3. Authentication Strategy
+
+**Local (stdio):**
+```bash
+pnpm start:stdio --access-token=<token> --host=<host>
+```
+
+**Remote (Cloudflare):**
+- OAuth flow with Sentry
+- Tokens stored in KV
+- Per-organization access control
+
+### 4. API Client Design
+
+Centralized client with method-specific implementations:
+
+```typescript
+class SentryApiService {
+  constructor(private config: { host: string; accessToken: string })
+  
+  // Resource-specific methods
+  issues = {
+    list: (params) => this.fetch("/issues/", params),
+    get: (params) => this.fetch(`/issues/${id}/`)
+  }
+}
+```
+
+### 5. Tool Design Pattern
+
+Each tool follows a consistent structure:
+
+1. **Definition** (toolDefinitions.ts):
+   - Schema with Zod
+   - LLM-friendly description
+   - Parameter documentation
+
+2. **Handler** (tools.ts):
+   - Parameter validation
+   - API calls via client
+   - Response formatting
+   - Error handling
+
+3. **Testing**:
+   - Unit tests with snapshots
+   - Mock API responses
+   - Evaluation tests
+
+### 6. Error Handling Philosophy
+
+Two-tier error system:
+
+- **UserInputError**: Invalid parameters, clear user feedback
+- **System errors**: Logged to Sentry, generic message to user
+
+### 7. Build System
+
+Turbo for monorepo orchestration:
+- Dependency-aware builds
+- Parallel task execution
+- Shared TypeScript configs
+- Centralized linting/formatting
+
+## Data Flow
+
+```
+1. LLM makes tool call
+   ↓
+2. MCP server receives request
+   ↓
+3. Handler validates parameters
+   ↓
+4. API client makes Sentry call
+   ↓
+5. Response formatted for LLM
+   ↓
+6. MCP sends response back
+```
+
+## MCP Concept Mappings
+
+### Tools
+Execute actions and retrieve data:
+- `find_issues` - Search for issues
+- `get_project_details` - Fetch project info
+- `create_issue_comment` - Add comments
+
+### Prompts
+Multi-step workflows:
+- `find_errors_in_file` - Analyze file errors
+- `fix_issue_with_seer` - AI-suggested fixes
+
+### Resources
+External documentation and data:
+- Platform docs (React, Python, etc.)
+- API references
+- Configuration examples
+
+## Performance Considerations
+
+- Stateless server design
+- No caching between requests
+- Streaming responses where applicable
+- Parallel API calls when possible
+
+## Security Model
+
+- Access tokens never logged
+- OAuth tokens encrypted in KV
+- Per-organization isolation
+- CORS configured for security
+
+## Testing Architecture
+
+Three levels of testing:
+
+1. **Unit tests**: Fast, isolated, snapshot-based
+2. **Integration tests**: With mocked API
+3. **Evaluation tests**: Real-world scenarios with LLM
+
+## References
+
+- MCP SDK: `@modelcontextprotocol/sdk`
+- Build config: `turbo.json`
+- TypeScript config: `packages/mcp-server-tsconfig/`
+- API client: `packages/mcp-server/src/api-client/`

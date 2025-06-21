@@ -1,0 +1,197 @@
+# Documentation Style Guide
+
+This guide defines how to write effective documentation for LLMs working with the Sentry MCP codebase.
+
+## Core Principles
+
+### 1. Assume Intelligence
+- LLMs understand programming concepts - don't explain basics
+- Focus on project-specific patterns and conventions
+- Skip obvious steps like "create a file" or "save your changes"
+
+### 2. Optimize for Context Windows
+- Keep documents focused on a single topic
+- Use code examples instead of verbose explanations
+- Every line should provide unique value
+- Split large topics across multiple focused docs
+
+### 3. Show, Don't Tell
+- Include minimal, focused code examples
+- Reference actual implementations: `See packages/mcp-server/src/tools.ts:45`
+- Use real patterns from the codebase
+
+## MDC Header Format
+
+### For Cursor IDE Rules
+```markdown
+---
+description: Brief description of what this document covers
+globs: 
+alwaysApply: true
+---
+```
+
+The header is optional for most docs but required for `cursor.mdc` to function as a Cursor IDE rule file.
+
+## Document Structure
+
+### Required Sections
+
+```markdown
+# [Feature/Pattern Name]
+
+Brief one-line description of what this covers.
+
+## When to Use
+
+Bullet points describing specific scenarios.
+
+## Implementation Pattern
+
+```typescript
+// Minimal example showing the pattern
+const example = {
+  // Only include what's unique to this project
+};
+```
+
+## Key Conventions
+
+Project-specific rules that must be followed.
+
+## Common Patterns
+
+Link to reusable patterns: See `common-patterns.mdc#error-handling`
+
+## References
+
+- Implementation: `packages/mcp-server/src/[file].ts`
+- Tests: `packages/mcp-server/src/[file].test.ts`
+- Examples in codebase: [specific function/tool names]
+```
+
+## What to Include
+
+### DO Include:
+- **Project-specific patterns** - How THIS codebase does things
+- **Architecture decisions** - Why things are structured this way
+- **Required conventions** - Must-follow rules for consistency
+- **Integration points** - How components interact
+- **Validation requirements** - What checks must pass
+
+### DON'T Include:
+- **General programming concepts** - How to write TypeScript
+- **Tool documentation** - How to use pnpm or Vitest
+- **Verbose examples** - Keep code samples minimal
+- **Redundant content** - Link to other docs instead
+- **Step-by-step tutorials** - LLMs don't need hand-holding
+
+## Code Examples
+
+### Good Example:
+```typescript
+// Tool parameter pattern used throughout the codebase
+export const ParamOrganizationSlug = z
+  .string()
+  .toLowerCase()
+  .trim()
+  .describe("The organization's slug. Find using `find_organizations()` tool.");
+```
+
+### Bad Example:
+```typescript
+// First, import the required libraries
+import { z } from "zod";
+
+// Define a schema for the organization slug parameter
+// This schema will validate that the input is a string
+// It will also convert to lowercase and trim whitespace
+export const ParamOrganizationSlug = z
+  .string() // Ensures the value is a string
+  .toLowerCase() // Converts to lowercase
+  .trim() // Removes whitespace
+  .describe("The organization's slug..."); // Adds description
+```
+
+## Cross-References
+
+### Internal Links:
+- Use relative references: `See common-patterns.mdc#error-handling`
+- Link to specific sections with anchors
+- Avoid duplicating content - link instead
+
+### Code References:
+- Use specific file paths: `packages/mcp-server/src/tools.ts`
+- Include line numbers for specific examples: `tools.ts:45-52`
+- Reference actual implementations over creating examples
+
+## Language and Tone
+
+### Use Direct Language:
+- ❌ "You might want to consider using..."
+- ✅ "Use UserInputError for validation failures"
+
+### Be Specific:
+- ❌ "Handle errors appropriately"
+- ✅ "Throw UserInputError with a message explaining how to fix it"
+
+### Focus on Requirements:
+- ❌ "It's a good practice to run tests"
+- ✅ "Run `pnpm test` - all tests must pass"
+
+## Document Length Guidelines
+
+### Context Window Optimization:
+- Each document should be consumable in a single context
+- Length depends on complexity, not arbitrary limits
+- Verbose explanations → concise code examples
+- Complex topics → split into focused documents
+
+### Examples:
+- **Quality checks**: ~100 lines (simple commands)
+- **Adding a tool**: ~300 lines (includes examples)
+- **API patterns**: May be longer if examples are valuable
+- **Architecture**: Split into overview + detailed sections
+
+## Maintenance
+
+### When Updating Docs:
+1. Check for redundancy with other docs
+2. Update cross-references if needed
+3. Ensure examples still match codebase
+4. Keep line count under 400
+
+### Red Flags:
+- Verbose prose explaining what code could show
+- Repeated content → extract to common-patterns.mdc
+- No code references → add implementation examples
+- Generic programming advice → remove it
+- Multiple concepts in one doc → split by topic
+
+## Example: Refactoring a Verbose Section
+
+### Before:
+```markdown
+## Setting Up Your Development Environment
+
+First, make sure you have Node.js installed. You can download it from nodejs.org.
+Next, install pnpm globally using npm install -g pnpm. Then clone the repository
+using git clone. Navigate to the project directory and run pnpm install to install
+all dependencies. Make sure to create your .env file with the required variables.
+```
+
+### After:
+```markdown
+## Environment Setup
+
+Required: Node.js 20+, pnpm
+
+```bash
+pnpm install
+cp .env.example .env  # Add your API keys
+```
+
+See `CLAUDE.md#development-setup` for environment variables.
+```
+
+This style guide ensures documentation remains focused, valuable, and maintainable for LLM consumption.
