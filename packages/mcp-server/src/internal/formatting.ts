@@ -248,7 +248,7 @@ function formatExceptionInterfaceOutput(
   const parts: string[] = [];
 
   // TODO: support chained exceptions
-  const firstError = data.value ?? data.values[0];
+  const firstError = data.value ?? data.values?.[0];
   if (!firstError) {
     return "";
   }

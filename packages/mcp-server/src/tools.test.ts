@@ -784,6 +784,9 @@ describe("update_project", () => {
         projectSlug: "cloudflare-mcp",
         teamSlug: "the-goats",
         regionUrl: undefined,
+        name: undefined,
+        slug: undefined,
+        platform: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`

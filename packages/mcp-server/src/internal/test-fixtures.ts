@@ -102,11 +102,13 @@ export class EventBuilder {
   constructor(platform = "javascript") {
     this.event = {
       id: "test123",
-      timestamp: "2024-01-01T00:00:00Z",
+      title: "Test Event",
+      message: null,
       platform,
+      type: "error",
       entries: [],
       contexts: {},
-    };
+    } as Event;
   }
 
   withId(id: string): this {
@@ -131,8 +133,12 @@ export class EventBuilder {
 
   withThread(thread: Thread): this {
     const existingThread = this.event.entries.find((e) => e.type === "threads");
-    if (existingThread?.data?.values) {
-      existingThread.data.values.push(thread);
+    if (
+      existingThread?.data &&
+      typeof existingThread.data === "object" &&
+      "values" in existingThread.data
+    ) {
+      (existingThread.data as any).values.push(thread);
     } else {
       this.event.entries.push({
         type: "threads",
@@ -161,6 +167,11 @@ export class EventBuilder {
 
   withType(type: string): this {
     this.event.type = type;
+    return this;
+  }
+
+  withContexts(contexts: Record<string, any>): this {
+    this.event.contexts = contexts;
     return this;
   }
 
@@ -292,8 +303,6 @@ export const advancedFixtures = {
 
   // Create event with specific context data
   withContextData: (contexts: Record<string, any>) => {
-    const builder = new EventBuilder();
-    builder.event.contexts = contexts;
-    return builder.build();
+    return new EventBuilder().withContexts(contexts).build();
   },
 };

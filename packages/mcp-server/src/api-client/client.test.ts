@@ -163,8 +163,8 @@ describe("network error handling", () => {
       await apiService.getAuthenticatedUser();
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
-      expect(error.cause).toBe(fetchError);
-      expect(error.cause.cause).toBe(originalError);
+      expect((error as Error).cause).toBe(fetchError);
+      expect(((error as Error).cause as Error).cause).toBe(originalError);
     }
   });
 });
