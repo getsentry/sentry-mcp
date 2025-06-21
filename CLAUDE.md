@@ -35,10 +35,12 @@ pnpm eval               # Run evaluation tests (requires OPENAI_API_KEY)
 
 ### Code Quality
 ```bash
-pnpm lint               # Run linting
-pnpm lint:fix           # Fix linting issues
-pnpm format             # Format code with Biome
+pnpm -w run lint        # Run linting (workspace-wide)
+pnpm -w run lint:fix    # Fix linting issues (workspace-wide)
+pnpm -w run format      # Format code with Biome (workspace-wide)
 ```
+
+Note: Most commands should be run workspace-wide using `pnpm -w run <command>`. The exception is when running tests for a specific package.
 
 ### Deployment
 ```bash

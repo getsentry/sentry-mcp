@@ -167,14 +167,18 @@ export async function configureServer({
     // TODO: this doesnt support any error handling afaict via the spec
     if (isTemplateResource(resource)) {
       // Register template resource
-      server.resource(
+      server.registerResource(
         resource.name,
-        resource, // The resource itself is a valid ResourceTemplate
+        resource.template,
+        {
+          description: resource.description,
+          mimeType: resource.mimeType,
+        },
         resourceHandler,
       );
     } else {
       // Register static resource
-      server.resource(
+      server.registerResource(
         resource.name,
         resource.uri,
         {

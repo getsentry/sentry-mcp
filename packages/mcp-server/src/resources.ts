@@ -18,29 +18,38 @@
  * }
  * ```
  */
-import type { ReadResourceCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  ResourceTemplate,
+  type ReadResourceCallback,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   ReadResourceResult,
   Resource,
-  ResourceTemplate,
 } from "@modelcontextprotocol/sdk/types.js";
 import { UserInputError } from "./errors";
 
 /**
  * Resource configuration with handler function
  */
-export type ResourceConfig = (Resource | ResourceTemplate) & {
+export type ResourceConfig = {
+  name: string;
+  description: string;
+  mimeType: string;
   handler: ReadResourceCallback;
-  description: string; // Make description required
-};
+} & (
+  | { uri: string; template?: never }
+  | { uri?: never; template: ResourceTemplate }
+);
 
 /**
  * Type guard to check if a resource uses a URI template
  */
 export function isTemplateResource(
   resource: ResourceConfig,
-): resource is ResourceTemplate & { handler: ReadResourceCallback } {
-  return "uriTemplate" in resource;
+): resource is ResourceConfig & { template: ResourceTemplate } {
+  return (
+    "template" in resource && resource.template instanceof ResourceTemplate
+  );
 }
 
 /**
@@ -133,15 +142,18 @@ export const RESOURCES: ResourceConfig[] = [
   // Platform documentation with dynamic segments
   {
     name: "sentry-docs-platform",
-    uriTemplate: "https://docs.sentry.io/platforms/{platform}/",
+    template: new ResourceTemplate(
+      "https://docs.sentry.io/platforms/{platform}/",
+    ),
     mimeType: "text/markdown",
     description: "Sentry SDK documentation for {platform}",
     handler: sentryDocsHandler,
   },
   {
     name: "sentry-docs-platform-guide",
-    uriTemplate:
+    template: new ResourceTemplate(
       "https://docs.sentry.io/platforms/{platform}/guides/{framework}/",
+    ),
     mimeType: "text/markdown",
     description: "Sentry integration guide for {framework} on {platform}",
     handler: sentryDocsHandler,
