@@ -26,6 +26,7 @@ import type {
   ReadResourceResult,
   Resource,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { UserInputError } from "./errors";
 
 /**
@@ -68,7 +69,10 @@ async function fetchRawGithubContent(rawPath: string) {
  * Default handler for GitHub-hosted resources.
  * Converts GitHub blob URLs to raw content URLs and returns MCP resource format.
  */
-async function defaultGitHubHandler(url: URL): Promise<ReadResourceResult> {
+async function defaultGitHubHandler(
+  url: URL,
+  _extra: RequestHandlerExtra<any, any>,
+): Promise<ReadResourceResult> {
   const uri = url.host;
   const rawPath = url.pathname;
   const content = await fetchRawGithubContent(rawPath);
@@ -90,7 +94,10 @@ async function defaultGitHubHandler(url: URL): Promise<ReadResourceResult> {
  * The handler receives the exact URI from the resource definition,
  * but dynamically constructs the markdown URL based on the actual request.
  */
-async function sentryDocsHandler(url: URL): Promise<ReadResourceResult> {
+async function sentryDocsHandler(
+  url: URL,
+  _extra: RequestHandlerExtra<any, any>,
+): Promise<ReadResourceResult> {
   // The URL passed here is the actual docs.sentry.io URL being requested
   // Transform it to fetch the markdown version
   const path = `${url.pathname.replace(/\/$/, "")}.md`;
@@ -144,6 +151,7 @@ export const RESOURCES: ResourceConfig[] = [
     name: "sentry-docs-platform",
     template: new ResourceTemplate(
       "https://docs.sentry.io/platforms/{platform}/",
+      { platform: undefined },
     ),
     mimeType: "text/markdown",
     description: "Sentry SDK documentation for {platform}",
@@ -153,6 +161,7 @@ export const RESOURCES: ResourceConfig[] = [
     name: "sentry-docs-platform-guide",
     template: new ResourceTemplate(
       "https://docs.sentry.io/platforms/{platform}/guides/{framework}/",
+      { platform: undefined, framework: undefined },
     ),
     mimeType: "text/markdown",
     description: "Sentry integration guide for {framework} on {platform}",

@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { RESOURCES, isTemplateResource } from "./resources";
 import { UserInputError } from "./errors";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 
 beforeEach(() => {
   mswServer.resetHandlers();
@@ -44,6 +45,7 @@ describe("resources", () => {
 
       const result = await docsResource!.handler(
         new URL("https://docs.sentry.io/platforms/javascript/"),
+        {} as RequestHandlerExtra<any, any>,
       );
 
       expect(result.contents).toHaveLength(1);
@@ -74,6 +76,7 @@ describe("resources", () => {
       // Test with trailing slash
       const result = await guideResource!.handler(
         new URL("https://docs.sentry.io/platforms/javascript/guides/nextjs/"),
+        {} as RequestHandlerExtra<any, any>,
       );
 
       expect(result.contents[0].text).toBe(mockContent);
@@ -93,12 +96,14 @@ describe("resources", () => {
       await expect(
         docsResource!.handler(
           new URL("https://docs.sentry.io/platforms/nonexistent/"),
+          {} as RequestHandlerExtra<any, any>,
         ),
       ).rejects.toThrow(UserInputError);
 
       await expect(
         docsResource!.handler(
           new URL("https://docs.sentry.io/platforms/nonexistent/"),
+          {} as RequestHandlerExtra<any, any>,
         ),
       ).rejects.toThrow(
         "Sentry documentation not found at /platforms/nonexistent/. Please check the URL is correct.",
@@ -122,6 +127,7 @@ describe("resources", () => {
       await expect(
         docsResource!.handler(
           new URL("https://docs.sentry.io/platforms/error/"),
+          {} as RequestHandlerExtra<any, any>,
         ),
       ).rejects.toThrow(
         "Failed to fetch Sentry docs: 500 Internal Server Error",
@@ -131,6 +137,7 @@ describe("resources", () => {
       await expect(
         docsResource!.handler(
           new URL("https://docs.sentry.io/platforms/error/"),
+          {} as RequestHandlerExtra<any, any>,
         ),
       ).rejects.not.toThrow(UserInputError);
     });
@@ -158,6 +165,7 @@ describe("resources", () => {
         new URL(
           "https://github.com/getsentry/sentry-ai-rules/blob/main/api/query-syntax.mdc",
         ),
+        {} as RequestHandlerExtra<any, any>,
       );
 
       expect(result.contents).toHaveLength(1);

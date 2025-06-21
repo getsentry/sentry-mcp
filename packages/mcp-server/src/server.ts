@@ -18,6 +18,7 @@
  * ```
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { TOOL_HANDLERS } from "./tools";
 import { TOOL_DEFINITIONS } from "./toolDefinitions";
 import type { ServerContext } from "./types";
@@ -144,7 +145,10 @@ export async function configureServer({
 
   for (const resource of RESOURCES) {
     // Create the handler function once - it's the same for both resource types
-    const resourceHandler = async (url: URL) => {
+    const resourceHandler = async (
+      url: URL,
+      extra: RequestHandlerExtra<any, any>,
+    ) => {
       return await startNewTrace(async () => {
         return await startSpan(
           { name: `mcp.resource/${resource.name}` },
@@ -158,36 +162,26 @@ export async function configureServer({
               setTag("client.id", context.clientId);
             }
 
-            return resource.handler(url);
+            return resource.handler(url, extra);
           },
         );
       });
     };
 
     // TODO: this doesnt support any error handling afaict via the spec
-    if (isTemplateResource(resource)) {
-      // Register template resource
-      server.registerResource(
-        resource.name,
-        resource.template,
-        {
-          description: resource.description,
-          mimeType: resource.mimeType,
-        },
-        resourceHandler,
-      );
-    } else {
-      // Register static resource
-      server.registerResource(
-        resource.name,
-        resource.uri,
-        {
-          description: resource.description,
-          mimeType: resource.mimeType,
-        },
-        resourceHandler,
-      );
-    }
+    const source = isTemplateResource(resource)
+      ? resource.template
+      : resource.uri;
+
+    server.registerResource(
+      resource.name,
+      source,
+      {
+        description: resource.description,
+        mimeType: resource.mimeType,
+      },
+      resourceHandler,
+    );
   }
 
   for (const prompt of PROMPT_DEFINITIONS) {

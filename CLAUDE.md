@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## CRITICAL: Code Quality Checks
+
+**After ANY code changes, you MUST run these commands to ensure code quality:**
+```bash
+pnpm -w run lint        # Check for linting issues
+pnpm -w run lint:fix    # Fix linting issues
+pnpm tsc --noEmit       # Run TypeScript type checking
+pnpm test               # Run all tests
+```
+
+**DO NOT proceed if any check fails. Fix all issues before continuing.**
+
 ## Project Overview
 
 sentry-mcp is a Model Context Protocol (MCP) server that provides access to Sentry's functionality. It supports both remote deployment via Cloudflare Workers and local stdio transport for self-hosted Sentry installations.
@@ -114,6 +126,19 @@ Additional environment variables used by the build system (set in CI or locally 
 
 ## Common Development Tasks
 
+### IMPORTANT: After Making Code Changes
+
+**You MUST always run these commands after any code changes to ensure code quality:**
+
+```bash
+pnpm -w run lint        # Check for linting issues
+pnpm -w run lint:fix    # Fix linting issues
+pnpm tsc --noEmit       # Run TypeScript type checking
+pnpm test               # Run all tests
+```
+
+Only proceed if all checks pass. If any check fails, fix the issues before continuing.
+
 ### Adding a New Sentry Tool
 
 1. Add the tool implementation to `packages/mcp-server/src/tools.ts`
@@ -121,6 +146,7 @@ Additional environment variables used by the build system (set in CI or locally 
 3. Add corresponding unit tests alongside the implementation
 4. Add evaluation tests in `packages/mcp-server-evals/src/evals/`
 5. If needed, add mock data to `packages/mcp-server-mocks/src/`
+6. **Run all checks**: `pnpm -w run lint && pnpm tsc --noEmit && pnpm test`
 
 ### Working with MCP Resources
 
@@ -150,13 +176,16 @@ pnpm add <package> --filter <pkg>  # Add to specific package
 
 ### Pre-PR Checklist
 
-Before submitting a pull request:
+Before submitting a pull request, you MUST run ALL of these checks:
 ```bash
-pnpm lint:fix     # Fix any linting issues
-pnpm format       # Format code with Biome
-pnpm build        # Ensure everything builds
-pnpm test         # Run unit tests
+pnpm -w run lint:fix    # Fix any linting issues
+pnpm -w run format      # Format code with Biome
+pnpm tsc --noEmit       # Verify TypeScript types are correct
+pnpm -w run build       # Ensure everything builds
+pnpm test               # Run all unit tests
 ```
+
+**IMPORTANT**: Do not proceed with a PR if any of these checks fail. Fix all issues first.
 
 ### Build Artifacts
 

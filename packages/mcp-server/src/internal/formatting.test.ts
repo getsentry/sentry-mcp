@@ -622,45 +622,34 @@ describe("formatEventOutput", () => {
     });
 
     it("should handle Ruby format with enhanced frame", () => {
-      const event: Event = {
-        id: "test123",
-        timestamp: "2024-01-01T00:00:00Z",
-        platform: "ruby",
-        entries: [
-          {
-            type: "exception",
-            data: {
-              values: [
+      const event = new EventBuilder("ruby")
+        .withException(
+          createExceptionValue({
+            type: "NoMethodError",
+            value: "undefined method `charge' for nil:NilClass",
+            stacktrace: createStackTrace([
+              createFrameWithContext(
                 {
-                  type: "NoMethodError",
-                  value: "undefined method `charge' for nil:NilClass",
-                  stacktrace: {
-                    frames: [
-                      {
-                        filename: "/app/services/payment_service.rb",
-                        function: "process_payment",
-                        lineNo: 8,
-                        inApp: true,
-                        context: [
-                          [6, "  def process_payment(amount)"],
-                          [7, "    payment_method = user.payment_method"],
-                          [8, "    payment_method.charge(amount)"],
-                          [9, "  rescue => e"],
-                          [10, "    Rails.logger.error(e)"],
-                        ],
-                        vars: {
-                          amount: 99.99,
-                          payment_method: null,
-                        },
-                      },
-                    ],
-                  },
+                  filename: "/app/services/payment_service.rb",
+                  function: "process_payment",
+                  lineNo: 8,
                 },
-              ],
-            },
-          },
-        ],
-      };
+                [
+                  [6, "  def process_payment(amount)"],
+                  [7, "    payment_method = user.payment_method"],
+                  [8, "    payment_method.charge(amount)"],
+                  [9, "  rescue => e"],
+                  [10, "    Rails.logger.error(e)"],
+                ],
+                {
+                  amount: 99.99,
+                  payment_method: null,
+                },
+              ),
+            ]),
+          }),
+        )
+        .build();
 
       const output = formatEventOutput(event);
 
@@ -697,43 +686,32 @@ describe("formatEventOutput", () => {
     });
 
     it("should handle PHP format with enhanced frame", () => {
-      const event: Event = {
-        id: "test123",
-        timestamp: "2024-01-01T00:00:00Z",
-        platform: "php",
-        entries: [
-          {
-            type: "exception",
-            data: {
-              values: [
+      const event = new EventBuilder("php")
+        .withException(
+          createExceptionValue({
+            type: "Error",
+            value: "Call to a member function getName() on null",
+            stacktrace: createStackTrace([
+              createFrameWithContext(
                 {
-                  type: "Error",
-                  value: "Call to a member function getName() on null",
-                  stacktrace: {
-                    frames: [
-                      {
-                        filename: "/var/www/app/User.php",
-                        function: "getDisplayName",
-                        lineNo: 45,
-                        inApp: true,
-                        context: [
-                          [43, "    public function getDisplayName() {"],
-                          [44, "        $profile = $this->getProfile();"],
-                          [45, "        return $profile->getName();"],
-                          [46, "    }"],
-                        ],
-                        vars: {
-                          profile: null,
-                        },
-                      },
-                    ],
-                  },
+                  filename: "/var/www/app/User.php",
+                  function: "getDisplayName",
+                  lineNo: 45,
                 },
-              ],
-            },
-          },
-        ],
-      };
+                [
+                  [43, "    public function getDisplayName() {"],
+                  [44, "        $profile = $this->getProfile();"],
+                  [45, "        return $profile->getName();"],
+                  [46, "    }"],
+                ],
+                {
+                  profile: null,
+                },
+              ),
+            ]),
+          }),
+        )
+        .build();
 
       const output = formatEventOutput(event);
 
@@ -768,44 +746,30 @@ describe("formatEventOutput", () => {
     });
 
     it("should handle frame with context but no vars", () => {
-      const event: Event = {
-        id: "test123",
-        timestamp: "2024-01-01T00:00:00Z",
-        platform: "python",
-        entries: [
-          {
-            type: "exception",
-            data: {
-              values: [
+      const event = new EventBuilder("python")
+        .withException(
+          createExceptionValue({
+            type: "ValueError",
+            value: "Invalid configuration",
+            stacktrace: createStackTrace([
+              createFrameWithContext(
                 {
-                  type: "ValueError",
-                  value: "Invalid configuration",
-                  stacktrace: {
-                    frames: [
-                      {
-                        filename: "/app/config.py",
-                        function: "load_config",
-                        lineNo: 12,
-                        inApp: true,
-                        context: [
-                          [10, "def load_config():"],
-                          [11, "    if not os.path.exists(CONFIG_FILE):"],
-                          [
-                            12,
-                            "        raise ValueError('Invalid configuration')",
-                          ],
-                          [13, "    with open(CONFIG_FILE) as f:"],
-                          [14, "        return json.load(f)"],
-                        ],
-                      },
-                    ],
-                  },
+                  filename: "/app/config.py",
+                  function: "load_config",
+                  lineNo: 12,
                 },
-              ],
-            },
-          },
-        ],
-      };
+                [
+                  [10, "def load_config():"],
+                  [11, "    if not os.path.exists(CONFIG_FILE):"],
+                  [12, "        raise ValueError('Invalid configuration')"],
+                  [13, "    with open(CONFIG_FILE) as f:"],
+                  [14, "        return json.load(f)"],
+                ],
+              ),
+            ]),
+          }),
+        )
+        .build();
 
       const output = formatEventOutput(event);
 
@@ -954,52 +918,40 @@ describe("formatEventOutput", () => {
     });
 
     it("should truncate very long objects and arrays", () => {
-      const event: Event = {
-        id: "test123",
-        timestamp: "2024-01-01T00:00:00Z",
-        platform: "python",
-        entries: [
-          {
-            type: "exception",
-            data: {
-              values: [
-                {
-                  type: "ValueError",
-                  value: "Data processing error",
-                  stacktrace: {
-                    frames: [
-                      {
-                        filename: "/app/processor.py",
-                        function: "process_batch",
-                        lineNo: 45,
-                        inApp: true,
-                        vars: {
-                          small_array: [1, 2, 3],
-                          large_array: Array(100)
-                            .fill(0)
-                            .map((_, i) => i),
-                          small_object: { name: "test", value: 123 },
-                          large_object: {
-                            data: Array(50)
-                              .fill(0)
-                              .reduce(
-                                (acc, _, i) => {
-                                  acc[`field${i}`] = `value${i}`;
-                                  return acc;
-                                },
-                                {} as Record<string, string>,
-                              ),
-                          },
+      const event = new EventBuilder("python")
+        .withException(
+          createExceptionValue({
+            type: "ValueError",
+            value: "Data processing error",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "/app/processor.py",
+                function: "process_batch",
+                lineNo: 45,
+                inApp: true,
+                vars: {
+                  small_array: [1, 2, 3],
+                  large_array: Array(100)
+                    .fill(0)
+                    .map((_, i) => i),
+                  small_object: { name: "test", value: 123 },
+                  large_object: {
+                    data: Array(50)
+                      .fill(0)
+                      .reduce(
+                        (acc, _, i) => {
+                          acc[`field${i}`] = `value${i}`;
+                          return acc;
                         },
-                      },
-                    ],
+                        {} as Record<string, string>,
+                      ),
                   },
                 },
-              ],
-            },
-          },
-        ],
-      };
+              }),
+            ]),
+          }),
+        )
+        .build();
 
       const output = formatEventOutput(event);
 
@@ -1031,55 +983,42 @@ describe("formatEventOutput", () => {
     });
 
     it("should show proper truncation format", () => {
-      const event: Event = {
-        id: "test123",
-        timestamp: "2024-01-01T00:00:00Z",
-        platform: "javascript",
-        entries: [
-          {
-            type: "exception",
-            data: {
-              values: [
-                {
-                  type: "Error",
-                  value: "Test error",
-                  stacktrace: {
-                    frames: [
-                      {
-                        filename: "/app/test.js",
-                        function: "test",
-                        lineNo: 1,
-                        inApp: true,
-                        vars: {
-                          shortArray: [1, 2, 3],
-                          // This will be over 80 chars when stringified
-                          longArray: [
-                            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-                            16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
-                            29, 30,
-                          ],
-                          shortObject: { a: 1, b: 2 },
-                          // This will be over 80 chars when stringified
-                          longObject: {
-                            field1: "value1",
-                            field2: "value2",
-                            field3: "value3",
-                            field4: "value4",
-                            field5: "value5",
-                            field6: "value6",
-                            field7: "value7",
-                            field8: "value8",
-                          },
-                        },
-                      },
-                    ],
+      const event = new EventBuilder("javascript")
+        .withException(
+          createExceptionValue({
+            type: "Error",
+            value: "Test error",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "/app/test.js",
+                function: "test",
+                lineNo: 1,
+                inApp: true,
+                vars: {
+                  shortArray: [1, 2, 3],
+                  // This will be over 80 chars when stringified
+                  longArray: [
+                    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                    18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                  ],
+                  shortObject: { a: 1, b: 2 },
+                  // This will be over 80 chars when stringified
+                  longObject: {
+                    field1: "value1",
+                    field2: "value2",
+                    field3: "value3",
+                    field4: "value4",
+                    field5: "value5",
+                    field6: "value6",
+                    field7: "value7",
+                    field8: "value8",
                   },
                 },
-              ],
-            },
-          },
-        ],
-      };
+              }),
+            ]),
+          }),
+        )
+        .build();
 
       const output = formatEventOutput(event);
 
@@ -1114,38 +1053,26 @@ describe("formatEventOutput", () => {
       const circular: any = { name: "test" };
       circular.self = circular;
 
-      const event: Event = {
-        id: "test123",
-        timestamp: "2024-01-01T00:00:00Z",
-        platform: "javascript",
-        entries: [
-          {
-            type: "exception",
-            data: {
-              values: [
-                {
-                  type: "TypeError",
-                  value: "Circular reference detected",
-                  stacktrace: {
-                    frames: [
-                      {
-                        filename: "/app/utils.js",
-                        function: "serialize",
-                        lineNo: 10,
-                        inApp: true,
-                        vars: {
-                          normal: { a: 1, b: 2 },
-                          circular: circular,
-                        },
-                      },
-                    ],
-                  },
+      const event = new EventBuilder("javascript")
+        .withException(
+          createExceptionValue({
+            type: "TypeError",
+            value: "Circular reference detected",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "/app/utils.js",
+                function: "serialize",
+                lineNo: 10,
+                inApp: true,
+                vars: {
+                  normal: { a: 1, b: 2 },
+                  circular: circular,
                 },
-              ],
-            },
-          },
-        ],
-      };
+              }),
+            ]),
+          }),
+        )
+        .build();
 
       const output = formatEventOutput(event);
 
