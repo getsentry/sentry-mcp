@@ -1,0 +1,229 @@
+# Document Scopes
+
+Defines the specific purpose and content for each documentation file.
+
+## Core Documents
+
+### architecture.mdc
+**Purpose**: Explain system design and package interactions
+
+**Must Include**:
+- Package responsibilities and boundaries
+- Data flow between components
+- Key architectural decisions and trade-offs
+- How MCP concepts map to implementation
+
+**Must Exclude**:
+- Installation instructions
+- Implementation details (link to code instead)
+- General MCP protocol explanation
+
+### common-patterns.mdc
+**Purpose**: Reusable patterns used throughout the codebase
+
+**Must Include**:
+- Error handling patterns (UserInputError, ApiError)
+- Zod schema patterns and conventions
+- TypeScript type helpers
+- Response formatting patterns
+- Parameter validation patterns
+
+**Must Exclude**:
+- Tool/prompt/resource-specific patterns
+- External library documentation
+- One-off patterns used in single places
+
+### quality-checks.mdc
+**Purpose**: Required checks and commands for code quality
+
+**Must Include**:
+- Essential commands that must pass
+- When to run each check
+- What each check validates
+- Common failure fixes
+
+**Must Exclude**:
+- Tool installation instructions
+- Detailed explanations of what linting is
+- CI/CD configuration
+
+## Feature Implementation Guides
+
+### adding-tools.mdc
+**Purpose**: How to add new MCP tools
+
+**Must Include**:
+- Tool definition structure
+- Handler implementation pattern
+- Required tests (unit + eval)
+- LLM-friendly descriptions
+- References to existing tools
+
+**Must Exclude**:
+- What MCP tools are conceptually
+- Duplicate testing patterns (link to testing.mdc)
+- Full code examples (reference real implementations)
+
+### adding-prompts.mdc
+**Purpose**: How to add new MCP prompts
+
+**Must Include**:
+- Prompt definition pattern
+- Multi-step workflow structure
+- Instruction writing guidelines
+- References to existing prompts
+
+**Must Exclude**:
+- Duplicate patterns from adding-tools.mdc
+- General prompt engineering advice
+- Testing details (link to testing.mdc)
+
+### adding-resources.mdc
+**Purpose**: How to add new MCP resources
+
+**Must Include**:
+- Resource types (context, live data, reference)
+- URI template patterns
+- Handler implementation
+- Binary content handling
+- References to existing resources
+
+**Must Exclude**:
+- MCP resource protocol details
+- Duplicate patterns
+- Verbose examples that could be code references
+
+## Technical Guides
+
+### testing.mdc
+**Purpose**: Testing strategies and patterns
+
+**Must Include**:
+- Unit test patterns with snapshots
+- Evaluation test setup
+- Mock patterns with MSW
+- When to update snapshots
+- Test file organization
+
+**Must Exclude**:
+- Vitest documentation
+- General testing philosophy
+- Duplicate mock examples
+
+### api-patterns.mdc
+**Purpose**: Sentry API client usage and mocking
+
+**Must Include**:
+- apiServiceFromContext pattern
+- Schema definitions with Zod
+- Mock handler patterns
+- Multi-region support
+- Error handling
+
+**Must Exclude**:
+- HTTP basics
+- Zod library documentation
+- Duplicate error patterns (link to common-patterns.mdc)
+
+## Operations Guides
+
+### deployment.mdc
+**Purpose**: Cloudflare deployment specifics
+
+**Must Include**:
+- Wrangler configuration
+- Environment variables
+- Durable Objects setup
+- OAuth flow
+- Deployment commands
+
+**Must Exclude**:
+- Cloudflare Workers concepts
+- General deployment best practices
+- Duplicate security content
+
+### monitoring.mdc
+**Purpose**: Observability and instrumentation
+
+**Must Include**:
+- Sentry integration patterns
+- Telemetry setup
+- Error tracking
+- Performance monitoring
+- Tag conventions
+
+**Must Exclude**:
+- What observability is
+- Sentry product documentation
+- General monitoring concepts
+
+### security.mdc
+**Purpose**: Authentication and security patterns
+
+**Must Include**:
+- OAuth implementation
+- Token management
+- Multi-tenant security
+- CORS configuration
+- Security headers
+
+**Must Exclude**:
+- OAuth protocol explanation
+- General security best practices
+- Duplicate deployment content
+
+## Meta Documents
+
+### README.md
+**Purpose**: Documentation index and navigation
+
+**Must Include**:
+- Document listing with one-line descriptions
+- Quick reference for common tasks
+- Links to style guide and scopes
+
+**Must Exclude**:
+- Detailed explanations
+- Duplicate content from other docs
+- Installation instructions
+
+### cursor.mdc
+**Purpose**: Cursor IDE-specific configuration
+
+**Must Include**:
+- Cursor metadata header
+- Link to documentation
+- Critical quality checks
+- Cursor-specific settings
+
+**Must Exclude**:
+- All content duplicated in other docs
+- General coding guidelines
+- Project overview
+
+### CLAUDE.md
+**Purpose**: Claude Code entry point
+
+**Must Include**:
+- Brief project description
+- Documentation directory reference
+- Critical quality checks
+- Claude Code-specific notes
+
+**Must Exclude**:
+- Detailed architecture (link to architecture.mdc)
+- Development setup (link to relevant docs)
+- Integration instructions (keep minimal)
+
+## Optimization Strategy
+
+Focus on clarity and usefulness, not arbitrary line counts.
+
+Key improvements needed:
+- **adding-resources.mdc** (765 lines): Too many verbose examples → show pattern, reference implementations
+- **security.mdc** (604 lines): Too much OAuth theory → focus on implementation
+- **api-patterns.mdc** (576 lines): Redundant examples → consolidate patterns
+- **deployment.mdc** (574 lines): Too much CloudFlare docs → focus on config
+- **monitoring.mdc** (559 lines): Verbose explanations → code examples
+
+The goal: Each document should be focused enough to be useful in a single context window while remaining comprehensive for its topic.

@@ -1,0 +1,207 @@
+---
+description: Step-by-step guide for adding new tools to the Sentry MCP server.
+globs: 
+alwaysApply: false
+---
+# Adding New Tools
+
+Step-by-step guide for adding new tools to the Sentry MCP server.
+
+## Tool Structure
+
+Each tool consists of:
+1. **Definition** - Schema in `toolDefinitions.ts`
+2. **Handler** - Logic in `tools.ts`
+3. **Tests** - Unit tests in `tools.test.ts`
+4. **Mocks** - API responses in `mcp-server-mocks`
+5. **Evals** - Integration tests (use sparingly)
+
+## Step 1: Define the Tool
+
+Add to `packages/mcp-server/src/toolDefinitions.ts`:
+
+```typescript
+{
+  name: "your_tool_name" as const,
+  description: [
+    "One-line summary.",
+    "",
+    "Use this tool when you need to:",
+    "- Specific use case 1",
+    "- Specific use case 2",
+    "",
+    "<examples>",
+    "your_tool_name(organizationSlug='my-org', param='value')",
+    "</examples>",
+    "",
+    "<hints>",
+    "- Parameter interpretation hints",
+    "</hints>",
+  ].join("\n"),
+  paramsSchema: {
+    organizationSlug: ParamOrganizationSlug,
+    regionUrl: ParamRegionUrl.optional(),
+    yourParam: z.string().describe("What values are expected"),
+  },
+}
+```
+
+### Writing LLM-Friendly Descriptions
+
+Critical for LLM success:
+- Start with "Use this tool when you need to:"
+- Include concrete examples
+- Reference related tools
+- Explain parameter formats in `.describe()`
+
+## Step 2: Implement the Handler
+
+Add to `packages/mcp-server/src/tools.ts`:
+
+```typescript
+your_tool_name: async (context, params) => {
+  // 1. Get API service
+  const api = apiServiceFromContext(context, {
+    regionUrl: params.regionUrl,
+  });
+
+  // 2. Validate inputs (see common-patterns.mdc)
+  if (!params.organizationSlug) {
+    throw new UserInputError(
+      "Organization slug is required. Use find_organizations() to list."
+    );
+  }
+
+  // 3. Set monitoring tags
+  setTag("organization.slug", params.organizationSlug);
+
+  // 4. Call API
+  const data = await api.yourMethod(params);
+
+  // 5. Format response
+  let output = `# Results in **${params.organizationSlug}**\n\n`;
+  
+  if (data.length === 0) {
+    return output + "No results found.\n";
+  }
+
+  // 6. Format data
+  output += formatYourData(data);
+
+  // 7. Add next steps
+  output += "\n\n# Using this information\n\n";
+  output += "- Next tool to use: `related_tool(param='...')`\n";
+
+  return output;
+};
+```
+
+### Response Formatting
+
+See `common-patterns.mdc#response-formatting` for:
+- Markdown structure
+- ID/URL formatting
+- Next steps guidance
+
+## Step 3: Add Tests
+
+Unit test in `tools.test.ts`:
+
+```typescript
+describe("your_tool_name", () => {
+  it("returns formatted output", async () => {
+    const result = await TOOL_HANDLERS.your_tool_name(
+      mockContext,
+      { organizationSlug: "test-org", yourParam: "value" }
+    );
+    
+    expect(result).toMatchInlineSnapshot(`
+      "# Results in **test-org**
+      
+      Expected output here"
+    `);
+  });
+});
+```
+
+**After changing output, update snapshots:**
+```bash
+cd packages/mcp-server
+pnpm vitest --run -u
+```
+
+## Step 4: Add Mocks
+
+In `packages/mcp-server-mocks/src/handlers/`:
+
+```typescript
+{
+  method: "get",
+  path: "/api/0/organizations/:org/your-endpoint/",
+  fetch: async ({ request, params }) => {
+    // Validate parameters
+    if (!params.org) {
+      return HttpResponse.json("Invalid org", { status: 400 });
+    }
+    
+    // Return fixture
+    return HttpResponse.json(yourDataFixture);
+  }
+}
+```
+
+See `api-patterns.mdc#mock-patterns` for validation examples.
+
+## Step 5: Add Evaluation Tests (Sparingly)
+
+**⚠️ Each eval costs time and API credits. Only test core functionality!**
+
+```typescript
+describeEval("your-tool", {
+  data: async () => [
+    {
+      input: `Primary use case in ${FIXTURES.organizationSlug}`,
+      expected: "Expected response"
+    },
+    // Maximum 2-3 scenarios!
+  ],
+  task: TaskRunner(),
+  scorers: [Factuality()],
+  threshold: 0.6,
+});
+```
+
+## Testing Workflow
+
+```bash
+# 1. Run unit tests
+pnpm test tools.test
+
+# 2. Test with inspector
+pnpm inspector
+
+# 3. Run minimal evals
+pnpm eval your-tool
+```
+
+## Checklist
+
+- [ ] Definition in `toolDefinitions.ts`
+- [ ] Handler in `tools.ts`
+- [ ] Unit tests with snapshots
+- [ ] Mock responses
+- [ ] 1-2 eval tests (if critical)
+- [ ] Run quality checks
+
+## Common Patterns
+
+- Error handling: `common-patterns.mdc#error-handling`
+- API usage: `api-patterns.mdc`
+- Testing: `testing.mdc`
+- Response formatting: `common-patterns.mdc#response-formatting`
+
+## References
+
+- Tool examples: `packages/mcp-server/src/tools.ts`
+- Schema patterns: `packages/mcp-server/src/schema.ts`
+- Mock examples: `packages/mcp-server-mocks/src/handlers/`

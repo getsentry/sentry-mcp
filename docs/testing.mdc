@@ -1,0 +1,239 @@
+# Testing
+
+Testing strategies and patterns for the Sentry MCP server.
+
+## Testing Levels
+
+### 1. Unit Tests
+Fast, isolated tests with mocked dependencies:
+- Located alongside source files (`*.test.ts`)
+- Use Vitest with inline snapshots
+- Mock API calls with MSW
+
+### 2. Integration Tests
+Test interactions between components:
+- API client with mock server
+- Tool handlers with context
+- Full request/response cycles
+
+### 3. Evaluation Tests
+Real-world scenarios with LLM:
+- Located in `packages/mcp-server-evals`
+- Use actual AI models
+- Verify end-to-end functionality
+
+## Unit Testing Patterns
+
+### Basic Test Structure
+
+```typescript
+describe("tool_name", () => {
+  it("returns formatted output", async () => {
+    const result = await TOOL_HANDLERS.tool_name(mockContext, {
+      organizationSlug: "test-org",
+      param: "value"
+    });
+    
+    expect(result).toMatchInlineSnapshot(`
+      "# Expected Output
+      
+      Formatted markdown response"
+    `);
+  });
+});
+```
+
+### Testing Error Cases
+
+```typescript
+it("validates required parameters", async () => {
+  await expect(
+    TOOL_HANDLERS.tool_name(mockContext, {})
+  ).rejects.toThrow(UserInputError);
+});
+
+it("handles API errors gracefully", async () => {
+  server.use(
+    http.get("*/api/0/issues/*", () => 
+      HttpResponse.json({ detail: "Not found" }, { status: 404 })
+    )
+  );
+  
+  await expect(handler(mockContext, params))
+    .rejects.toThrow("Issue not found");
+});
+```
+
+## Mock Server Setup
+
+### Test Configuration
+
+```typescript
+// packages/mcp-server/src/test-utils/setup.ts
+import { setupMockServer } from "@sentry-mcp/mocks";
+
+export const mswServer = setupMockServer();
+
+// Global test setup
+beforeAll(() => mswServer.listen({ onUnhandledRequest: "error" }));
+afterEach(() => mswServer.resetHandlers());
+afterAll(() => mswServer.close());
+```
+
+### Mock Context
+
+```typescript
+export const mockContext: ServerContext = {
+  host: "sentry.io",
+  accessToken: "test-token",
+  organizationSlug: "test-org"
+};
+```
+
+## Snapshot Testing
+
+### When to Use Snapshots
+
+Use inline snapshots for:
+- Tool output formatting
+- Error message text
+- Markdown responses
+- JSON structure validation
+
+### Updating Snapshots
+
+When output changes are intentional:
+
+```bash
+cd packages/mcp-server
+pnpm vitest --run -u
+```
+
+**Always review snapshot changes before committing!**
+
+### Snapshot Best Practices
+
+```typescript
+// Good: Inline snapshot for output verification
+expect(result).toMatchInlineSnapshot(`
+  "# Issues in **my-org**
+  
+  Found 2 unresolved issues"
+`);
+
+// Bad: Don't use snapshots for dynamic data
+expect(result.timestamp).toMatchInlineSnapshot(); // ❌
+```
+
+## Evaluation Testing
+
+### Eval Test Structure
+
+```typescript
+import { describeEval } from "vitest-evals";
+import { TaskRunner, Factuality } from "./utils";
+
+describeEval("tool-name", {
+  data: async () => [
+    {
+      input: "Natural language request",
+      expected: "Expected response content"
+    }
+  ],
+  task: TaskRunner(),      // Uses AI to call tools
+  scorers: [Factuality()], // Validates output
+  threshold: 0.6,
+  timeout: 30000
+});
+```
+
+### Running Evals
+
+```bash
+# Requires OPENAI_API_KEY in .env
+pnpm eval
+
+# Run specific eval
+pnpm eval tool-name
+```
+
+## Test Data Management
+
+### Using Fixtures
+
+```typescript
+import { issueFixture } from "@sentry-mcp/mocks";
+
+// Modify fixture for test case
+const customIssue = {
+  ...issueFixture,
+  status: "resolved",
+  id: "CUSTOM-123"
+};
+```
+
+### Dynamic Test Data
+
+```typescript
+// Generate test data
+function createTestIssues(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    ...issueFixture,
+    id: `TEST-${i}`,
+    title: `Test Issue ${i}`
+  }));
+}
+```
+
+## Performance Testing
+
+### Timeout Configuration
+
+```typescript
+it("handles large datasets", async () => {
+  const largeDataset = createTestIssues(1000);
+  
+  const result = await handler(mockContext, params);
+  expect(result).toBeDefined();
+}, { timeout: 10000 }); // 10 second timeout
+```
+
+### Memory Testing
+
+```typescript
+it("streams large responses efficiently", async () => {
+  const initialMemory = process.memoryUsage().heapUsed;
+  
+  await processLargeDataset();
+  
+  const memoryIncrease = process.memoryUsage().heapUsed - initialMemory;
+  expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024); // < 50MB
+});
+```
+
+## Common Testing Patterns
+
+See `common-patterns.mdc` for:
+- Mock server setup
+- Error handling tests
+- Parameter validation
+- Response formatting
+
+## CI/CD Integration
+
+Tests run automatically on:
+- Pull requests
+- Main branch commits
+- Pre-release checks
+
+Coverage requirements:
+- Statements: 80%
+- Branches: 75%
+- Functions: 80%
+
+## References
+
+- Test setup: `packages/mcp-server/src/test-utils/`
+- Mock server: `packages/mcp-server-mocks/`
+- Eval tests: `packages/mcp-server-evals/`
+- Vitest docs: https://vitest.dev/

@@ -1,6 +1,11 @@
-# CLAUDE.md
+---
+description: Cursor IDE instructions for working with Sentry MCP codebase
+globs: 
+alwaysApply: true
+---
+# Cursor IDE Instructions for Sentry MCP
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides instructions for Cursor IDE when working with the Sentry MCP codebase.
 
 ## Project Overview
 
@@ -61,12 +66,12 @@ pnpm deploy             # Deploy to Cloudflare
 2. For local testing: `pnpm start:stdio --access-token=<token>`
 3. For development: `pnpm dev`
 
-## Claude Code-Specific Notes
+## Cursor-Specific Notes
 
-When using Claude Code's MCP integration:
+When using Cursor's MCP integration:
 - The server runs via stdio transport
 - Authentication uses access tokens (not OAuth)
-- See integration docs in the web UI for setup instructions
+- Follow the patterns in existing code
 
 ## Environment Variables
 
