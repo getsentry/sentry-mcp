@@ -3,7 +3,7 @@ import "./instrument";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import App from "./App";
+import App from "./app";
 import * as Sentry from "@sentry/react";
 
 const container = document.getElementById("root");

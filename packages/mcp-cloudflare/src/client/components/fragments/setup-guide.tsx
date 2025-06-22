@@ -3,6 +3,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "../ui/accordion";
+import { Prose } from "../ui/prose";
 
 export default function SetupGuide({
   id,
@@ -12,8 +13,8 @@ export default function SetupGuide({
   return (
     <AccordionItem value={id}>
       <AccordionTrigger>{title}</AccordionTrigger>
-      <AccordionContent className="prose prose-invert">
-        {children}
+      <AccordionContent>
+        <Prose>{children}</Prose>
       </AccordionContent>
     </AccordionItem>
   );

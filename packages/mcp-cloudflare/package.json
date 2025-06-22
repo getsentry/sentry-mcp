@@ -38,6 +38,7 @@
     "wrangler": "^4.20.5"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^1.3.22",
     "@cloudflare/workers-oauth-provider": "^0.0.5",
     "@modelcontextprotocol/sdk": "^1.13.0",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -45,6 +46,7 @@
     "@sentry/cloudflare": "^9.30.0",
     "@sentry/react": "^9.30.0",
     "agents": "~0.0.95",
+    "ai": "^4.0.25",
     "better-sqlite3": "^11.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -52,6 +54,8 @@
     "lucide-react": "^0.503.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
     "tailwind-merge": "^3.3.1",
     "tw-animate-css": "^1.3.4",
     "workers-mcp": "0.1.0-3",

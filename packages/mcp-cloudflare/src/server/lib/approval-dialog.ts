@@ -3,6 +3,7 @@ import type {
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
 import { logError } from "@sentry/mcp-server/logging";
+import { sanitizeHtml } from "./html-utils";
 
 const COOKIE_NAME = "mcp-approved-clients";
 const ONE_YEAR_IN_SECONDS = 31536000;
@@ -698,16 +699,4 @@ export async function parseRedirectApproval(
   return { state, headers };
 }
 
-/**
- * Sanitizes HTML content to prevent XSS attacks
- * @param unsafe - The unsafe string that might contain HTML
- * @returns A safe string with HTML special characters escaped
- */
-function sanitizeHtml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
+// sanitizeHtml function is now imported from "./html-utils"

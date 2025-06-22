@@ -15,16 +15,18 @@ export const Header: React.FC = () => {
             <span className="text-sm text-muted-foreground">{LIB_VERSION}</span>
           </div>
         </div>
-        <Button variant="outline" asChild>
-          <a
-            href="https://github.com/getsentry/sentry-mcp"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Github className="h-5 w-5" />
-            <span>GitHub</span>
-          </a>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <a
+              href="https://github.com/getsentry/sentry-mcp"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Github className="h-5 w-5" />
+              <span>GitHub</span>
+            </a>
+          </Button>
+        </div>
       </div>
     </header>
   );
