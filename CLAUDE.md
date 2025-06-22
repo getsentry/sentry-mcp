@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sentry MCP is a Model Context Protocol server that provides access to Sentry's functionality through tools, prompts, and resources.
 
+- Our project in sentry is 'sentry/mcp-server'
+
 ## Documentation
 
 All documentation is in the `docs/` directory:

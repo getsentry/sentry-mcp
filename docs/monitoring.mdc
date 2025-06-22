@@ -1,3 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
 # Monitoring
 
 Observability patterns using Sentry across the MCP server.
@@ -51,11 +56,11 @@ export async function createTracedToolHandler<T extends ToolName>(
     async (context: ServerContext, params: ToolParams<T>) => {
       const attributes = {
         "mcp.tool.name": name,
-        "mcp.tool.params": JSON.stringify(params),
+        ...extractMcpParameters(params),
       };
 
       return await withActiveSpan(
-        `mcp.tool.${name}`,
+        `tools/call ${name}`,
         attributes,
         async () => handler(context, params)
       );
@@ -151,20 +156,88 @@ process.on("uncaughtException", (error) => {
 });
 ```
 
-## Span Conventions
+## OpenTelemetry Semantic Conventions
 
-### Naming Pattern
-- Tools: `mcp.tool.{tool_name}`
-- API calls: `http.client.{method}`
-- Resources: `mcp.resource.{resource_name}`
+Sentry follows OpenTelemetry semantic conventions for consistent observability.
 
-### Required Attributes
+### MCP Attributes (Model Context Protocol)
+Based on [OpenTelemetry MCP conventions](mdc:https:/github.com/open-telemetry/semantic-conventions/blob/3097fb0af5b9492b0e3f55dc5f6c21a3dc2be8df/docs/registry/attributes/mcp.md) (currently in **draft form**):
+
+- `mcp.method.name` - The name of the request or notification method (e.g., "notifications/cancelled", "initialize", "notifications/initialized")
+- `mcp.prompt.name` - The name of the prompt or prompt template provided in the request or response (e.g., "analyze-code")
+- `mcp.request.argument.<key>` - Additional arguments passed to the request within `params` object (e.g., "mcp.request.argument.location='Seattle, WA'", "mcp.request.argument.a='42'")
+- `mcp.request.id` - A unique identifier for the request (e.g., "42")
+- `mcp.resource.uri` - The value of the resource uri (e.g., "postgres://database/customers/schema", "file:///home/user/documents/report.pdf")
+- `mcp.session.id` - Identifies MCP session (e.g., "191c4850af6c49e08843a3f6c80e5046")
+- `mcp.tool.name` - The name of the tool provided in the request (e.g., "get-weather", "execute_command")
+
+### Custom MCP Attributes
+These are custom attributes - *not in draft spec* - we've added to enhance MCP observability:
+
+- `mcp.resource.name` - The name of the resource (e.g., "sentry-docs-platform", "sentry-query-syntax")
+- `mcp.transport` - The transport method used for MCP communication (values: "http", "sse", "stdio")
+
+### Network Attributes
+Based on [OpenTelemetry network conventions](mdc:https:/github.com/open-telemetry/semantic-conventions/blob/main/docs/registry/attributes/network.md):
+
+- `network.transport` - Transport protocol used ("pipe" for stdio, "tcp" for SSE)
+
+### GenAI Attributes (Generative AI)
+Based on [OpenTelemetry GenAI conventions](mdc:https:/github.com/open-telemetry/semantic-conventions/blob/main/docs/registry/attributes/gen-ai.md):
+
+- `gen_ai.system` - The AI system being used (e.g., "anthropic")
+- `gen_ai.request.model` - Name of the GenAI model
+- `gen_ai.request.max_tokens` - Maximum tokens to generate
+- `gen_ai.operation.name` - Type of operation (e.g., "chat")
+- `gen_ai.usage.input_tokens` - Number of tokens in input
+- `gen_ai.usage.output_tokens` - Number of tokens in response
+
+### Span Naming Pattern
+Follows the format: `{mcp.method.name} {target}` per OpenTelemetry MCP semantic conventions
+
+- Tools: `tools/call {tool_name}` (e.g., `tools/call find_issues`)
+- Prompts: `prompts/get {prompt_name}` (e.g., `prompts/get analyze-code`)
+- Resources: `resources/read {resource_uri}` (e.g., `resources/read https://github.com/...`)
+- Client: `mcp.client/{target}` (e.g., `mcp.client/agent`)
+- Connect: `mcp.connect/{transport}` (e.g., `mcp.connect/stdio`)
+- Auth: `mcp.auth/{method}` (e.g., `mcp.auth/oauth`)
+
+**Note**: Span names are flexible and can be adjusted based on your needs. However, attribute names MUST follow the OpenTelemetry semantic conventions exactly as specified above.
+
+### Example Attributes
 ```typescript
+// MCP Tool Execution
 {
   "mcp.tool.name": "find_issues",
-  "mcp.tool.params": "{ organizationSlug: 'sentry' }",
-  "mcp.organization": "sentry",
-  "mcp.region": "us"
+  "mcp.session.id": "191c4850af6c49e08843a3f6c80e5046"
+}
+
+// GenAI Agent
+{
+  "gen_ai.system": "anthropic",
+  "gen_ai.request.model": "claude-3-5-sonnet-20241022",
+  "gen_ai.operation.name": "chat",
+  "gen_ai.usage.input_tokens": 150,
+  "gen_ai.usage.output_tokens": 2048
+}
+
+// Connection
+{
+  "network.transport": "pipe",  // "pipe" for stdio, "tcp" for SSE
+  "mcp.session.id": "191c4850af6c49e08843a3f6c80e5046",
+  "mcp.transport": "stdio",  // Custom attribute: "stdio" or "sse"
+  "service.version": "1.2.3"  // Version of the MCP server/client
+}
+
+// MCP Client
+{
+  "mcp.session.id": "191c4850af6c49e08843a3f6c80e5046",
+  "network.transport": "pipe",  // "pipe" for stdio, "tcp" for SSE
+  "mcp.transport": "stdio",  // Custom attribute: "stdio" or "sse"
+  "gen_ai.system": "anthropic",
+  "gen_ai.request.model": "claude-3-5-sonnet-20241022",
+  "gen_ai.operation.name": "chat",
+  "service.version": "1.2.3"  // Version of the MCP client
 }
 ```
 

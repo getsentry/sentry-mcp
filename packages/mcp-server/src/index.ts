@@ -65,7 +65,7 @@ Sentry.init({
     tags: {
       "mcp.server_version": LIB_VERSION,
       "mcp.transport": "stdio",
-      "sentry.host": host,
+      "sentry.host": host || "https://sentry.io",
     },
   },
   release: process.env.SENTRY_RELEASE,

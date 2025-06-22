@@ -5,11 +5,13 @@ import { stdin as input, stdout as output } from "node:process";
 import { Command } from "commander";
 import { config } from "dotenv";
 import chalk from "chalk";
-import { connectToMCPServer } from "./mcp-client.js";
-import { connectToRemoteMCPServer } from "./mcp-client-remote.js";
+import * as Sentry from "@sentry/node";
+import { connectToMCPServer } from "./mcp-test-client.js";
+import { connectToRemoteMCPServer } from "./mcp-test-client-remote.js";
 import { runAgent } from "./agent.js";
 import { DEFAULT_MODEL } from "./constants.js";
-import { logError, logInfo, logUser } from "./logger.js";
+import { logError, logInfo, logSuccess, logUser } from "./logger.js";
+import { LIB_VERSION } from "./version.js";
 import type { MCPConnection } from "./types.js";
 
 // Load environment variables from multiple possible locations
@@ -21,7 +23,7 @@ const program = new Command();
 // OAuth support for MCP server (not Sentry directly)
 
 program
-  .name("mcp-client")
+  .name("mcp-test-client")
   .description("CLI tool to test Sentry MCP server")
   .version("0.0.1")
   .argument("[prompt]", "Prompt to send to the AI agent")
@@ -32,9 +34,37 @@ program
     "MCP server host",
     process.env.MCP_HOST || "https://mcp.sentry.dev",
   )
-  .option("--local", "Use local stdio transport instead of HTTP")
+  .option("--sentry-dsn <dsn>", "Sentry DSN for error reporting")
   .action(async (prompt, options) => {
     try {
+      // Initialize Sentry with CLI-provided DSN if available
+      const sentryDsn =
+        options.sentryDsn ||
+        process.env.SENTRY_DSN ||
+        process.env.DEFAULT_SENTRY_DSN;
+
+      Sentry.init({
+        dsn: sentryDsn,
+        sendDefaultPii: true,
+        tracesSampleRate: 1,
+        initialScope: {
+          tags: {
+            "gen_ai.agent.name": "sentry-mcp-agent",
+            "gen_ai.system": "anthropic",
+          },
+        },
+        release: process.env.SENTRY_RELEASE,
+        integrations: [
+          Sentry.consoleIntegration(),
+          Sentry.zodErrorsIntegration(),
+        ],
+        environment:
+          process.env.SENTRY_ENVIRONMENT ??
+          (process.env.NODE_ENV !== "production"
+            ? "development"
+            : "production"),
+      });
+
       // Check for access token in priority order
       const accessToken =
         options.accessToken || process.env.SENTRY_ACCESS_TOKEN;
@@ -42,8 +72,11 @@ program
 
       const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
+      // Determine mode based on access token availability
+      const useLocalMode = !!accessToken;
+
       // Only require Sentry access token for local mode
-      if (options.local && !accessToken) {
+      if (useLocalMode && !accessToken) {
         logError("No Sentry access token found");
         console.log(chalk.yellow("To authenticate with Sentry:\n"));
         console.log(chalk.gray("1. Use an access token:"));
@@ -77,19 +110,23 @@ program
 
       // Connect to MCP server
       let connection: MCPConnection;
-      if (options.local) {
-        // Use local stdio transport
+      if (useLocalMode) {
+        // Use local stdio transport when access token is provided
         connection = await connectToMCPServer({
           accessToken,
           host: sentryHost || process.env.SENTRY_HOST,
+          sentryDsn: sentryDsn,
         });
       } else {
-        // Use remote SSE transport
+        // Use remote SSE transport when no access token
         connection = await connectToRemoteMCPServer({
           mcpHost: options.mcpHost,
           accessToken: accessToken,
         });
       }
+
+      // Set conversation ID as a global tag for all traces
+      Sentry.setTag("gen_ai.conversation.id", connection.sessionId);
 
       const agentConfig = {
         model: options.model,
@@ -98,17 +135,17 @@ program
       try {
         if (prompt) {
           // Single prompt mode
-          logUser(prompt);
           await runAgent(connection, prompt, agentConfig);
         } else {
           // Interactive mode (default when no prompt provided)
-          logInfo("Interactive mode - type 'exit', 'quit', or Ctrl+D to end");
+          logInfo("Interactive mode", "type 'exit', 'quit', or Ctrl+D to end");
+          console.log(); // Add extra newline after startup message
 
           const rl = readline.createInterface({ input, output });
 
           while (true) {
             try {
-              const userInput = await rl.question(chalk.cyan("You> "));
+              const userInput = await rl.question(chalk.gray("> "));
 
               // Handle null input (Ctrl+D / EOF)
               if (userInput === null) {
@@ -125,8 +162,9 @@ program
               }
 
               if (userInput.trim()) {
-                logUser(userInput);
                 await runAgent(connection, userInput, agentConfig);
+                // Add newline after response before next prompt
+                console.log();
               }
             } catch (error) {
               // Handle EOF (Ctrl+D) which may throw an error
@@ -146,16 +184,30 @@ program
       } finally {
         // Always disconnect
         await connection.disconnect();
+        // Ensure Sentry events are flushed
+        await Sentry.flush(5000);
       }
     } catch (error) {
-      logError("Fatal error", error instanceof Error ? error : String(error));
+      const eventId = Sentry.captureException(error);
+      logError(
+        "Fatal error",
+        `${error instanceof Error ? error.message : String(error)}. Event ID: ${eventId}`,
+      );
+      // Ensure Sentry events are flushed before exit
+      await Sentry.flush(5000);
       process.exit(1);
     }
   });
 
 // Handle uncaught errors
-process.on("unhandledRejection", (error) => {
-  logError("Unhandled error", error instanceof Error ? error : String(error));
+process.on("unhandledRejection", async (error) => {
+  const eventId = Sentry.captureException(error);
+  logError(
+    "Unhandled error",
+    `${error instanceof Error ? error.message : String(error)}. Event ID: ${eventId}`,
+  );
+  // Ensure Sentry events are flushed before exit
+  await Sentry.flush(5000);
   process.exit(1);
 });
 
