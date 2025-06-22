@@ -51,6 +51,10 @@ pnpm inspector          # Test tools interactively
 pnpm test               # Unit tests
 pnpm eval               # Evaluation tests (needs OPENAI_API_KEY)
 
+# MCP Client Testing
+pnpm start:client       # Interactive MCP client (needs ANTHROPIC_API_KEY)
+pnpm start:client:local # Use local stdio server
+
 # Deployment
 pnpm deploy             # Deploy to Cloudflare
 ```
@@ -60,6 +64,7 @@ pnpm deploy             # Deploy to Cloudflare
 1. Install dependencies: `pnpm install`
 2. For local testing: `pnpm start:stdio --access-token=<token>`
 3. For development: `pnpm dev`
+4. For client testing: `pnpm start:client` (requires ANTHROPIC_API_KEY)
 
 ## Claude Code-Specific Notes
 
@@ -74,6 +79,10 @@ See specific guides for required environment variables:
 - Cloudflare: `deployment.mdc`
 - Evaluation tests: `.env.example`
 - Local development: Use command-line args
+- MCP Client: 
+  - `ANTHROPIC_API_KEY` - Required for AI agent
+  - `SENTRY_ACCESS_TOKEN` - Required for local stdio mode
+  - `MCP_HOST` - Optional, defaults to https://mcp.sentry.dev
 
 ## References
 
