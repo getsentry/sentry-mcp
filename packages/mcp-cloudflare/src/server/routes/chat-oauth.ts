@@ -229,6 +229,12 @@ export default new Hono<{
     // Validate state parameter to prevent CSRF attacks
     if (!state || !storedState || state !== storedState) {
       deleteCookie(c, "chat_oauth_state", getSecureCookieOptions(c.req.url));
+      logError("Invalid state parameter received", {
+        oauth: {
+          state,
+          expectedState: storedState,
+        },
+      });
       return c.html(
         createErrorPage(
           "Authentication Failed",
@@ -243,6 +249,7 @@ export default new Hono<{
     deleteCookie(c, "chat_oauth_state", getSecureCookieOptions(c.req.url));
 
     if (!code) {
+      logError("No authorization code received");
       return c.html(
         createErrorPage(
           "Authentication Failed",
@@ -271,7 +278,7 @@ export default new Hono<{
       // The MCP token is all we need - it handles Sentry authentication internally
       return c.html(createSuccessPage(tokenResponse.access_token));
     } catch (error) {
-      console.error("Chat OAuth callback error:", error);
+      logError(error);
       return c.html(
         createErrorPage(
           "Authentication Error",

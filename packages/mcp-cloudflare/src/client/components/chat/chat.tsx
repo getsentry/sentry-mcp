@@ -51,23 +51,67 @@ export function Chat({ isOpen, onClose }: ChatProps) {
     onError: (error: Error) => {
       console.error("Chat error:", error);
 
-      // Handle authentication and authorization errors
-      if (
-        error.message.includes("401") ||
-        error.message.includes("Authorization") ||
-        error.message.includes("AUTH_EXPIRED") ||
-        error.message.includes("Authentication with Sentry has expired")
-      ) {
-        console.log("Authentication expired, clearing auth state");
+      // Parse structured error response
+      let statusCode: number | undefined;
+      let errorName: string | undefined;
+      let errorData: any = null;
+
+      try {
+        // Extract status code from error message (e.g., "Error: 401")
+        const statusMatch = error.message.match(/\b(\d{3})\b/);
+        if (statusMatch) {
+          statusCode = Number.parseInt(statusMatch[1], 10);
+        }
+
+        // Try to parse JSON error response from message
+        const jsonMatch = error.message.match(/\{.*\}/);
+        if (jsonMatch) {
+          errorData = JSON.parse(jsonMatch[0]);
+          errorName = errorData.name;
+        }
+      } catch {
+        // Fall back to basic status code detection if JSON parsing fails
+      }
+
+      // Handle errors based on status code and error name
+      if (statusCode === 401) {
+        // Authentication errors - clear auth state and force re-login
+        console.error("Authentication error detected, clearing auth state", {
+          statusCode,
+          errorName,
+        });
         clearAuthState();
-      } else if (
-        error.message.includes("403") ||
-        error.message.includes("INSUFFICIENT_PERMISSIONS") ||
-        error.message.includes("permission")
-      ) {
-        console.log("Insufficient permissions detected");
-        // For permission errors, we don't clear auth but log the issue
-        // The user might need to switch organizations or get access
+      } else if (statusCode === 403) {
+        // Authorization errors - user lacks permissions but auth is valid
+        if (errorName === "INSUFFICIENT_PERMISSIONS") {
+          console.error(
+            "Authorization error detected - insufficient permissions",
+            {
+              statusCode,
+              errorName,
+            },
+          );
+          // Don't clear auth - user may need different org access
+        }
+      } else if (statusCode === 429) {
+        // Rate limiting errors
+        if (
+          errorName === "RATE_LIMIT_EXCEEDED" ||
+          errorName === "AI_RATE_LIMIT"
+        ) {
+          console.error("Rate limit error detected", {
+            statusCode,
+            errorName,
+          });
+          // Could show a specific rate limit message in the future
+        }
+      } else if (statusCode === 500) {
+        // Server errors
+        console.error("Server error detected", {
+          statusCode,
+          errorName,
+          eventId: errorData?.eventId,
+        });
       }
     },
   });
