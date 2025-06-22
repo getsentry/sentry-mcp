@@ -8,30 +8,28 @@ import { logError } from "@sentry/mcp-server/logging";
 // Standardized error response format
 interface ErrorResponse {
   error: string;
-  code?: string;
+  name?: // 400-level errors (client errors)
+    | "MISSING_AUTH_TOKEN"
+    | "INVALID_MESSAGES_FORMAT"
+    // 401-level errors (authentication)
+    | "AUTH_EXPIRED"
+    | "AI_AUTH_FAILED"
+    | "SENTRY_AUTH_INVALID"
+    // 403-level errors (authorization)
+    | "INSUFFICIENT_PERMISSIONS"
+    // 429-level errors (rate limiting)
+    | "RATE_LIMIT_EXCEEDED"
+    | "AI_RATE_LIMIT"
+    // 500-level errors (server errors)
+    | "AI_SERVICE_UNAVAILABLE"
+    | "RATE_LIMITER_ERROR"
+    | "MCP_CONNECTION_FAILED"
+    | "INTERNAL_ERROR";
   eventId?: string;
-  type?:
-    | "validation"
-    | "authentication"
-    | "authorization"
-    | "rate_limit"
-    | "server_error";
 }
 
-function createErrorResponse(
-  message: string,
-  options: {
-    code?: string;
-    type?: ErrorResponse["type"];
-    eventId?: string;
-  } = {},
-): ErrorResponse {
-  return {
-    error: message,
-    ...(options.code && { code: options.code }),
-    ...(options.type && { type: options.type }),
-    ...(options.eventId && { eventId: options.eventId }),
-  };
+function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
+  return errorResponse;
 }
 
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
@@ -39,9 +37,9 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   if (!c.env.OPENAI_API_KEY) {
     console.error("OPENAI_API_KEY is not configured");
     return c.json(
-      createErrorResponse("AI service not configured", {
-        code: "AI_SERVICE_UNAVAILABLE",
-        type: "server_error",
+      createErrorResponse({
+        error: "AI service not configured",
+        name: "AI_SERVICE_UNAVAILABLE",
       }),
       500,
     );
@@ -51,9 +49,9 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   const authHeader = c.req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return c.json(
-      createErrorResponse("Authorization required", {
-        code: "MISSING_AUTH_TOKEN",
-        type: "authentication",
+      createErrorResponse({
+        error: "Authorization required",
+        name: "MISSING_AUTH_TOKEN",
       }),
       401,
     );
@@ -81,27 +79,22 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       });
       if (!success) {
         return c.json(
-          createErrorResponse(
-            "Rate limit exceeded. You can send up to 10 messages per minute. Please wait before sending another message.",
-            {
-              code: "RATE_LIMIT_EXCEEDED",
-              type: "rate_limit",
-            },
-          ),
+          createErrorResponse({
+            error:
+              "Rate limit exceeded. You can send up to 10 messages per minute. Please wait before sending another message.",
+            name: "RATE_LIMIT_EXCEEDED",
+          }),
           429,
         );
       }
     } catch (error) {
       const eventId = logError(error);
       return c.json(
-        createErrorResponse(
-          "There was an error communicating with the rate limiter.",
-          {
-            code: "RATE_LIMITER_ERROR",
-            type: "server_error",
-            eventId,
-          },
-        ),
+        createErrorResponse({
+          error: "There was an error communicating with the rate limiter.",
+          name: "RATE_LIMITER_ERROR",
+          eventId,
+        }),
         500,
       );
     }
@@ -113,9 +106,9 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     // Validate messages array
     if (!Array.isArray(messages)) {
       return c.json(
-        createErrorResponse("Messages must be an array", {
-          code: "INVALID_MESSAGES_FORMAT",
-          type: "validation",
+        createErrorResponse({
+          error: "Messages must be an array",
+          name: "INVALID_MESSAGES_FORMAT",
         }),
         400,
       );
@@ -160,13 +153,11 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           errorMessage.includes("access token")
         ) {
           return c.json(
-            createErrorResponse(
-              "Authentication with Sentry has expired. Please log in again.",
-              {
-                code: "AUTH_EXPIRED",
-                type: "authentication",
-              },
-            ),
+            createErrorResponse({
+              error:
+                "Authentication with Sentry has expired. Please log in again.",
+              name: "AUTH_EXPIRED",
+            }),
             401,
           );
         }
@@ -176,13 +167,11 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           errorMessage.includes("forbidden")
         ) {
           return c.json(
-            createErrorResponse(
-              "You don't have permission to access this Sentry organization.",
-              {
-                code: "INSUFFICIENT_PERMISSIONS",
-                type: "authorization",
-              },
-            ),
+            createErrorResponse({
+              error:
+                "You don't have permission to access this Sentry organization.",
+              name: "INSUFFICIENT_PERMISSIONS",
+            }),
             403,
           );
         }
@@ -190,9 +179,9 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
       const eventId = logError(error);
       return c.json(
-        createErrorResponse("Failed to connect to MCP server", {
-          code: "MCP_CONNECTION_FAILED",
-          type: "server_error",
+        createErrorResponse({
+          error: "Failed to connect to MCP server",
+          name: "MCP_CONNECTION_FAILED",
           eventId,
         }),
         500,
@@ -235,28 +224,34 @@ Keep responses focused on demonstrating the MCP integration and working with the
     // Provide more specific error messages for common issues
     if (error instanceof Error) {
       if (error.message.includes("API key")) {
+        const eventId = logError(error);
         return c.json(
-          createErrorResponse("Authentication failed with AI service", {
-            code: "AI_AUTH_FAILED",
-            type: "authentication",
+          createErrorResponse({
+            error: "Authentication failed with AI service",
+            name: "AI_AUTH_FAILED",
+            eventId,
           }),
           401,
         );
       }
       if (error.message.includes("rate limit")) {
+        const eventId = logError(error);
         return c.json(
-          createErrorResponse("Rate limit exceeded. Please try again later.", {
-            code: "AI_RATE_LIMIT",
-            type: "rate_limit",
+          createErrorResponse({
+            error: "Rate limit exceeded. Please try again later.",
+            name: "AI_RATE_LIMIT",
+            eventId,
           }),
           429,
         );
       }
       if (error.message.includes("Authorization")) {
+        const eventId = logError(error);
         return c.json(
-          createErrorResponse("Invalid or missing Sentry authentication", {
-            code: "SENTRY_AUTH_INVALID",
-            type: "authentication",
+          createErrorResponse({
+            error: "Invalid or missing Sentry authentication",
+            name: "SENTRY_AUTH_INVALID",
+            eventId,
           }),
           401,
         );
@@ -264,23 +259,13 @@ Keep responses focused on demonstrating the MCP integration and working with the
 
       const eventId = logError(error);
       return c.json(
-        createErrorResponse("Internal server error", {
-          code: "INTERNAL_ERROR",
-          type: "server_error",
+        createErrorResponse({
+          error: "Internal server error",
+          name: "INTERNAL_ERROR",
           eventId,
         }),
         500,
       );
     }
-
-    const eventId = logError(new Error("Unknown error occurred"));
-    return c.json(
-      createErrorResponse("Internal server error", {
-        code: "UNKNOWN_ERROR",
-        type: "server_error",
-        eventId,
-      }),
-      500,
-    );
   }
 });

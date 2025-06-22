@@ -71,7 +71,7 @@ export async function exchangeCodeForAccessToken({
   client_id: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!code) {
-    logError("[oauth] Missing code in token exchange", {
+    const eventId = logError("[oauth] Missing code in token exchange", {
       oauth: {
         client_id,
       },
@@ -80,6 +80,7 @@ export async function exchangeCodeForAccessToken({
       null,
       new Response("Invalid request: missing authorization code", {
         status: 400,
+        headers: { "X-Event-ID": eventId ?? "" },
       }),
     ];
   }
@@ -97,7 +98,7 @@ export async function exchangeCodeForAccessToken({
     }).toString(),
   });
   if (!resp.ok) {
-    logError(
+    const eventId = logError(
       `[oauth] Failed to exchange code for access token: ${await resp.text()}`,
       {
         oauth: {
@@ -109,7 +110,7 @@ export async function exchangeCodeForAccessToken({
       null,
       new Response(
         "There was an issue authenticating your account and retrieving an access token. Please try again.",
-        { status: 400 },
+        { status: 400, headers: { "X-Event-ID": eventId ?? "" } },
       ),
     ];
   }
@@ -121,7 +122,7 @@ export async function exchangeCodeForAccessToken({
 
     return [output, null];
   } catch (e) {
-    logError(
+    const eventId = logError(
       new Error("Failed to parse token response", {
         cause: e,
       }),
@@ -135,7 +136,7 @@ export async function exchangeCodeForAccessToken({
       null,
       new Response(
         "There was an issue authenticating your account and retrieving an access token. Please try again.",
-        { status: 500 },
+        { status: 500, headers: { "X-Event-ID": eventId ?? "" } },
       ),
     ];
   }
