@@ -9,7 +9,6 @@
   },
   "scripts": {
     "build": "tsdown",
-    "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "test-client": "node dist/index.js",
     "test": "vitest",
