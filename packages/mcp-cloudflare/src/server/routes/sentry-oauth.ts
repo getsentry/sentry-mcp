@@ -120,6 +120,24 @@ export default new Hono<{
       return c.text("Invalid state", 400);
     }
 
+    // Validate redirectUri is a valid URL
+    if (!oauthReqInfo.redirectUri) {
+      logger.warn("Missing redirectUri in OAuth state");
+      return c.text("Authorization failed: No redirect URL provided", 400);
+    }
+
+    try {
+      new URL(oauthReqInfo.redirectUri);
+    } catch (err) {
+      logger.warn(
+        `Invalid redirectUri in OAuth state: ${oauthReqInfo.redirectUri}`,
+        {
+          error: String(err),
+        },
+      );
+      return c.text("Authorization failed: Invalid redirect URL", 400);
+    }
+
     // Exchange the code for an access token
     const [payload, errResponse] = await exchangeCodeForAccessToken({
       upstream_url: new URL(
