@@ -15,7 +15,8 @@ packages/
 ├── mcp-server/          # Core MCP server (npm package)
 ├── mcp-cloudflare/      # Cloudflare Workers deployment
 ├── mcp-server-evals/    # Evaluation test suite
-└── mcp-server-mocks/    # Shared mock data
+├── mcp-server-mocks/    # Shared mock data
+└── mcp-client/          # Interactive CLI client
 ```
 
 ### packages/mcp-server
@@ -70,6 +71,17 @@ Centralized mock data and MSW handlers.
 - Fixture data for all Sentry entities
 - MSW request handlers
 - Shared test utilities
+
+### packages/mcp-client
+
+Interactive CLI for testing the MCP server with an AI agent.
+
+**Key features:**
+- Vercel AI SDK integration with Anthropic
+- Interactive and single-prompt modes
+- OAuth authentication for remote servers
+- Stdio transport for local testing
+- Clean terminal output with tool call visualization
 
 ## Key Architectural Decisions
 
