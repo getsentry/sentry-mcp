@@ -3,6 +3,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { SCOPES } from "../../constants";
 import type { Env } from "../types";
 import { createErrorPage, createSuccessPage } from "../lib/html-utils";
+import { logError } from "@sentry/mcp-server/logging";
 
 // Generate a secure random state parameter using Web Crypto API
 function generateState(): string {
@@ -211,8 +212,8 @@ export default new Hono<{
 
       return c.redirect(authUrl.toString());
     } catch (error) {
-      console.error("OAuth authorization error:", error);
-      return c.json({ error: "Failed to initiate OAuth flow" }, 500);
+      const eventId = logError(error);
+      return c.json({ error: "Failed to initiate OAuth flow", eventId }, 500);
     }
   })
 
