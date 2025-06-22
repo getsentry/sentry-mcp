@@ -1,5 +1,6 @@
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
+
 import {
   exchangeCodeForAccessToken,
   getUpstreamAuthorizeUrl,

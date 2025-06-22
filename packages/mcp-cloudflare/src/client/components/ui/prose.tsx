@@ -8,7 +8,7 @@ export function Prose({
   return (
     <div
       className={cn(
-        "prose prose-invert max-w-none prose-a:text-violet-300",
+        "prose prose-invert prose-slate max-w-none prose-a:text-violet-300",
         className,
       )}
       {...props}

@@ -65,7 +65,7 @@ export default function RemoteSetup() {
         </p>
         <h3>Integration Guides</h3>
       </Prose>
-      <Accordion type="single" collapsible className="max-w-full">
+      <Accordion type="single" collapsible className="max-w-full space-y-1">
         <SetupGuide id="cursor" title="Cursor">
           <ol>
             <li>
@@ -79,6 +79,7 @@ export default function RemoteSetup() {
             </li>
             <li>
               <CodeSnippet
+                noMargin
                 snippet={JSON.stringify(
                   {
                     mcpServers: {
@@ -95,9 +96,10 @@ export default function RemoteSetup() {
 
         <SetupGuide id="claude-code" title="Claude Code">
           <ol>
+            <li>Open your terminal to access the CLI.</li>
             <li>
-              Open Claude Code and run the following command:
               <CodeSnippet
+                noMargin
                 snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e SENTRY_HOST=sentry.io -- ${mcpStdioSnippet}`}
               />
             </li>
@@ -130,6 +132,7 @@ export default function RemoteSetup() {
             </li>
             <li>
               <CodeSnippet
+                noMargin
                 snippet={JSON.stringify(
                   {
                     mcpServers: {
@@ -155,7 +158,7 @@ export default function RemoteSetup() {
             </li>
             <li>
               Enter the following configuration, and hit enter.
-              <CodeSnippet snippet={mcpStdioSnippet} />
+              <CodeSnippet noMargin snippet={mcpStdioSnippet} />
             </li>
             <li>
               Enter the name <strong>Sentry</strong> and hit enter.
@@ -163,6 +166,7 @@ export default function RemoteSetup() {
             <li>
               Update the server configuration to include your configuration:
               <CodeSnippet
+                noMargin
                 snippet={JSON.stringify(
                   {
                     [mcpServerName]: {
@@ -193,6 +197,7 @@ export default function RemoteSetup() {
             </li>
             <li>
               <CodeSnippet
+                noMargin
                 snippet={JSON.stringify(
                   {
                     context_servers: {

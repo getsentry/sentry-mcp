@@ -67,6 +67,7 @@ export default function RemoteSetup() {
             </li>
             <li>
               <CodeSnippet
+                noMargin
                 snippet={JSON.stringify(
                   {
                     mcpServers: {
@@ -83,9 +84,10 @@ export default function RemoteSetup() {
 
         <SetupGuide id="claude-code" title="Claude Code">
           <ol>
+            <li>Open your terminal to access the CLI.</li>
             <li>
-              Open Claude Code and run the following command:
               <CodeSnippet
+                noMargin
                 snippet={`claude mcp add --transport http sentry ${endpoint}`}
               />
             </li>
@@ -117,6 +119,7 @@ export default function RemoteSetup() {
             </li>
             <li>
               <CodeSnippet
+                noMargin
                 snippet={JSON.stringify(
                   {
                     mcpServers: {
@@ -151,7 +154,7 @@ export default function RemoteSetup() {
             </li>
             <li>
               Enter the following configuration, and hit enter.
-              <CodeSnippet snippet={mcpRemoteSnippet} />
+              <CodeSnippet noMargin snippet={mcpRemoteSnippet} />
             </li>
             <li>
               Enter the name <strong>Sentry</strong> and hit enter.
@@ -173,7 +176,7 @@ export default function RemoteSetup() {
               <strong>CMD + ,</strong> to open Zed settings.
             </li>
             <li>
-              <CodeSnippet snippet={zedInstructions} />
+              <CodeSnippet noMargin snippet={zedInstructions} />
             </li>
           </ol>
         </SetupGuide>

@@ -36,7 +36,19 @@
       }
     ]
   },
-
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "CHAT_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1001",
+        "simple": {
+          "limit": 10,
+          "period": 60
+        }
+      }
+    ]
+  },
   "kv_namespaces": [
     {
       "binding": "OAUTH_KV",

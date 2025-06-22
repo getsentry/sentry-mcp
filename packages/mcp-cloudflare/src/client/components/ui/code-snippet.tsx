@@ -1,14 +1,20 @@
 import { Copy } from "lucide-react";
 import { Button } from "./button";
 
-export default function CodeSnippet({ snippet }: { snippet: string }) {
+export default function CodeSnippet({
+  snippet,
+  noMargin,
+}: {
+  snippet: string;
+  noMargin?: boolean;
+}) {
   return (
-    <div className="relative text-white bg-gray-900 mb-6">
-      <div className="absolute right-2 top-2">
+    <div className={`relative text-white ${noMargin ? "" : "mb-6"}`}>
+      <div className="absolute top-2.5 right-2.5 flex items-center justify-end">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-gray-400 hover:text-white hover:bg-gray-800 cursor-pointer"
+          className="h-8 w-8 text-slate-500 cursor-pointer"
           onClick={() => {
             navigator.clipboard.writeText(snippet);
           }}
@@ -18,7 +24,7 @@ export default function CodeSnippet({ snippet }: { snippet: string }) {
         </Button>
       </div>
       <pre
-        className="p-4 overflow-x-auto text-gray-200 text-sm"
+        className="p-4 overflow-x-auto text-slate-200 text-sm bg-slate-950"
         style={{ margin: 0 }}
       >
         {snippet}

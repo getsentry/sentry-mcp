@@ -5,9 +5,16 @@ import { ChevronDownIcon } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 function Accordion({
+  className,
   ...props
 }: React.ComponentProps<typeof AccordionPrimitive.Root>) {
-  return <AccordionPrimitive.Root data-slot="accordion" {...props} />;
+  return (
+    <AccordionPrimitive.Root
+      data-slot="accordion"
+      className="space-y-1"
+      {...props}
+    />
+  );
 }
 
 function AccordionItem({
@@ -17,7 +24,7 @@ function AccordionItem({
   return (
     <AccordionPrimitive.Item
       data-slot="accordion-item"
-      className={cn("last:border-b border px-4 border-gray-800", className)}
+      className={cn("px-4 bg-slate-950 rounded", className)}
       {...props}
     />
   );
@@ -33,7 +40,7 @@ function AccordionTrigger({
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(
-          "focus-visible:border-ring focus-visible:ring-ring/50 flex flex-1 items-start justify-between gap-4 rounded-md py-4 text-left font-medium transition-all outline-none hover:underline focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&[data-state=open]>svg]:rotate-180 text-lg text-white hover:text-violet-300 cursor-pointer",
+          "focus-visible:border-ring focus-visible:ring-ring/50 flex flex-1 items-center justify-between gap-4 rounded-md py-4 text-left font-medium transition-all outline-none hover:underline focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&[data-state=open]>svg]:rotate-180 text-lg text-white hover:text-violet-300 cursor-pointer ",
           className,
         )}
         {...props}
@@ -53,7 +60,7 @@ function AccordionContent({
   return (
     <AccordionPrimitive.Content
       data-slot="accordion-content"
-      className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden text-sm"
+      className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden text-sm border-t border-t-slate-800"
       {...props}
     >
       <div className={cn("pt-0 pb-4", className)}>{children}</div>
