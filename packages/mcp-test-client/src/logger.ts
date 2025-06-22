@@ -13,20 +13,22 @@ import chalk from "chalk";
 let responseStarted = false;
 
 export const logError = (msg: string, detail?: any) =>
-  console.log(
-    `\n${chalk.red("●")} ${msg}${detail ? `\n  ⎿  ${chalk.gray(detail instanceof Error ? detail.message : detail)}` : ""}`,
+  process.stdout.write(
+    `\n${chalk.red("●")} ${msg}${detail ? `\n  ⎿  ${chalk.gray(detail instanceof Error ? detail.message : detail)}` : ""}\n`,
   );
 
 export const logSuccess = (msg: string, detail?: string) =>
-  console.log(
-    `\n${chalk.green("●")} ${msg}${detail ? `\n  ⎿  ${chalk.gray(detail)}` : ""}`,
+  process.stdout.write(
+    `\n${chalk.green("●")} ${msg}${detail ? `\n  ⎿  ${chalk.gray(detail)}` : ""}\n`,
   );
 
-export const logInfo = (msg: string) =>
-  console.log(`\n${chalk.blue("●")} ${msg}`);
+export const logInfo = (msg: string, detail?: string) =>
+  process.stdout.write(
+    `\n${chalk.blue("●")} ${msg}${detail ? `\n  ⎿  ${chalk.gray(detail)}` : ""}\n`,
+  );
 
 export const logUser = (msg: string) =>
-  console.log(`\n${chalk.gray(">")} ${chalk.gray(msg)}`);
+  process.stdout.write(`\n${chalk.gray(">")} ${chalk.gray(msg)}\n`);
 
 export const logTool = (name: string, args?: any) => {
   const params =
@@ -38,11 +40,11 @@ export const logTool = (name: string, args?: any) => {
           )
           .join(", ")})`
       : "()";
-  console.log(`\n${chalk.green("●")} ${name}${params}`);
+  process.stdout.write(`\n${chalk.green("●")} ${name}${params}\n`);
 };
 
 export const logToolResult = (msg: string) =>
-  console.log(`  ⎿  ${chalk.white(msg)}`);
+  process.stdout.write(`  ⎿  ${chalk.white(msg)}\n`);
 
 export const logStreamStart = () => {
   if (!responseStarted) {
@@ -56,7 +58,7 @@ export const logStreamWrite = (chunk: string) =>
 
 export const logStreamEnd = () => {
   if (responseStarted) {
-    console.log();
+    process.stdout.write("\n");
     responseStarted = false;
   }
 };

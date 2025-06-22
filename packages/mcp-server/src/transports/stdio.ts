@@ -23,6 +23,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "../server";
 import type { ServerContext } from "../types";
 import * as Sentry from "@sentry/node";
+import { LIB_VERSION } from "../version";
 
 /**
  * Starts the MCP server with stdio transport and telemetry.
@@ -48,8 +49,20 @@ import * as Sentry from "@sentry/node";
  */
 export async function startStdio(server: McpServer, context: ServerContext) {
   await Sentry.startNewTrace(async () => {
-    const transport = new StdioServerTransport();
-    await configureServer({ server, context });
-    await server.connect(transport);
+    return await Sentry.startSpan(
+      {
+        name: "mcp.server/stdio",
+        attributes: {
+          "mcp.transport": "stdio",
+          "network.transport": "pipe",
+          "service.version": LIB_VERSION,
+        },
+      },
+      async () => {
+        const transport = new StdioServerTransport();
+        await configureServer({ server, context });
+        await server.connect(transport);
+      },
+    );
   });
 }

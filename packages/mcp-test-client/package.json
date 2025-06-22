@@ -1,28 +1,29 @@
 {
-  "name": "mcp-client",
+  "name": "@sentry/mcp-test-client",
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "CLI tool to test Sentry MCP server using stdio transport",
+  "description": "CLI tool to test the Sentry MCP server",
   "bin": {
-    "mcp-client": "./dist/index.js"
+    "sentry-mcp-test-client": "./dist/index.js"
   },
   "scripts": {
     "build": "tsdown",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
-    "mcp-client": "node dist/index.js",
+    "test-client": "node dist/index.js",
     "test": "vitest",
     "test:ci": "vitest run --reporter=junit --outputFile=tests.junit.xml",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.8",
-    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@sentry/core": "^9.30.0",
     "@sentry/mcp-server": "workspace:*",
+    "@sentry/node": "^9.30.0",
     "ai": "^4.0.26",
     "chalk": "^5.3.0",
-    "commander": "^12.1.0",
+    "commander": "^14.0.0",
     "dotenv": "^16.5.0",
     "open": "^10.0.0"
   },

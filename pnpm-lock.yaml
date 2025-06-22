@@ -48,49 +48,6 @@ importers:
         specifier: ^0.3.0
         version: 0.3.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/node@22.15.32)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.15.32)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0))
 
-  packages/mcp-client:
-    dependencies:
-      '@ai-sdk/anthropic':
-        specifier: ^1.0.8
-        version: 1.2.12(zod@3.25.67)
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.0.4
-        version: 1.13.0
-      '@sentry/mcp-server':
-        specifier: workspace:*
-        version: link:../mcp-server
-      ai:
-        specifier: ^4.0.26
-        version: 4.3.16(react@19.1.0)(zod@3.25.67)
-      chalk:
-        specifier: ^5.3.0
-        version: 5.4.1
-      commander:
-        specifier: ^12.1.0
-        version: 12.1.0
-      dotenv:
-        specifier: ^16.5.0
-        version: 16.5.0
-      open:
-        specifier: ^10.0.0
-        version: 10.1.2
-    devDependencies:
-      '@types/node':
-        specifier: ^22.15.32
-        version: 22.15.32
-      tsdown:
-        specifier: ^0.12.8
-        version: 0.12.8(typescript@5.8.3)
-      tsx:
-        specifier: ^4.20.3
-        version: 4.20.3
-      typescript:
-        specifier: ^5.8.3
-        version: 5.8.3
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/node@22.15.32)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.15.32)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
-
   packages/mcp-cloudflare:
     dependencies:
       '@cloudflare/workers-oauth-provider':
@@ -257,6 +214,52 @@ importers:
         version: link:../mcp-server-tsconfig
 
   packages/mcp-server-tsconfig: {}
+
+  packages/mcp-test-client:
+    dependencies:
+      '@ai-sdk/anthropic':
+        specifier: ^1.0.8
+        version: 1.2.12(zod@3.25.67)
+      '@sentry/core':
+        specifier: ^9.30.0
+        version: 9.30.0
+      '@sentry/mcp-server':
+        specifier: workspace:*
+        version: link:../mcp-server
+      '@sentry/node':
+        specifier: ^9.30.0
+        version: 9.30.0
+      ai:
+        specifier: ^4.0.26
+        version: 4.3.16(react@19.1.0)(zod@3.25.67)
+      chalk:
+        specifier: ^5.3.0
+        version: 5.4.1
+      commander:
+        specifier: ^14.0.0
+        version: 14.0.0
+      dotenv:
+        specifier: ^16.5.0
+        version: 16.5.0
+      open:
+        specifier: ^10.0.0
+        version: 10.1.2
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.32
+        version: 22.15.32
+      tsdown:
+        specifier: ^0.12.8
+        version: 0.12.8(typescript@5.8.3)
+      tsx:
+        specifier: ^4.20.3
+        version: 4.20.3
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.15.32)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.15.32)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
 
 packages:
 
@@ -2157,13 +2160,13 @@ packages:
   colorette@2.0.20:
     resolution: {integrity: sha512-IfEDxwoWIjkeXL1eXcDiow4UbKjhLdq6/EuSVR9GMN7KVH3r9gQ83e73hsz1Nd1T3ijd5xv1wcWRYO+D6kCI2w==}
 
-  commander@12.1.0:
-    resolution: {integrity: sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==}
-    engines: {node: '>=18'}
-
   commander@13.1.0:
     resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
     engines: {node: '>=18'}
+
+  commander@14.0.0:
+    resolution: {integrity: sha512-2uM9rYjPvyq39NwLRqaiLtWHyDC1FvryJDa2ATTVims5YAS4PupsEQsDvP14FqhFr0P49CYDugi59xaxJlTXRA==}
+    engines: {node: '>=20'}
 
   commander@2.20.3:
     resolution: {integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==}
@@ -5870,9 +5873,9 @@ snapshots:
 
   colorette@2.0.20: {}
 
-  commander@12.1.0: {}
-
   commander@13.1.0: {}
+
+  commander@14.0.0: {}
 
   commander@2.20.3: {}
 

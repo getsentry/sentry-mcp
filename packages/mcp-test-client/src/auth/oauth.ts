@@ -255,8 +255,6 @@ export class OAuthClient {
     );
 
     if (clientId) {
-      logInfo("Using existing OAuth client");
-      logToolResult(clientId);
       return clientId;
     }
 
@@ -287,6 +285,7 @@ export class OAuthClient {
       this.config.mcpHost,
     );
     if (cachedToken) {
+      logInfo("Authenticated with Sentry", "using stored token");
       return cachedToken;
     }
 
@@ -298,8 +297,6 @@ export class OAuthClient {
    * Perform the OAuth flow
    */
   async authenticate(): Promise<string> {
-    logInfo("Starting OAuth authentication");
-
     // Get or register client ID
     const clientId = await this.getOrRegisterClientId();
 
@@ -320,12 +317,11 @@ export class OAuthClient {
     authUrl.searchParams.set("code_challenge", challenge);
     authUrl.searchParams.set("code_challenge_method", "S256");
 
-    logInfo("Opening browser for authentication");
+    logInfo("Authenticating with Sentry - opening browser");
     console.log(
       chalk.gray("If your browser doesn't open automatically, visit:"),
     );
     console.log(chalk.white(authUrl.toString()));
-    console.log();
 
     // Open browser
     try {
@@ -333,8 +329,6 @@ export class OAuthClient {
     } catch (error) {
       // Browser opening failed, user will need to copy/paste
     }
-
-    logInfo("Waiting for authentication");
 
     try {
       // Wait for callback
@@ -346,7 +340,6 @@ export class OAuthClient {
       }
 
       // Exchange code for token
-      logInfo("Exchanging authorization code for token");
 
       try {
         const tokenResponse = await this.exchangeCodeForToken({

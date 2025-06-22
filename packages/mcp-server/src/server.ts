@@ -29,6 +29,7 @@ import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
 import { UserInputError } from "./errors";
+import { LIB_VERSION } from "./version";
 
 /**
  * Type guard to identify Sentry API errors.
@@ -104,13 +105,13 @@ async function logAndFormatError(error: unknown) {
  * ```typescript
  * const input = { organizationSlug: "my-org", query: "is:unresolved" };
  * const output = extractMcpParameters(input);
- * // { "mcp.param.organizationSlug": "\"my-org\"", "mcp.param.query": "\"is:unresolved\"" }
+ * // { "mcp.request.argument.organizationSlug": "\"my-org\"", "mcp.request.argument.query": "\"is:unresolved\"" }
  * ```
  */
 function extractMcpParameters(args: Record<string, any>) {
   return Object.fromEntries(
     Object.entries(args).map(([key, value]) => {
-      return [`mcp.param.${key}`, JSON.stringify(value)];
+      return [`mcp.request.argument.${key}`, JSON.stringify(value)];
     }),
   );
 }
@@ -151,7 +152,13 @@ export async function configureServer({
     ) => {
       return await startNewTrace(async () => {
         return await startSpan(
-          { name: `mcp.resource/${resource.name}` },
+          {
+            name: `resources/read ${url.toString()}`,
+            attributes: {
+              "mcp.resource.name": resource.name,
+              "mcp.resource.uri": url.toString(),
+            },
+          },
           async () => {
             if (context.userId) {
               setUser({
@@ -196,8 +203,11 @@ export async function configureServer({
           return await startNewTrace(async () => {
             return await startSpan(
               {
-                name: `mcp.prompt/${prompt.name}`,
-                attributes: extractMcpParameters(args),
+                name: `prompts/get ${prompt.name}`,
+                attributes: {
+                  "mcp.prompt.name": prompt.name,
+                  ...extractMcpParameters(args),
+                },
               },
               async (span) => {
                 if (context.userId) {
@@ -254,8 +264,11 @@ export async function configureServer({
           return await startNewTrace(async () => {
             return await startSpan(
               {
-                name: `mcp.tool/${tool.name}`,
-                attributes: extractMcpParameters(args),
+                name: `tools/call ${tool.name}`,
+                attributes: {
+                  "mcp.tool.name": tool.name,
+                  ...extractMcpParameters(args),
+                },
               },
               async (span) => {
                 if (context.userId) {

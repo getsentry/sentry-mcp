@@ -38,10 +38,10 @@ When using remote mode (default), the MCP client can authenticate via OAuth 2.1 
 
 ```bash
 # The client will automatically prompt for OAuth if no token is provided
-pnpm mcp-client
+pnpm mcp-test-client
 
 # Or specify a custom MCP server
-pnpm mcp-client --mcp-host http://localhost:8787
+pnpm mcp-test-client --mcp-host http://localhost:8787
 ```
 
 The OAuth flow uses PKCE (Proof Key for Code Exchange) and doesn't require a client secret, making it secure for CLI applications.
@@ -61,6 +61,10 @@ SENTRY_ACCESS_TOKEN=your_sentry_access_token
 SENTRY_HOST=https://sentry.io  # For self-hosted Sentry instances
 MCP_HOST=https://mcp.sentry.dev  # MCP server host (defaults to production)
 MCP_MODEL=claude-sonnet-4  # Override default model (Claude 4 Sonnet)
+
+# Optional - Error tracking
+SENTRY_DSN=your_sentry_dsn  # Error tracking for the client itself
+
 # OAuth clients are automatically registered via Dynamic Client Registration (RFC 7591)
 # No manual client ID configuration needed
 ```
@@ -68,16 +72,19 @@ MCP_MODEL=claude-sonnet-4  # Override default model (Claude 4 Sonnet)
 ### 3. Command Line Flags
 
 ```bash
-pnpm mcp-client --access-token=your_token "Your prompt"
+pnpm mcp-test-client --access-token=your_token "Your prompt"
 ```
 
 ### Token Priority
 
-The client checks for tokens in this order:
+The client automatically determines the connection mode:
+
+**Local Mode (stdio transport)**: Used when an access token is provided via:
 1. Command-line flag (`--access-token`)
 2. Environment variable (`SENTRY_ACCESS_TOKEN`)
 3. `.env` file
-4. If none found and using remote mode, prompts for OAuth authentication
+
+**Remote Mode (SSE transport)**: Used when no access token is provided, prompts for OAuth authentication
 
 ### Required Sentry Permissions
 
@@ -97,20 +104,24 @@ Connect to the remote MCP server via SSE transport (uses OAuth for authenticatio
 
 ```bash
 # Connect to production MCP server (uses /sse endpoint)
-pnpm mcp-client
+pnpm mcp-test-client
 
 # Connect to local development MCP server
-pnpm mcp-client --mcp-host http://localhost:8787
+pnpm mcp-test-client --mcp-host http://localhost:8787
 ```
 
 **Note**: Remote mode uses Server-Sent Events (SSE) transport and connects to the `/sse` endpoint on the MCP server.
 
 ### Local Mode
 
-Use the local stdio transport (requires Sentry access token):
+Use the local stdio transport by providing a Sentry access token:
 
 ```bash
-pnpm mcp-client --local
+# Using environment variable
+SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client
+
+# Using command line flag
+pnpm mcp-test-client --access-token your_token
 ```
 
 ### Interactive Mode (Default)
@@ -118,7 +129,7 @@ pnpm mcp-client --local
 Start an interactive session by running without arguments:
 
 ```bash
-pnpm mcp-client
+pnpm mcp-test-client
 ```
 
 In interactive mode:
@@ -131,7 +142,7 @@ In interactive mode:
 Run with a specific prompt:
 
 ```bash
-pnpm mcp-client "List all unresolved issues in my project"
+pnpm mcp-test-client "List all unresolved issues in my project"
 ```
 
 ### Advanced Options
@@ -139,19 +150,19 @@ pnpm mcp-client "List all unresolved issues in my project"
 Use a different AI model:
 
 ```bash
-pnpm mcp-client --model claude-3-opus-20240229 "Analyze my error trends"
+pnpm mcp-test-client --model claude-3-opus-20240229 "Analyze my error trends"
 ```
 
 Connect to a local MCP server:
 
 ```bash
-pnpm mcp-client --mcp-host http://localhost:8787 "List my projects"
+pnpm mcp-test-client --mcp-host http://localhost:8787 "List my projects"
 ```
 
 Use local stdio transport with custom Sentry host:
 
 ```bash
-SENTRY_HOST=my-sentry.com pnpm mcp-client --local "Show my projects"
+SENTRY_HOST=my-sentry.com SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client "Show my projects"
 ```
 
 ## Development
@@ -203,36 +214,36 @@ If tools fail to execute:
 
 ```bash
 # List recent issues
-pnpm mcp-client "Show me issues from the last 24 hours"
+pnpm mcp-test-client "Show me issues from the last 24 hours"
 
 # Search for specific errors
-pnpm mcp-client "Find all TypeError issues in the frontend project"
+pnpm mcp-test-client "Find all TypeError issues in the frontend project"
 
 # Get issue details
-pnpm mcp-client "Show me details about issue FRONTEND-123"
+pnpm mcp-test-client "Show me details about issue FRONTEND-123"
 ```
 
 ### Project Management
 
 ```bash
 # List all projects
-pnpm mcp-client "List all my projects with their platforms"
+pnpm mcp-test-client "List all my projects with their platforms"
 
 # Get project settings
-pnpm mcp-client "Show me the alert settings for my React project"
+pnpm mcp-test-client "Show me the alert settings for my React project"
 
 # View team assignments
-pnpm mcp-client "Which teams have access to the mobile app project?"
+pnpm mcp-test-client "Which teams have access to the mobile app project?"
 ```
 
 ### Performance Analysis
 
 ```bash
 # Check slow transactions
-pnpm mcp-client "Find the slowest API endpoints in the last hour"
+pnpm mcp-test-client "Find the slowest API endpoints in the last hour"
 
 # Analyze performance trends
-pnpm mcp-client "Show me performance metrics for the checkout flow"
+pnpm mcp-test-client "Show me performance metrics for the checkout flow"
 ```
 
 ## Testing the Installation
@@ -241,36 +252,15 @@ After installation, you can verify everything is working:
 
 ```bash
 # Check CLI is installed
-pnpm mcp-client --help
+pnpm mcp-test-client --help
 
 # Test basic functionality (no API keys required)
-SENTRY_ACCESS_TOKEN=dummy ANTHROPIC_API_KEY=dummy pnpm mcp-client --help
+SENTRY_ACCESS_TOKEN=dummy ANTHROPIC_API_KEY=dummy pnpm mcp-test-client --help
 
 # Run the test script (requires valid credentials)
 ./examples/test-connection.sh
 ```
 
-## Programmatic Usage
-
-You can also use the client programmatically in your own scripts:
-
-```typescript
-import { connectToMCPServer } from "mcp-client/src/mcp-client.js";
-import { runAgent } from "mcp-client/src/agent.js";
-
-const connection = await connectToMCPServer({
-  accessToken: "your-token",
-  host: "https://sentry.io"
-});
-
-try {
-  await runAgent(connection, "List my organizations");
-} finally {
-  await connection.disconnect();
-}
-```
-
-See `examples/programmatic-usage.ts` for a complete example.
 
 ## Authentication Methods
 
@@ -285,7 +275,7 @@ When connecting to a remote MCP server (default), the client supports OAuth 2.1 
 
 ### Local Mode (Access Tokens)
 
-When using local stdio transport (`--local` flag), you must provide a Sentry access token:
+When using local stdio transport (automatic when access token is provided), you must provide a Sentry access token:
 - Set `SENTRY_ACCESS_TOKEN` environment variable
 - Or use `--access-token` command-line flag
 - Tokens need appropriate Sentry permissions (see Required Sentry Permissions section)
@@ -294,10 +284,16 @@ When using local stdio transport (`--local` flag), you must provide a Sentry acc
 
 The CLI consists of these main components:
 
-1. **MCP Client** (`mcp-client.ts`) - Handles stdio connection to the MCP server
+1. **MCP Client** (`mcp-test-client.ts`) - Handles connection to the MCP server
 2. **AI Agent** (`agent.ts`) - Integrates with Vercel AI SDK for Claude
 3. **Auth** (`auth/`) - OAuth flow and secure token storage
 4. **CLI Interface** (`index.ts`) - Command-line argument parsing and modes
+
+### Technical Notes
+
+- The client uses `console.log` for all terminal output to maintain compatibility with the logger module
+- Error tracking is available via the `SENTRY_DSN` environment variable
+- All operations follow OpenTelemetry semantic conventions for observability
 
 ## Contributing
 

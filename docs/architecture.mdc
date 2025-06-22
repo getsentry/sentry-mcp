@@ -1,3 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
 # Architecture
 
 System design and package interactions for the Sentry MCP server.
@@ -16,7 +21,7 @@ packages/
 ├── mcp-cloudflare/      # Cloudflare Workers deployment
 ├── mcp-server-evals/    # Evaluation test suite
 ├── mcp-server-mocks/    # Shared mock data
-└── mcp-client/          # Interactive CLI client
+└── mcp-test-client/     # Interactive CLI client
 ```
 
 ### packages/mcp-server
@@ -72,7 +77,7 @@ Centralized mock data and MSW handlers.
 - MSW request handlers
 - Shared test utilities
 
-### packages/mcp-client
+### packages/mcp-test-client
 
 Interactive CLI for testing the MCP server with an AI agent.
 
