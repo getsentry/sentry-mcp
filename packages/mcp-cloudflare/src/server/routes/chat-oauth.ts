@@ -31,7 +31,7 @@ function getSecureCookieOptions(url: string, maxAge?: number) {
   return {
     httpOnly: true,
     secure: !isDev, // HTTPS in production, allow HTTP in development
-    sameSite: "Strict" as const, // Strict since OAuth flow is same-domain
+    sameSite: "Lax" as const, // Strict since OAuth flow is same-domain
     path: "/", // Available across all paths
     ...(maxAge && { maxAge }), // Optional max age
   };
