@@ -50,12 +50,24 @@ export function Chat({ isOpen, onClose }: ChatProps) {
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
     onError: (error: Error) => {
       console.error("Chat error:", error);
+
+      // Handle authentication and authorization errors
       if (
         error.message.includes("401") ||
-        error.message.includes("Authorization")
+        error.message.includes("Authorization") ||
+        error.message.includes("AUTH_EXPIRED") ||
+        error.message.includes("Authentication with Sentry has expired")
       ) {
-        // Clear auth state when we get authorization errors
+        console.log("Authentication expired, clearing auth state");
         clearAuthState();
+      } else if (
+        error.message.includes("403") ||
+        error.message.includes("INSUFFICIENT_PERMISSIONS") ||
+        error.message.includes("permission")
+      ) {
+        console.log("Insufficient permissions detected");
+        // For permission errors, we don't clear auth but log the issue
+        // The user might need to switch organizations or get access
       }
     },
   });

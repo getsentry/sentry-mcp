@@ -9,7 +9,8 @@
   "compatibility_date": "2025-03-21",
   "compatibility_flags": [
     "nodejs_compat",
-    "nodejs_compat_populate_process_env"
+    "nodejs_compat_populate_process_env",
+    "global_fetch_strictly_public"
   ],
   // we ask people to configure environment variables in prod
   "keep_vars": true,

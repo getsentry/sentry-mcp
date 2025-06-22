@@ -5,17 +5,58 @@ import { experimental_createMCPClient } from "ai";
 import type { Env } from "../types";
 import { logError } from "@sentry/mcp-server/logging";
 
+// Standardized error response format
+interface ErrorResponse {
+  error: string;
+  code?: string;
+  eventId?: string;
+  type?:
+    | "validation"
+    | "authentication"
+    | "authorization"
+    | "rate_limit"
+    | "server_error";
+}
+
+function createErrorResponse(
+  message: string,
+  options: {
+    code?: string;
+    type?: ErrorResponse["type"];
+    eventId?: string;
+  } = {},
+): ErrorResponse {
+  return {
+    error: message,
+    ...(options.code && { code: options.code }),
+    ...(options.type && { type: options.type }),
+    ...(options.eventId && { eventId: options.eventId }),
+  };
+}
+
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   // Validate that we have an OpenAI API key
   if (!c.env.OPENAI_API_KEY) {
     console.error("OPENAI_API_KEY is not configured");
-    return c.json({ error: "AI service not configured" }, 500);
+    return c.json(
+      createErrorResponse("AI service not configured", {
+        code: "AI_SERVICE_UNAVAILABLE",
+        type: "server_error",
+      }),
+      500,
+    );
   }
 
   // Get the authorization header for MCP authentication
   const authHeader = c.req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return c.json({ error: "Authorization required" }, 401);
+    return c.json(
+      createErrorResponse("Authorization required", {
+        code: "MISSING_AUTH_TOKEN",
+        type: "authentication",
+      }),
+      401,
+    );
   }
 
   const accessToken = authHeader.substring(7); // Remove "Bearer " prefix
@@ -40,17 +81,27 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       });
       if (!success) {
         return c.json(
-          {
-            error:
-              "Rate limit exceeded. You can send up to 10 messages per minute. Please wait before sending another message.",
-          },
+          createErrorResponse(
+            "Rate limit exceeded. You can send up to 10 messages per minute. Please wait before sending another message.",
+            {
+              code: "RATE_LIMIT_EXCEEDED",
+              type: "rate_limit",
+            },
+          ),
           429,
         );
       }
     } catch (error) {
-      logError(error);
+      const eventId = logError(error);
       return c.json(
-        { error: "There was an error communicating with the rate limiter." },
+        createErrorResponse(
+          "There was an error communicating with the rate limiter.",
+          {
+            code: "RATE_LIMITER_ERROR",
+            type: "server_error",
+            eventId,
+          },
+        ),
         500,
       );
     }
@@ -61,7 +112,13 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
     // Validate messages array
     if (!Array.isArray(messages)) {
-      return c.json({ error: "Messages must be an array" }, 400);
+      return c.json(
+        createErrorResponse("Messages must be an array", {
+          code: "INVALID_MESSAGES_FORMAT",
+          type: "validation",
+        }),
+        400,
+      );
     }
 
     // Create MCP client connection to the SSE endpoint
@@ -90,8 +147,56 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
         `Connected to ${sseUrl} with ${Object.keys(tools).length} tools`,
       );
     } catch (error) {
-      logError(error);
-      return c.json({ error: "Failed to connect to MCP server" }, 500);
+      console.error("MCP connection error:", error);
+
+      // Check if this is an authentication error
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        if (
+          errorMessage.includes("401") ||
+          errorMessage.includes("unauthorized") ||
+          errorMessage.includes("authentication") ||
+          errorMessage.includes("invalid token") ||
+          errorMessage.includes("access token")
+        ) {
+          return c.json(
+            createErrorResponse(
+              "Authentication with Sentry has expired. Please log in again.",
+              {
+                code: "AUTH_EXPIRED",
+                type: "authentication",
+              },
+            ),
+            401,
+          );
+        }
+
+        if (
+          errorMessage.includes("403") ||
+          errorMessage.includes("forbidden")
+        ) {
+          return c.json(
+            createErrorResponse(
+              "You don't have permission to access this Sentry organization.",
+              {
+                code: "INSUFFICIENT_PERMISSIONS",
+                type: "authorization",
+              },
+            ),
+            403,
+          );
+        }
+      }
+
+      const eventId = logError(error);
+      return c.json(
+        createErrorResponse("Failed to connect to MCP server", {
+          code: "MCP_CONNECTION_FAILED",
+          type: "server_error",
+          eventId,
+        }),
+        500,
+      );
     }
 
     const result = streamText({
@@ -130,26 +235,51 @@ Keep responses focused on demonstrating the MCP integration and working with the
     // Provide more specific error messages for common issues
     if (error instanceof Error) {
       if (error.message.includes("API key")) {
-        return c.json({ error: "Authentication failed with AI service" }, 401);
+        return c.json(
+          createErrorResponse("Authentication failed with AI service", {
+            code: "AI_AUTH_FAILED",
+            type: "authentication",
+          }),
+          401,
+        );
       }
       if (error.message.includes("rate limit")) {
         return c.json(
-          { error: "Rate limit exceeded. Please try again later." },
+          createErrorResponse("Rate limit exceeded. Please try again later.", {
+            code: "AI_RATE_LIMIT",
+            type: "rate_limit",
+          }),
           429,
         );
       }
       if (error.message.includes("Authorization")) {
         return c.json(
-          { error: "Invalid or missing Sentry authentication" },
+          createErrorResponse("Invalid or missing Sentry authentication", {
+            code: "SENTRY_AUTH_INVALID",
+            type: "authentication",
+          }),
           401,
         );
       }
+
+      const eventId = logError(error);
+      return c.json(
+        createErrorResponse("Internal server error", {
+          code: "INTERNAL_ERROR",
+          type: "server_error",
+          eventId,
+        }),
+        500,
+      );
     }
 
+    const eventId = logError(new Error("Unknown error occurred"));
     return c.json(
-      {
-        error: "Internal server error",
-      },
+      createErrorResponse("Internal server error", {
+        code: "UNKNOWN_ERROR",
+        type: "server_error",
+        eventId,
+      }),
       500,
     );
   }
