@@ -82,7 +82,7 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
             <div className="flex-shrink-0 m-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-red-400" />
               <div className="text-red-400">
-                Something went wrong. Please try again.
+                {error.message || "Something went wrong. Please try again."}
               </div>
               {onRetry && (
                 <Button
