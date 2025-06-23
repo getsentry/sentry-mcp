@@ -1,6 +1,6 @@
 export { ToolContent, ToolInvocation } from "./tool-invocation";
 export { AuthForm } from "./auth-form";
-export { ChatMessage, MessagePart, TextPart, ToolPart } from "./chat-message";
+export { MessagePart, TextPart, ToolPart } from "./chat-message";
 export { ChatInput } from "./chat-input";
 export { Chat } from "./chat";
 export { ChatMessages, type ProcessedMessagePart } from "./chat-messages";

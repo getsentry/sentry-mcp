@@ -1,5 +1,5 @@
 import { Button } from "../ui/button";
-import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 interface AuthFormProps {
   authError: string;
@@ -13,12 +13,22 @@ export function AuthForm({
   onOAuthLogin,
 }: AuthFormProps) {
   return (
-    <div className="sm:p-8 p-4 flex flex-col items-center justify-center">
+    <div className="sm:p-8 p-4 flex flex-col items-center">
       <div className="max-w-md w-full space-y-6">
+        {/* Chat illustration - hidden on short screens */}
+        <div className="text-slate-400 hidden [@media(min-height:500px)]:block">
+          <img
+            src="/flow-transparent.png"
+            alt="Flow"
+            className="w-full mb-6 bg-violet-300 rounded"
+          />
+        </div>
+
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">Blame Assistant</h1>
+          <h1 className="text-2xl font-bold">Live MCP Demo</h1>
           <p className="text-slate-400">
-            Chat with your stack traces. Argue with confidence. Lose gracefully.
+            Connect your Sentry account to test the Model Context Protocol with
+            real data from your projects.
           </p>
         </div>
 

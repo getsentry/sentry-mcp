@@ -10,7 +10,7 @@ export const TokenResponseSchema = z.object({
   user: z.object({
     email: z.string().email(),
     id: z.string(),
-    name: z.string(),
+    name: z.string().nullable(),
   }),
   scope: z.string(),
 });
