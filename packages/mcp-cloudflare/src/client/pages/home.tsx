@@ -119,7 +119,22 @@ export default function Home({ onChatClick }: HomeProps) {
               </>
             }
           >
-            {stdio ? <StdioSetup /> : <RemoteSetup />}
+            <div className="relative overflow-hidden">
+              <div
+                className={`transition-transform duration-300 ease-in-out ${
+                  stdio ? "-translate-x-full" : "translate-x-0"
+                }`}
+              >
+                <RemoteSetup />
+              </div>
+              <div
+                className={`absolute inset-0 transition-transform duration-300 ease-in-out ${
+                  stdio ? "translate-x-0" : "translate-x-full"
+                }`}
+              >
+                <StdioSetup />
+              </div>
+            </div>
           </Section>
         </Section>
 
