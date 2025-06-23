@@ -59,6 +59,8 @@ import type {
   TeamListSchema,
   TeamSchema,
   UserSchema,
+  IssueAlertRuleSchema,
+  IssueAlertRuleListSchema,
 } from "./schema";
 
 export type User = z.infer<typeof UserSchema>;
@@ -81,3 +83,6 @@ export type ReleaseList = z.infer<typeof ReleaseListSchema>;
 export type IssueList = z.infer<typeof IssueListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;
+
+export type IssueAlertRule = z.infer<typeof IssueAlertRuleSchema>;
+export type IssueAlertRuleList = z.infer<typeof IssueAlertRuleListSchema>;
