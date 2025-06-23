@@ -1,8 +1,8 @@
 // Default MCP Server host
 export const DEFAULT_MCP_HOST = "https://mcp.sentry.dev";
 
-// Default AI model - using Claude Sonnet 4
-export const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+// Default AI model - using GPT-4
+export const DEFAULT_MODEL = "gpt-4o";
 
 // OAuth configuration
 export const OAUTH_REDIRECT_PORT = 8765;

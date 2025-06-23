@@ -45,13 +45,14 @@ export function parseChatError(error: Error): ParsedError {
  * Determine what action to take based on the error
  */
 export function getChatErrorAction(parsedError: ParsedError): ChatErrorAction {
-  const { statusCode, errorName } = parsedError;
+  const { statusCode, errorName, errorData } = parsedError;
 
-  // Authentication errors - need to clear auth and re-login
+  // ANY 401 error should clear auth and re-login
   if (statusCode === 401) {
     return {
       type: "CLEAR_AUTH",
-      message: "Your session has expired. Please log in again.",
+      message:
+        errorData?.error || "Your session has expired. Please log in again.",
     };
   }
 
@@ -84,10 +85,10 @@ export function getChatErrorAction(parsedError: ParsedError): ChatErrorAction {
     };
   }
 
-  // Default
+  // Default - show specific error message if available
   return {
     type: "SHOW_ERROR",
-    message: "An error occurred. Please try again.",
+    message: errorData?.error || "An error occurred. Please try again.",
   };
 }
 

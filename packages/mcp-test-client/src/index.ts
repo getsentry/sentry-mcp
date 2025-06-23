@@ -50,7 +50,7 @@ program
         initialScope: {
           tags: {
             "gen_ai.agent.name": "sentry-mcp-agent",
-            "gen_ai.system": "anthropic",
+            "gen_ai.system": "openai",
           },
         },
         release: process.env.SENTRY_RELEASE,
@@ -74,7 +74,7 @@ program
         options.accessToken || process.env.SENTRY_ACCESS_TOKEN;
       const sentryHost = process.env.SENTRY_HOST;
 
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
+      const openaiKey = process.env.OPENAI_API_KEY;
 
       // Determine mode based on access token availability
       const useLocalMode = !!accessToken;
@@ -103,12 +103,12 @@ program
         process.exit(1);
       }
 
-      if (!anthropicKey) {
-        logError("ANTHROPIC_API_KEY environment variable is required");
+      if (!openaiKey) {
+        logError("OPENAI_API_KEY environment variable is required");
         console.log(
           chalk.yellow("\nPlease set it in your .env file or environment:"),
         );
-        console.log(chalk.gray("ANTHROPIC_API_KEY=your_anthropic_api_key"));
+        console.log(chalk.gray("OPENAI_API_KEY=your_openai_api_key"));
         process.exit(1);
       }
 

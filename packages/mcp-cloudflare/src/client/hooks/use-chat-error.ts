@@ -13,10 +13,15 @@ export function useChatError() {
   const handleError = useCallback(
     (error: Error) => {
       handleChatError(error, {
-        onClearAuth: clearAuthState,
+        onClearAuth: () => {
+          // Clear auth state without throwing an error
+          // This will cause the UI to show the login form
+          clearAuthState();
+        },
         onShowError: (message) => {
-          // For now, just log errors. In the future, we could show toast notifications
-          console.error("Chat error message:", message);
+          // The AI SDK's useChat will display the error message
+          // So we need to throw a new error with the proper message
+          throw new Error(message);
         },
       });
     },

@@ -9,6 +9,7 @@ export type { Message } from "ai/react";
 
 // Error handling types
 export interface ChatErrorData {
+  error?: string;
   name?: string;
   eventId?: string;
   statusCode?: number;
