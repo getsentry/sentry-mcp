@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { startNewTrace, startSpan } from "@sentry/core";
 import type { MCPConnection } from "./types.js";
@@ -38,7 +38,7 @@ export async function runAgent(
           "service.version": LIB_VERSION,
           "gen_ai.conversation.id": sessionId,
           "gen_ai.agent.name": "sentry-mcp-agent",
-          "gen_ai.system": "anthropic",
+          "gen_ai.system": "openai",
           "gen_ai.request.model": model,
           "gen_ai.operation.name": "chat",
         },
@@ -51,7 +51,7 @@ export async function runAgent(
           let isStreaming = false;
 
           const result = await streamText({
-            model: anthropic(model),
+            model: openai(model),
             system: getSystemPrompt(),
             messages: [{ role: "user", content: userPrompt }],
             tools,

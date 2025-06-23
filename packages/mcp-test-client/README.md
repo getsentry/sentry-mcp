@@ -4,7 +4,7 @@ A simple CLI tool to test the Sentry MCP server using stdio transport with an AI
 
 ## Features
 
-- 🤖 AI-powered interaction with Sentry MCP tools using Claude 4 Sonnet
+- 🤖 AI-powered interaction with Sentry MCP tools using GPT-4
 - 🔧 Full access to all MCP server tools
 - 💬 Interactive mode by default when no prompt provided
 - 🎨 Colorized output for better readability
@@ -16,7 +16,7 @@ A simple CLI tool to test the Sentry MCP server using stdio transport with an AI
 
 - Node.js >= 20
 - pnpm package manager
-- Anthropic API key
+- OpenAI API key
 - Sentry access token with appropriate permissions
 
 ## Installation
@@ -52,7 +52,7 @@ Create a `.env` file in the package directory:
 
 ```env
 # Required
-ANTHROPIC_API_KEY=your_anthropic_api_key
+OPENAI_API_KEY=your_openai_api_key
 
 # Required - Sentry access token with appropriate permissions
 SENTRY_ACCESS_TOKEN=your_sentry_access_token
@@ -60,7 +60,7 @@ SENTRY_ACCESS_TOKEN=your_sentry_access_token
 # Optional
 SENTRY_HOST=https://sentry.io  # For self-hosted Sentry instances
 MCP_HOST=https://mcp.sentry.dev  # MCP server host (defaults to production)
-MCP_MODEL=claude-sonnet-4  # Override default model (Claude 4 Sonnet)
+MCP_MODEL=gpt-4o  # Override default model (GPT-4)
 
 # Optional - Error tracking
 SENTRY_DSN=your_sentry_dsn  # Error tracking for the client itself
@@ -150,7 +150,7 @@ pnpm mcp-test-client "List all unresolved issues in my project"
 Use a different AI model:
 
 ```bash
-pnpm mcp-test-client --model claude-3-opus-20240229 "Analyze my error trends"
+pnpm mcp-test-client --model gpt-4-turbo "Analyze my error trends"
 ```
 
 Connect to a local MCP server:
@@ -197,7 +197,7 @@ If you see "Failed to connect to MCP server":
 ### Authentication Errors
 
 If you get authentication errors:
-1. Verify your ANTHROPIC_API_KEY is set correctly
+1. Verify your OPENAI_API_KEY is set correctly
 2. Check that your SENTRY_ACCESS_TOKEN has the required permissions
 3. For self-hosted Sentry, ensure SENTRY_HOST is set
 
@@ -255,7 +255,7 @@ After installation, you can verify everything is working:
 pnpm mcp-test-client --help
 
 # Test basic functionality (no API keys required)
-SENTRY_ACCESS_TOKEN=dummy ANTHROPIC_API_KEY=dummy pnpm mcp-test-client --help
+SENTRY_ACCESS_TOKEN=dummy OPENAI_API_KEY=dummy pnpm mcp-test-client --help
 
 # Run the test script (requires valid credentials)
 ./examples/test-connection.sh
