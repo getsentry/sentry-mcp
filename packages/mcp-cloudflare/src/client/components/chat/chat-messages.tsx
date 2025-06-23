@@ -74,6 +74,8 @@ export const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
                 <img
                   src="/flow-transparent.png"
                   alt="Flow"
+                  width={1536}
+                  height={1024}
                   className="w-full mb-6 bg-violet-300 rounded"
                 />
               </div>

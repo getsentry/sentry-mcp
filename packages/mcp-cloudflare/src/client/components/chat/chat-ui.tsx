@@ -120,20 +120,6 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
             />
           </div>
         </div>
-
-        {/* Desktop floating logout button */}
-        {showControls && (
-          <Button
-            type="button"
-            onClick={onLogout}
-            variant="default"
-            className="hidden md:block absolute top-4 right-4 z-10 cursor-pointer"
-            title="Logout"
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
-        )}
       </div>
     );
   },
