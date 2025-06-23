@@ -63,7 +63,7 @@ export default function Home({ onChatClick }: HomeProps) {
           <Section heading="What is a Model Context Protocol?">
             <Prose>
               <p>
-                Simply put, its a way to plug Sentry's API into an LLM, letting
+                Simply put, it's a way to plug Sentry's API into an LLM, letting
                 you ask questions about your data in context of the LLM itself.
                 This lets you take an agent that you already use, like Cursor,
                 and pull in additional information from Sentry to help with
