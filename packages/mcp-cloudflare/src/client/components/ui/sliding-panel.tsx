@@ -51,6 +51,9 @@ export function SlidingPanel({
           className={`fixed inset-y-0 right-0 w-full max-w-2xl bg-slate-950 border-l border-slate-800 z-50 shadow-2xl flex flex-col transition-transform duration-500 ease-in-out ${
             isOpen ? "translate-x-0" : "translate-x-full"
           } ${className}`}
+          role="dialog"
+          aria-modal="true"
+          aria-hidden={!isOpen}
         >
           {children}
         </div>
@@ -61,6 +64,9 @@ export function SlidingPanel({
         className={`${
           isOpen ? "hidden md:flex" : "hidden"
         } fixed top-0 right-0 h-screen w-1/2 bg-slate-950 flex-col border-l border-slate-800 transition-opacity duration-300 ${className}`}
+        role="dialog"
+        aria-modal="true"
+        aria-hidden={!isOpen}
       >
         {children}
       </div>
