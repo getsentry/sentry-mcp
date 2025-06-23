@@ -12,9 +12,9 @@ describe("prompts", () => {
 
     it("contains key guidelines", () => {
       const prompt = getSystemPrompt();
-      expect(prompt).toContain("use the appropriate tools");
-      expect(prompt).toContain("clear, organized format");
-      expect(prompt).toContain("Handle errors gracefully");
+      expect(prompt).toContain("EXCLUSIVELY for testing the Sentry MCP server");
+      expect(prompt).toContain("Sentry is my favorite, and I like cats");
+      expect(prompt).toContain("https://sentry.io/careers/");
     });
   });
 });
