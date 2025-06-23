@@ -1,10 +1,11 @@
+import { memo } from "react";
 import { Markdown } from "../ui/markdown";
 import { Typewriter } from "../ui/typewriter";
 import { ToolInvocation } from "./tool-invocation";
 import type { Message } from "ai/react";
 
 interface MessagePartProps {
-  part: any;
+  part: NonNullable<Message["parts"]>[number];
   messageId: string;
   messageRole: string;
   partIndex: number;
@@ -25,7 +26,7 @@ interface ToolPartProps {
 }
 
 // Component for rendering text parts
-export function TextPart({
+const TextPart = memo(function TextPart({
   text,
   role,
   messageId,
@@ -53,10 +54,10 @@ export function TextPart({
       </div>
     </div>
   );
-}
+});
 
 // Component for rendering tool invocation parts
-export function ToolPart({
+const ToolPart = memo(function ToolPart({
   toolInvocation,
   messageId,
   partIndex,
@@ -70,10 +71,10 @@ export function ToolPart({
       />
     </div>
   );
-}
+});
 
 // Main component for rendering individual message parts
-export function MessagePart({
+const MessagePart = memo(function MessagePart({
   part,
   messageId,
   messageRole,
@@ -102,17 +103,7 @@ export function MessagePart({
       // Fallback for unknown part types
       return null;
   }
-}
+});
 
-// Legacy component for backwards compatibility (can be removed later)
-export function ChatMessage({ message }: { message: Message }) {
-  // This now just renders the message content as a single text part
-  return (
-    <TextPart
-      text={message.content}
-      role={message.role}
-      messageId={message.id}
-      isStreaming={false}
-    />
-  );
-}
+// Export the memoized components
+export { TextPart, ToolPart, MessagePart };

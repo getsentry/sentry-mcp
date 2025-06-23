@@ -9,7 +9,7 @@ import {
   AccordionTrigger,
 } from "../components/ui/accordion";
 import Note from "../components/ui/note";
-import { ChevronRight, MessageCircle, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
 import RemoteSetup from "../components/fragments/remote-setup";
 import { useState } from "react";
@@ -31,14 +31,13 @@ export default function Home({ onChatClick }: HomeProps) {
         <Section className="space-y-4 mb-10">
           <Prose>
             <p>
-              This service provides a Model Context Provider (MCP) for
-              interacting with{" "}
-              <a href="https://docs.sentry.io/api/">Sentry's API</a>.
+              This service implements the Model Context Protocol (MCP) for
+              interacting with <a href="https://sentry.io/welcome/">Sentry</a>.
             </p>
           </Prose>
 
-          {/* Big Call to Action */}
-          <div className="relative overflow-hidden bg-slate-950 p-8 text-center">
+          {/* Big Call to Action - Mobile Only */}
+          <div className="md:hidden relative overflow-hidden bg-slate-950 p-8 text-center">
             <div className="absolute inset-0 bg-slate-950" />
             <div className="relative z-10">
               <p className="text-slate-300 mb-6 max-w-lg mx-auto">
@@ -61,67 +60,67 @@ export default function Home({ onChatClick }: HomeProps) {
             </div>
           </div>
 
-          <Prose>
-            <h3>What is a Model Context Provider?</h3>
-            <p>
-              Simply put, its a way to plug Sentry's API into an LLM, letting
-              you ask questions about your data in context of the LLM itself.
-              This lets you take an agent that you already use, like Cursor, and
-              pull in additional information from Sentry to help with tasks like
-              debugging, code generation, and more.
-            </p>
-            <img src="/flow.jpg" alt="Flow" className="w-full mb-6" />
-            <p>
-              This project is still in its infancy as development of the MCP
-              specification is ongoing. If you find any problems, or have an
-              idea for how we can improve it, please let us know on{" "}
-              <Link href="https://github.com/getsentry/sentry-mcp/issues">
-                GitHub
-              </Link>
-            </p>
-            <h3>Interested in learning more?</h3>
-            <ul>
-              <li>
-                <Link href="https://www.youtube.com/watch?v=n4v0fR6mVTU">
-                  Using Sentry's Seer via MCP
+          <Section heading="What is a Model Context Protocol?">
+            <Prose>
+              <p>
+                Simply put, its a way to plug Sentry's API into an LLM, letting
+                you ask questions about your data in context of the LLM itself.
+                This lets you take an agent that you already use, like Cursor,
+                and pull in additional information from Sentry to help with
+                tasks like debugging, code generation, and more.
+              </p>
+              <p>
+                This project is still in its infancy as development of the MCP
+                specification is ongoing. If you find any problems, or have an
+                idea for how we can improve it, please let us know on{" "}
+                <Link href="https://github.com/getsentry/sentry-mcp/issues">
+                  GitHub
                 </Link>
-              </li>
-              <li>
-                <Link href="https://www.youtube.com/watch?v=m3IE6JygT1o">
-                  Building Sentry's MCP on Cloudflare
-                </Link>
-              </li>
-            </ul>
-          </Prose>
-        </Section>
+              </p>
+              <h3>Interested in learning more?</h3>
+              <ul>
+                <li>
+                  <Link href="https://www.youtube.com/watch?v=n4v0fR6mVTU">
+                    Using Sentry's Seer via MCP
+                  </Link>
+                </li>
+                <li>
+                  <Link href="https://www.youtube.com/watch?v=m3IE6JygT1o">
+                    Building Sentry's MCP on Cloudflare
+                  </Link>
+                </li>
+              </ul>
+            </Prose>
+          </Section>
 
-        <Section
-          heading={
-            <>
-              <div className="flex-1">Getting Started</div>
-              <div className="flex self-justify-end items-center gap-1 text-xs">
-                <Button
-                  variant="link"
-                  size="xs"
-                  onClick={() => setStdio(false)}
-                  active={!stdio}
-                >
-                  Remote
-                </Button>
-                <span>/</span>
-                <Button
-                  variant="link"
-                  size="xs"
-                  onClick={() => setStdio(true)}
-                  active={stdio}
-                >
-                  Stdio
-                </Button>
-              </div>
-            </>
-          }
-        >
-          {stdio ? <StdioSetup /> : <RemoteSetup />}
+          <Section
+            heading={
+              <>
+                <div className="flex-1">Getting Started</div>
+                <div className="flex self-justify-end items-center gap-1 text-xs">
+                  <Button
+                    variant="link"
+                    size="xs"
+                    onClick={() => setStdio(false)}
+                    active={!stdio}
+                  >
+                    Remote
+                  </Button>
+                  <span>/</span>
+                  <Button
+                    variant="link"
+                    size="xs"
+                    onClick={() => setStdio(true)}
+                    active={stdio}
+                  >
+                    Stdio
+                  </Button>
+                </div>
+              </>
+            }
+          >
+            {stdio ? <StdioSetup /> : <RemoteSetup />}
+          </Section>
         </Section>
 
         <Section heading="Available Tools" id="tools">

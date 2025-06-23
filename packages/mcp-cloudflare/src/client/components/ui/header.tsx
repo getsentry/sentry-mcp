@@ -1,10 +1,18 @@
 import type React from "react";
 import { SentryIcon } from "./icons/sentry";
-import { Github } from "lucide-react";
+import { Github, LogOut } from "lucide-react";
 import { Button } from "./button";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  isAuthenticated?: boolean;
+  onLogout?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  isAuthenticated,
+  onLogout,
+}) => {
   return (
     <header className="mb-6 w-full">
       <div className="flex items-center justify-between w-full">
@@ -26,6 +34,16 @@ export const Header: React.FC = () => {
               <span>GitHub</span>
             </a>
           </Button>
+          {isAuthenticated && onLogout && (
+            <Button
+              variant="outline"
+              onClick={onLogout}
+              className="hidden md:flex cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          )}
         </div>
       </div>
     </header>

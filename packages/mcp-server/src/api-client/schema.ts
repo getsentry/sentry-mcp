@@ -51,7 +51,7 @@ export const ApiErrorSchema = z
 
 export const UserSchema = z.object({
   id: z.union([z.string(), z.number()]),
-  name: z.string(),
+  name: z.string().nullable(),
   email: z.string(),
 });
 

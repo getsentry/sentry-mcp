@@ -3,8 +3,9 @@
 import { useChat } from "ai/react";
 import { useEffect, useRef, useCallback } from "react";
 import { Button } from "../ui/button";
-import { AuthForm, ChatInput, ChatMessages, PanelBackdrop, useAuth } from ".";
-import { AlertCircle, LogOut } from "lucide-react";
+import { AuthForm, ChatInput, ChatMessages, PanelBackdrop } from ".";
+import { useAuthContext } from "../../contexts/auth-context";
+import { AlertCircle, LogOut, X } from "lucide-react";
 
 interface ChatProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ export function Chat({ isOpen, onClose }: ChatProps) {
     handleOAuthLogin,
     handleLogout,
     clearAuthState,
-  } = useAuth();
+  } = useAuthContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -131,10 +132,10 @@ export function Chat({ isOpen, onClose }: ChatProps) {
     }
   }, [isChatLoading, scrollToBottom]);
 
-  // Disable body scrolling when panel is open
+  // Disable body scrolling when panel is open (mobile only)
   useEffect(() => {
     if (isOpen) {
-      // Disable scrolling
+      // Disable scrolling on mobile when chat is open
       document.body.style.overflow = "hidden";
     } else {
       // Restore scrolling
@@ -155,61 +156,152 @@ export function Chat({ isOpen, onClose }: ChatProps) {
   // Show authentication form if not authenticated
   if (!isAuthenticated) {
     return (
-      <div
-        className={`fixed inset-0 z-40 bg-transparent max-w-none max-h-none w-full h-full m-0 p-0 ${
-          isOpen ? "pointer-events-auto" : "pointer-events-none"
-        }`}
-      >
-        {/* Backdrop */}
-        <PanelBackdrop isOpen={isOpen} onClose={onClose} />
-
-        {/* Auth Panel */}
+      <>
+        {/* Mobile: Overlay layout - positioned behind when closed */}
         <div
-          className={`fixed top-0 right-0 h-full w-full max-w-2xl bg-slate-950 border-l border-slate-800 z-50 transform transition-all duration-500 ease-out shadow-2xl ${
-            isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-90"
+          className={`md:hidden fixed inset-0 bg-transparent max-w-none max-h-none w-full h-full m-0 p-0 ${
+            isOpen ? "z-40 pointer-events-auto" : "-z-10 pointer-events-none"
           }`}
         >
-          <div className="h-full flex flex-col">
-            <AuthForm
-              authError={authError}
-              isAuthenticating={isAuthenticating}
-              onOAuthLogin={handleOAuthLogin}
-            />
+          {/* Backdrop */}
+          <PanelBackdrop isOpen={isOpen} onClose={onClose} />
+
+          {/* Auth Panel */}
+          <div
+            className={`fixed top-0 right-0 h-full w-full max-w-2xl bg-slate-950 border-l border-slate-800 z-50 transform shadow-2xl max-md:transition-all max-md:duration-500 max-md:ease-out ${
+              isOpen
+                ? "translate-x-0 opacity-100"
+                : "translate-x-full opacity-90"
+            }`}
+          >
+            {/* Floating Close Button */}
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="default"
+              className="absolute top-4 left-4 z-10 cursor-pointer"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+
+            <div className="h-full flex flex-col items-center justify-center">
+              <AuthForm
+                authError={authError}
+                isAuthenticating={isAuthenticating}
+                onOAuthLogin={handleOAuthLogin}
+              />
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Desktop: Auth form - hidden by default, only show when open */}
+        <div
+          className={`${
+            isOpen ? "hidden md:flex" : "hidden"
+          } h-full bg-slate-950 flex-col items-center justify-center fixed top-0 right-0 w-1/2 border-l border-slate-800 md:transition-opacity md:duration-300`}
+        >
+          <AuthForm
+            authError={authError}
+            isAuthenticating={isAuthenticating}
+            onOAuthLogin={handleOAuthLogin}
+          />
+        </div>
+      </>
     );
   }
 
   // Show chat interface when authenticated
   return (
-    <div
-      className={`fixed inset-0 z-40 bg-transparent max-w-none max-h-none w-full h-full m-0 p-0 ${
-        isOpen ? "pointer-events-auto" : "pointer-events-none"
-      }`}
-    >
-      {/* Backdrop */}
-      <PanelBackdrop isOpen={isOpen} onClose={onClose} />
-
-      {/* Chat Panel */}
+    <>
+      {/* Mobile: Overlay layout - positioned behind when closed */}
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-2xl bg-slate-950 border-l border-slate-800 z-50 transform transition-all duration-500 ease-out shadow-2xl ${
-          isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-90"
+        className={`md:hidden fixed inset-0 bg-transparent max-w-none max-h-none w-full h-full m-0 p-0 ${
+          isOpen ? "z-40 pointer-events-auto" : "-z-10 pointer-events-none"
         }`}
+      >
+        {/* Backdrop */}
+        <PanelBackdrop isOpen={isOpen} onClose={onClose} />
+
+        {/* Chat Panel */}
+        <div
+          className={`fixed top-0 right-0 h-full w-full max-w-2xl bg-slate-950 border-l border-slate-800 z-50 transform shadow-2xl max-md:transition-all max-md:duration-500 max-md:ease-out ${
+            isOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-90"
+          }`}
+          aria-labelledby="chat-panel-title"
+        >
+          {/* Floating Close Button */}
+          <Button
+            type="button"
+            onClick={onClose}
+            variant="default"
+            className="absolute top-4 left-4 z-10 cursor-pointer"
+            title="Close"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+
+          {/* Floating Logout Button */}
+          <Button
+            type="button"
+            onClick={handleLogout}
+            variant="default"
+            className="absolute top-4 right-4 z-10 cursor-pointer"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+
+          <div className="h-full flex flex-col">
+            {/* Error Display */}
+            {error && (
+              <div className="flex-shrink-0 m-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-400" />
+                <div className="text-red-400">
+                  Something went wrong. Please try again.
+                </div>
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => reload()}
+                  className="text-red-300 hover:text-red-200 ml-auto"
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+
+            {/* Chat Messages */}
+            <ChatMessages
+              ref={messagesContainerRef}
+              messages={messages}
+              isChatLoading={isChatLoading}
+            />
+            <div ref={messagesEndRef} />
+
+            {/* Chat Input - Always pinned at bottom */}
+            <div className="flex-shrink-0 p-6">
+              <ChatInput
+                input={input}
+                isLoading={isChatLoading}
+                isOpen={isOpen}
+                onInputChange={handleInputChange}
+                onSubmit={handleSubmit}
+                onStop={stop}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: Fixed positioned as right half - hidden by default, only show when open */}
+      <div
+        className={`${
+          isOpen ? "hidden md:flex" : "hidden"
+        } fixed top-0 right-0 h-screen w-1/2 bg-slate-950 flex-col border-l border-slate-800 md:transition-opacity md:duration-300`}
         aria-labelledby="chat-panel-title"
       >
-        {/* Floating Logout Button */}
-        <Button
-          type="button"
-          onClick={handleLogout}
-          variant="default"
-          className="absolute top-4 right-4 z-10 cursor-pointer"
-          title="Logout"
-        >
-          <LogOut className="h-4 w-4" />
-        </Button>
-
-        <div className="h-full flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {/* Error Display */}
           {error && (
             <div className="flex-shrink-0 m-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg flex items-center gap-2">
@@ -249,6 +341,6 @@ export function Chat({ isOpen, onClose }: ChatProps) {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
