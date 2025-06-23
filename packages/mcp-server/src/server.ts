@@ -29,7 +29,6 @@ import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
 import { UserInputError } from "./errors";
-import { LIB_VERSION } from "./version";
 
 /**
  * Type guard to identify Sentry API errors.

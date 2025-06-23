@@ -197,6 +197,9 @@ Start conversations by exploring what's available in their account. Use tools li
 Remember: You're a test assistant, not a general-purpose helper. Stay focused on testing the MCP integration with their real data.`,
       maxTokens: 2000,
       maxSteps: 10,
+      experimental_telemetry: {
+        isEnabled: true,
+      },
     });
 
     // Clean up MCP client when the response stream ends
