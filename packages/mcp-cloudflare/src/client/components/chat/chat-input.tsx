@@ -6,7 +6,6 @@ interface ChatInputProps {
   isOpen: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  onStop: () => void;
 }
 
 export function ChatInput({
@@ -15,19 +14,21 @@ export function ChatInput({
   isOpen,
   onInputChange,
   onSubmit,
-  onStop,
 }: ChatInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus when dialog opens (with slight delay for animation)
+  // Focus when dialog opens (with delay for mobile animation)
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      // Add a small delay to ensure the dialog animation completes
+    if (isOpen) {
+      // Add delay to ensure the slide-in animation completes on mobile
       const timer = setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
-      }, 100);
+        // Use requestAnimationFrame to ensure browser has finished layout
+        requestAnimationFrame(() => {
+          if (inputRef.current && !inputRef.current.disabled) {
+            inputRef.current.focus({ preventScroll: false });
+          }
+        });
+      }, 600); // Delay to account for 500ms animation
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
