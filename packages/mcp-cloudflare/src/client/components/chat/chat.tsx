@@ -181,6 +181,7 @@ export function Chat({ isOpen, onClose }: ChatProps) {
               variant="default"
               className="absolute top-4 left-4 z-10 cursor-pointer"
               title="Close"
+              aria-label="Close chat panel"
             >
               <X className="h-4 w-4" />
             </Button>
