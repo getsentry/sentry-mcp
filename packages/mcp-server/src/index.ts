@@ -72,6 +72,10 @@ Sentry.init({
   integrations: [
     Sentry.consoleLoggingIntegration(),
     Sentry.zodErrorsIntegration(),
+    Sentry.vercelAIIntegration({
+      recordInputs: true,
+      recordOutputs: true,
+    }),
   ],
   environment:
     process.env.SENTRY_ENVIRONMENT ??

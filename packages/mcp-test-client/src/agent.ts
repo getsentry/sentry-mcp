@@ -56,6 +56,9 @@ export async function runAgent(
             messages: [{ role: "user", content: userPrompt }],
             tools,
             maxSteps,
+            experimental_telemetry: {
+              isEnabled: true,
+            },
             onStepFinish: ({ stepType, toolCalls, toolResults, text }) => {
               if (toolCalls && toolCalls.length > 0) {
                 // End current streaming if active

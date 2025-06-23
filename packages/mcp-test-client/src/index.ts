@@ -57,6 +57,10 @@ program
         integrations: [
           Sentry.consoleIntegration(),
           Sentry.zodErrorsIntegration(),
+          Sentry.vercelAIIntegration({
+            recordInputs: true,
+            recordOutputs: true,
+          }),
         ],
         environment:
           process.env.SENTRY_ENVIRONMENT ??
