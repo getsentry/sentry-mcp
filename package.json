@@ -33,7 +33,9 @@
     "start:client": "pnpm run --filter ./packages/mcp-test-client start",
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
     "test": "dotenv -e .env -e .env.local -- turbo test",
-    "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci"
+    "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
+    "test:e2e": "pnpm --filter @sentry/mcp-cloudflare-e2e exec playwright test",
+    "test:e2e:ui": "pnpm --filter @sentry/mcp-cloudflare-e2e test:ui"
   },
   "dependencies": {
     "@biomejs/biome": "^1.9.4",
