@@ -2,28 +2,12 @@ import { memo } from "react";
 import { Markdown } from "../ui/markdown";
 import { Typewriter } from "../ui/typewriter";
 import { ToolInvocation } from "./tool-invocation";
-import type { Message } from "ai/react";
-
-interface MessagePartProps {
-  part: NonNullable<Message["parts"]>[number];
-  messageId: string;
-  messageRole: string;
-  partIndex: number;
-  isStreaming?: boolean;
-}
-
-interface TextPartProps {
-  text: string;
-  role: string;
-  messageId: string;
-  isStreaming?: boolean;
-}
-
-interface ToolPartProps {
-  toolInvocation: any;
-  messageId: string;
-  partIndex: number;
-}
+import type {
+  MessagePartProps,
+  TextPartProps,
+  ToolPartProps,
+  ChatToolInvocation,
+} from "./types";
 
 // Component for rendering text parts
 const TextPart = memo(function TextPart({
@@ -33,25 +17,29 @@ const TextPart = memo(function TextPart({
   isStreaming,
 }: TextPartProps) {
   const isAssistant = role === "assistant";
+  const isUser = role === "user";
 
-  return (
-    <div
-      className={`p-4 pb-2 ${
-        role === "user" ? "bg-slate-800 ml-8" : "bg-slate-800/40 mr-8"
-      }`}
-    >
-      <div className="text-sm text-slate-400 mb-2">
-        {role === "user" ? "You" : "Assistant"}
-      </div>
-      <div className="text-slate-200">
-        {isAssistant && isStreaming ? (
-          <Typewriter text={text} speed={20}>
-            {(displayedText) => <Markdown>{displayedText}</Markdown>}
-          </Typewriter>
-        ) : (
+  if (isUser) {
+    // User messages: flexible width with background
+    return (
+      <div className="flex justify-end">
+        <div className="bg-slate-800 px-4 rounded max-w-3xl">
           <Markdown>{text}</Markdown>
-        )}
+        </div>
       </div>
+    );
+  }
+
+  // Assistant messages: no background, just text
+  return (
+    <div className="mr-8">
+      {isAssistant && isStreaming ? (
+        <Typewriter text={text} speed={20}>
+          {(displayedText) => <Markdown>{displayedText}</Markdown>}
+        </Typewriter>
+      ) : (
+        <Markdown>{text}</Markdown>
+      )}
     </div>
   );
 });
@@ -94,7 +82,7 @@ const MessagePart = memo(function MessagePart({
     case "tool-invocation":
       return (
         <ToolPart
-          toolInvocation={part.toolInvocation}
+          toolInvocation={part.toolInvocation as ChatToolInvocation}
           messageId={messageId}
           partIndex={partIndex}
         />

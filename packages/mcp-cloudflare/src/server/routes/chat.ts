@@ -1,32 +1,16 @@
 import { Hono } from "hono";
 import { openai } from "@ai-sdk/openai";
-import { streamText } from "ai";
+import { streamText, type ToolSet } from "ai";
 import { experimental_createMCPClient } from "ai";
 import type { Env } from "../types";
 import { logError } from "@sentry/mcp-server/logging";
+import type {
+  ErrorResponse,
+  ChatRequest,
+  RateLimitResult,
+} from "../types/chat";
 
-// Standardized error response format
-interface ErrorResponse {
-  error: string;
-  name?: // 400-level errors (client errors)
-    | "MISSING_AUTH_TOKEN"
-    | "INVALID_MESSAGES_FORMAT"
-    // 401-level errors (authentication)
-    | "AUTH_EXPIRED"
-    | "AI_AUTH_FAILED"
-    | "SENTRY_AUTH_INVALID"
-    // 403-level errors (authorization)
-    | "INSUFFICIENT_PERMISSIONS"
-    // 429-level errors (rate limiting)
-    | "RATE_LIMIT_EXCEEDED"
-    | "AI_RATE_LIMIT"
-    // 500-level errors (server errors)
-    | "AI_SERVICE_UNAVAILABLE"
-    | "RATE_LIMITER_ERROR"
-    | "MCP_CONNECTION_FAILED"
-    | "INTERNAL_ERROR";
-  eventId?: string;
-}
+type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
 function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
   return errorResponse;
@@ -74,7 +58,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
         .join("");
       const rateLimitKey = `user:${hashHex.substring(0, 16)}`; // Use first 16 chars of hash
 
-      const { success } = await c.env.CHAT_RATE_LIMITER.limit({
+      const { success }: RateLimitResult = await c.env.CHAT_RATE_LIMITER.limit({
         key: rateLimitKey,
       });
       if (!success) {
@@ -101,7 +85,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   }
 
   try {
-    const { messages } = await c.req.json();
+    const { messages } = await c.req.json<ChatRequest>();
 
     // Validate messages array
     if (!Array.isArray(messages)) {
@@ -115,8 +99,8 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     }
 
     // Create MCP client connection to the SSE endpoint
-    let mcpClient: any = null;
-    let tools = {};
+    let mcpClient: MCPClient | null = null;
+    const tools: ToolSet = {};
 
     try {
       // Get the current request URL to construct the SSE endpoint URL
@@ -135,13 +119,11 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       });
 
       // Get available tools from MCP server
-      tools = await mcpClient.tools();
+      Object.assign(tools, await mcpClient.tools());
       console.log(
         `Connected to ${sseUrl} with ${Object.keys(tools).length} tools`,
       );
     } catch (error) {
-      console.error("MCP connection error:", error);
-
       // Check if this is an authentication error
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();

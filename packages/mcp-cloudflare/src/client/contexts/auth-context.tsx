@@ -1,16 +1,6 @@
 import React, { createContext, useContext, type ReactNode } from "react";
-import { useAuth } from "../components/chat";
-
-interface AuthContextType {
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  authToken: string;
-  isAuthenticating: boolean;
-  authError: string;
-  handleOAuthLogin: () => void;
-  handleLogout: () => void;
-  clearAuthState: () => void;
-}
+import { useAuth } from "../hooks/use-auth";
+import type { AuthContextType } from "../components/chat/types";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

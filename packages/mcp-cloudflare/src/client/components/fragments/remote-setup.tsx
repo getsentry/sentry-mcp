@@ -112,7 +112,7 @@ export default function RemoteSetup() {
             <li>Open Windsurf Settings.</li>
             <li>
               Under <strong>Cascade</strong>, you'll find{" "}
-              <strong>Model Context Provider Servers</strong>.
+              <strong>Model Context Protocol Servers</strong>.
             </li>
             <li>
               Select <strong>Add Server</strong>.

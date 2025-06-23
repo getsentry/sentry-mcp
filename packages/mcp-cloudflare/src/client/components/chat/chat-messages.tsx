@@ -1,20 +1,7 @@
 import { forwardRef, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { MessagePart } from ".";
-import type { Message } from "ai/react";
-
-export interface ProcessedMessagePart {
-  part: NonNullable<Message["parts"]>[number];
-  messageId: string;
-  messageRole: string;
-  partIndex: number;
-  isStreaming: boolean;
-}
-
-interface ChatMessagesProps {
-  messages: Message[];
-  isChatLoading: boolean;
-}
+import type { Message, ProcessedMessagePart, ChatMessagesProps } from "./types";
 
 // Cache for stable part objects to avoid recreating them
 const partCache = new WeakMap<Message, { type: "text"; text: string }>();
