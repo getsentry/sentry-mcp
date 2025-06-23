@@ -5,7 +5,7 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     cloudflare(),
@@ -27,4 +27,11 @@ export default defineConfig({
     port: 5173,
     strictPort: true, // Fail if port is in use
   },
-});
+  // Enable instrumentation for coverage in e2e test mode
+  define:
+    mode === "e2e-test"
+      ? {
+          __COVERAGE__: true,
+        }
+      : {},
+}));

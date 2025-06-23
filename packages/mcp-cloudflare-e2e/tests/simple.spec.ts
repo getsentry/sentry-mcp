@@ -1,6 +1,42 @@
 import { test, expect } from "@playwright/test";
+import fs from "node:fs";
 
 test.describe("Simple Application Tests", () => {
+  const jsCoverage: any[] = [];
+  const cssCoverage: any[] = [];
+
+  test.beforeEach(async ({ page }) => {
+    // Start coverage collection for each test
+    await page.coverage.startJSCoverage();
+    await page.coverage.startCSSCoverage();
+  });
+
+  test.afterEach(async ({ page }) => {
+    // Collect coverage after each test
+    const jsResults = await page.coverage.stopJSCoverage();
+    const cssResults = await page.coverage.stopCSSCoverage();
+
+    jsCoverage.push(...jsResults);
+    cssCoverage.push(...cssResults);
+  });
+
+  test.afterAll(async () => {
+    // Write coverage data to files
+    if (jsCoverage.length > 0) {
+      fs.mkdirSync("coverage", { recursive: true });
+      fs.writeFileSync(
+        "coverage/js-coverage.json",
+        JSON.stringify(jsCoverage, null, 2),
+      );
+    }
+    if (cssCoverage.length > 0) {
+      fs.mkdirSync("coverage", { recursive: true });
+      fs.writeFileSync(
+        "coverage/css-coverage.json",
+        JSON.stringify(cssCoverage, null, 2),
+      );
+    }
+  });
   test("should load without errors", async ({ page }) => {
     await page.goto("/");
 

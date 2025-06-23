@@ -5,13 +5,13 @@ on:
     paths:
       - 'packages/mcp-server/**'
       - 'packages/mcp-cloudflare/**'
-      - 'packages/e2e/**'
+      - 'packages/mcp-cloudflare-e2e/**'
   push:
     branches: [main]
     paths:
       - 'packages/mcp-server/**'
       - 'packages/mcp-cloudflare/**'
-      - 'packages/e2e/**'
+      - 'packages/mcp-cloudflare-e2e/**'
 
 permissions:
   contents: read
@@ -54,12 +54,29 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Run E2E tests
-        run: pnpm test:e2e
+      - name: Run E2E tests with coverage
+        run: pnpm --filter=@sentry/mcp-cloudflare-e2e test:ci
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          directory: packages/mcp-cloudflare-e2e/coverage/
+          flags: e2e
+          name: codecov-e2e
+          fail_ci_if_error: false
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
-          path: packages/e2e/playwright-report/
+          path: packages/mcp-cloudflare-e2e/playwright-report/
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: packages/mcp-cloudflare-e2e/test-results.xml
           retention-days: 30
