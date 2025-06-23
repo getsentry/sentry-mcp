@@ -22,7 +22,6 @@ export function Chat({ isOpen, onClose }: ChatProps) {
     authError,
     handleOAuthLogin,
     handleLogout,
-    clearAuthState,
   } = useAuthContext();
 
   // Use error handling hook
