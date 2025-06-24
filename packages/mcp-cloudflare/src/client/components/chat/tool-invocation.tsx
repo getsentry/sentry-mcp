@@ -66,7 +66,7 @@ export function ToolContent({ content }: { content: ToolMessage[] }) {
         <div key={`message-${message.type}-${index}`} className="space-y-2">
           <pre className="text-slate-400 text-sm whitespace-pre-wrap overflow-x-auto">
             {isTextMessage(message)
-              ? message.text.replace(/\\t/g, "\t")
+              ? message.text
               : JSON.stringify(message, null, 2)}
           </pre>
         </div>

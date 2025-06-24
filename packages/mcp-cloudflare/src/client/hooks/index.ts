@@ -1,8 +1,6 @@
-// Auth hooks
-export { useAuth } from "./use-auth";
+// Auth hooks are internal - use useAuth from auth-context instead
 
-// Chat hooks
-export { useChatError } from "./use-chat-error";
+// Chat hooks removed - useChatError was deleted
 
 // UI hooks
 export { useScrollLock } from "./use-scroll-lock";

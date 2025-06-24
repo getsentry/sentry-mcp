@@ -59,8 +59,27 @@ function apiServiceFromContext(
 
   if (opts.regionUrl?.trim()) {
     try {
-      host = new URL(opts.regionUrl).host;
+      const parsedUrl = new URL(opts.regionUrl);
+
+      // Validate that the URL has a proper protocol
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        throw new UserInputError(
+          `Invalid regionUrl provided: ${opts.regionUrl}. Must include protocol (http:// or https://).`,
+        );
+      }
+
+      // Validate that the host is not just the protocol name
+      if (parsedUrl.host === "https" || parsedUrl.host === "http") {
+        throw new UserInputError(
+          `Invalid regionUrl provided: ${opts.regionUrl}. The host cannot be just a protocol name.`,
+        );
+      }
+
+      host = parsedUrl.host;
     } catch (error) {
+      if (error instanceof UserInputError) {
+        throw error;
+      }
       throw new UserInputError(
         `Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`,
       );

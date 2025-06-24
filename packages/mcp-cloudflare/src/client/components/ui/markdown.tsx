@@ -32,42 +32,6 @@ export function Markdown({ children, className }: MarkdownProps) {
       remarkPlugins={[remarkGfm]}
       disallowedElements={["script", "style", "iframe", "object", "embed"]}
       unwrapDisallowed={true}
-      components={{
-        // Custom components to ensure no HTML passthrough
-        a: ({ href, children, ...props }: any) => (
-          <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
-            {children}
-          </a>
-        ),
-        // Ensure code blocks are properly styled
-        pre: ({ children, ...props }: any) => (
-          <pre
-            className="bg-slate-900 border border-slate-700 rounded-lg p-4 overflow-x-auto"
-            {...props}
-          >
-            {children}
-          </pre>
-        ),
-        // Inline code styling
-        code: ({ children, className, ...props }: any) => {
-          const isCodeBlock = className?.includes("language-");
-          if (isCodeBlock) {
-            return (
-              <code className={className} {...props}>
-                {children}
-              </code>
-            );
-          }
-          return (
-            <code
-              className="bg-slate-800 px-1 py-0.5 rounded text-sm font-mono"
-              {...props}
-            >
-              {children}
-            </code>
-          );
-        },
-      }}
     >
       {children}
     </ReactMarkdown>

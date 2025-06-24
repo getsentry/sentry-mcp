@@ -7,19 +7,14 @@ import type { Message } from "ai/react";
 // Re-export AI SDK types for convenience
 export type { Message } from "ai/react";
 
-// Error handling types
+// Error handling types (simplified)
+// We only keep this for potential server response parsing
 export interface ChatErrorData {
   error?: string;
   name?: string;
   eventId?: string;
   statusCode?: number;
   message?: string;
-}
-
-export interface ParsedError {
-  statusCode?: number;
-  errorName?: string;
-  errorData: ChatErrorData | null;
 }
 
 // Authentication types
@@ -96,6 +91,8 @@ export interface ChatProps {
 export interface ChatMessagesProps {
   messages: Message[];
   isChatLoading: boolean;
+  error?: Error | null;
+  onRetry?: () => void;
 }
 
 export interface ChatInputProps {
