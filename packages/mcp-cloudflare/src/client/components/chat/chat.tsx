@@ -42,28 +42,6 @@ export function Chat({ isOpen, onClose }: ChatProps) {
     // Use a stable ID that doesn't change during reauthentication
     // This preserves messages when the auth token changes
     id: "chat-session",
-    // Custom fetch for debugging
-    fetch: async (input, init) => {
-      const response = await fetch(input, init);
-
-      console.log("Chat API response:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-
-      if (!response.ok) {
-        const cloned = response.clone();
-        try {
-          const errorData = await cloned.json();
-          console.log("Error response body:", errorData);
-        } catch (e) {
-          console.log("Could not parse error response body");
-        }
-      }
-
-      return response;
-    },
   });
 
   // Use declarative scroll hook - scroll on new messages and during streaming
@@ -78,22 +56,25 @@ export function Chat({ isOpen, onClose }: ChatProps) {
   // Only clear messages on explicit logout, not during reauthentication
   // This is now handled in the handleLogout function
 
-  // Track if we had an auth error before
+  // Track if we had an auth error before and the token when it happened
   const hadAuthErrorRef = useRef(false);
+  const authTokenWhenErrorRef = useRef<string>("");
   const retriedRef = useRef(false);
 
-  // When auth succeeds after an auth error, retry the failed message
+  // Handle auth error detection and retry after reauthentication
   useEffect(() => {
-    if (error && isAuthError(error)) {
+    // If we get an auth error, record it and the current token
+    if (error && isAuthError(error) && !hadAuthErrorRef.current) {
       hadAuthErrorRef.current = true;
+      authTokenWhenErrorRef.current = authToken;
       retriedRef.current = false;
     }
 
-    // If we had an auth error and now we're authenticated again, retry once
+    // If we had an auth error and the token changed (reauthentication), retry once
     if (
       hadAuthErrorRef.current &&
-      isAuthenticated &&
-      error &&
+      authToken &&
+      authToken !== authTokenWhenErrorRef.current &&
       !retriedRef.current
     ) {
       hadAuthErrorRef.current = false;
@@ -101,7 +82,14 @@ export function Chat({ isOpen, onClose }: ChatProps) {
       // Retry the failed message
       reload();
     }
-  }, [isAuthenticated, error, reload]);
+
+    // Reset retry state on successful completion (no error)
+    if (!error) {
+      hadAuthErrorRef.current = false;
+      retriedRef.current = false;
+      authTokenWhenErrorRef.current = "";
+    }
+  }, [authToken, error, reload]);
 
   // Show loading state while checking auth session
   if (isLoading) {
