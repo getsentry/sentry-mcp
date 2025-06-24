@@ -131,6 +131,16 @@ export class EventBuilder {
     return this;
   }
 
+  withChainedExceptions(exceptions: ExceptionValue[]): this {
+    this.event.entries.push({
+      type: "exception",
+      data: {
+        values: exceptions,
+      },
+    });
+    return this;
+  }
+
   withThread(thread: Thread): this {
     const existingThread = this.event.entries.find((e) => e.type === "threads");
     if (
