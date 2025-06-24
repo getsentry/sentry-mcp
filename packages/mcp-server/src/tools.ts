@@ -62,10 +62,7 @@ function apiServiceFromContext(
       const parsedUrl = new URL(opts.regionUrl);
 
       // Validate that the URL has a proper protocol
-      if (
-        !parsedUrl.protocol ||
-        !["http:", "https:"].includes(parsedUrl.protocol)
-      ) {
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
         throw new UserInputError(
           `Invalid regionUrl provided: ${opts.regionUrl}. Must include protocol (http:// or https://).`,
         );
