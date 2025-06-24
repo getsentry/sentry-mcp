@@ -247,54 +247,133 @@ function formatExceptionInterfaceOutput(
 ) {
   const parts: string[] = [];
 
-  // TODO: support chained exceptions
-  const firstError = data.value ?? data.values?.[0];
-  if (!firstError) {
+  // Handle both single exception (value) and chained exceptions (values)
+  const exceptions = data.values || (data.value ? [data.value] : []);
+
+  if (exceptions.length === 0) {
     return "";
   }
 
-  parts.push("### Error");
-  parts.push("");
-  parts.push("```");
-  parts.push(`${firstError.type}: ${firstError.value}`);
-  parts.push("```");
-  parts.push("");
+  // For chained exceptions, they are typically ordered from innermost to outermost
+  // We'll render them in reverse order (outermost first) to match how they occurred
+  const isChained = exceptions.length > 1;
 
-  if (!firstError.stacktrace || !firstError.stacktrace.frames) {
-    return parts.join("\n");
-  }
+  // Create a copy before reversing to avoid mutating the original array
+  [...exceptions].reverse().forEach((exception, index) => {
+    if (!exception) return;
 
-  const frames = firstError.stacktrace.frames;
+    // Add language-specific chain indicator for multiple exceptions
+    if (isChained && index > 0) {
+      parts.push("");
+      parts.push(
+        getExceptionChainMessage(event.platform, index, exceptions.length),
+      );
+      parts.push("");
+    }
 
-  // Find and format the first in-app frame with enhanced view
-  const firstInAppFrame = findFirstInAppFrame(frames);
-  if (
-    firstInAppFrame &&
-    (firstInAppFrame.context?.length || firstInAppFrame.vars)
-  ) {
-    parts.push(renderEnhancedFrame(firstInAppFrame, event));
+    // Use the actual exception type and value as the heading
+    const exceptionTitle = `${exception.type}${exception.value ? `: ${exception.value}` : ""}`;
+
+    parts.push(index === 0 ? "### Error" : `### ${exceptionTitle}`);
     parts.push("");
-    parts.push("**Full Stacktrace:**");
-    parts.push("────────────────");
-  } else {
-    parts.push("**Stacktrace:**");
-  }
 
-  parts.push("```");
-  parts.push(
-    frames
-      .map((frame) => {
-        const header = formatFrameHeader(frame, undefined, event.platform);
-        const context = renderInlineContext(frame);
-        return `${header}${context}`;
-      })
-      .join("\n"),
-  );
-  parts.push("```");
+    // Add the error details in a code block for the first exception
+    // to maintain backward compatibility
+    if (index === 0) {
+      parts.push("```");
+      parts.push(exceptionTitle);
+      parts.push("```");
+      parts.push("");
+    }
+
+    if (!exception.stacktrace || !exception.stacktrace.frames) {
+      parts.push("**Stacktrace:**");
+      parts.push("```");
+      parts.push("No stacktrace available");
+      parts.push("```");
+      return;
+    }
+
+    const frames = exception.stacktrace.frames;
+
+    // Only show enhanced frame for the first (outermost) exception to avoid overwhelming output
+    if (index === 0) {
+      const firstInAppFrame = findFirstInAppFrame(frames);
+      if (
+        firstInAppFrame &&
+        (firstInAppFrame.context?.length || firstInAppFrame.vars)
+      ) {
+        parts.push(renderEnhancedFrame(firstInAppFrame, event));
+        parts.push("");
+        parts.push("**Full Stacktrace:**");
+        parts.push("────────────────");
+      } else {
+        parts.push("**Stacktrace:**");
+      }
+    } else {
+      parts.push("**Stacktrace:**");
+    }
+
+    parts.push("```");
+    parts.push(
+      frames
+        .map((frame) => {
+          const header = formatFrameHeader(frame, undefined, event.platform);
+          const context = renderInlineContext(frame);
+          return `${header}${context}`;
+        })
+        .join("\n"),
+    );
+    parts.push("```");
+  });
+
   parts.push("");
   parts.push("");
 
   return parts.join("\n");
+}
+
+/**
+ * Get the appropriate exception chain message based on the platform
+ */
+function getExceptionChainMessage(
+  platform: string | null,
+  index: number,
+  totalExceptions: number,
+): string {
+  // Default message for unknown platforms
+  const defaultMessage =
+    "**During handling of the above exception, another exception occurred:**";
+
+  if (!platform) {
+    return defaultMessage;
+  }
+
+  switch (platform.toLowerCase()) {
+    case "python":
+      // Python has two distinct messages, but without additional metadata
+      // we default to the implicit chaining message
+      return "**During handling of the above exception, another exception occurred:**";
+
+    case "java":
+      return "**Caused by:**";
+
+    case "csharp":
+    case "dotnet":
+      return "**---> Inner Exception:**";
+
+    case "ruby":
+      return "**Caused by:**";
+
+    case "go":
+      return "**Wrapped error:**";
+
+    case "rust":
+      return `**Caused by (${index}):**`;
+
+    default:
+      return defaultMessage;
+  }
 }
 
 function formatRequestInterfaceOutput(

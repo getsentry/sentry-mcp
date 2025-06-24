@@ -1254,4 +1254,379 @@ describe("formatEventOutput", () => {
       `);
     });
   });
+
+  describe("Chained exceptions", () => {
+    it("should render multiple chained exceptions", () => {
+      const event = new EventBuilder("python")
+        .withChainedExceptions([
+          createExceptionValue({
+            type: "KeyError",
+            value: "'user_id'",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "/app/database.py",
+                function: "get_user",
+                lineNo: 15,
+                inApp: true,
+              }),
+            ]),
+          }),
+          createExceptionValue({
+            type: "ValueError",
+            value: "User not found",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "/app/services.py",
+                function: "process_user",
+                lineNo: 25,
+                inApp: true,
+              }),
+            ]),
+          }),
+          createExceptionValue({
+            type: "HTTPError",
+            value: "500 Internal Server Error",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "/app/handlers.py",
+                function: "handle_request",
+                lineNo: 42,
+                inApp: true,
+              }),
+            ]),
+          }),
+        ])
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`
+        "### Error
+
+        \`\`\`
+        HTTPError: 500 Internal Server Error
+        \`\`\`
+
+        **Stacktrace:**
+        \`\`\`
+          File "/app/handlers.py", line 42, in handle_request
+        \`\`\`
+
+        **During handling of the above exception, another exception occurred:**
+
+        ### ValueError: User not found
+
+        **Stacktrace:**
+        \`\`\`
+          File "/app/services.py", line 25, in process_user
+        \`\`\`
+
+        **During handling of the above exception, another exception occurred:**
+
+        ### KeyError: 'user_id'
+
+        **Stacktrace:**
+        \`\`\`
+          File "/app/database.py", line 15, in get_user
+        \`\`\`
+
+        "
+      `);
+    });
+
+    it("should render chained exceptions with enhanced frame on outermost exception", () => {
+      const event = new EventBuilder("python")
+        .withChainedExceptions([
+          createExceptionValue({
+            type: "KeyError",
+            value: "'user_id'",
+            stacktrace: createStackTrace([
+              createFrameWithContext(
+                {
+                  filename: "/app/database.py",
+                  function: "get_user",
+                  lineNo: 15,
+                  inApp: true,
+                },
+                [
+                  [13, "def get_user(data):"],
+                  [14, "    # This will fail if user_id is missing"],
+                  [15, "    user_id = data['user_id']"],
+                  [16, "    return db.find_user(user_id)"],
+                ],
+                {
+                  data: {},
+                },
+              ),
+            ]),
+          }),
+          createExceptionValue({
+            type: "ValueError",
+            value: "User not found",
+            stacktrace: createStackTrace([
+              createFrameWithContext(
+                {
+                  filename: "/app/services.py",
+                  function: "process_user",
+                  lineNo: 25,
+                  inApp: true,
+                },
+                [
+                  [23, "    try:"],
+                  [24, "        user = get_user(request_data)"],
+                  [25, "    except KeyError:"],
+                  [26, "        raise ValueError('User not found')"],
+                ],
+                {
+                  request_data: {},
+                },
+              ),
+            ]),
+          }),
+        ])
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`
+        "### Error
+
+        \`\`\`
+        ValueError: User not found
+        \`\`\`
+
+        **Most Relevant Frame:**
+        ─────────────────────
+          File "/app/services.py", line 25, in process_user
+
+            23 │     try:
+            24 │         user = get_user(request_data)
+          → 25 │     except KeyError:
+            26 │         raise ValueError('User not found')
+
+        Local Variables:
+        └─ request_data: {}
+
+        **Full Stacktrace:**
+        ────────────────
+        \`\`\`
+          File "/app/services.py", line 25, in process_user
+            except KeyError:
+        \`\`\`
+
+        **During handling of the above exception, another exception occurred:**
+
+        ### KeyError: 'user_id'
+
+        **Stacktrace:**
+        \`\`\`
+          File "/app/database.py", line 15, in get_user
+            user_id = data['user_id']
+        \`\`\`
+
+        "
+      `);
+    });
+
+    it("should handle single exception in values array (not chained)", () => {
+      const event = new EventBuilder("python")
+        .withChainedExceptions([
+          createExceptionValue({
+            type: "RuntimeError",
+            value: "Something went wrong",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "/app/main.py",
+                function: "main",
+                lineNo: 10,
+                inApp: true,
+              }),
+            ]),
+          }),
+        ])
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`
+        "### Error
+
+        \`\`\`
+        RuntimeError: Something went wrong
+        \`\`\`
+
+        **Stacktrace:**
+        \`\`\`
+          File "/app/main.py", line 10, in main
+        \`\`\`
+
+        "
+      `);
+    });
+
+    it("should use Java-style 'Caused by' for Java platform", () => {
+      const event = new EventBuilder("java")
+        .withChainedExceptions([
+          createExceptionValue({
+            type: "SQLException",
+            value: "Database connection failed",
+            stacktrace: createStackTrace([
+              frameFactories.java({
+                module: "com.example.db.DatabaseConnector",
+                function: "connect",
+                filename: "DatabaseConnector.java",
+                lineNo: 45,
+              }),
+            ]),
+          }),
+          createExceptionValue({
+            type: "RuntimeException",
+            value: "Failed to initialize service",
+            stacktrace: createStackTrace([
+              frameFactories.java({
+                module: "com.example.service.UserService",
+                function: "initialize",
+                filename: "UserService.java",
+                lineNo: 23,
+              }),
+            ]),
+          }),
+        ])
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`
+        "### Error
+
+        \`\`\`
+        RuntimeException: Failed to initialize service
+        \`\`\`
+
+        **Stacktrace:**
+        \`\`\`
+        at com.example.service.UserService.initialize(UserService.java:23)
+        \`\`\`
+
+        **Caused by:**
+
+        ### SQLException: Database connection failed
+
+        **Stacktrace:**
+        \`\`\`
+        at com.example.db.DatabaseConnector.connect(DatabaseConnector.java:45)
+        \`\`\`
+
+        "
+      `);
+    });
+
+    it("should use C#-style arrow notation for dotnet platform", () => {
+      const event = new EventBuilder("csharp")
+        .withChainedExceptions([
+          createExceptionValue({
+            type: "ArgumentNullException",
+            value: "Value cannot be null. (Parameter 'userId')",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "UserRepository.cs",
+                function: "GetUserById",
+                lineNo: 15,
+                inApp: true,
+              }),
+            ]),
+          }),
+          createExceptionValue({
+            type: "ApplicationException",
+            value: "Failed to load user profile",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "UserService.cs",
+                function: "LoadProfile",
+                lineNo: 42,
+                inApp: true,
+              }),
+            ]),
+          }),
+        ])
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`
+        "### Error
+
+        \`\`\`
+        ApplicationException: Failed to load user profile
+        \`\`\`
+
+        **Stacktrace:**
+        \`\`\`
+            at LoadProfile (UserService.cs:42)
+        \`\`\`
+
+        **---> Inner Exception:**
+
+        ### ArgumentNullException: Value cannot be null. (Parameter 'userId')
+
+        **Stacktrace:**
+        \`\`\`
+            at GetUserById (UserRepository.cs:15)
+        \`\`\`
+
+        "
+      `);
+    });
+
+    it("should handle child exception without stacktrace", () => {
+      const event = new EventBuilder("python")
+        .withChainedExceptions([
+          createExceptionValue({
+            type: "KeyError",
+            value: "'missing_key'",
+            // No stacktrace for child exception
+            stacktrace: null,
+          }),
+          createExceptionValue({
+            type: "ValueError",
+            value: "Data processing failed",
+            stacktrace: createStackTrace([
+              createFrame({
+                filename: "/app/processor.py",
+                function: "process_data",
+                lineNo: 42,
+                inApp: true,
+              }),
+            ]),
+          }),
+        ])
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`
+        "### Error
+
+        \`\`\`
+        ValueError: Data processing failed
+        \`\`\`
+
+        **Stacktrace:**
+        \`\`\`
+          File "/app/processor.py", line 42, in process_data
+        \`\`\`
+
+        **During handling of the above exception, another exception occurred:**
+
+        ### KeyError: 'missing_key'
+
+        **Stacktrace:**
+        \`\`\`
+        No stacktrace available
+        \`\`\`
+
+        "
+      `);
+    });
+  });
 });
