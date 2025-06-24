@@ -1,11 +1,11 @@
 import { Header } from "./components/ui/header";
 import { useState, useEffect } from "react";
 import { Chat } from "./components/chat";
-import { useAuthContext } from "./contexts/auth-context";
+import { useAuth } from "./contexts/auth-context";
 import Home from "./pages/home";
 
 export default function App() {
-  const { isAuthenticated, handleLogout } = useAuthContext();
+  const { isAuthenticated, handleLogout } = useAuth();
 
   const [isChatOpen, setIsChatOpen] = useState(() => {
     // Initialize based on URL query string only to avoid hydration issues

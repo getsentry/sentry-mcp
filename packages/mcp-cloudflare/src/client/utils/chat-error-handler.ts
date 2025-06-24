@@ -1,125 +1,64 @@
 /**
- * Utility for handling chat API errors
- * Extracts error parsing logic from components
+ * Simplified chat error handling utilities
+ * Only handles two concerns: auth errors vs other errors
  */
 
-import type { ParsedError, ChatErrorData } from "../components/chat/types";
+/**
+ * Check if an error is authentication-related (401)
+ */
+export function isAuthError(error: Error): boolean {
+  const message = error.message.toLowerCase();
 
-export interface ChatErrorAction {
-  type: "CLEAR_AUTH" | "SHOW_ERROR" | "LOG_ONLY";
-  message?: string;
+  // Check for 401 status code or auth-related keywords
+  return (
+    message.includes("401") ||
+    message.includes("auth_expired") ||
+    message.includes("invalid_token") ||
+    message.includes("session has expired") ||
+    message.includes("unauthorized")
+  );
 }
 
 /**
- * Parse error from the chat API
+ * Extract a user-friendly error message from the error
  */
-export function parseChatError(error: Error): ParsedError {
-  const result: ParsedError = {
-    statusCode: undefined,
-    errorName: undefined,
-    errorData: null,
-  };
-
+export function getErrorMessage(error: Error): string {
   try {
-    // Extract status code from error message (e.g., "Error: 401")
-    const statusMatch = error.message.match(/\b(\d{3})\b/);
-    if (statusMatch) {
-      result.statusCode = Number.parseInt(statusMatch[1], 10);
-    }
-
-    // Try to parse JSON error response from message
+    // Try to parse JSON error response
     const jsonMatch = error.message.match(/\{.*\}/);
     if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[0]) as ChatErrorData;
-      result.errorData = data;
-      result.errorName = data.name;
+      const data = JSON.parse(jsonMatch[0]);
+      if (data.error) {
+        return data.error;
+      }
     }
   } catch {
-    // Ignore parsing errors
+    // Ignore JSON parse errors
   }
 
-  return result;
-}
-
-/**
- * Determine what action to take based on the error
- */
-export function getChatErrorAction(parsedError: ParsedError): ChatErrorAction {
-  const { statusCode, errorName, errorData } = parsedError;
-
-  // ANY 401 error should clear auth and re-login
-  if (statusCode === 401) {
-    return {
-      type: "CLEAR_AUTH",
-      message:
-        errorData?.error || "Your session has expired. Please log in again.",
-    };
+  // Check for specific error types
+  if (isAuthError(error)) {
+    return "Your session has expired. Please log in again.";
   }
 
-  // Permission errors - show error but keep auth
-  if (statusCode === 403) {
-    if (errorName === "INSUFFICIENT_PERMISSIONS") {
-      return {
-        type: "SHOW_ERROR",
-        message: "You don't have permission to access this organization.",
-      };
-    }
+  if (
+    error.message.includes("429") ||
+    error.message.toLowerCase().includes("rate_limit")
+  ) {
+    return "You've sent too many messages. Please wait a moment before trying again.";
   }
 
-  // Rate limiting
-  if (statusCode === 429) {
-    if (errorName === "RATE_LIMIT_EXCEEDED" || errorName === "AI_RATE_LIMIT") {
-      return {
-        type: "SHOW_ERROR",
-        message:
-          "You've sent too many messages. Please wait a moment before trying again.",
-      };
-    }
+  if (
+    error.message.includes("403") ||
+    error.message.toLowerCase().includes("permission")
+  ) {
+    return "You don't have permission to access this organization.";
   }
 
-  // Server errors
-  if (statusCode === 500) {
-    return {
-      type: "LOG_ONLY",
-      message: "Something went wrong on our end. Please try again.",
-    };
+  if (error.message.includes("500")) {
+    return "Something went wrong on our end. Please try again.";
   }
 
-  // Default - show specific error message if available
-  return {
-    type: "SHOW_ERROR",
-    message: errorData?.error || "An error occurred. Please try again.",
-  };
-}
-
-/**
- * Handle chat error with appropriate action
- */
-export function handleChatError(
-  error: Error,
-  callbacks: {
-    onClearAuth?: () => void;
-    onShowError?: (message: string) => void;
-  },
-): void {
-  const parsedError = parseChatError(error);
-  const action = getChatErrorAction(parsedError);
-
-  console.error("Chat error:", {
-    error,
-    parsedError,
-    action,
-  });
-
-  switch (action.type) {
-    case "CLEAR_AUTH":
-      callbacks.onClearAuth?.();
-      break;
-    case "SHOW_ERROR":
-      callbacks.onShowError?.(action.message || "An error occurred");
-      break;
-    case "LOG_ONLY":
-      // Already logged above
-      break;
-  }
+  // Default message
+  return "An error occurred. Please try again.";
 }

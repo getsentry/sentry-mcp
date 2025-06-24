@@ -667,6 +667,28 @@ describe("get_issue_details", () => {
       "
     `);
   });
+
+  it("throws error for malformed regionUrl", async () => {
+    const tool = TOOL_HANDLERS.get_issue_details;
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          eventId: undefined,
+          issueUrl: undefined,
+          regionUrl: "https",
+        },
+      ),
+    ).rejects.toThrow(
+      "Invalid regionUrl provided: https. Must be a valid URL.",
+    );
+  });
 });
 
 describe("create_team", () => {

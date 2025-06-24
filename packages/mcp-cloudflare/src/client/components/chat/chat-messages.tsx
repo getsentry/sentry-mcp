@@ -1,7 +1,10 @@
 import { forwardRef, useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Button } from "../ui/button";
 import { MessagePart } from ".";
 import type { Message, ProcessedMessagePart, ChatMessagesProps } from "./types";
+import { isAuthError, getErrorMessage } from "../../utils/chat-error-handler";
+import { useAuth } from "../../contexts/auth-context";
 
 // Cache for stable part objects to avoid recreating them
 const partCache = new WeakMap<Message, { type: "text"; text: string }>();
@@ -59,11 +62,17 @@ function processMessages(
 }
 
 export const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
-  ({ messages, isChatLoading }, ref) => {
+  ({ messages, isChatLoading, error, onRetry }, ref) => {
+    const { handleOAuthLogin } = useAuth();
+
     const processedParts = useMemo(
       () => processMessages(messages, isChatLoading),
       [messages, isChatLoading],
     );
+
+    // Simple error handling - just check if it's auth or not
+    const errorIsAuth = error ? isAuthError(error) : false;
+    const errorMessage = error ? getErrorMessage(error) : null;
     return (
       <div ref={ref} className="flex-1 overflow-y-auto m-6 space-y-4">
         {/* Empty State when no messages */}
@@ -107,12 +116,48 @@ export const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
               />
             ))}
 
-            {isChatLoading && (
+            {/* Show error or loading state */}
+            {error && errorMessage ? (
+              <div className="mr-8 p-4 bg-red-900/10 border border-red-500/30 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-red-300">{errorMessage}</p>
+                    {/* Simple action buttons */}
+                    <div className="mt-3 flex gap-2">
+                      {errorIsAuth ? (
+                        <Button
+                          onClick={() => {
+                            handleOAuthLogin();
+                          }}
+                          size="sm"
+                          variant="secondary"
+                          className="bg-red-900/20 hover:bg-red-900/30 text-red-300 border-red-500/30 cursor-pointer"
+                        >
+                          Reauthenticate
+                        </Button>
+                      ) : (
+                        onRetry && (
+                          <Button
+                            onClick={onRetry}
+                            size="sm"
+                            variant="secondary"
+                            className="bg-red-900/20 hover:bg-red-900/30 text-red-300 border-red-500/30 cursor-pointer"
+                          >
+                            Try again
+                          </Button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : isChatLoading ? (
               <div className="flex items-center space-x-2 text-slate-400 mr-8">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Assistant is thinking...</span>
               </div>
-            )}
+            ) : null}
           </>
         )}
       </div>

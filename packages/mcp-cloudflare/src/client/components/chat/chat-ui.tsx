@@ -4,7 +4,7 @@
  */
 
 import { forwardRef } from "react";
-import { AlertCircle, LogOut, X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { ChatInput, ChatMessages } from ".";
 import type { Message } from "ai/react";
@@ -77,31 +77,13 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
         </div>
 
         <div className="flex-1 flex flex-col min-h-0">
-          {/* Error Display */}
-          {error && (
-            <div className="flex-shrink-0 m-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-400" />
-              <div className="text-red-400">
-                {error.message || "Something went wrong. Please try again."}
-              </div>
-              {onRetry && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  onClick={onRetry}
-                  className="text-red-300 hover:text-red-200 ml-auto"
-                >
-                  Retry
-                </Button>
-              )}
-            </div>
-          )}
-
           {/* Chat Messages */}
           <ChatMessages
             ref={ref}
             messages={messages}
             isChatLoading={isChatLoading}
+            error={error}
+            onRetry={onRetry}
           />
 
           {/* Chat Input - Always pinned at bottom */}
