@@ -19,6 +19,10 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+import type {
+  ServerRequest,
+  ServerNotification,
+} from "@modelcontextprotocol/sdk/types.js";
 import { TOOL_HANDLERS } from "./tools";
 import { TOOL_DEFINITIONS } from "./toolDefinitions";
 import type { ServerContext } from "./types";
@@ -33,8 +37,8 @@ import { UserInputError } from "./errors";
 /**
  * Type guard to identify Sentry API errors.
  */
-function isApiError(error: unknown) {
-  return error instanceof ApiError || Object.hasOwn(error as any, "status");
+function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError;
 }
 
 /**
@@ -107,7 +111,7 @@ async function logAndFormatError(error: unknown) {
  * // { "mcp.request.argument.organizationSlug": "\"my-org\"", "mcp.request.argument.query": "\"is:unresolved\"" }
  * ```
  */
-function extractMcpParameters(args: Record<string, any>) {
+function extractMcpParameters(args: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(args).map(([key, value]) => {
       return [`mcp.request.argument.${key}`, JSON.stringify(value)];
@@ -147,7 +151,7 @@ export async function configureServer({
     // Create the handler function once - it's the same for both resource types
     const resourceHandler = async (
       url: URL,
-      extra: RequestHandlerExtra<any, any>,
+      extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
     ) => {
       return await startNewTrace(async () => {
         return await startSpan(
@@ -205,7 +209,7 @@ export async function configureServer({
                 name: `prompts/get ${prompt.name}`,
                 attributes: {
                   "mcp.prompt.name": prompt.name,
-                  ...extractMcpParameters(args),
+                  ...extractMcpParameters(args[0] || {}),
                 },
               },
               async (span) => {
@@ -266,7 +270,7 @@ export async function configureServer({
                 name: `tools/call ${tool.name}`,
                 attributes: {
                   "mcp.tool.name": tool.name,
-                  ...extractMcpParameters(args),
+                  ...extractMcpParameters(args[0] || {}),
                 },
               },
               async (span) => {

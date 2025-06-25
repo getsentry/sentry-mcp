@@ -33,6 +33,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
         accessToken: this.props.accessToken,
         organizationSlug: this.props.organizationSlug,
         userId: this.props.id,
+        mcpHost: process.env.MCP_HOST,
       },
       onToolComplete: () => {
         this.ctx.waitUntil(Sentry.flush(2000));

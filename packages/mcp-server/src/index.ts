@@ -21,14 +21,16 @@ import { LIB_VERSION } from "./version";
 // SENTRY_AUTH_TOKEN is deprecated, but we support it for backwards compatibility
 let accessToken: string | undefined =
   process.env.SENTRY_ACCESS_TOKEN ?? process.env.SENTRY_AUTH_TOKEN;
-let host: string | undefined = process.env.SENTRY_HOST;
+let host: string | undefined = process.env.SENTRY_HOST || "https://sentry.io";
+let mcpHost: string | undefined =
+  process.env.MCP_HOST || "https://mcp.sentry.dev";
 let sentryDsn: string | undefined =
   process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
 
 const packageName = "@sentry/mcp-server";
 
 function getUsage() {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>] [--sentry-dsn=<dsn>]`;
+  return `Usage: ${packageName} --access-token=<token> [--host=<host>] [--mcp-host=<host>] [--sentry-dsn=<dsn>]`;
 }
 
 for (const arg of process.argv.slice(2)) {
@@ -40,6 +42,8 @@ for (const arg of process.argv.slice(2)) {
     accessToken = arg.split("=")[1];
   } else if (arg.startsWith("--host=")) {
     host = arg.split("=")[1];
+  } else if (arg.startsWith("--mcp-host=")) {
+    mcpHost = arg.split("=")[1];
   } else if (arg.startsWith("--sentry-dsn=")) {
     sentryDsn = arg.split("=")[1];
   } else {
@@ -65,7 +69,8 @@ Sentry.init({
     tags: {
       "mcp.server_version": LIB_VERSION,
       "mcp.transport": "stdio",
-      "sentry.host": host || "https://sentry.io",
+      "sentry.host": host,
+      "mcp.mcp-host": mcpHost,
     },
   },
   release: process.env.SENTRY_RELEASE,
@@ -97,6 +102,7 @@ startStdio(instrumentedServer, {
   accessToken,
   organizationSlug: null,
   host,
+  mcpHost,
 }).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events

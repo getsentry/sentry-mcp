@@ -193,6 +193,50 @@ pnpm eval your-tool
 - [ ] 1-2 eval tests (if critical)
 - [ ] Run quality checks
 
+## Worker-Specific Tools
+
+Some tools may require access to Cloudflare Worker-specific bindings (like AutoRAG, D1, R2, etc.) that aren't available in the standard ServerContext. For these cases, create a separate endpoint in the Worker that the tool can call.
+
+### Example: RAG Search Endpoint
+
+The `search_docs` tool demonstrates this pattern:
+
+1. **Worker Route** (`/api/search`): Handles the actual AutoRAG interaction
+2. **MCP Tool**: Makes HTTP requests to the Worker endpoint
+3. **Authentication**: Uses the same Bearer token for security
+
+```typescript
+// In the Worker (routes/search.ts)
+export default new Hono().post("/", async (c) => {
+  const { query, maxResults, docType } = await c.req.json();
+  
+  // Access Worker-specific bindings
+  const results = await c.env.AI.autorag("sentry-docs").aiSearch({
+    query,
+    max_num_results: maxResults,
+  });
+  
+  return c.json({ results });
+});
+
+// In the MCP tool (tools.ts)
+search_docs: async (context, params) => {
+  const response = await fetch(`${context.host}/api/search`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${context.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(params),
+  });
+  
+  const data = await response.json();
+  // Format and return results
+}
+```
+
+This pattern works with both Cloudflare-hosted and stdio transports.
+
 ## Common Patterns
 
 - Error handling: `common-patterns.mdc#error-handling`

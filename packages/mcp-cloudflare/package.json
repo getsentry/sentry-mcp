@@ -35,6 +35,7 @@
     "@vitejs/plugin-react": "^4.5.2",
     "tailwindcss": "^4.1.10",
     "vite": "^6.3.5",
+    "vitest": "^3.2.4",
     "wrangler": "^4.20.5"
   },
   "dependencies": {

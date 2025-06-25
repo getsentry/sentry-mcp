@@ -72,6 +72,7 @@ export type ToolHandlers = {
 
 export type ServerContext = {
   host?: string;
+  mcpHost?: string;
   accessToken: string;
   organizationSlug: string | null;
   userId?: string | null;

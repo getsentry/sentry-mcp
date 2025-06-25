@@ -3,6 +3,7 @@ import type { Env } from "./types";
 import sentryOauth from "./routes/sentry-oauth";
 import chatOauth from "./routes/chat-oauth";
 import chat from "./routes/chat";
+import search from "./routes/search";
 import { logError } from "@sentry/mcp-server/logging";
 
 const app = new Hono<{
@@ -25,7 +26,8 @@ const app = new Hono<{
   })
   .route("/oauth", sentryOauth)
   .route("/api/auth", chatOauth)
-  .route("/api/chat", chat);
+  .route("/api/chat", chat)
+  .route("/api/search", search);
 
 // TODO: propagate the error as sentry isnt injecting into hono
 app.onError((err, c) => {

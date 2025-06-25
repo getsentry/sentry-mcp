@@ -27,4 +27,6 @@ export interface Env {
   AI: Ai;
   CF_VERSION_METADATA: WorkerVersionMetadata;
   CHAT_RATE_LIMITER: RateLimit;
+  SEARCH_RATE_LIMITER: RateLimit;
+  AUTORAG_INDEX_NAME?: string;
 }
