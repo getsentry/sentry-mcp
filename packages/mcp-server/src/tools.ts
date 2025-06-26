@@ -865,7 +865,7 @@ export const TOOL_HANDLERS = {
 
       // Make request to the search endpoint with timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
       let response: Response;
       try {
@@ -886,10 +886,11 @@ export const TOOL_HANDLERS = {
 
         // Handle timeout specifically
         if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          throw new ApiError(
-            "Documentation search request timed out after 5 seconds. Please try again.",
-            408,
+          const timeoutError = new Error(
+            "Documentation search request timed out after 15 seconds. Please try again.",
           );
+          timeoutError.name = "TimeoutError";
+          throw timeoutError;
         }
 
         throw fetchError;
@@ -899,10 +900,10 @@ export const TOOL_HANDLERS = {
         const errorData = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new ApiError(
-          errorData?.error || `Search failed with status ${response.status}`,
-          response.status,
-        );
+
+        const errorMessage =
+          errorData?.error || `Search failed with status ${response.status}`;
+        throw new ApiError(errorMessage, response.status);
       }
 
       const data = (await response.json()) as SearchResponse;
@@ -948,17 +949,12 @@ export const TOOL_HANDLERS = {
           "- Use `get_doc()` to read the complete documentation page with full context\n";
       }
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (error instanceof ApiError || error instanceof UserInputError) {
         throw error;
       }
 
-      logError(error);
-      output += `> **Error**: Failed to search documentation. `;
-      output += `Please try again or search directly at https://docs.sentry.io\n\n`;
-
-      if (process.env.NODE_ENV !== "production" && error instanceof Error) {
-        output += `Debug: ${error.message}\n`;
-      }
+      // Re-throw the error to be handled by the tool wrapper
+      throw error;
     }
 
     return output;
@@ -994,7 +990,7 @@ export const TOOL_HANDLERS = {
 
       // Fetch the markdown content with timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
       try {
         const response = await fetch(docUrl.toString(), {
@@ -1055,10 +1051,11 @@ export const TOOL_HANDLERS = {
 
         // Handle timeout specifically
         if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          throw new ApiError(
-            "Documentation request timed out after 5 seconds. Please try again.",
-            408,
+          const timeoutError = new Error(
+            "Documentation request timed out after 15 seconds. Please try again.",
           );
+          timeoutError.name = "TimeoutError";
+          throw timeoutError;
         }
 
         throw fetchError;
@@ -1068,13 +1065,8 @@ export const TOOL_HANDLERS = {
         throw error;
       }
 
-      logError(error);
-      output += `> **Error**: Failed to fetch documentation. `;
-      output += `Please try again or visit https://docs.sentry.io${params.path.replace(".md", "")}\n\n`;
-
-      if (process.env.NODE_ENV !== "production" && error instanceof Error) {
-        output += `Debug: ${error.message}\n`;
-      }
+      // Re-throw the error to be handled by the tool wrapper
+      throw error;
     }
 
     return output;
