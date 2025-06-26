@@ -7,7 +7,7 @@ import { Prose } from "../ui/prose";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
-export default function RemoteSetup() {
+export default function StdioSetup() {
   const mcpStdioSnippet = `npx ${NPM_PACKAGE_NAME}@latest`;
 
   const coreConfig = {
