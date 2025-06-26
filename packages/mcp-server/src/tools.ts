@@ -32,6 +32,7 @@ import {
   type Project,
   SentryApiService,
   type AssignedTo,
+  ApiError,
 } from "./api-client/index";
 import { formatIssueOutput } from "./internal/formatting";
 import { parseIssueParams } from "./internal/issue-helpers";
@@ -39,6 +40,20 @@ import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
 import { UserInputError } from "./errors";
+
+/**
+ * Response from the search API endpoint
+ */
+interface SearchResponse {
+  query: string;
+  results: Array<{
+    id: string;
+    url: string;
+    snippet: string;
+    relevance: number;
+  }>;
+  error?: string;
+}
 
 /**
  * Creates a SentryApiService instance from server context with optional region override.
@@ -832,6 +847,236 @@ export const TOOL_HANDLERS = {
       output += getOutputForAutofixStep(step);
       output += "\n";
     }
+    return output;
+  },
+
+  search_docs: async (context, params) => {
+    // Query is already validated and trimmed by Zod schema
+    setTag("search.query", params.query);
+    setTag("search.max_results", params.maxResults || 3);
+
+    let output = `# Documentation Search Results\n\n`;
+    output += `**Query**: "${params.query}"\n\n`;
+
+    try {
+      // Determine the host - use context.host if available, then check env var, otherwise default to production
+      const host = context.mcpHost || "https://mcp.sentry.dev";
+      const searchUrl = new URL("/api/search", host);
+
+      // Make request to the search endpoint with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      let response: Response;
+      try {
+        response = await fetch(searchUrl.toString(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query: params.query,
+            maxResults: params.maxResults,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+
+        // Handle timeout specifically
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          throw new ApiError(
+            "Documentation search request timed out after 5 seconds. Please try again.",
+            408,
+          );
+        }
+
+        throw fetchError;
+      }
+
+      if (!response.ok) {
+        const errorData = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new ApiError(
+          errorData?.error || `Search failed with status ${response.status}`,
+          response.status,
+        );
+      }
+
+      const data = (await response.json()) as SearchResponse;
+
+      // Handle error in response
+      if ("error" in data && data.error) {
+        output += `> **Error**: ${data.error}\n\n`;
+        return output;
+      }
+
+      // Display results
+      if (data.results.length === 0) {
+        output += "No documentation found matching your query.\n\n";
+        output += "## Suggestions\n\n";
+        output += "- Try using different keywords or a broader search term\n";
+        output +=
+          "- Check the [Sentry documentation](https://docs.sentry.io) directly\n";
+        output +=
+          "- Use `find_issues()` to search for related issues in your projects\n";
+      } else {
+        output += `Found ${data.results.length} matching document${data.results.length === 1 ? "" : "s"}. Showing snippets below.\n\n`;
+        output += `> **Note**: These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.\n\n`;
+
+        for (const [index, result] of data.results.entries()) {
+          output += `## ${index + 1}. ${result.id}\n\n`;
+          output += `**URL**: ${result.url}\n\n`;
+          output += "**Matching snippet**:\n";
+          output += `> ${result.snippet.replace(/\n/g, "\n> ")}\n\n`;
+          output += `*Relevance: ${(result.relevance * 100).toFixed(1)}%*\n\n`;
+        }
+
+        output += "## Next Steps\n\n";
+        output += "To get the full documentation content, use:\n\n";
+        for (const [index, result] of data.results.entries()) {
+          if (index < 3) {
+            // Show first 3 examples
+            output += `\`\`\`\nget_doc(path='/${result.id}')\n\`\`\`\n\n`;
+          }
+        }
+        output +=
+          "- The snippets above show where your search terms appear in the documentation\n";
+        output +=
+          "- Use `get_doc()` to read the complete documentation page with full context\n";
+      }
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      logError(error);
+      output += `> **Error**: Failed to search documentation. `;
+      output += `Please try again or search directly at https://docs.sentry.io\n\n`;
+
+      if (process.env.NODE_ENV !== "production" && error instanceof Error) {
+        output += `Debug: ${error.message}\n`;
+      }
+    }
+
+    return output;
+  },
+
+  get_doc: async (context, params) => {
+    setTag("doc.path", params.path);
+
+    let output = `# Documentation Content\n\n`;
+    output += `**Path**: ${params.path}\n\n`;
+
+    try {
+      // Validate path format
+      if (!params.path.endsWith(".md")) {
+        throw new UserInputError(
+          "Invalid documentation path. Path must end with .md extension.",
+        );
+      }
+
+      // Use docs.sentry.io for now - will be configurable via flag in the future
+      const baseUrl = "https://docs.sentry.io";
+
+      // Construct the full URL for the markdown file
+      const docUrl = new URL(params.path, baseUrl);
+
+      // Validate domain whitelist for security
+      const allowedDomains = ["docs.sentry.io", "develop.sentry.io"];
+      if (!allowedDomains.includes(docUrl.hostname)) {
+        throw new UserInputError(
+          `Invalid domain. Documentation can only be fetched from allowed domains: ${allowedDomains.join(", ")}`,
+        );
+      }
+
+      // Fetch the markdown content with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      try {
+        const response = await fetch(docUrl.toString(), {
+          headers: {
+            Accept: "text/plain, text/markdown",
+            "User-Agent": "Sentry-MCP/1.0",
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            output += `> **Error**: Documentation not found at this path.\n\n`;
+            output += `Please verify the path is correct. Common issues:\n`;
+            output += `- Path should start with / (e.g., /platforms/javascript/guides/nextjs.md)\n`;
+            output += `- Path should match exactly what's shown in search_docs results\n`;
+            output += `- Some pages may have been moved or renamed\n\n`;
+            output += `Try searching again with \`search_docs()\` to find the correct path.\n`;
+            return output;
+          }
+
+          throw new ApiError(
+            `Failed to fetch documentation: ${response.statusText}`,
+            response.status,
+          );
+        }
+
+        const content = await response.text();
+
+        // Check if we got HTML instead of markdown (wrong path format)
+        if (
+          content.trim().startsWith("<!DOCTYPE") ||
+          content.trim().startsWith("<html")
+        ) {
+          output += `> **Error**: Received HTML instead of markdown. The path may be incorrect.\n\n`;
+          output += `Make sure to use the .md extension in the path.\n`;
+          output += `Example: /platforms/javascript/guides/nextjs.md\n`;
+          return output;
+        }
+
+        // Add the markdown content
+        output += "---\n\n";
+        output += content;
+        output += "\n\n---\n\n";
+
+        output += "## Using this documentation\n\n";
+        output +=
+          "- This is the raw markdown content from Sentry's documentation\n";
+        output +=
+          "- Code examples and configuration snippets can be copied directly\n";
+        output +=
+          "- Links in the documentation are relative to https://docs.sentry.io\n";
+        output +=
+          "- For more related topics, use `search_docs()` to find additional pages\n";
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+
+        // Handle timeout specifically
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          throw new ApiError(
+            "Documentation request timed out after 5 seconds. Please try again.",
+            408,
+          );
+        }
+
+        throw fetchError;
+      }
+    } catch (error) {
+      if (error instanceof UserInputError || error instanceof ApiError) {
+        throw error;
+      }
+
+      logError(error);
+      output += `> **Error**: Failed to fetch documentation. `;
+      output += `Please try again or visit https://docs.sentry.io${params.path.replace(".md", "")}\n\n`;
+
+      if (process.env.NODE_ENV !== "production" && error instanceof Error) {
+        output += `Debug: ${error.message}\n`;
+      }
+    }
+
     return output;
   },
 } satisfies ToolHandlers;

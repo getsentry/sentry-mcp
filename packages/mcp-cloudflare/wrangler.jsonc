@@ -13,6 +13,8 @@
     "global_fetch_strictly_public"
   ],
   // we ask people to configure environment variables in prod
+  // Available environment variables:
+  // - AUTORAG_INDEX_NAME: Name of the AutoRAG index to use for documentation search (default: "sentry-docs")
   "keep_vars": true,
   "migrations": [
     {
@@ -45,6 +47,15 @@
         "namespace_id": "1001",
         "simple": {
           "limit": 10,
+          "period": 60
+        }
+      },
+      {
+        "name": "SEARCH_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1002",
+        "simple": {
+          "limit": 20,
           "period": 60
         }
       }

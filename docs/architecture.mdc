@@ -203,6 +203,8 @@ Execute actions and retrieve data:
 - `find_issues` - Search for issues
 - `get_project_details` - Fetch project info
 - `create_issue_comment` - Add comments
+- `search_docs` - Search Sentry documentation
+- `get_doc` - Fetch full documentation pages
 
 ### Prompts
 Multi-step workflows:

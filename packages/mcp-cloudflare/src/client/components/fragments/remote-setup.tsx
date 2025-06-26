@@ -53,7 +53,7 @@ export default function RemoteSetup() {
         <CodeSnippet snippet={sseEndpoint} />
         <h3>Integration Guides</h3>
       </Prose>
-      <Accordion type="single" collapsible className="w-full">
+      <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
           <ol>
             <li>

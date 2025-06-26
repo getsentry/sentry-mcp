@@ -1585,7 +1585,7 @@ describe("formatEventOutput", () => {
             type: "KeyError",
             value: "'missing_key'",
             // No stacktrace for child exception
-            stacktrace: null,
+            stacktrace: undefined,
           }),
           createExceptionValue({
             type: "ValueError",

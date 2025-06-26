@@ -7,7 +7,7 @@ import { Prose } from "../ui/prose";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
-export default function RemoteSetup() {
+export default function StdioSetup() {
   const mcpStdioSnippet = `npx ${NPM_PACKAGE_NAME}@latest`;
 
   const coreConfig = {
@@ -65,7 +65,7 @@ export default function RemoteSetup() {
         </p>
         <h3>Integration Guides</h3>
       </Prose>
-      <Accordion type="single" collapsible className="max-w-full space-y-1">
+      <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
           <ol>
             <li>

@@ -84,7 +84,7 @@ See specific guides for required environment variables:
 - MCP Client: 
   - `ANTHROPIC_API_KEY` - Required for AI agent
   - `SENTRY_ACCESS_TOKEN` - Required for local stdio mode
-  - `MCP_HOST` - Optional, defaults to https://mcp.sentry.dev
+  - `MCP_HOST` - Optional, defaults to https://mcp.sentry.dev (used by search_docs tool)
 
 ## References
 

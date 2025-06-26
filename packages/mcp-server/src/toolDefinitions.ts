@@ -618,4 +618,123 @@ export const TOOL_DEFINITIONS = [
       issueUrl: ParamIssueUrl.optional(),
     },
   },
+  {
+    name: "search_docs" as const,
+    description: [
+      "Search Sentry documentation for SDK setup, instrumentation, and configuration guidance.",
+      "",
+      "Use this tool when you need to:",
+      "- Set up Sentry SDK in any language (Python, JavaScript, Go, Ruby, etc.)",
+      "- Configure specific features like performance monitoring, error sampling, or release tracking",
+      "- Implement custom instrumentation (spans, transactions, breadcrumbs)",
+      "- Set up integrations with frameworks (Django, Flask, Express, Next.js, etc.)",
+      "- Configure data scrubbing, filtering, or sampling rules",
+      "- Troubleshoot SDK issues or find best practices",
+      "",
+      "This tool searches technical documentation, NOT general information about Sentry as a company.",
+      "",
+      "<examples>",
+      "### Setting up Sentry in a Python Django app",
+      "",
+      "```",
+      "search_docs(query='Django setup configuration SENTRY_DSN')",
+      "```",
+      "",
+      "### Implementing custom performance monitoring",
+      "",
+      "```",
+      "search_docs(query='custom spans transactions performance monitoring Python')",
+      "```",
+      "",
+      "### Configuring error sampling and filtering",
+      "",
+      "```",
+      "search_docs(query='beforeSend sample rate filter errors JavaScript', maxResults=5)",
+      "```",
+      "",
+      "### Setting up source maps for JavaScript",
+      "",
+      "```",
+      "search_docs(query='source maps webpack upload JavaScript')",
+      "```",
+      "",
+      "### Configuring release tracking",
+      "",
+      "```",
+      "search_docs(query='release tracking deployment integration CI/CD')",
+      "```",
+      "</examples>",
+      "",
+      "<hints>",
+      "- Include the programming language/framework in your query for SDK-specific results",
+      "- Use technical terms like 'instrumentation', 'spans', 'transactions' for performance docs",
+      "- Include specific feature names like 'beforeSend', 'tracesSampleRate', 'SENTRY_DSN'",
+      "- The AI will automatically enhance your query for better results",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      query: z
+        .string()
+        .trim()
+        .min(
+          2,
+          "Search query is too short. Please provide at least 2 characters.",
+        )
+        .max(
+          200,
+          "Search query is too long. Please keep your query under 200 characters.",
+        )
+        .describe(
+          "The search query in natural language. Be specific about what you're looking for.",
+        ),
+      maxResults: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .default(3)
+        .describe("Maximum number of results to return (1-10)")
+        .optional(),
+    },
+  },
+  {
+    name: "get_doc" as const,
+    description: [
+      "Fetch the full markdown content of a Sentry documentation page.",
+      "",
+      "Use this tool when you need to:",
+      "- Read the complete documentation for a specific topic",
+      "- Get detailed implementation examples or code snippets",
+      "- Access the full context of a documentation page",
+      "- Extract specific sections from documentation",
+      "",
+      "<examples>",
+      "### Get the Next.js integration guide",
+      "",
+      "```",
+      "get_doc(path='/platforms/javascript/guides/nextjs.md')",
+      "```",
+      "",
+      "### Get the rate limiting documentation",
+      "",
+      "```",
+      "get_doc(path='/product/rate-limiting.md')",
+      "```",
+      "</examples>",
+      "",
+      "<hints>",
+      "- Use the path from search_docs results for accurate fetching",
+      "- Paths should end with .md extension",
+      "- The path format is the URL path with .md added",
+      "</hints>",
+    ].join("\n"),
+    paramsSchema: {
+      path: z
+        .string()
+        .trim()
+        .describe(
+          "The documentation path (e.g., '/platforms/javascript/guides/nextjs.md'). Get this from search_docs results.",
+        ),
+    },
+  },
 ];

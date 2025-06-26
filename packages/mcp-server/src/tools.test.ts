@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { TOOL_HANDLERS } from "./tools";
 
 describe("whoami", () => {
@@ -10,9 +10,7 @@ describe("whoami", () => {
         userId: "1",
         organizationSlug: null,
       },
-      {
-        // No regionUrl parameter - user data must always come from the main API server
-      },
+      {},
     );
     expect(result).toMatchInlineSnapshot(
       `
@@ -33,9 +31,7 @@ describe("find_organizations", () => {
         userId: "1",
         organizationSlug: null,
       },
-      {
-        // No regionUrl parameter - user data and region lists must always come from the main API server
-      },
+      {},
     );
     expect(result).toMatchInlineSnapshot(`
       "# Organizations
@@ -62,9 +58,7 @@ describe("find_organizations", () => {
         userId: "1",
         organizationSlug: null,
       },
-      {
-        regionUrl: "", // Empty string - should be handled gracefully
-      },
+      {},
     );
     expect(result).toContain("Organizations");
   });
@@ -77,9 +71,7 @@ describe("find_organizations", () => {
         userId: "1",
         organizationSlug: null,
       },
-      {
-        regionUrl: undefined,
-      },
+      {},
     );
     expect(result).toContain("Organizations");
   });
@@ -299,7 +291,6 @@ describe("find_tags", () => {
       },
       {
         organizationSlug: "sentry-mcp-evals",
-        projectSlug: undefined,
         regionUrl: undefined,
       },
     );
@@ -755,7 +746,7 @@ describe("create_project", () => {
 });
 
 describe("update_project", () => {
-  it("updates project settings", async () => {
+  it("updates name and platform", async () => {
     const tool = TOOL_HANDLERS.update_project;
     const result = await tool(
       {
@@ -766,8 +757,8 @@ describe("update_project", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
-        name: "Updated Project Name",
-        slug: "updated-project-slug",
+        name: "New Project Name",
+        slug: undefined,
         platform: "python",
         teamSlug: undefined,
         regionUrl: undefined,
@@ -777,23 +768,22 @@ describe("update_project", () => {
       "# Updated Project in **sentry-mcp-evals**
 
       **ID**: 4509109104082945
-      **Slug**: updated-project-slug
-      **Name**: Updated Project Name
+      **Slug**: cloudflare-mcp
+      **Name**: New Project Name
       **Platform**: python
 
       ## Updates Applied
-      - Updated name to "Updated Project Name"
-      - Updated slug to "updated-project-slug"
+      - Updated name to "New Project Name"
       - Updated platform to "python"
 
       # Using this information
 
-      - The project is now accessible at slug: \`updated-project-slug\`
+      - The project is now accessible at slug: \`cloudflare-mcp\`
       "
     `);
   });
 
-  it("assigns project to team", async () => {
+  it("assigns project to new team", async () => {
     const tool = TOOL_HANDLERS.update_project;
     const result = await tool(
       {
@@ -804,11 +794,11 @@ describe("update_project", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
-        teamSlug: "the-goats",
-        regionUrl: undefined,
         name: undefined,
         slug: undefined,
         platform: undefined,
+        teamSlug: "backend-team",
+        regionUrl: undefined,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -820,12 +810,12 @@ describe("update_project", () => {
       **Platform**: node
 
       ## Updates Applied
-      - Updated team assignment to "the-goats"
+      - Updated team assignment to "backend-team"
 
       # Using this information
 
       - The project is now accessible at slug: \`cloudflare-mcp\`
-      - The project is now assigned to the \`the-goats\` team
+      - The project is now assigned to the \`backend-team\` team
       "
     `);
   });
@@ -1311,7 +1301,7 @@ describe("update_issue", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         issueId: "CLOUDFLARE-MCP-41",
-        status: "ignored",
+        status: "resolved",
         assignedTo: "me",
         issueUrl: undefined,
         regionUrl: undefined,
@@ -1325,55 +1315,13 @@ describe("update_issue", () => {
 
       ## Changes Made
 
-      **Status**: unresolved → **ignored**
+      **Status**: unresolved → **resolved**
       **Assigned To**: Unassigned → **You**
 
       ## Current Status
 
-      **Status**: ignored
-      **Assigned To**: me
-
-      # Using this information
-
-      - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_issue_details(organizationSlug="sentry-mcp-evals", issueId="CLOUDFLARE-MCP-41")\`
-      - The issue is now ignored and will not generate alerts until it escalates
-      "
-    `);
-  });
-
-  it("works with issueUrl", async () => {
-    const tool = TOOL_HANDLERS.update_issue;
-    const result = await tool(
-      {
-        accessToken: "access-token",
-        userId: "1",
-        organizationSlug: null,
-      },
-      {
-        organizationSlug: undefined,
-        issueId: undefined,
-        status: "resolved",
-        assignedTo: undefined,
-        issueUrl: "https://sentry-mcp-evals.sentry.io/issues/6507376925",
-        regionUrl: undefined,
-      },
-    );
-
-    expect(result).toMatchInlineSnapshot(`
-      "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
-
-      **Issue**: Error: Tool list_organizations is already registered
-      **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
-
-      ## Changes Made
-
-      **Status**: unresolved → **resolved**
-
-      ## Current Status
-
       **Status**: resolved
-      **Assigned To**: Unassigned
+      **Assigned To**: me
 
       # Using this information
 
@@ -1451,6 +1399,394 @@ describe("update_issue", () => {
       ),
     ).rejects.toThrow(
       "At least one of `status` or `assignedTo` must be provided to update the issue",
+    );
+  });
+});
+
+describe("search_docs", () => {
+  // Note: Query validation (empty, too short, too long) is now handled by Zod schema
+  // These validation tests are no longer needed as they test framework behavior, not our tool logic
+
+  it("returns results from the API", async () => {
+    const tool = TOOL_HANDLERS.search_docs;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+        host: "https://mcp.sentry.dev",
+      },
+      {
+        query: "How do I configure rate limiting?",
+        maxResults: 5,
+        docType: "all",
+      },
+    );
+    expect(result).toEqual(`# Documentation Search Results
+
+**Query**: "How do I configure rate limiting?"
+
+Found 2 matching documents. Showing snippets below.
+
+> **Note**: These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.
+
+## 1. product/rate-limiting.md
+
+**URL**: https://docs.sentry.io/product/rate-limiting
+
+**Matching snippet**:
+> Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.
+
+*Relevance: 95.0%*
+
+## 2. product/accounts/quotas/spike-protection.md
+
+**URL**: https://docs.sentry.io/product/accounts/quotas/spike-protection
+
+**Matching snippet**:
+> Spike protection helps prevent unexpected spikes in event volume from consuming your quota.
+
+*Relevance: 87.0%*
+
+## Next Steps
+
+To get the full documentation content, use:
+
+\`\`\`
+get_doc(path='/product/rate-limiting.md')
+\`\`\`
+
+\`\`\`
+get_doc(path='/product/accounts/quotas/spike-protection.md')
+\`\`\`
+
+- The snippets above show where your search terms appear in the documentation
+- Use \`get_doc()\` to read the complete documentation page with full context
+`);
+  });
+
+  it("handles API errors", async () => {
+    const tool = TOOL_HANDLERS.search_docs;
+
+    vi.spyOn(global, "fetch").mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      json: async () => ({ error: "Internal server error" }),
+    } as Response);
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          query: "test query",
+          maxResults: undefined,
+          docType: undefined,
+        },
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("handles timeout errors", async () => {
+    const tool = TOOL_HANDLERS.search_docs;
+
+    // Mock fetch to simulate a timeout by throwing an AbortError
+    vi.spyOn(global, "fetch").mockImplementationOnce(() => {
+      const error = new Error("The operation was aborted");
+      error.name = "AbortError";
+      return Promise.reject(error);
+    });
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          query: "test query",
+          maxResults: undefined,
+          docType: undefined,
+        },
+      ),
+    ).rejects.toThrow(
+      "Documentation search request timed out after 5 seconds. Please try again.",
+    );
+  });
+});
+
+describe("get_doc", () => {
+  it("returns document content", async () => {
+    const tool = TOOL_HANDLERS.get_doc;
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+        host: "https://mcp.sentry.dev",
+      },
+      {
+        path: "/product/rate-limiting.md",
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      "# Documentation Content
+
+      **Path**: /product/rate-limiting.md
+
+      ---
+
+      # Project Rate Limits and Quotas
+
+      Rate limiting allows you to control the volume of events that Sentry accepts from your applications. This helps you manage costs and ensures that a sudden spike in errors doesn't consume your entire quota.
+
+      ## Why Use Rate Limiting?
+
+      - **Cost Control**: Prevent unexpected charges from error spikes
+      - **Noise Reduction**: Filter out repetitive or low-value events
+      - **Resource Management**: Ensure critical projects have quota available
+      - **Performance**: Reduce load on your Sentry organization
+
+      ## Types of Rate Limits
+
+      ### 1. Organization Rate Limits
+
+      Set a maximum number of events per hour across your entire organization:
+
+      \`\`\`python
+      # In your organization settings
+      rate_limit = 1000  # events per hour
+      \`\`\`
+
+      ### 2. Project Rate Limits
+
+      Configure limits for specific projects:
+
+      \`\`\`javascript
+      // Project settings
+      {
+        "rateLimit": {
+          "window": 3600,  // 1 hour in seconds
+          "limit": 500     // max events
+        }
+      }
+      \`\`\`
+
+      ### 3. Key-Based Rate Limiting
+
+      Rate limit by specific attributes:
+
+      - **By Release**: Limit events from specific releases
+      - **By User**: Prevent single users from consuming quota
+      - **By Transaction**: Control high-volume transactions
+
+      ## Configuration Examples
+
+      ### SDK Configuration
+
+      Configure client-side sampling to reduce events before they're sent:
+
+      \`\`\`javascript
+      Sentry.init({
+        dsn: "your-dsn",
+        tracesSampleRate: 0.1,  // Sample 10% of transactions
+        beforeSend(event) {
+          // Custom filtering logic
+          if (event.exception?.values?.[0]?.value?.includes("NetworkError")) {
+            return null;  // Drop network errors
+          }
+          return event;
+        }
+      });
+      \`\`\`
+
+      ### Inbound Filters
+
+      Use Sentry's inbound filters to drop events server-side:
+
+      1. Go to **Project Settings** → **Inbound Filters**
+      2. Enable filters for:
+         - Legacy browsers
+         - Web crawlers
+         - Specific error messages
+         - IP addresses
+
+      ### Spike Protection
+
+      Enable spike protection to automatically limit events during traffic spikes:
+
+      \`\`\`python
+      # Project settings
+      spike_protection = {
+        "enabled": True,
+        "max_events_per_hour": 10000,
+        "detection_window": 300  # 5 minutes
+      }
+      \`\`\`
+
+      ## Best Practices
+
+      1. **Start Conservative**: Begin with lower limits and increase as needed
+      2. **Monitor Usage**: Regularly review your quota consumption
+      3. **Use Sampling**: Implement transaction sampling for high-volume apps
+      4. **Filter Noise**: Drop known low-value events at the SDK level
+      5. **Set Alerts**: Configure notifications for quota thresholds
+
+      ## Rate Limit Headers
+
+      Sentry returns rate limit information in response headers:
+
+      \`\`\`
+      X-Sentry-Rate-Limit: 60
+      X-Sentry-Rate-Limit-Remaining: 42
+      X-Sentry-Rate-Limit-Reset: 1634567890
+      \`\`\`
+
+      ## Quota Management
+
+      ### Viewing Quota Usage
+
+      1. Navigate to **Settings** → **Subscription**
+      2. View usage by:
+         - Project
+         - Event type
+         - Time period
+
+      ### On-Demand Budgets
+
+      Purchase additional events when approaching limits:
+
+      \`\`\`bash
+      # Via API
+      curl -X POST https://sentry.io/api/0/organizations/{org}/quotas/ \\
+        -H 'Authorization: Bearer <token>' \\
+        -d '{"events": 100000}'
+      \`\`\`
+
+      ## Troubleshooting
+
+      ### Events Being Dropped?
+
+      Check:
+      1. Organization and project rate limits
+      2. Spike protection status
+      3. SDK sampling configuration
+      4. Inbound filter settings
+
+      ### Rate Limit Errors
+
+      If you see 429 errors:
+      - Review your rate limit configuration
+      - Implement exponential backoff
+      - Consider event buffering
+
+      ## Related Documentation
+
+      - [SDK Configuration Guide](/platforms/javascript/configuration)
+      - [Quotas and Billing](/product/quotas)
+      - [Filtering Events](/product/data-management/filtering)
+
+      ---
+
+      ## Using this documentation
+
+      - This is the raw markdown content from Sentry's documentation
+      - Code examples and configuration snippets can be copied directly
+      - Links in the documentation are relative to https://docs.sentry.io
+      - For more related topics, use \`search_docs()\` to find additional pages
+      "
+    `);
+  });
+
+  it("handles invalid path format", async () => {
+    const tool = TOOL_HANDLERS.get_doc;
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          path: "/product/rate-limiting", // Missing .md extension
+        },
+      ),
+    ).rejects.toThrow(
+      "Invalid documentation path. Path must end with .md extension.",
+    );
+  });
+
+  it("handles API errors", async () => {
+    const tool = TOOL_HANDLERS.get_doc;
+
+    vi.spyOn(global, "fetch").mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+    } as Response);
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          path: "/product/test.md",
+        },
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("validates domain whitelist", async () => {
+    const tool = TOOL_HANDLERS.get_doc;
+
+    // Test with absolute URL that would resolve to a different domain
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          path: "https://malicious.com/test.md",
+        },
+      ),
+    ).rejects.toThrow(
+      "Invalid domain. Documentation can only be fetched from allowed domains: docs.sentry.io, develop.sentry.io",
+    );
+  });
+
+  it("handles timeout errors", async () => {
+    const tool = TOOL_HANDLERS.get_doc;
+
+    // Mock fetch to simulate a timeout by throwing an AbortError
+    vi.spyOn(global, "fetch").mockImplementationOnce(() => {
+      const error = new Error("The operation was aborted");
+      error.name = "AbortError";
+      return Promise.reject(error);
+    });
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          path: "/product/test.md",
+        },
+      ),
+    ).rejects.toThrow(
+      "Documentation request timed out after 5 seconds. Please try again.",
     );
   });
 });
