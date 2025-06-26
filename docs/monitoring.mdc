@@ -264,20 +264,6 @@ Follows the format: `{mcp.method.name} {target}` per OpenTelemetry MCP semantic 
 }
 ```
 
-### Custom Metrics
-```typescript
-// Track tool usage
-Sentry.metrics.increment("mcp.tool.usage", 1, {
-  tags: { tool: toolName }
-});
-
-// Track response time
-Sentry.metrics.distribution("mcp.tool.duration", duration, {
-  tags: { tool: toolName },
-  unit: "millisecond"
-});
-```
-
 ## Environment Variables
 
 ### Required for Monitoring
