@@ -65,7 +65,7 @@ export default function StdioSetup() {
         </p>
         <h3>Integration Guides</h3>
       </Prose>
-      <Accordion type="single" collapsible className="max-w-full space-y-1">
+      <Accordion type="single" collapsible className="w-full">
         <SetupGuide id="cursor" title="Cursor">
           <ol>
             <li>
