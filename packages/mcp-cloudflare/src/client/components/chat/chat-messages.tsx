@@ -74,7 +74,7 @@ export const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
     const errorIsAuth = error ? isAuthError(error) : false;
     const errorMessage = error ? getErrorMessage(error) : null;
     return (
-      <div ref={ref} className="flex-1 overflow-y-auto mx-6 mt-6 space-y-4">
+      <div ref={ref} className="flex-1 mx-6 mt-6 space-y-4">
         {/* Empty State when no messages */}
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full">
@@ -118,7 +118,7 @@ export const ChatMessages = forwardRef<HTMLDivElement, ChatMessagesProps>(
 
             {/* Show error or loading state */}
             {error && errorMessage ? (
-              <div className="mr-8 p-4 bg-red-900/10 border border-red-500/30 rounded-lg">
+              <div className="mr-8 p-4 bg-red-900/10 border border-red-500/30 rounded">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
                   <div className="flex-1">

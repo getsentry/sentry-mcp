@@ -103,6 +103,8 @@ export interface ChatUIProps {
   onRetry?: () => void;
   onClose?: () => void;
   onLogout?: () => void;
+  onSlashCommand?: (command: string) => void;
+  onSendPrompt?: (prompt: string) => void;
 }
 
 export interface ChatMessagesProps {

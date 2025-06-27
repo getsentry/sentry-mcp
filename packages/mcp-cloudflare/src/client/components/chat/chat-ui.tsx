@@ -26,6 +26,7 @@ interface ChatUIProps {
   onClose?: () => void;
   onLogout?: () => void;
   onSlashCommand?: (command: string) => void;
+  onSendPrompt?: (prompt: string) => void;
 }
 
 export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
@@ -44,6 +45,7 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
       onClose,
       onLogout,
       onSlashCommand,
+      onSendPrompt,
     },
     ref,
   ) => {
@@ -53,23 +55,14 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
         <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
           {showControls && (
             <>
-              <Button
-                type="button"
-                onClick={onClose}
-                variant="ghost"
-                size="icon"
-                className="cursor-pointer"
-                title="Close"
-              >
+              <Button type="button" onClick={onClose} size="icon" title="Close">
                 <X className="h-4 w-4" />
               </Button>
 
               <Button
                 type="button"
                 onClick={onLogout}
-                variant="ghost"
                 size="icon"
-                className="cursor-pointer"
                 title="Logout"
               >
                 <LogOut className="h-4 w-4" />
@@ -78,7 +71,7 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
           )}
         </div>
 
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="pb-34 overflow-y-auto">
           {/* Chat Messages */}
           <ChatMessages
             ref={ref}
@@ -89,18 +82,52 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
           />
 
           {/* Chat Input - Always pinned at bottom */}
-          <div
-            className="flex-shrink-0 p-6"
-            style={{
-              paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
-            }}
-          >
+          <div className="py-4 px-6 bottom-0 left-0 right-0 absolute bg-slate-950/95 h-34 overflow-hidden">
+            {/* Sample Prompt Buttons - Always visible above input */}
+            {onSendPrompt && (
+              <div className="mb-4 flex flex-wrap gap-2 justify-center">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    onSendPrompt("What organizations do I have access to?")
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  Get Organizations
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    onSendPrompt(
+                      "Show me how to set up the React SDK for error monitoring",
+                    )
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  React SDK Usage
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    onSendPrompt("What are my most recent issues?")
+                  }
+                  size="sm"
+                  variant="outline"
+                >
+                  Recent Issues
+                </Button>
+              </div>
+            )}
+
             <ChatInput
               input={input}
               isLoading={isChatLoading}
               isOpen={isOpen}
               onInputChange={onInputChange}
               onSubmit={onSubmit}
+              onStop={onStop || EMPTY_FUNCTION}
               onSlashCommand={onSlashCommand}
             />
           </div>
