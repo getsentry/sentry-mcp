@@ -86,9 +86,9 @@
     "msw": "^2.10.2"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.13.0",
-    "@sentry/core": "^9.30.1",
-    "@sentry/node": "^9.30.1",
+    "@modelcontextprotocol/sdk": "^1.13.2",
+    "@sentry/core": "^9.33.0",
+    "@sentry/node": "^9.33.0",
     "zod": "^3.25.67"
   }
 }
