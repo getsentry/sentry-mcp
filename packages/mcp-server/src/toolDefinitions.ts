@@ -692,7 +692,7 @@ export const TOOL_DEFINITIONS = [
         .int()
         .min(1)
         .max(10)
-        .default(3)
+        .default(10)
         .describe("Maximum number of results to return (1-10)")
         .optional(),
     },

@@ -230,7 +230,9 @@ export const TOOL_HANDLERS = {
         ? sortByMap[params.sortBy as keyof typeof sortByMap]
         : undefined,
     });
-    let output = `# Issues in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
+    let output = `# Issues in **${organizationSlug}${
+      params.projectSlug ? `/${params.projectSlug}` : ""
+    }**\n\n`;
     if (issues.length === 0) {
       output += "No issues found.\n";
       return output;
@@ -267,7 +269,9 @@ export const TOOL_HANDLERS = {
       projectSlug: params.projectSlug,
       query: params.query,
     });
-    let output = `# Releases in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
+    let output = `# Releases in **${organizationSlug}${
+      params.projectSlug ? `/${params.projectSlug}` : ""
+    }**\n\n`;
     if (releases.length === 0) {
       output += "No releases found.\n";
       return output;
@@ -310,7 +314,9 @@ export const TOOL_HANDLERS = {
             `**Commit Author**: ${release.lastCommit.author.name}`,
           );
           releaseInfo.push(
-            `**Commit Date**: ${new Date(release.lastCommit.dateCreated).toISOString()}`,
+            `**Commit Date**: ${new Date(
+              release.lastCommit.dateCreated,
+            ).toISOString()}`,
           );
         }
         if (release.lastDeploy) {
@@ -321,12 +327,16 @@ export const TOOL_HANDLERS = {
           );
           if (release.lastDeploy.dateStarted) {
             releaseInfo.push(
-              `**Deploy Started**: ${new Date(release.lastDeploy.dateStarted).toISOString()}`,
+              `**Deploy Started**: ${new Date(
+                release.lastDeploy.dateStarted,
+              ).toISOString()}`,
             );
           }
           if (release.lastDeploy.dateFinished) {
             releaseInfo.push(
-              `**Deploy Finished**: ${new Date(release.lastDeploy.dateFinished).toISOString()}`,
+              `**Deploy Finished**: ${new Date(
+                release.lastDeploy.dateFinished,
+              ).toISOString()}`,
             );
           }
         }
@@ -336,7 +346,9 @@ export const TOOL_HANDLERS = {
     output += "\n\n";
     output += "# Using this information\n\n";
     output += `- You can reference the Release version in commit messages or documentation.\n`;
-    output += `- You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:${releases.length ? releases[0]!.shortVersion : "VERSION"}\`.\n`;
+    output += `- You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:${
+      releases.length ? releases[0]!.shortVersion : "VERSION"
+    }\`.\n`;
     return output;
   },
   find_tags: async (context, params) => {
@@ -482,7 +494,10 @@ export const TOOL_HANDLERS = {
 
     let output = `# Issue ${updatedIssue.shortId} Updated in **${orgSlug}**\n\n`;
     output += `**Issue**: ${updatedIssue.title}\n`;
-    output += `**URL**: ${apiService.getIssueUrl(orgSlug, updatedIssue.shortId)}\n\n`;
+    output += `**URL**: ${apiService.getIssueUrl(
+      orgSlug,
+      updatedIssue.shortId,
+    )}\n\n`;
 
     // Show what changed
     output += "## Changes Made\n\n";
@@ -532,7 +547,9 @@ export const TOOL_HANDLERS = {
       transaction: params.transaction,
       sortBy: params.sortBy as "last_seen" | "count" | undefined,
     });
-    let output = `# Errors in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
+    let output = `# Errors in **${organizationSlug}${
+      params.projectSlug ? `/${params.projectSlug}` : ""
+    }**\n\n`;
     if (params.query)
       output += `These errors match the query \`${params.query}\`\n`;
     if (params.filename)
@@ -547,7 +564,10 @@ export const TOOL_HANDLERS = {
       output += `## ${eventSummary.issue}\n\n`;
       output += `**Description**: ${eventSummary.title}\n`;
       output += `**Issue ID**: ${eventSummary.issue}\n`;
-      output += `**URL**: ${apiService.getIssueUrl(organizationSlug, eventSummary.issue)}\n`;
+      output += `**URL**: ${apiService.getIssueUrl(
+        organizationSlug,
+        eventSummary.issue,
+      )}\n`;
       output += `**Project**: ${eventSummary.project}\n`;
       output += `**Last Seen**: ${eventSummary["last_seen()"]}\n`;
       output += `**Occurrences**: ${eventSummary["count()"]}\n\n`;
@@ -573,7 +593,9 @@ export const TOOL_HANDLERS = {
       query: params.query,
       sortBy: params.sortBy as "timestamp" | "duration" | undefined,
     });
-    let output = `# Transactions in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
+    let output = `# Transactions in **${organizationSlug}${
+      params.projectSlug ? `/${params.projectSlug}` : ""
+    }**\n\n`;
     if (params.query)
       output += `These spans match the query \`${params.query}\`\n`;
     if (params.transaction)
@@ -593,7 +615,10 @@ export const TOOL_HANDLERS = {
       output += `**Duration**: ${eventSummary["span.duration"]}\n`;
       output += `**Timestamp**: ${eventSummary.timestamp}\n`;
       output += `**Project**: ${eventSummary.project}\n`;
-      output += `**URL**: ${apiService.getTraceUrl(organizationSlug, eventSummary.trace)}\n\n`;
+      output += `**URL**: ${apiService.getTraceUrl(
+        organizationSlug,
+        eventSummary.trace,
+      )}\n\n`;
     }
     return output;
   },
@@ -677,7 +702,9 @@ export const TOOL_HANDLERS = {
       } catch (err) {
         logError(err);
         throw new Error(
-          `Failed to assign team ${params.teamSlug} to project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
+          `Failed to assign team ${params.teamSlug} to project ${
+            params.projectSlug
+          }: ${err instanceof Error ? err.message : "Unknown error"}`,
         );
       }
     }
@@ -698,7 +725,9 @@ export const TOOL_HANDLERS = {
       } catch (err) {
         logError(err);
         throw new Error(
-          `Failed to update project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
+          `Failed to update project ${params.projectSlug}: ${
+            err instanceof Error ? err.message : "Unknown error"
+          }`,
         );
       }
     } else {
@@ -853,7 +882,7 @@ export const TOOL_HANDLERS = {
   search_docs: async (context, params) => {
     // Query is already validated and trimmed by Zod schema
     setTag("search.query", params.query);
-    setTag("search.max_results", params.maxResults || 3);
+    setTag("search.max_results", params.maxResults || 10);
 
     let output = `# Documentation Search Results\n\n`;
     output += `**Query**: "${params.query}"\n\n`;
@@ -924,29 +953,55 @@ export const TOOL_HANDLERS = {
         output +=
           "- Use `find_issues()` to search for related issues in your projects\n";
       } else {
-        output += `Found ${data.results.length} matching document${data.results.length === 1 ? "" : "s"}. Showing snippets below.\n\n`;
-        output += `> **Note**: These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.\n\n`;
+        // Add LLM note about focusing on technology from URL
+        output += `> **Note for LLMs**: Focus on the technology the user is inquiring about. You can often infer the technology/platform from the URL paths (e.g., '/platforms/javascript/', '/platforms/python/', '/platforms/java/guides/spring-boot/').\n\n`;
 
-        for (const [index, result] of data.results.entries()) {
-          output += `## ${index + 1}. ${result.id}\n\n`;
-          output += `**URL**: ${result.url}\n\n`;
-          output += "**Matching snippet**:\n";
-          output += `> ${result.snippet.replace(/\n/g, "\n> ")}\n\n`;
-          output += `*Relevance: ${(result.relevance * 100).toFixed(1)}%*\n\n`;
+        output += `Found ${data.results.length} matching document${
+          data.results.length === 1 ? "" : "s"
+        }.\n\n`;
+
+        // Separate results: first 3 with snippets, remaining 7 with core data only
+        const detailedResults = data.results.slice(0, 3);
+        const summaryResults = data.results.slice(3);
+
+        if (detailedResults.length > 0) {
+          output += "## Top Results (with snippets)\n\n";
+          for (let i = 0; i < detailedResults.length; i++) {
+            const result = detailedResults[i];
+            output += `### ${i + 1}. ${result.id}\n\n`;
+            output += `**URL**: ${result.url}\n\n`;
+            output += "**Matching snippet**:\n";
+            output += `> ${result.snippet.replace(/\n/g, "\n> ")}\n\n`;
+            output += `*Relevance: ${(result.relevance * 100).toFixed(
+              1,
+            )}%*\n\n`;
+          }
+        }
+
+        if (summaryResults.length > 0) {
+          output += "## Additional Results\n\n";
+          for (let i = 0; i < summaryResults.length; i++) {
+            const result = summaryResults[i];
+            output += `${i + 4}. **${result.id}** - ${result.url} *(${(
+              result.relevance * 100
+            ).toFixed(1)}% relevance)*\n`;
+          }
+          output += "\n";
         }
 
         output += "## Next Steps\n\n";
         output += "To get the full documentation content, use:\n\n";
-        for (const [index, result] of data.results.entries()) {
-          if (index < 3) {
+        for (let i = 0; i < data.results.length; i++) {
+          if (i < 3) {
             // Show first 3 examples
+            const result = data.results[i];
             output += `\`\`\`\nget_doc(path='/${result.id}')\n\`\`\`\n\n`;
           }
         }
         output +=
-          "- The snippets above show where your search terms appear in the documentation\n";
-        output +=
           "- Use `get_doc()` to read the complete documentation page with full context\n";
+        output +=
+          "- Focus on documentation relevant to your specific technology stack\n";
       }
     } catch (error) {
       if (error instanceof ApiError || error instanceof UserInputError) {
@@ -984,7 +1039,9 @@ export const TOOL_HANDLERS = {
       const allowedDomains = ["docs.sentry.io", "develop.sentry.io"];
       if (!allowedDomains.includes(docUrl.hostname)) {
         throw new UserInputError(
-          `Invalid domain. Documentation can only be fetched from allowed domains: ${allowedDomains.join(", ")}`,
+          `Invalid domain. Documentation can only be fetched from allowed domains: ${allowedDomains.join(
+            ", ",
+          )}`,
         );
       }
 

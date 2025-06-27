@@ -1419,18 +1419,19 @@ describe("search_docs", () => {
       {
         query: "How do I configure rate limiting?",
         maxResults: 5,
-        docType: "all",
       },
     );
     expect(result).toEqual(`# Documentation Search Results
 
 **Query**: "How do I configure rate limiting?"
 
-Found 2 matching documents. Showing snippets below.
+> **Note for LLMs**: Focus on the technology the user is inquiring about. You can often infer the technology/platform from the URL paths (e.g., '/platforms/javascript/', '/platforms/python/', '/platforms/java/guides/spring-boot/').
 
-> **Note**: These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.
+Found 5 matching documents.
 
-## 1. product/rate-limiting.md
+## Top Results (with snippets)
+
+### 1. product/rate-limiting.md
 
 **URL**: https://docs.sentry.io/product/rate-limiting
 
@@ -1439,7 +1440,7 @@ Found 2 matching documents. Showing snippets below.
 
 *Relevance: 95.0%*
 
-## 2. product/accounts/quotas/spike-protection.md
+### 2. product/accounts/quotas/spike-protection.md
 
 **URL**: https://docs.sentry.io/product/accounts/quotas/spike-protection
 
@@ -1447,6 +1448,20 @@ Found 2 matching documents. Showing snippets below.
 > Spike protection helps prevent unexpected spikes in event volume from consuming your quota.
 
 *Relevance: 87.0%*
+
+### 3. product/accounts/quotas/index.md
+
+**URL**: https://docs.sentry.io/product/accounts/quotas
+
+**Matching snippet**:
+> Understand how quotas work and manage your event limits effectively.
+
+*Relevance: 82.0%*
+
+## Additional Results
+
+4. **product/performance/index.md** - https://docs.sentry.io/product/performance *(78.0% relevance)*
+5. **platforms/javascript/configuration/options.md** - https://docs.sentry.io/platforms/javascript/configuration/options *(74.0% relevance)*
 
 ## Next Steps
 
@@ -1460,8 +1475,12 @@ get_doc(path='/product/rate-limiting.md')
 get_doc(path='/product/accounts/quotas/spike-protection.md')
 \`\`\`
 
-- The snippets above show where your search terms appear in the documentation
+\`\`\`
+get_doc(path='/product/accounts/quotas/index.md')
+\`\`\`
+
 - Use \`get_doc()\` to read the complete documentation page with full context
+- Focus on documentation relevant to your specific technology stack
 `);
   });
 
@@ -1485,7 +1504,6 @@ get_doc(path='/product/accounts/quotas/spike-protection.md')
         {
           query: "test query",
           maxResults: undefined,
-          docType: undefined,
         },
       ),
     ).rejects.toThrow();
@@ -1511,7 +1529,6 @@ get_doc(path='/product/accounts/quotas/spike-protection.md')
         {
           query: "test query",
           maxResults: undefined,
-          docType: undefined,
         },
       ),
     ).rejects.toThrow(

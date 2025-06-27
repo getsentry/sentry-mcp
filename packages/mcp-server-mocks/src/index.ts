@@ -862,7 +862,7 @@ export const searchHandlers = [
   http.post("https://mcp.sentry.dev/api/search", async ({ request }) => {
     const body = (await request.json()) as any;
 
-    // Return mock search results
+    // Return mock search results (10 results to match new default)
     return HttpResponse.json({
       query: body?.query || "",
       results: [
@@ -879,6 +879,55 @@ export const searchHandlers = [
           snippet:
             "Spike protection helps prevent unexpected spikes in event volume from consuming your quota.",
           relevance: 0.87,
+        },
+        {
+          id: "product/accounts/quotas/index.md",
+          url: "https://docs.sentry.io/product/accounts/quotas",
+          snippet:
+            "Understand how quotas work and manage your event limits effectively.",
+          relevance: 0.82,
+        },
+        {
+          id: "product/performance/index.md",
+          url: "https://docs.sentry.io/product/performance",
+          snippet: "Monitor application performance and identify bottlenecks.",
+          relevance: 0.78,
+        },
+        {
+          id: "platforms/javascript/configuration/options.md",
+          url: "https://docs.sentry.io/platforms/javascript/configuration/options",
+          snippet: "Configure JavaScript SDK options including sampling rates.",
+          relevance: 0.74,
+        },
+        {
+          id: "platforms/python/configuration/options.md",
+          url: "https://docs.sentry.io/platforms/python/configuration/options",
+          snippet: "Configure Python SDK options and sampling settings.",
+          relevance: 0.7,
+        },
+        {
+          id: "product/data-management/filtering.md",
+          url: "https://docs.sentry.io/product/data-management/filtering",
+          snippet: "Filter events using inbound filters and SDK configuration.",
+          relevance: 0.66,
+        },
+        {
+          id: "product/alerts/index.md",
+          url: "https://docs.sentry.io/product/alerts",
+          snippet: "Set up alerts and notifications for your projects.",
+          relevance: 0.62,
+        },
+        {
+          id: "platforms/javascript/guides/nextjs.md",
+          url: "https://docs.sentry.io/platforms/javascript/guides/nextjs",
+          snippet: "Integrate Sentry with Next.js applications.",
+          relevance: 0.58,
+        },
+        {
+          id: "platforms/python/guides/django.md",
+          url: "https://docs.sentry.io/platforms/python/guides/django",
+          snippet: "Integrate Sentry with Django applications.",
+          relevance: 0.54,
         },
       ],
     });
@@ -886,7 +935,7 @@ export const searchHandlers = [
   http.post("https://api.sentry.io/api/search", async ({ request }) => {
     const body = (await request.json()) as any;
 
-    // Return mock search results
+    // Return mock search results (10 results to match new default)
     return HttpResponse.json({
       query: body?.query || "",
       results: [
@@ -903,6 +952,55 @@ export const searchHandlers = [
           snippet:
             "Spike protection helps prevent unexpected spikes in event volume from consuming your quota.",
           relevance: 0.87,
+        },
+        {
+          id: "product/accounts/quotas/index.md",
+          url: "https://docs.sentry.io/product/accounts/quotas",
+          snippet:
+            "Understand how quotas work and manage your event limits effectively.",
+          relevance: 0.82,
+        },
+        {
+          id: "product/performance/index.md",
+          url: "https://docs.sentry.io/product/performance",
+          snippet: "Monitor application performance and identify bottlenecks.",
+          relevance: 0.78,
+        },
+        {
+          id: "platforms/javascript/configuration/options.md",
+          url: "https://docs.sentry.io/platforms/javascript/configuration/options",
+          snippet: "Configure JavaScript SDK options including sampling rates.",
+          relevance: 0.74,
+        },
+        {
+          id: "platforms/python/configuration/options.md",
+          url: "https://docs.sentry.io/platforms/python/configuration/options",
+          snippet: "Configure Python SDK options and sampling settings.",
+          relevance: 0.7,
+        },
+        {
+          id: "product/data-management/filtering.md",
+          url: "https://docs.sentry.io/product/data-management/filtering",
+          snippet: "Filter events using inbound filters and SDK configuration.",
+          relevance: 0.66,
+        },
+        {
+          id: "product/alerts/index.md",
+          url: "https://docs.sentry.io/product/alerts",
+          snippet: "Set up alerts and notifications for your projects.",
+          relevance: 0.62,
+        },
+        {
+          id: "platforms/javascript/guides/nextjs.md",
+          url: "https://docs.sentry.io/platforms/javascript/guides/nextjs",
+          snippet: "Integrate Sentry with Next.js applications.",
+          relevance: 0.58,
+        },
+        {
+          id: "platforms/python/guides/django.md",
+          url: "https://docs.sentry.io/platforms/python/guides/django",
+          snippet: "Integrate Sentry with Django applications.",
+          relevance: 0.54,
         },
       ],
     });
@@ -910,7 +1008,7 @@ export const searchHandlers = [
   http.post("http://localhost:8788/api/search", async ({ request }) => {
     const body = (await request.json()) as any;
 
-    // Return mock search results
+    // Return mock search results (10 results to match new default)
     return HttpResponse.json({
       query: body?.query || "",
       results: [
@@ -927,6 +1025,55 @@ export const searchHandlers = [
           snippet:
             "Spike protection helps prevent unexpected spikes in event volume from consuming your quota.",
           relevance: 0.87,
+        },
+        {
+          id: "product/accounts/quotas/index.md",
+          url: "https://docs.sentry.io/product/accounts/quotas",
+          snippet:
+            "Understand how quotas work and manage your event limits effectively.",
+          relevance: 0.82,
+        },
+        {
+          id: "product/performance/index.md",
+          url: "https://docs.sentry.io/product/performance",
+          snippet: "Monitor application performance and identify bottlenecks.",
+          relevance: 0.78,
+        },
+        {
+          id: "platforms/javascript/configuration/options.md",
+          url: "https://docs.sentry.io/platforms/javascript/configuration/options",
+          snippet: "Configure JavaScript SDK options including sampling rates.",
+          relevance: 0.74,
+        },
+        {
+          id: "platforms/python/configuration/options.md",
+          url: "https://docs.sentry.io/platforms/python/configuration/options",
+          snippet: "Configure Python SDK options and sampling settings.",
+          relevance: 0.7,
+        },
+        {
+          id: "product/data-management/filtering.md",
+          url: "https://docs.sentry.io/product/data-management/filtering",
+          snippet: "Filter events using inbound filters and SDK configuration.",
+          relevance: 0.66,
+        },
+        {
+          id: "product/alerts/index.md",
+          url: "https://docs.sentry.io/product/alerts",
+          snippet: "Set up alerts and notifications for your projects.",
+          relevance: 0.62,
+        },
+        {
+          id: "platforms/javascript/guides/nextjs.md",
+          url: "https://docs.sentry.io/platforms/javascript/guides/nextjs",
+          snippet: "Integrate Sentry with Next.js applications.",
+          relevance: 0.58,
+        },
+        {
+          id: "platforms/python/guides/django.md",
+          url: "https://docs.sentry.io/platforms/python/guides/django",
+          snippet: "Integrate Sentry with Django applications.",
+          relevance: 0.54,
         },
       ],
     });
