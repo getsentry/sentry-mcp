@@ -8,6 +8,7 @@ import { useAuth } from "../../contexts/auth-context";
 import { X, Loader2 } from "lucide-react";
 import type { ChatProps } from "./types";
 import { useScrollToBottom } from "../../hooks/use-scroll-to-bottom";
+import { usePersistedChat } from "../../hooks/use-persisted-chat";
 import { SlidingPanel } from "../ui/sliding-panel";
 import { isAuthError } from "../../utils/chat-error-handler";
 
@@ -26,6 +27,10 @@ export function Chat({ isOpen, onClose }: ChatProps) {
     clearAuthState,
   } = useAuth();
 
+  // Use persisted chat to save/load messages from localStorage
+  const { initialMessages, saveMessages, clearPersistedMessages } =
+    usePersistedChat(isAuthenticated);
+
   const {
     messages,
     input,
@@ -42,6 +47,7 @@ export function Chat({ isOpen, onClose }: ChatProps) {
     // Use a stable ID that doesn't change during reauthentication
     // This preserves messages when the auth token changes
     id: "chat-session",
+    initialMessages,
   });
 
   // Use declarative scroll hook - scroll on new messages and during streaming
@@ -52,6 +58,11 @@ export function Chat({ isOpen, onClose }: ChatProps) {
       dependencies: [messages, isChatLoading],
       delay: isChatLoading ? 100 : 0, // More frequent updates during streaming
     });
+
+  // Save messages when they change
+  useEffect(() => {
+    saveMessages(messages);
+  }, [messages, saveMessages]);
 
   // Only clear messages on explicit logout, not during reauthentication
   // This is now handled in the handleLogout function
@@ -168,6 +179,7 @@ export function Chat({ isOpen, onClose }: ChatProps) {
           onLogout={() => {
             // Clear messages on explicit logout
             setMessages([]);
+            clearPersistedMessages();
             handleLogout();
           }}
         />

@@ -12,6 +12,7 @@ export { AuthForm } from "./auth-form";
 // Export types
 export type {
   ChatProps,
+  ChatUIProps,
   ChatMessagesProps,
   ChatInputProps,
   AuthFormProps,

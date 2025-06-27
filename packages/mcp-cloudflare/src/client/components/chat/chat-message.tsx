@@ -31,9 +31,11 @@ const TextPart = memo(function TextPart({
   }
 
   // Assistant messages: no background, just text
+  const shouldAnimate = isAssistant && isStreaming;
+
   return (
     <div className="mr-8">
-      {isAssistant && isStreaming ? (
+      {shouldAnimate ? (
         <Typewriter text={text} speed={20}>
           {(displayedText) => <Markdown>{displayedText}</Markdown>}
         </Typewriter>
