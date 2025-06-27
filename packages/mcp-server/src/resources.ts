@@ -22,10 +22,7 @@ import {
   ResourceTemplate,
   type ReadResourceCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type {
-  ReadResourceResult,
-  Resource,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { UserInputError } from "./errors";
 
@@ -138,52 +135,8 @@ async function sentryDocsHandler(
 // and the author barely knows TypeScript, we're opting for a solution we've
 // seen employed elsewhere (h/t Neon)
 
-/**
- * Common Sentry platforms that have documentation available
- */
-const SENTRY_PLATFORMS = [
-  "javascript",
-  "python",
-  "react",
-  "node",
-  "java",
-  "dotnet",
-  "go",
-  "php",
-  "ruby",
-  "android",
-  "apple",
-  "flutter",
-  "unity",
-  "unreal",
-  "rust",
-  "elixir",
-  "kotlin",
-  "native",
-] as const;
-
-/**
- * Platform-specific frameworks that have Sentry guides
- */
-const SENTRY_FRAMEWORK_GUIDES: Record<string, string[]> = {
-  javascript: [
-    "nextjs",
-    "react",
-    "vue",
-    "angular",
-    "hono",
-    "svelte",
-    "express",
-    "fastify",
-  ],
-  python: ["django", "flask", "fastapi", "celery", "tornado", "pyramid"],
-  node: ["express", "fastify", "koa", "nestjs", "hapi"],
-  react: ["nextjs", "gatsby", "remix"],
-  dotnet: ["aspnetcore", "maui", "wpf", "winforms"],
-  java: ["spring", "spring-boot", "android"],
-  android: ["kotlin"],
-  apple: ["ios", "macos", "watchos", "tvos"],
-} as const;
+// Import platform constants from constants
+import { SENTRY_PLATFORMS_BASE, SENTRY_FRAMEWORKS } from "./constants";
 
 export const RESOURCES: ResourceConfig[] = [
   {
@@ -201,7 +154,7 @@ export const RESOURCES: ResourceConfig[] = [
       "https://docs.sentry.io/platforms/{platform}/",
       {
         list: async (_extra) => ({
-          resources: SENTRY_PLATFORMS.map((platform) => ({
+          resources: SENTRY_PLATFORMS_BASE.map((platform) => ({
             uri: `https://docs.sentry.io/platforms/${platform}/`,
             name: `${platform}-docs`,
             description: `Sentry SDK documentation for ${platform}`,
@@ -220,7 +173,7 @@ export const RESOURCES: ResourceConfig[] = [
       "https://docs.sentry.io/platforms/{platform}/guides/{framework}/",
       {
         list: async (_extra) => ({
-          resources: Object.entries(SENTRY_FRAMEWORK_GUIDES).flatMap(
+          resources: Object.entries(SENTRY_FRAMEWORKS).flatMap(
             ([platform, frameworks]) =>
               frameworks.map((framework) => ({
                 uri: `https://docs.sentry.io/platforms/${platform}/guides/${framework}/`,

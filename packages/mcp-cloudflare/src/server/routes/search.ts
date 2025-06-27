@@ -1,26 +1,22 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
 import { logError } from "@sentry/mcp-server/logging";
+import { SENTRY_GUIDES } from "@sentry/mcp-server/constants";
 import { z } from "zod";
 import type { RateLimitResult } from "../types/chat";
-import type { AutoRagSearchResponse } from "@cloudflare/workers-types";
+import type {
+  AutoRagSearchResponse,
+  ComparisonFilter,
+  CompoundFilter,
+  AutoRagSearchRequest,
+} from "@cloudflare/workers-types";
 
 // Request schema matching the MCP tool parameters
 const SearchRequestSchema = z.object({
   query: z.string().trim().min(1, "Query is required"),
   maxResults: z.number().int().min(1).max(10).default(10).optional(),
+  guide: z.enum(SENTRY_GUIDES).optional(),
 });
-
-interface SearchResponse {
-  results: Array<{
-    id: string;
-    url: string;
-    snippet: string;
-    relevance: number;
-  }>;
-  query: string;
-  error?: string;
-}
 
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   try {
@@ -84,7 +80,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       );
     }
 
-    const { query, maxResults = 10 } = validationResult.data;
+    const { query, maxResults = 10, guide } = validationResult.data;
 
     // Check if AI binding is available
     if (!c.env.AI) {
@@ -97,20 +93,67 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       );
     }
 
-    // Initialize response object
-    let response: SearchResponse;
-
     try {
       const autoragId = c.env.AUTORAG_INDEX_NAME || "sentry-docs";
-      const searchResult = await c.env.AI.autorag(autoragId).search({
+
+      // Construct AutoRAG search parameters
+      const searchParams: AutoRagSearchRequest = {
         query,
         max_num_results: maxResults,
-      });
+      };
+
+      // Add filename filters based on guide parameter
+      if (guide) {
+        let filter: ComparisonFilter | CompoundFilter;
+
+        if (guide.includes("/")) {
+          // Platform/guide combination: platforms/[platform]/guides/[guide]
+          const [platformName, guideName] = guide.split("/", 2);
+
+          filter = {
+            type: "and",
+            filters: [
+              {
+                type: "gt",
+                key: "filename",
+                value: `platforms/${platformName}/guides/${guideName}`,
+              },
+              {
+                type: "lte",
+                key: "filename",
+                value: `platforms/${platformName}/guides/${guideName}/z`,
+              },
+            ],
+          };
+        } else {
+          // Just platform: platforms/[platform]/ - use range filter
+          filter = {
+            type: "and",
+            filters: [
+              {
+                type: "gt",
+                key: "filename",
+                value: `platforms/${guide}`,
+              },
+              {
+                type: "lte",
+                key: "filename",
+                value: `platforms/${guide}/z`,
+              },
+            ],
+          };
+        }
+
+        searchParams.filters = filter;
+      }
+
+      const searchResult =
+        await c.env.AI.autorag(autoragId).search(searchParams);
 
       // Process search results - handle the actual response format from Cloudflare AI
       const searchData = searchResult as AutoRagSearchResponse;
 
-      response = {
+      return c.json({
         query,
         results:
           searchData.data?.map((result) => {
@@ -136,23 +179,25 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
               relevance: result.score || 0,
             };
           }) || [],
-      };
+      });
     } catch (error) {
-      logError(error);
-      response = {
-        query,
-        results: [],
-        error: "Failed to search documentation. Please try again later.",
-      };
+      const eventId = logError(error);
+      return c.json(
+        {
+          error: "Failed to search documentation. Please try again later.",
+          name: "SEARCH_FAILED",
+          eventId,
+        },
+        500,
+      );
     }
-
-    return c.json(response);
   } catch (error) {
-    logError(error);
+    const eventId = logError(error);
     return c.json(
       {
         error: "Internal server error",
         name: "INTERNAL_ERROR",
+        eventId,
       },
       500,
     );

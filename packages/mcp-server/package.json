@@ -34,6 +34,10 @@
       "types": "./dist/api-client/index.ts",
       "default": "./dist/api-client/index.js"
     },
+    "./constants": {
+      "types": "./dist/constants.ts",
+      "default": "./dist/constants.js"
+    },
     "./logging": {
       "types": "./dist/logging.ts",
       "default": "./dist/logging.js"

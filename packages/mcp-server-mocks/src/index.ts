@@ -862,73 +862,53 @@ export const searchHandlers = [
   http.post("https://mcp.sentry.dev/api/search", async ({ request }) => {
     const body = (await request.json()) as any;
 
-    // Return mock search results
-    return HttpResponse.json({
-      query: body?.query || "",
-      results: [
-        {
-          id: "product/rate-limiting.md",
-          url: "https://docs.sentry.io/product/rate-limiting",
-          snippet:
-            "Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.",
-          relevance: 0.95,
-        },
-        {
-          id: "product/accounts/quotas/spike-protection.md",
-          url: "https://docs.sentry.io/product/accounts/quotas/spike-protection",
-          snippet:
-            "Spike protection helps prevent unexpected spikes in event volume from consuming your quota.",
-          relevance: 0.87,
-        },
-      ],
-    });
-  }),
-  http.post("https://api.sentry.io/api/search", async ({ request }) => {
-    const body = (await request.json()) as any;
+    // Mock different results based on guide
+    let results = [
+      {
+        id: "product/rate-limiting.md",
+        url: "https://docs.sentry.io/product/rate-limiting",
+        snippet:
+          "Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.",
+        relevance: 0.95,
+      },
+      {
+        id: "product/accounts/quotas/spike-protection.md",
+        url: "https://docs.sentry.io/product/accounts/quotas/spike-protection",
+        snippet:
+          "Spike protection helps prevent unexpected spikes in event volume from consuming your quota.",
+        relevance: 0.87,
+      },
+    ];
+
+    // If guide is specified, return platform-specific results
+    if (body?.guide) {
+      const guide = body.guide;
+      if (guide.includes("/")) {
+        const [platformName, guideName] = guide.split("/");
+        results = [
+          {
+            id: `platforms/${platformName}/guides/${guideName}.md`,
+            url: `https://docs.sentry.io/platforms/${platformName}/guides/${guideName}`,
+            snippet: `Setup guide for ${guideName} on ${platformName}`,
+            relevance: 0.95,
+          },
+        ];
+      } else {
+        results = [
+          {
+            id: `platforms/${guide}/index.md`,
+            url: `https://docs.sentry.io/platforms/${guide}`,
+            snippet: `Documentation for ${guide} platform`,
+            relevance: 0.95,
+          },
+        ];
+      }
+    }
 
     // Return mock search results
     return HttpResponse.json({
       query: body?.query || "",
-      results: [
-        {
-          id: "product/rate-limiting.md",
-          url: "https://docs.sentry.io/product/rate-limiting",
-          snippet:
-            "Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.",
-          relevance: 0.95,
-        },
-        {
-          id: "product/accounts/quotas/spike-protection.md",
-          url: "https://docs.sentry.io/product/accounts/quotas/spike-protection",
-          snippet:
-            "Spike protection helps prevent unexpected spikes in event volume from consuming your quota.",
-          relevance: 0.87,
-        },
-      ],
-    });
-  }),
-  http.post("http://localhost:8788/api/search", async ({ request }) => {
-    const body = (await request.json()) as any;
-
-    // Return mock search results
-    return HttpResponse.json({
-      query: body?.query || "",
-      results: [
-        {
-          id: "product/rate-limiting.md",
-          url: "https://docs.sentry.io/product/rate-limiting",
-          snippet:
-            "Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.",
-          relevance: 0.95,
-        },
-        {
-          id: "product/accounts/quotas/spike-protection.md",
-          url: "https://docs.sentry.io/product/accounts/quotas/spike-protection",
-          snippet:
-            "Spike protection helps prevent unexpected spikes in event volume from consuming your quota.",
-          relevance: 0.87,
-        },
-      ],
+      results,
     });
   }),
 ];

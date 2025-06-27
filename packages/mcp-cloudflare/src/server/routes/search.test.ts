@@ -189,6 +189,90 @@ describe("search route", () => {
       });
     });
 
+    it("should filter by platform for platform/guide combination", async () => {
+      const res = await app.request(
+        "/api/search",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "CF-Connecting-IP": "192.0.2.1",
+          },
+          body: JSON.stringify({
+            query: "setup configuration",
+            guide: "javascript/nextjs",
+          }),
+        },
+        {
+          AI: mockAIBinding,
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      expect(mockAutorag.search).toHaveBeenCalledWith({
+        query: "setup configuration",
+        max_num_results: 10,
+        filters: {
+          type: "and",
+          filters: [
+            {
+              type: "gt",
+              key: "filename",
+              value: "platforms/javascript/guides/nextjs",
+            },
+            {
+              type: "lte",
+              key: "filename",
+              value: "platforms/javascript/guides/nextjs/z",
+            },
+          ],
+        },
+      });
+    });
+
+    it("should filter by platform for platform only", async () => {
+      const res = await app.request(
+        "/api/search",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "CF-Connecting-IP": "192.0.2.1",
+          },
+          body: JSON.stringify({
+            query: "setup configuration",
+            guide: "python",
+          }),
+        },
+        {
+          AI: mockAIBinding,
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      expect(mockAutorag.search).toHaveBeenCalledWith({
+        query: "setup configuration",
+        max_num_results: 10,
+        filters: {
+          type: "and",
+          filters: [
+            {
+              type: "gt",
+              key: "filename",
+              value: "platforms/python",
+            },
+            {
+              type: "lte",
+              key: "filename",
+              value: "platforms/python/z",
+            },
+          ],
+        },
+      });
+    });
+
     it("should handle custom maxResults parameter", async () => {
       const res = await app.request(
         "/api/search",
@@ -262,12 +346,11 @@ describe("search route", () => {
         },
       );
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(500);
       const json = await res.json();
       expect(json).toMatchObject({
-        query: "test",
-        results: [],
         error: "Failed to search documentation. Please try again later.",
+        name: "SEARCH_FAILED",
       });
     });
 
@@ -332,14 +415,28 @@ describe("search route", () => {
       const json = (await res.json()) as {
         results: Array<{ id: string; url: string }>;
       };
-      expect(json.results[0]).toMatchObject({
-        id: "platforms/javascript/index.md",
-        url: "https://docs.sentry.io/platforms/javascript/index",
-      });
-      expect(json.results[1]).toMatchObject({
-        id: "product/issues.md",
-        url: "https://docs.sentry.io/product/issues",
-      });
+      expect(json.results[0]).toMatchInlineSnapshot(
+        {
+          id: "platforms/javascript/index.md",
+          url: "https://docs.sentry.io/platforms/javascript/index",
+        },
+        `
+        {
+          "id": "platforms/javascript/index.md",
+          "relevance": 0.9,
+          "snippet": "Content 1",
+          "url": "https://docs.sentry.io/platforms/javascript/index",
+        }
+      `,
+      );
+      expect(json.results[1]).toMatchInlineSnapshot(`
+        {
+          "id": "product/issues.md",
+          "relevance": 0.8,
+          "snippet": "Content 2",
+          "url": "https://docs.sentry.io/product/issues",
+        }
+      `);
     });
 
     it("should handle index.md files correctly", async () => {
@@ -432,12 +529,14 @@ describe("search route", () => {
       const json = (await res.json()) as {
         results: Array<{ id: string; url: string }>;
       };
-      expect(json.results[0]).toMatchObject({
-        id: "",
-        url: "",
-        snippet: "Content without metadata",
-        relevance: 0.5,
-      });
+      expect(json.results[0]).toMatchInlineSnapshot(`
+        {
+          "id": "",
+          "relevance": 0.5,
+          "snippet": "Content without metadata",
+          "url": "",
+        }
+      `);
     });
 
     it("should handle unexpected response structure", async () => {
@@ -463,10 +562,12 @@ describe("search route", () => {
 
       expect(res.status).toBe(200);
       const json = await res.json();
-      expect(json).toMatchObject({
-        query: "test",
-        results: [],
-      });
+      expect(json).toMatchInlineSnapshot(`
+        {
+          "query": "test",
+          "results": [],
+        }
+      `);
     });
   });
 
@@ -541,11 +642,12 @@ describe("search route", () => {
 
       expect(res.status).toBe(429);
       const json = await res.json();
-      expect(json).toMatchObject({
-        error:
-          "Rate limit exceeded. You can perform up to 20 documentation searches per minute. Please wait before searching again.",
-        name: "RATE_LIMIT_EXCEEDED",
-      });
+      expect(json).toMatchInlineSnapshot(`
+        {
+          "error": "Rate limit exceeded. You can perform up to 20 documentation searches per minute. Please wait before searching again.",
+          "name": "RATE_LIMIT_EXCEEDED",
+        }
+      `);
     });
 
     it("should handle rate limiter errors gracefully", async () => {

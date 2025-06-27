@@ -853,7 +853,11 @@ export const TOOL_HANDLERS = {
 
   search_docs: async (context, params) => {
     let output = `# Documentation Search Results\n\n`;
-    output += `**Query**: "${params.query}"\n\n`;
+    output += `**Query**: "${params.query}"\n`;
+    if (params.guide) {
+      output += `**Guide**: ${params.guide}\n`;
+    }
+    output += `\n`;
 
     // Determine the host - use context.host if available, then check env var, otherwise default to production
     const host = context.mcpHost || "https://mcp.sentry.dev";
@@ -869,12 +873,14 @@ export const TOOL_HANDLERS = {
         body: JSON.stringify({
           query: params.query,
           maxResults: params.maxResults,
+          guide: params.guide,
         }),
       },
       15000, // 15 second timeout
     );
 
     if (!response.ok) {
+      // TODO: improve error responses with types
       const errorData = (await response.json().catch(() => null)) as {
         error?: string;
       } | null;
@@ -900,14 +906,12 @@ export const TOOL_HANDLERS = {
 
     output += `Found ${data.results.length} match${data.results.length === 1 ? "" : "es"}\n\n`;
 
-    output += `- Focus on the technology the user is inquiring about. You can often infer the technology/platform from the URL paths (e.g., '/platforms/javascript/', '/platforms/python/', '/platforms/java/guides/spring-boot/').\n`;
-    output += `- These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.\n\n`;
+    output += `These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.\n\n`;
 
     for (const [index, result] of data.results.entries()) {
-      output += `## ${index + 1}. ${result.id}\n\n`;
+      output += `## ${index + 1}. ${result.url}\n\n`;
       output += `**Path**: ${result.id}\n`;
-      output += `**URL**: ${result.url}\n`;
-      output += `*Relevance: ${(result.relevance * 100).toFixed(1)}%*\n\n`;
+      output += `**Relevance**: ${(result.relevance * 100).toFixed(1)}%\n\n`;
       if (index < 3) {
         output += "**Matching Context**\n";
         output += `> ${result.snippet.replace(/\n/g, "\n> ")}\n\n`;
@@ -957,7 +961,7 @@ export const TOOL_HANDLERS = {
 
     if (!response.ok) {
       if (response.status === 404) {
-        output += `> **Error**: Documentation not found at this path.\n\n`;
+        output += `**Error**: Documentation not found at this path.\n\n`;
         output += `Please verify the path is correct. Common issues:\n`;
         output += `- Path should start with / (e.g., /platforms/javascript/guides/nextjs.md)\n`;
         output += `- Path should match exactly what's shown in search_docs results\n`;

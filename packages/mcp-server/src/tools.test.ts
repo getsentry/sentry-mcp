@@ -1419,36 +1419,36 @@ describe("search_docs", () => {
       {
         query: "How do I configure rate limiting?",
         maxResults: 5,
+        guide: undefined,
       },
     );
-    expect(result).toEqual(`# Documentation Search Results
+    expect(result).toMatchInlineSnapshot(`
+      "# Documentation Search Results
 
-**Query**: "How do I configure rate limiting?"
+      **Query**: "How do I configure rate limiting?"
 
-Found 2 matches
+      Found 2 matches
 
-- Focus on the technology the user is inquiring about. You can often infer the technology/platform from the URL paths (e.g., '/platforms/javascript/', '/platforms/python/', '/platforms/java/guides/spring-boot/').
-- These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.
+      These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.
 
-## 1. product/rate-limiting.md
+      ## 1. https://docs.sentry.io/product/rate-limiting
 
-**Path**: product/rate-limiting.md
-**URL**: https://docs.sentry.io/product/rate-limiting
-*Relevance: 95.0%*
+      **Path**: product/rate-limiting.md
+      **Relevance**: 95.0%
 
-**Matching Context**
-> Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.
+      **Matching Context**
+      > Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.
 
-## 2. product/accounts/quotas/spike-protection.md
+      ## 2. https://docs.sentry.io/product/accounts/quotas/spike-protection
 
-**Path**: product/accounts/quotas/spike-protection.md
-**URL**: https://docs.sentry.io/product/accounts/quotas/spike-protection
-*Relevance: 87.0%*
+      **Path**: product/accounts/quotas/spike-protection.md
+      **Relevance**: 87.0%
 
-**Matching Context**
-> Spike protection helps prevent unexpected spikes in event volume from consuming your quota.
+      **Matching Context**
+      > Spike protection helps prevent unexpected spikes in event volume from consuming your quota.
 
-`);
+      "
+    `);
   });
 
   it("handles API errors", async () => {
@@ -1471,6 +1471,7 @@ Found 2 matches
         {
           query: "test query",
           maxResults: undefined,
+          guide: undefined,
         },
       ),
     ).rejects.toThrow();
@@ -1496,9 +1497,48 @@ Found 2 matches
         {
           query: "test query",
           maxResults: undefined,
+          guide: undefined,
         },
       ),
     ).rejects.toThrow("Request timeout after 15000ms");
+  });
+
+  it("includes platform in output and request", async () => {
+    const tool = TOOL_HANDLERS.search_docs;
+    const mockFetch = vi.spyOn(global, "fetch");
+
+    const result = await tool(
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+        host: "https://mcp.sentry.dev",
+      },
+      {
+        query: "test query",
+        maxResults: 5,
+        guide: "javascript/nextjs",
+      },
+    );
+
+    // Check that platform is included in the output
+    expect(result).toContain("**Guide**: javascript/nextjs");
+
+    // Check that platform is included in the request
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://mcp.sentry.dev/api/search",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: "test query",
+          maxResults: 5,
+          guide: "javascript/nextjs",
+        }),
+      }),
+    );
   });
 });
 

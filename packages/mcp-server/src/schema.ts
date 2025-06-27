@@ -6,6 +6,7 @@
  * (e.g., toLowerCase, trim) and LLM-friendly descriptions.
  */
 import { z } from "zod";
+import { SENTRY_GUIDES } from "./constants";
 
 export const ParamOrganizationSlug = z
   .string()
@@ -105,4 +106,11 @@ export const ParamAssignedTo = z
   .trim()
   .describe(
     "The username or team slug to assign the issue to. Use 'me' to assign to yourself, or provide a username/team slug.",
+  );
+
+export const ParamSentryGuide = z
+  .enum(SENTRY_GUIDES)
+  .describe(
+    "Optional guide filter to limit search results to specific documentation sections. " +
+      "Use either a platform (e.g., 'javascript', 'python') or platform/guide combination (e.g., 'javascript/nextjs', 'python/django').",
   );
