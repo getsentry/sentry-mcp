@@ -172,7 +172,7 @@ describe("search route", () => {
       expect(mockAIBinding.autorag).toHaveBeenCalledWith("sentry-docs");
       expect(mockAutorag.search).toHaveBeenCalledWith({
         query: "rate limiting",
-        max_num_results: 3,
+        max_num_results: 10,
       });
 
       expect(json).toMatchObject({

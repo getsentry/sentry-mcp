@@ -1419,49 +1419,35 @@ describe("search_docs", () => {
       {
         query: "How do I configure rate limiting?",
         maxResults: 5,
-        docType: "all",
       },
     );
     expect(result).toEqual(`# Documentation Search Results
 
 **Query**: "How do I configure rate limiting?"
 
-Found 2 matching documents. Showing snippets below.
+Found 2 matches
 
-> **Note**: These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.
+- Focus on the technology the user is inquiring about. You can often infer the technology/platform from the URL paths (e.g., '/platforms/javascript/', '/platforms/python/', '/platforms/java/guides/spring-boot/').
+- These are just snippets. Use \`get_doc(path='...')\` to fetch the full content.
 
 ## 1. product/rate-limiting.md
 
+**Path**: product/rate-limiting.md
 **URL**: https://docs.sentry.io/product/rate-limiting
-
-**Matching snippet**:
-> Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.
-
 *Relevance: 95.0%*
+
+**Matching Context**
+> Learn how to configure rate limiting in Sentry to prevent quota exhaustion and control event ingestion.
 
 ## 2. product/accounts/quotas/spike-protection.md
 
+**Path**: product/accounts/quotas/spike-protection.md
 **URL**: https://docs.sentry.io/product/accounts/quotas/spike-protection
-
-**Matching snippet**:
-> Spike protection helps prevent unexpected spikes in event volume from consuming your quota.
-
 *Relevance: 87.0%*
 
-## Next Steps
+**Matching Context**
+> Spike protection helps prevent unexpected spikes in event volume from consuming your quota.
 
-To get the full documentation content, use:
-
-\`\`\`
-get_doc(path='/product/rate-limiting.md')
-\`\`\`
-
-\`\`\`
-get_doc(path='/product/accounts/quotas/spike-protection.md')
-\`\`\`
-
-- The snippets above show where your search terms appear in the documentation
-- Use \`get_doc()\` to read the complete documentation page with full context
 `);
   });
 
@@ -1485,7 +1471,6 @@ get_doc(path='/product/accounts/quotas/spike-protection.md')
         {
           query: "test query",
           maxResults: undefined,
-          docType: undefined,
         },
       ),
     ).rejects.toThrow();
@@ -1511,12 +1496,9 @@ get_doc(path='/product/accounts/quotas/spike-protection.md')
         {
           query: "test query",
           maxResults: undefined,
-          docType: undefined,
         },
       ),
-    ).rejects.toThrow(
-      "Documentation search request timed out after 5 seconds. Please try again.",
-    );
+    ).rejects.toThrow("Request timeout after 15000ms");
   });
 });
 
@@ -1785,8 +1767,6 @@ describe("get_doc", () => {
           path: "/product/test.md",
         },
       ),
-    ).rejects.toThrow(
-      "Documentation request timed out after 5 seconds. Please try again.",
-    );
+    ).rejects.toThrow("Request timeout after 15000ms");
   });
 });

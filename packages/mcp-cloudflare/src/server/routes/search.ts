@@ -8,7 +8,7 @@ import type { AutoRagSearchResponse } from "@cloudflare/workers-types";
 // Request schema matching the MCP tool parameters
 const SearchRequestSchema = z.object({
   query: z.string().trim().min(1, "Query is required"),
-  maxResults: z.number().int().min(1).max(10).default(3).optional(),
+  maxResults: z.number().int().min(1).max(10).default(10).optional(),
 });
 
 interface SearchResponse {
@@ -84,7 +84,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       );
     }
 
-    const { query, maxResults = 3 } = validationResult.data;
+    const { query, maxResults = 10 } = validationResult.data;
 
     // Check if AI binding is available
     if (!c.env.AI) {

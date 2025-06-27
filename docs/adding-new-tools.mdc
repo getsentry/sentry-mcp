@@ -208,7 +208,7 @@ The `search_docs` tool demonstrates this pattern:
 ```typescript
 // In the Worker (routes/search.ts)
 export default new Hono().post("/", async (c) => {
-  const { query, maxResults, docType } = await c.req.json();
+  const { query, maxResults } = await c.req.json();
   
   // Access Worker-specific bindings
   const results = await c.env.AI.autorag("sentry-docs").aiSearch({

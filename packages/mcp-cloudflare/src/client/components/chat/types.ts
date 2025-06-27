@@ -88,6 +88,21 @@ export interface ChatProps {
   onClose: () => void;
 }
 
+export interface ChatUIProps {
+  messages: Message[];
+  input: string;
+  error?: Error | null;
+  isChatLoading: boolean;
+  isOpen?: boolean;
+  showControls?: boolean;
+  onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onStop?: () => void;
+  onRetry?: () => void;
+  onClose?: () => void;
+  onLogout?: () => void;
+}
+
 export interface ChatMessagesProps {
   messages: Message[];
   isChatLoading: boolean;
