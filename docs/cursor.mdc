@@ -32,6 +32,8 @@ All documentation is in the `docs/` directory:
 - `monitoring.mdc` - Observability patterns
 - `security.mdc` - Authentication and security
 
+You should ALWAYS update docs when they are inaccurate or you have learned new relevant information which would add clarity that is otherwise missing.
+
 ## Critical Quality Checks
 
 **After ANY code changes, you MUST run:**

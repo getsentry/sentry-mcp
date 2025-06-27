@@ -13,21 +13,26 @@ Sentry MCP is a Model Context Protocol server that provides access to Sentry's f
 All documentation is in the `docs/` directory:
 
 ### Core References
+
 - `architecture.mdc` - System design and package structure
 - `common-patterns.mdc` - Reusable code patterns
 - `quality-checks.mdc` - Required quality checks
 
-### Implementation Guides  
+### Implementation Guides
+
 - `adding-tools.mdc` - Adding new MCP tools
 - `adding-prompts.mdc` - Adding new MCP prompts
 - `adding-resources.mdc` - Adding new MCP resources
 
 ### Technical References
+
 - `api-patterns.mdc` - Sentry API client usage
 - `testing.mdc` - Testing strategies
 - `deployment.mdc` - Cloudflare deployment
 - `monitoring.mdc` - Observability patterns
 - `security.mdc` - Authentication and security
+
+You should ALWAYS update docs when they are inaccurate or you have learned new relevant information which would add clarity that is otherwise missing.
 
 ## Critical Quality Checks
 
@@ -71,6 +76,7 @@ pnpm deploy             # Deploy to Cloudflare
 ## Claude Code-Specific Notes
 
 When using Claude Code's MCP integration:
+
 - The server runs via stdio transport
 - Authentication uses access tokens (not OAuth)
 - See integration docs in the web UI for setup instructions
@@ -78,10 +84,11 @@ When using Claude Code's MCP integration:
 ## Environment Variables
 
 See specific guides for required environment variables:
+
 - Cloudflare: `deployment.mdc`
 - Evaluation tests: `.env.example`
 - Local development: Use command-line args
-- MCP Client: 
+- MCP Client:
   - `ANTHROPIC_API_KEY` - Required for AI agent
   - `SENTRY_ACCESS_TOKEN` - Required for local stdio mode
   - `MCP_HOST` - Optional, defaults to https://mcp.sentry.dev (used by search_docs tool)
