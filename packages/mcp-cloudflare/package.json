@@ -15,6 +15,7 @@
     "build": "tsc -b && vite build",
     "dev": "vite",
     "deploy": "npm exec wrangler deploy",
+    "cf:versions:upload": "npx wrangler versions upload",
     "preview": "vite preview",
     "cf-typegen": "wrangler types",
     "test": "vitest",
