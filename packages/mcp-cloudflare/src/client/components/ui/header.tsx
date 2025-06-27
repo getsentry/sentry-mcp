@@ -24,7 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
+          <Button variant="secondary" asChild>
             <a
               href="https://github.com/getsentry/sentry-mcp"
               target="_blank"
@@ -36,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
           </Button>
           {isAuthenticated && onLogout && (
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={onLogout}
               className="hidden md:flex cursor-pointer"
             >

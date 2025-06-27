@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { Send, CircleStop } from "lucide-react";
+import { Button } from "../ui/button";
 
 interface ChatInputProps {
   input: string;
@@ -6,6 +8,7 @@ interface ChatInputProps {
   isOpen: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onStop: () => void;
   onSlashCommand?: (command: string) => void;
 }
 
@@ -15,6 +18,7 @@ export function ChatInput({
   isOpen,
   onInputChange,
   onSubmit,
+  onStop,
   onSlashCommand,
 }: ChatInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,15 +63,29 @@ export function ChatInput({
 
   return (
     <form onSubmit={handleSubmit} className="relative flex-1">
-      <div className="flex space-x-2 items-center">
+      <div className="relative">
         <input
           ref={inputRef}
           value={input}
           onChange={onInputChange}
           placeholder="Ask me anything about your Sentry data..."
           disabled={isLoading}
-          className="flex-1 p-4 bg-slate-800/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent disabled:opacity-50"
+          className="w-full p-4 pr-12 rounded bg-slate-800/50 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent disabled:opacity-50"
         />
+        <Button
+          type={isLoading ? "button" : "submit"}
+          variant="ghost"
+          onClick={isLoading ? onStop : undefined}
+          disabled={!isLoading && !input.trim()}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-colors"
+          title={isLoading ? "Stop generation" : "Send message"}
+        >
+          {isLoading ? (
+            <CircleStop className="h-4 w-4" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </Button>
       </div>
     </form>
   );
