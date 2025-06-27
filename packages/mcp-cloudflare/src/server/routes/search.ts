@@ -159,6 +159,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           logger.fmt`No results found for query: ${query} with guide: ${guide}`,
           {
             result_query: searchData.search_query,
+            guide,
           },
         );
       }
