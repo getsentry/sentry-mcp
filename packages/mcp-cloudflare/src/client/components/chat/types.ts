@@ -2,6 +2,7 @@
  * Type definitions for Chat components
  */
 
+import type React from "react";
 import type { Message } from "ai/react";
 
 // Re-export AI SDK types for convenience
@@ -86,6 +87,7 @@ export interface ProcessedMessagePart {
 export interface ChatProps {
   isOpen: boolean;
   onClose: () => void;
+  onLogout: () => void;
 }
 
 export interface ChatUIProps {

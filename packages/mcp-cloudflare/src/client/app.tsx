@@ -1,5 +1,5 @@
 import { Header } from "./components/ui/header";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Chat } from "./components/chat";
 import { useAuth } from "./contexts/auth-context";
 import Home from "./pages/home";
@@ -116,7 +116,11 @@ export default function App() {
       </div>
 
       {/* Single Chat component - handles both mobile and desktop layouts */}
-      <Chat isOpen={isChatOpen} onClose={() => toggleChat(false)} />
+      <Chat
+        isOpen={isChatOpen}
+        onClose={() => toggleChat(false)}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

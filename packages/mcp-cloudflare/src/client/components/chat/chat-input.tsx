@@ -6,6 +6,7 @@ interface ChatInputProps {
   isOpen: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onSlashCommand?: (command: string) => void;
 }
 
 export function ChatInput({
@@ -14,6 +15,7 @@ export function ChatInput({
   isOpen,
   onInputChange,
   onSubmit,
+  onSlashCommand,
 }: ChatInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -40,8 +42,23 @@ export function ChatInput({
     }
   }, [isLoading, isOpen]);
 
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    // Check if input is a slash command
+    if (input.startsWith("/") && onSlashCommand) {
+      const command = input.slice(1).toLowerCase().trim();
+      // Pass all slash commands to the handler, let it decide what to do
+      onSlashCommand(command);
+      return;
+    }
+
+    // Otherwise, submit normally
+    onSubmit(e);
+  };
+
   return (
-    <form onSubmit={onSubmit} className="relative flex-1">
+    <form onSubmit={handleSubmit} className="relative flex-1">
       <div className="flex space-x-2 items-center">
         <input
           ref={inputRef}
