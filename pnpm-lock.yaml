@@ -4,130 +4,295 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@ai-sdk/openai':
+      specifier: ^1.3.22
+      version: 1.3.22
+    '@ai-sdk/react':
+      specifier: ^1.2.12
+      version: 1.2.12
+    '@biomejs/biome':
+      specifier: ^1.9.4
+      version: 1.9.4
+    '@cloudflare/vite-plugin':
+      specifier: ^1.7.5
+      version: 1.7.5
+    '@cloudflare/vitest-pool-workers':
+      specifier: ^0.8.47
+      version: 0.8.47
+    '@cloudflare/workers-oauth-provider':
+      specifier: ^0.0.5
+      version: 0.0.5
+    '@cloudflare/workers-types':
+      specifier: ^4.20250627.0
+      version: 4.20250627.0
+    '@modelcontextprotocol/sdk':
+      specifier: ^1.13.2
+      version: 1.13.2
+    '@radix-ui/react-accordion':
+      specifier: ^1.2.11
+      version: 1.2.11
+    '@radix-ui/react-slot':
+      specifier: ^1.2.3
+      version: 1.2.3
+    '@sentry/cloudflare':
+      specifier: ^9.33.0
+      version: 9.33.0
+    '@sentry/core':
+      specifier: ^9.33.0
+      version: 9.33.0
+    '@sentry/node':
+      specifier: ^9.33.0
+      version: 9.33.0
+    '@sentry/react':
+      specifier: ^9.33.0
+      version: 9.33.0
+    '@sentry/vite-plugin':
+      specifier: ^3.5.0
+      version: 3.5.0
+    '@tailwindcss/typography':
+      specifier: ^0.5.16
+      version: 0.5.16
+    '@tailwindcss/vite':
+      specifier: ^4.1.11
+      version: 4.1.11
+    '@types/node':
+      specifier: ^22.15.33
+      version: 22.15.33
+    '@types/react':
+      specifier: ^19.1.8
+      version: 19.1.8
+    '@types/react-dom':
+      specifier: ^19.1.6
+      version: 19.1.6
+    '@vitejs/plugin-react':
+      specifier: ^4.6.0
+      version: 4.6.0
+    '@vitest/coverage-v8':
+      specifier: ^3.2.4
+      version: 3.2.4
+    agents:
+      specifier: ~0.0.99
+      version: 0.0.99
+    ai:
+      specifier: ^4.3.16
+      version: 4.3.16
+    better-sqlite3:
+      specifier: ^11.10.0
+      version: 11.10.0
+    chalk:
+      specifier: ^5.4.1
+      version: 5.4.1
+    class-variance-authority:
+      specifier: ^0.7.1
+      version: 0.7.1
+    clsx:
+      specifier: ^2.1.1
+      version: 2.1.1
+    commander:
+      specifier: ^14.0.0
+      version: 14.0.0
+    dotenv:
+      specifier: ^16.6.1
+      version: 16.6.1
+    dotenv-cli:
+      specifier: ^8.0.0
+      version: 8.0.0
+    hono:
+      specifier: ^4.8.3
+      version: 4.8.3
+    lint-staged:
+      specifier: ^15.5.2
+      version: 15.5.2
+    lucide-react:
+      specifier: ^0.503.0
+      version: 0.503.0
+    msw:
+      specifier: ^2.10.2
+      version: 2.10.2
+    open:
+      specifier: ^10.1.2
+      version: 10.1.2
+    react:
+      specifier: ^19.1.0
+      version: 19.1.0
+    react-dom:
+      specifier: ^19.1.0
+      version: 19.1.0
+    react-markdown:
+      specifier: ^9.1.0
+      version: 9.1.0
+    remark-gfm:
+      specifier: ^4.0.1
+      version: 4.0.1
+    simple-git-hooks:
+      specifier: ^2.13.0
+      version: 2.13.0
+    tailwind-merge:
+      specifier: ^3.3.1
+      version: 3.3.1
+    tailwindcss:
+      specifier: ^4.1.11
+      version: 4.1.11
+    tsdown:
+      specifier: ^0.12.9
+      version: 0.12.9
+    tsx:
+      specifier: ^4.20.3
+      version: 4.20.3
+    turbo:
+      specifier: ^2.5.4
+      version: 2.5.4
+    tw-animate-css:
+      specifier: ^1.3.4
+      version: 1.3.4
+    typescript:
+      specifier: ^5.8.3
+      version: 5.8.3
+    vite:
+      specifier: ^6.3.5
+      version: 6.3.5
+    vitest:
+      specifier: ^3.2.4
+      version: 3.2.4
+    vitest-evals:
+      specifier: ^0.3.0
+      version: 0.3.0
+    workers-mcp:
+      specifier: 0.1.0-3
+      version: 0.1.0-3
+    wrangler:
+      specifier: ^4.22.0
+      version: 4.22.0
+    zod:
+      specifier: ^3.25.67
+      version: 3.25.67
+
 importers:
 
   .:
     dependencies:
       '@biomejs/biome':
-        specifier: ^1.9.4
+        specifier: 'catalog:'
         version: 1.9.4
       '@types/node':
-        specifier: ^22.15.33
+        specifier: 'catalog:'
         version: 22.15.33
       '@vitest/coverage-v8':
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.33)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.15.33)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0))
       dotenv:
-        specifier: ^16.6.1
+        specifier: 'catalog:'
         version: 16.6.1
       dotenv-cli:
-        specifier: ^8.0.0
+        specifier: 'catalog:'
         version: 8.0.0
       lint-staged:
-        specifier: ^15.5.2
+        specifier: 'catalog:'
         version: 15.5.2
       simple-git-hooks:
-        specifier: ^2.13.0
+        specifier: 'catalog:'
         version: 2.13.0
       tsdown:
-        specifier: ^0.12.9
+        specifier: 'catalog:'
         version: 0.12.9(typescript@5.8.3)
       tsx:
-        specifier: ^4.20.3
+        specifier: 'catalog:'
         version: 4.20.3
       turbo:
-        specifier: ^2.5.4
+        specifier: 'catalog:'
         version: 2.5.4
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.8.3
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.15.33)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.15.33)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
       vitest-evals:
-        specifier: ^0.3.0
+        specifier: 'catalog:'
         version: 0.3.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.15.33)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.15.33)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0))
 
   packages/mcp-cloudflare:
     dependencies:
       '@ai-sdk/openai':
-        specifier: ^1.3.22
+        specifier: 'catalog:'
         version: 1.3.22(zod@3.25.67)
       '@ai-sdk/react':
-        specifier: ^1.2.12
+        specifier: 'catalog:'
         version: 1.2.12(react@19.1.0)(zod@3.25.67)
       '@cloudflare/workers-oauth-provider':
-        specifier: ^0.0.5
+        specifier: 'catalog:'
         version: 0.0.5
       '@modelcontextprotocol/sdk':
-        specifier: ^1.13.2
+        specifier: 'catalog:'
         version: 1.13.2
       '@radix-ui/react-accordion':
-        specifier: ^1.2.11
+        specifier: 'catalog:'
         version: 1.2.11(@types/react-dom@19.1.6(@types/react@19.1.8))(@types/react@19.1.8)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@radix-ui/react-slot':
-        specifier: ^1.2.3
+        specifier: 'catalog:'
         version: 1.2.3(@types/react@19.1.8)(react@19.1.0)
       '@sentry/cloudflare':
-        specifier: ^9.33.0
+        specifier: 'catalog:'
         version: 9.33.0(@cloudflare/workers-types@4.20250627.0)
       '@sentry/react':
-        specifier: ^9.33.0
+        specifier: 'catalog:'
         version: 9.33.0(react@19.1.0)
       agents:
-        specifier: ~0.0.99
+        specifier: 'catalog:'
         version: 0.0.99(@cloudflare/workers-types@4.20250627.0)(react@19.1.0)
       ai:
-        specifier: ^4.3.16
+        specifier: 'catalog:'
         version: 4.3.16(react@19.1.0)(zod@3.25.67)
       better-sqlite3:
-        specifier: ^11.10.0
+        specifier: 'catalog:'
         version: 11.10.0
       class-variance-authority:
-        specifier: ^0.7.1
+        specifier: 'catalog:'
         version: 0.7.1
       clsx:
-        specifier: ^2.1.1
+        specifier: 'catalog:'
         version: 2.1.1
       hono:
-        specifier: ^4.8.3
+        specifier: 'catalog:'
         version: 4.8.3
       lucide-react:
-        specifier: ^0.503.0
+        specifier: 'catalog:'
         version: 0.503.0(react@19.1.0)
       react:
-        specifier: ^19.1.0
+        specifier: 'catalog:'
         version: 19.1.0
       react-dom:
-        specifier: ^19.1.0
+        specifier: 'catalog:'
         version: 19.1.0(react@19.1.0)
       react-markdown:
-        specifier: ^9.1.0
+        specifier: 'catalog:'
         version: 9.1.0(@types/react@19.1.8)(react@19.1.0)
       remark-gfm:
-        specifier: ^4.0.1
+        specifier: 'catalog:'
         version: 4.0.1
       tailwind-merge:
-        specifier: ^3.3.1
+        specifier: 'catalog:'
         version: 3.3.1
       tw-animate-css:
-        specifier: ^1.3.4
+        specifier: 'catalog:'
         version: 1.3.4
       workers-mcp:
-        specifier: 0.1.0-3
+        specifier: 'catalog:'
         version: 0.1.0-3
       zod:
-        specifier: ^3.25.67
+        specifier: 'catalog:'
         version: 3.25.67
     devDependencies:
       '@cloudflare/vite-plugin':
-        specifier: ^1.7.5
+        specifier: 'catalog:'
         version: 1.7.5(rollup@4.44.1)(vite@6.3.5(@types/node@24.0.6)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.0))(workerd@1.20250617.0)(wrangler@4.22.0(@cloudflare/workers-types@4.20250627.0))
       '@cloudflare/vitest-pool-workers':
-        specifier: ^0.8.47
+        specifier: 'catalog:'
         version: 0.8.47(@cloudflare/workers-types@4.20250627.0)(@vitest/runner@3.2.4)(@vitest/snapshot@3.2.4)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.0.6)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@24.0.6)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0))
       '@cloudflare/workers-types':
-        specifier: ^4.20250627.0
+        specifier: 'catalog:'
         version: 4.20250627.0
       '@sentry/mcp-server':
         specifier: workspace:*
@@ -136,49 +301,49 @@ importers:
         specifier: workspace:*
         version: link:../mcp-server-tsconfig
       '@sentry/vite-plugin':
-        specifier: ^3.5.0
+        specifier: 'catalog:'
         version: 3.5.0
       '@tailwindcss/typography':
-        specifier: ^0.5.16
+        specifier: 'catalog:'
         version: 0.5.16(tailwindcss@4.1.11)
       '@tailwindcss/vite':
-        specifier: ^4.1.11
+        specifier: 'catalog:'
         version: 4.1.11(vite@6.3.5(@types/node@24.0.6)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.0))
       '@types/react':
-        specifier: ^19.1.8
+        specifier: 'catalog:'
         version: 19.1.8
       '@types/react-dom':
-        specifier: ^19.1.6
+        specifier: 'catalog:'
         version: 19.1.6(@types/react@19.1.8)
       '@vitejs/plugin-react':
-        specifier: ^4.6.0
+        specifier: 'catalog:'
         version: 4.6.0(vite@6.3.5(@types/node@24.0.6)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.0))
       tailwindcss:
-        specifier: ^4.1.11
+        specifier: 'catalog:'
         version: 4.1.11
       vite:
-        specifier: ^6.3.5
+        specifier: 'catalog:'
         version: 6.3.5(@types/node@24.0.6)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.0)
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.6)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@24.0.6)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
       wrangler:
-        specifier: ^4.22.0
+        specifier: 'catalog:'
         version: 4.22.0(@cloudflare/workers-types@4.20250627.0)
 
   packages/mcp-server:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: ^1.13.2
+        specifier: 'catalog:'
         version: 1.13.2
       '@sentry/core':
-        specifier: ^9.33.0
+        specifier: 'catalog:'
         version: 9.33.0
       '@sentry/node':
-        specifier: ^9.33.0
+        specifier: 'catalog:'
         version: 9.33.0
       zod:
-        specifier: ^3.25.67
+        specifier: 'catalog:'
         version: 3.25.67
     devDependencies:
       '@sentry/mcp-server-mocks':
@@ -188,16 +353,16 @@ importers:
         specifier: workspace:*
         version: link:../mcp-server-tsconfig
       msw:
-        specifier: ^2.10.2
+        specifier: 'catalog:'
         version: 2.10.2(@types/node@24.0.6)(typescript@5.8.3)
 
   packages/mcp-server-evals:
     dependencies:
       '@ai-sdk/openai':
-        specifier: ^1.3.22
+        specifier: 'catalog:'
         version: 1.3.22(zod@3.25.67)
       '@modelcontextprotocol/sdk':
-        specifier: ^1.13.2
+        specifier: 'catalog:'
         version: 1.13.2
       '@sentry/mcp-server':
         specifier: workspace:*
@@ -209,22 +374,22 @@ importers:
         specifier: workspace:*
         version: link:../mcp-server-tsconfig
       ai:
-        specifier: ^4.3.16
+        specifier: 'catalog:'
         version: 4.3.16(react@19.1.0)(zod@3.25.67)
       msw:
-        specifier: ^2.10.2
+        specifier: 'catalog:'
         version: 2.10.2(@types/node@24.0.6)(typescript@5.8.3)
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.8.3
       zod:
-        specifier: ^3.25.67
+        specifier: 'catalog:'
         version: 3.25.67
 
   packages/mcp-server-mocks:
     dependencies:
       msw:
-        specifier: ^2.10.2
+        specifier: 'catalog:'
         version: 2.10.2(@types/node@24.0.6)(typescript@5.8.3)
     devDependencies:
       '@sentry/mcp-server-tsconfig':
@@ -236,44 +401,44 @@ importers:
   packages/mcp-test-client:
     dependencies:
       '@ai-sdk/openai':
-        specifier: ^1.3.22
+        specifier: 'catalog:'
         version: 1.3.22(zod@3.25.67)
       '@sentry/core':
-        specifier: ^9.33.0
+        specifier: 'catalog:'
         version: 9.33.0
       '@sentry/mcp-server':
         specifier: workspace:*
         version: link:../mcp-server
       '@sentry/node':
-        specifier: ^9.33.0
+        specifier: 'catalog:'
         version: 9.33.0
       ai:
-        specifier: ^4.3.16
+        specifier: 'catalog:'
         version: 4.3.16(react@19.1.0)(zod@3.25.67)
       chalk:
-        specifier: ^5.4.1
+        specifier: 'catalog:'
         version: 5.4.1
       commander:
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.0.0
       dotenv:
-        specifier: ^16.6.1
+        specifier: 'catalog:'
         version: 16.6.1
       open:
-        specifier: ^10.1.2
+        specifier: 'catalog:'
         version: 10.1.2
     devDependencies:
       tsdown:
-        specifier: ^0.12.9
+        specifier: 'catalog:'
         version: 0.12.9(typescript@5.8.3)
       tsx:
-        specifier: ^4.20.3
+        specifier: 'catalog:'
         version: 4.20.3
       typescript:
-        specifier: ^5.8.3
+        specifier: 'catalog:'
         version: 5.8.3
       vitest:
-        specifier: ^3.2.4
+        specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.6)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@24.0.6)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
 
 packages:

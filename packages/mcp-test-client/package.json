@@ -16,20 +16,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^1.3.22",
-    "@sentry/core": "^9.33.0",
+    "@ai-sdk/openai": "catalog:",
+    "@sentry/core": "catalog:",
     "@sentry/mcp-server": "workspace:*",
-    "@sentry/node": "^9.33.0",
-    "ai": "^4.3.16",
-    "chalk": "^5.4.1",
-    "commander": "^14.0.0",
-    "dotenv": "^16.6.1",
-    "open": "^10.1.2"
+    "@sentry/node": "catalog:",
+    "ai": "catalog:",
+    "chalk": "catalog:",
+    "commander": "catalog:",
+    "dotenv": "catalog:",
+    "open": "catalog:"
   },
   "devDependencies": {
-    "tsdown": "^0.12.9",
-    "tsx": "^4.20.3",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

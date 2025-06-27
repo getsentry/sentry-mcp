@@ -83,12 +83,12 @@
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
-    "msw": "^2.10.2"
+    "msw": "catalog:"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.13.2",
-    "@sentry/core": "^9.33.0",
-    "@sentry/node": "^9.33.0",
-    "zod": "^3.25.67"
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@sentry/core": "catalog:",
+    "@sentry/node": "catalog:",
+    "zod": "catalog:"
   }
 }
