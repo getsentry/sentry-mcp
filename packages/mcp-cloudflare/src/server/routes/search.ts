@@ -10,6 +10,7 @@ import type {
   CompoundFilter,
   AutoRagSearchRequest,
 } from "@cloudflare/workers-types";
+import { logger } from "@sentry/cloudflare";
 
 // Request schema matching the MCP tool parameters
 const SearchRequestSchema = z.object({
@@ -152,6 +153,15 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
       // Process search results - handle the actual response format from Cloudflare AI
       const searchData = searchResult as AutoRagSearchResponse;
+
+      if (searchData.data?.length === 0) {
+        logger.warn(
+          logger.fmt`No results found for query: ${query} with guide: ${guide}`,
+          {
+            result_query: searchData.search_query,
+          },
+        );
+      }
 
       return c.json({
         query,
