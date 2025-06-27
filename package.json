@@ -36,19 +36,19 @@
     "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci"
   },
   "dependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@types/node": "^22.15.33",
-    "@vitest/coverage-v8": "^3.2.4",
-    "dotenv": "^16.6.1",
-    "dotenv-cli": "^8.0.0",
-    "lint-staged": "^15.5.2",
-    "simple-git-hooks": "^2.13.0",
-    "tsdown": "^0.12.9",
-    "tsx": "^4.20.3",
-    "turbo": "^2.5.4",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4",
-    "vitest-evals": "^0.3.0"
+    "@biomejs/biome": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "dotenv": "catalog:",
+    "dotenv-cli": "catalog:",
+    "lint-staged": "catalog:",
+    "simple-git-hooks": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-evals": "catalog:"
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm exec lint-staged --concurrent false"
