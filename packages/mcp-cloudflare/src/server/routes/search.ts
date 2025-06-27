@@ -101,6 +101,9 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       const searchParams: AutoRagSearchRequest = {
         query,
         max_num_results: maxResults,
+        ranking_options: {
+          score_threshold: 0.2,
+        },
       };
 
       // Add filename filters based on guide parameter
@@ -160,6 +163,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           {
             result_query: searchData.search_query,
             guide,
+            searchParams: JSON.stringify(searchParams),
           },
         );
       }

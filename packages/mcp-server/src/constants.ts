@@ -10,8 +10,6 @@
 export const SENTRY_PLATFORMS_BASE = [
   "javascript",
   "python",
-  "react",
-  "node",
   "java",
   "dotnet",
   "go",
@@ -19,7 +17,6 @@ export const SENTRY_PLATFORMS_BASE = [
   "ruby",
   "android",
   "apple",
-  "flutter",
   "unity",
   "unreal",
   "rust",
@@ -42,6 +39,8 @@ export const SENTRY_FRAMEWORKS: Record<string, string[]> = {
   javascript: [
     "nextjs",
     "react",
+    "gatsby",
+    "remix",
     "vue",
     "angular",
     "hono",
@@ -63,6 +62,10 @@ export const SENTRY_FRAMEWORKS: Record<string, string[]> = {
     "sveltekit",
     "tanstack-react",
     "wasm",
+    "node",
+    "koa",
+    "nestjs",
+    "hapi",
   ],
   python: [
     "django",
@@ -93,8 +96,7 @@ export const SENTRY_FRAMEWORKS: Record<string, string[]> = {
     "sqlalchemy",
     "starlette",
   ],
-  node: ["express", "fastify", "koa", "nestjs", "hapi"],
-  react: ["nextjs", "gatsby", "remix"],
+  dart: ["flutter"],
   dotnet: [
     "aspnetcore",
     "maui",

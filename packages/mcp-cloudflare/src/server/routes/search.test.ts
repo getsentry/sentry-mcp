@@ -173,6 +173,9 @@ describe("search route", () => {
       expect(mockAutorag.search).toHaveBeenCalledWith({
         query: "rate limiting",
         max_num_results: 10,
+        ranking_options: {
+          score_threshold: 0.2,
+        },
       });
 
       expect(json).toMatchObject({
@@ -213,6 +216,9 @@ describe("search route", () => {
       expect(mockAutorag.search).toHaveBeenCalledWith({
         query: "setup configuration",
         max_num_results: 10,
+        ranking_options: {
+          score_threshold: 0.2,
+        },
         filters: {
           type: "and",
           filters: [
@@ -255,6 +261,9 @@ describe("search route", () => {
       expect(mockAutorag.search).toHaveBeenCalledWith({
         query: "setup configuration",
         max_num_results: 10,
+        ranking_options: {
+          score_threshold: 0.2,
+        },
         filters: {
           type: "and",
           filters: [
@@ -293,6 +302,9 @@ describe("search route", () => {
       expect(mockAutorag.search).toHaveBeenCalledWith({
         query: "error handling",
         max_num_results: 5,
+        ranking_options: {
+          score_threshold: 0.2,
+        },
       });
     });
 
