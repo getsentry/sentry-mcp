@@ -107,6 +107,8 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       };
 
       // Add filename filters based on guide parameter
+      // TODO: This is a hack to get the guide to work. Currently 'filename' is not working
+      // with folder matching which means we're lacking guideName.md in the search results.
       if (guide) {
         let filter: ComparisonFilter | CompoundFilter;
 
@@ -118,13 +120,13 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             type: "and",
             filters: [
               {
-                type: "gt",
-                key: "filename",
-                value: `platforms/${platformName}/guides/${guideName}`,
+                type: "gte",
+                key: "folder",
+                value: `platforms/${platformName}/guides/${guideName}/`,
               },
               {
                 type: "lte",
-                key: "filename",
+                key: "folder",
                 value: `platforms/${platformName}/guides/${guideName}/z`,
               },
             ],
@@ -135,13 +137,13 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             type: "and",
             filters: [
               {
-                type: "gt",
-                key: "filename",
-                value: `platforms/${guide}`,
+                type: "gte",
+                key: "folder",
+                value: `platforms/${guide}/`,
               },
               {
                 type: "lte",
-                key: "filename",
+                key: "folder",
                 value: `platforms/${guide}/z`,
               },
             ],

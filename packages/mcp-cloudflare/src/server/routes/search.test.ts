@@ -223,13 +223,13 @@ describe("search route", () => {
           type: "and",
           filters: [
             {
-              type: "gt",
-              key: "filename",
-              value: "platforms/javascript/guides/nextjs",
+              type: "gte",
+              key: "folder",
+              value: "platforms/javascript/guides/nextjs/",
             },
             {
               type: "lte",
-              key: "filename",
+              key: "folder",
               value: "platforms/javascript/guides/nextjs/z",
             },
           ],
@@ -268,13 +268,13 @@ describe("search route", () => {
           type: "and",
           filters: [
             {
-              type: "gt",
-              key: "filename",
-              value: "platforms/python",
+              type: "gte",
+              key: "folder",
+              value: "platforms/python/",
             },
             {
               type: "lte",
-              key: "filename",
+              key: "folder",
               value: "platforms/python/z",
             },
           ],
