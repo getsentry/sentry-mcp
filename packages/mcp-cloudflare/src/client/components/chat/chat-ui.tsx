@@ -25,6 +25,7 @@ interface ChatUIProps {
   onRetry?: () => void;
   onClose?: () => void;
   onLogout?: () => void;
+  onSlashCommand?: (command: string) => void;
 }
 
 export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
@@ -42,6 +43,7 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
       onRetry,
       onClose,
       onLogout,
+      onSlashCommand,
     },
     ref,
   ) => {
@@ -99,6 +101,7 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
               isOpen={isOpen}
               onInputChange={onInputChange}
               onSubmit={onSubmit}
+              onSlashCommand={onSlashCommand}
             />
           </div>
         </div>
