@@ -1540,6 +1540,27 @@ describe("search_docs", () => {
       }),
     );
   });
+
+  it("validates invalid guide parameter", async () => {
+    const tool = TOOL_HANDLERS.search_docs;
+
+    await expect(
+      tool(
+        {
+          accessToken: "access-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+        {
+          query: "test query",
+          maxResults: 5,
+          guide: "invalid-guide",
+        },
+      ),
+    ).rejects.toThrow(
+      "Invalid guide: \"invalid-guide\". Valid guides are: javascript, python, react, node, java, dotnet, go, php, ruby, android... Use a platform (e.g., 'javascript', 'python') or platform/guide combination (e.g., 'javascript/nextjs', 'python/django').",
+    );
+  });
 });
 
 describe("get_doc", () => {

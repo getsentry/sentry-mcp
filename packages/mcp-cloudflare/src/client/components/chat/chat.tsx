@@ -1,8 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useCallback } from "react";
-import { Button } from "../ui/button";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
 import { X, Loader2 } from "lucide-react";
@@ -40,6 +39,7 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     reload,
     setMessages,
     setInput,
+    append,
   } = useChat({
     api: "/api/chat",
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
@@ -48,13 +48,10 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     initialMessages,
   });
 
-  // Use declarative scroll hook - scroll on new messages and during streaming
-  const { containerRef: messagesContainerRef } =
+  // Use the clean scroll hook with smart auto-scroll detection
+  const [messagesContainerRef, scrollToBottom, setAutoScroll] =
     useScrollToBottom<HTMLDivElement>({
-      enabled: true,
-      smooth: true,
-      dependencies: [messages, status],
-      delay: status === "streaming" ? 100 : 0, // More frequent updates during streaming
+      delay: 50, // Simple consistent delay
     });
 
   // Clear messages function - used locally for /clear command and logout
@@ -123,6 +120,23 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     }
   }, [authToken, error, reload]);
 
+  // Handle sending a prompt programmatically
+  const handleSendPrompt = useCallback(
+    (prompt: string) => {
+      // Clear the input and directly send the message using append
+      append({ role: "user", content: prompt });
+    },
+    [append],
+  );
+
+  // Wrap form submission to ensure scrolling
+  const handleFormSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      handleSubmit(e);
+    },
+    [handleSubmit],
+  );
+
   // Handle slash commands
   const handleSlashCommand = (command: string) => {
     // Always clear the input first for all commands
@@ -171,18 +185,6 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
   // Use a single SlidingPanel and transition between auth and chat states
   return (
     <SlidingPanel isOpen={isOpen} onClose={onClose}>
-      {/* Mobile close button - always visible */}
-      <Button
-        type="button"
-        onClick={onClose}
-        variant="default"
-        className="md:hidden absolute top-4 left-4 z-10 cursor-pointer"
-        title="Close"
-        aria-label="Close chat panel"
-      >
-        <X className="h-4 w-4" />
-      </Button>
-
       {/* Auth form with fade transition */}
       <div
         className={`absolute inset-0 h-full flex flex-col items-center justify-center transition-all duration-500 ease-in-out ${
@@ -221,16 +223,17 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
           messages={messages}
           input={input}
           error={error}
-          isChatLoading={status === "streaming"}
+          isChatLoading={status === "streaming" || status === "submitted"}
           isOpen={isOpen}
-          showControls={true}
+          showControls
           onInputChange={handleInputChange}
-          onSubmit={handleSubmit}
+          onSubmit={handleFormSubmit}
           onStop={stop}
           onRetry={reload}
           onClose={onClose}
           onLogout={onLogout}
           onSlashCommand={handleSlashCommand}
+          onSendPrompt={handleSendPrompt}
         />
       </div>
     </SlidingPanel>

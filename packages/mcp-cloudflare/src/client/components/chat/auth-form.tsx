@@ -36,7 +36,7 @@ export function AuthForm({
 
         <div className="space-y-4">
           {authError && (
-            <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+            <div className="p-3 bg-red-900/20 border border-red-500/30 rounded flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-red-400" />
               <div className="text-red-400 text-sm">{authError}</div>
             </div>
