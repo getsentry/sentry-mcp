@@ -41,6 +41,7 @@ import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
 import { UserInputError } from "./errors";
+import { SENTRY_GUIDES } from "./constants";
 
 /**
  * Response from the search API endpoint

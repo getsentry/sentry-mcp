@@ -1,8 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useCallback } from "react";
-import { Button } from "../ui/button";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
 import { X, Loader2 } from "lucide-react";
@@ -49,13 +48,10 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     initialMessages,
   });
 
-  // Use declarative scroll hook - scroll on new messages and during streaming
-  const { containerRef: messagesContainerRef } =
+  // Use the clean scroll hook with smart auto-scroll detection
+  const [messagesContainerRef, scrollToBottom, setAutoScroll] =
     useScrollToBottom<HTMLDivElement>({
-      enabled: true,
-      smooth: true,
-      dependencies: [messages, status],
-      delay: status === "streaming" || status === "submitted" ? 100 : 0, // More frequent updates during loading
+      delay: 50, // Simple consistent delay
     });
 
   // Clear messages function - used locally for /clear command and logout
@@ -131,6 +127,14 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
       append({ role: "user", content: prompt });
     },
     [append],
+  );
+
+  // Wrap form submission to ensure scrolling
+  const handleFormSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      handleSubmit(e);
+    },
+    [handleSubmit],
   );
 
   // Handle slash commands
@@ -223,7 +227,7 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
           isOpen={isOpen}
           showControls
           onInputChange={handleInputChange}
-          onSubmit={handleSubmit}
+          onSubmit={handleFormSubmit}
           onStop={stop}
           onRetry={reload}
           onClose={onClose}

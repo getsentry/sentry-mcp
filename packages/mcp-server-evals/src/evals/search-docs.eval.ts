@@ -32,7 +32,7 @@ describeEval("search-docs", {
           "- Focus on the technology the user is inquiring about.",
           "- These are just snippets. Use `get_doc(path='...')` to fetch the full content.",
           "",
-          "platforms/react",
+          "javascript/react",
         ].join("\n"),
       },
       {
