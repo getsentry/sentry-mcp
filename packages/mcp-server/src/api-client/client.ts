@@ -199,6 +199,7 @@ export class SentryApiService {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "User-Agent": "Sentry MCP Server",
     };
     if (this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;

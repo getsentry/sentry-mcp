@@ -114,6 +114,7 @@ async function getOrRegisterChatClient(
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      "User-Agent": "Sentry MCP Chat Demo",
     },
     body: JSON.stringify(registrationData),
   });
@@ -163,6 +164,7 @@ async function exchangeCodeForToken(
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
+      "User-Agent": "Sentry MCP Chat Demo",
     },
     body: body.toString(),
   });
