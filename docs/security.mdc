@@ -150,44 +150,6 @@ SENTRY_CLIENT_SECRET=your_oauth_app_secret
 COOKIE_SECRET=random_32_char_string
 ```
 
-## Bot Protection
-
-The MCP server includes bot protection at the Cloudflare Worker level to prevent abuse from generic HTTP clients.
-
-### Implementation
-
-Bot protection is implemented as a wrapper around the worker's fetch handler:
-
-```typescript
-export default withBotProtection(
-  Sentry.withSentry(
-    getSentryConfig,
-    oAuthProvider,
-  )
-) satisfies ExportedHandler<Env>;
-```
-
-### Blocked User Agents
-
-Generic bot user agents are blocked, including:
-- Python clients: `python-requests`, `aiohttp`, `python-urllib`
-- Go clients: `go-http-client`
-- Java clients: `okhttp`, `apache-httpclient`
-- Command line tools: `curl`, `wget`
-- Other generic clients: `libwww-perl`, `bot`, `spider`, `crawler`
-
-### Allowed Bots
-
-Well-behaved bots are allowed, including:
-- Search engines: Googlebot, Bingbot, DuckDuckBot
-- Social media: FacebookExternalHit, TwitterBot
-- Development tools: Postman, Insomnia
-- Monitoring services: UptimeRobot, Pingdom, NewRelic
-
-### Response
-
-Blocked requests receive a `403 Forbidden` response with the message "Access denied".
-
 ## CORS Configuration
 
 ```typescript
@@ -203,5 +165,4 @@ const ALLOWED_ORIGINS = [
 - OAuth implementation: `packages/mcp-cloudflare/src/server/routes/sentry-oauth.ts`
 - Cookie utilities: `packages/mcp-cloudflare/src/server/utils/cookies.ts`
 - OAuth Provider: `packages/mcp-cloudflare/src/server/bindings.ts`
-- Bot protection: `packages/mcp-cloudflare/src/server/lib/bot-protection.ts`
 - Sentry OAuth docs: https://docs.sentry.io/api/guides/oauth/
