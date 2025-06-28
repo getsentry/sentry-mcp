@@ -1,8 +1,7 @@
 name: Upload Cloudflare Version
 
 on:
-  push:
-    branches: ['**']
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -22,7 +21,7 @@ jobs:
     needs: test
     # Run on all branches except main (which uses deploy.yml)
     if: github.ref != 'refs/heads/main'
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -64,9 +63,9 @@ jobs:
           workingDirectory: packages/mcp-cloudflare
           command: versions upload
           wranglerVersion: "3"
-        
+
       - name: Comment on PR
-        if: github.event_name == 'push' && github.event.pull_request
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
