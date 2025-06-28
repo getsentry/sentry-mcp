@@ -5,7 +5,6 @@ import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
-import { withBotProtection } from "./lib/bot-protection";
 
 // required for Durable Objects
 export { SentryMCP };
@@ -24,6 +23,7 @@ const oAuthProvider = new OAuthProvider({
   scopesSupported: Object.keys(SCOPES),
 });
 
-export default withBotProtection(
-  Sentry.withSentry(getSentryConfig, oAuthProvider),
+export default Sentry.withSentry(
+  getSentryConfig,
+  oAuthProvider,
 ) satisfies ExportedHandler<Env>;
