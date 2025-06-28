@@ -115,6 +115,22 @@ pnpm dev
 
 ### Production Deployment
 
+#### Automated via GitHub Actions (Recommended)
+
+Production deployments happen automatically when changes are pushed to the main branch:
+
+1. Push to main or merge a PR
+2. GitHub Actions runs tests
+3. If tests pass, deploys to Cloudflare
+
+Required secrets in GitHub repository settings:
+- `CLOUDFLARE_API_TOKEN` - API token with Workers deployment permissions
+- `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
+
+See `github-actions.mdc` for detailed setup instructions.
+
+#### Manual Deployment
+
 ```bash
 # Build client assets
 pnpm build
@@ -124,6 +140,20 @@ pnpm deploy
 
 # Or deploy specific environment
 pnpm deploy --env production
+```
+
+#### Version Uploads (Gradual Rollouts)
+
+For feature branches, GitHub Actions automatically uploads new versions without deploying:
+
+1. Push to any branch (except main)
+2. Tests run automatically
+3. If tests pass, version is uploaded to Cloudflare
+4. Use Cloudflare dashboard to gradually roll out the version
+
+Manual version upload:
+```bash
+pnpm cf:versions:upload
 ```
 
 ### Creating Resources
