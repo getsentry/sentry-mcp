@@ -233,6 +233,7 @@ export class OAuthClient {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
+        "User-Agent": "Sentry MCP CLI",
       },
       body: body.toString(),
     });

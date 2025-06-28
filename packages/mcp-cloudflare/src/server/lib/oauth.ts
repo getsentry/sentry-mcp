@@ -89,6 +89,7 @@ export async function exchangeCodeForAccessToken({
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Sentry MCP Cloudflare",
     },
     body: new URLSearchParams({
       grant_type: "authorization_code",

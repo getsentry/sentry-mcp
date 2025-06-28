@@ -100,7 +100,11 @@ async function sentryDocsHandler(
   const path = `${url.pathname.replace(/\/$/, "")}.md`;
   const mdUrl = `${url.origin}${path}`;
 
-  const response = await fetch(mdUrl);
+  const response = await fetch(mdUrl, {
+    headers: {
+      "User-Agent": "Sentry MCP Server",
+    },
+  });
   if (!response.ok) {
     if (response.status === 404) {
       throw new UserInputError(
