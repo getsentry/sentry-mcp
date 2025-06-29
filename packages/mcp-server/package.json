@@ -54,6 +54,10 @@
       "types": "./dist/promptDefinitions.ts",
       "default": "./dist/promptDefinitions.js"
     },
+    "./prompts": {
+      "types": "./dist/prompts.ts",
+      "default": "./dist/prompts.js"
+    },
     "./resources": {
       "types": "./dist/resources.ts",
       "default": "./dist/resources.js"

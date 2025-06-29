@@ -15,8 +15,8 @@ const EMPTY_FUNCTION = () => {};
 // Sample prompts for quick access
 const SAMPLE_PROMPTS = [
   {
-    label: "Get Organizations",
-    prompt: "What organizations do I have access to?",
+    label: "Help",
+    prompt: "/help",
   },
   {
     label: "React SDK Usage",
@@ -33,6 +33,8 @@ interface ChatUIProps {
   input: string;
   error?: Error | null;
   isChatLoading: boolean;
+  isLocalStreaming?: boolean;
+  isMessageStreaming?: (messageId: string) => boolean;
   isOpen?: boolean;
   showControls?: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -43,6 +45,7 @@ interface ChatUIProps {
   onLogout?: () => void;
   onSlashCommand?: (command: string) => void;
   onSendPrompt?: (prompt: string) => void;
+  onPromptSelect?: (prompt: any) => void;
 }
 
 export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
@@ -52,6 +55,8 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
       input,
       error,
       isChatLoading,
+      isLocalStreaming,
+      isMessageStreaming,
       isOpen = true,
       showControls = false,
       onInputChange,
@@ -62,6 +67,7 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
       onLogout,
       onSlashCommand,
       onSendPrompt,
+      onPromptSelect,
     },
     ref,
   ) => {
@@ -92,8 +98,12 @@ export const ChatUI = forwardRef<HTMLDivElement, ChatUIProps>(
           <ChatMessages
             messages={messages}
             isChatLoading={isChatLoading}
+            isLocalStreaming={isLocalStreaming}
+            isMessageStreaming={isMessageStreaming}
             error={error}
             onRetry={onRetry}
+            onPromptSelect={onPromptSelect}
+            onSlashCommand={onSlashCommand}
           />
         </div>
 

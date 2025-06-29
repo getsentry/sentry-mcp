@@ -9,6 +9,7 @@ import type {
   ChatRequest,
   RateLimitResult,
 } from "../types/chat";
+import { executePromptHandler } from "../lib/mcp-prompts";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
@@ -98,6 +99,45 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       );
     }
 
+    // Process messages to handle prompt executions
+    const processedMessages = await Promise.all(
+      messages.map(async (message) => {
+        // Check if this is a prompt execution message
+        if (
+          message.data?.type === "prompt-execution" &&
+          message.data.promptName
+        ) {
+          const { promptName, parameters } = message.data;
+
+          // Execute the prompt handler to get the filled template
+          const promptContent = await executePromptHandler(
+            promptName,
+            parameters || {},
+            {
+              accessToken,
+              host: c.env.SENTRY_HOST || "sentry.io",
+            },
+          );
+
+          // If we got a filled template, replace the message content
+          if (promptContent) {
+            return {
+              ...message,
+              content: promptContent,
+              // Keep the data to preserve context
+              data: {
+                ...message.data,
+                wasExecuted: true,
+              },
+            };
+          }
+        }
+
+        // Return message unchanged if not a prompt execution
+        return message;
+      }),
+    );
+
     // Create MCP client connection to the SSE endpoint
     let mcpClient: MCPClient | null = null;
     const tools: ToolSet = {};
@@ -172,7 +212,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
     const result = streamText({
       model: openai("gpt-4o"),
-      messages,
+      messages: processedMessages,
       tools,
       system: `You are an AI assistant designed EXCLUSIVELY for testing the Sentry MCP service. Your sole purpose is to help users test MCP functionality with their real Sentry account data - nothing more, nothing less.
 

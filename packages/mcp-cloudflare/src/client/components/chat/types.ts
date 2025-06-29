@@ -8,6 +8,22 @@ import type { Message } from "ai/react";
 // Re-export AI SDK types for convenience
 export type { Message } from "ai/react";
 
+// Extended message type that includes our custom metadata
+export interface ExtendedMessage extends Message {
+  data?: {
+    type?: string;
+    prompts?: any[];
+    hasSlashCommands?: boolean;
+    error?: string;
+    // Prompt execution data
+    promptName?: string;
+    parameters?: Record<string, any>;
+    wasExecuted?: boolean;
+    simulateStreaming?: boolean;
+    [key: string]: any;
+  };
+}
+
 // Error handling types (simplified)
 // We only keep this for potential server response parsing
 export interface ChatErrorData {
@@ -110,8 +126,12 @@ export interface ChatUIProps {
 export interface ChatMessagesProps {
   messages: Message[];
   isChatLoading: boolean;
+  isLocalStreaming?: boolean;
+  isMessageStreaming?: (messageId: string) => boolean;
   error?: Error | null;
   onRetry?: () => void;
+  onPromptSelect?: (prompt: any) => void;
+  onSlashCommand?: (command: string) => void;
 }
 
 export interface ChatInputProps {
@@ -140,6 +160,8 @@ export interface MessagePartProps {
   messageRole: string;
   partIndex: number;
   isStreaming?: boolean;
+  messageData?: any;
+  onSlashCommand?: (command: string) => void;
 }
 
 export interface TextPartProps {
@@ -147,6 +169,8 @@ export interface TextPartProps {
   role: string;
   messageId: string;
   isStreaming?: boolean;
+  messageData?: any;
+  onSlashCommand?: (command: string) => void;
 }
 
 export interface ToolPartProps {

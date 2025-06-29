@@ -20,6 +20,7 @@ export type ErrorName =
   | "AI_SERVICE_UNAVAILABLE"
   | "RATE_LIMITER_ERROR"
   | "MCP_CONNECTION_FAILED"
+  | "METADATA_FETCH_FAILED"
   | "INTERNAL_ERROR";
 
 export interface ErrorResponse {
