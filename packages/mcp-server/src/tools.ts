@@ -41,7 +41,9 @@ import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
 import { setTag } from "@sentry/core";
 import { UserInputError } from "./errors";
-import { SENTRY_GUIDES } from "./constants";
+
+const SEER_POLLING_INTERVAL = 5000; // 5 seconds
+const SEER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Response from the search API endpoint
@@ -792,7 +794,7 @@ export const TOOL_HANDLERS = {
       "- The `SENTRY_DSN` value is a URL that you can use to initialize Sentry's SDKs.\n";
     return output;
   },
-  begin_seer_issue_fix: async (context, params) => {
+  analyze_issue_with_seer: async (context, params) => {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
     });
@@ -805,50 +807,114 @@ export const TOOL_HANDLERS = {
 
     setTag("organization.slug", orgSlug);
 
-    const data = await apiService.startAutofix({
-      organizationSlug: orgSlug,
-      issueId: parsedIssueId,
-    });
-    return [
-      `# Issue Fix Started for Issue ${parsedIssueId}`,
-      "",
-      `**Run ID:**: ${data.run_id}`,
-      "",
-      "This operation may take some time, so you should call `get_seer_issue_fix_status()` to check the status of the analysis, and repeat the process until its finished.",
-      "",
-      "You should also inform the user that the operation may take some time, and give them updates whenever you check the status of the operation..",
-      "",
-      "```",
-      params.issueUrl
-        ? `get_seer_issue_fix_status(issueUrl="${params.issueUrl}")`
-        : `get_seer_issue_fix_status(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`,
-      "```",
-    ].join("\n");
-  },
-  get_seer_issue_fix_status: async (context, params) => {
-    const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
-    });
-    const { organizationSlug: orgSlug, issueId: parsedIssueId } =
-      parseIssueParams({
-        organizationSlug: params.organizationSlug,
-        issueId: params.issueId,
-        issueUrl: params.issueUrl,
-      });
-    setTag("organization.slug", orgSlug);
-    const { autofix } = await apiService.getAutofixState({
+    let output = `# Seer AI Analysis for Issue ${parsedIssueId}\n\n`;
+
+    // Step 1: Check if analysis already exists
+    let currentState = await apiService.getAutofixState({
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
     });
-    let output = `# Issue Fix Status for Issue ${parsedIssueId}\n\n`;
-    if (!autofix) {
-      output += `No issue fix process found for ${parsedIssueId}.\n\nYou can initiate a new issue fix execution using the \`begin_seer_issue_fix\` tool.`;
-      return output;
+
+    // Step 2: Start analysis if none exists
+    if (!currentState.autofix) {
+      output += `Starting new analysis...\n\n`;
+      const startResult = await apiService.startAutofix({
+        organizationSlug: orgSlug,
+        issueId: parsedIssueId,
+        instruction: params.instruction,
+      });
+      output += `Analysis started with Run ID: ${startResult.run_id}\n\n`;
+
+      // Give it a moment to initialize
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Refresh state
+      currentState = await apiService.getAutofixState({
+        organizationSlug: orgSlug,
+        issueId: parsedIssueId!,
+      });
+    } else {
+      output += `Found existing analysis (Run ID: ${currentState.autofix.run_id})\n\n`;
     }
-    for (const step of autofix.steps) {
-      output += getOutputForAutofixStep(step);
-      output += "\n";
+
+    // Step 3: Poll until complete or timeout
+    const startTime = Date.now();
+    let lastStatus = "";
+
+    while (Date.now() - startTime < SEER_TIMEOUT) {
+      if (!currentState.autofix) {
+        output += `Error: Analysis state lost. Please try again.\n`;
+        return output;
+      }
+
+      const status = currentState.autofix.status;
+
+      // Check if completed
+      if (
+        status === "COMPLETED" ||
+        status === "FAILED" ||
+        status === "ERROR" ||
+        status === "CANCELLED"
+      ) {
+        output += `## Analysis ${status === "COMPLETED" ? "Complete" : "Failed"}\n\n`;
+
+        // Add all step outputs
+        for (const step of currentState.autofix.steps) {
+          output += getOutputForAutofixStep(step);
+          output += "\n";
+        }
+
+        if (status !== "COMPLETED") {
+          output += `\n**Status**: ${status}\n`;
+        }
+
+        return output;
+      }
+
+      // Update status if changed
+      if (status !== lastStatus) {
+        const activeStep = currentState.autofix.steps.find(
+          (step) =>
+            step.status === "PROCESSING" || step.status === "IN_PROGRESS",
+        );
+        if (activeStep) {
+          output += `Processing: ${activeStep.title}...\n`;
+        }
+        lastStatus = status;
+      }
+
+      // Wait before next poll
+      await new Promise((resolve) =>
+        setTimeout(resolve, SEER_POLLING_INTERVAL),
+      );
+
+      // Refresh state
+      currentState = await apiService.getAutofixState({
+        organizationSlug: orgSlug,
+        issueId: parsedIssueId!,
+      });
     }
+
+    // Show current progress
+    if (currentState.autofix) {
+      output += `**Current Status**: ${currentState.autofix.status}\n\n`;
+      for (const step of currentState.autofix.steps) {
+        output += getOutputForAutofixStep(step);
+        output += "\n";
+      }
+    }
+
+    // Timeout reached
+    output += `\n## Analysis Timed Out\n\n`;
+    output += `The analysis is taking longer than expected (>${SEER_TIMEOUT / 1000}s).\n\n`;
+
+    output += `\nYou can check the status later by running the same command again:\n`;
+    output += `\`\`\`\n`;
+    output += params.issueUrl
+      ? `analyze_issue_with_seer(issueUrl="${params.issueUrl}")`
+      : `analyze_issue_with_seer(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`;
+    output += `\n\`\`\`\n`;
+
     return output;
   },
 
