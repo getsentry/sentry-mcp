@@ -789,6 +789,48 @@ export const restHandlers = buildHandlers([
     fetch: () => HttpResponse.json({ run_id: 123 }),
   },
   {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
+  {
+    method: "post",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+    fetch: () => HttpResponse.json({ run_id: 12 }),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-45/autofix/",
+    fetch: () =>
+      HttpResponse.json({
+        autofix: {
+          run_id: 13,
+          request: { project_id: 4505138086019073 },
+          status: "COMPLETED",
+          updated_at: "2025-04-09T22:39:50.778146",
+          steps: [
+            {
+              type: "root_cause_analysis",
+              key: "root_cause_analysis",
+              index: 0,
+              status: "COMPLETED",
+              title: "1. **Root Cause Analysis**",
+              output_stream: null,
+              progress: [],
+              description: "The analysis has completed successfully.",
+              causes: [
+                {
+                  description: "The analysis has completed successfully.",
+                  id: 1,
+                  root_cause_reproduction: [],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+  },
+  {
     method: "post",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/:teamSlug/",
     fetch: async ({ request, params }) => {

@@ -51,11 +51,11 @@ export const PROMPT_HANDLERS = {
       "",
       issueMessage,
       "",
-      "1. Call the tool `get_seer_issue_fix_status` to see if its already in progress.",
-      "2a. If it isn't, you can start it with the tool `begin_seer_issue_fix`.",
-      "2b. If it is, you can call the tool `get_seer_issue_fix_status` to check the status of the analysis.",
-      "3. Repeat step 2b until the task has completed.",
-      "4. Help me apply the fix to my application, if you are able to. Think carefully when doing this.",
+      "1. Call the tool `analyze_issue_with_seer` to analyze the issue and get fix recommendations.",
+      "2. The tool will automatically check for existing analysis or start a new one if needed.",
+      "3. Wait for the analysis to complete (typically 30-60 seconds).",
+      "4. Review the root cause analysis and suggested fixes.",
+      "5. Help me apply the fix to my application, if you are able to. Think carefully when doing this.",
     ].join("\n");
   },
 } satisfies PromptHandlers;
