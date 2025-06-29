@@ -160,6 +160,9 @@ export async function configureServer({
             attributes: {
               "mcp.resource.name": resource.name,
               "mcp.resource.uri": url.toString(),
+              ...(context.userAgent && {
+                "user_agent.original": context.userAgent,
+              }),
             },
           },
           async () => {
@@ -209,6 +212,9 @@ export async function configureServer({
                 name: `prompts/get ${prompt.name}`,
                 attributes: {
                   "mcp.prompt.name": prompt.name,
+                  ...(context.userAgent && {
+                    "user_agent.original": context.userAgent,
+                  }),
                   ...extractMcpParameters(args[0] || {}),
                 },
               },
@@ -270,6 +276,9 @@ export async function configureServer({
                 name: `tools/call ${tool.name}`,
                 attributes: {
                   "mcp.tool.name": tool.name,
+                  ...(context.userAgent && {
+                    "user_agent.original": context.userAgent,
+                  }),
                   ...extractMcpParameters(args[0] || {}),
                 },
               },

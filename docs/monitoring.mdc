@@ -177,6 +177,16 @@ These are custom attributes - *not in draft spec* - we've added to enhance MCP o
 - `mcp.resource.name` - The name of the resource (e.g., "sentry-docs-platform", "sentry-query-syntax")
 - `mcp.transport` - The transport method used for MCP communication (values: "http", "sse", "stdio")
 
+### User Agent Tracking
+
+Following [OpenTelemetry semantic conventions for user agent](https://opentelemetry.io/docs/specs/semconv/attributes-registry/user-agent/):
+
+- `user_agent.original` - The original User-Agent header value from the client
+
+**Stdio Transport**: Set via `MCP_USER_AGENT` environment variable, defaults to `sentry-mcp-stdio/{version}`
+
+**Cloudflare Transport**: Captured from the initial SSE/WebSocket connection request headers and cached for the session
+
 ### Network Attributes
 Based on [OpenTelemetry network conventions](mdc:https:/github.com/open-telemetry/semantic-conventions/blob/main/docs/registry/attributes/network.md):
 
