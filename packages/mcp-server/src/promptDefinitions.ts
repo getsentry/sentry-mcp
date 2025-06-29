@@ -53,8 +53,8 @@ export const PROMPT_DEFINITIONS = [
     ].join("\n"),
     paramsSchema: {
       organizationSlug: ParamOrganizationSlug.optional(),
-      issueId: ParamIssueShortId,
-      issueUrl: ParamIssueUrl,
+      issueId: ParamIssueShortId.optional(),
+      issueUrl: ParamIssueUrl.optional(),
     },
   },
 ];
