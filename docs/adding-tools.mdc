@@ -7,6 +7,18 @@ alwaysApply: false
 
 Step-by-step guide for adding new tools to the Sentry MCP server.
 
+## Tool Count Limits
+
+**IMPORTANT**: AI agents have a hard cap of 45 total tools available. Since Sentry MCP cannot consume all available tool slots:
+- **Target**: Keep total tool count around 20
+- **Maximum**: Absolutely no more than 25 tools
+- **Constraint**: This limit exists in Cursor and possibly other tools
+
+Before adding a new tool, consider if it could be:
+1. Combined with an existing tool
+2. Implemented as a parameter variant
+3. Truly necessary for core functionality
+
 ## Tool Structure
 
 Each tool consists of:

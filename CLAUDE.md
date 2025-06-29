@@ -34,6 +34,20 @@ All documentation is in the `docs/` directory:
 
 You should ALWAYS update docs when they are inaccurate or you have learned new relevant information which would add clarity that is otherwise missing.
 
+## Documentation Maintenance
+
+- **Keep CLAUDE.md and cursor.mdc concise**: These files are navigation aids, not comprehensive docs
+- **Reference, don't duplicate**: Point to `docs/` files instead of repeating content
+- **Update referenced docs first**: When making changes, update the actual documentation before updating references
+- **Avoid redundancy**: Check existing docs before creating new ones (see `docs/llms/documentation-style-guide.mdc`)
+
+## Tool Count Limits
+
+**IMPORTANT**: AI agents have a hard cap of 45 total tools. Sentry MCP must:
+- Target ~20 tools (current best practice)
+- Never exceed 25 tools (absolute maximum)
+- This limit exists in Cursor and possibly other tools
+
 ## Critical Quality Checks
 
 **After ANY code changes, you MUST run:**

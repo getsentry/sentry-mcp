@@ -1,10 +1,23 @@
-# Adding Resources
+---
+description: Guide for adding new resources that provide context, live data, and reference materials.
+globs: 
+alwaysApply: false
+---
+# Adding New Resources
 
-How to add new MCP resources to provide context, live data, and reference materials to LLMs.
+Guide for adding new resources that provide context, live data, and reference materials.
 
 ## What Are Resources?
 
 Resources are **application-controlled** content that clients provide to LLMs proactively, unlike tools which are **model-controlled** (LLM decides when to call).
+
+## Resource Structure
+
+Each resource consists of:
+1. **Definition** - Schema in `resources.ts`
+2. **Handler** - Logic in `resources.ts`
+3. **Tests** - Unit tests in `resources.test.ts`
+4. **Integration** - Referenced by prompts and tools
 
 ## Resource Types
 
@@ -48,11 +61,9 @@ Reference guides, API docs:
 }
 ```
 
-## Implementation Pattern
+## Step 1: Define the Resource
 
-### 1. Add Resource Definition
-
-In `packages/mcp-server/src/resources.ts`:
+Add to `packages/mcp-server/src/resources.ts`:
 
 ```typescript
 const RESOURCE_HANDLERS: ResourceHandler[] = [
@@ -66,7 +77,13 @@ const RESOURCE_HANDLERS: ResourceHandler[] = [
 ];
 ```
 
-### 2. Implement Handler
+### Resource URI Design
+
+- Use semantic paths: `sentry://entity/identifier/aspect`
+- Support templates with `{variable}` placeholders
+- Keep URIs predictable and consistent
+
+## Step 2: Implement the Handler
 
 ```typescript
 async function yourResourceHandler(url: URL): Promise<ReadResourceResult> {
@@ -88,7 +105,28 @@ async function yourResourceHandler(url: URL): Promise<ReadResourceResult> {
 }
 ```
 
-### 3. Handle Binary Content
+## Step 3: Add Tests
+
+```typescript
+describe("resource: your-resource", () => {
+  it("returns expected content", async () => {
+    const handler = findHandler("sentry://your/path/123");
+    const result = await handler(new URL("sentry://your/path/123"));
+    
+    expect(result.contents[0]).toMatchInlineSnapshot(`
+      {
+        "mimeType": "application/json",
+        "text": "{\"expected\": \"content\"}",
+        "uri": "sentry://your/path/123"
+      }
+    `);
+  });
+});
+```
+
+## Advanced Patterns
+
+### Handle Binary Content
 
 For images, PDFs, or other binary data:
 
@@ -106,7 +144,7 @@ async function binaryResourceHandler(url: URL): Promise<ReadResourceResult> {
 }
 ```
 
-### 4. Support Multiple Contents
+### Support Multiple Contents
 
 Resources can return multiple content items:
 
@@ -127,7 +165,7 @@ return {
 };
 ```
 
-## Resource Templates
+### Resource Templates
 
 Support dynamic URIs with placeholders:
 
@@ -146,68 +184,65 @@ The MCP server automatically generates:
 - `sentry://issue/123/context` → Specific instance
 - `sentry://issue/{issueId}/context` → Template for discovery
 
-## Testing Resources
-
-### Unit Test Pattern
-
-```typescript
-describe("resource: your-resource", () => {
-  it("returns expected content", async () => {
-    const handler = findHandler("sentry://your/path/123");
-    const result = await handler(new URL("sentry://your/path/123"));
-    
-    expect(result.contents[0]).toMatchInlineSnapshot(`
-      {
-        "mimeType": "application/json",
-        "text": "{\\"expected\\": \\"content\\"}",
-        "uri": "sentry://your/path/123"
-      }
-    `);
-  });
-});
-```
-
-See: `packages/mcp-server/src/resources.test.ts`
-
 ## Best Practices
 
-### 1. Clear Naming
+### Clear Naming
 - Use descriptive resource names
 - Follow the pattern: `noun-context` (e.g., `issue-attachments`, `project-health`)
+- Match naming conventions from tools
 
-### 2. Efficient Data
+### Efficient Data
 - Don't overload with unnecessary data
 - Structure for LLM consumption
 - Use appropriate mimeTypes
+- Consider resource size limits
 
-### 3. Error Handling
+### Error Handling
 - Return empty contents for missing data
 - Use clear error messages
 - Don't throw unless critical
+- Log errors for debugging
 
-### 4. Security
+### Security
 - Validate access permissions
 - Sanitize user input in URIs
 - Don't expose sensitive data
+- Use the same auth as tools
 
 ## Common Patterns
 
-See `common-patterns.mdc#multi-content-resources` for:
+See `common-patterns.mdc` for:
 - Response formatting
 - Error handling
 - Parameter extraction
 - Binary content handling
+- Multi-content resources
 
-## Existing Resources
+## Integration with Prompts
 
-Current implementations in `packages/mcp-server/src/resources.ts`:
-- Platform documentation (`sentry://docs/{platform}`)
-- Framework guides (`sentry://docs/{platform}/{framework}`)
-- SDK references (`sentry://sdk/{platform}`)
-- Troubleshooting guides
+Resources are often referenced in prompts:
+
+```typescript
+// In prompt handler
+const instructions = [
+  "Check available resources:",
+  "1. `user-session-context` for recent activity",
+  "2. `project-health` for current metrics",
+];
+```
+
+## Checklist
+
+- [ ] Resource defined in `resources.ts`
+- [ ] Handler implemented with proper error handling
+- [ ] Unit tests with snapshots added
+- [ ] Resource documented in handler comments
+- [ ] Referenced in relevant prompts
+- [ ] Follows security best practices
 
 ## References
 
 - Implementation: `packages/mcp-server/src/resources.ts`
 - Tests: `packages/mcp-server/src/resources.test.ts`
-- MCP Resource spec: https://modelcontextprotocol.io/docs/concepts/resources
+- Common patterns: `docs/common-patterns.mdc`
+- MCP spec: https://modelcontextprotocol.io/docs/concepts/resources
