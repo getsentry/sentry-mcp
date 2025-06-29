@@ -1,7 +1,6 @@
 # sentry-mcp
 
 [![codecov](https://codecov.io/gh/getsentry/sentry-mcp/graph/badge.svg?token=khVKvJP5Ig)](https://codecov.io/gh/getsentry/sentry-mcp)
-[![smithery badge](https://smithery.ai/badge/@getsentry/sentry-mcp)](https://smithery.ai/server/@getsentry/sentry-mcp)
 
 This is a prototype of a remote MCP sever, acting as a middleware to the upstream Sentry API provider.
 

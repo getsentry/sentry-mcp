@@ -165,6 +165,12 @@ Each tool follows a consistent structure:
    - Mock API responses
    - Evaluation tests
 
+**Tool Count Constraints:**
+- AI agents have a 45 tool limit (Cursor, etc.)
+- Sentry MCP must stay under 25 tools (target: ~20)
+- Consolidate functionality where possible
+- Consider parameter variants over new tools
+
 ### 6. Error Handling Philosophy
 
 Two-tier error system:

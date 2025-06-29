@@ -21,7 +21,7 @@ This directory serves a dual purpose:
 
 ### API and Tools
 - `adding-new-tools.mdc` - How to add new MCP tools
-- `adding-new-prompts.mdc` - Guidelines for adding new prompts
+- `adding-prompts.mdc` - Guidelines for adding new prompts
 - `adding-new-resources.mdc` - How to add new MCP resources
 - `api-client-patterns.mdc` - Working with the Sentry API client
 - `using-api-mocks.mdc` - Testing with API mocks
