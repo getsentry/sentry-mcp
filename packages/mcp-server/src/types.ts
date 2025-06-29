@@ -77,4 +77,5 @@ export type ServerContext = {
   organizationSlug: string | null;
   userId?: string | null;
   clientId?: string;
+  userAgent?: string;
 };

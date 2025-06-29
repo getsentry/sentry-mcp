@@ -83,7 +83,13 @@ export default function StdioSetup() {
                 snippet={JSON.stringify(
                   {
                     mcpServers: {
-                      sentry: coreConfig,
+                      sentry: {
+                        ...coreConfig,
+                        env: {
+                          ...coreConfig.env,
+                          MCP_USER_AGENT: "Cursor (stdio)",
+                        },
+                      },
                     },
                   },
                   undefined,
@@ -100,7 +106,7 @@ export default function StdioSetup() {
             <li>
               <CodeSnippet
                 noMargin
-                snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e SENTRY_HOST=sentry.io -- ${mcpStdioSnippet}`}
+                snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e SENTRY_HOST=sentry.io -e MCP_USER_AGENT="Claude Code (stdio)" -- ${mcpStdioSnippet}`}
               />
             </li>
             <li>
@@ -136,7 +142,13 @@ export default function StdioSetup() {
                 snippet={JSON.stringify(
                   {
                     mcpServers: {
-                      sentry: coreConfig,
+                      sentry: {
+                        ...coreConfig,
+                        env: {
+                          ...coreConfig.env,
+                          MCP_USER_AGENT: "Windsurf (stdio)",
+                        },
+                      },
                     },
                   },
                   undefined,
@@ -172,6 +184,10 @@ export default function StdioSetup() {
                     [mcpServerName]: {
                       type: "stdio",
                       ...coreConfig,
+                      env: {
+                        ...coreConfig.env,
+                        MCP_USER_AGENT: "VSCode (stdio)",
+                      },
                     },
                   },
                   undefined,
@@ -201,7 +217,13 @@ export default function StdioSetup() {
                 snippet={JSON.stringify(
                   {
                     context_servers: {
-                      [mcpServerName]: coreConfig,
+                      [mcpServerName]: {
+                        ...coreConfig,
+                        env: {
+                          ...coreConfig.env,
+                          MCP_USER_AGENT: "Zed (stdio)",
+                        },
+                      },
                       settings: {},
                     },
                   },

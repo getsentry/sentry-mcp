@@ -103,6 +103,7 @@ startStdio(instrumentedServer, {
   organizationSlug: null,
   host,
   mcpHost,
+  userAgent: process.env.MCP_USER_AGENT || `sentry-mcp-stdio/${LIB_VERSION}`,
 }).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events
