@@ -12,9 +12,9 @@ Sentry MCP is a Model Context Protocol server that provides access to Sentry's f
 
 All documentation is in the `docs/` directory:
 
-### Core References
+### Core MCP Server
 
-- `architecture.mdc` - System design and package structure
+- `architecture.mdc` - MCP server architecture (NOT the web app)
 - `common-patterns.mdc` - Reusable code patterns
 - `quality-checks.mdc` - Required quality checks
 
@@ -28,9 +28,13 @@ All documentation is in the `docs/` directory:
 
 - `api-patterns.mdc` - Sentry API client usage
 - `testing.mdc` - Testing strategies
-- `deployment.mdc` - Cloudflare deployment
 - `monitoring.mdc` - Observability patterns
 - `security.mdc` - Authentication and security
+
+### Cloudflare Web App (Separate Project)
+
+- `cloudflare/` - Documentation for the web chat application
+- This is a SEPARATE application that uses MCP, not part of MCP itself
 
 You should ALWAYS update docs when they are inaccurate or you have learned new relevant information which would add clarity that is otherwise missing.
 
@@ -54,7 +58,7 @@ You should ALWAYS update docs when they are inaccurate or you have learned new r
 
 ```bash
 pnpm -w run lint:fix    # Fix linting issues
-pnpm tsc --noEmit       # Check TypeScript types
+pnpm tsc               # Check TypeScript types
 pnpm test               # Run all tests
 ```
 
@@ -99,7 +103,7 @@ When using Claude Code's MCP integration:
 
 See specific guides for required environment variables:
 
-- Cloudflare: `deployment.mdc`
+- Cloudflare web app: `docs/cloudflare/deployment.md`
 - Evaluation tests: `.env.example`
 - Local development: Use command-line args
 - MCP Client:

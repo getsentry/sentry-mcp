@@ -34,6 +34,7 @@ export interface ChatRequest {
   messages: Array<{
     role: "user" | "assistant" | "system";
     content: string;
+    data?: any; // Additional metadata for messages
   }>;
 }
 

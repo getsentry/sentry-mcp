@@ -20,7 +20,8 @@
     "cf-typegen": "wrangler types",
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "tsc": "tsc --noEmit"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "catalog:",

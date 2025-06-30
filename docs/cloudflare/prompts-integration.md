@@ -59,26 +59,37 @@ export function useMcpMetadata(authToken: string | null, enabled = true) {
 }
 ```
 
-### 3. Data Stream Integration (Fallback)
+### 3. Prompt Execution in Chat Messages
 
-The chat endpoint still uses AI SDK 4's `createDataStreamResponse` as a fallback for prompt metadata:
+The chat endpoint processes messages to handle prompt executions:
 
 ```typescript
 // packages/mcp-cloudflare/src/server/routes/chat.ts
-return createDataStreamResponse({
-  execute: async (dataStream) => {
-    // Write prompt metadata at the start of the stream
-    dataStream.writeData({
-      type: 'mcp-metadata',
-      prompts: serializedPrompts,
-      tools: Object.keys(tools),
-    });
-
-    // Stream the AI response
-    const result = streamText({...});
-    result.mergeIntoDataStream(dataStream);
-  },
-});
+const processedMessages = await Promise.all(
+  messages.map(async (message) => {
+    // Check if this is a prompt execution message
+    if (message.data?.type === "prompt-execution" && message.data.promptName) {
+      const { promptName, parameters } = message.data;
+      
+      // Execute the prompt handler to get the filled template
+      const promptContent = await executePromptHandler(
+        promptName,
+        parameters || {},
+        { accessToken, host: c.env.SENTRY_HOST || "sentry.io" }
+      );
+      
+      // Replace message content with the prompt template
+      if (promptContent) {
+        return {
+          ...message,
+          content: promptContent,
+          data: { ...message.data, wasExecuted: true }
+        };
+      }
+    }
+    return message;
+  })
+);
 ```
 
 ### 4. Enhanced System Prompt

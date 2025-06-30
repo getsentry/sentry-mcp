@@ -33,7 +33,8 @@
     "start:client": "pnpm run --filter ./packages/mcp-test-client start",
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
     "test": "dotenv -e .env -e .env.local -- turbo test",
-    "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci"
+    "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
+    "tsc": "turbo tsc"
   },
   "dependencies": {
     "@biomejs/biome": "catalog:",

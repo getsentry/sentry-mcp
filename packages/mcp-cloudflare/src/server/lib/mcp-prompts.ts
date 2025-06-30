@@ -91,7 +91,7 @@ export async function executePromptHandler(
   }
 
   try {
-    return await handler(context, parameters);
+    return await handler(context, parameters as any);
   } catch (error) {
     console.error(`Failed to execute prompt handler ${promptName}:`, error);
     return null;

@@ -10,6 +10,7 @@ import type {
   RateLimitResult,
 } from "../types/chat";
 import { executePromptHandler } from "../lib/mcp-prompts";
+import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
@@ -109,25 +110,50 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
         ) {
           const { promptName, parameters } = message.data;
 
-          // Execute the prompt handler to get the filled template
-          const promptContent = await executePromptHandler(
-            promptName,
-            parameters || {},
-            {
-              accessToken,
-              host: c.env.SENTRY_HOST || "sentry.io",
-            },
-          );
+          try {
+            // Execute the prompt handler to get the filled template
+            const promptContent = await executePromptHandler(
+              promptName,
+              parameters || {},
+              {
+                accessToken,
+                host: c.env.SENTRY_HOST || "sentry.io",
+                organizationSlug: null,
+              },
+            );
 
-          // If we got a filled template, replace the message content
-          if (promptContent) {
+            // If we got a filled template, replace the message content
+            if (promptContent) {
+              return {
+                ...message,
+                content: promptContent,
+                // Keep the data to preserve context
+                data: {
+                  ...message.data,
+                  wasExecuted: true,
+                },
+              };
+            }
+            // Handler returned null - prompt not found
             return {
               ...message,
-              content: promptContent,
-              // Keep the data to preserve context
+              content: `Error: The prompt "${promptName}" could not be found or executed. Please check the prompt name and try again.`,
               data: {
                 ...message.data,
-                wasExecuted: true,
+                wasExecuted: false,
+                error: "Prompt not found",
+              },
+            };
+          } catch (error) {
+            // Handler threw an error
+            console.error(`Prompt execution error for ${promptName}:`, error);
+            return {
+              ...message,
+              content: `Error executing prompt "${promptName}": ${error instanceof Error ? error.message : "Unknown error"}. Please check your parameters and try again.`,
+              data: {
+                ...message.data,
+                wasExecuted: false,
+                error: error instanceof Error ? error.message : "Unknown error",
               },
             };
           }
@@ -165,38 +191,12 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       );
     } catch (error) {
       // Check if this is an authentication error
-      if (error instanceof Error) {
-        const errorMessage = error.message.toLowerCase();
-        if (
-          errorMessage.includes("401") ||
-          errorMessage.includes("unauthorized") ||
-          errorMessage.includes("authentication") ||
-          errorMessage.includes("invalid token") ||
-          errorMessage.includes("access token")
-        ) {
-          return c.json(
-            createErrorResponse({
-              error:
-                "Authentication with Sentry has expired. Please log in again.",
-              name: "AUTH_EXPIRED",
-            }),
-            401,
-          );
-        }
-
-        if (
-          errorMessage.includes("403") ||
-          errorMessage.includes("forbidden")
-        ) {
-          return c.json(
-            createErrorResponse({
-              error:
-                "You don't have permission to access this Sentry organization.",
-              name: "INSUFFICIENT_PERMISSIONS",
-            }),
-            403,
-          );
-        }
+      const authInfo = analyzeAuthError(error);
+      if (authInfo.isAuthError) {
+        return c.json(
+          createErrorResponse(getAuthErrorResponse(authInfo)),
+          authInfo.statusCode || (401 as any),
+        );
       }
 
       const eventId = logError(error);

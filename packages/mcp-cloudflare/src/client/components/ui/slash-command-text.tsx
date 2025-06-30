@@ -18,6 +18,9 @@ export function SlashCommandText({
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
+  // Reset regex state before using
+  SLASH_COMMAND_REGEX.lastIndex = 0;
+
   // Find all slash commands in the text
   match = SLASH_COMMAND_REGEX.exec(children);
   while (match !== null) {

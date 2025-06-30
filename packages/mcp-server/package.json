@@ -82,6 +82,7 @@
     "prepare": "pnpm run build",
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
+    "tsc": "tsc --noEmit",
     "test:watch": "vitest watch"
   },
   "devDependencies": {

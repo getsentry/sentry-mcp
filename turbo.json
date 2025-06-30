@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "daemon": true,
+  "daemon": false,
   "ui": "stream",
   "tasks": {
     "setup": {
@@ -22,6 +22,11 @@
       "cache": true
     },
     "test": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": true
+    },
+    "tsc": {
       "dependsOn": ["^build"],
       "outputs": [],
       "cache": true

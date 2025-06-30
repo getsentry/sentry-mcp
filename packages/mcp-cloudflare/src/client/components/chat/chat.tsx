@@ -80,12 +80,19 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
   }, [scrollToBottom]);
 
   // Create a wrapper for startStreaming that includes scroll updates
-  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const startStreaming = useCallback(
     (messageId: string, duration: number) => {
-      // Clear any existing interval
+      // Clear any existing intervals/timeouts
       if (scrollIntervalRef.current) {
         clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
       }
 
       // Start the base streaming
@@ -97,11 +104,12 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
       }, 100);
 
       // Clear interval after streaming duration
-      setTimeout(() => {
+      scrollTimeoutRef.current = setTimeout(() => {
         if (scrollIntervalRef.current) {
           clearInterval(scrollIntervalRef.current);
           scrollIntervalRef.current = null;
         }
+        scrollTimeoutRef.current = null;
       }, duration);
     },
     [startStreamingBase],
@@ -250,11 +258,16 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
   // Track previous auth state to detect logout events
   const prevAuthStateRef = useRef({ isAuthenticated, authToken });
 
-  // Cleanup scroll interval on unmount
+  // Cleanup scroll intervals and timeouts on unmount
   useEffect(() => {
     return () => {
       if (scrollIntervalRef.current) {
         clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = null;
       }
     };
   }, []);

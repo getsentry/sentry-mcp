@@ -43,7 +43,7 @@ function processMessages(
             (isLastPartOfLastMessage &&
               isChatLoading &&
               part.type === "text") ||
-            (part.type === "text" && isMessageStreaming?.(message.id)),
+            (part.type === "text" && !!isMessageStreaming?.(message.id)),
         });
       });
     } else if (message.content) {
@@ -134,13 +134,14 @@ export function ChatMessages({
             const originalMessage = messages.find(
               (m) => m.id === item.messageId,
             );
+            const messageData = originalMessage?.data as any;
             const hasPromptActions =
-              originalMessage?.data?.type === "prompts-list" &&
-              originalMessage?.data?.prompts &&
-              Array.isArray(originalMessage.data.prompts);
+              messageData?.type === "prompts-list" &&
+              messageData?.prompts &&
+              Array.isArray(messageData.prompts);
             const hasSlashCommandActions =
-              originalMessage?.data?.type === "help-message" &&
-              originalMessage?.data?.hasSlashCommands;
+              messageData?.type === "help-message" &&
+              messageData?.hasSlashCommands;
 
             return (
               <div key={`${item.messageId}-part-${item.partIndex}`}>
@@ -155,11 +156,12 @@ export function ChatMessages({
                 />
                 {/* Show prompt actions only for the last part of messages with prompt metadata */}
                 {hasPromptActions &&
-                  item.partIndex === (originalMessage.parts?.length ?? 1) - 1 &&
+                  item.partIndex ===
+                    (originalMessage?.parts?.length ?? 1) - 1 &&
                   onPromptSelect && (
                     <div className="mr-8 mt-4">
                       <PromptActions
-                        prompts={originalMessage.data.prompts}
+                        prompts={messageData.prompts}
                         onPromptSelect={onPromptSelect}
                       />
                     </div>

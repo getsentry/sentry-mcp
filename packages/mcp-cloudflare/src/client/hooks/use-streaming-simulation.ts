@@ -15,7 +15,7 @@ export function useStreamingSimulation() {
     streamingMessageId: null,
   });
 
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Start streaming simulation for a specific message
   const startStreaming = useCallback((messageId: string, duration = 1000) => {

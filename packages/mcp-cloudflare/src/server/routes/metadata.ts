@@ -10,6 +10,7 @@ import type { Env } from "../types";
 import { logError } from "@sentry/mcp-server/logging";
 import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
 import type { ErrorResponse } from "../types/chat";
+import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 
 function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
   return errorResponse;
@@ -70,35 +71,12 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     console.error("Metadata API error:", error);
 
     // Check if this is an authentication error
-    if (error instanceof Error) {
-      const errorMessage = error.message.toLowerCase();
-      if (
-        errorMessage.includes("401") ||
-        errorMessage.includes("unauthorized") ||
-        errorMessage.includes("authentication") ||
-        errorMessage.includes("invalid token") ||
-        errorMessage.includes("access token")
-      ) {
-        return c.json(
-          createErrorResponse({
-            error:
-              "Authentication with Sentry has expired. Please log in again.",
-            name: "AUTH_EXPIRED",
-          }),
-          401,
-        );
-      }
-
-      if (errorMessage.includes("403") || errorMessage.includes("forbidden")) {
-        return c.json(
-          createErrorResponse({
-            error:
-              "You don't have permission to access this Sentry organization.",
-            name: "INSUFFICIENT_PERMISSIONS",
-          }),
-          403,
-        );
-      }
+    const authInfo = analyzeAuthError(error);
+    if (authInfo.isAuthError) {
+      return c.json(
+        createErrorResponse(getAuthErrorResponse(authInfo)),
+        authInfo.statusCode || (401 as any),
+      );
     }
 
     const eventId = logError(error);

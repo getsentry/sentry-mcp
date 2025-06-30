@@ -47,7 +47,7 @@ export function InteractiveMarkdown({
         unwrapDisallowed={true}
         components={{
           // Custom renderer for code that might contain slash commands
-          code: ({ children, ...props }) => {
+          code: ({ children, ref, ...props }) => {
             const text = String(children);
             if (text.startsWith("/") && text.match(/^\/[a-zA-Z]+$/)) {
               // This is a slash command, make it clickable
@@ -64,7 +64,11 @@ export function InteractiveMarkdown({
               );
             }
             // Regular code rendering
-            return <code {...props}>{children}</code>;
+            return (
+              <code ref={ref as any} {...props}>
+                {children}
+              </code>
+            );
           },
         }}
       >
