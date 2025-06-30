@@ -307,9 +307,6 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
 
           // Start streaming simulation
           startStreaming(helpMessage.id, 1200);
-
-          // Trigger initial scroll after message is added
-          setTimeout(() => scrollToBottomRef.current(), 50);
         }, 100);
       } else if (command === "prompts") {
         // Add user message first
@@ -329,9 +326,6 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
 
           // Start streaming simulation
           startStreaming(promptsMessage.id, 800);
-
-          // Trigger initial scroll after message is added
-          setTimeout(() => scrollToBottomRef.current(), 50);
         }, 100);
       } else {
         // Handle unknown slash commands - add user message and error

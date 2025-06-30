@@ -42,11 +42,15 @@ export function usePersistedChat(isAuthenticated: boolean) {
         }
 
         // Tool invocation parts must be complete (have result) if state is "call" or "result"
-        if (part.type === "tool-call") {
+        if (part.type === "tool-invocation") {
           const invocation = part as any;
           // If it's in "call" or "result" state, it must have a result
           if (invocation.state === "call" || invocation.state === "result") {
-            return invocation.result?.content;
+            const content = invocation.result?.content;
+            // Ensure content exists and is not an empty array
+            return (
+              content && (Array.isArray(content) ? content.length > 0 : true)
+            );
           }
           // partial-call state is okay without result
           return true;
