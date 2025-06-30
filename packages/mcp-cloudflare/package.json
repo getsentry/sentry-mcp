@@ -59,6 +59,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-markdown": "catalog:",
+    "react-scroll-to-bottom": "^4.2.0",
     "remark-gfm": "catalog:",
     "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:",

@@ -6,7 +6,6 @@ import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
 import { X, Loader2 } from "lucide-react";
 import type { ChatProps } from "./types";
-import { useScrollToBottom } from "../../hooks/use-scroll-to-bottom";
 import { usePersistedChat } from "../../hooks/use-persisted-chat";
 import { useMcpMetadata } from "../../hooks/use-mcp-metadata";
 import { useStreamingSimulation } from "../../hooks/use-streaming-simulation";
@@ -41,7 +40,7 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
   // Initialize streaming simulation first (without scroll callback)
   const {
     isStreaming: isLocalStreaming,
-    startStreaming: startStreamingBase,
+    startStreaming,
     isMessageStreaming,
   } = useStreamingSimulation();
 
@@ -67,53 +66,7 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     sendExtraMessageFields: true,
   });
 
-  // Use the clean scroll hook with smart auto-scroll detection
-  const [messagesContainerRef, scrollToBottom, setAutoScroll] =
-    useScrollToBottom<HTMLDivElement>({
-      delay: 50, // Simple consistent delay
-    });
-
-  // Use a ref to store scrollToBottom for streaming simulation
-  const scrollToBottomRef = useRef(scrollToBottom);
-  useEffect(() => {
-    scrollToBottomRef.current = scrollToBottom;
-  }, [scrollToBottom]);
-
-  // Create a wrapper for startStreaming that includes scroll updates
-  const scrollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const startStreaming = useCallback(
-    (messageId: string, duration: number) => {
-      // Clear any existing intervals/timeouts
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = null;
-      }
-
-      // Start the base streaming
-      startStreamingBase(messageId, duration);
-
-      // Set up periodic scrolling during streaming
-      scrollIntervalRef.current = setInterval(() => {
-        scrollToBottomRef.current();
-      }, 100);
-
-      // Clear interval after streaming duration
-      scrollTimeoutRef.current = setTimeout(() => {
-        if (scrollIntervalRef.current) {
-          clearInterval(scrollIntervalRef.current);
-          scrollIntervalRef.current = null;
-        }
-        scrollTimeoutRef.current = null;
-      }, duration);
-    },
-    [startStreamingBase],
-  );
+  // No need for custom scroll handling - react-scroll-to-bottom handles it
 
   // Clear messages function - used locally for /clear command and logout
   const clearMessages = useCallback(() => {
@@ -257,20 +210,6 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
 
   // Track previous auth state to detect logout events
   const prevAuthStateRef = useRef({ isAuthenticated, authToken });
-
-  // Cleanup scroll intervals and timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = null;
-      }
-    };
-  }, []);
 
   // Clear messages when user logs out (auth state changes from authenticated to not)
   useEffect(() => {
@@ -490,7 +429,6 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
         }}
       >
         <ChatUI
-          ref={messagesContainerRef}
           messages={messages}
           input={input}
           error={error}
