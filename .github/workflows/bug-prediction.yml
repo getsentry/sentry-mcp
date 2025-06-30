@@ -21,6 +21,9 @@ jobs:
           curl -o overwatch-cli https://overwatch.codecov.io/linux/cli
           chmod +x overwatch-cli
 
+      # Using --upload-empty-on-error flag to force this step through.
+      # This workflow is a temporary workaround until this alpha feature 
+      # is merged into AI PR review
       - name: Run Overwatch CLI
         run: |
           ./overwatch-cli \
