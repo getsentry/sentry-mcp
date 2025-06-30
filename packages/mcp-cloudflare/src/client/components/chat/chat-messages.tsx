@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { MessagePart } from ".";
+import { PromptActions } from "../ui/prompt-actions";
+import { SlashCommandActions } from "../ui/slash-command-actions";
 import type { Message, ProcessedMessagePart, ChatMessagesProps } from "./types";
 import { isAuthError, getErrorMessage } from "../../utils/chat-error-handler";
 import { useAuth } from "../../contexts/auth-context";
@@ -12,6 +14,8 @@ const partCache = new WeakMap<Message, { type: "text"; text: string }>();
 function processMessages(
   messages: Message[],
   isChatLoading: boolean,
+  isLocalStreaming?: boolean,
+  isMessageStreaming?: (messageId: string) => boolean,
 ): ProcessedMessagePart[] {
   const allParts: ProcessedMessagePart[] = [];
 
@@ -34,9 +38,12 @@ function processMessages(
           messageId: message.id,
           messageRole: message.role,
           partIndex,
-          // Only stream if it's the last text part of the last message and chat is loading
+          // Stream if it's AI response OR local streaming simulation
           isStreaming:
-            isLastPartOfLastMessage && isChatLoading && part.type === "text",
+            (isLastPartOfLastMessage &&
+              isChatLoading &&
+              part.type === "text") ||
+            (part.type === "text" && !!isMessageStreaming?.(message.id)),
         });
       });
     } else if (message.content) {
@@ -52,8 +59,11 @@ function processMessages(
         messageId: message.id,
         messageRole: message.role,
         partIndex: 0,
-        // Only stream if it's the last message and chat is loading
-        isStreaming: isLastMessage && isChatLoading,
+        // Stream if it's AI response OR local streaming simulation
+        isStreaming:
+          (isLastMessage && isChatLoading) ||
+          isMessageStreaming?.(message.id) ||
+          false,
       });
     }
   });
@@ -64,14 +74,24 @@ function processMessages(
 export function ChatMessages({
   messages,
   isChatLoading,
+  isLocalStreaming,
+  isMessageStreaming,
   error,
   onRetry,
+  onPromptSelect,
+  onSlashCommand,
 }: ChatMessagesProps) {
   const { handleOAuthLogin } = useAuth();
 
   const processedParts = useMemo(
-    () => processMessages(messages, isChatLoading),
-    [messages, isChatLoading],
+    () =>
+      processMessages(
+        messages,
+        isChatLoading,
+        isLocalStreaming,
+        isMessageStreaming,
+      ),
+    [messages, isChatLoading, isLocalStreaming, isMessageStreaming],
   );
 
   // Simple error handling - just check if it's auth or not
@@ -109,16 +129,46 @@ export function ChatMessages({
           <h2 id="chat-panel-title" className="sr-only">
             Chat Messages
           </h2>
-          {processedParts.map((item) => (
-            <MessagePart
-              key={`${item.messageId}-part-${item.partIndex}`}
-              part={item.part}
-              messageId={item.messageId}
-              messageRole={item.messageRole}
-              partIndex={item.partIndex}
-              isStreaming={item.isStreaming}
-            />
-          ))}
+          {processedParts.map((item) => {
+            // Find the original message to check for metadata
+            const originalMessage = messages.find(
+              (m) => m.id === item.messageId,
+            );
+            const messageData = originalMessage?.data as any;
+            const hasPromptActions =
+              messageData?.type === "prompts-list" &&
+              messageData?.prompts &&
+              Array.isArray(messageData.prompts);
+            const hasSlashCommandActions =
+              messageData?.type === "help-message" &&
+              messageData?.hasSlashCommands;
+
+            return (
+              <div key={`${item.messageId}-part-${item.partIndex}`}>
+                <MessagePart
+                  part={item.part}
+                  messageId={item.messageId}
+                  messageRole={item.messageRole}
+                  partIndex={item.partIndex}
+                  isStreaming={item.isStreaming}
+                  messageData={originalMessage?.data}
+                  onSlashCommand={onSlashCommand}
+                />
+                {/* Show prompt actions only for the last part of messages with prompt metadata */}
+                {hasPromptActions &&
+                  item.partIndex ===
+                    (originalMessage?.parts?.length ?? 1) - 1 &&
+                  onPromptSelect && (
+                    <div className="mr-8 mt-4">
+                      <PromptActions
+                        prompts={messageData.prompts}
+                        onPromptSelect={onPromptSelect}
+                      />
+                    </div>
+                  )}
+              </div>
+            );
+          })}
 
           {/* Show error or loading state */}
           {error && errorMessage ? (

@@ -50,14 +50,11 @@ src/
 
 ### packages/mcp-cloudflare
 
-Cloudflare Workers deployment with OAuth authentication.
+A separate web chat application that uses the MCP server. 
 
-**Key features:**
-- OAuth flow for Sentry authentication
-- React UI for setup instructions
-- Durable Objects for state management
-- KV storage for tokens
-- HTTP transport for remote access
+**Note**: This is NOT part of the MCP server itself - it's a demonstration of how to build a chat interface that consumes MCP.
+
+See [Cloudflare Web App Documentation](./cloudflare/overview.md) for details.
 
 ### packages/mcp-server-evals
 
@@ -107,27 +104,32 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
 
 ### 2. Transport Layers
 
-**Stdio Transport** (Local/Self-hosted):
-- Direct process communication
-- Used by IDEs and local tools
-- Configured via command-line args
+The MCP server supports multiple transport mechanisms:
 
-**HTTP Transport** (Cloudflare):
-- Remote access via Workers
-- OAuth authentication
-- Stateless request handling
+**Stdio Transport** (Primary):
+- Direct process communication
+- Used by IDEs (Cursor, VS Code) and local tools
+- Configured via command-line args
+- This is the standard MCP transport
+
+**HTTP/SSE Transport** (For web apps):
+- Allows web applications to connect to MCP
+- Used by the example Cloudflare chat app
+- Not part of core MCP spec
 
 ### 3. Authentication Strategy
 
-**Local (stdio):**
+The MCP server uses Sentry access tokens for authentication:
+
 ```bash
+# Via command line
 pnpm start:stdio --access-token=<token> --host=<host>
+
+# Via environment variable
+SENTRY_ACCESS_TOKEN=<token> pnpm start:stdio
 ```
 
-**Remote (Cloudflare):**
-- OAuth flow with Sentry
-- Tokens stored in KV
-- Per-organization access control
+For web applications using MCP (like the Cloudflare example), they handle their own authentication and pass tokens to the MCP server.
 
 ### 4. API Client Design
 
