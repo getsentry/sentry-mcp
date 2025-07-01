@@ -4,7 +4,6 @@ import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
 import { Prose } from "../ui/prose";
-import { Button } from "../ui/button";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -68,31 +67,6 @@ export default function StdioSetup() {
       </Prose>
       <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              const config = {
-                mcpServers: {
-                  sentry: {
-                    ...coreConfig,
-                    env: {
-                      ...coreConfig.env,
-                      MCP_USER_AGENT: "Cursor (stdio)",
-                    },
-                  },
-                },
-              };
-              const configJson = JSON.stringify(config);
-              const deepLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=${encodeURIComponent(
-                configJson,
-              )}`;
-              window.location.href = deepLink;
-            }}
-            className="mb-4"
-          >
-            Install in Cursor
-          </Button>
           <ol>
             <li>
               Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
