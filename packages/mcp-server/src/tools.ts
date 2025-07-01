@@ -923,13 +923,11 @@ export const TOOL_HANDLERS = {
           output += `\n**Status**: ${status}\n`;
 
         if (status !== "COMPLETED") {
-          output += `\n\nAnalysis status: ${status}`;
-          
           // Add specific guidance for human-intervention states
           if (status === "NEED_MORE_INFORMATION") {
-            output += `\nSeer needs additional information to continue the analysis. Please review the insights above and consider providing more context.\n`;
+            output += `\n\nSeer needs additional information to continue the analysis. Please review the insights above and consider providing more context.\n`;
           } else if (status === "WAITING_FOR_USER_RESPONSE") {
-            output += `\nSeer is waiting for your response to proceed. Please review the analysis and provide feedback.\n`;
+            output += `\n\nSeer is waiting for your response to proceed. Please review the analysis and provide feedback.\n`;
           }
         }
         }
