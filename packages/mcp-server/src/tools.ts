@@ -60,6 +60,27 @@ interface SearchResponse {
 }
 
 /**
+ * Convert autofix status to user-friendly display name
+ */
+function getStatusDisplayName(status: string): string {
+  switch (status) {
+    case "COMPLETED":
+      return "Complete";
+    case "FAILED":
+    case "ERROR":
+      return "Failed";
+    case "CANCELLED":
+      return "Cancelled";
+    case "NEED_MORE_INFORMATION":
+      return "Needs More Information";
+    case "WAITING_FOR_USER_RESPONSE":
+      return "Waiting for Response";
+    default:
+      return status;
+  }
+}
+
+/**
  * Creates a SentryApiService instance from server context with optional region override.
  *
  * For self-hosted Sentry compatibility, empty regionUrl values are ignored gracefully.
@@ -835,9 +856,41 @@ export const TOOL_HANDLERS = {
       });
     } else {
       output += `Found existing analysis (Run ID: ${currentState.autofix.run_id})\n\n`;
+
+      // FIX #1: Check if existing analysis is already complete
+      const existingStatus = currentState.autofix.status;
+      if (
+        existingStatus === "COMPLETED" ||
+        existingStatus === "FAILED" ||
+        existingStatus === "ERROR" ||
+        existingStatus === "CANCELLED" ||
+        existingStatus === "NEED_MORE_INFORMATION" ||
+        existingStatus === "WAITING_FOR_USER_RESPONSE"
+      ) {
+        // Return results immediately, no polling needed
+        output += `## Analysis ${getStatusDisplayName(existingStatus)}\n\n`;
+
+        for (const step of currentState.autofix.steps) {
+          output += getOutputForAutofixStep(step);
+          output += "\n";
+        }
+
+        if (existingStatus !== "COMPLETED") {
+          output += `\n**Status**: ${existingStatus}\n`;
+
+          // Add specific guidance for human-intervention states
+          if (existingStatus === "NEED_MORE_INFORMATION") {
+            output += `\nSeer needs additional information to continue the analysis. Please review the insights above and consider providing more context.\n`;
+          } else if (existingStatus === "WAITING_FOR_USER_RESPONSE") {
+            output += `\nSeer is waiting for your response to proceed. Please review the analysis and provide feedback.\n`;
+          }
+        }
+
+        return output;
+      }
     }
 
-    // Step 3: Poll until complete or timeout
+    // Step 3: Poll until complete or timeout (only for non-terminal states)
     const startTime = Date.now();
     let lastStatus = "";
 
@@ -849,14 +902,16 @@ export const TOOL_HANDLERS = {
 
       const status = currentState.autofix.status;
 
-      // Check if completed
+      // FIX #2: Check if completed (include all terminal states)
       if (
         status === "COMPLETED" ||
         status === "FAILED" ||
         status === "ERROR" ||
-        status === "CANCELLED"
+        status === "CANCELLED" ||
+        status === "NEED_MORE_INFORMATION" ||
+        status === "WAITING_FOR_USER_RESPONSE"
       ) {
-        output += `## Analysis ${status === "COMPLETED" ? "Complete" : "Failed"}\n\n`;
+        output += `## Analysis ${getStatusDisplayName(status)}\n\n`;
 
         // Add all step outputs
         for (const step of currentState.autofix.steps) {
@@ -866,6 +921,13 @@ export const TOOL_HANDLERS = {
 
         if (status !== "COMPLETED") {
           output += `\n**Status**: ${status}\n`;
+
+          // Add specific guidance for human-intervention states
+          if (status === "NEED_MORE_INFORMATION") {
+            output += `\nSeer needs additional information to continue the analysis. Please review the insights above and consider providing more context.\n`;
+          } else if (status === "WAITING_FOR_USER_RESPONSE") {
+            output += `\nSeer is waiting for your response to proceed. Please review the analysis and provide feedback.\n`;
+          }
         }
 
         return output;
