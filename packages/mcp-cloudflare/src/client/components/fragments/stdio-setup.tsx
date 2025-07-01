@@ -68,32 +68,32 @@ export default function StdioSetup() {
       </Prose>
       <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
-          <ol>
-            <li>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  const config = {
-                    mcpServers: {
-                      sentry: {
-                        ...coreConfig,
-                        env: {
-                          ...coreConfig.env,
-                          MCP_USER_AGENT: "Cursor (stdio)",
-                        },
-                      },
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const config = {
+                mcpServers: {
+                  sentry: {
+                    ...coreConfig,
+                    env: {
+                      ...coreConfig.env,
+                      MCP_USER_AGENT: "Cursor (stdio)",
                     },
-                  };
-                  const deepLink = `cursor://settings/mcp/install?config=${encodeURIComponent(
-                    JSON.stringify(config),
-                  )}`;
-                  window.location.href = deepLink;
-                }}
-              >
-                Quick Install in Cursor
-              </Button>
-            </li>
+                  },
+                },
+              };
+              const configJson = JSON.stringify(config);
+              const deepLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=${encodeURIComponent(
+                configJson,
+              )}`;
+              window.location.href = deepLink;
+            }}
+            className="mb-4"
+          >
+            Install in Cursor
+          </Button>
+          <ol>
             <li>
               Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
               Settings.

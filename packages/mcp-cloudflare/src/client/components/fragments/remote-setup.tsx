@@ -56,26 +56,24 @@ export default function RemoteSetup() {
       </Prose>
       <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const config = {
+                url: endpoint,
+              };
+              const configJson = JSON.stringify(config);
+              const deepLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=${encodeURIComponent(
+                configJson,
+              )}`;
+              window.location.href = deepLink;
+            }}
+            className="mb-4"
+          >
+            Install in Cursor
+          </Button>
           <ol>
-            <li>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  const config = {
-                    mcpServers: {
-                      sentry: coreConfig,
-                    },
-                  };
-                  const deepLink = `cursor://settings/mcp/install?config=${encodeURIComponent(
-                    JSON.stringify(config),
-                  )}`;
-                  window.location.href = deepLink;
-                }}
-              >
-                Quick Install in Cursor
-              </Button>
-            </li>
             <li>
               Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
               Settings.
