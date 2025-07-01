@@ -3,6 +3,7 @@ import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
 import { Prose } from "../ui/prose";
 import { NPM_REMOTE_NAME } from "@/constants";
+import { Button } from "../ui/button";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -57,7 +58,27 @@ export default function RemoteSetup() {
         <SetupGuide id="cursor" title="Cursor">
           <ol>
             <li>
-              <strong>Cmd + Shift + J</strong> to open Cursor Settings.
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const config = {
+                    mcpServers: {
+                      sentry: coreConfig,
+                    },
+                  };
+                  const deepLink = `cursor://settings/mcp/install?config=${encodeURIComponent(
+                    JSON.stringify(config),
+                  )}`;
+                  window.location.href = deepLink;
+                }}
+              >
+                Quick Install in Cursor
+              </Button>
+            </li>
+            <li>
+              Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
+              Settings.
             </li>
             <li>
               Select <strong>MCP</strong>.
