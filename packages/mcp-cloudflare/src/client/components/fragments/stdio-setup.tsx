@@ -69,7 +69,8 @@ export default function StdioSetup() {
         <SetupGuide id="cursor" title="Cursor">
           <ol>
             <li>
-              <strong>Cmd + Shift + J</strong> to open Cursor Settings.
+              Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
+              Settings.
             </li>
             <li>
               Select <strong>MCP Tools</strong>.

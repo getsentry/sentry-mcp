@@ -3,6 +3,7 @@ import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
 import { Prose } from "../ui/prose";
 import { NPM_REMOTE_NAME } from "@/constants";
+import { Button } from "../ui/button";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -17,12 +18,15 @@ export default function RemoteSetup() {
     args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
   };
 
+  const sentryMCPConfig = {
+    url: endpoint,
+  };
+
   // https://code.visualstudio.com/docs/copilot/chat/mcp-servers
-  const vsCodeHandler = `code:mcp/install?${encodeURIComponent(
+  const vsCodeHandler = `vscode:mcp/install?${encodeURIComponent(
     JSON.stringify({
       name: mcpServerName,
-      command: "npx",
-      args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
+      serverUrl: endpoint,
     }),
   )}`;
   const zedInstructions = JSON.stringify(
@@ -55,15 +59,28 @@ export default function RemoteSetup() {
       </Prose>
       <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const deepLink =
+                "cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9";
+              window.location.href = deepLink;
+            }}
+            className="mt-2 mb-2 bg-violet-300 text-black hover:bg-violet-400 hover:text-black"
+          >
+            Install in Cursor
+          </Button>
           <ol>
             <li>
-              <strong>Cmd + Shift + J</strong> to open Cursor Settings.
+              Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
+              Settings.
             </li>
             <li>
-              Select <strong>MCP</strong>.
+              Select <strong>Tools and Integrations</strong>.
             </li>
             <li>
-              Select <strong>Add new global MCP server</strong>.
+              Select <strong>New MCP Server</strong>.
             </li>
             <li>
               <CodeSnippet
@@ -71,7 +88,7 @@ export default function RemoteSetup() {
                 snippet={JSON.stringify(
                   {
                     mcpServers: {
-                      sentry: coreConfig,
+                      sentry: sentryMCPConfig,
                     },
                   },
                   undefined,
@@ -135,11 +152,16 @@ export default function RemoteSetup() {
         </SetupGuide>
 
         <SetupGuide id="vscode" title="Visual Studio Code">
-          <ol>
-            <li>
-              <a href={vsCodeHandler}>Install the MCP extension</a>
-            </li>
-          </ol>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              window.location.href = vsCodeHandler;
+            }}
+            className="mt-2 mb-2 bg-violet-300 text-black hover:bg-violet-400 hover:text-black"
+          >
+            Install in VSCode
+          </Button>
           <p>
             If this doesn't work, you can manually add the server using the
             following steps:
@@ -150,15 +172,16 @@ export default function RemoteSetup() {
               <strong>MCP: Add Server</strong>.
             </li>
             <li>
-              Select <strong>Command (stdio)</strong>.
+              Select <strong>HTTP (HTTP or Server-Sent Events)</strong>.
             </li>
             <li>
-              Enter the following configuration, and hit enter.
-              <CodeSnippet noMargin snippet={mcpRemoteSnippet} />
+              Enter the following configuration, and hit enter
+              <strong> {endpoint}</strong>
             </li>
             <li>
               Enter the name <strong>Sentry</strong> and hit enter.
             </li>
+            <li>Allow the authentication flow to complete.</li>
             <li>
               Activate the server using <strong>MCP: List Servers</strong> and
               selecting <strong>Sentry</strong>, and selecting{" "}
