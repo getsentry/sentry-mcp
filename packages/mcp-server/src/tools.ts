@@ -39,6 +39,11 @@ import { parseIssueParams } from "./internal/issue-helpers";
 import { fetchWithTimeout } from "./internal/fetch-utils";
 import { logError } from "./logging";
 import type { ServerContext, ToolHandlers } from "./types";
+import type {
+  EmbeddedResource,
+  ImageContent,
+  TextContent,
+} from "@modelcontextprotocol/sdk/types.js";
 import { setTag } from "@sentry/core";
 import { UserInputError } from "./errors";
 
@@ -456,6 +461,120 @@ export const TOOL_HANDLERS = {
       event,
       apiService,
     });
+  },
+  get_event_attachment: async (context, params) => {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+
+    setTag("organization.slug", params.organizationSlug);
+
+    // If attachmentId is provided, download the specific attachment
+    if (params.attachmentId) {
+      const attachment = await apiService.getEventAttachment({
+        organizationSlug: params.organizationSlug,
+        projectSlug: params.projectSlug,
+        eventId: params.eventId,
+        attachmentId: params.attachmentId,
+      });
+
+      const contentParts: (TextContent | ImageContent | EmbeddedResource)[] =
+        [];
+      const isBinary = !attachment.attachment.mimetype?.startsWith("text/");
+
+      if (isBinary) {
+        const isImage = attachment.attachment.mimetype?.startsWith("image/");
+        // Base64 encode the binary attachment content
+        // and add to the content as an embedded resource
+        const uint8Array = new Uint8Array(await attachment.blob.arrayBuffer());
+        let binary = "";
+        for (let i = 0; i < uint8Array.byteLength; i++) {
+          binary += String.fromCharCode(uint8Array[i]);
+        }
+        if (isImage) {
+          const image: ImageContent = {
+            type: "image",
+            mimeType: attachment.attachment.mimetype,
+            data: btoa(binary),
+          };
+          contentParts.push(image);
+        } else {
+          const resource: EmbeddedResource = {
+            id: params.attachmentId,
+            type: "resource",
+            resource: {
+              uri: `file://${attachment.filename}`,
+              mimeType: attachment.attachment.mimetype,
+              blob: btoa(binary),
+            },
+          };
+          contentParts.push(resource);
+        }
+      }
+
+      let output = `# Event Attachment Download\n\n`;
+      output += `**Event ID:** ${params.eventId}\n`;
+      output += `**Attachment ID:** ${params.attachmentId}\n`;
+      output += `**Filename:** ${attachment.filename}\n`;
+      output += `**Type:** ${attachment.attachment.type}\n`;
+      output += `**Size:** ${attachment.attachment.size} bytes\n`;
+      output += `**MIME Type:** ${attachment.attachment.mimetype}\n`;
+      output += `**Created:** ${attachment.attachment.dateCreated}\n`;
+      output += `**SHA1:** ${attachment.attachment.sha1}\n\n`;
+      output += `**Download URL:** ${attachment.downloadUrl}\n\n`;
+
+      if (isBinary) {
+        output += `## Binary Content\n\n`;
+        output += `The attachment is included as a resource and accessible through your client.\n`;
+      } else {
+        // If it's a text file and we have blob content, decode and display it instead
+        // of embedding it as an image or resource
+        const textContent = await attachment.blob.text();
+        output += `## File Content\n\n`;
+        output += `\`\`\`\n${textContent}\n\`\`\`\n\n`;
+      }
+
+      const text: TextContent = {
+        type: "text",
+        text: output,
+      };
+      contentParts.push(text);
+
+      return contentParts;
+    }
+
+    // List all attachments for the event
+    const attachments = await apiService.listEventAttachments({
+      organizationSlug: params.organizationSlug,
+      projectSlug: params.projectSlug,
+      eventId: params.eventId,
+    });
+
+    let output = `# Event Attachments\n\n`;
+    output += `**Event ID:** ${params.eventId}\n`;
+    output += `**Project:** ${params.projectSlug}\n\n`;
+
+    if (attachments.length === 0) {
+      output += "No attachments found for this event.\n";
+      return output;
+    }
+
+    output += `Found ${attachments.length} attachment(s):\n\n`;
+
+    attachments.forEach((attachment, index) => {
+      output += `## Attachment ${index + 1}\n\n`;
+      output += `**ID:** ${attachment.id}\n`;
+      output += `**Name:** ${attachment.name}\n`;
+      output += `**Type:** ${attachment.type}\n`;
+      output += `**Size:** ${attachment.size} bytes\n`;
+      output += `**MIME Type:** ${attachment.mimetype}\n`;
+      output += `**Created:** ${attachment.dateCreated}\n`;
+      output += `**SHA1:** ${attachment.sha1}\n\n`;
+      output += `To download this attachment, use the "get_event_attachment" tool with the attachmentId provided:\n`;
+      output += `\`get_event_attachment(organizationSlug="${params.organizationSlug}", projectSlug="${params.projectSlug}", eventId="${params.eventId}", attachmentId="${attachment.id}")\`\n\n`;
+    });
+
+    return output;
   },
   update_issue: async (context, params) => {
     const apiService = apiServiceFromContext(context, {

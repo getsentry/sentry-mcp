@@ -12,6 +12,9 @@ import type { z } from "zod";
 import type {
   GetPromptResult,
   Notification,
+  ImageContent,
+  TextContent,
+  EmbeddedResource,
 } from "@modelcontextprotocol/sdk/types.js";
 
 type ZodifyRecord<T extends Record<string, any>> = {
@@ -58,13 +61,13 @@ export type ToolParams<T extends ToolName> = ToolDefinition<T> extends {
 
 export type ToolHandler<T extends ToolName> = (
   params: ToolParams<T>,
-) => Promise<string>;
+) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
 
 export type ToolHandlerExtended<T extends ToolName> = (
   context: ServerContext,
   params: ToolParams<T>,
   extra: RequestHandlerExtra<Request, Notification>,
-) => Promise<string>;
+) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
 
 export type ToolHandlers = {
   [K in ToolName]: ToolHandlerExtended<K>;
