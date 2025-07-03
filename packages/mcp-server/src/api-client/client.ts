@@ -9,6 +9,8 @@ import {
   IssueListSchema,
   IssueSchema,
   EventSchema,
+  EventAttachmentListSchema,
+  EventAttachmentSchema,
   ErrorsSearchResponseSchema,
   SpansSearchResponseSchema,
   TagListSchema,
@@ -25,6 +27,8 @@ import type {
   ClientKey,
   ClientKeyList,
   Event,
+  EventAttachment,
+  EventAttachmentList,
   Issue,
   IssueList,
   OrganizationList,
@@ -869,6 +873,86 @@ export class SentryApiService {
       },
       opts,
     );
+  }
+
+  async listEventAttachments(
+    {
+      organizationSlug,
+      projectSlug,
+      eventId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      eventId: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const response = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
+      undefined,
+      opts,
+    );
+
+    const body = await response.json();
+    return EventAttachmentListSchema.parse(body);
+  }
+
+  async getEventAttachment(
+    {
+      organizationSlug,
+      projectSlug,
+      eventId,
+      attachmentId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      eventId: string;
+      attachmentId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<{
+    attachment: any;
+    downloadUrl: string;
+    filename: string;
+    blob: Blob;
+  }> {
+    // Get the attachment metadata first
+    const attachmentsResponse = await this.request(
+      `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
+      undefined,
+      opts,
+    );
+
+    const attachments = EventAttachmentListSchema.parse(
+      await attachmentsResponse.json(),
+    );
+    const attachment = attachments.find((att) => att.id === attachmentId);
+
+    if (!attachment) {
+      throw new Error(
+        `Attachment with ID ${attachmentId} not found for event ${eventId}`,
+      );
+    }
+
+    // Download the actual file content
+    const downloadUrl = `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/?download=1`;
+    const downloadResponse = await this.request(
+      downloadUrl,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/octet-stream",
+        },
+      },
+      opts,
+    );
+
+    return {
+      attachment,
+      downloadUrl: downloadResponse.url,
+      filename: attachment.name,
+      blob: await downloadResponse.blob(),
+    };
   }
 
   async updateIssue(
