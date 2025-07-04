@@ -38,6 +38,49 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Validate agents patch applied
+        run: |
+          echo "🔍 Checking if agents patch was applied..."
+          
+          # Check if the patch file exists
+          if [ -f "patches/agents.patch" ]; then
+            echo "✅ Patch file found at patches/agents.patch"
+          else
+            echo "❌ Patch file not found!"
+            exit 1
+          fi
+          
+          # Check if pnpm config references the patch
+          if grep -q "patchedDependencies" package.json; then
+            echo "✅ Patch configuration found in package.json"
+            grep -A 5 "patchedDependencies" package.json
+          else
+            echo "❌ No patch configuration found in package.json!"
+            exit 1
+          fi
+          
+          # Check if the actual change is applied in the installed package
+          if [ -f "packages/mcp-cloudflare/node_modules/agents/src/index.ts" ]; then
+            echo "✅ agents package found in mcp-cloudflare"
+            if grep -q "hibernate: false" packages/mcp-cloudflare/node_modules/agents/src/index.ts; then
+              echo "✅ Patch applied successfully - hibernate is set to false"
+              echo "Configuration:"
+              grep -A 2 -B 2 "hibernate: false" packages/mcp-cloudflare/node_modules/agents/src/index.ts
+            else
+              echo "❌ Patch NOT applied - hibernate is not set to false"
+              echo "Current configuration:"
+              grep -A 2 -B 2 "hibernate:" packages/mcp-cloudflare/node_modules/agents/src/index.ts || echo "No hibernate config found"
+              exit 1
+            fi
+          else
+            echo "❌ agents package not found in expected location"
+            find . -name "index.ts" -path "*/agents/src/*" 2>/dev/null | head -5
+            exit 1
+          fi
+          
+          echo "🎉 Patch validation completed successfully!"
+
+
       - name: Run build
         run: pnpm build
 
