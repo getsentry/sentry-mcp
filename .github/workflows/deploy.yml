@@ -48,6 +48,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Validate agents patch applied
+        run: |
+          echo "🔍 Checking if agents patch was applied..."
+          
+          # Check patch hash exists (proof of patch application)
+          if find node_modules -path "*agents*" -name "agents" -type d | grep -q "patch_hash"; then
+            echo "✅ Patch successfully applied!"
+          else
+            echo "❌ Patch not applied"
+            exit 1
+          fi
+
       - name: Build
         run: pnpm build
 
