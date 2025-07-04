@@ -64,6 +64,48 @@ jobs:
           patch --dry-run -p1 < ../../../../../patches/agents.patch
           cd ../../../../../
 
+      - name: Find agents package location
+        run: |
+          echo "=== FINDING AGENTS PACKAGE ==="
+          
+          echo "1. Finding all agents directories:"
+          find . -name "agents" -type d 2>/dev/null | head -10
+          
+          echo "2. Finding agents package.json files:"
+          find . -name "package.json" -path "*/agents/*" 2>/dev/null | head -5
+          
+          echo "3. Checking if agents is in pnpm store:"
+          find $(pnpm store path) -name "agents" -type d 2>/dev/null | head -5
+          
+          echo "4. Checking pnpm list for agents:"
+          pnpm list --depth=0 --json | jq -r '.[] | select(.dependencies.agents) | {name: .name, agents: .dependencies.agents}'
+          
+          echo "5. Looking for agents in all node_modules:"
+          find . -path "*/node_modules/agents/package.json" 2>/dev/null | head -5
+          
+          echo "6. Checking the specific expected location:"
+          ls -la packages/mcp-cloudflare/node_modules/ | grep agents || echo "agents not found in mcp-cloudflare/node_modules"
+          
+          echo "7. Check if agents is hoisted to root:"
+          ls -la node_modules/ | grep agents || echo "agents not found in root node_modules"
+
+      - name: Check patch configuration format
+        run: |
+          echo "=== PATCH CONFIGURATION CHECK ==="
+          
+          echo "1. Full pnpm section from package.json:"
+          jq -r '.pnpm' package.json
+          
+          echo "2. Check if agents is in pnpm-lock.yaml:"
+          grep -A 5 -B 5 "agents" pnpm-lock.yaml | head -20
+          
+          echo "3. Check patch file format:"
+          echo "First 20 lines of patch file:"
+          head -20 patches/agents.patch
+          
+          echo "4. Check if patch references correct version:"
+          grep -E "^(index|@@|\+\+\+|---)" patches/agents.patch | head -5
+
       - name: Run build
         run: pnpm build
 
