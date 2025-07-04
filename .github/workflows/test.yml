@@ -38,17 +38,47 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Validate agents patch applied
+      - name: Validate agents patch applied to mcp-cloudflare
         run: |
-          echo "🔍 Checking if agents patch was applied..."
+          echo "🔍 Checking if mcp-cloudflare is using patched agents..."
           
-          # Check patch hash exists (proof of patch application)
-          if find node_modules -path "*agents*" -name "agents" -type d | grep -q "patch_hash"; then
-            echo "✅ Patch successfully applied!"
+          # 1. Check if mcp-cloudflare has agents as a symlink
+          if [ -L "packages/mcp-cloudflare/node_modules/agents" ]; then
+            echo "✅ agents is a symlink in mcp-cloudflare (expected with pnpm)"
+            
+            # 2. Get the actual symlink target
+            SYMLINK_TARGET=$(readlink packages/mcp-cloudflare/node_modules/agents)
+            echo "Symlink target: $SYMLINK_TARGET"
+            
+            # 3. Check if the target contains patch_hash (proof of patch)
+            if echo "$SYMLINK_TARGET" | grep -q "patch_hash"; then
+              echo "✅ mcp-cloudflare is using PATCHED agents!"
+              echo "Patch hash found in path: $(echo "$SYMLINK_TARGET" | grep -o 'patch_hash=[^_]*')"
+              
+              # 4. Verify the actual hibernation setting
+              REAL_AGENTS_PATH=$(readlink -f packages/mcp-cloudflare/node_modules/agents/src/index.ts)
+              if grep -q "hibernate: false" "$REAL_AGENTS_PATH"; then
+                echo "✅ Hibernation is correctly set to FALSE"
+                echo "Configuration:"
+                grep -A 1 -B 1 "hibernate: false" "$REAL_AGENTS_PATH"
+              else
+                echo "❌ Hibernation setting not found or incorrect"
+                exit 1
+              fi
+              
+            else
+              echo "❌ mcp-cloudflare is using UNPATCHED agents (no patch_hash in path)"
+              echo "Target: $SYMLINK_TARGET"
+              exit 1
+            fi
+            
           else
-            echo "❌ Patch not applied"
+            echo "❌ agents not found or not a symlink in mcp-cloudflare"
+            ls -la packages/mcp-cloudflare/node_modules/ | grep agents || echo "No agents found"
             exit 1
           fi
+          
+          echo "🎉 mcp-cloudflare patch validation successful!"
       
       - name: Run build
         run: pnpm build
