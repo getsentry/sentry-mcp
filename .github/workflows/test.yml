@@ -38,32 +38,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Enhanced patch debugging
-        run: |
-          echo "=== COMPREHENSIVE PATCH DEBUG ==="
-          
-          echo "1. pnpm configuration:"
-          pnpm config list
-          
-          echo "2. Workspace info:"
-          pnpm list --depth=0 --json | jq -r '.[] | select(.name == "@sentry/mcp-cloudflare") | .dependencies.agents'
-          
-          echo "3. Check if agents is patched:"
-          pnpm list --depth=0 --json | jq -r '.[] | select(.dependencies.agents) | .dependencies.agents'
-          
-          echo "4. Patch file hash:"
-          if [ -f "patches/agents.patch" ]; then
-            sha256sum patches/agents.patch
-          fi
-          
-          echo "5. Direct file check:"
-          find packages/mcp-cloudflare/node_modules -name "package.json" -path "*/agents/*" -exec cat {} \; | grep version
-          
-          echo "6. Test applying patch manually:"
-          cd packages/mcp-cloudflare/node_modules/agents
-          patch --dry-run -p1 < ../../../../../patches/agents.patch
-          cd ../../../../../
-
       - name: Find agents package location
         run: |
           echo "=== FINDING AGENTS PACKAGE ==="
