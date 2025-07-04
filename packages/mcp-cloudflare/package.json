@@ -21,8 +21,7 @@
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "vitest watch",
-    "tsc": "tsc --noEmit",
-    "postinstall": "patch-package"
+    "tsc": "tsc --noEmit"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "catalog:",
@@ -58,7 +57,6 @@
     "clsx": "catalog:",
     "hono": "catalog:",
     "lucide-react": "catalog:",
-    "patch-package": "^8.0.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-markdown": "catalog:",

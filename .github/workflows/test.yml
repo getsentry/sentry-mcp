@@ -42,20 +42,20 @@ jobs:
         run: |
           echo "🔍 Checking if agents patch was applied..."
           
-          # Check if the patch file exists
-          if [ -f "patches/agents.patch" ]; then
-            echo "✅ Patch file found at patches/agents.patch"
+          # Check if the patch file exists (in the mcp-cloudflare package)
+          if [ -f "packages/mcp-cloudflare/patches/agents.patch" ]; then
+            echo "✅ Patch file found at packages/mcp-cloudflare/patches/agents.patch"
           else
             echo "❌ Patch file not found!"
             exit 1
           fi
           
-          # Check if pnpm config references the patch
-          if grep -q "patchedDependencies" package.json; then
-            echo "✅ Patch configuration found in package.json"
-            grep -A 5 "patchedDependencies" package.json
+          # Check if pnpm config references the patch (in mcp-cloudflare package)
+          if grep -q "patchedDependencies" packages/mcp-cloudflare/package.json; then
+            echo "✅ Patch configuration found in mcp-cloudflare package.json"
+            grep -A 5 "patchedDependencies" packages/mcp-cloudflare/package.json
           else
-            echo "❌ No patch configuration found in package.json!"
+            echo "❌ No patch configuration found in mcp-cloudflare package.json!"
             exit 1
           fi
           
