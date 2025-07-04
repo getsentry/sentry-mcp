@@ -8,13 +8,13 @@ catalog:
   "@cloudflare/vitest-pool-workers": ^0.8.47
   "@cloudflare/workers-oauth-provider": ^0.0.5
   "@cloudflare/workers-types": ^4.20250627.0
-  "@modelcontextprotocol/sdk": ^1.13.2
+  "@modelcontextprotocol/sdk": ^1.15.0
   "@radix-ui/react-accordion": ^1.2.11
   "@radix-ui/react-slot": ^1.2.3
-  "@sentry/cloudflare": ^9.33.0
-  "@sentry/core": ^9.33.0
-  "@sentry/node": ^9.33.0
-  "@sentry/react": ^9.33.0
+  "@sentry/cloudflare": ^9.34.0
+  "@sentry/core": ^9.34.0
+  "@sentry/node": ^9.34.0
+  "@sentry/react": ^9.34.0
   "@sentry/vite-plugin": ^3.5.0
   "@tailwindcss/typography": ^0.5.16
   "@tailwindcss/vite": ^4.1.11
@@ -23,7 +23,7 @@ catalog:
   "@types/react-dom": ^19.1.6
   "@vitejs/plugin-react": ^4.6.0
   "@vitest/coverage-v8": ^3.2.4
-  agents: ~0.0.99
+  agents: ~0.0.101
   ai: ^4.3.16
   better-sqlite3: ^11.10.0
   chalk: ^5.4.1
@@ -53,5 +53,5 @@ catalog:
   vitest: ^3.2.4
   vitest-evals: ^0.3.0
   workers-mcp: 0.1.0-3
-  wrangler: ^4.22.0
+  wrangler: ^4.23.0
   zod: ^3.25.67
