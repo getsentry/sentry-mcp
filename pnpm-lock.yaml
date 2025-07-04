@@ -171,7 +171,7 @@ catalogs:
 
 patchedDependencies:
   agents:
-    hash: ecdd563676ee1b0e7c7689be121beebb43bdfae06888ef108149fad8fe090e04
+    hash: 50f8a0f758066ccfb8ea55ce6263f55a60dda94c549670b0870d899e8158d86a
     path: patches/agents.patch
 
 importers:
@@ -246,7 +246,7 @@ importers:
         version: 9.34.0(react@19.1.0)
       agents:
         specifier: 'catalog:'
-        version: 0.0.101(patch_hash=ecdd563676ee1b0e7c7689be121beebb43bdfae06888ef108149fad8fe090e04)(@cloudflare/workers-types@4.20250704.0)(react@19.1.0)
+        version: 0.0.101(patch_hash=50f8a0f758066ccfb8ea55ce6263f55a60dda94c549670b0870d899e8158d86a)(@cloudflare/workers-types@4.20250704.0)(react@19.1.0)
       ai:
         specifier: 'catalog:'
         version: 4.3.16(react@19.1.0)(zod@3.25.72)
@@ -6369,7 +6369,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  agents@0.0.101(patch_hash=ecdd563676ee1b0e7c7689be121beebb43bdfae06888ef108149fad8fe090e04)(@cloudflare/workers-types@4.20250704.0)(react@19.1.0):
+  agents@0.0.101(patch_hash=50f8a0f758066ccfb8ea55ce6263f55a60dda94c549670b0870d899e8158d86a)(@cloudflare/workers-types@4.20250704.0)(react@19.1.0):
     dependencies:
       '@modelcontextprotocol/sdk': 1.15.0
       ai: 4.3.16(react@19.1.0)(zod@3.25.72)

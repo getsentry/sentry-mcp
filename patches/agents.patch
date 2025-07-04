@@ -1,5 +1,27 @@
+diff --git a/dist/mcp/index.js b/dist/mcp/index.js
+index 74f0557ad2782a89adb89e0f0caf4f2f45ff36f8..eff5995b9da0d5c3d4a57da5ae598f598852e63f 100644
+--- a/dist/mcp/index.js
++++ b/dist/mcp/index.js
+@@ -126,7 +126,7 @@ var McpAgent = class _McpAgent extends DurableObject {
+         return self.onMessage(connection, message);
+       }
+     }, _a.options = {
+-      hibernate: true
++      hibernate: false
+     }, _a)(ctx, env);
+   }
+   get mcp() {
+@@ -159,7 +159,7 @@ var McpAgent = class _McpAgent extends DurableObject {
+         return self.onMessage(connection, event);
+       }
+     }, _a.options = {
+-      hibernate: true
++      hibernate: false
+     }, _a)(this.ctx, this.env);
+     this.props = await this.ctx.storage.get("props");
+     this._transportType = await this.ctx.storage.get(
 diff --git a/src/index.ts b/src/index.ts
-index da4881fa3ec784f13f62cd71b05e2e65fdfc51dd..41c08d45cd788fdb373da5f1ece3ce2d4add5911 100644
+index dbf92b18332c7f2c062fa572b72b68ead4374bec..5bdf7ac897e4ee27fe809e0a59ec940e7724caf7 100644
 --- a/src/index.ts
 +++ b/src/index.ts
 @@ -313,7 +313,7 @@ export class Agent<Env, State = unknown> extends Server<Env> {
