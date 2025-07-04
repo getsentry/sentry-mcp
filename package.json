@@ -34,7 +34,8 @@
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
     "test": "dotenv -e .env -e .env.local -- turbo test",
     "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
-    "tsc": "turbo tsc"
+    "tsc": "turbo tsc",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@biomejs/biome": "catalog:",
@@ -43,6 +44,7 @@
     "dotenv": "catalog:",
     "dotenv-cli": "catalog:",
     "lint-staged": "catalog:",
+    "patch-package": "^8.0.0",
     "simple-git-hooks": "catalog:",
     "tsdown": "catalog:",
     "tsx": "catalog:",

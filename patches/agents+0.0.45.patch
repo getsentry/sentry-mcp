@@ -1,0 +1,13 @@
+diff --git a/node_modules/agents/src/index.ts b/node_modules/agents/src/index.ts
+index 7848345..24a618a 100644
+--- a/node_modules/agents/src/index.ts
++++ b/node_modules/agents/src/index.ts
+@@ -238,7 +238,7 @@ export class Agent<Env, State = unknown> extends Server<Env> {
+    */
+   static options = {
+     /** Whether the Agent should hibernate when inactive */
+-    hibernate: true, // default to hibernate
++    hibernate: false, // default to hibernate
+   };
+ 
+   /**
