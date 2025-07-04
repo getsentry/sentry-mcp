@@ -68,9 +68,9 @@
       "sharp",
       "simple-git-hooks",
       "workerd"
-    ]
-  },
-  "patchedDependencies": {
-    "agents": "patches/agents.patch"
+    ],
+    "patchedDependencies": {
+      "agents": "patches/agents.patch"
+    }
   }
 }
