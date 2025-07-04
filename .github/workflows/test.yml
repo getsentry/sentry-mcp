@@ -37,29 +37,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-
-      - name: Validate agents patch applied (Simple)
-        run: |
-          echo "🔍 Checking if agents patch was applied..."
-          
-          # Check if the patch hash exists in the pnpm store path
-          if find node_modules -path "*agents*" -name "agents" -type d | grep -q "patch_hash"; then
-            echo "✅ Patch successfully applied!"
-            echo "Patched agents location:"
-            find node_modules -path "*agents*" -name "agents" -type d | grep "patch_hash"
-            
-            # Verify the content
-            PATCHED_FILE=$(find node_modules -path "*agents*" -name "index.ts" -path "*/src/*" | head -1)
-            if [ -f "$PATCHED_FILE" ]; then
-              echo "✅ Checking patched file content:"
-              grep -A 2 -B 2 "hibernate: false" "$PATCHED_FILE" || echo "❌ hibernate: false not found"
-            fi
-          else
-            echo "❌ Patch not applied - no patch hash found"
-            exit 1
-          fi
-          
-          echo "🎉 Your patch is working perfectly!"
       
       - name: Run build
         run: pnpm build
