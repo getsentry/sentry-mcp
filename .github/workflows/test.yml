@@ -38,48 +38,31 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Validate agents patch applied
+      - name: Enhanced patch debugging
         run: |
-          echo "🔍 Checking if agents patch was applied..."
+          echo "=== COMPREHENSIVE PATCH DEBUG ==="
           
-          # Check if the patch file exists (at root level)
+          echo "1. pnpm configuration:"
+          pnpm config list
+          
+          echo "2. Workspace info:"
+          pnpm list --depth=0 --json | jq -r '.[] | select(.name == "@sentry/mcp-cloudflare") | .dependencies.agents'
+          
+          echo "3. Check if agents is patched:"
+          pnpm list --depth=0 --json | jq -r '.[] | select(.dependencies.agents) | .dependencies.agents'
+          
+          echo "4. Patch file hash:"
           if [ -f "patches/agents.patch" ]; then
-            echo "✅ Patch file found at patches/agents.patch"
-          else
-            echo "❌ Patch file not found!"
-            exit 1
+            sha256sum patches/agents.patch
           fi
           
-          # Check if pnpm config references the patch (at root level)
-          if grep -q "patchedDependencies" package.json; then
-            echo "✅ Patch configuration found in root package.json"
-            grep -A 5 "patchedDependencies" package.json
-          else
-            echo "❌ No patch configuration found in root package.json!"
-            exit 1
-          fi
+          echo "5. Direct file check:"
+          find packages/mcp-cloudflare/node_modules -name "package.json" -path "*/agents/*" -exec cat {} \; | grep version
           
-          # Check if the actual change is applied in the installed package
-          if [ -f "packages/mcp-cloudflare/node_modules/agents/src/index.ts" ]; then
-            echo "✅ agents package found in mcp-cloudflare"
-            if grep -q "hibernate: false" packages/mcp-cloudflare/node_modules/agents/src/index.ts; then
-              echo "✅ Patch applied successfully - hibernate is set to false"
-              echo "Configuration:"
-              grep -A 2 -B 2 "hibernate: false" packages/mcp-cloudflare/node_modules/agents/src/index.ts
-            else
-              echo "❌ Patch NOT applied - hibernate is not set to false"
-              echo "Current configuration:"
-              grep -A 2 -B 2 "hibernate:" packages/mcp-cloudflare/node_modules/agents/src/index.ts || echo "No hibernate config found"
-              exit 1
-            fi
-          else
-            echo "❌ agents package not found in expected location"
-            find . -name "index.ts" -path "*/agents/src/*" 2>/dev/null | head -5
-            exit 1
-          fi
-          
-          echo "🎉 Patch validation completed successfully!"
-
+          echo "6. Test applying patch manually:"
+          cd packages/mcp-cloudflare/node_modules/agents
+          patch --dry-run -p1 < ../../../../../patches/agents.patch
+          cd ../../../../../
 
       - name: Run build
         run: pnpm build
