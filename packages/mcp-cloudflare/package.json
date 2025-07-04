@@ -66,10 +66,5 @@
     "tw-animate-css": "catalog:",
     "workers-mcp": "catalog:",
     "zod": "catalog:"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "agents": "patches/agents.patch"
-    }
   }
 }
