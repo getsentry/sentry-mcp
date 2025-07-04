@@ -69,5 +69,8 @@
       "simple-git-hooks",
       "workerd"
     ]
+  },
+  "patchedDependencies": {
+    "agents": "patches/agents.patch"
   }
 }
