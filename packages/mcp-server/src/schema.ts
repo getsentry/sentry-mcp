@@ -114,3 +114,10 @@ export const ParamSentryGuide = z
     "Optional guide filter to limit search results to specific documentation sections. " +
       "Use either a platform (e.g., 'javascript', 'python') or platform/guide combination (e.g., 'javascript/nextjs', 'python/django').",
   );
+
+export const ParamEventId = z.string().trim().describe("The ID of the event.");
+
+export const ParamAttachmentId = z
+  .string()
+  .trim()
+  .describe("The ID of the attachment to download.");
