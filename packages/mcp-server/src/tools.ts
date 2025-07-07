@@ -75,9 +75,49 @@ function getStatusDisplayName(status: string): string {
       return "Needs More Information";
     case "WAITING_FOR_USER_RESPONSE":
       return "Waiting for Response";
+    case "PROCESSING":
+      return "Processing";
+    case "IN_PROGRESS":
+      return "In Progress";
     default:
       return status;
   }
+}
+
+/**
+ * Check if an autofix status is terminal (no more updates expected)
+ */
+function isTerminalStatus(status: string): boolean {
+  return [
+    "COMPLETED",
+    "FAILED",
+    "ERROR",
+    "CANCELLED",
+    "NEED_MORE_INFORMATION",
+    "WAITING_FOR_USER_RESPONSE",
+  ].includes(status);
+}
+
+/**
+ * Check if an autofix status requires human intervention
+ */
+function isHumanInterventionStatus(status: string): boolean {
+  return (
+    status === "NEED_MORE_INFORMATION" || status === "WAITING_FOR_USER_RESPONSE"
+  );
+}
+
+/**
+ * Get guidance message for human intervention states
+ */
+function getHumanInterventionGuidance(status: string): string {
+  if (status === "NEED_MORE_INFORMATION") {
+    return "\nSeer needs additional information to continue the analysis. Please review the insights above and consider providing more context.\n";
+  }
+  if (status === "WAITING_FOR_USER_RESPONSE") {
+    return "\nSeer is waiting for your response to proceed. Please review the analysis and provide feedback.\n";
+  }
+  return "";
 }
 
 /**
@@ -831,13 +871,13 @@ export const TOOL_HANDLERS = {
     let output = `# Seer AI Analysis for Issue ${parsedIssueId}\n\n`;
 
     // Step 1: Check if analysis already exists
-    let currentState = await apiService.getAutofixState({
+    let autofixState = await apiService.getAutofixState({
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
     });
 
     // Step 2: Start analysis if none exists
-    if (!currentState.autofix) {
+    if (!autofixState.autofix) {
       output += `Starting new analysis...\n\n`;
       const startResult = await apiService.startAutofix({
         organizationSlug: orgSlug,
@@ -850,40 +890,28 @@ export const TOOL_HANDLERS = {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Refresh state
-      currentState = await apiService.getAutofixState({
+      autofixState = await apiService.getAutofixState({
         organizationSlug: orgSlug,
         issueId: parsedIssueId!,
       });
     } else {
-      output += `Found existing analysis (Run ID: ${currentState.autofix.run_id})\n\n`;
+      output += `Found existing analysis (Run ID: ${autofixState.autofix.run_id})\n\n`;
 
-      // FIX #1: Check if existing analysis is already complete
-      const existingStatus = currentState.autofix.status;
-      if (
-        existingStatus === "COMPLETED" ||
-        existingStatus === "FAILED" ||
-        existingStatus === "ERROR" ||
-        existingStatus === "CANCELLED" ||
-        existingStatus === "NEED_MORE_INFORMATION" ||
-        existingStatus === "WAITING_FOR_USER_RESPONSE"
-      ) {
+      // Check if existing analysis is already complete
+      const existingStatus = autofixState.autofix.status;
+      if (isTerminalStatus(existingStatus)) {
         // Return results immediately, no polling needed
         output += `## Analysis ${getStatusDisplayName(existingStatus)}\n\n`;
 
-        for (const step of currentState.autofix.steps) {
+        for (const step of autofixState.autofix.steps) {
           output += getOutputForAutofixStep(step);
           output += "\n";
         }
 
         if (existingStatus !== "COMPLETED") {
           output += `\n**Status**: ${existingStatus}\n`;
-
-          // Add specific guidance for human-intervention states
-          if (existingStatus === "NEED_MORE_INFORMATION") {
-            output += `\nSeer needs additional information to continue the analysis. Please review the insights above and consider providing more context.\n`;
-          } else if (existingStatus === "WAITING_FOR_USER_RESPONSE") {
-            output += `\nSeer is waiting for your response to proceed. Please review the analysis and provide feedback.\n`;
-          }
+          output += getHumanInterventionGuidance(existingStatus);
+          output += "\n";
         }
 
         return output;
@@ -895,39 +923,31 @@ export const TOOL_HANDLERS = {
     let lastStatus = "";
 
     while (Date.now() - startTime < SEER_TIMEOUT) {
-      if (!currentState.autofix) {
-        output += `Error: Analysis state lost. Please try again.\n`;
+      if (!autofixState.autofix) {
+        output += `Error: Analysis state lost. Please try again by running:\n`;
+        output += `\`\`\`\n`;
+        output += params.issueUrl
+          ? `analyze_issue_with_seer(issueUrl="${params.issueUrl}")`
+          : `analyze_issue_with_seer(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`;
+        output += `\n\`\`\`\n`;
         return output;
       }
 
-      const status = currentState.autofix.status;
+      const status = autofixState.autofix.status;
 
-      // FIX #2: Check if completed (include all terminal states)
-      if (
-        status === "COMPLETED" ||
-        status === "FAILED" ||
-        status === "ERROR" ||
-        status === "CANCELLED" ||
-        status === "NEED_MORE_INFORMATION" ||
-        status === "WAITING_FOR_USER_RESPONSE"
-      ) {
+      // Check if completed (terminal state)
+      if (isTerminalStatus(status)) {
         output += `## Analysis ${getStatusDisplayName(status)}\n\n`;
 
         // Add all step outputs
-        for (const step of currentState.autofix.steps) {
+        for (const step of autofixState.autofix.steps) {
           output += getOutputForAutofixStep(step);
           output += "\n";
         }
 
         if (status !== "COMPLETED") {
           output += `\n**Status**: ${status}\n`;
-
-          // Add specific guidance for human-intervention states
-          if (status === "NEED_MORE_INFORMATION") {
-            output += `\n\nSeer needs additional information to continue the analysis. Please review the insights above and consider providing more context.\n`;
-          } else if (status === "WAITING_FOR_USER_RESPONSE") {
-            output += `\n\nSeer is waiting for your response to proceed. Please review the analysis and provide feedback.\n`;
-          }
+          output += getHumanInterventionGuidance(status);
         }
 
         return output;
@@ -935,7 +955,7 @@ export const TOOL_HANDLERS = {
 
       // Update status if changed
       if (status !== lastStatus) {
-        const activeStep = currentState.autofix.steps.find(
+        const activeStep = autofixState.autofix.steps.find(
           (step) =>
             step.status === "PROCESSING" || step.status === "IN_PROGRESS",
         );
@@ -951,16 +971,16 @@ export const TOOL_HANDLERS = {
       );
 
       // Refresh state
-      currentState = await apiService.getAutofixState({
+      autofixState = await apiService.getAutofixState({
         organizationSlug: orgSlug,
         issueId: parsedIssueId!,
       });
     }
 
     // Show current progress
-    if (currentState.autofix) {
-      output += `**Current Status**: ${currentState.autofix.status}\n\n`;
-      for (const step of currentState.autofix.steps) {
+    if (autofixState.autofix) {
+      output += `**Current Status**: ${getStatusDisplayName(autofixState.autofix.status)}\n\n`;
+      for (const step of autofixState.autofix.steps) {
         output += getOutputForAutofixStep(step);
         output += "\n";
       }
