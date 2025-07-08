@@ -87,9 +87,15 @@ You should ALWAYS update docs when they are inaccurate or you have learned new r
 - Never exceed 25 tools (absolute maximum)
 - This limit exists in Cursor and possibly other tools
 
-## Critical Quality Checks
+## Code Validation Requirements
 
-**After ANY code changes, you MUST run:**
+**MANDATORY after ANY code changes:**
+- Run `pnpm run tsc` to verify type safety
+- Run `pnpm run lint` to check code style  
+- Run `pnpm run test` for affected components
+- See `docs/quality-checks.mdc` for complete checklist
+
+**Commands to run:**
 
 ```bash
 pnpm -w run lint:fix    # Fix linting issues

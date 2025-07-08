@@ -147,105 +147,49 @@ export async function configureServer({
   };
 
   for (const resource of RESOURCES) {
+    // Create the handler function once - it's the same for both resource types
+    const resourceHandler = async (
+      url: URL,
+      extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+    ) => {
+      return await startNewTrace(async () => {
+        return await startSpan(
+          {
+            name: `resources/read ${url.toString()}`,
+            attributes: {
+              "mcp.resource.name": resource.name,
+              "mcp.resource.uri": url.toString(),
+              ...(context.userAgent && {
+                "user_agent.original": context.userAgent,
+              }),
+            },
+          },
+          async () => {
+            if (context.userId) {
+              setUser({
+                id: context.userId,
+              });
+            }
+            if (context.clientId) {
+              setTag("client.id", context.clientId);
+            }
+
+            return resource.handler(url, extra);
+          },
+        );
+      });
+    };
+
     // TODO: this doesnt support any error handling afaict via the spec
-    if (isTemplateResource(resource)) {
-      // Template resource handler receives variables instead of RequestHandlerExtra
-      const templateHandler = async (
-        url: URL,
-        variables: Record<string, string | string[]>,
-      ) => {
-        return await startNewTrace(async () => {
-          return await startSpan(
-            {
-              name: `resources/read ${url.toString()}`,
-              attributes: {
-                "mcp.resource.name": resource.name,
-                "mcp.resource.uri": url.toString(),
-                ...(context.userAgent && {
-                  "user_agent.original": context.userAgent,
-                }),
-              },
-            },
-            async () => {
-              if (context.userId) {
-                setUser({
-                  id: context.userId,
-                });
-              }
-              if (context.clientId) {
-                setTag("client.id", context.clientId);
-              }
-
-              // Create a minimal RequestHandlerExtra for the handler
-              const extra: RequestHandlerExtra<
-                ServerRequest,
-                ServerNotification
-              > = {
-                signal: new AbortController().signal,
-                requestId: crypto.randomUUID(),
-                sendNotification: async () => {},
-                sendRequest: async () => ({}) as any,
-              };
-
-              return resource.handler(url, extra);
-            },
-          );
-        });
-      };
-
-      server.registerResource(
-        resource.name,
-        resource.template,
-        {
-          description: resource.description,
-          mimeType: resource.mimeType,
-        },
-        templateHandler,
-      );
-    } else {
-      // Regular resource handler
-      const resourceHandler = async (
-        url: URL,
-        extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-      ) => {
-        return await startNewTrace(async () => {
-          return await startSpan(
-            {
-              name: `resources/read ${url.toString()}`,
-              attributes: {
-                "mcp.resource.name": resource.name,
-                "mcp.resource.uri": url.toString(),
-                ...(context.userAgent && {
-                  "user_agent.original": context.userAgent,
-                }),
-              },
-            },
-            async () => {
-              if (context.userId) {
-                setUser({
-                  id: context.userId,
-                });
-              }
-              if (context.clientId) {
-                setTag("client.id", context.clientId);
-              }
-
-              return resource.handler(url, extra);
-            },
-          );
-        });
-      };
-
-      server.registerResource(
-        resource.name,
-        resource.uri,
-        {
-          description: resource.description,
-          mimeType: resource.mimeType,
-        },
-        resourceHandler,
-      );
-    }
+    server.registerResource(
+      resource.name,
+      (isTemplateResource(resource) ? resource.template : resource.uri) as any,
+      {
+        description: resource.description,
+        mimeType: resource.mimeType,
+      },
+      resourceHandler as any,
+    );
   }
 
   for (const prompt of PROMPT_DEFINITIONS) {

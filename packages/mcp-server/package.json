@@ -76,7 +76,7 @@
   },
   "scripts": {
     "build": "tsdown && pnpm run generate-tool-definitions",
-    "dev": "tsc -w",
+    "dev": "pnpm run generate-tool-definitions && tsc -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
     "test": "vitest",

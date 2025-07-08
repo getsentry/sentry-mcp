@@ -79,9 +79,13 @@ When making changes, consider these areas:
 - CLAUDE.md ↔ cursor.mdc must stay synchronized
 - Update relevant docs for tools, prompts, resources, API patterns, or architecture changes
 
-## Quality Checks
+## Code Validation Requirements
 
-**MUST run after ANY code changes:** See `docs/quality-checks.mdc`
+**MANDATORY after ANY code changes:**
+- Run `pnpm run tsc` to verify type safety
+- Run `pnpm run lint` to check code style  
+- Run `pnpm run test` for affected components
+- See `docs/quality-checks.mdc` for complete checklist
 
 ## Component Limits
 
