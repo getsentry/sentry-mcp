@@ -23,26 +23,24 @@ const __dirname = path.dirname(__filename);
 const tools = await import("../src/tools/index.js");
 
 /**
- * Convert Zod schema object to JSON Schema
+ * Convert Zod schema object to JSON Schema properties
  */
 function convertInputSchemaToJsonSchema(inputSchema: Record<string, any>) {
   if (!inputSchema || Object.keys(inputSchema).length === 0) {
     return {};
   }
 
-  // Convert the inputSchema object to a Zod object schema, then to JSON Schema
-  const zodObjectSchema = z.object(inputSchema);
-  const jsonSchema = zodToJsonSchema(zodObjectSchema, {
-    name: "ToolInputSchema",
-    $refStrategy: "none", // Don't use $ref for cleaner output
-  });
+  const properties: Record<string, any> = {};
 
-  // If there are definitions, extract from there, otherwise use direct properties
-  if (jsonSchema.definitions?.ToolInputSchema?.properties) {
-    return jsonSchema.definitions.ToolInputSchema.properties;
+  // Convert each individual Zod schema to JSON Schema
+  for (const [key, zodSchema] of Object.entries(inputSchema)) {
+    const jsonSchema = zodToJsonSchema(zodSchema, {
+      $refStrategy: "none", // Don't use $ref for cleaner output
+    });
+    properties[key] = jsonSchema;
   }
 
-  return jsonSchema.properties || {};
+  return properties;
 }
 
 /**
@@ -105,11 +103,30 @@ async function main() {
 
     // Write TypeScript declaration file
     const dtsPath = path.join(distDir, "toolDefinitions.d.ts");
-    const dtsContent = `declare const toolDefinitions: Array<{
+    const dtsContent = `// JSON Schema property type definition
+interface JsonSchemaProperty {
+  type: string;
+  description: string;
+  enum?: string[];
+  default?: any;
+  format?: string;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+}
+
+// Tool definition interface with proper JSON Schema types
+interface ToolDefinition {
   name: string;
   description: string;
-  inputSchema: Record<string, any>;
-}>;
+  inputSchema: Record<string, JsonSchemaProperty>;
+}
+
+// Array of tool definitions with proper typing
+type ToolDefinitions = ToolDefinition[];
+
+declare const toolDefinitions: ToolDefinitions;
 export default toolDefinitions;`;
     fs.writeFileSync(dtsPath, dtsContent);
 
