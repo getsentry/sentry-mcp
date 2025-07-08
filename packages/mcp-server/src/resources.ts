@@ -21,30 +21,45 @@
 import {
   ResourceTemplate,
   type ReadResourceCallback,
+  type ReadResourceTemplateCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import { UserInputError } from "./errors";
 
 /**
- * Resource configuration with handler function
+ * Resource configuration for regular URI resources
  */
-export type ResourceConfig = {
+export type UriResourceConfig = {
   name: string;
   description: string;
   mimeType: string;
+  uri: string;
   handler: ReadResourceCallback;
-} & (
-  | { uri: string; template?: never }
-  | { uri?: never; template: ResourceTemplate }
-);
+};
+
+/**
+ * Resource configuration for URI template resources
+ */
+export type TemplateResourceConfig = {
+  name: string;
+  description: string;
+  mimeType: string;
+  template: ResourceTemplate;
+  handler: ReadResourceCallback; // Changed back to ReadResourceCallback
+};
+
+/**
+ * Resource configuration with handler function
+ */
+export type ResourceConfig = UriResourceConfig | TemplateResourceConfig;
 
 /**
  * Type guard to check if a resource uses a URI template
  */
 export function isTemplateResource(
   resource: ResourceConfig,
-): resource is ResourceConfig & { template: ResourceTemplate } {
+): resource is TemplateResourceConfig {
   return (
     "template" in resource && resource.template instanceof ResourceTemplate
   );
@@ -150,7 +165,7 @@ export const RESOURCES: ResourceConfig[] = [
     description:
       "Use these rules to understand common query parameters when searching Sentry for information.",
     handler: defaultGitHubHandler,
-  },
+  } as UriResourceConfig,
   // Platform documentation with dynamic segments
   {
     name: "sentry-docs-platform",
@@ -170,7 +185,7 @@ export const RESOURCES: ResourceConfig[] = [
     mimeType: "text/markdown",
     description: "Sentry SDK documentation for {platform}",
     handler: sentryDocsHandler,
-  },
+  } as TemplateResourceConfig,
   {
     name: "sentry-docs-platform-guide",
     template: new ResourceTemplate(
@@ -192,5 +207,5 @@ export const RESOURCES: ResourceConfig[] = [
     mimeType: "text/markdown",
     description: "Sentry integration guide for {framework} on {platform}",
     handler: sentryDocsHandler,
-  },
+  } as TemplateResourceConfig,
 ];

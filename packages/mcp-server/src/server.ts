@@ -23,6 +23,11 @@ import type {
   ServerRequest,
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Variables } from "@modelcontextprotocol/sdk/shared/uriTemplate.js";
 import tools from "./tools/index";
 import type { ServerContext } from "./types";
 import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
@@ -119,6 +124,89 @@ function extractMcpParameters(args: Record<string, unknown>) {
 }
 
 /**
+ * Creates a telemetry wrapper for regular URI resource handlers.
+ * Captures URI access and user context for observability.
+ */
+function createResourceHandler(
+  resource: { name: string; handler: ReadResourceCallback },
+  context: ServerContext,
+): ReadResourceCallback {
+  return async (uri: URL, extra: RequestHandlerExtra<any, any>) => {
+    return await startNewTrace(async () => {
+      return await startSpan(
+        {
+          name: `resources/read ${resource.name}`,
+          attributes: {
+            "mcp.resource.name": resource.name,
+            "mcp.resource.uri": uri.toString(),
+            ...(context.userAgent && {
+              "user_agent.original": context.userAgent,
+            }),
+          },
+        },
+        async () => {
+          if (context.userId) {
+            setUser({
+              id: context.userId,
+            });
+          }
+          if (context.clientId) {
+            setTag("client.id", context.clientId);
+          }
+
+          return resource.handler(uri, extra);
+        },
+      );
+    });
+  };
+}
+
+/**
+ * Creates a telemetry wrapper for URI template resource handlers.
+ * Captures template parameters and user context for observability.
+ */
+function createTemplateResourceHandler(
+  resource: { name: string; handler: ReadResourceCallback },
+  context: ServerContext,
+): ReadResourceTemplateCallback {
+  return async (
+    uri: URL,
+    variables: Variables,
+    extra: RequestHandlerExtra<any, any>,
+  ) => {
+    return await startNewTrace(async () => {
+      return await startSpan(
+        {
+          name: `resources/read ${resource.name}`,
+          attributes: {
+            "mcp.resource.name": resource.name,
+            "mcp.resource.uri": uri.toString(),
+            ...(context.userAgent && {
+              "user_agent.original": context.userAgent,
+            }),
+            ...extractMcpParameters(variables),
+          },
+        },
+        async () => {
+          if (context.userId) {
+            setUser({
+              id: context.userId,
+            });
+          }
+          if (context.clientId) {
+            setTag("client.id", context.clientId);
+          }
+
+          // The MCP SDK has already constructed the URI from the template and variables
+          // We just need to call the handler with the constructed URI
+          return resource.handler(uri, extra);
+        },
+      );
+    });
+  };
+}
+
+/**
  * Configures an MCP server with all tools, prompts, resources, and telemetry.
  *
  * Transforms a bare MCP server instance into a fully-featured Sentry integration
@@ -147,49 +235,29 @@ export async function configureServer({
   };
 
   for (const resource of RESOURCES) {
-    // Create the handler function once - it's the same for both resource types
-    const resourceHandler = async (
-      url: URL,
-      extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-    ) => {
-      return await startNewTrace(async () => {
-        return await startSpan(
-          {
-            name: `resources/read ${url.toString()}`,
-            attributes: {
-              "mcp.resource.name": resource.name,
-              "mcp.resource.uri": url.toString(),
-              ...(context.userAgent && {
-                "user_agent.original": context.userAgent,
-              }),
-            },
-          },
-          async () => {
-            if (context.userId) {
-              setUser({
-                id: context.userId,
-              });
-            }
-            if (context.clientId) {
-              setTag("client.id", context.clientId);
-            }
-
-            return resource.handler(url, extra);
-          },
-        );
-      });
-    };
-
-    // TODO: this doesnt support any error handling afaict via the spec
-    server.registerResource(
-      resource.name,
-      (isTemplateResource(resource) ? resource.template : resource.uri) as any,
-      {
-        description: resource.description,
-        mimeType: resource.mimeType,
-      },
-      resourceHandler as any,
-    );
+    if (isTemplateResource(resource)) {
+      // Handle URI template resources
+      server.registerResource(
+        resource.name,
+        resource.template,
+        {
+          description: resource.description,
+          mimeType: resource.mimeType,
+        },
+        createTemplateResourceHandler(resource, context),
+      );
+    } else {
+      // Handle regular URI resources
+      server.registerResource(
+        resource.name,
+        resource.uri,
+        {
+          description: resource.description,
+          mimeType: resource.mimeType,
+        },
+        createResourceHandler(resource, context),
+      );
+    }
   }
 
   for (const prompt of PROMPT_DEFINITIONS) {
