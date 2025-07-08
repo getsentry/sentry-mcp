@@ -168,6 +168,9 @@ catalogs:
     zod:
       specifier: ^3.25.67
       version: 3.25.72
+    zod-to-json-schema:
+      specifier: ^3.24.6
+      version: 3.24.6
 
 importers:
 
@@ -361,6 +364,9 @@ importers:
       msw:
         specifier: 'catalog:'
         version: 2.10.2(@types/node@24.0.10)(typescript@5.8.3)
+      zod-to-json-schema:
+        specifier: 'catalog:'
+        version: 3.24.6(zod@3.25.72)
 
   packages/mcp-server-evals:
     dependencies:

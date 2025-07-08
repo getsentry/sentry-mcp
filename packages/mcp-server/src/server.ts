@@ -23,8 +23,12 @@ import type {
   ServerRequest,
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
-import { TOOL_HANDLERS } from "./tools";
-import { TOOL_DEFINITIONS } from "./toolDefinitions";
+import type {
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Variables } from "@modelcontextprotocol/sdk/shared/uriTemplate.js";
+import tools from "./tools/index";
 import type { ServerContext } from "./types";
 import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
 import { logError } from "./logging";
@@ -120,6 +124,89 @@ function extractMcpParameters(args: Record<string, unknown>) {
 }
 
 /**
+ * Creates a telemetry wrapper for regular URI resource handlers.
+ * Captures URI access and user context for observability.
+ */
+function createResourceHandler(
+  resource: { name: string; handler: ReadResourceCallback },
+  context: ServerContext,
+): ReadResourceCallback {
+  return async (uri: URL, extra: RequestHandlerExtra<any, any>) => {
+    return await startNewTrace(async () => {
+      return await startSpan(
+        {
+          name: `resources/read ${resource.name}`,
+          attributes: {
+            "mcp.resource.name": resource.name,
+            "mcp.resource.uri": uri.toString(),
+            ...(context.userAgent && {
+              "user_agent.original": context.userAgent,
+            }),
+          },
+        },
+        async () => {
+          if (context.userId) {
+            setUser({
+              id: context.userId,
+            });
+          }
+          if (context.clientId) {
+            setTag("client.id", context.clientId);
+          }
+
+          return resource.handler(uri, extra);
+        },
+      );
+    });
+  };
+}
+
+/**
+ * Creates a telemetry wrapper for URI template resource handlers.
+ * Captures template parameters and user context for observability.
+ */
+function createTemplateResourceHandler(
+  resource: { name: string; handler: ReadResourceCallback },
+  context: ServerContext,
+): ReadResourceTemplateCallback {
+  return async (
+    uri: URL,
+    variables: Variables,
+    extra: RequestHandlerExtra<any, any>,
+  ) => {
+    return await startNewTrace(async () => {
+      return await startSpan(
+        {
+          name: `resources/read ${resource.name}`,
+          attributes: {
+            "mcp.resource.name": resource.name,
+            "mcp.resource.uri": uri.toString(),
+            ...(context.userAgent && {
+              "user_agent.original": context.userAgent,
+            }),
+            ...extractMcpParameters(variables),
+          },
+        },
+        async () => {
+          if (context.userId) {
+            setUser({
+              id: context.userId,
+            });
+          }
+          if (context.clientId) {
+            setTag("client.id", context.clientId);
+          }
+
+          // The MCP SDK has already constructed the URI from the template and variables
+          // We just need to call the handler with the constructed URI
+          return resource.handler(uri, extra);
+        },
+      );
+    });
+  };
+}
+
+/**
  * Configures an MCP server with all tools, prompts, resources, and telemetry.
  *
  * Transforms a bare MCP server instance into a fully-featured Sentry integration
@@ -148,53 +235,29 @@ export async function configureServer({
   };
 
   for (const resource of RESOURCES) {
-    // Create the handler function once - it's the same for both resource types
-    const resourceHandler = async (
-      url: URL,
-      extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-    ) => {
-      return await startNewTrace(async () => {
-        return await startSpan(
-          {
-            name: `resources/read ${url.toString()}`,
-            attributes: {
-              "mcp.resource.name": resource.name,
-              "mcp.resource.uri": url.toString(),
-              ...(context.userAgent && {
-                "user_agent.original": context.userAgent,
-              }),
-            },
-          },
-          async () => {
-            if (context.userId) {
-              setUser({
-                id: context.userId,
-              });
-            }
-            if (context.clientId) {
-              setTag("client.id", context.clientId);
-            }
-
-            return resource.handler(url, extra);
-          },
-        );
-      });
-    };
-
-    // TODO: this doesnt support any error handling afaict via the spec
-    const source = isTemplateResource(resource)
-      ? resource.template
-      : resource.uri;
-
-    server.registerResource(
-      resource.name,
-      source,
-      {
-        description: resource.description,
-        mimeType: resource.mimeType,
-      },
-      resourceHandler,
-    );
+    if (isTemplateResource(resource)) {
+      // Handle URI template resources
+      server.registerResource(
+        resource.name,
+        resource.template,
+        {
+          description: resource.description,
+          mimeType: resource.mimeType,
+        },
+        createTemplateResourceHandler(resource, context),
+      );
+    } else {
+      // Handle regular URI resources
+      server.registerResource(
+        resource.name,
+        resource.uri,
+        {
+          description: resource.description,
+          mimeType: resource.mimeType,
+        },
+        createResourceHandler(resource, context),
+      );
+    }
   }
 
   for (const prompt of PROMPT_DEFINITIONS) {
@@ -261,14 +324,15 @@ export async function configureServer({
     );
   }
 
-  for (const tool of TOOL_DEFINITIONS) {
-    const handler = TOOL_HANDLERS[tool.name];
-
+  for (const [toolKey, tool] of Object.entries(tools)) {
     server.tool(
-      tool.name as string,
+      tool.name,
       tool.description,
-      tool.paramsSchema ? tool.paramsSchema : {},
-      async (...args) => {
+      tool.inputSchema,
+      async (
+        params: any,
+        extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+      ) => {
         try {
           return await startNewTrace(async () => {
             return await startSpan(
@@ -279,7 +343,7 @@ export async function configureServer({
                   ...(context.userAgent && {
                     "user_agent.original": context.userAgent,
                   }),
-                  ...extractMcpParameters(args[0] || {}),
+                  ...extractMcpParameters(params || {}),
                 },
               },
               async (span) => {
@@ -293,17 +357,15 @@ export async function configureServer({
                 }
 
                 try {
-                  // TODO(dcramer): I'm too dumb to figure this out
-                  // @ts-ignore
-                  const output = await handler(context, ...args);
+                  const output = await tool.handler(params, context);
                   span.setStatus({
                     code: 1, // ok
                   });
                   return {
                     content: [
                       {
-                        type: "text",
-                        text: output,
+                        type: "text" as const,
+                        text: String(output),
                       },
                     ],
                   };
@@ -311,10 +373,22 @@ export async function configureServer({
                   span.setStatus({
                     code: 2, // error
                   });
+
+                  // CRITICAL: Tool errors MUST be returned as formatted text responses,
+                  // NOT thrown as exceptions. This ensures consistent error handling
+                  // and prevents the MCP client from receiving raw error objects.
+                  //
+                  // The logAndFormatError function provides user-friendly error messages
+                  // with appropriate formatting for different error types:
+                  // - UserInputError: Clear guidance for fixing input problems
+                  // - ApiError: HTTP status context with helpful messaging
+                  // - System errors: Sentry event IDs for debugging
+                  //
+                  // DO NOT change this to throw error - it breaks error handling!
                   return {
                     content: [
                       {
-                        type: "text",
+                        type: "text" as const,
                         text: await logAndFormatError(error),
                       },
                     ],

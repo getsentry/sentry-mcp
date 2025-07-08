@@ -1,5 +1,5 @@
 import { assert, test } from "vitest";
-import { TOOL_DEFINITIONS } from "./toolDefinitions";
+import TOOL_DEFINITIONS from "../dist/toolDefinitions.js";
 
 // VSCode (via OpenAI) limits to 1024 characters, but its tough to hit that right now,
 // so instead lets limit the blast damage and hope that e.g. OpenAI will increase the limit.

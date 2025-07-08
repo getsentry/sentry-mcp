@@ -6,7 +6,6 @@
  * extraction and handler registration.
  */
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import type { TOOL_DEFINITIONS } from "./toolDefinitions";
 import type { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import type { z } from "zod";
 import type {
@@ -41,33 +40,6 @@ export type PromptHandlerExtended<T extends PromptName> = (
 
 export type PromptHandlers = {
   [K in PromptName]: PromptHandlerExtended<K>;
-};
-
-export type ToolName = (typeof TOOL_DEFINITIONS)[number]["name"];
-
-export type ToolDefinition<T extends ToolName> = Extract<
-  (typeof TOOL_DEFINITIONS)[number],
-  { name: T }
->;
-
-export type ToolParams<T extends ToolName> = ToolDefinition<T> extends {
-  paramsSchema: Record<string, any>;
-}
-  ? ZodifyRecord<ToolDefinition<T>["paramsSchema"]>
-  : Record<string, never>;
-
-export type ToolHandler<T extends ToolName> = (
-  params: ToolParams<T>,
-) => Promise<string>;
-
-export type ToolHandlerExtended<T extends ToolName> = (
-  context: ServerContext,
-  params: ToolParams<T>,
-  extra: RequestHandlerExtra<Request, Notification>,
-) => Promise<string>;
-
-export type ToolHandlers = {
-  [K in ToolName]: ToolHandlerExtended<K>;
 };
 
 export type ServerContext = {

@@ -85,6 +85,8 @@ export type ToolParams<T> = z.infer<typeof toolDefinitions[T].parameters>;
 
 ## Testing Patterns
 
+For comprehensive testing guidance, see `testing.mdc` and `adding-tools.mdc#step-3-add-tests`.
+
 ### Unit Test Structure
 
 ```typescript
@@ -123,6 +125,8 @@ afterAll(() => mswServer.close());
 See: `packages/mcp-server/src/test-utils/setup.ts`
 
 ## API Patterns
+
+For complete API usage patterns, see `api-patterns.mdc`.
 
 ### Service Creation
 

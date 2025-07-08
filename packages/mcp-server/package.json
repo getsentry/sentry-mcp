@@ -63,7 +63,6 @@
       "default": "./dist/resources.js"
     },
     "./toolDefinitions": {
-      "types": "./dist/toolDefinitions.ts",
       "default": "./dist/toolDefinitions.js"
     },
     "./types": {
@@ -76,19 +75,21 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsc -w",
+    "build": "tsdown && pnpm run generate-tool-definitions",
+    "dev": "pnpm run generate-tool-definitions && tsc -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "tsc": "tsc --noEmit",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "generate-tool-definitions": "tsx scripts/generate-tool-definitions.ts"
   },
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
-    "msw": "catalog:"
+    "msw": "catalog:",
+    "zod-to-json-schema": "catalog:"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",

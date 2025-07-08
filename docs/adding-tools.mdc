@@ -22,19 +22,23 @@ Before adding a new tool, consider if it could be:
 ## Tool Structure
 
 Each tool consists of:
-1. **Definition** - Schema in `toolDefinitions.ts`
-2. **Handler** - Logic in `tools.ts`
-3. **Tests** - Unit tests in `tools.test.ts`
-4. **Mocks** - API responses in `mcp-server-mocks`
-5. **Evals** - Integration tests (use sparingly)
+1. **Tool Module** - Single file in `src/tools/your-tool-name.ts` with definition and handler
+2. **Tests** - Unit tests in `src/tools/your-tool-name.test.ts`
+3. **Mocks** - API responses in `mcp-server-mocks`
+4. **Evals** - Integration tests (use sparingly)
 
-## Step 1: Define the Tool
+## Step 1: Create the Tool Module
 
-Add to `packages/mcp-server/src/toolDefinitions.ts`:
+Create `packages/mcp-server/src/tools/your-tool-name.ts`:
 
 ```typescript
-{
-  name: "your_tool_name" as const,
+import { z } from "zod";
+import { defineTool } from "./utils/defineTool";
+import { apiServiceFromContext } from "./utils/api-utils";
+import type { ServerContext } from "../types";
+
+export default defineTool({
+  name: "your_tool_name",
   description: [
     "One-line summary.",
     "",
@@ -50,12 +54,15 @@ Add to `packages/mcp-server/src/toolDefinitions.ts`:
     "- Parameter interpretation hints",
     "</hints>",
   ].join("\n"),
-  paramsSchema: {
-    organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.optional(),
+  inputSchema: {
+    organizationSlug: z.string().describe("The organization's slug"),
+    regionUrl: z.string().optional().describe("Optional region URL"),
     yourParam: z.string().describe("What values are expected"),
   },
-}
+  async handler(params, context: ServerContext) {
+    // Implementation here
+  },
+});
 ```
 
 ### Writing LLM-Friendly Descriptions
@@ -68,16 +75,16 @@ Critical for LLM success:
 
 ## Step 2: Implement the Handler
 
-Add to `packages/mcp-server/src/tools.ts`:
+Add the handler implementation to your tool module:
 
 ```typescript
-your_tool_name: async (context, params) => {
+async handler(params, context: ServerContext) {
   // 1. Get API service
   const api = apiServiceFromContext(context, {
     regionUrl: params.regionUrl,
   });
 
-  // 2. Validate inputs (see common-patterns.mdc)
+  // 2. Validate inputs (see common-patterns.mdc#error-handling)
   if (!params.organizationSlug) {
     throw new UserInputError(
       "Organization slug is required. Use find_organizations() to list."
@@ -105,7 +112,7 @@ your_tool_name: async (context, params) => {
   output += "- Next tool to use: `related_tool(param='...')`\n";
 
   return output;
-};
+}
 ```
 
 ### Response Formatting
@@ -117,14 +124,23 @@ See `common-patterns.mdc#response-formatting` for:
 
 ## Step 3: Add Tests
 
-Unit test in `tools.test.ts`:
+Follow comprehensive testing patterns from `testing.mdc` for unit, integration, and evaluation tests.
+
+Create `packages/mcp-server/src/tools/your-tool-name.test.ts`:
 
 ```typescript
+import { describe, it, expect } from "vitest";
+import yourToolName from "./your-tool-name.js";
+
 describe("your_tool_name", () => {
   it("returns formatted output", async () => {
-    const result = await TOOL_HANDLERS.your_tool_name(
-      mockContext,
-      { organizationSlug: "test-org", yourParam: "value" }
+    const result = await yourToolName.handler(
+      { organizationSlug: "test-org", yourParam: "value" },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      }
     );
     
     expect(result).toMatchInlineSnapshot(`
@@ -135,6 +151,12 @@ describe("your_tool_name", () => {
   });
 });
 ```
+
+**Testing Requirements:**
+- Input validation (see `testing.mdc#testing-error-cases`)
+- Error handling (use patterns from `common-patterns.mdc#error-handling`)
+- Output formatting with snapshots
+- API integration with MSW mocks
 
 **After changing output, update snapshots:**
 ```bash

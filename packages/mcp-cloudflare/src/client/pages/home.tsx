@@ -1,4 +1,4 @@
-import { TOOL_DEFINITIONS } from "@sentry/mcp-server/toolDefinitions";
+import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
 import { RESOURCES } from "@sentry/mcp-server/resources";
 import { PROMPT_DEFINITIONS } from "@sentry/mcp-server/promptDefinitions";
 import { Link } from "../components/ui/base";
@@ -162,17 +162,18 @@ export default function Home({ onChatClick }: HomeProps) {
                     <Prose>
                       <p className="mb-0">{tool.description.split("\n")[0]}</p>
                     </Prose>
-                    {tool.paramsSchema ? (
+                    {tool.inputSchema &&
+                    Object.keys(tool.inputSchema).length > 0 ? (
                       <dl className="space-y-3 mt-6">
-                        {Object.entries(tool.paramsSchema).map(
-                          ([key, value]) => {
+                        {Object.entries(tool.inputSchema).map(
+                          ([key, property]) => {
                             return (
                               <div className="p-3 bg-black/30" key={key}>
                                 <dt className="text-sm font-medium text-violet-300">
                                   {key}
                                 </dt>
                                 <dd className="text-sm text-slate-300 mt-1">
-                                  {value.description}
+                                  {property.description}
                                 </dd>
                               </div>
                             );

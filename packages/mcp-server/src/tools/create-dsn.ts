@@ -1,0 +1,67 @@
+import { z } from "zod";
+import { setTag } from "@sentry/core";
+import { defineTool } from "./utils/defineTool";
+import { apiServiceFromContext } from "./utils/api-utils";
+import type { ServerContext } from "../types";
+import {
+  ParamOrganizationSlug,
+  ParamRegionUrl,
+  ParamProjectSlug,
+} from "../schema";
+
+export default defineTool({
+  name: "create_dsn",
+  description: [
+    "Create a new Sentry DSN for a specific project.",
+    "",
+    "Be careful when using this tool!",
+    "",
+    "Use this tool when you need to:",
+    "- Create a new DSN for a specific project",
+    "",
+    "<examples>",
+    "### Create a new DSN for the 'my-project' project",
+    "",
+    "```",
+    "create_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')",
+    "```",
+    "",
+    "</examples>",
+    "",
+    "<hints>",
+    "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
+    "- If any parameter is ambiguous, you should clarify with the user what they meant.",
+    "</hints>",
+  ].join("\n"),
+  inputSchema: {
+    organizationSlug: ParamOrganizationSlug,
+    regionUrl: ParamRegionUrl.optional(),
+    projectSlug: ParamProjectSlug,
+    name: z
+      .string()
+      .trim()
+      .describe("The name of the DSN to create, for example 'Production'."),
+  },
+  async handler(params, context: ServerContext) {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    const organizationSlug = params.organizationSlug;
+
+    setTag("organization.slug", organizationSlug);
+    setTag("project.slug", params.projectSlug);
+
+    const clientKey = await apiService.createClientKey({
+      organizationSlug,
+      projectSlug: params.projectSlug,
+      name: params.name,
+    });
+    let output = `# New DSN in **${organizationSlug}/${params.projectSlug}**\n\n`;
+    output += `**DSN**: ${clientKey.dsn.public}\n`;
+    output += `**Name**: ${clientKey.name}\n\n`;
+    output += "# Using this information\n\n";
+    output +=
+      "- The `SENTRY_DSN` value is a URL that you can use to initialize Sentry's SDKs.\n";
+    return output;
+  },
+});

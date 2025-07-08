@@ -24,6 +24,8 @@ Real-world scenarios with LLM:
 
 ## Unit Testing Patterns
 
+See `adding-tools.mdc#step-3-add-tests` for the complete tool testing workflow.
+
 ### Basic Test Structure
 
 ```typescript
@@ -42,6 +44,8 @@ describe("tool_name", () => {
   });
 });
 ```
+
+**NOTE**: Follow error handling patterns from `common-patterns.mdc#error-handling` when testing error cases.
 
 ### Testing Error Cases
 
@@ -65,6 +69,8 @@ it("handles API errors gracefully", async () => {
 ```
 
 ## Mock Server Setup
+
+Use MSW patterns from `api-patterns.mdc#mock-patterns` for API mocking.
 
 ### Test Configuration
 
