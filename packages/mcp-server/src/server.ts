@@ -300,9 +300,9 @@ export async function configureServer({
                   return {
                     messages: [
                       {
-                        role: "user",
+                        role: "user" as const,
                         content: {
-                          type: "text",
+                          type: "text" as const,
                           text: output,
                         },
                       },
@@ -361,14 +361,24 @@ export async function configureServer({
                   span.setStatus({
                     code: 1, // ok
                   });
-                  return {
-                    content: [
-                      {
-                        type: "text" as const,
-                        text: String(output),
-                      },
-                    ],
-                  };
+                  // if the tool returns a string, assume it's a message
+                  if (typeof output === "string") {
+                    return {
+                      content: [
+                        {
+                          type: "text" as const,
+                          text: output,
+                        },
+                      ],
+                    };
+                  }
+                  // if the tool returns a list, assume it's a content list
+                  if (Array.isArray(output)) {
+                    return {
+                      content: output,
+                    };
+                  }
+                  throw new Error(`Invalid tool output: ${output}`);
                 } catch (error) {
                   span.setStatus({
                     code: 2, // error

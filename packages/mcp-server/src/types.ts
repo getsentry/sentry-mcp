@@ -5,13 +5,9 @@
  * and server context. Uses advanced TypeScript patterns for type-safe parameter
  * extraction and handler registration.
  */
-import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import type { z } from "zod";
-import type {
-  GetPromptResult,
-  Notification,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
 
 type ZodifyRecord<T extends Record<string, any>> = {
   [K in keyof T]: z.infer<T[K]>;

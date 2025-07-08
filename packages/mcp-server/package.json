@@ -79,8 +79,8 @@
     "dev": "pnpm run generate-tool-definitions && tsc -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
-    "test": "vitest",
-    "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
+    "test": "pnpm run generate-tool-definitions && vitest",
+    "test:ci": "pnpm run generate-tool-definitions && vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "tsc": "tsc --noEmit",
     "test:watch": "vitest watch",
     "generate-tool-definitions": "tsx scripts/generate-tool-definitions.ts"

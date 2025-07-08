@@ -533,3 +533,16 @@ export const AutofixRunStateSchema = z.object({
     .passthrough()
     .nullable(),
 });
+
+export const EventAttachmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  size: z.number(),
+  mimetype: z.string(),
+  dateCreated: z.string().datetime(),
+  sha1: z.string(),
+  headers: z.record(z.string(), z.string()).optional(),
+});
+
+export const EventAttachmentListSchema = z.array(EventAttachmentSchema);

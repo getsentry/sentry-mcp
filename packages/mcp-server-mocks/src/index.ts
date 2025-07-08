@@ -27,6 +27,7 @@ import { http, HttpResponse } from "msw";
 import autofixStateFixture from "./fixtures/autofix-state.json";
 import issueFixture from "./fixtures/issue.json";
 import eventsFixture from "./fixtures/event.json";
+import eventAttachmentsFixture from "./fixtures/event-attachments.json";
 import tagsFixture from "./fixtures/tags.json";
 import projectFixture from "./fixtures/project.json";
 import teamFixture from "./fixtures/team.json";
@@ -895,6 +896,25 @@ export const restHandlers = buildHandlers([
         assignedTo: body?.assignedTo || issueFixture2.assignedTo,
       };
       return HttpResponse.json(updatedIssue);
+    },
+  },
+  // Event attachment endpoints
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/7ca573c0f4814912aaa9bdc77d1a7d51/attachments/",
+    fetch: () => HttpResponse.json(eventAttachmentsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/7ca573c0f4814912aaa9bdc77d1a7d51/attachments/123/",
+    fetch: () => {
+      // Mock attachment blob response
+      const mockBlob = new Blob(["fake image data"], { type: "image/png" });
+      return new HttpResponse(mockBlob, {
+        headers: {
+          "Content-Type": "image/png",
+        },
+      });
     },
   },
 ]);
