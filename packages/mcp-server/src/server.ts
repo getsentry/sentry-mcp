@@ -361,7 +361,27 @@ export async function configureServer({
                   span.setStatus({
                     code: 2, // error
                   });
-                  throw error;
+
+                  // CRITICAL: Tool errors MUST be returned as formatted text responses,
+                  // NOT thrown as exceptions. This ensures consistent error handling
+                  // and prevents the MCP client from receiving raw error objects.
+                  //
+                  // The logAndFormatError function provides user-friendly error messages
+                  // with appropriate formatting for different error types:
+                  // - UserInputError: Clear guidance for fixing input problems
+                  // - ApiError: HTTP status context with helpful messaging
+                  // - System errors: Sentry event IDs for debugging
+                  //
+                  // DO NOT change this to throw error - it breaks error handling!
+                  return {
+                    content: [
+                      {
+                        type: "text" as const,
+                        text: await logAndFormatError(error),
+                      },
+                    ],
+                    isError: true,
+                  };
                 }
               },
             );

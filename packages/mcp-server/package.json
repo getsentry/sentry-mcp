@@ -88,7 +88,8 @@
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
-    "msw": "catalog:"
+    "msw": "catalog:",
+    "zod-to-json-schema": "catalog:"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",

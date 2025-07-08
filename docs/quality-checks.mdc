@@ -1,0 +1,78 @@
+# Quality Checks
+
+Required quality checks that MUST pass before completing any code changes.
+
+## Critical Quality Checks
+
+**After ANY code changes, you MUST run:**
+
+```bash
+pnpm -w run lint:fix    # Fix linting issues
+pnpm tsc --noEmit       # Check TypeScript types
+pnpm test               # Run all tests
+```
+
+**DO NOT proceed if any check fails.**
+
+## Tool Testing Requirements
+
+**ALL tools MUST have comprehensive tests that verify:**
+
+- **Input validation** - Required/optional parameters, type checking, edge cases
+- **Output formatting** - Markdown structure, content accuracy, error messages
+- **API integration** - Mock server responses, error handling, parameter passing
+- **Snapshot testing** - Use inline snapshots to verify formatted output
+
+**Required test patterns:**
+- Unit tests in individual `{tool-name}.test.ts` files using Vitest and MSW mocks
+- Input/output validation with inline snapshots
+- Error case testing (API failures, invalid params)
+- Mock server setup in `packages/mcp-server-mocks`
+
+See `docs/testing.mdc` for detailed testing patterns and `docs/adding-tools.mdc` for the testing workflow.
+
+## Tool Count Limits
+
+**IMPORTANT**: AI agents have a hard cap of 45 total tools. Sentry MCP must:
+- Target ~20 tools (current best practice)
+- Never exceed 25 tools (absolute maximum)
+- This limit exists in Cursor and possibly other tools
+
+**Current status**: 19 tools (within target range)
+
+## Build Verification
+
+Ensure the build process works correctly:
+
+```bash
+npm run build              # Build all packages
+npm run generate-tool-definitions  # Generate tool definitions
+```
+
+Tool definitions must generate without errors for client consumption.
+
+## Code Quality Standards
+
+- **TypeScript strict mode** - All code must compile without errors
+- **Linting compliance** - Follow established code style patterns
+- **Test coverage** - All new tools must have comprehensive tests
+- **Error handling** - Use patterns from `common-patterns.mdc#error-handling`
+- **API patterns** - Follow patterns from `api-patterns.mdc`
+
+## Pre-Commit Checklist
+
+Before completing any task:
+
+- [ ] All quality checks pass (`pnpm -w run lint:fix`, `pnpm tsc --noEmit`, `pnpm test`)
+- [ ] Tool count within limits (≤20 target, ≤25 absolute max)
+- [ ] New tools have comprehensive tests
+- [ ] Build process generates tool definitions successfully
+- [ ] Documentation updated if patterns changed
+- [ ] CLAUDE.md ↔ cursor.mdc sync maintained (if applicable)
+
+## References
+
+- Testing patterns: `testing.mdc`
+- Tool development: `adding-tools.mdc`
+- Code patterns: `common-patterns.mdc`
+- API usage: `api-patterns.mdc`

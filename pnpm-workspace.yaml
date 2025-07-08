@@ -55,3 +55,4 @@ catalog:
   workers-mcp: 0.1.0-3
   wrangler: ^4.22.0
   zod: ^3.25.67
+  zod-to-json-schema: ^3.24.6

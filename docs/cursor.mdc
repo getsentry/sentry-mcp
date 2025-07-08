@@ -11,6 +11,45 @@ This file provides instructions for Cursor IDE when working with the Sentry MCP 
 
 Sentry MCP is a Model Context Protocol server that provides access to Sentry's functionality through tools, prompts, and resources.
 
+## 🔴 CRITICAL: Pre-Development Requirements
+
+**MANDATORY READING before code changes:**
+
+### Tool Development
+- MUST read `docs/adding-tools.mdc` before creating/modifying any tool
+- MUST read `docs/testing.mdc` for testing requirements
+- MUST verify tool count limits (target ~20, max 25)
+
+### Code Changes  
+- MUST read `docs/common-patterns.mdc` for established patterns
+- MUST read `docs/api-patterns.mdc` for API usage
+
+## Documentation Maintenance Requirements
+
+**MANDATORY: Documentation MUST be updated when making code changes**
+
+### When Documentation MUST Be Updated
+- **Adding new tools**: Update `docs/adding-tools.mdc` if new patterns emerge
+- **Changing testing approaches**: Update `docs/testing.mdc` immediately 
+- **Modifying API patterns**: Update `docs/api-patterns.mdc` with new patterns
+- **Adding common patterns**: Update `docs/common-patterns.mdc` immediately
+- **Changing architecture**: Update `docs/architecture.mdc`
+
+### Critical Sync Requirements
+- **CLAUDE.md ↔ cursor.mdc**: These files MUST stay synchronized
+- **When updating CLAUDE.md**: Also update `cursor.mdc` with equivalent guidance
+- **When updating cursor.mdc**: Also update `CLAUDE.md` with equivalent guidance
+- Both files serve the same purpose for different tools (Claude Code vs Cursor IDE)
+
+### Documentation Update Process
+1. **Identify affected docs** while implementing changes
+2. **Update documentation in the same session** as code changes
+3. **Verify cross-references** remain accurate
+4. **Ensure CLAUDE.md ↔ cursor.mdc sync** is maintained
+5. **Add examples** for new patterns introduced
+
+**Documentation updates are not optional - they are part of completing any task.**
+
 ## Documentation
 
 All documentation is in the `docs/` directory:
@@ -60,6 +99,23 @@ pnpm test               # Run all tests
 
 **DO NOT proceed if any check fails.**
 
+## Tool Testing Requirements
+
+**ALL tools MUST have comprehensive tests that verify:**
+
+- **Input validation** - Required/optional parameters, type checking, edge cases
+- **Output formatting** - Markdown structure, content accuracy, error messages
+- **API integration** - Mock server responses, error handling, parameter passing
+- **Snapshot testing** - Use inline snapshots to verify formatted output
+
+**Required test patterns:**
+- Unit tests in individual `{tool-name}.test.ts` files using Vitest and MSW mocks
+- Input/output validation with inline snapshots
+- Error case testing (API failures, invalid params)
+- Mock server setup in `packages/mcp-server-mocks`
+
+See `docs/testing.mdc` for detailed testing patterns and `docs/adding-tools.mdc` for the testing workflow.
+
 ## Essential Commands
 
 ```bash
@@ -95,6 +151,61 @@ See specific guides for required environment variables:
 - Cloudflare: `deployment.mdc`
 - Evaluation tests: `.env.example`
 - Local development: Use command-line args
+
+## Repository Structure
+
+```
+sentry-mcp/
+├── packages/
+│   ├── mcp-server/           # Main MCP server (tools, prompts, resources)
+│   │   ├── src/
+│   │   │   ├── tools/        # 19 individual tool modules + utils
+│   │   │   ├── prompts.ts    # MCP prompts
+│   │   │   ├── resources.ts  # MCP resources
+│   │   │   ├── server.ts     # MCP server configuration
+│   │   │   ├── api-client/   # Sentry API client
+│   │   │   └── internal/     # Shared utilities
+│   │   └── scripts/          # Build scripts (tool definitions generation)
+│   ├── mcp-cloudflare/       # Cloudflare Worker chat application
+│   │   ├── src/
+│   │   │   ├── client/       # React frontend
+│   │   │   └── server/       # Worker API routes
+│   │   └── components.json   # Shadcn/ui config
+│   ├── mcp-server-evals/     # AI evaluation tests
+│   ├── mcp-server-mocks/     # MSW mocks for testing
+│   ├── mcp-server-tsconfig/  # Shared TypeScript configs
+│   └── mcp-test-client/      # MCP client for testing
+└── docs/                     # All documentation
+    ├── cloudflare/           # Web app docs
+    └── llms/                 # LLM-specific docs
+```
+
+## Core Components Impact Analysis
+
+When making changes, consider these component interactions:
+
+### MCP Server (`packages/mcp-server/`)
+- **Tools** (19 modules): Query, create, update Sentry resources
+- **Prompts**: Help text and guidance for LLMs  
+- **Resources**: Static documentation and references
+- **API Client**: Sentry API integration layer
+- **Server**: MCP protocol handler and error formatting
+
+### Cloudflare Web App (`packages/mcp-cloudflare/`)
+- **Client**: React-based chat interface with UI components
+- **Server**: Worker API routes for search, auth, MCP communication
+- **Integration**: Uses MCP server for tool execution
+
+### Testing Infrastructure
+- **Unit Tests**: Co-located with each component
+- **Mocks**: Realistic API responses in `mcp-server-mocks/`
+- **Evaluations**: AI-driven integration tests in `mcp-server-evals/`
+- **Test Client**: Interactive MCP testing in `mcp-test-client/`
+
+### Build & Deployment
+- **Tool Definitions**: Auto-generated JSON schemas for client consumption
+- **TypeScript Config**: Shared configurations in `mcp-server-tsconfig/`
+- **Packaging**: Multiple package coordination
 
 ## References
 
