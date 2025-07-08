@@ -6,6 +6,7 @@ import findIssues from "./find-issues";
 import findReleases from "./find-releases";
 import findTags from "./find-tags";
 import getIssueDetails from "./get-issue-details";
+import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
 import findErrors from "./find-errors";
 import findTransactions from "./find-transactions";
@@ -28,6 +29,7 @@ export default {
   find_releases: findReleases,
   find_tags: findTags,
   get_issue_details: getIssueDetails,
+  get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
   find_errors: findErrors,
   find_transactions: findTransactions,

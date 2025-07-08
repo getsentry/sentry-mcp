@@ -1,5 +1,10 @@
 import type { z } from "zod";
 import type { ServerContext } from "../types";
+import type {
+  TextContent,
+  ImageContent,
+  EmbeddedResource,
+} from "@modelcontextprotocol/sdk/types.js";
 
 export interface ToolConfig<
   TSchema extends Record<string, z.ZodType> = Record<string, z.ZodType>,
@@ -10,7 +15,7 @@ export interface ToolConfig<
   handler: (
     params: z.infer<z.ZodObject<TSchema>>,
     context: ServerContext,
-  ) => Promise<unknown>;
+  ) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
 }
 
 /**
