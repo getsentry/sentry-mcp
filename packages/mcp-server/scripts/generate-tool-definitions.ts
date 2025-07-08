@@ -104,7 +104,7 @@ async function main() {
     // Write TypeScript declaration file
     const dtsPath = path.join(distDir, "toolDefinitions.d.ts");
     const dtsContent = `// JSON Schema property type definition
-interface JsonSchemaProperty {
+export interface JsonSchemaProperty {
   type: string;
   description: string;
   enum?: string[];
@@ -117,14 +117,14 @@ interface JsonSchemaProperty {
 }
 
 // Tool definition interface with proper JSON Schema types
-interface ToolDefinition {
+export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: Record<string, JsonSchemaProperty>;
 }
 
 // Array of tool definitions with proper typing
-type ToolDefinitions = ToolDefinition[];
+export type ToolDefinitions = ToolDefinition[];
 
 declare const toolDefinitions: ToolDefinitions;
 export default toolDefinitions;`;
