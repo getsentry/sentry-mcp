@@ -17,20 +17,40 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "./version";
+import { normalizeHost, extractHostname } from "./utils/url-utils";
 
-// SENTRY_AUTH_TOKEN is deprecated, but we support it for backwards compatibility
-let accessToken: string | undefined =
-  process.env.SENTRY_ACCESS_TOKEN ?? process.env.SENTRY_AUTH_TOKEN;
-let host: string | undefined = process.env.SENTRY_HOST || "https://sentry.io";
-let mcpHost: string | undefined =
-  process.env.MCP_HOST || "https://mcp.sentry.dev";
+let accessToken: string | undefined = process.env.SENTRY_ACCESS_TOKEN;
+let sentryHostOrUrl: string = process.env.SENTRY_HOST || "sentry.io";
+let mcpUrl: string | undefined =
+  process.env.MCP_URL || "https://mcp.sentry.dev";
 let sentryDsn: string | undefined =
   process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
+
+// Parse SENTRY_HOST to extract hostname and protocol
+function parseSentryHost(hostOrUrl: string): {
+  host: string;
+  protocol: string;
+} {
+  try {
+    const normalizedUrl = normalizeHost(hostOrUrl);
+    const url = new URL(normalizedUrl);
+    return {
+      host: url.host,
+      protocol: url.protocol.replace(":", ""),
+    };
+  } catch (error) {
+    // Fallback for invalid URLs - assume it's just a hostname
+    return {
+      host: hostOrUrl,
+      protocol: "https",
+    };
+  }
+}
 
 const packageName = "@sentry/mcp-server";
 
 function getUsage() {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>] [--mcp-host=<host>] [--sentry-dsn=<dsn>]`;
+  return `Usage: ${packageName} --access-token=<token> [--host=<host>] [--mcp-url=<url>] [--sentry-dsn=<dsn>]`;
 }
 
 for (const arg of process.argv.slice(2)) {
@@ -41,9 +61,9 @@ for (const arg of process.argv.slice(2)) {
   if (arg.startsWith("--access-token=")) {
     accessToken = arg.split("=")[1];
   } else if (arg.startsWith("--host=")) {
-    host = arg.split("=")[1];
-  } else if (arg.startsWith("--mcp-host=")) {
-    mcpHost = arg.split("=")[1];
+    sentryHostOrUrl = arg.split("=")[1];
+  } else if (arg.startsWith("--mcp-url=")) {
+    mcpUrl = arg.split("=")[1];
   } else if (arg.startsWith("--sentry-dsn=")) {
     sentryDsn = arg.split("=")[1];
   } else {
@@ -52,6 +72,9 @@ for (const arg of process.argv.slice(2)) {
     process.exit(1);
   }
 }
+
+// Parse the final host value after processing command line args
+const { host, protocol } = parseSentryHost(sentryHostOrUrl);
 
 if (!accessToken) {
   console.error(
@@ -70,7 +93,7 @@ Sentry.init({
       "mcp.server_version": LIB_VERSION,
       "mcp.transport": "stdio",
       "sentry.host": host,
-      "mcp.mcp-host": mcpHost,
+      "mcp.mcp-url": mcpUrl,
     },
   },
   release: process.env.SENTRY_RELEASE,
@@ -101,8 +124,9 @@ const SENTRY_TIMEOUT = 5000; // 5 seconds
 startStdio(instrumentedServer, {
   accessToken,
   organizationSlug: null,
-  host,
-  mcpHost,
+  sentryHost: host,
+  sentryProtocol: protocol,
+  mcpUrl,
   userAgent: process.env.MCP_USER_AGENT || `sentry-mcp-stdio/${LIB_VERSION}`,
 }).catch((err) => {
   console.error("Server error:", err);

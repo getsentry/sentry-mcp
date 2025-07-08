@@ -81,8 +81,8 @@ export default defineTool({
     }
     output += `\n`;
 
-    // Determine the host - use context.host if available, then check env var, otherwise default to production
-    const host = context.mcpHost || "https://mcp.sentry.dev";
+    // Determine the URL - use context.mcpUrl if available, otherwise default to production
+    const host = context.mcpUrl || "https://mcp.sentry.dev";
     const searchUrl = new URL("/api/search", host);
 
     const response = await fetchWithTimeout(

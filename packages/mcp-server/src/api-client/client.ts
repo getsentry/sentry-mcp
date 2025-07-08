@@ -40,6 +40,7 @@ import type {
   TeamList,
   User,
 } from "./types";
+import { normalizeHost, extractHostname } from "../utils/url-utils";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
 // import { logger } from "@sentry/node";
@@ -127,10 +128,16 @@ type RequestOptions = {
  *
  * @example Multi-Region Support
  * ```typescript
- * // Self-hosted instance
+ * // Self-hosted instance with hostname
  * const selfHosted = new SentryApiService({
  *   accessToken: "token",
  *   host: "sentry.company.com"
+ * });
+ *
+ * // Self-hosted instance with full URL (e.g. for local development)
+ * const localDev = new SentryApiService({
+ *   accessToken: "token",
+ *   host: "http://localhost:8000"
  * });
  *
  * // Regional endpoint override
@@ -143,6 +150,7 @@ type RequestOptions = {
 export class SentryApiService {
   private accessToken: string | null;
   protected host: string;
+  protected protocol: string;
   protected apiPrefix: string;
 
   /**
@@ -150,18 +158,22 @@ export class SentryApiService {
    *
    * @param config Configuration object
    * @param config.accessToken OAuth access token for authentication (optional for some endpoints)
-   * @param config.host Sentry host (defaults to sentry.io)
+   * @param config.host Sentry hostname (e.g. "sentry.io", "localhost:8000")
+   * @param config.protocol Protocol to use for UI URLs ("http" or "https", defaults to "https")
    */
   constructor({
     accessToken = null,
-    host = process.env.SENTRY_HOST,
+    host = "sentry.io",
+    protocol = "https",
   }: {
     accessToken?: string | null;
     host?: string;
+    protocol?: string;
   }) {
     this.accessToken = accessToken;
-    this.host = host || "sentry.io";
-    this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
+    this.host = host;
+    this.protocol = protocol;
+    this.apiPrefix = `${protocol}://${host}/api/0`;
   }
 
   /**
@@ -169,11 +181,15 @@ export class SentryApiService {
    *
    * Used for multi-region support or switching between Sentry instances.
    *
-   * @param host New host to use for API requests
+   * @param host New hostname to use for API requests
+   * @param protocol Protocol to use for UI URLs (optional, defaults to current protocol)
    */
-  setHost(host: string) {
+  setHost(host: string, protocol?: string) {
     this.host = host;
-    this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
+    if (protocol) {
+      this.protocol = protocol;
+    }
+    this.apiPrefix = `${this.protocol}://${this.host}/api/0`;
   }
 
   /**
@@ -198,7 +214,7 @@ export class SentryApiService {
     { host }: { host?: string } = {},
   ): Promise<Response> {
     const url = host
-      ? new URL(`/api/0${path}`, `https://${host}`).href
+      ? `https://${host}/api/0${path}`
       : `${this.apiPrefix}${path}`;
 
     const headers: Record<string, string> = {
@@ -289,7 +305,7 @@ export class SentryApiService {
    *
    * @param organizationSlug Organization identifier
    * @param issueId Issue identifier (short ID or numeric ID)
-   * @returns Full HTTPS URL to the issue in Sentry UI
+   * @returns Full URL to the issue in Sentry UI (preserves original protocol)
    *
    * @example
    * ```typescript
@@ -301,9 +317,11 @@ export class SentryApiService {
    * ```
    */
   getIssueUrl(organizationSlug: string, issueId: string): string {
-    return this.host !== "sentry.io"
-      ? `https://${this.host}/organizations/${organizationSlug}/issues/${issueId}`
-      : `https://${organizationSlug}.${this.host}/issues/${issueId}`;
+    const isSaas = this.host === "sentry.io";
+
+    return isSaas
+      ? `${this.protocol}://${organizationSlug}.${this.host}/issues/${issueId}`
+      : `${this.protocol}://${this.host}/organizations/${organizationSlug}/issues/${issueId}`;
   }
 
   /**
@@ -311,7 +329,7 @@ export class SentryApiService {
    *
    * @param organizationSlug Organization identifier
    * @param traceId Trace identifier (hex string)
-   * @returns Full HTTPS URL to the trace in Sentry UI
+   * @returns Full URL to the trace in Sentry UI (preserves original protocol)
    *
    * @example
    * ```typescript
@@ -320,9 +338,11 @@ export class SentryApiService {
    * ```
    */
   getTraceUrl(organizationSlug: string, traceId: string): string {
-    return this.host !== "sentry.io"
-      ? `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`
-      : `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`;
+    const isSaas = this.host === "sentry.io";
+
+    return isSaas
+      ? `${this.protocol}://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`
+      : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`;
   }
 
   /**

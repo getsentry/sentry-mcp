@@ -58,7 +58,7 @@ OPENAI_API_KEY=your_openai_api_key
 SENTRY_ACCESS_TOKEN=your_sentry_access_token
 
 # Optional
-SENTRY_HOST=https://sentry.io  # For self-hosted Sentry instances
+SENTRY_HOST=sentry.io  # For self-hosted Sentry instances (hostname or full URL)
 MCP_HOST=https://mcp.sentry.dev  # MCP server host (defaults to production)
 MCP_MODEL=gpt-4o  # Override default model (GPT-4)
 

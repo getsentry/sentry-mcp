@@ -26,9 +26,14 @@ npx @sentry/mcp-server@latest --access-token=sentry-user-token --host=sentry.exa
 Note: You can also use environment variables:
 
 ```shell
-SENTRY_ACCESS_TOKEN=
-SENTRY_HOST=
+SENTRY_ACCESS_TOKEN=your-token
+SENTRY_HOST=sentry.io              # Hostname only (https:// will be added)
+SENTRY_HOST=http://localhost:8000  # Full URL (for local development)
 ```
+
+The `SENTRY_HOST` parameter accepts both formats:
+- Hostname only: `sentry.io`, `sentry.example.com` (https:// will be added automatically)
+- Full URL: `https://sentry.io`, `http://localhost:8000` (protocol will be preserved)
 
 By default we also enable Sentry reporting (traces, errors) upstream to our cloud service. You can disable that, or send it to a different Sentry instance by using the `--sentry-dsn` flag:
 

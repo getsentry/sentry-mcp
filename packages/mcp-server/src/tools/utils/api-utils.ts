@@ -13,7 +13,8 @@ export function apiServiceFromContext(
   context: ServerContext,
   opts: { regionUrl?: string } = {},
 ) {
-  let host = context.host;
+  let host = context.sentryHost;
+  let protocol = context.sentryProtocol || "https";
 
   if (opts.regionUrl?.trim()) {
     try {
@@ -34,6 +35,7 @@ export function apiServiceFromContext(
       }
 
       host = parsedUrl.host;
+      protocol = parsedUrl.protocol.replace(":", "");
     } catch (error) {
       if (error instanceof UserInputError) {
         throw error;
@@ -46,6 +48,7 @@ export function apiServiceFromContext(
 
   return new SentryApiService({
     host,
+    protocol,
     accessToken: context.accessToken,
   });
 }
