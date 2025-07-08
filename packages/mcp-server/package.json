@@ -63,7 +63,6 @@
       "default": "./dist/resources.js"
     },
     "./toolDefinitions": {
-      "types": "./dist/toolDefinitions.ts",
       "default": "./dist/toolDefinitions.js"
     },
     "./types": {
@@ -76,14 +75,15 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && pnpm run generate-tool-definitions",
     "dev": "tsc -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
     "test": "vitest",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "tsc": "tsc --noEmit",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "generate-tool-definitions": "tsx scripts/generate-tool-definitions.ts"
   },
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",

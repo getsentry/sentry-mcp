@@ -6,7 +6,7 @@ const packageVersion =
   JSON.parse(readFileSync("./package.json", "utf-8")).version;
 
 export default defineConfig({
-  entry: ["src/**/*.ts"],
+  entry: ["src/**/*.ts", "!src/**/*.test.ts"],
   format: ["cjs", "esm"], // Build for commonJS and ESmodules
   dts: true, // Generate declaration file (.d.ts)
   sourcemap: true,

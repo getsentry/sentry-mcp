@@ -1,5 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
-import { TOOL_HANDLERS } from "./tools";
+import tools from "./tools/index.js";
+
+// Create a compatibility wrapper for the old TOOL_HANDLERS structure
+const TOOL_HANDLERS = Object.fromEntries(
+  Object.entries(tools).map(([key, tool]) => [
+    key,
+    async (context: any, params: any) => {
+      return tool.handler(params, context);
+    },
+  ]),
+);
 
 describe("whoami", () => {
   it("serializes", async () => {
