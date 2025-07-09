@@ -53,6 +53,7 @@ for (const arg of process.argv.slice(2)) {
     accessToken = arg.split("=")[1];
   } else if (arg.startsWith("--host=")) {
     sentryHost = arg.split("=")[1];
+    validateSentryHost(sentryHost);
   } else if (arg.startsWith("--url=")) {
     const url = arg.split("=")[1];
     sentryHost = validateAndParseSentryUrl(url);
@@ -64,15 +65,6 @@ for (const arg of process.argv.slice(2)) {
     console.error("Error: Invalid argument:", arg);
     console.error(getUsage());
     process.exit(1);
-  }
-}
-
-// Validate command line host argument if provided
-for (const arg of process.argv.slice(2)) {
-  if (arg.startsWith("--host=")) {
-    const hostArg = arg.split("=")[1];
-    validateSentryHost(hostArg);
-    break;
   }
 }
 
