@@ -1,4 +1,4 @@
-import { SentryApiService } from "../../api-client/index";
+import { SentryApiService, ApiError } from "../../api-client/index";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 
@@ -48,4 +48,99 @@ export function apiServiceFromContext(
     host,
     accessToken: context.accessToken,
   });
+}
+
+/**
+ * Maps API errors to user-friendly errors based on context
+ * @param error - The error to handle
+ * @param context - Context about what was being attempted
+ * @returns Never - always throws an error
+ * @throws {UserInputError} For errors that are clearly user input issues
+ * @throws {Error} For other errors
+ */
+export function handleApiError(
+  error: unknown,
+  context: {
+    operation:
+      | "getIssue"
+      | "updateIssue"
+      | "getEvent"
+      | "getOrganization"
+      | "getProject"
+      | "getTeam";
+    resourceId?: string;
+    resourceType?: string;
+  },
+): never {
+  if (error instanceof ApiError && error.status === 404) {
+    const resourceType =
+      context.resourceType ||
+      context.operation.replace(/^get|update/, "").toLowerCase();
+    const resourceId = context.resourceId || "unknown";
+
+    switch (context.operation) {
+      case "getIssue":
+      case "updateIssue":
+        throw new UserInputError(
+          `Issue '${resourceId}' not found. Please verify the issue ID is correct.`,
+        );
+      case "getEvent":
+        throw new UserInputError(
+          `Event '${resourceId}' not found. Please verify the event ID is correct.`,
+        );
+      case "getOrganization":
+        throw new UserInputError(
+          `Organization '${resourceId}' not found. Please verify the organization slug is correct.`,
+        );
+      case "getProject":
+        throw new UserInputError(
+          `Project '${resourceId}' not found. Please verify the project slug is correct.`,
+        );
+      case "getTeam":
+        throw new UserInputError(
+          `Team '${resourceId}' not found. Please verify the team slug is correct.`,
+        );
+      default:
+        throw new UserInputError(
+          `${resourceType} '${resourceId}' not found. Please verify the ID is correct.`,
+        );
+    }
+  }
+
+  // For other API errors, check if they're likely user input issues
+  if (error instanceof ApiError) {
+    // 400 Bad Request often indicates invalid parameters
+    if (error.status === 400) {
+      throw new UserInputError(`Invalid request: ${error.message}`);
+    }
+
+    // 403 Forbidden might be a permissions issue but could also be wrong org/project
+    if (error.status === 403) {
+      throw new UserInputError(
+        `Access denied: ${error.message}. Please verify you have access to this resource.`,
+      );
+    }
+  }
+
+  // Re-throw any other errors as-is
+  throw error;
+}
+
+/**
+ * Wraps an async API call with automatic error handling
+ * @param fn - The async function to execute
+ * @param context - Context about what operation is being performed
+ * @returns The result of the function
+ * @throws {UserInputError} For user input errors
+ * @throws {Error} For other errors
+ */
+export async function withApiErrorHandling<T>(
+  fn: () => Promise<T>,
+  context: Parameters<typeof handleApiError>[1],
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    handleApiError(error, context);
+  }
 }

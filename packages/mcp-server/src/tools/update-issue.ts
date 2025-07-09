@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext } from "./utils/api-utils";
+import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
 import { parseIssueParams } from "./utils/issue-utils";
 import { formatAssignedTo } from "./utils/formatting-utils";
 import { UserInputError } from "../errors";
@@ -103,18 +103,26 @@ export default defineTool({
     setTag("organization.slug", orgSlug);
 
     // Get current issue details first
-    const currentIssue = await apiService.getIssue({
-      organizationSlug: orgSlug,
-      issueId: parsedIssueId!,
-    });
+    const currentIssue = await withApiErrorHandling(
+      () =>
+        apiService.getIssue({
+          organizationSlug: orgSlug,
+          issueId: parsedIssueId!,
+        }),
+      { operation: "getIssue", resourceId: parsedIssueId },
+    );
 
     // Update the issue
-    const updatedIssue = await apiService.updateIssue({
-      organizationSlug: orgSlug,
-      issueId: parsedIssueId!,
-      status: params.status,
-      assignedTo: params.assignedTo,
-    });
+    const updatedIssue = await withApiErrorHandling(
+      () =>
+        apiService.updateIssue({
+          organizationSlug: orgSlug,
+          issueId: parsedIssueId!,
+          status: params.status,
+          assignedTo: params.assignedTo,
+        }),
+      { operation: "updateIssue", resourceId: parsedIssueId },
+    );
 
     let output = `# Issue ${updatedIssue.shortId} Updated in **${orgSlug}**\n\n`;
     output += `**Issue**: ${updatedIssue.title}\n`;
