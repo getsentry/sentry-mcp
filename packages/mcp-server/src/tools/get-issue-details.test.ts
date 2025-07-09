@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer, autofixStateFixture } from "@sentry/mcp-server-mocks";
 import getIssueDetails from "./get-issue-details.js";
 
 describe("get_issue_details", () => {
@@ -262,5 +264,34 @@ describe("get_issue_details", () => {
     ).rejects.toThrow(
       "Invalid regionUrl provided: https. Must be a valid URL.",
     );
+  });
+
+  it("includes Seer analysis when available", async () => {
+    // Add ADDITIONAL endpoint binding for autofix state using mswServer.use()
+    // The default fixtures will handle the regular issue and events endpoints
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () => HttpResponse.json(autofixStateFixture),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    expect(result).toContain("## Seer AI Analysis");
+    expect(result).toContain("Consolidate bottle and price data fetching");
   });
 });
