@@ -697,7 +697,7 @@ export class SentryApiService {
       : `/organizations/${organizationSlug}/releases/`;
 
     const response = await this.request(
-      `${path}${searchQuery.toString()}`,
+      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
       opts,
     );
@@ -744,7 +744,9 @@ export class SentryApiService {
     }
 
     const response = await this.request(
-      `/organizations/${organizationSlug}/tags/${searchQuery.toString()}`,
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/tags/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/tags/`,
       undefined,
       opts,
     );
