@@ -70,7 +70,7 @@ describe("extractIssueId", () => {
 
   it("should throw error for empty input", () => {
     expect(() => extractIssueId("")).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Invalid Sentry issue URL. URL must be a non-empty string.]`,
+      `[UserInputError: Invalid Sentry issue URL. URL must be a non-empty string.]`,
     );
   });
 
@@ -78,7 +78,7 @@ describe("extractIssueId", () => {
     expect(() =>
       extractIssueId("https://sentry.sentry.io/projects/123"),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Invalid Sentry issue URL. Path must contain '/issues/{issue_id}']`,
+      `[UserInputError: Invalid Sentry issue URL. Path must contain '/issues/{issue_id}']`,
     );
   });
 
@@ -95,7 +95,7 @@ describe("extractIssueId", () => {
 
   it("should throw error for non-numeric standalone ID", () => {
     expect(() => extractIssueId("abc")).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Invalid Sentry issue URL. Must start with http:// or https://]`,
+      `[UserInputError: Invalid Sentry issue URL. Must start with http:// or https://]`,
     );
   });
 });
@@ -140,7 +140,9 @@ describe("parseIssueId", () => {
       );
 
       // Empty string after cleaning
-      expect(() => parseIssueId("!!!")).toThrowError(/Invalid issue ID format/);
+      expect(() => parseIssueId("!!!")).toThrowError(
+        /empty after removing special characters/,
+      );
     });
   });
 });
@@ -170,7 +172,7 @@ describe("parseIssueParams", () => {
     expect(() =>
       parseIssueParams({ organizationSlug: "foo" }),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Either issueId or issueUrl must be provided]`,
+      `[UserInputError: Either issueId or issueUrl must be provided]`,
     );
   });
 
@@ -178,7 +180,7 @@ describe("parseIssueParams", () => {
     expect(() =>
       parseIssueParams({ issueId: "123" }),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Organization slug is required]`,
+      `[UserInputError: Organization slug is required]`,
     );
   });
 
@@ -186,7 +188,7 @@ describe("parseIssueParams", () => {
     expect(() =>
       parseIssueParams({ issueUrl: "not-a-url" }),
     ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Invalid Sentry issue URL. Must start with http:// or https://]`,
+      `[UserInputError: Invalid Sentry issue URL. Must start with http:// or https://]`,
     );
   });
 });
