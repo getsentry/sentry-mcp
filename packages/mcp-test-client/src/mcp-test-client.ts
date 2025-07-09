@@ -46,7 +46,7 @@ export async function connectToMCPServer(
             env: {
               ...process.env,
               SENTRY_ACCESS_TOKEN: config.accessToken,
-              SENTRY_HOST: config.host || "https://sentry.io",
+              SENTRY_HOST: config.host || "sentry.io",
               ...(config.sentryDsn && { SENTRY_DSN: config.sentryDsn }),
             },
           });
