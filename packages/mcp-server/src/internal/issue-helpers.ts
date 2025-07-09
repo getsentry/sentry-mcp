@@ -88,7 +88,8 @@ export function parseIssueId(issueId: string) {
 
   // Validate against common Sentry issue ID patterns
   // Either numeric IDs or PROJECT-ABC123 format
-  const validFormatRegex = /^(\d+|[A-Za-z][\w-]*-[A-Za-z0-9]+)$/;
+  // Allow project codes to start with alphanumeric characters (including numbers)
+  const validFormatRegex = /^(\d+|[A-Za-z0-9][\w-]*-[A-Za-z0-9]+)$/;
 
   if (!validFormatRegex.test(finalIssueId)) {
     throw new Error(
