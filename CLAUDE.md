@@ -109,3 +109,8 @@ When making changes, consider these areas:
 
 - Server runs via stdio transport
 - Authentication uses access tokens (not OAuth)
+
+## Sentry Organization and Project Information
+
+- Organization: 'sentry'
+- Project: 'mcp-server'

@@ -7,6 +7,8 @@
  * inconsistencies.
  */
 
+import { UserInputError } from "../errors";
+
 /**
  * Extracts the Sentry issue ID and organization slug from a full URL
  *
@@ -19,13 +21,13 @@ export function extractIssueId(url: string): {
   organizationSlug: string;
 } {
   if (!url || typeof url !== "string") {
-    throw new Error(
+    throw new UserInputError(
       "Invalid Sentry issue URL. URL must be a non-empty string.",
     );
   }
 
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    throw new Error(
+    throw new UserInputError(
       "Invalid Sentry issue URL. Must start with http:// or https://",
     );
   }
@@ -34,19 +36,21 @@ export function extractIssueId(url: string): {
   try {
     parsedUrl = new URL(url);
   } catch (error) {
-    throw new Error(`Invalid Sentry issue URL. Unable to parse URL: ${url}`);
+    throw new UserInputError(
+      `Invalid Sentry issue URL. Unable to parse URL: ${url}`,
+    );
   }
 
   const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
   if (pathParts.length < 2 || !pathParts.includes("issues")) {
-    throw new Error(
+    throw new UserInputError(
       "Invalid Sentry issue URL. Path must contain '/issues/{issue_id}'",
     );
   }
 
   const issueId = pathParts[pathParts.indexOf("issues") + 1];
   if (!issueId) {
-    throw new Error("Unable to determine issue ID from URL.");
+    throw new UserInputError("Unable to determine issue ID from URL.");
   }
 
   // Extract organization slug from either the path or subdomain
@@ -65,7 +69,7 @@ export function extractIssueId(url: string): {
   }
 
   if (!organizationSlug) {
-    throw new Error(
+    throw new UserInputError(
       "Invalid Sentry issue URL. Could not determine organization.",
     );
   }
@@ -82,9 +86,19 @@ export function extractIssueId(url: string): {
  * @returns The parsed issue ID
  */
 export function parseIssueId(issueId: string) {
+  if (!issueId.trim()) {
+    throw new UserInputError("Issue ID cannot be empty");
+  }
+
   let finalIssueId = issueId;
   // remove trailing punctuation
   finalIssueId = finalIssueId.replace(/[^\w-]/g, "");
+
+  if (!finalIssueId) {
+    throw new UserInputError(
+      "Issue ID cannot be empty after removing special characters",
+    );
+  }
 
   // Validate against common Sentry issue ID patterns
   // Either numeric IDs or PROJECT-ABC123 format
@@ -92,7 +106,7 @@ export function parseIssueId(issueId: string) {
   const validFormatRegex = /^(\d+|[A-Za-z0-9][\w-]*-[A-Za-z0-9]+)$/;
 
   if (!validFormatRegex.test(finalIssueId)) {
-    throw new Error(
+    throw new UserInputError(
       `Invalid issue ID format: "${finalIssueId}". Expected either a numeric ID or a project code followed by an alphanumeric identifier (e.g., "PROJECT-ABC123").`,
     );
   }
@@ -133,7 +147,7 @@ export function parseIssueParams({
   }
 
   if (!organizationSlug) {
-    throw new Error("Organization slug is required");
+    throw new UserInputError("Organization slug is required");
   }
 
   if (issueId) {
@@ -143,5 +157,5 @@ export function parseIssueParams({
     };
   }
 
-  throw new Error("Either issueId or issueUrl must be provided");
+  throw new UserInputError("Either issueId or issueUrl must be provided");
 }
