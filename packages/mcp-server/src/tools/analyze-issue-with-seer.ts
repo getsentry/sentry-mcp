@@ -139,8 +139,15 @@ export default defineTool({
     // Step 3: Poll until complete or timeout (only for non-terminal states)
     const startTime = Date.now();
     let lastStatus = "";
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 3;
 
     while (Date.now() - startTime < SEER_TIMEOUT) {
+      // Check for timeout before making API call
+      if (Date.now() - startTime >= SEER_TIMEOUT) {
+        break;
+      }
+
       if (!autofixState.autofix) {
         output += `Error: Analysis state lost. Please try again by running:\n`;
         output += `\`\`\`\n`;
@@ -188,16 +195,45 @@ export default defineTool({
         setTimeout(resolve, SEER_POLLING_INTERVAL),
       );
 
-      // Refresh state
-      autofixState = await apiService.getAutofixState({
-        organizationSlug: orgSlug,
-        issueId: parsedIssueId!,
-      });
+      // Refresh state with error handling
+      try {
+        autofixState = await apiService.getAutofixState({
+          organizationSlug: orgSlug,
+          issueId: parsedIssueId!,
+        });
+        // Reset error counter on successful API call
+        consecutiveErrors = 0;
+      } catch (error) {
+        consecutiveErrors++;
+
+        // If we've hit the max consecutive errors, give up
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          output += `\n## API Error\n\n`;
+          output += `Failed to check analysis status after ${maxConsecutiveErrors} attempts.\n`;
+          output += `Error: ${
+            error instanceof Error ? error.message : String(error)
+          }\n\n`;
+          output += `Please try again later by running:\n`;
+          output += `\`\`\`\n`;
+          output += params.issueUrl
+            ? `analyze_issue_with_seer(issueUrl="${params.issueUrl}")`
+            : `analyze_issue_with_seer(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`;
+          output += `\n\`\`\`\n`;
+          return output;
+        }
+
+        // For transient errors, wait longer before retrying
+        await new Promise((resolve) =>
+          setTimeout(resolve, SEER_POLLING_INTERVAL * 2),
+        );
+      }
     }
 
     // Show current progress
     if (autofixState.autofix) {
-      output += `**Current Status**: ${getStatusDisplayName(autofixState.autofix.status)}\n\n`;
+      output += `**Current Status**: ${getStatusDisplayName(
+        autofixState.autofix.status,
+      )}\n\n`;
       for (const step of autofixState.autofix.steps) {
         output += getOutputForAutofixStep(step);
         output += "\n";
@@ -206,7 +242,9 @@ export default defineTool({
 
     // Timeout reached
     output += `\n## Analysis Timed Out\n\n`;
-    output += `The analysis is taking longer than expected (>${SEER_TIMEOUT / 1000}s).\n\n`;
+    output += `The analysis is taking longer than expected (>${
+      SEER_TIMEOUT / 1000
+    }s).\n\n`;
 
     output += `\nYou can check the status later by running the same command again:\n`;
     output += `\`\`\`\n`;
