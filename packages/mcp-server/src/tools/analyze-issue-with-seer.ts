@@ -134,6 +134,8 @@ export default defineTool({
             issueId: parsedIssueId!,
           }),
         {
+          maxRetries: SEER_MAX_RETRIES,
+          initialDelay: SEER_INITIAL_RETRY_DELAY,
           shouldRetry: (error) => {
             if (error instanceof ApiError) {
               return error.status >= 500;
@@ -228,6 +230,8 @@ export default defineTool({
               issueId: parsedIssueId!,
             }),
           {
+            maxRetries: SEER_MAX_RETRIES,
+            initialDelay: SEER_INITIAL_RETRY_DELAY,
             shouldRetry: (error) => {
               if (error instanceof ApiError) {
                 return error.status >= 500;
