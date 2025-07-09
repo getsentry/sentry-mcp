@@ -48,7 +48,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
         accessToken: this.props.accessToken,
         organizationSlug: this.props.organizationSlug,
         userId: this.props.id,
-        mcpHost: process.env.MCP_HOST,
+        mcpUrl: process.env.MCP_URL,
         // User agent is captured from the initial SSE/WebSocket request
         userAgent: this.cachedUserAgent,
       },

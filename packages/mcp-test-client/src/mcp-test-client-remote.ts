@@ -1,7 +1,7 @@
 import { experimental_createMCPClient } from "ai";
 import { startNewTrace, startSpan } from "@sentry/core";
 import { OAuthClient } from "./auth/oauth.js";
-import { DEFAULT_MCP_HOST } from "./constants.js";
+import { DEFAULT_MCP_URL } from "./constants.js";
 import { logError, logSuccess } from "./logger.js";
 import type { MCPConnection, RemoteMCPConfig } from "./types.js";
 import { randomUUID } from "node:crypto";
@@ -24,7 +24,7 @@ export async function connectToRemoteMCPServer(
       },
       async (span) => {
         try {
-          const mcpHost = config.mcpHost || DEFAULT_MCP_HOST;
+          const mcpHost = config.mcpHost || DEFAULT_MCP_URL;
 
           // Remove custom attributes - let SDK handle standard attributes
           let accessToken = config.accessToken;

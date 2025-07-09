@@ -117,7 +117,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
               parameters || {},
               {
                 accessToken,
-                host: c.env.SENTRY_HOST || "sentry.io",
+                sentryHost: c.env.SENTRY_HOST || "sentry.io",
                 organizationSlug: null,
               },
             );
