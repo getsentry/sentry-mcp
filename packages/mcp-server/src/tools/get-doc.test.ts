@@ -11,7 +11,7 @@ describe("get_doc", () => {
         accessToken: "access-token",
         userId: "1",
         organizationSlug: null,
-        host: "https://mcp.sentry.dev",
+        mcpUrl: "https://mcp.sentry.dev",
       },
     );
     expect(result).toMatchInlineSnapshot(`

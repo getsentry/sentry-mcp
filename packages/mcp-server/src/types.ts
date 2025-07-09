@@ -39,8 +39,8 @@ export type PromptHandlers = {
 };
 
 export type ServerContext = {
-  host?: string;
-  mcpHost?: string;
+  sentryHost?: string;
+  mcpUrl?: string;
   accessToken: string;
   organizationSlug: string | null;
   userId?: string | null;

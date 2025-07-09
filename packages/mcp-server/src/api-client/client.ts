@@ -10,7 +10,6 @@ import {
   IssueSchema,
   EventSchema,
   EventAttachmentListSchema,
-  EventAttachmentSchema,
   ErrorsSearchResponseSchema,
   SpansSearchResponseSchema,
   TagListSchema,
@@ -110,6 +109,7 @@ type RequestOptions = {
  * - Enhanced error handling with LLM-friendly messages
  * - URL generation for Sentry resources (issues, traces)
  * - Bearer token authentication
+ * - Always uses HTTPS for secure connections
  *
  * @example Basic Usage
  * ```typescript
@@ -127,7 +127,7 @@ type RequestOptions = {
  *
  * @example Multi-Region Support
  * ```typescript
- * // Self-hosted instance
+ * // Self-hosted instance with hostname
  * const selfHosted = new SentryApiService({
  *   accessToken: "token",
  *   host: "sentry.company.com"
@@ -148,32 +148,35 @@ export class SentryApiService {
   /**
    * Creates a new Sentry API service instance.
    *
+   * Always uses HTTPS for secure connections.
+   *
    * @param config Configuration object
    * @param config.accessToken OAuth access token for authentication (optional for some endpoints)
-   * @param config.host Sentry host (defaults to sentry.io)
+   * @param config.host Sentry hostname (e.g. "sentry.io", "sentry.example.com")
    */
   constructor({
     accessToken = null,
-    host = process.env.SENTRY_HOST,
+    host = "sentry.io",
   }: {
     accessToken?: string | null;
     host?: string;
   }) {
     this.accessToken = accessToken;
-    this.host = host || "sentry.io";
-    this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
+    this.host = host;
+    this.apiPrefix = `https://${host}/api/0`;
   }
 
   /**
    * Updates the host for API requests.
    *
    * Used for multi-region support or switching between Sentry instances.
+   * Always uses HTTPS protocol.
    *
-   * @param host New host to use for API requests
+   * @param host New hostname to use for API requests
    */
   setHost(host: string) {
     this.host = host;
-    this.apiPrefix = new URL("/api/0", `https://${this.host}`).href;
+    this.apiPrefix = `https://${this.host}/api/0`;
   }
 
   /**
@@ -198,7 +201,7 @@ export class SentryApiService {
     { host }: { host?: string } = {},
   ): Promise<Response> {
     const url = host
-      ? new URL(`/api/0${path}`, `https://${host}`).href
+      ? `https://${host}/api/0${path}`
       : `${this.apiPrefix}${path}`;
 
     const headers: Record<string, string> = {
@@ -286,10 +289,11 @@ export class SentryApiService {
    * Generates a Sentry issue URL for browser navigation.
    *
    * Handles both SaaS (subdomain-based) and self-hosted URL formats.
+   * Always uses HTTPS protocol.
    *
    * @param organizationSlug Organization identifier
    * @param issueId Issue identifier (short ID or numeric ID)
-   * @returns Full HTTPS URL to the issue in Sentry UI
+   * @returns Full URL to the issue in Sentry UI
    *
    * @example
    * ```typescript
@@ -301,13 +305,17 @@ export class SentryApiService {
    * ```
    */
   getIssueUrl(organizationSlug: string, issueId: string): string {
-    return this.host !== "sentry.io"
-      ? `https://${this.host}/organizations/${organizationSlug}/issues/${issueId}`
-      : `https://${organizationSlug}.${this.host}/issues/${issueId}`;
+    const isSaas = this.host === "sentry.io";
+
+    return isSaas
+      ? `https://${organizationSlug}.${this.host}/issues/${issueId}`
+      : `https://${this.host}/organizations/${organizationSlug}/issues/${issueId}`;
   }
 
   /**
    * Generates a Sentry trace URL for performance investigation.
+   *
+   * Always uses HTTPS protocol.
    *
    * @param organizationSlug Organization identifier
    * @param traceId Trace identifier (hex string)
@@ -320,9 +328,11 @@ export class SentryApiService {
    * ```
    */
   getTraceUrl(organizationSlug: string, traceId: string): string {
-    return this.host !== "sentry.io"
-      ? `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`
-      : `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`;
+    const isSaas = this.host === "sentry.io";
+
+    return isSaas
+      ? `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`
+      : `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`;
   }
 
   /**
@@ -886,7 +896,7 @@ export class SentryApiService {
       eventId: string;
     },
     opts?: RequestOptions,
-  ) {
+  ): Promise<EventAttachmentList> {
     const response = await this.request(
       `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
       undefined,
@@ -911,7 +921,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<{
-    attachment: any;
+    attachment: EventAttachment;
     downloadUrl: string;
     filename: string;
     blob: Blob;

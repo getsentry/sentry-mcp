@@ -1,5 +1,5 @@
-// Default MCP Server host
-export const DEFAULT_MCP_HOST = "https://mcp.sentry.dev";
+// Default MCP Server
+export const DEFAULT_MCP_URL = "https://mcp.sentry.dev";
 
 // Default AI model - using GPT-4
 export const DEFAULT_MODEL = "gpt-4o";

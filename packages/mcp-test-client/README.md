@@ -58,8 +58,8 @@ OPENAI_API_KEY=your_openai_api_key
 SENTRY_ACCESS_TOKEN=your_sentry_access_token
 
 # Optional
-SENTRY_HOST=https://sentry.io  # For self-hosted Sentry instances
-MCP_HOST=https://mcp.sentry.dev  # MCP server host (defaults to production)
+SENTRY_HOST=sentry.io  # For self-hosted Sentry instances (hostname or full URL)
+MCP_URL=https://mcp.sentry.dev  # MCP server host (defaults to production)
 MCP_MODEL=gpt-4o  # Override default model (GPT-4)
 
 # Optional - Error tracking
@@ -80,6 +80,7 @@ pnpm mcp-test-client --access-token=your_token "Your prompt"
 The client automatically determines the connection mode:
 
 **Local Mode (stdio transport)**: Used when an access token is provided via:
+
 1. Command-line flag (`--access-token`)
 2. Environment variable (`SENTRY_ACCESS_TOKEN`)
 3. `.env` file
@@ -89,6 +90,7 @@ The client automatically determines the connection mode:
 ### Required Sentry Permissions
 
 Your Sentry access token needs the following scopes:
+
 - `org:read`
 - `project:read`
 - `project:write`
@@ -133,6 +135,7 @@ pnpm mcp-test-client
 ```
 
 In interactive mode:
+
 - Type your prompts and press Enter
 - Type `exit` or `quit` to end the session
 - The AI maintains context across prompts
@@ -162,7 +165,7 @@ pnpm mcp-test-client --mcp-host http://localhost:8787 "List my projects"
 Use local stdio transport with custom Sentry host:
 
 ```bash
-SENTRY_HOST=my-sentry.com SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client "Show my projects"
+SENTRY_HOST=sentry.example.com SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client "Show my projects"
 ```
 
 ## Development
@@ -190,6 +193,7 @@ pnpm typecheck
 ### Connection Issues
 
 If you see "Failed to connect to MCP server":
+
 1. Ensure the mcp-server package is built
 2. Check that your access token is valid
 3. Verify the Sentry host URL is correct
@@ -197,6 +201,7 @@ If you see "Failed to connect to MCP server":
 ### Authentication Errors
 
 If you get authentication errors:
+
 1. Verify your OPENAI_API_KEY is set correctly
 2. Check that your SENTRY_ACCESS_TOKEN has the required permissions
 3. For self-hosted Sentry, ensure SENTRY_HOST is set
@@ -204,6 +209,7 @@ If you get authentication errors:
 ### Tool Errors
 
 If tools fail to execute:
+
 1. Check the error message for missing parameters
 2. Ensure your Sentry token has appropriate permissions
 3. Verify you have access to the requested resources
@@ -261,12 +267,12 @@ SENTRY_ACCESS_TOKEN=dummy OPENAI_API_KEY=dummy pnpm mcp-test-client --help
 ./examples/test-connection.sh
 ```
 
-
 ## Authentication Methods
 
 ### Remote Mode (OAuth)
 
 When connecting to a remote MCP server (default), the client supports OAuth 2.1 with PKCE:
+
 - No client secret required (secure for CLI applications)
 - Automatic browser-based authentication flow
 - Tokens are securely stored in memory during the session
@@ -276,6 +282,7 @@ When connecting to a remote MCP server (default), the client supports OAuth 2.1 
 ### Local Mode (Access Tokens)
 
 When using local stdio transport (automatic when access token is provided), you must provide a Sentry access token:
+
 - Set `SENTRY_ACCESS_TOKEN` environment variable
 - Or use `--access-token` command-line flag
 - Tokens need appropriate Sentry permissions (see Required Sentry Permissions section)
@@ -298,6 +305,7 @@ The CLI consists of these main components:
 ## Contributing
 
 When adding new features:
+
 1. Follow the existing code style
 2. Add new test scenarios if applicable
 3. Update this README with new usage examples

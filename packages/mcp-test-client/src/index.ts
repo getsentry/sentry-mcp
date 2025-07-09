@@ -32,7 +32,7 @@ program
   .option(
     "--mcp-host <host>",
     "MCP server host",
-    process.env.MCP_HOST || "https://mcp.sentry.dev",
+    process.env.MCP_URL || "https://mcp.sentry.dev",
   )
   .option("--sentry-dsn <dsn>", "Sentry DSN for error reporting")
   .action(async (prompt, options) => {

@@ -6,14 +6,14 @@ import type { ServerContext } from "../../types";
  * Create a Sentry API service from server context with optional region override
  * @param context - Server context containing host and access token
  * @param opts - Options object containing optional regionUrl override
- * @returns Configured SentryApiService instance
+ * @returns Configured SentryApiService instance (always uses HTTPS)
  * @throws {UserInputError} When regionUrl is provided but invalid
  */
 export function apiServiceFromContext(
   context: ServerContext,
   opts: { regionUrl?: string } = {},
 ) {
-  let host = context.host;
+  let host = context.sentryHost;
 
   if (opts.regionUrl?.trim()) {
     try {
