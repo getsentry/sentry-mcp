@@ -11,8 +11,12 @@ import {
   getOutputForAutofixStep,
   SEER_POLLING_INTERVAL,
   SEER_TIMEOUT,
+  SEER_MAX_RETRIES,
+  SEER_INITIAL_RETRY_DELAY,
 } from "./utils/seer-utils";
+import { retryWithBackoff } from "../internal/fetch-utils";
 import type { ServerContext } from "../types";
+import { ApiError } from "../api-client/index";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -89,10 +93,25 @@ export default defineTool({
     let output = `# Seer AI Analysis for Issue ${parsedIssueId}\n\n`;
 
     // Step 1: Check if analysis already exists
-    let autofixState = await apiService.getAutofixState({
-      organizationSlug: orgSlug,
-      issueId: parsedIssueId!,
-    });
+    let autofixState = await retryWithBackoff(
+      () =>
+        apiService.getAutofixState({
+          organizationSlug: orgSlug,
+          issueId: parsedIssueId!,
+        }),
+      {
+        maxRetries: SEER_MAX_RETRIES,
+        initialDelay: SEER_INITIAL_RETRY_DELAY,
+        shouldRetry: (error) => {
+          // Retry on network errors or 5xx errors
+          if (error instanceof ApiError) {
+            return error.status >= 500;
+          }
+          // Retry on network/connection errors
+          return true;
+        },
+      },
+    );
 
     // Step 2: Start analysis if none exists
     if (!autofixState.autofix) {
@@ -107,11 +126,24 @@ export default defineTool({
       // Give it a moment to initialize
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Refresh state
-      autofixState = await apiService.getAutofixState({
-        organizationSlug: orgSlug,
-        issueId: parsedIssueId!,
-      });
+      // Refresh state with retry logic
+      autofixState = await retryWithBackoff(
+        () =>
+          apiService.getAutofixState({
+            organizationSlug: orgSlug,
+            issueId: parsedIssueId!,
+          }),
+        {
+          maxRetries: SEER_MAX_RETRIES,
+          initialDelay: SEER_INITIAL_RETRY_DELAY,
+          shouldRetry: (error) => {
+            if (error instanceof ApiError) {
+              return error.status >= 500;
+            }
+            return true;
+          },
+        },
+      );
     } else {
       output += `Found existing analysis (Run ID: ${autofixState.autofix.run_id})\n\n`;
 
@@ -139,6 +171,7 @@ export default defineTool({
     // Step 3: Poll until complete or timeout (only for non-terminal states)
     const startTime = Date.now();
     let lastStatus = "";
+    let consecutiveErrors = 0;
 
     while (Date.now() - startTime < SEER_TIMEOUT) {
       if (!autofixState.autofix) {
@@ -188,11 +221,46 @@ export default defineTool({
         setTimeout(resolve, SEER_POLLING_INTERVAL),
       );
 
-      // Refresh state
-      autofixState = await apiService.getAutofixState({
-        organizationSlug: orgSlug,
-        issueId: parsedIssueId!,
-      });
+      // Refresh state with error handling
+      try {
+        autofixState = await retryWithBackoff(
+          () =>
+            apiService.getAutofixState({
+              organizationSlug: orgSlug,
+              issueId: parsedIssueId!,
+            }),
+          {
+            maxRetries: SEER_MAX_RETRIES,
+            initialDelay: SEER_INITIAL_RETRY_DELAY,
+            shouldRetry: (error) => {
+              if (error instanceof ApiError) {
+                return error.status >= 500;
+              }
+              return true;
+            },
+          },
+        );
+        consecutiveErrors = 0; // Reset error counter on success
+      } catch (error) {
+        consecutiveErrors++;
+
+        // If we've had too many consecutive errors, give up
+        if (consecutiveErrors >= 3) {
+          output += `\n## Error During Analysis\n\n`;
+          output += `Unable to retrieve analysis status after multiple attempts.\n`;
+          output += `Error: ${error instanceof Error ? error.message : String(error)}\n\n`;
+          output += `You can check the status later by running the same command again:\n`;
+          output += `\`\`\`\n`;
+          output += params.issueUrl
+            ? `analyze_issue_with_seer(issueUrl="${params.issueUrl}")`
+            : `analyze_issue_with_seer(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`;
+          output += `\n\`\`\`\n`;
+          return output;
+        }
+
+        // Log the error but continue polling
+        output += `Temporary error retrieving status (attempt ${consecutiveErrors}/3), retrying...\n`;
+      }
     }
 
     // Show current progress
