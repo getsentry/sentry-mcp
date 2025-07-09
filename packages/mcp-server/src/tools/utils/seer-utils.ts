@@ -88,8 +88,8 @@ export function getOutputForAutofixStep(
     >;
 
     for (const cause of typedStep.causes) {
-      if (typedStep.description) {
-        output += `${typedStep.description}\n\n`;
+      if (cause.description) {
+        output += `${cause.description}\n\n`;
       }
       for (const entry of cause.root_cause_reproduction) {
         output += `**${entry.title}**\n\n`;

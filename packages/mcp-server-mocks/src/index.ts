@@ -722,6 +722,7 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
     fetch: () => HttpResponse.json(issueFixture2),
   },
+
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
@@ -754,6 +755,7 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/events/latest/",
     fetch: () => HttpResponse.json(eventsFixture),
   },
+
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/releases/",
@@ -771,17 +773,12 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
-    fetch: () => HttpResponse.json(autofixStateFixture),
-  },
-  {
-    method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
     fetch: () => HttpResponse.json(autofixStateFixture),
   },
   {
     method: "post",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/autofix/",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/autofix/",
     fetch: () => HttpResponse.json({ run_id: 123 }),
   },
   {
@@ -789,16 +786,7 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
     fetch: () => HttpResponse.json({ run_id: 123 }),
   },
-  {
-    method: "get",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
-    fetch: () => HttpResponse.json({ autofix: null }),
-  },
-  {
-    method: "post",
-    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
-    fetch: () => HttpResponse.json({ run_id: 12 }),
-  },
+
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-45/autofix/",
@@ -1203,3 +1191,6 @@ export const mswServer = setupServer(
   ...searchHandlers,
   ...docsHandlers,
 );
+
+// Export fixtures for use in tests
+export { autofixStateFixture };

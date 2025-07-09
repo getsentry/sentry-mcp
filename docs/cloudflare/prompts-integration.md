@@ -138,6 +138,7 @@ Users can type `/prompts` in the chat to see all available MCP prompts:
 ```
 
 This displays a formatted list with:
+
 - Prompt names and descriptions
 - Required and optional parameters
 - Parameter types and descriptions

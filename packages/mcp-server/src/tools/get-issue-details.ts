@@ -17,23 +17,20 @@ export default defineTool({
   description: [
     "Retrieve issue details from Sentry for a specific Issue ID, including the stacktrace and error message if available. Either issueId or issueUrl MUST be provided.",
     "",
-    "**NOTE: If the user asks HOW TO FIX an issue, use `analyze_issue_with_seer` instead!**",
-    "",
     "Use this tool when you need to:",
     "- View error details, stacktraces, and metadata",
     "- Investigate when/where an error occurred",
     "- Access raw error information from Sentry",
+    "- Get comprehensive issue information including any available Seer analysis",
     "",
     "Do NOT use this tool when:",
-    '- User asks "how do I fix this?" → Use `analyze_issue_with_seer`',
     "- User wants root cause analysis → Use `analyze_issue_with_seer`",
-    "- User needs code fixes → Use `analyze_issue_with_seer`",
     "",
     "<examples>",
-    "### Get details for issue ID 'CLOUDFLARE-MCP-41'",
+    '### User: "How do I fix ISSUE-123?"',
     "",
     "```",
-    "get_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')",
+    "get_issue_details(organizationSlug='my-organization', issueId='ISSUE-123')",
     "```",
     "",
     "### Get details for event ID 'c49541c747cb4d8aa3efb70ca5aba243'",
@@ -81,11 +78,27 @@ export default defineTool({
         issueId: issue.shortId,
         eventId: params.eventId,
       });
+
+      // Try to fetch Seer analysis context (non-blocking)
+      let autofixState:
+        | Awaited<ReturnType<typeof apiService.getAutofixState>>
+        | undefined;
+      try {
+        autofixState = await apiService.getAutofixState({
+          organizationSlug: orgSlug,
+          issueId: issue.shortId,
+        });
+      } catch (error) {
+        // Silently continue if Seer analysis is not available
+        // This ensures the tool works even if Seer is not enabled
+      }
+
       return formatIssueOutput({
         organizationSlug: orgSlug,
         issue,
         event,
         apiService,
+        autofixState,
       });
     }
 
@@ -119,11 +132,27 @@ export default defineTool({
       organizationSlug: orgSlug,
       issueId: issue.shortId,
     });
+
+    // Try to fetch Seer analysis context (non-blocking)
+    let autofixState:
+      | Awaited<ReturnType<typeof apiService.getAutofixState>>
+      | undefined;
+    try {
+      autofixState = await apiService.getAutofixState({
+        organizationSlug: orgSlug,
+        issueId: issue.shortId,
+      });
+    } catch (error) {
+      // Silently continue if Seer analysis is not available
+      // This ensures the tool works even if Seer is not enabled
+    }
+
     return formatIssueOutput({
       organizationSlug: orgSlug,
       issue,
       event,
       apiService,
+      autofixState,
     });
   },
 });

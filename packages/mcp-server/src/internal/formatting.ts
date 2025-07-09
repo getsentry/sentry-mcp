@@ -6,7 +6,7 @@
  * and contextual information with consistent formatting patterns.
  */
 import type { z } from "zod";
-import type { Event, Issue } from "../api-client/types";
+import type { Event, Issue, AutofixRunState } from "../api-client/types";
 import type {
   ErrorEntrySchema,
   ErrorEventSchema,
@@ -17,6 +17,11 @@ import type {
   ThreadsEntrySchema,
   SentryApiService,
 } from "../api-client";
+import {
+  getOutputForAutofixStep,
+  getStatusDisplayName,
+  isTerminalStatus,
+} from "../tools/utils/seer-utils";
 
 // Language detection mappings
 const LANGUAGE_EXTENSIONS: Record<string, string> = {
@@ -605,6 +610,63 @@ function formatContexts(contexts: z.infer<typeof EventSchema>["contexts"]) {
 }
 
 /**
+ * Formats Seer AI analysis context for inclusion in issue details.
+ * Provides a minimal summary showing just the key solution when available.
+ *
+ * @param autofixState - The autofix state containing Seer analysis data
+ * @returns Formatted markdown string with Seer context, or empty string if no analysis exists
+ */
+function formatSeerContext(autofixState: AutofixRunState): string {
+  if (!autofixState.autofix) {
+    return "";
+  }
+
+  const { autofix } = autofixState;
+  const parts: string[] = [];
+
+  parts.push("## Seer AI Analysis");
+  parts.push("");
+
+  // For completed analyses, show just the key solution
+  if (isTerminalStatus(autofix.status) && autofix.steps.length > 0) {
+    const completedSteps = autofix.steps.filter(
+      (step) => step.status === "COMPLETED",
+    );
+
+    // Find the solution step and show its description directly
+    const solutionStep = completedSteps.find(
+      (step) => step.type === "solution",
+    );
+
+    if (solutionStep) {
+      // For solution steps, use the description directly
+      const solutionDescription = solutionStep.description;
+      if (
+        solutionDescription &&
+        typeof solutionDescription === "string" &&
+        solutionDescription.trim()
+      ) {
+        parts.push(solutionDescription.trim());
+      } else {
+        // Fallback to extracting from output if no description
+        const solutionOutput = getOutputForAutofixStep(solutionStep);
+        const lines = solutionOutput.split("\n");
+        const firstParagraph = lines.find(
+          (line) =>
+            line.trim().length > 50 &&
+            !line.startsWith("#") &&
+            !line.startsWith("*"),
+        );
+        if (firstParagraph) {
+          parts.push(firstParagraph.trim());
+        }
+      }
+    }
+  }
+  return `${parts.join("\n")}\n\n`;
+}
+
+/**
  * Formats a Sentry issue with its latest event into comprehensive markdown output.
  * Includes issue metadata, event details, and usage instructions.
  *
@@ -616,11 +678,13 @@ export function formatIssueOutput({
   issue,
   event,
   apiService,
+  autofixState,
 }: {
   organizationSlug: string;
   issue: Issue;
   event: Event;
   apiService: SentryApiService;
+  autofixState?: AutofixRunState;
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
   output += `**Description**: ${issue.title}\n`;
@@ -644,6 +708,12 @@ export function formatIssueOutput({
   }
   output += "\n";
   output += formatEventOutput(event);
+
+  // Add Seer context if available
+  if (autofixState) {
+    output += formatSeerContext(autofixState);
+  }
+
   output += "# Using this information\n\n";
   output += `- You can reference the IssueID in commit messages (e.g. \`Fixes ${issue.shortId}\`) to automatically close the issue when the commit is merged.\n`;
   output +=

@@ -29,6 +29,7 @@ packages/
 The core MCP implementation and npm-publishable package.
 
 **Structure:**
+
 ```
 src/
 ├── api-client/         # Sentry API client
@@ -43,6 +44,7 @@ src/
 ```
 
 **Key responsibilities:**
+
 - Implements MCP protocol using the official SDK
 - Provides tools for Sentry operations (issues, projects, etc.)
 - Handles authentication and API communication
@@ -50,7 +52,7 @@ src/
 
 ### packages/mcp-cloudflare
 
-A separate web chat application that uses the MCP server. 
+A separate web chat application that uses the MCP server.
 
 **Note**: This is NOT part of the MCP server itself - it's a demonstration of how to build a chat interface that consumes MCP.
 
@@ -61,6 +63,7 @@ See [Cloudflare Web App Documentation](./cloudflare/overview.md) for details.
 Evaluation tests that verify real Sentry operations.
 
 **Uses:**
+
 - Vercel AI SDK for LLM integration
 - Real Sentry API calls with mocked responses
 - Factuality scoring for output validation
@@ -70,6 +73,7 @@ Evaluation tests that verify real Sentry operations.
 Centralized mock data and MSW handlers.
 
 **Provides:**
+
 - Fixture data for all Sentry entities
 - MSW request handlers
 - Shared test utilities
@@ -79,6 +83,7 @@ Centralized mock data and MSW handlers.
 Interactive CLI for testing the MCP server with an AI agent.
 
 **Key features:**
+
 - Vercel AI SDK integration with Anthropic
 - Interactive and single-prompt modes
 - OAuth authentication for remote servers
@@ -107,12 +112,14 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
 The MCP server supports multiple transport mechanisms:
 
 **Stdio Transport** (Primary):
+
 - Direct process communication
 - Used by IDEs (Cursor, VS Code) and local tools
 - Configured via command-line args
 - This is the standard MCP transport
 
 **HTTP/SSE Transport** (For web apps):
+
 - Allows web applications to connect to MCP
 - Used by the example Cloudflare chat app
 - Not part of core MCP spec
@@ -168,6 +175,7 @@ Each tool follows a consistent structure:
    - Evaluation tests
 
 **Tool Count Constraints:**
+
 - AI agents have a 45 tool limit (Cursor, etc.)
 - Sentry MCP must stay under 25 tools (target: ~20)
 - Consolidate functionality where possible
@@ -183,6 +191,7 @@ Two-tier error system:
 ### 7. Build System
 
 Turbo for monorepo orchestration:
+
 - Dependency-aware builds
 - Parallel task execution
 - Shared TypeScript configs
@@ -207,7 +216,9 @@ Turbo for monorepo orchestration:
 ## MCP Concept Mappings
 
 ### Tools
+
 Execute actions and retrieve data:
+
 - `find_issues` - Search for issues
 - `get_project_details` - Fetch project info
 - `create_issue_comment` - Add comments
@@ -215,12 +226,16 @@ Execute actions and retrieve data:
 - `get_doc` - Fetch full documentation pages
 
 ### Prompts
+
 Multi-step workflows:
+
 - `find_errors_in_file` - Analyze file errors
 - `fix_issue_with_seer` - AI-suggested fixes
 
 ### Resources
+
 External documentation and data:
+
 - Platform docs (React, Python, etc.)
 - API references
 - Configuration examples
