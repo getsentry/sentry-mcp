@@ -68,9 +68,6 @@ for (const arg of process.argv.slice(2)) {
   }
 }
 
-// Use the hostname directly (always HTTPS)
-const host = sentryHost;
-
 if (!accessToken) {
   console.error(
     "Error: No access token was provided. Pass one with `--access-token` or via `SENTRY_ACCESS_TOKEN`.",
@@ -87,7 +84,7 @@ Sentry.init({
     tags: {
       "mcp.server_version": LIB_VERSION,
       "mcp.transport": "stdio",
-      "sentry.host": host,
+      "sentry.host": sentryHost,
       "mcp.mcp-url": mcpUrl,
     },
   },
@@ -119,7 +116,7 @@ const SENTRY_TIMEOUT = 5000; // 5 seconds
 startStdio(instrumentedServer, {
   accessToken,
   organizationSlug: null,
-  sentryHost: host,
+  sentryHost,
   mcpUrl,
   userAgent: process.env.MCP_USER_AGENT || `sentry-mcp-stdio/${LIB_VERSION}`,
 }).catch((err) => {
