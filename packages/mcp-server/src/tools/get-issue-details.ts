@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext } from "./utils/api-utils";
+import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
 import { parseIssueParams, formatIssueOutput } from "./utils/issue-utils";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
@@ -124,10 +124,15 @@ export default defineTool({
 
     setTag("organization.slug", orgSlug);
 
-    const issue = await apiService.getIssue({
-      organizationSlug: orgSlug,
-      issueId: parsedIssueId!,
-    });
+    const issue = await withApiErrorHandling(
+      () =>
+        apiService.getIssue({
+          organizationSlug: orgSlug,
+          issueId: parsedIssueId!,
+        }),
+      { operation: "getIssue", resourceId: parsedIssueId },
+    );
+
     const event = await apiService.getLatestEventForIssue({
       organizationSlug: orgSlug,
       issueId: issue.shortId,

@@ -258,6 +258,16 @@ export class SentryApiService {
       try {
         parsed = JSON.parse(errorText);
       } catch (error) {
+        // If we can't parse JSON, check if it's HTML (server error)
+        if (errorText.includes("<!DOCTYPE") || errorText.includes("<html")) {
+          console.error(
+            `[sentryApi] Received HTML error page instead of JSON (status ${response.status})`,
+            error,
+          );
+          throw new Error(
+            `Server error: Received HTML instead of JSON (${response.status} ${response.statusText}). This may indicate an invalid URL or server issue.`,
+          );
+        }
         console.error(
           `[sentryApi] Failed to parse error response: ${errorText}`,
           error,
