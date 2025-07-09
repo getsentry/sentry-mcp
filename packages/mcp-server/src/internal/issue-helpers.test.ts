@@ -101,19 +101,47 @@ describe("extractIssueId", () => {
 });
 
 describe("parseIssueId", () => {
-  it("should remove trailing punctuation from issue ID", () => {
-    expect(
-      // trailing period and exclamation
-      parseIssueId("CLOUDFLARE-MCP-41.!"),
-    ).toBe("CLOUDFLARE-MCP-41");
+  describe("cleaning", () => {
+    it("should remove trailing punctuation", () => {
+      expect(parseIssueId("CLOUDFLARE-MCP-41.!")).toBe("CLOUDFLARE-MCP-41");
+    });
+
+    it("should remove special characters except dash and underscore", () => {
+      expect(parseIssueId("ID_123-456!@#")).toBe("ID_123-456");
+    });
   });
 
-  it("should not modify a clean issue ID", () => {
-    expect(parseIssueId("CLOUDFLARE-MCP-41")).toBe("CLOUDFLARE-MCP-41");
-  });
+  describe("format validation", () => {
+    it("should accept pure numeric issue IDs", () => {
+      expect(parseIssueId("12345")).toBe("12345");
+    });
 
-  it("should remove special characters except dash and underscore", () => {
-    expect(parseIssueId("ID_123-456!@#")).toBe("ID_123-456");
+    it("should accept project-based IDs starting with letters", () => {
+      expect(parseIssueId("PROJECT-123")).toBe("PROJECT-123");
+      expect(parseIssueId("MCP-SERVER-E9E")).toBe("MCP-SERVER-E9E");
+    });
+
+    it("should accept project-based IDs starting with numbers", () => {
+      expect(parseIssueId("3R-3")).toBe("3R-3");
+      expect(parseIssueId("3R-AUTOMATION-SYSTEM-3")).toBe(
+        "3R-AUTOMATION-SYSTEM-3",
+      );
+    });
+
+    it("should throw error for invalid formats", () => {
+      // Starting with hyphen
+      expect(() => parseIssueId("-123")).toThrowError(
+        /Invalid issue ID format/,
+      );
+
+      // Ending with hyphen
+      expect(() => parseIssueId("PROJECT-")).toThrowError(
+        /Invalid issue ID format/,
+      );
+
+      // Empty string after cleaning
+      expect(() => parseIssueId("!!!")).toThrowError(/Invalid issue ID format/);
+    });
   });
 });
 
