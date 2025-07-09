@@ -180,6 +180,18 @@ export class SentryApiService {
   }
 
   /**
+   * Checks if the current host is Sentry SaaS (sentry.io).
+   *
+   * Used to determine API endpoint availability and URL formats.
+   * Self-hosted instances may not have all endpoints available.
+   *
+   * @returns True if using Sentry SaaS, false for self-hosted instances
+   */
+  private isSaas(): boolean {
+    return this.host === "sentry.io";
+  }
+
+  /**
    * Internal method for making authenticated requests to Sentry API.
    *
    * Handles:
@@ -315,9 +327,7 @@ export class SentryApiService {
    * ```
    */
   getIssueUrl(organizationSlug: string, issueId: string): string {
-    const isSaas = this.host === "sentry.io";
-
-    return isSaas
+    return this.isSaas()
       ? `https://${organizationSlug}.${this.host}/issues/${issueId}`
       : `https://${this.host}/organizations/${organizationSlug}/issues/${issueId}`;
   }
@@ -338,9 +348,7 @@ export class SentryApiService {
    * ```
    */
   getTraceUrl(organizationSlug: string, traceId: string): string {
-    const isSaas = this.host === "sentry.io";
-
-    return isSaas
+    return this.isSaas()
       ? `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`
       : `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`;
   }
@@ -377,26 +385,48 @@ export class SentryApiService {
    * ```
    */
   async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
-    // TODO: Sentry is currently not returning all orgs without hitting region endpoints
-    const regionResponse = await this.request(
-      "/users/me/regions/",
-      undefined,
-      opts,
-    );
-    const regionData = UserRegionsSchema.parse(await regionResponse.json());
+    // For self-hosted instances, the regions endpoint doesn't exist
+    if (!this.isSaas()) {
+      const response = await this.request("/organizations/", undefined, opts);
+      const body = await response.json();
+      return OrganizationListSchema.parse(body);
+    }
 
-    return (
-      await Promise.all(
-        regionData.regions.map(async (region) =>
-          this.request(`/organizations/`, undefined, {
-            ...opts,
-            host: new URL(region.url).host,
-          }).then((response) => response.json()),
-        ),
+    // For SaaS, try to use regions endpoint first
+    try {
+      // TODO: Sentry is currently not returning all orgs without hitting region endpoints
+      const regionResponse = await this.request(
+        "/users/me/regions/",
+        undefined,
+        opts,
+      );
+      const regionData = UserRegionsSchema.parse(await regionResponse.json());
+
+      return (
+        await Promise.all(
+          regionData.regions.map(async (region) =>
+            this.request(`/organizations/`, undefined, {
+              ...opts,
+              host: new URL(region.url).host,
+            }).then((response) => response.json()),
+          ),
+        )
       )
-    )
-      .map((data) => OrganizationListSchema.parse(data))
-      .reduce((acc, curr) => acc.concat(curr), []);
+        .map((data) => OrganizationListSchema.parse(data))
+        .reduce((acc, curr) => acc.concat(curr), []);
+    } catch (error) {
+      // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
+      // fall back to direct organizations endpoint
+      if (error instanceof ApiError && error.status === 404) {
+        // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
+        const response = await this.request("/organizations/", undefined, opts);
+        const body = await response.json();
+        return OrganizationListSchema.parse(body);
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   /**
