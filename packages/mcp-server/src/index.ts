@@ -10,6 +10,7 @@
  * @example CLI Usage
  * ```bash
  * npx @sentry/mcp-server --access-token=TOKEN --host=sentry.io
+ * npx @sentry/mcp-server --access-token=TOKEN --url=https://sentry.example.com
  * ```
  */
 
@@ -17,40 +18,30 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "./version";
-import { normalizeHost, extractHostname } from "./utils/url-utils";
+import {
+  validateSentryHost,
+  validateAndParseSentryUrl,
+} from "./utils/url-utils";
 
 let accessToken: string | undefined = process.env.SENTRY_ACCESS_TOKEN;
-let sentryHostOrUrl: string = process.env.SENTRY_HOST || "sentry.io";
+let sentryHost = "sentry.io"; // Default hostname
 let mcpUrl: string | undefined =
   process.env.MCP_URL || "https://mcp.sentry.dev";
 let sentryDsn: string | undefined =
   process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
 
-// Parse SENTRY_HOST to extract hostname and protocol
-function parseSentryHost(hostOrUrl: string): {
-  host: string;
-  protocol: string;
-} {
-  try {
-    const normalizedUrl = normalizeHost(hostOrUrl);
-    const url = new URL(normalizedUrl);
-    return {
-      host: url.host,
-      protocol: url.protocol.replace(":", ""),
-    };
-  } catch (error) {
-    // Fallback for invalid URLs - assume it's just a hostname
-    return {
-      host: hostOrUrl,
-      protocol: "https",
-    };
-  }
+// Set initial host from environment variables (SENTRY_URL takes precedence)
+if (process.env.SENTRY_URL) {
+  sentryHost = validateAndParseSentryUrl(process.env.SENTRY_URL);
+} else if (process.env.SENTRY_HOST) {
+  validateSentryHost(process.env.SENTRY_HOST);
+  sentryHost = process.env.SENTRY_HOST;
 }
 
 const packageName = "@sentry/mcp-server";
 
-function getUsage() {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>] [--mcp-url=<url>] [--sentry-dsn=<dsn>]`;
+function getUsage(): string {
+  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>]`;
 }
 
 for (const arg of process.argv.slice(2)) {
@@ -61,7 +52,10 @@ for (const arg of process.argv.slice(2)) {
   if (arg.startsWith("--access-token=")) {
     accessToken = arg.split("=")[1];
   } else if (arg.startsWith("--host=")) {
-    sentryHostOrUrl = arg.split("=")[1];
+    sentryHost = arg.split("=")[1];
+  } else if (arg.startsWith("--url=")) {
+    const url = arg.split("=")[1];
+    sentryHost = validateAndParseSentryUrl(url);
   } else if (arg.startsWith("--mcp-url=")) {
     mcpUrl = arg.split("=")[1];
   } else if (arg.startsWith("--sentry-dsn=")) {
@@ -73,8 +67,17 @@ for (const arg of process.argv.slice(2)) {
   }
 }
 
-// Parse the final host value after processing command line args
-const { host, protocol } = parseSentryHost(sentryHostOrUrl);
+// Validate command line host argument if provided
+for (const arg of process.argv.slice(2)) {
+  if (arg.startsWith("--host=")) {
+    const hostArg = arg.split("=")[1];
+    validateSentryHost(hostArg);
+    break;
+  }
+}
+
+// Use the hostname directly (always HTTPS)
+const host = sentryHost;
 
 if (!accessToken) {
   console.error(
@@ -125,7 +128,6 @@ startStdio(instrumentedServer, {
   accessToken,
   organizationSlug: null,
   sentryHost: host,
-  sentryProtocol: protocol,
   mcpUrl,
   userAgent: process.env.MCP_USER_AGENT || `sentry-mcp-stdio/${LIB_VERSION}`,
 }).catch((err) => {

@@ -16,7 +16,7 @@ describe("search_docs", () => {
         accessToken: "access-token",
         userId: "1",
         organizationSlug: null,
-        host: "https://mcp.sentry.dev",
+        mcpUrl: "https://mcp.sentry.dev",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -109,7 +109,7 @@ describe("search_docs", () => {
         accessToken: "access-token",
         userId: "1",
         organizationSlug: null,
-        host: "https://mcp.sentry.dev",
+        mcpUrl: "https://mcp.sentry.dev",
       },
     );
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { SentryApiService } from "./client.js";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { SentryApiService } from "./client";
 
 describe("getIssueUrl", () => {
   it("should work with sentry.io", () => {
@@ -19,21 +19,19 @@ describe("getIssueUrl", () => {
   it("should work with full URL including protocol", () => {
     const apiService = new SentryApiService({
       host: "sentry.example.com",
-      protocol: "https",
     });
     const result = apiService.getIssueUrl("sentry-mcp", "123456");
     expect(result).toMatchInlineSnapshot(
       `"https://sentry.example.com/organizations/sentry-mcp/issues/123456"`,
     );
   });
-  it("should work with http protocol", () => {
+  it("should always use HTTPS protocol", () => {
     const apiService = new SentryApiService({
       host: "localhost:8000",
-      protocol: "http",
     });
     const result = apiService.getIssueUrl("sentry-mcp", "123456");
     expect(result).toMatchInlineSnapshot(
-      `"http://localhost:8000/organizations/sentry-mcp/issues/123456"`,
+      `"https://localhost:8000/organizations/sentry-mcp/issues/123456"`,
     );
   });
 });
@@ -59,17 +57,16 @@ describe("getTraceUrl", () => {
       `"https://sentry.example.com/organizations/sentry-mcp/explore/traces/trace/6a477f5b0f31ef7b6b9b5e1dea66c91d"`,
     );
   });
-  it("should work with http protocol", () => {
+  it("should always use HTTPS protocol", () => {
     const apiService = new SentryApiService({
       host: "localhost:8000",
-      protocol: "http",
     });
     const result = apiService.getTraceUrl(
       "sentry-mcp",
       "6a477f5b0f31ef7b6b9b5e1dea66c91d",
     );
     expect(result).toMatchInlineSnapshot(
-      `"http://localhost:8000/organizations/sentry-mcp/explore/traces/trace/6a477f5b0f31ef7b6b9b5e1dea66c91d"`,
+      `"https://localhost:8000/organizations/sentry-mcp/explore/traces/trace/6a477f5b0f31ef7b6b9b5e1dea66c91d"`,
     );
   });
 });
@@ -208,8 +205,6 @@ describe("host configuration", () => {
     // @ts-expect-error - accessing private property for testing
     expect(apiService.host).toBe("sentry.io");
     // @ts-expect-error - accessing private property for testing
-    expect(apiService.protocol).toBe("https");
-    // @ts-expect-error - accessing private property for testing
     expect(apiService.apiPrefix).toBe("https://sentry.io/api/0");
   });
 
@@ -218,54 +213,42 @@ describe("host configuration", () => {
     // @ts-expect-error - accessing private property for testing
     expect(apiService.host).toBe("localhost:8000");
     // @ts-expect-error - accessing private property for testing
-    expect(apiService.protocol).toBe("https");
-    // @ts-expect-error - accessing private property for testing
     expect(apiService.apiPrefix).toBe("https://localhost:8000/api/0");
   });
 
-  it("should handle explicit HTTPS protocol", () => {
+  it("should always use HTTPS protocol", () => {
     const apiService = new SentryApiService({
       host: "sentry.example.com",
-      protocol: "https",
     });
     // @ts-expect-error - accessing private property for testing
     expect(apiService.host).toBe("sentry.example.com");
     // @ts-expect-error - accessing private property for testing
-    expect(apiService.protocol).toBe("https");
-    // @ts-expect-error - accessing private property for testing
     expect(apiService.apiPrefix).toBe("https://sentry.example.com/api/0");
   });
 
-  it("should handle HTTP protocol", () => {
+  it("should always use HTTPS even for localhost", () => {
     const apiService = new SentryApiService({
       host: "localhost:8000",
-      protocol: "http",
     });
     // @ts-expect-error - accessing private property for testing
     expect(apiService.host).toBe("localhost:8000");
     // @ts-expect-error - accessing private property for testing
-    expect(apiService.protocol).toBe("http");
-    // @ts-expect-error - accessing private property for testing
-    expect(apiService.apiPrefix).toBe("http://localhost:8000/api/0");
+    expect(apiService.apiPrefix).toBe("https://localhost:8000/api/0");
   });
 
   it("should update host and API prefix with setHost", () => {
     const apiService = new SentryApiService({ host: "sentry.io" });
 
-    apiService.setHost("eu.sentry.io", "https");
+    apiService.setHost("eu.sentry.io");
     // @ts-expect-error - accessing private property for testing
     expect(apiService.host).toBe("eu.sentry.io");
     // @ts-expect-error - accessing private property for testing
-    expect(apiService.protocol).toBe("https");
-    // @ts-expect-error - accessing private property for testing
     expect(apiService.apiPrefix).toBe("https://eu.sentry.io/api/0");
 
-    apiService.setHost("localhost:9000", "http");
+    apiService.setHost("localhost:9000");
     // @ts-expect-error - accessing private property for testing
     expect(apiService.host).toBe("localhost:9000");
     // @ts-expect-error - accessing private property for testing
-    expect(apiService.protocol).toBe("http");
-    // @ts-expect-error - accessing private property for testing
-    expect(apiService.apiPrefix).toBe("http://localhost:9000/api/0");
+    expect(apiService.apiPrefix).toBe("https://localhost:9000/api/0");
   });
 });

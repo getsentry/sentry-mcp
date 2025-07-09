@@ -1,39 +1,93 @@
 /**
- * Normalizes a host/URL input to ensure it has a protocol.
- * Accepts both:
- * - Hostnames: "sentry.io", "localhost:8000"
- * - Full URLs: "https://sentry.io", "http://localhost:8000"
+ * Internal validation function that checks if a SENTRY_HOST value contains only hostname (no protocol).
+ * Throws an error if validation fails instead of exiting the process.
  *
- * @param hostOrUrl The host or URL to normalize
- * @param defaultProtocol The protocol to use if none is provided (defaults to "https")
- * @returns A normalized URL with protocol
+ * @param host The hostname to validate
+ * @throws {Error} If the host contains a protocol
  */
-export function normalizeHost(
-  hostOrUrl: string,
-  defaultProtocol = "https",
-): string {
-  // If it already has a protocol, return as-is
-  if (hostOrUrl.startsWith("http://") || hostOrUrl.startsWith("https://")) {
-    return hostOrUrl;
+function _validateSentryHostInternal(host: string): void {
+  if (host.startsWith("http://") || host.startsWith("https://")) {
+    throw new Error(
+      "SENTRY_HOST should only contain a hostname (e.g., sentry.example.com). Use SENTRY_URL if you want to provide a full URL.",
+    );
   }
-
-  // Otherwise, prepend the default protocol
-  return `${defaultProtocol}://${hostOrUrl}`;
 }
 
 /**
- * Extracts just the hostname (without protocol) from a host/URL input.
+ * Internal validation function that checks if a SENTRY_URL value is a valid HTTPS URL and extracts the hostname.
+ * Throws an error if validation fails instead of exiting the process.
  *
- * @param hostOrUrl The host or URL to extract from
- * @returns The hostname without protocol
+ * @param url The HTTPS URL to validate and parse
+ * @returns The extracted hostname from the URL
+ * @throws {Error} If the URL is invalid or not HTTPS
  */
-export function extractHostname(hostOrUrl: string): string {
-  try {
-    // Try to parse as URL
-    const url = new URL(normalizeHost(hostOrUrl));
-    return url.host;
-  } catch {
-    // If parsing fails, assume it's already just a hostname
-    return hostOrUrl;
+function _validateAndParseSentryUrlInternal(url: string): string {
+  if (!url.startsWith("https://")) {
+    throw new Error(
+      "SENTRY_URL must be a full HTTPS URL (e.g., https://sentry.example.com).",
+    );
   }
+
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.host;
+  } catch (error) {
+    throw new Error(
+      "SENTRY_URL must be a valid HTTPS URL (e.g., https://sentry.example.com).",
+    );
+  }
+}
+
+/**
+ * Validates that a SENTRY_HOST value contains only hostname (no protocol).
+ * Exits the process with error code 1 if validation fails (CLI behavior).
+ *
+ * @param host The hostname to validate
+ */
+export function validateSentryHost(host: string): void {
+  try {
+    _validateSentryHostInternal(host);
+  } catch (error) {
+    console.error(`Error: ${(error as Error).message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Validates that a SENTRY_URL value is a valid HTTPS URL and extracts the hostname.
+ * Exits the process with error code 1 if validation fails (CLI behavior).
+ *
+ * @param url The HTTPS URL to validate and parse
+ * @returns The extracted hostname from the URL
+ */
+export function validateAndParseSentryUrl(url: string): string {
+  try {
+    return _validateAndParseSentryUrlInternal(url);
+  } catch (error) {
+    console.error(`Error: ${(error as Error).message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Validates that a SENTRY_HOST value contains only hostname (no protocol).
+ * Throws an error instead of exiting the process (for testing).
+ *
+ * @param host The hostname to validate
+ * @throws {Error} If the host contains a protocol
+ */
+export function validateSentryHostThrows(host: string): void {
+  _validateSentryHostInternal(host);
+}
+
+/**
+ * Validates that a SENTRY_URL value is a valid HTTPS URL and extracts the hostname.
+ * Throws an error instead of exiting the process (for testing).
+ *
+ * @param url The HTTPS URL to validate and parse
+ * @returns The extracted hostname from the URL
+ * @throws {Error} If the URL is invalid or not HTTPS
+ */
+export function validateAndParseSentryUrlThrows(url: string): string {
+  return _validateAndParseSentryUrlInternal(url);
 }

@@ -40,7 +40,6 @@ export type PromptHandlers = {
 
 export type ServerContext = {
   sentryHost?: string;
-  sentryProtocol?: string;
   mcpUrl?: string;
   accessToken: string;
   organizationSlug: string | null;
