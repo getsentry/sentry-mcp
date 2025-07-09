@@ -169,17 +169,21 @@ describe("fetch-utils", () => {
     it("respects maxRetries", async () => {
       const fn = vi.fn().mockRejectedValue(new Error("Persistent failure"));
 
-      // Immediately await and handle the promise rejection
-      await expect(
-        (async () => {
-          const promise = retryWithBackoff(fn, {
-            maxRetries: 2,
-            initialDelay: 10,
-          });
-          await vi.runAllTimersAsync();
-          return promise;
-        })(),
-      ).rejects.toThrow("Persistent failure");
+      const promise = retryWithBackoff(fn, {
+        maxRetries: 2,
+        initialDelay: 10,
+      });
+
+      // Immediately add a catch handler to prevent unhandled rejection
+      promise.catch(() => {
+        // Expected rejection, handled
+      });
+
+      // Advance timers to trigger all retries
+      await vi.runAllTimersAsync();
+
+      // Now await the promise and expect it to reject
+      await expect(promise).rejects.toThrow("Persistent failure");
 
       expect(fn).toHaveBeenCalledTimes(3); // initial + 2 retries
     });
