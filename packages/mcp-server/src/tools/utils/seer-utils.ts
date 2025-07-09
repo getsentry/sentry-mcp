@@ -8,6 +8,8 @@ import type {
 
 export const SEER_POLLING_INTERVAL = 5000; // 5 seconds
 export const SEER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+export const SEER_MAX_RETRIES = 3; // Maximum retries for transient failures
+export const SEER_INITIAL_RETRY_DELAY = 1000; // 1 second initial retry delay
 
 export function getStatusDisplayName(status: string): string {
   switch (status) {
