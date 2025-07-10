@@ -264,6 +264,7 @@ export class SentryApiService {
       throw new Error(friendlyMessage, { cause: error });
     }
 
+    // Handle error responses generically
     if (!response.ok) {
       const errorText = await response.text();
       let parsed: unknown | undefined;

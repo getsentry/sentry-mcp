@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext } from "./utils/api-utils";
+import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
 import type { ServerContext } from "../types";
 
 export default defineTool({
@@ -17,7 +17,10 @@ export default defineTool({
     // User data endpoints (like /users/me/regions/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
-    const organizations = await apiService.listOrganizations();
+    const organizations = await withApiErrorHandling(
+      () => apiService.listOrganizations(),
+      {}, // No params for this endpoint
+    );
 
     let output = "# Organizations\n\n";
 

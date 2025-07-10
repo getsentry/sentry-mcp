@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext } from "./utils/api-utils";
+import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
 import type { ServerContext } from "../types";
 import {
   ParamOrganizationSlug,
@@ -73,14 +73,21 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
-    const eventList = await apiService.searchErrors({
-      organizationSlug,
-      projectSlug: params.projectSlug,
-      filename: params.filename,
-      query: params.query,
-      transaction: params.transaction,
-      sortBy: params.sortBy as "last_seen" | "count" | undefined,
-    });
+    const eventList = await withApiErrorHandling(
+      () =>
+        apiService.searchErrors({
+          organizationSlug,
+          projectSlug: params.projectSlug,
+          filename: params.filename,
+          query: params.query,
+          transaction: params.transaction,
+          sortBy: params.sortBy as "last_seen" | "count" | undefined,
+        }),
+      {
+        organizationSlug,
+        projectSlug: params.projectSlug,
+      },
+    );
     let output = `# Errors in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
     if (params.query)
       output += `These errors match the query \`${params.query}\`\n`;

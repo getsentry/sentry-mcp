@@ -4,60 +4,65 @@ import { UserInputError } from "../../errors";
 import { handleApiError, withApiErrorHandling } from "./api-utils";
 
 describe("handleApiError", () => {
-  it("converts 404 errors for issues to UserInputError", () => {
+  it("converts 404 errors with params to list all parameters", () => {
     const error = new ApiError("Not Found", 404);
 
     expect(() =>
-      handleApiError(error, { operation: "getIssue", resourceId: "PROJ-123" }),
+      handleApiError(error, {
+        organizationSlug: "my-org",
+        issueId: "PROJ-123",
+      }),
     ).toThrow(UserInputError);
 
     expect(() =>
-      handleApiError(error, { operation: "getIssue", resourceId: "PROJ-123" }),
+      handleApiError(error, {
+        organizationSlug: "my-org",
+        issueId: "PROJ-123",
+      }),
     ).toThrow(
-      "Issue 'PROJ-123' not found. Please verify the issue ID is correct.",
+      "Resource not found. Please verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - issueId: 'PROJ-123'",
     );
   });
 
-  it("converts 404 errors for other resources appropriately", () => {
+  it("converts 404 errors with multiple params including nullish values", () => {
     const error = new ApiError("Not Found", 404);
 
     expect(() =>
       handleApiError(error, {
-        operation: "getOrganization",
-        resourceId: "my-org",
+        organizationSlug: "my-org",
+        projectSlug: "my-project",
+        query: undefined,
+        sortBy: null,
+        limit: 0,
+        emptyString: "",
       }),
     ).toThrow(
-      "Organization 'my-org' not found. Please verify the organization slug is correct.",
+      "Resource not found. Please verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - projectSlug: 'my-project'\n  - limit: '0'",
     );
+  });
 
-    expect(() =>
-      handleApiError(error, {
-        operation: "getProject",
-        resourceId: "my-project",
-      }),
-    ).toThrow(
-      "Project 'my-project' not found. Please verify the project slug is correct.",
+  it("converts 404 errors with no params to generic message", () => {
+    const error = new ApiError("Not Found", 404);
+
+    expect(() => handleApiError(error, {})).toThrow(
+      "Resource not found (404). Please verify that all provided identifiers are correct and you have access to the requested resources.",
     );
   });
 
   it("converts 400 errors to UserInputError", () => {
     const error = new ApiError("Invalid parameters", 400);
 
-    expect(() =>
-      handleApiError(error, { operation: "getIssue", resourceId: "PROJ-123" }),
-    ).toThrow(UserInputError);
+    expect(() => handleApiError(error)).toThrow(UserInputError);
 
-    expect(() =>
-      handleApiError(error, { operation: "getIssue", resourceId: "PROJ-123" }),
-    ).toThrow("Invalid request: Invalid parameters");
+    expect(() => handleApiError(error)).toThrow(
+      "Invalid request: Invalid parameters",
+    );
   });
 
   it("converts 403 errors to UserInputError with access message", () => {
     const error = new ApiError("Forbidden", 403);
 
-    expect(() =>
-      handleApiError(error, { operation: "getIssue", resourceId: "PROJ-123" }),
-    ).toThrow(
+    expect(() => handleApiError(error)).toThrow(
       "Access denied: Forbidden. Please verify you have access to this resource.",
     );
   });
@@ -65,9 +70,7 @@ describe("handleApiError", () => {
   it("re-throws non-API errors unchanged", () => {
     const error = new Error("Network error");
 
-    expect(() =>
-      handleApiError(error, { operation: "getIssue", resourceId: "PROJ-123" }),
-    ).toThrow(error);
+    expect(() => handleApiError(error)).toThrow(error);
   });
 });
 
@@ -75,7 +78,7 @@ describe("withApiErrorHandling", () => {
   it("returns successful results unchanged", async () => {
     const result = await withApiErrorHandling(
       async () => ({ id: "123", title: "Test Issue" }),
-      { operation: "getIssue", resourceId: "PROJ-123" },
+      { issueId: "PROJ-123" },
     );
 
     expect(result).toEqual({ id: "123", title: "Test Issue" });
@@ -89,10 +92,13 @@ describe("withApiErrorHandling", () => {
         async () => {
           throw error;
         },
-        { operation: "getIssue", resourceId: "PROJ-123" },
+        {
+          organizationSlug: "my-org",
+          issueId: "PROJ-123",
+        },
       ),
     ).rejects.toThrow(
-      "Issue 'PROJ-123' not found. Please verify the issue ID is correct.",
+      "Resource not found. Please verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - issueId: 'PROJ-123'",
     );
   });
 });

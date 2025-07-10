@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext } from "./utils/api-utils";
+import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import {
@@ -73,14 +73,21 @@ export default defineTool({
       count: "freq" as const,
       userCount: "user" as const,
     };
-    const issues = await apiService.listIssues({
-      organizationSlug,
-      projectSlug: params.projectSlug,
-      query: params.query,
-      sortBy: params.sortBy
-        ? sortByMap[params.sortBy as keyof typeof sortByMap]
-        : undefined,
-    });
+    const issues = await withApiErrorHandling(
+      () =>
+        apiService.listIssues({
+          organizationSlug,
+          projectSlug: params.projectSlug,
+          query: params.query,
+          sortBy: params.sortBy
+            ? sortByMap[params.sortBy as keyof typeof sortByMap]
+            : undefined,
+        }),
+      {
+        organizationSlug,
+        projectSlug: params.projectSlug,
+      },
+    );
     let output = `# Issues in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
     if (issues.length === 0) {
       output += "No issues found.\n";
