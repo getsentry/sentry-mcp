@@ -446,7 +446,9 @@ export class SentryApiService {
         undefined,
         opts,
       );
-      const regionData = UserRegionsSchema.parse(await regionResponse.json());
+      const regionData = UserRegionsSchema.parse(
+        await this.parseJsonResponse(regionResponse),
+      );
 
       return (
         await Promise.all(

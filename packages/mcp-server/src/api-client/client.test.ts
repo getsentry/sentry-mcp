@@ -513,4 +513,32 @@ describe("Content-Type validation", () => {
       "Expected JSON response but received HTML (200 OK). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.",
     );
   });
+
+  it("should handle HTML response from regions endpoint", async () => {
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head><title>Login Required</title></head>
+<body><h1>Please log in</h1></body>
+</html>`;
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        get: (key: string) =>
+          key === "content-type" ? "text/html; charset=utf-8" : null,
+      },
+      text: () => Promise.resolve(htmlContent),
+    });
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.listOrganizations()).rejects.toThrow(
+      "Expected JSON response but received HTML (200 OK). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.",
+    );
+  });
 });
