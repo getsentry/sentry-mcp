@@ -308,6 +308,52 @@ export class SentryApiService {
   }
 
   /**
+   * Safely parses a JSON response, checking Content-Type header first.
+   *
+   * @param response The Response object from fetch
+   * @returns Promise resolving to the parsed JSON object
+   * @throws {Error} If response is not JSON or parsing fails
+   */
+  private async parseJsonResponse(response: Response): Promise<unknown> {
+    // Handle case where response might not have all properties (e.g., in tests or promise chains)
+    if (!response.headers?.get) {
+      return response.json();
+    }
+
+    const contentType = response.headers.get("content-type");
+
+    // Check if the response is JSON
+    if (!contentType || !contentType.includes("application/json")) {
+      const responseText = await response.text();
+
+      // Check if it's HTML
+      if (
+        contentType?.includes("text/html") ||
+        responseText.includes("<!DOCTYPE") ||
+        responseText.includes("<html")
+      ) {
+        throw new Error(
+          `Expected JSON response but received HTML (${response.status} ${response.statusText}). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.`,
+        );
+      }
+
+      // Generic non-JSON error
+      throw new Error(
+        `Expected JSON response but received ${contentType || "unknown content type"} ` +
+          `(${response.status} ${response.statusText})`,
+      );
+    }
+
+    try {
+      return await response.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to parse JSON response: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
    * Generates a Sentry issue URL for browser navigation.
    *
    * Handles both SaaS (subdomain-based) and self-hosted URL formats.
@@ -362,7 +408,7 @@ export class SentryApiService {
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
     const response = await this.request("/auth/", undefined, opts);
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return UserSchema.parse(body);
   }
 
@@ -388,7 +434,7 @@ export class SentryApiService {
     // For self-hosted instances, the regions endpoint doesn't exist
     if (!this.isSaas()) {
       const response = await this.request("/organizations/", undefined, opts);
-      const body = await response.json();
+      const body = await this.parseJsonResponse(response);
       return OrganizationListSchema.parse(body);
     }
 
@@ -408,7 +454,7 @@ export class SentryApiService {
             this.request(`/organizations/`, undefined, {
               ...opts,
               host: new URL(region.url).host,
-            }).then((response) => response.json()),
+            }).then((response) => this.parseJsonResponse(response)),
           ),
         )
       )
@@ -420,7 +466,7 @@ export class SentryApiService {
       if (error instanceof ApiError && error.status === 404) {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
         const response = await this.request("/organizations/", undefined, opts);
-        const body = await response.json();
+        const body = await this.parseJsonResponse(response);
         return OrganizationListSchema.parse(body);
       }
 
@@ -446,7 +492,7 @@ export class SentryApiService {
       opts,
     );
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return TeamListSchema.parse(body);
   }
 
@@ -479,7 +525,7 @@ export class SentryApiService {
       opts,
     );
 
-    return TeamSchema.parse(await response.json());
+    return TeamSchema.parse(await this.parseJsonResponse(response));
   }
 
   /**
@@ -499,7 +545,7 @@ export class SentryApiService {
       opts,
     );
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return ProjectListSchema.parse(body);
   }
 
@@ -539,7 +585,7 @@ export class SentryApiService {
       },
       opts,
     );
-    return ProjectSchema.parse(await response.json());
+    return ProjectSchema.parse(await this.parseJsonResponse(response));
   }
 
   /**
@@ -583,7 +629,7 @@ export class SentryApiService {
       },
       opts,
     );
-    return ProjectSchema.parse(await response.json());
+    return ProjectSchema.parse(await this.parseJsonResponse(response));
   }
 
   /**
@@ -661,7 +707,7 @@ export class SentryApiService {
       },
       opts,
     );
-    return ClientKeySchema.parse(await response.json());
+    return ClientKeySchema.parse(await this.parseJsonResponse(response));
   }
 
   /**
@@ -688,7 +734,7 @@ export class SentryApiService {
       undefined,
       opts,
     );
-    return ClientKeyListSchema.parse(await response.json());
+    return ClientKeyListSchema.parse(await this.parseJsonResponse(response));
   }
 
   /**
@@ -742,7 +788,7 @@ export class SentryApiService {
       opts,
     );
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return ReleaseListSchema.parse(body);
   }
 
@@ -791,7 +837,7 @@ export class SentryApiService {
       opts,
     );
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return TagListSchema.parse(body);
   }
 
@@ -861,7 +907,7 @@ export class SentryApiService {
 
     const response = await this.request(apiUrl, undefined, opts);
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return IssueListSchema.parse(body);
   }
 
@@ -881,7 +927,7 @@ export class SentryApiService {
       opts,
     );
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return IssueSchema.parse(body);
   }
 
@@ -903,7 +949,7 @@ export class SentryApiService {
       opts,
     );
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return EventSchema.parse(body);
   }
 
@@ -945,7 +991,7 @@ export class SentryApiService {
       opts,
     );
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return EventAttachmentListSchema.parse(body);
   }
 
@@ -1034,7 +1080,7 @@ export class SentryApiService {
       opts,
     );
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return IssueSchema.parse(body);
   }
 
@@ -1107,7 +1153,7 @@ export class SentryApiService {
 
     const response = await this.request(apiUrl, undefined, opts);
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     // TODO(dcramer): If you're using an older version of Sentry this API had a breaking change
     // meaning this endpoint will error.
     return ErrorsSearchResponseSchema.parse(body).data;
@@ -1165,7 +1211,7 @@ export class SentryApiService {
 
     const response = await this.request(apiUrl, undefined, opts);
 
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return SpansSearchResponseSchema.parse(body).data;
   }
 
@@ -1195,7 +1241,7 @@ export class SentryApiService {
       },
       opts,
     );
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return AutofixRunSchema.parse(body);
   }
 
@@ -1215,7 +1261,7 @@ export class SentryApiService {
       undefined,
       opts,
     );
-    const body = await response.json();
+    const body = await this.parseJsonResponse(response);
     return AutofixRunStateSchema.parse(body);
   }
 }
