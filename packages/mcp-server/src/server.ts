@@ -108,7 +108,7 @@ async function logAndFormatError(error: unknown) {
   if (isApiError(error)) {
     return [
       "**Error**",
-      `There was an HTTP ${error.status} error with the your request to the Sentry API.`,
+      `There was an HTTP ${error.status} error with your request to the Sentry API.`,
       `${error.message}`,
       `You may be able to resolve the issue by addressing the concern and trying again.`,
     ].join("\n\n");
