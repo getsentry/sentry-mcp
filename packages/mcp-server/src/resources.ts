@@ -85,13 +85,12 @@ async function defaultGitHubHandler(
   url: URL,
   _extra: RequestHandlerExtra<any, any>,
 ): Promise<ReadResourceResult> {
-  const uri = url.host;
   const rawPath = url.pathname;
   const content = await fetchRawGithubContent(rawPath);
   return {
     contents: [
       {
-        uri: uri,
+        uri: url.toString(),
         mimeType: "text/plain",
         text: content,
       },
