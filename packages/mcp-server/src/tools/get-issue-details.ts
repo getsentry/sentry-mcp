@@ -130,7 +130,10 @@ export default defineTool({
           organizationSlug: orgSlug,
           issueId: parsedIssueId!,
         }),
-      { operation: "getIssue", resourceId: parsedIssueId },
+      {
+        organizationSlug: orgSlug,
+        issueId: parsedIssueId,
+      },
     );
 
     const event = await apiService.getLatestEventForIssue({

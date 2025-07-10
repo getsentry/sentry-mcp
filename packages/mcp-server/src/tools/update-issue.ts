@@ -109,7 +109,10 @@ export default defineTool({
           organizationSlug: orgSlug,
           issueId: parsedIssueId!,
         }),
-      { operation: "getIssue", resourceId: parsedIssueId },
+      {
+        organizationSlug: orgSlug,
+        issueId: parsedIssueId,
+      },
     );
 
     // Update the issue
@@ -121,7 +124,10 @@ export default defineTool({
           status: params.status,
           assignedTo: params.assignedTo,
         }),
-      { operation: "updateIssue", resourceId: parsedIssueId },
+      {
+        organizationSlug: orgSlug,
+        issueId: parsedIssueId,
+      },
     );
 
     let output = `# Issue ${updatedIssue.shortId} Updated in **${orgSlug}**\n\n`;

@@ -53,58 +53,36 @@ export function apiServiceFromContext(
 /**
  * Maps API errors to user-friendly errors based on context
  * @param error - The error to handle
- * @param context - Context about what was being attempted
+ * @param params - The parameters that were used in the API call
  * @returns Never - always throws an error
  * @throws {UserInputError} For errors that are clearly user input issues
  * @throws {Error} For other errors
  */
 export function handleApiError(
   error: unknown,
-  context: {
-    operation:
-      | "getIssue"
-      | "updateIssue"
-      | "getEvent"
-      | "getOrganization"
-      | "getProject"
-      | "getTeam";
-    resourceId?: string;
-    resourceType?: string;
-  },
+  params?: Record<string, unknown>,
 ): never {
   if (error instanceof ApiError && error.status === 404) {
-    const resourceType =
-      context.resourceType ||
-      context.operation.replace(/^get|update/, "").toLowerCase();
-    const resourceId = context.resourceId || "unknown";
-
-    switch (context.operation) {
-      case "getIssue":
-      case "updateIssue":
-        throw new UserInputError(
-          `Issue '${resourceId}' not found. Please verify the issue ID is correct.`,
-        );
-      case "getEvent":
-        throw new UserInputError(
-          `Event '${resourceId}' not found. Please verify the event ID is correct.`,
-        );
-      case "getOrganization":
-        throw new UserInputError(
-          `Organization '${resourceId}' not found. Please verify the organization slug is correct.`,
-        );
-      case "getProject":
-        throw new UserInputError(
-          `Project '${resourceId}' not found. Please verify the project slug is correct.`,
-        );
-      case "getTeam":
-        throw new UserInputError(
-          `Team '${resourceId}' not found. Please verify the team slug is correct.`,
-        );
-      default:
-        throw new UserInputError(
-          `${resourceType} '${resourceId}' not found. Please verify the ID is correct.`,
-        );
+    // Build a list of all provided parameters
+    const paramsList: string[] = [];
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null && value !== "") {
+          paramsList.push(`${key}: '${value}'`);
+        }
+      }
     }
+
+    if (paramsList.length > 0) {
+      throw new UserInputError(
+        `Resource not found. Please verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`,
+      );
+    }
+
+    // Fallback to generic message if no params provided
+    throw new UserInputError(
+      `Resource not found (404). Please verify that all provided identifiers are correct and you have access to the requested resources.`,
+    );
   }
 
   // For other API errors, check if they're likely user input issues
@@ -129,18 +107,18 @@ export function handleApiError(
 /**
  * Wraps an async API call with automatic error handling
  * @param fn - The async function to execute
- * @param context - Context about what operation is being performed
+ * @param params - The parameters that were used in the API call
  * @returns The result of the function
  * @throws {UserInputError} For user input errors
  * @throws {Error} For other errors
  */
 export async function withApiErrorHandling<T>(
   fn: () => Promise<T>,
-  context: Parameters<typeof handleApiError>[1],
+  params?: Record<string, unknown>,
 ): Promise<T> {
   try {
     return await fn();
   } catch (error) {
-    handleApiError(error, context);
+    handleApiError(error, params);
   }
 }
