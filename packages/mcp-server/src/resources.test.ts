@@ -170,7 +170,7 @@ describe("resources", () => {
 
       expect(result.contents).toHaveLength(1);
       expect(result.contents[0]).toEqual({
-        uri: "github.com",
+        uri: "https://github.com/getsentry/sentry-ai-rules/blob/main/api/query-syntax.mdc",
         mimeType: "text/plain",
         text: mockContent,
       });
