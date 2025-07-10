@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { SentryApiService } from "./client";
+import { ConfigurationError } from "../errors";
 
 describe("getIssueUrl", () => {
   it("should work with sentry.io", () => {
@@ -196,6 +197,38 @@ describe("network error handling", () => {
       expect((error as Error).cause).toBe(fetchError);
       expect(((error as Error).cause as Error).cause).toBe(originalError);
     }
+  });
+
+  it("should throw ConfigurationError for DNS errors", async () => {
+    const dnsError = new Error("fetch failed");
+    dnsError.cause = new Error("getaddrinfo ENOTFOUND invalid.host");
+
+    globalThis.fetch = vi.fn().mockRejectedValue(dnsError);
+
+    const apiService = new SentryApiService({
+      host: "invalid.host",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.getAuthenticatedUser()).rejects.toThrow(
+      ConfigurationError,
+    );
+  });
+
+  it("should throw ConfigurationError for connection timeout errors", async () => {
+    const timeoutError = new Error("fetch failed");
+    timeoutError.cause = new Error("connect ETIMEDOUT 192.168.1.1:443");
+
+    globalThis.fetch = vi.fn().mockRejectedValue(timeoutError);
+
+    const apiService = new SentryApiService({
+      host: "192.168.1.1",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.getAuthenticatedUser()).rejects.toThrow(
+      ConfigurationError,
+    );
   });
 });
 

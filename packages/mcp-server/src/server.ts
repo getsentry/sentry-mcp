@@ -36,7 +36,7 @@ import { RESOURCES, isTemplateResource } from "./resources";
 import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
-import { UserInputError } from "./errors";
+import { UserInputError, ConfigurationError } from "./errors";
 
 /**
  * Type guard to identify Sentry API errors.
@@ -48,8 +48,15 @@ function isApiError(error: unknown): error is ApiError {
 /**
  * Type guard to identify user input validation errors.
  */
-function isUserInputError(error: unknown) {
+function isUserInputError(error: unknown): error is UserInputError {
   return error instanceof UserInputError;
+}
+
+/**
+ * Type guard to identify configuration errors.
+ */
+function isConfigurationError(error: unknown): error is ConfigurationError {
+  return error instanceof ConfigurationError;
 }
 
 /**
@@ -57,6 +64,7 @@ function isUserInputError(error: unknown) {
  *
  * **Error Types:**
  * - User Input Errors: Clear guidance without telemetry
+ * - Configuration Errors: Configuration guidance without telemetry
  * - API Errors: Enhanced messaging with HTTP status context
  * - System Errors: Full telemetry capture with event IDs
  *
@@ -68,24 +76,40 @@ function isUserInputError(error: unknown) {
  * Organization slug is required. Please provide an organizationSlug parameter.
  * You may be able to resolve the issue by addressing the concern and trying again.
  * ```
+ *
+ * @example Configuration Error Response
+ * ```markdown
+ * **Configuration Error**
+ *
+ * There appears to be a configuration issue with your setup.
+ * Unable to connect to sentry.invalid.com - Hostname not found. Verify the URL is correct.
+ * Please check your environment configuration and try again.
+ * ```
  */
 async function logAndFormatError(error: unknown) {
   if (isUserInputError(error)) {
-    const typedError = error as UserInputError;
     return [
       "**Input Error**",
       "It looks like there was a problem with the input you provided.",
-      typedError.message,
+      error.message,
       `You may be able to resolve the issue by addressing the concern and trying again.`,
     ].join("\n\n");
   }
 
+  if (isConfigurationError(error)) {
+    return [
+      "**Configuration Error**",
+      "There appears to be a configuration issue with your setup.",
+      error.message,
+      `Please check your environment configuration and try again.`,
+    ].join("\n\n");
+  }
+
   if (isApiError(error)) {
-    const typedError = error as ApiError;
     return [
       "**Error**",
-      `There was an HTTP ${typedError.status} error with the your request to the Sentry API.`,
-      `${typedError.message}`,
+      `There was an HTTP ${error.status} error with the your request to the Sentry API.`,
+      `${error.message}`,
       `You may be able to resolve the issue by addressing the concern and trying again.`,
     ].join("\n\n");
   }
@@ -391,6 +415,7 @@ export async function configureServer({
                   // The logAndFormatError function provides user-friendly error messages
                   // with appropriate formatting for different error types:
                   // - UserInputError: Clear guidance for fixing input problems
+                  // - ConfigurationError: Clear guidance for fixing configuration issues
                   // - ApiError: HTTP status context with helpful messaging
                   // - System errors: Sentry event IDs for debugging
                   //
