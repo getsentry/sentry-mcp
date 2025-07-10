@@ -392,3 +392,153 @@ describe("host configuration", () => {
     expect(apiService.apiPrefix).toBe("https://localhost:9000/api/0");
   });
 });
+
+describe("Content-Type validation", () => {
+  it("should throw error when receiving HTML instead of JSON", async () => {
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head><title>Login Required</title></head>
+<body><h1>Please log in</h1></body>
+</html>`;
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        get: (key: string) =>
+          key === "content-type" ? "text/html; charset=utf-8" : null,
+      },
+      text: () => Promise.resolve(htmlContent),
+    });
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.getAuthenticatedUser()).rejects.toThrow(
+      "Expected JSON response but received HTML (200 OK). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.",
+    );
+  });
+
+  it("should throw error when receiving non-JSON content type", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        get: (key: string) => (key === "content-type" ? "text/plain" : null),
+      },
+      text: () => Promise.resolve("Error: Something went wrong"),
+    });
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.getAuthenticatedUser()).rejects.toThrow(
+      "Expected JSON response but received text/plain (200 OK)",
+    );
+  });
+
+  it("should throw error when no content-type header is present", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        get: () => null,
+      },
+      text: () => Promise.resolve("Some non-JSON response"),
+    });
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.getAuthenticatedUser()).rejects.toThrow(
+      "Expected JSON response but received unknown content type (200 OK)",
+    );
+  });
+
+  it("should parse JSON successfully when content-type is application/json", async () => {
+    const mockUser = {
+      id: "123",
+      name: "Test User",
+      email: "test@example.com",
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        get: (key: string) =>
+          key === "content-type" ? "application/json; charset=utf-8" : null,
+      },
+      json: () => Promise.resolve(mockUser),
+    });
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const result = await apiService.getAuthenticatedUser();
+    expect(result).toEqual(mockUser);
+  });
+
+  it("should detect HTML content even without content-type header", async () => {
+    const htmlContent = "<!DOCTYPE html><html><body>Error page</body></html>";
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        get: () => null,
+      },
+      text: () => Promise.resolve(htmlContent),
+    });
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.getAuthenticatedUser()).rejects.toThrow(
+      "Expected JSON response but received HTML (200 OK). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.",
+    );
+  });
+
+  it("should handle HTML response from regions endpoint", async () => {
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head><title>Login Required</title></head>
+<body><h1>Please log in</h1></body>
+</html>`;
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        get: (key: string) =>
+          key === "content-type" ? "text/html; charset=utf-8" : null,
+      },
+      text: () => Promise.resolve(htmlContent),
+    });
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await expect(apiService.listOrganizations()).rejects.toThrow(
+      "Expected JSON response but received HTML (200 OK). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.",
+    );
+  });
+});
