@@ -354,6 +354,29 @@ export class SentryApiService {
   }
 
   /**
+   * Makes a request to the Sentry API and parses the JSON response.
+   *
+   * This is the primary method for API calls that expect JSON responses.
+   * It automatically validates Content-Type and provides helpful error messages
+   * for common issues like authentication failures or server errors.
+   *
+   * @param path API endpoint path (without /api/0 prefix)
+   * @param options Fetch options
+   * @param requestOptions Additional request configuration
+   * @returns Promise resolving to the parsed JSON response
+   * @throws {ApiError} Enhanced API errors with user-friendly messages
+   * @throws {Error} Network, parsing, or validation errors
+   */
+  private async requestJSON(
+    path: string,
+    options: RequestInit = {},
+    requestOptions?: { host?: string },
+  ): Promise<unknown> {
+    const response = await this.request(path, options, requestOptions);
+    return this.parseJsonResponse(response);
+  }
+
+  /**
    * Generates a Sentry issue URL for browser navigation.
    *
    * Handles both SaaS (subdomain-based) and self-hosted URL formats.
@@ -407,8 +430,7 @@ export class SentryApiService {
    * @throws {ApiError} If authentication fails or user not found
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
-    const response = await this.request("/auth/", undefined, opts);
-    const body = await this.parseJsonResponse(response);
+    const body = await this.requestJSON("/auth/", undefined, opts);
     return UserSchema.parse(body);
   }
 
@@ -433,30 +455,24 @@ export class SentryApiService {
   async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
     // For self-hosted instances, the regions endpoint doesn't exist
     if (!this.isSaas()) {
-      const response = await this.request("/organizations/", undefined, opts);
-      const body = await this.parseJsonResponse(response);
+      const body = await this.requestJSON("/organizations/", undefined, opts);
       return OrganizationListSchema.parse(body);
     }
 
     // For SaaS, try to use regions endpoint first
     try {
       // TODO: Sentry is currently not returning all orgs without hitting region endpoints
-      const regionResponse = await this.request(
-        "/users/me/regions/",
-        undefined,
-        opts,
-      );
       const regionData = UserRegionsSchema.parse(
-        await this.parseJsonResponse(regionResponse),
+        await this.requestJSON("/users/me/regions/", undefined, opts),
       );
 
       return (
         await Promise.all(
           regionData.regions.map(async (region) =>
-            this.request(`/organizations/`, undefined, {
+            this.requestJSON(`/organizations/`, undefined, {
               ...opts,
               host: new URL(region.url).host,
-            }).then((response) => this.parseJsonResponse(response)),
+            }),
           ),
         )
       )
@@ -467,8 +483,7 @@ export class SentryApiService {
       // fall back to direct organizations endpoint
       if (error instanceof ApiError && error.status === 404) {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
-        const response = await this.request("/organizations/", undefined, opts);
-        const body = await this.parseJsonResponse(response);
+        const body = await this.requestJSON("/organizations/", undefined, opts);
         return OrganizationListSchema.parse(body);
       }
 
@@ -488,13 +503,11 @@ export class SentryApiService {
     organizationSlug: string,
     opts?: RequestOptions,
   ): Promise<TeamList> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/teams/`,
       undefined,
       opts,
     );
-
-    const body = await this.parseJsonResponse(response);
     return TeamListSchema.parse(body);
   }
 
@@ -518,7 +531,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Team> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/teams/`,
       {
         method: "POST",
@@ -526,8 +539,7 @@ export class SentryApiService {
       },
       opts,
     );
-
-    return TeamSchema.parse(await this.parseJsonResponse(response));
+    return TeamSchema.parse(body);
   }
 
   /**
@@ -541,13 +553,11 @@ export class SentryApiService {
     organizationSlug: string,
     opts?: RequestOptions,
   ): Promise<ProjectList> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/projects/`,
       undefined,
       opts,
     );
-
-    const body = await this.parseJsonResponse(response);
     return ProjectListSchema.parse(body);
   }
 
@@ -576,7 +586,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/teams/${organizationSlug}/${teamSlug}/projects/`,
       {
         method: "POST",
@@ -587,7 +597,7 @@ export class SentryApiService {
       },
       opts,
     );
-    return ProjectSchema.parse(await this.parseJsonResponse(response));
+    return ProjectSchema.parse(body);
   }
 
   /**
@@ -623,7 +633,7 @@ export class SentryApiService {
     if (slug !== undefined) updateData.slug = slug;
     if (platform !== undefined) updateData.platform = platform;
 
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/projects/${organizationSlug}/${projectSlug}/`,
       {
         method: "PUT",
@@ -631,7 +641,7 @@ export class SentryApiService {
       },
       opts,
     );
-    return ProjectSchema.parse(await this.parseJsonResponse(response));
+    return ProjectSchema.parse(body);
   }
 
   /**
@@ -699,7 +709,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ClientKey> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/projects/${organizationSlug}/${projectSlug}/keys/`,
       {
         method: "POST",
@@ -709,7 +719,7 @@ export class SentryApiService {
       },
       opts,
     );
-    return ClientKeySchema.parse(await this.parseJsonResponse(response));
+    return ClientKeySchema.parse(body);
   }
 
   /**
@@ -731,12 +741,12 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ClientKeyList> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/projects/${organizationSlug}/${projectSlug}/keys/`,
       undefined,
       opts,
     );
-    return ClientKeyListSchema.parse(await this.parseJsonResponse(response));
+    return ClientKeyListSchema.parse(body);
   }
 
   /**
@@ -784,13 +794,11 @@ export class SentryApiService {
       ? `/projects/${organizationSlug}/${projectSlug}/releases/`
       : `/organizations/${organizationSlug}/releases/`;
 
-    const response = await this.request(
+    const body = await this.requestJSON(
       searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
       undefined,
       opts,
     );
-
-    const body = await this.parseJsonResponse(response);
     return ReleaseListSchema.parse(body);
   }
 
@@ -831,15 +839,13 @@ export class SentryApiService {
       searchQuery.set("dataset", dataset);
     }
 
-    const response = await this.request(
+    const body = await this.requestJSON(
       searchQuery.toString()
         ? `/organizations/${organizationSlug}/tags/?${searchQuery.toString()}`
         : `/organizations/${organizationSlug}/tags/`,
       undefined,
       opts,
     );
-
-    const body = await this.parseJsonResponse(response);
     return TagListSchema.parse(body);
   }
 
@@ -907,9 +913,7 @@ export class SentryApiService {
       ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
       : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
 
-    const response = await this.request(apiUrl, undefined, opts);
-
-    const body = await this.parseJsonResponse(response);
+    const body = await this.requestJSON(apiUrl, undefined, opts);
     return IssueListSchema.parse(body);
   }
 
@@ -923,13 +927,11 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Issue> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/`,
       undefined,
       opts,
     );
-
-    const body = await this.parseJsonResponse(response);
     return IssueSchema.parse(body);
   }
 
@@ -945,13 +947,11 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Event> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/`,
       undefined,
       opts,
     );
-
-    const body = await this.parseJsonResponse(response);
     return EventSchema.parse(body);
   }
 
@@ -987,13 +987,11 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<EventAttachmentList> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
       undefined,
       opts,
     );
-
-    const body = await this.parseJsonResponse(response);
     return EventAttachmentListSchema.parse(body);
   }
 
@@ -1017,15 +1015,13 @@ export class SentryApiService {
     blob: Blob;
   }> {
     // Get the attachment metadata first
-    const attachmentsResponse = await this.request(
+    const attachmentsData = await this.requestJSON(
       `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/`,
       undefined,
       opts,
     );
 
-    const attachments = EventAttachmentListSchema.parse(
-      await attachmentsResponse.json(),
-    );
+    const attachments = EventAttachmentListSchema.parse(attachmentsData);
     const attachment = attachments.find((att) => att.id === attachmentId);
 
     if (!attachment) {
@@ -1073,7 +1069,7 @@ export class SentryApiService {
     if (status !== undefined) updateData.status = status;
     if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
 
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/`,
       {
         method: "PUT",
@@ -1081,8 +1077,6 @@ export class SentryApiService {
       },
       opts,
     );
-
-    const body = await this.parseJsonResponse(response);
     return IssueSchema.parse(body);
   }
 
@@ -1153,9 +1147,7 @@ export class SentryApiService {
 
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
 
-    const response = await this.request(apiUrl, undefined, opts);
-
-    const body = await this.parseJsonResponse(response);
+    const body = await this.requestJSON(apiUrl, undefined, opts);
     // TODO(dcramer): If you're using an older version of Sentry this API had a breaking change
     // meaning this endpoint will error.
     return ErrorsSearchResponseSchema.parse(body).data;
@@ -1211,9 +1203,7 @@ export class SentryApiService {
 
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
 
-    const response = await this.request(apiUrl, undefined, opts);
-
-    const body = await this.parseJsonResponse(response);
+    const body = await this.requestJSON(apiUrl, undefined, opts);
     return SpansSearchResponseSchema.parse(body).data;
   }
 
@@ -1232,7 +1222,7 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<AutofixRun> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
       {
         method: "POST",
@@ -1243,7 +1233,6 @@ export class SentryApiService {
       },
       opts,
     );
-    const body = await this.parseJsonResponse(response);
     return AutofixRunSchema.parse(body);
   }
 
@@ -1258,12 +1247,11 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<AutofixRunState> {
-    const response = await this.request(
+    const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
       undefined,
       opts,
     );
-    const body = await this.parseJsonResponse(response);
     return AutofixRunStateSchema.parse(body);
   }
 }
