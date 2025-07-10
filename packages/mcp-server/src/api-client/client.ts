@@ -20,6 +20,7 @@ import {
   UserSchema,
   UserRegionsSchema,
 } from "./schema";
+import { UserInputError, ConfigurationError } from "../errors";
 import type {
   AutofixRun,
   AutofixRunState,
@@ -259,6 +260,17 @@ export class SentryApiService {
         friendlyMessage += ` - ${NETWORK_ERROR_MESSAGES[errorCode]}`;
       } else {
         friendlyMessage += ` - ${errorMessage}`;
+      }
+
+      // DNS resolution failures and connection timeouts to custom hosts are configuration issues
+      if (
+        errorCode === "ENOTFOUND" ||
+        errorCode === "EAI_AGAIN" ||
+        errorCode === "ECONNREFUSED" ||
+        errorCode === "ETIMEDOUT" ||
+        errorMessage.includes("Connect Timeout Error")
+      ) {
+        throw new ConfigurationError(friendlyMessage, { cause: error });
       }
 
       throw new Error(friendlyMessage, { cause: error });
