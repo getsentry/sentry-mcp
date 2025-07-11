@@ -90,12 +90,12 @@ export class ApiError extends Error {
       finalMessage =
         "You do not have access to query across multiple projects. Please select a project for your query.";
     }
-    
+
     // Include event ID in the message for debugging
     if (eventId) {
       finalMessage += ` (Event ID: ${eventId})`;
     }
-    
+
     super(finalMessage);
   }
 }
@@ -311,7 +311,7 @@ export class SentryApiService {
       if (parsed) {
         // Try to extract event ID from error response for debugging
         let eventId: string | undefined;
-        if (typeof parsed === 'object' && parsed !== null) {
+        if (typeof parsed === "object" && parsed !== null) {
           const errorObj = parsed as any;
           eventId = errorObj.event_id || errorObj.eventId || errorObj.id;
         }
@@ -326,7 +326,7 @@ export class SentryApiService {
           `[sentryApi] Failed to parse error response: ${errorText}`,
           error,
         );
-        
+
         // If we found an event ID, include it in a more helpful error
         if (eventId) {
           throw new Error(
@@ -476,17 +476,17 @@ export class SentryApiService {
    * ```
    */
   getEventsExplorerUrl(
-    organizationSlug: string, 
-    query: string, 
+    organizationSlug: string,
+    query: string,
     projectSlug?: string,
-    dataset: "spans" | "errors" | "logs" = "spans"
+    dataset: "spans" | "errors" | "logs" = "spans",
   ): string {
     const params = new URLSearchParams();
     params.set("query", query);
     if (projectSlug) {
       params.set("project", projectSlug);
     }
-    
+
     let path: string;
     if (dataset === "errors") {
       // Errors use the legacy discover URL
@@ -513,7 +513,7 @@ export class SentryApiService {
         ? `https://${organizationSlug}.${this.host}/explore/traces/`
         : `https://${this.host}/organizations/${organizationSlug}/explore/traces/`;
     }
-    
+
     return `${path}?${params.toString()}`;
   }
 
@@ -525,9 +525,7 @@ export class SentryApiService {
    * @throws {ApiError} If authentication fails or user not found
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
-    return UserSchema.parse(
-      await this.requestJSON("/auth/", undefined, opts),
-    );
+    return UserSchema.parse(await this.requestJSON("/auth/", undefined, opts));
   }
 
   /**
@@ -970,10 +968,20 @@ export class SentryApiService {
   ): Promise<any> {
     // Fetch both string and number attributes
     const [stringAttributes, numberAttributes] = await Promise.all([
-      this.fetchTraceItemAttributesByType(organizationSlug, itemType, "string", opts),
-      this.fetchTraceItemAttributesByType(organizationSlug, itemType, "number", opts),
+      this.fetchTraceItemAttributesByType(
+        organizationSlug,
+        itemType,
+        "string",
+        opts,
+      ),
+      this.fetchTraceItemAttributesByType(
+        organizationSlug,
+        itemType,
+        "number",
+        opts,
+      ),
     ]);
-    
+
     // Combine and return all attributes
     return [...stringAttributes, ...numberAttributes];
   }
@@ -987,15 +995,14 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("itemType", itemType);
     queryParams.set("attributeType", attributeType);
-    
+
     const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
-    console.log(`[listTraceItemAttributes] Request URL (${attributeType}):`, url);
-    
-    const body = await this.requestJSON(
+    console.log(
+      `[listTraceItemAttributes] Request URL (${attributeType}):`,
       url,
-      undefined,
-      opts,
     );
+
+    const body = await this.requestJSON(url, undefined, opts);
     return Array.isArray(body) ? body : [];
   }
 
@@ -1457,3 +1464,6 @@ export class SentryApiService {
     return AutofixRunStateSchema.parse(body);
   }
 }
+
+// Export alias for backward compatibility
+export { SentryApiService as ApiService };
