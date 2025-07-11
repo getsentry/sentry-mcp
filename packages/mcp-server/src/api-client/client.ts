@@ -503,7 +503,8 @@ export class SentryApiService {
    * @throws {ApiError} If authentication fails or user not found
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
-    return UserSchema.parse(await this.requestJSON("/auth/", undefined, opts));
+    const body = await this.requestJSON("/auth/", undefined, opts);
+    return UserSchema.parse(body);
   }
 
   /**
@@ -527,17 +528,19 @@ export class SentryApiService {
   async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
     // For self-hosted instances, the regions endpoint doesn't exist
     if (!this.isSaas()) {
-      return OrganizationListSchema.parse(
-        await this.requestJSON("/organizations/", undefined, opts),
-      );
+      const body = await this.requestJSON("/organizations/", undefined, opts);
+      return OrganizationListSchema.parse(body);
     }
 
     // For SaaS, try to use regions endpoint first
     try {
       // TODO: Sentry is currently not returning all orgs without hitting region endpoints
-      const regionData = UserRegionsSchema.parse(
-        await this.requestJSON("/users/me/regions/", undefined, opts),
+      const regionsBody = await this.requestJSON(
+        "/users/me/regions/",
+        undefined,
+        opts,
       );
+      const regionData = UserRegionsSchema.parse(regionsBody);
 
       return (
         await Promise.all(
@@ -556,9 +559,8 @@ export class SentryApiService {
       // fall back to direct organizations endpoint
       if (error instanceof ApiError && error.status === 404) {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
-        return OrganizationListSchema.parse(
-          await this.requestJSON("/organizations/", undefined, opts),
-        );
+        const body = await this.requestJSON("/organizations/", undefined, opts);
+        return OrganizationListSchema.parse(body);
       }
 
       // Re-throw other errors
@@ -1044,9 +1046,8 @@ export class SentryApiService {
       ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
       : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
 
-    return IssueListSchema.parse(
-      await this.requestJSON(apiUrl, undefined, opts),
-    );
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return IssueListSchema.parse(body);
   }
 
   async getIssue(
@@ -1335,9 +1336,8 @@ export class SentryApiService {
 
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
 
-    return SpansSearchResponseSchema.parse(
-      await this.requestJSON(apiUrl, undefined, opts),
-    ).data;
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return SpansSearchResponseSchema.parse(body).data;
   }
 
   /**
