@@ -15,7 +15,7 @@ A unified search tool that accepts natural language queries and translates them 
 ```typescript
 interface SearchEventsParams {
   organizationSlug: string;      // Required
-  semanticQuery: string;         // Natural language search description
+  naturalLanguageQuery: string;         // Natural language search description
   projectSlug?: string;          // Optional - limit to specific project
   regionUrl?: string;           
   limit?: number;                // Default: 10, Max: 100
@@ -29,13 +29,13 @@ interface SearchEventsParams {
 // Find errors
 search_events({
   organizationSlug: "my-org",
-  semanticQuery: "database timeouts in checkout flow from last hour"
+  naturalLanguageQuery: "database timeouts in checkout flow from last hour"
 })
 
 // Find slow transactions
 search_events({
   organizationSlug: "my-org",
-  semanticQuery: "API calls taking over 5 seconds",
+  naturalLanguageQuery: "API calls taking over 5 seconds",
   projectSlug: "backend"
 })
 ```
@@ -92,7 +92,7 @@ find_errors({
 // After
 search_events({
   organizationSlug: "sentry",
-  semanticQuery: "unresolved errors in checkout.js"
+  naturalLanguageQuery: "unresolved errors in checkout.js"
 })
 ```
 
@@ -102,7 +102,7 @@ search_events({
    - Current `listTags` may be insufficient
    - Need to investigate trace/log explorer implementation
 
-2. **Parameter naming**: `semanticQuery` clearly indicates AI interpretation needed
+2. **Parameter naming**: `naturalLanguageQuery` clearly indicates AI interpretation needed
 
 ## Success Criteria
 

@@ -1220,6 +1220,46 @@ export class SentryApiService {
     return SpansSearchResponseSchema.parse(body).data;
   }
 
+  /**
+   * Searches for events in Sentry using a general query.
+   * This method is used by the search_events tool for semantic search.
+   */
+  async searchEvents(
+    {
+      organizationSlug,
+      query,
+      fields,
+      limit = 10,
+      projectSlug,
+    }: {
+      organizationSlug: string;
+      query: string;
+      fields: string[];
+      limit?: number;
+      projectSlug?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", limit.toString());
+    queryParams.set("query", query);
+    queryParams.set("referrer", "sentry-mcp");
+
+    // Add project filter if specified
+    if (projectSlug) {
+      queryParams.set("project", projectSlug);
+    }
+
+    // Add each field as a separate parameter
+    for (const field of fields) {
+      queryParams.append("field", field);
+    }
+
+    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    const body = await this.requestJSON(apiUrl, undefined, opts);
+    return body;
+  }
+
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
   async startAutofix(
     {

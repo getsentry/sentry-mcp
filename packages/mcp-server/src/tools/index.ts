@@ -8,8 +8,7 @@ import findTags from "./find-tags";
 import getIssueDetails from "./get-issue-details";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
-import findErrors from "./find-errors";
-import findTransactions from "./find-transactions";
+import searchEvents from "./search-events";
 import createTeam from "./create-team";
 import createProject from "./create-project";
 import updateProject from "./update-project";
@@ -31,8 +30,7 @@ export default {
   get_issue_details: getIssueDetails,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
-  find_errors: findErrors,
-  find_transactions: findTransactions,
+  search_events: searchEvents,
   create_team: createTeam,
   create_project: createProject,
   update_project: updateProject,
