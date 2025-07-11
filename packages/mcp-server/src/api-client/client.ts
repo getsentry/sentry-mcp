@@ -77,6 +77,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public eventId?: string,
   ) {
     // HACK: improving this error message for the LLMs
     let finalMessage = message;
@@ -89,6 +90,12 @@ export class ApiError extends Error {
       finalMessage =
         "You do not have access to query across multiple projects. Please select a project for your query.";
     }
+    
+    // Include event ID in the message for debugging
+    if (eventId) {
+      finalMessage += ` (Event ID: ${eventId})`;
+    }
+    
     super(finalMessage);
   }
 }
@@ -217,6 +224,8 @@ export class SentryApiService {
       ? `https://${host}/api/0${path}`
       : `${this.apiPrefix}${path}`;
 
+    console.log("[request] Final URL:", url);
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "User-Agent": "Sentry MCP Server",
@@ -300,16 +309,30 @@ export class SentryApiService {
       }
 
       if (parsed) {
+        // Try to extract event ID from error response for debugging
+        let eventId: string | undefined;
+        if (typeof parsed === 'object' && parsed !== null) {
+          const errorObj = parsed as any;
+          eventId = errorObj.event_id || errorObj.eventId || errorObj.id;
+        }
+
         const { data, success, error } = ApiErrorSchema.safeParse(parsed);
 
         if (success) {
-          throw new ApiError(data.detail, response.status);
+          throw new ApiError(data.detail, response.status, eventId);
         }
 
         console.error(
           `[sentryApi] Failed to parse error response: ${errorText}`,
           error,
         );
+        
+        // If we found an event ID, include it in a more helpful error
+        if (eventId) {
+          throw new Error(
+            `API request failed: ${response.status} ${response.statusText}. Event ID: ${eventId}\n${errorText}`,
+          );
+        }
       }
 
       throw new Error(
@@ -436,6 +459,65 @@ export class SentryApiService {
   }
 
   /**
+   * Generates a Sentry events explorer URL for viewing search results.
+   *
+   * Creates a URL to the Explore Traces page with the provided query.
+   * Always uses HTTPS protocol.
+   *
+   * @param organizationSlug Organization identifier
+   * @param query Sentry search query
+   * @param projectSlug Optional project filter
+   * @returns Full HTTPS URL to the events explorer in Sentry UI
+   *
+   * @example
+   * ```typescript
+   * const url = apiService.getEventsExplorerUrl("my-org", "level:error", "backend");
+   * // https://my-org.sentry.io/explore/traces/?query=level%3Aerror&project=backend
+   * ```
+   */
+  getEventsExplorerUrl(
+    organizationSlug: string, 
+    query: string, 
+    projectSlug?: string,
+    dataset: "spans" | "errors" | "logs" = "spans"
+  ): string {
+    const params = new URLSearchParams();
+    params.set("query", query);
+    if (projectSlug) {
+      params.set("project", projectSlug);
+    }
+    
+    let path: string;
+    if (dataset === "errors") {
+      // Errors use the legacy discover URL
+      params.set("dataset", "errors");
+      params.set("queryDataset", "error-events");
+      params.set("field", "title");
+      params.set("field", "project");
+      params.set("field", "user.display");
+      params.set("field", "timestamp");
+      params.set("sort", "-timestamp");
+      params.set("statsPeriod", "14d");
+      params.set("yAxis", "count()");
+      path = this.isSaas()
+        ? `https://${organizationSlug}.${this.host}/explore/discover/homepage/`
+        : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
+    } else if (dataset === "logs") {
+      // Logs use /explore/logs/
+      path = this.isSaas()
+        ? `https://${organizationSlug}.${this.host}/explore/logs/`
+        : `https://${this.host}/organizations/${organizationSlug}/explore/logs/`;
+    } else {
+      // Spans use /explore/traces/
+      path = this.isSaas()
+        ? `https://${organizationSlug}.${this.host}/explore/traces/`
+        : `https://${this.host}/organizations/${organizationSlug}/explore/traces/`;
+    }
+    
+    return `${path}?${params.toString()}`;
+  }
+
+  /**
    * Retrieves the authenticated user's profile information.
    *
    * @param opts Request options including host override
@@ -443,8 +525,9 @@ export class SentryApiService {
    * @throws {ApiError} If authentication fails or user not found
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
-    const body = await this.requestJSON("/auth/", undefined, opts);
-    return UserSchema.parse(body);
+    return UserSchema.parse(
+      await this.requestJSON("/auth/", undefined, opts),
+    );
   }
 
   /**
@@ -468,8 +551,9 @@ export class SentryApiService {
   async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
     // For self-hosted instances, the regions endpoint doesn't exist
     if (!this.isSaas()) {
-      const body = await this.requestJSON("/organizations/", undefined, opts);
-      return OrganizationListSchema.parse(body);
+      return OrganizationListSchema.parse(
+        await this.requestJSON("/organizations/", undefined, opts),
+      );
     }
 
     // For SaaS, try to use regions endpoint first
@@ -496,8 +580,9 @@ export class SentryApiService {
       // fall back to direct organizations endpoint
       if (error instanceof ApiError && error.status === 404) {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
-        const body = await this.requestJSON("/organizations/", undefined, opts);
-        return OrganizationListSchema.parse(body);
+        return OrganizationListSchema.parse(
+          await this.requestJSON("/organizations/", undefined, opts),
+        );
       }
 
       // Re-throw other errors
@@ -876,17 +961,42 @@ export class SentryApiService {
   async listTraceItemAttributes(
     {
       organizationSlug,
+      itemType = "span",
     }: {
       organizationSlug: string;
+      itemType?: "span" | "logs";
     },
     opts?: RequestOptions,
   ): Promise<any> {
+    // Fetch both string and number attributes
+    const [stringAttributes, numberAttributes] = await Promise.all([
+      this.fetchTraceItemAttributesByType(organizationSlug, itemType, "string", opts),
+      this.fetchTraceItemAttributesByType(organizationSlug, itemType, "number", opts),
+    ]);
+    
+    // Combine and return all attributes
+    return [...stringAttributes, ...numberAttributes];
+  }
+
+  private async fetchTraceItemAttributesByType(
+    organizationSlug: string,
+    itemType: "span" | "logs",
+    attributeType: "string" | "number",
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("itemType", itemType);
+    queryParams.set("attributeType", attributeType);
+    
+    const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
+    console.log(`[listTraceItemAttributes] Request URL (${attributeType}):`, url);
+    
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/trace-items/attributes/`,
+      url,
       undefined,
       opts,
     );
-    return body;
+    return Array.isArray(body) ? body : [];
   }
 
   /**
@@ -953,8 +1063,9 @@ export class SentryApiService {
       ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
       : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
 
-    const body = await this.requestJSON(apiUrl, undefined, opts);
-    return IssueListSchema.parse(body);
+    return IssueListSchema.parse(
+      await this.requestJSON(apiUrl, undefined, opts),
+    );
   }
 
   async getIssue(
@@ -1243,8 +1354,9 @@ export class SentryApiService {
 
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
 
-    const body = await this.requestJSON(apiUrl, undefined, opts);
-    return SpansSearchResponseSchema.parse(body).data;
+    return SpansSearchResponseSchema.parse(
+      await this.requestJSON(apiUrl, undefined, opts),
+    ).data;
   }
 
   /**
@@ -1258,12 +1370,18 @@ export class SentryApiService {
       fields,
       limit = 10,
       projectSlug,
+      dataset = "spans",
+      statsPeriod,
+      sort = "-timestamp",
     }: {
       organizationSlug: string;
       query: string;
       fields: string[];
       limit?: number;
       projectSlug?: string;
+      dataset?: "spans" | "errors" | "ourlogs";
+      statsPeriod?: string;
+      sort?: string;
     },
     opts?: RequestOptions,
   ) {
@@ -1271,6 +1389,11 @@ export class SentryApiService {
     queryParams.set("per_page", limit.toString());
     queryParams.set("query", query);
     queryParams.set("referrer", "sentry-mcp");
+    queryParams.set("dataset", dataset);
+    if (statsPeriod) {
+      queryParams.set("statsPeriod", statsPeriod);
+    }
+    queryParams.set("sort", sort);
 
     // Add project filter if specified
     if (projectSlug) {
@@ -1283,8 +1406,7 @@ export class SentryApiService {
     }
 
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
-    const body = await this.requestJSON(apiUrl, undefined, opts);
-    return body;
+    return await this.requestJSON(apiUrl, undefined, opts);
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/

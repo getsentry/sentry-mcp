@@ -73,6 +73,27 @@ describeEval("search-events", {
         input: `Search for API timeouts in ${FIXTURES.organizationSlug}/${FIXTURES.projectSlug} project`,
         expected: ["**Project**: cloudflare-mcp", "Found 0 event"].join("\n"),
       },
+      {
+        input: `Can you show me the latest logs on ${FIXTURES.organizationSlug}`,
+        expected: [
+          "Found 0 log",
+          "No results found",
+          "/explore/logs/",
+          "## Log Entries",
+          "## Rendering Suggestions",
+          "**For AI Agents**: Display logs in a terminal/console-like format"
+        ].join("\n"),
+      },
+      {
+        input: `Show me error logs from the last hour in ${FIXTURES.organizationSlug}`,
+        expected: [
+          "severity:error",
+          "/explore/logs/",
+          "Found 0 log",
+          "## Log Entries",
+          "## Rendering Suggestions"
+        ].join("\n"),
+      },
     ];
   },
   task: TaskRunner(),
