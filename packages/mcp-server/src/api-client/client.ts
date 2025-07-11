@@ -224,8 +224,6 @@ export class SentryApiService {
       ? `https://${host}/api/0${path}`
       : `${this.apiPrefix}${path}`;
 
-    console.log("[request] Final URL:", url);
-
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "User-Agent": "Sentry MCP Server",
@@ -997,10 +995,6 @@ export class SentryApiService {
     queryParams.set("attributeType", attributeType);
 
     const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
-    console.log(
-      `[listTraceItemAttributes] Request URL (${attributeType}):`,
-      url,
-    );
 
     const body = await this.requestJSON(url, undefined, opts);
     return Array.isArray(body) ? body : [];
