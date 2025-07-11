@@ -10,6 +10,7 @@ import {
 } from "../schema";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { logError } from "../logging";
 
 // Common Sentry fields for different datasets
 const COMMON_SPANS_FIELDS = {
@@ -277,7 +278,13 @@ export default defineTool({
         }
       } catch (error) {
         // If we can't get tags, continue with just common fields
-        console.error("Failed to fetch tags for errors dataset:", error);
+        logError(error, {
+          search_events: {
+            dataset: "errors",
+            organizationSlug,
+            operation: "listTags",
+          },
+        });
       }
     } else if (dataset === "logs") {
       // For logs dataset, use the trace-items attributes endpoint
@@ -296,7 +303,14 @@ export default defineTool({
           }
         }
       } catch (error) {
-        console.error("Failed to fetch trace item attributes for logs:", error);
+        logError(error, {
+          search_events: {
+            dataset: "logs",
+            organizationSlug,
+            operation: "listTraceItemAttributes",
+            itemType: "logs",
+          },
+        });
       }
     } else {
       // Default to spans dataset
@@ -315,10 +329,14 @@ export default defineTool({
           }
         }
       } catch (error) {
-        console.error(
-          "Failed to fetch trace item attributes for spans:",
-          error,
-        );
+        logError(error, {
+          search_events: {
+            dataset: "spans",
+            organizationSlug,
+            operation: "listTraceItemAttributes",
+            itemType: "span",
+          },
+        });
       }
     }
 
