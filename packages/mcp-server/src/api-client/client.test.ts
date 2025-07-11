@@ -72,6 +72,62 @@ describe("getTraceUrl", () => {
   });
 });
 
+describe("getEventsExplorerUrl", () => {
+  it("should work with sentry.io", () => {
+    const apiService = new SentryApiService({ host: "sentry.io" });
+    const result = apiService.getEventsExplorerUrl(
+      "sentry-mcp",
+      "level:error AND message:timeout",
+    );
+    expect(result).toMatchInlineSnapshot(
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror+AND+message%3Atimeout"`,
+    );
+  });
+  it("should work with self-hosted", () => {
+    const apiService = new SentryApiService({ host: "sentry.example.com" });
+    const result = apiService.getEventsExplorerUrl(
+      "sentry-mcp",
+      "level:error AND message:timeout",
+    );
+    expect(result).toMatchInlineSnapshot(
+      `"https://sentry.example.com/organizations/sentry-mcp/explore/traces/?query=level%3Aerror+AND+message%3Atimeout"`,
+    );
+  });
+  it("should include project parameter when provided", () => {
+    const apiService = new SentryApiService({ host: "sentry.io" });
+    const result = apiService.getEventsExplorerUrl(
+      "sentry-mcp",
+      "level:error",
+      "backend",
+    );
+    expect(result).toMatchInlineSnapshot(
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror&project=backend"`,
+    );
+  });
+  it("should properly encode special characters in query", () => {
+    const apiService = new SentryApiService({ host: "sentry.io" });
+    const result = apiService.getEventsExplorerUrl(
+      "sentry-mcp",
+      'message:"database timeout" AND level:error',
+    );
+    expect(result).toMatchInlineSnapshot(
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=message%3A%22database+timeout%22+AND+level%3Aerror"`,
+    );
+  });
+  it("should always use HTTPS protocol", () => {
+    const apiService = new SentryApiService({
+      host: "localhost:8000",
+    });
+    const result = apiService.getEventsExplorerUrl(
+      "sentry-mcp",
+      "level:error",
+    );
+    expect(result).toMatchInlineSnapshot(
+      `"https://localhost:8000/organizations/sentry-mcp/explore/traces/?query=level%3Aerror"`,
+    );
+  });
+});
+
 describe("network error handling", () => {
   let originalFetch: typeof globalThis.fetch;
 

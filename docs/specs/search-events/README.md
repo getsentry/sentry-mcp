@@ -15,7 +15,8 @@ A unified search tool that accepts natural language queries and translates them 
 ```typescript
 interface SearchEventsParams {
   organizationSlug: string;      // Required
-  naturalLanguageQuery: string;         // Natural language search description
+  naturalLanguageQuery: string;  // Natural language search description
+  dataset?: "spans" | "errors" | "logs"; // Dataset to search (default: "errors")
   projectSlug?: string;          // Optional - limit to specific project
   regionUrl?: string;           
   limit?: number;                // Default: 10, Max: 100
@@ -26,7 +27,7 @@ interface SearchEventsParams {
 ### Examples
 
 ```typescript
-// Find errors
+// Find errors (errors dataset is default)
 search_events({
   organizationSlug: "my-org",
   naturalLanguageQuery: "database timeouts in checkout flow from last hour"
@@ -36,18 +37,30 @@ search_events({
 search_events({
   organizationSlug: "my-org",
   naturalLanguageQuery: "API calls taking over 5 seconds",
-  projectSlug: "backend"
+  projectSlug: "backend",
+  dataset: "spans"
+})
+
+// Find logs
+search_events({
+  organizationSlug: "my-org",
+  naturalLanguageQuery: "warning logs about memory usage",
+  dataset: "logs"
 })
 ```
 
 ## Architecture
 
-1. **Tool receives** natural language query
-2. **LLM agent translates** to discover endpoint parameters using:
+1. **Tool receives** natural language query and dataset selection
+2. **Fetches searchable attributes** based on dataset:
+   - For `spans`/`logs`: Uses `/organizations/{org}/trace-items/attributes/` endpoint
+   - For `errors`: Uses `/organizations/{org}/tags/` endpoint (legacy, will be updated)
+3. **LLM agent translates** to discover endpoint parameters using:
    - Built-in knowledge of Sentry query syntax
-   - `find_custom_attributes(org, project?)` tool for org-specific fields
-3. **Executes** discover endpoint: `/organizations/{org}/events/`
-4. **Returns** formatted results
+   - Dataset-specific field mappings and query patterns
+   - Custom attributes from the organization
+4. **Executes** discover endpoint: `/organizations/{org}/events/` with appropriate dataset
+5. **Returns** formatted results with dataset-specific fields and Sentry Explorer URL
 
 ## Key Constraints
 
@@ -61,17 +74,16 @@ search_events({
 
 ### Translation Output
 
-The LLM must produce valid discover endpoint parameters:
+The LLM produces a Sentry query string based on the selected dataset:
 
-```typescript
-{
-  dataset: "errors" | "spans",  // Determines data type
-  query: string,                 // Sentry query syntax
-  fields: string[],              // Fields to return
-  sort: string,                  // Sort order (e.g., "-last_seen")
-  statsPeriod?: string,          // Time range (e.g., "24h")
-}
-```
+- **Spans dataset**: Focus on `span.op`, `span.description`, `span.duration`, `transaction`
+- **Errors dataset**: Focus on `message`, `level`, `error.type`, `error.handled`
+- **Logs dataset**: Focus on `message`, `severity`, `severity_number`
+
+The tool automatically:
+- Sets appropriate fields based on dataset
+- Uses the correct API parameters (e.g., `dataset=ourlogs` for logs)
+- Generates Explorer URLs pointing to the correct view (`/explore/traces/`)
 
 ### Tool Removal
 
@@ -99,17 +111,27 @@ search_events({
 })
 ```
 
-## Open Questions
+## Implementation Notes
 
-1. **Custom attributes API**: Which endpoint returns ALL searchable attributes?
-   - Current `listTags` may be insufficient
-   - Need to investigate trace/log explorer implementation
+1. **Custom attributes API**: 
+   - **Resolved**: `/organizations/{org}/trace-items/attributes/` for spans/logs
+   - **Legacy**: `/organizations/{org}/tags/` for errors (TODO: migrate when new API supports errors)
 
-2. **Parameter naming**: `naturalLanguageQuery` clearly indicates AI interpretation needed
+2. **Dataset mapping**:
+   - User specifies `logs` → API uses `ourlogs`
+   - User specifies `errors` → API uses `errors`
+   - User specifies `spans` → API uses `spans`
+
+3. **URL Generation**:
+   - All datasets use `/explore/traces/` path in Sentry UI
+   - Query and project parameters are properly encoded
 
 ## Success Criteria
 
-- Accurate translation of common query patterns
-- Proper handling of org-specific custom attributes
-- Seamless migration from old tools
-- Maintains performance (translation overhead acceptable)
+- ✅ Accurate translation of common query patterns
+- ✅ Proper handling of org-specific custom attributes
+- ✅ Seamless migration from old tools (find_errors, find_transactions removed)
+- ✅ Maintains performance (translation overhead acceptable)
+- ✅ Supports multiple datasets (spans, errors, logs)
+- ✅ Generates shareable Sentry Explorer URLs
+- ✅ Clear output indicating URL should be shared with end-user

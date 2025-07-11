@@ -229,7 +229,7 @@ Execute actions and retrieve data:
 
 Multi-step workflows:
 
-- `find_errors_in_file` - Analyze file errors
+- `find_errors_in_file` - Search for errors in a specific file
 - `fix_issue_with_seer` - AI-suggested fixes
 
 ### Resources

@@ -49,7 +49,7 @@ When adding a new feature specification:
 ## Current Specifications
 
 ### search-events
-A unified event search tool that uses an embedded LLM agent to translate natural language queries into Sentry's search syntax. This replaces the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
+A unified event search tool that uses an embedded LLM agent to translate natural language queries into Sentry's search syntax. This replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
 
 - **Status**: In Design
 - **Target Release**: TBD
