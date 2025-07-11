@@ -93,6 +93,9 @@ catalogs:
     commander:
       specifier: ^14.0.0
       version: 14.0.0
+    date-fns:
+      specifier: ^3.6.0
+      version: 3.6.0
     dotenv:
       specifier: ^16.6.1
       version: 16.6.1
@@ -406,6 +409,9 @@ importers:
 
   packages/mcp-server-mocks:
     dependencies:
+      date-fns:
+        specifier: 'catalog:'
+        version: 3.6.0
       msw:
         specifier: 'catalog:'
         version: 2.10.2(@types/node@24.0.10)(typescript@5.8.3)
@@ -2526,6 +2532,9 @@ packages:
 
   data-uri-to-buffer@2.0.2:
     resolution: {integrity: sha512-ND9qDTLc6diwj+Xe5cdAgVTbLVdXbtxTJRXRhli8Mowuaan+0EJOtdqJ0QCHNSSPyoXGx9HX2/VMnKeC34AChA==}
+
+  date-fns@3.6.0:
+    resolution: {integrity: sha512-fRHTG8g/Gif+kSh50gaGEdToemgfj74aRX3swtiouboip5JDLAyDE9F11nHMIcvOaXeOC6D7SpNhi7uFyB7Uww==}
 
   debug@4.4.1:
     resolution: {integrity: sha512-KcKCqiftBJcZr++7ykoDIEwSa3XWowTfNPo92BYxjXiyYEVrUQh2aLyhxBCwww+heortUFxEJYcRzosstTEBYQ==}
@@ -6657,6 +6666,8 @@ snapshots:
   current-module-paths@1.1.2: {}
 
   data-uri-to-buffer@2.0.2: {}
+
+  date-fns@3.6.0: {}
 
   debug@4.4.1:
     dependencies:

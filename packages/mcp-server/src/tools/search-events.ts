@@ -189,14 +189,17 @@ const DATASET_CONFIGS = {
 - severity_number is numeric (21=fatal, 17=error, 13=warning, 9=info, 5=debug, 1=trace)
 - IMPORTANT: For time-based filtering in logs, do NOT use timestamp filters in the query
 - Instead, time filtering for logs is handled by the statsPeriod parameter (not part of the query string)
-- Keep your query focused on message content, severity levels, and other attributes only`,
+- Keep your query focused on message content, severity levels, and other attributes only
+- When user asks for "error logs", interpret this as logs with severity:error`,
     examples: `- "warning logs about memory" → severity:warning AND message:"*memory*"
 - "error logs from database" → severity:error AND message:"*database*"
 - "debug logs" → severity:debug
 - "critical system alerts" → severity_number:>=17
 - "recent logs" → (no timestamp filter needed - time range handled separately)
 - "logs from last hour" → (no timestamp filter needed - time range handled separately)
-- "API error logs" → severity:error AND message:"*API*"`,
+- "API error logs" → severity:error AND message:"*API*"
+- "error logs from the last hour" → severity:error
+- "show me error logs" → severity:error`,
   },
   spans: {
     rules: `- For traces/spans, focus on: span.op, span.description, span.duration, transaction
@@ -243,23 +246,35 @@ Important:
 export default defineTool({
   name: "search_events",
   description: [
-    "Search for events in Sentry using natural language queries.",
+    "Search for individual events (error occurrences, log entries, or spans) in Sentry using natural language queries.",
     "",
+    "IMPORTANT: This tool searches for individual events, NOT grouped issues. Use find_issues for grouped errors.",
     "This tool accepts plain English descriptions and translates them to Sentry's search syntax.",
-    "It searches across errors, traces/spans, and logs in your Sentry organization.",
+    "It searches across individual error events, traces/spans, and log entries in your Sentry organization.",
+    "",
+    "IMPORTANT Dataset Selection Rules:",
+    "- When user mentions 'logs' or 'log entries' → use dataset='logs'",
+    "- When user mentions 'error logs' → use dataset='logs' (these are log entries with error severity)",
+    "- When user mentions 'exceptions', 'crashes', or individual 'errors' → use dataset='errors' (default)",
+    "- When user mentions 'traces', 'spans', or 'performance' → use dataset='spans'",
     "",
     "Use this tool when you need to:",
-    "- Find errors, traces, or logs using natural language",
-    "- Search for problems without knowing Sentry's query syntax",
+    "- Find individual error occurrences, traces, or log entries using natural language",
+    "- Search for specific events without knowing Sentry's query syntax",
     "- Analyze patterns across different types of telemetry data",
     "",
     "<examples>",
+    "### Find error logs (log entries with error severity)",
+    "```",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='Show me error logs from the last hour', dataset='logs')",
+    "```",
+    "",
     "### Find database timeouts in traces",
     "```",
     "search_events(organizationSlug='my-org', naturalLanguageQuery='database timeouts in checkout flow from last hour', dataset='spans')",
     "```",
     "",
-    "### Find errors with specific messages",
+    "### Find errors/exceptions with specific messages",
     "```",
     "search_events(organizationSlug='my-org', naturalLanguageQuery='null pointer exceptions in production', dataset='errors')",
     "```",
@@ -275,6 +290,7 @@ export default defineTool({
     "- You can mention time ranges, error types, performance thresholds, etc.",
     "- The tool will explain how it translated your query if includeExplanation is true",
     "- Dataset defaults to 'errors' for exception/error data",
+    "- CRITICAL: 'error logs' means dataset='logs' NOT dataset='errors'",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -382,17 +398,15 @@ export default defineTool({
 
     // Select fields based on dataset - these are the fields we want to retrieve from the API
     const DATASET_API_FIELDS = {
-      errors: [
-        "id",
-        "message",
-        "level",
-        "culprit",
-        "type",
+      errors: ["issue", "title", "project", "last_seen()", "count()"],
+      logs: [
         "timestamp",
         "project",
-        "title",
+        "message",
+        "severity",
+        "trace",
+        "sentry.item_id",
       ],
-      logs: ["timestamp", "project", "message", "severity", "trace"],
       spans: [
         "id",
         "span.op",
@@ -408,6 +422,14 @@ export default defineTool({
 
     const fields = DATASET_API_FIELDS[dataset];
 
+    // Determine the appropriate sort parameter based on dataset
+    const sortParam =
+      dataset === "errors"
+        ? "-last_seen"
+        : dataset === "spans"
+          ? "-span.duration"
+          : "-timestamp";
+
     const eventsResponse = await withApiErrorHandling(
       () =>
         apiService.searchEvents({
@@ -417,8 +439,9 @@ export default defineTool({
           limit: params.limit,
           projectSlug: projectId, // API requires numeric project ID, not slug
           dataset: dataset === "logs" ? "ourlogs" : dataset,
-          // For logs, use a default time window since timestamp filters don't work in queries
-          ...(dataset === "logs" && { statsPeriod: "24h" }),
+          sort: sortParam,
+          // For logs and errors, use a default time window
+          ...(dataset !== "spans" && { statsPeriod: "24h" }),
         }),
       {
         organizationSlug,
@@ -470,29 +493,27 @@ export default defineTool({
       output += `Found ${eventData.length} error${eventData.length === 1 ? "" : "s"}:\n\n`;
 
       for (const event of eventData) {
-        const title =
-          getStringValue(event, "title") ||
-          getStringValue(event, "message") ||
-          "Unknown Error";
-        const level = getStringValue(event, "level", "error");
-        const culprit = getStringValue(event, "culprit", "Unknown");
+        const title = getStringValue(event, "title", "Unknown Error");
+        const issue = getStringValue(event, "issue");
         const project = getStringValue(event, "project", "N/A");
-        const timestamp = getStringValue(event, "timestamp", "N/A");
-        const id = getStringValue(event, "id");
+        const lastSeen = getStringValue(event, "last_seen()", "N/A");
+        const count = getNumberValue(event, "count()");
 
         output += `## ${title}\n\n`;
-        output += `**Level**: ${level}\n`;
-        output += `**Location**: ${culprit}\n`;
+        output += `**Issue ID**: ${issue}\n`;
         output += `**Project**: ${project}\n`;
-        output += `**Timestamp**: ${timestamp}\n`;
-        if (id) {
-          output += `**Event ID**: ${id}\n`;
+        output += `**Last seen**: ${lastSeen}\n`;
+        if (count !== undefined) {
+          output += `**Occurrences**: ${count}\n`;
+        }
+        if (issue) {
+          output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue)}\n`;
         }
         output += "\n";
       }
 
       output += "## Next Steps\n\n";
-      output += "- Get more details about a specific error: Use the Event ID\n";
+      output += "- Get more details about a specific error: Use the Issue ID\n";
       output += "- View error groups: Navigate to the Issues page in Sentry\n";
       output +=
         "- Set up alerts: Configure alert rules for these error patterns\n";

@@ -1,5 +1,5 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, TaskRunner } from "./utils";
+import { Factuality, TaskRunner, ToolUsage } from "./utils";
 
 describeEval("search-docs", {
   data: async () => {
@@ -53,7 +53,7 @@ describeEval("search-docs", {
     ];
   },
   task: TaskRunner(),
-  scorers: [Factuality()],
+  scorers: [ToolUsage("search_docs"), Factuality()],
   threshold: 0.6,
   timeout: 30000,
 });

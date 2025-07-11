@@ -21,6 +21,7 @@
     "@sentry/mcp-server-tsconfig": "workspace:*"
   },
   "dependencies": {
-    "msw": "catalog:"
+    "msw": "catalog:",
+    "date-fns": "catalog:"
   }
 }

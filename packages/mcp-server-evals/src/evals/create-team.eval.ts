@@ -1,5 +1,5 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, FIXTURES, TaskRunner } from "./utils";
+import { Factuality, FIXTURES, TaskRunner, ToolUsage } from "./utils";
 
 describeEval("create-team", {
   data: async () => {
@@ -11,7 +11,7 @@ describeEval("create-team", {
     ];
   },
   task: TaskRunner(),
-  scorers: [Factuality()],
+  scorers: [ToolUsage("create_team"), Factuality()],
   threshold: 0.6,
   timeout: 30000,
 });

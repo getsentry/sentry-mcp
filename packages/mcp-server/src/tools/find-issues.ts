@@ -14,12 +14,15 @@ import {
 export default defineTool({
   name: "find_issues",
   description: [
-    "Find issues in Sentry.",
+    "Find grouped issues in Sentry (not individual events).",
     "",
+    "IMPORTANT: Issues are grouped errors/problems. Use this for questions about 'issues', 'problems', or when users want summaries.",
     "Use this tool when you need to:",
     "- View all issues in a Sentry organization",
+    "- Find production issues, recent issues, or issues affecting specific users",
+    "- Get issue counts or summaries",
     "",
-    "If you're looking for more granular data beyond a summary of identified problems, you should use the `find_errors()` or `find_transactions()` tools instead.",
+    "If you're looking for individual error occurrences or events, use the `search_events()` tool instead.",
     "",
     "<examples>",
     "### Find the newest unresolved issues across 'my-organization'",

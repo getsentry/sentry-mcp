@@ -1381,6 +1381,12 @@ export class SentryApiService {
       queryParams.set("project", projectSlug);
     }
 
+    // Add dataset-specific parameters
+    if (dataset === "spans") {
+      queryParams.set("allowAggregateConditions", "0");
+      queryParams.set("useRpc", "1");
+    }
+
     // Add each field as a separate parameter
     for (const field of fields) {
       queryParams.append("field", field);
