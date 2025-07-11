@@ -1438,6 +1438,3 @@ export class SentryApiService {
     return AutofixRunStateSchema.parse(body);
   }
 }
-
-// Export alias for backward compatibility
-export { SentryApiService as ApiService };
