@@ -490,10 +490,10 @@ export class SentryApiService {
       // Errors use the legacy discover URL
       params.set("dataset", "errors");
       params.set("queryDataset", "error-events");
-      params.set("field", "title");
-      params.set("field", "project");
-      params.set("field", "user.display");
-      params.set("field", "timestamp");
+      params.append("field", "title");
+      params.append("field", "project");
+      params.append("field", "user.display");
+      params.append("field", "timestamp");
       params.set("sort", "-timestamp");
       params.set("statsPeriod", "14d");
       params.set("yAxis", "count()");
