@@ -75,8 +75,11 @@ The LLM must produce valid discover endpoint parameters:
 
 ### Tool Removal
 
-- **Must remove** `find_errors` and `find_transactions` in same PR
+- **Must remove** `find_errors` and `find_transactions` in same PR ✓
+  - Removed from tool exports
+  - Files still exist but are no longer used
 - **Migration required** for existing usage
+  - Updated `find_errors_in_file` prompt to use `search_events`
 - **Documentation** updates needed
 
 ## Migration Examples
