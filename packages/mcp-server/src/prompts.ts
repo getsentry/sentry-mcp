@@ -27,10 +27,12 @@ export const PROMPT_HANDLERS = {
     [
       `I want to find errors in Sentry, within the organization ${organizationSlug}, for the file ${filename}`,
       "",
-      "You should use the tool `search_errors` to find errors in Sentry.",
+      "You should use the tool `search_events` with a natural language query to find errors in Sentry.",
       "",
-      "If the filename is ambiguous, such as something like `index.ts`, and in most cases, you should pass it in with its direct parent.",
-      "For example: if the file is `app/utils/index.ts`, you should pass in `utils/index.ts` or `app/utils/index.ts` depending on if the file is actually part of the applications source path.",
+      "For example: `search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='errors in file ${filename}')`",
+      "",
+      "If the filename is ambiguous, such as something like `index.ts`, and in most cases, you should include its direct parent.",
+      "For example: if the file is `app/utils/index.ts`, you should search for `errors in file utils/index.ts` or `errors in file app/utils/index.ts` depending on if the file is actually part of the applications source path.",
     ].join("\n"),
   fix_issue_with_seer: async (
     context,
