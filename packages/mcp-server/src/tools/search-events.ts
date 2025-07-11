@@ -3,6 +3,8 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "./utils/defineTool";
 import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
 import type { ServerContext } from "../types";
+import type { SentryApiService } from "../api-client";
+import { EventsResponseSchema } from "../api-client/schema";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -12,39 +14,85 @@ import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { logError } from "../logging";
 
-// Common Sentry fields for different datasets
-const COMMON_SPANS_FIELDS = {
-  // Span fields
-  "span.op": "Span operation type (e.g., http.client, db.query, cache.get)",
-  "span.description": "Detailed description of the span operation",
-  "span.duration": "Duration of the span in milliseconds",
-  "span.status": "Span status (ok, cancelled, unknown, etc.)",
-  "span.self_time": "Time spent in this span excluding child spans",
+// Type for flexible event data that can contain any fields
+type FlexibleEventData = Record<string, unknown>;
 
-  // Transaction fields
-  transaction: "Transaction name/route",
-  "transaction.duration": "Total transaction duration in milliseconds",
-  "transaction.op": "Transaction operation type",
-  "transaction.status": "Transaction status",
-  is_transaction: "Whether this span is a transaction (true/false)",
+// Helper to safely get a string value from event data
+function getStringValue(
+  event: FlexibleEventData,
+  key: string,
+  defaultValue = "",
+): string {
+  const value = event[key];
+  return typeof value === "string" ? value : defaultValue;
+}
 
-  // Trace fields
-  trace: "Trace ID",
-  "trace.span_id": "Span ID within the trace",
-  "trace.parent_span_id": "Parent span ID",
+// Helper to safely get a number value from event data
+function getNumberValue(
+  event: FlexibleEventData,
+  key: string,
+): number | undefined {
+  const value = event[key];
+  return typeof value === "number" ? value : undefined;
+}
 
-  // HTTP fields
-  "http.method": "HTTP method (GET, POST, etc.)",
-  "http.status_code": "HTTP response status code",
-  "http.url": "Full HTTP URL",
+// Helper function to fetch custom attributes for a dataset
+async function fetchCustomAttributes(
+  apiService: SentryApiService,
+  organizationSlug: string,
+  dataset: "errors" | "logs" | "spans",
+): Promise<Record<string, string>> {
+  const customAttributes: Record<string, string> = {};
 
-  // Database fields
-  "db.system": "Database system (postgresql, mysql, etc.)",
-  "db.operation": "Database operation (SELECT, INSERT, etc.)",
+  try {
+    if (dataset === "errors") {
+      // TODO: For errors dataset, we currently need to use the old listTags API
+      // This will be updated in the future to use the new trace-items attributes API
+      const tagsResponse = await apiService.listTags({
+        organizationSlug,
+      });
 
-  // General fields
+      for (const tag of tagsResponse) {
+        if (tag.key && !tag.key.startsWith("sentry:")) {
+          customAttributes[tag.key] = tag.name || tag.key;
+        }
+      }
+    } else {
+      // For logs and spans datasets, use the trace-items attributes endpoint
+      const itemType = dataset === "logs" ? "logs" : "span";
+      const attributesResponse = await apiService.listTraceItemAttributes({
+        organizationSlug,
+        itemType,
+      });
+
+      for (const attr of attributesResponse) {
+        if (attr.key) {
+          customAttributes[attr.key] = attr.name || attr.key;
+        }
+      }
+    }
+  } catch (error) {
+    // If we can't get custom attributes, continue with just common fields
+    logError(error, {
+      search_events: {
+        dataset,
+        organizationSlug,
+        operation:
+          dataset === "errors" ? "listTags" : "listTraceItemAttributes",
+        ...(dataset !== "errors" && {
+          itemType: dataset === "logs" ? "logs" : "span",
+        }),
+      },
+    });
+  }
+
+  return customAttributes;
+}
+
+// Base fields common to all datasets
+const BASE_COMMON_FIELDS = {
   project: "Project slug",
-  timestamp: "When the span occurred",
+  timestamp: "When the event occurred",
   environment: "Environment (production, staging, development)",
   release: "Release version",
   platform: "Platform (javascript, python, etc.)",
@@ -54,53 +102,69 @@ const COMMON_SPANS_FIELDS = {
   "sdk.version": "SDK version",
 };
 
-const COMMON_ERRORS_FIELDS = {
-  // Error fields
-  message: "Error message",
-  level: "Error level (error, warning, info, debug)",
-  "error.type": "Error type/exception class",
-  "error.value": "Error value/description",
-  "error.handled": "Whether the error was handled (true/false)",
-  culprit: "Code location that caused the error",
+// Dataset-specific field definitions
+const DATASET_FIELDS = {
+  spans: {
+    // Span-specific fields
+    "span.op": "Span operation type (e.g., http.client, db.query, cache.get)",
+    "span.description": "Detailed description of the span operation",
+    "span.duration": "Duration of the span in milliseconds",
+    "span.status": "Span status (ok, cancelled, unknown, etc.)",
+    "span.self_time": "Time spent in this span excluding child spans",
 
-  // Stack trace fields
-  "stack.filename": "File where error occurred",
-  "stack.function": "Function where error occurred",
-  "stack.module": "Module where error occurred",
-  "stack.abs_path": "Absolute path to file",
+    // Transaction fields
+    transaction: "Transaction name/route",
+    "transaction.duration": "Total transaction duration in milliseconds",
+    "transaction.op": "Transaction operation type",
+    "transaction.status": "Transaction status",
+    is_transaction: "Whether this span is a transaction (true/false)",
 
-  // General fields
-  title: "Error title/grouping",
-  project: "Project slug",
-  timestamp: "When the error occurred",
-  environment: "Environment (production, staging, development)",
-  release: "Release version",
-  platform: "Platform (javascript, python, etc.)",
-  "user.id": "User ID",
-  "user.email": "User email",
-  "sdk.name": "SDK name",
-  "sdk.version": "SDK version",
-  "os.name": "Operating system name",
-  "browser.name": "Browser name",
-  "device.family": "Device family",
-};
+    // Trace fields
+    trace: "Trace ID",
+    "trace.span_id": "Span ID within the trace",
+    "trace.parent_span_id": "Parent span ID",
 
-const COMMON_LOGS_FIELDS = {
-  // Log fields
-  message: "Log message",
-  severity: "Log severity level",
-  severity_number: "Numeric severity level",
-  "sentry.item_id": "Sentry item ID",
-  "sentry.observed_timestamp_nanos": "Observed timestamp in nanoseconds",
+    // HTTP fields
+    "http.method": "HTTP method (GET, POST, etc.)",
+    "http.status_code": "HTTP response status code",
+    "http.url": "Full HTTP URL",
 
-  // Trace context
-  trace: "Trace ID",
+    // Database fields
+    "db.system": "Database system (postgresql, mysql, etc.)",
+    "db.operation": "Database operation (SELECT, INSERT, etc.)",
+  },
+  errors: {
+    // Error-specific fields
+    message: "Error message",
+    level: "Error level (error, warning, info, debug)",
+    "error.type": "Error type/exception class",
+    "error.value": "Error value/description",
+    "error.handled": "Whether the error was handled (true/false)",
+    culprit: "Code location that caused the error",
+    title: "Error title/grouping",
 
-  // General fields
-  project: "Project slug",
-  timestamp: "When the log was created",
-  environment: "Environment (production, staging, development)",
-  release: "Release version",
+    // Stack trace fields
+    "stack.filename": "File where error occurred",
+    "stack.function": "Function where error occurred",
+    "stack.module": "Module where error occurred",
+    "stack.abs_path": "Absolute path to file",
+
+    // Additional context fields
+    "os.name": "Operating system name",
+    "browser.name": "Browser name",
+    "device.family": "Device family",
+  },
+  logs: {
+    // Log-specific fields
+    message: "Log message",
+    severity: "Log severity level",
+    severity_number: "Numeric severity level",
+    "sentry.item_id": "Sentry item ID",
+    "sentry.observed_timestamp_nanos": "Observed timestamp in nanoseconds",
+
+    // Trace context
+    trace: "Trace ID",
+  },
 };
 
 // Dataset-specific rules and examples
@@ -252,96 +316,25 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
-    // Get searchable attributes based on dataset
-    const customAttributes: Record<string, string> = {};
-    let commonFields: Record<string, string>;
-
     // Use errors dataset by default if not specified
     const dataset = params.dataset || "errors";
 
-    if (dataset === "errors") {
-      // TODO: For errors dataset, we currently need to use the old listTags API
-      // This will be updated in the future to use the new trace-items attributes API
-      commonFields = COMMON_ERRORS_FIELDS;
-      try {
-        const tagsResponse = await apiService.listTags({
-          organizationSlug,
-        });
+    // Get the dataset-specific fields
+    const datasetSpecificFields = DATASET_FIELDS[dataset];
 
-        // listTags returns an array of tag objects with 'key' field
-        if (Array.isArray(tagsResponse)) {
-          for (const tag of tagsResponse) {
-            if (tag.key && !tag.key.startsWith("sentry:")) {
-              customAttributes[tag.key] = tag.name || tag.key;
-            }
-          }
-        }
-      } catch (error) {
-        // If we can't get tags, continue with just common fields
-        logError(error, {
-          search_events: {
-            dataset: "errors",
-            organizationSlug,
-            operation: "listTags",
-          },
-        });
-      }
-    } else if (dataset === "logs") {
-      // For logs dataset, use the trace-items attributes endpoint
-      commonFields = COMMON_LOGS_FIELDS;
-      try {
-        const attributesResponse = await apiService.listTraceItemAttributes({
-          organizationSlug,
-          itemType: "logs", // Specify logs item type (plural)
-        });
+    // Fetch custom attributes based on dataset
+    const customAttributes = await fetchCustomAttributes(
+      apiService,
+      organizationSlug,
+      dataset,
+    );
 
-        if (Array.isArray(attributesResponse)) {
-          for (const attr of attributesResponse) {
-            if (attr.key) {
-              customAttributes[attr.key] = attr.name || attr.key;
-            }
-          }
-        }
-      } catch (error) {
-        logError(error, {
-          search_events: {
-            dataset: "logs",
-            organizationSlug,
-            operation: "listTraceItemAttributes",
-            itemType: "logs",
-          },
-        });
-      }
-    } else {
-      // Default to spans dataset
-      commonFields = COMMON_SPANS_FIELDS;
-      try {
-        const attributesResponse = await apiService.listTraceItemAttributes({
-          organizationSlug,
-          itemType: "span", // Specify span item type
-        });
-
-        if (Array.isArray(attributesResponse)) {
-          for (const attr of attributesResponse) {
-            if (attr.key) {
-              customAttributes[attr.key] = attr.name || attr.key;
-            }
-          }
-        }
-      } catch (error) {
-        logError(error, {
-          search_events: {
-            dataset: "spans",
-            organizationSlug,
-            operation: "listTraceItemAttributes",
-            itemType: "span",
-          },
-        });
-      }
-    }
-
-    // Combine common fields with custom attributes
-    const allFields = { ...commonFields, ...customAttributes };
+    // Combine base fields, dataset-specific fields, and custom attributes
+    const allFields = {
+      ...BASE_COMMON_FIELDS,
+      ...datasetSpecificFields,
+      ...customAttributes,
+    };
 
     // Get dataset configuration
     const datasetConfig = DATASET_CONFIGS[dataset] || DATASET_CONFIGS.spans;
@@ -388,10 +381,9 @@ export default defineTool({
       projectId = String(project.id);
     }
 
-    // Select fields based on dataset
-    let fields: string[];
-    if (dataset === "errors") {
-      fields = [
+    // Select fields based on dataset - these are the fields we want to retrieve from the API
+    const DATASET_API_FIELDS = {
+      errors: [
         "id",
         "message",
         "level",
@@ -400,9 +392,8 @@ export default defineTool({
         "timestamp",
         "project",
         "title",
-      ];
-    } else if (dataset === "logs") {
-      fields = [
+      ],
+      logs: [
         "sentry.item_id",
         "project.id",
         "trace",
@@ -412,10 +403,8 @@ export default defineTool({
         "tags[sentry.timestamp_precise,number]",
         "sentry.observed_timestamp_nanos",
         "message",
-      ];
-    } else {
-      // Spans dataset
-      fields = [
+      ],
+      spans: [
         "id",
         "span.op",
         "span.description",
@@ -425,10 +414,12 @@ export default defineTool({
         "project",
         "trace",
         "transaction.span_id",
-      ];
-    }
+      ],
+    };
 
-    const events = await withApiErrorHandling(
+    const fields = DATASET_API_FIELDS[dataset];
+
+    const eventsResponse = await withApiErrorHandling(
       () =>
         apiService.searchEvents({
           organizationSlug,
@@ -475,7 +466,11 @@ export default defineTool({
     output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
     output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
-    const eventData = (events as any).data || [];
+    // Type-safe access to event data
+    // Since searchEvents returns unknown, we need to safely access the data property
+    const responseData = eventsResponse as { data?: unknown[] };
+    const eventData = (responseData.data || []) as FlexibleEventData[];
+
     if (eventData.length === 0) {
       output += `No results found.\n\n`;
       output += `Try being more specific or using different terms in your search.\n`;
@@ -486,17 +481,23 @@ export default defineTool({
       output += `Found ${eventData.length} error${eventData.length === 1 ? "" : "s"}:\n\n`;
 
       for (const event of eventData) {
-        const title = event.title || event.message || "Unknown Error";
-        const level = event.level || "error";
-        const culprit = event.culprit || "Unknown";
+        const title =
+          getStringValue(event, "title") ||
+          getStringValue(event, "message") ||
+          "Unknown Error";
+        const level = getStringValue(event, "level", "error");
+        const culprit = getStringValue(event, "culprit", "Unknown");
+        const project = getStringValue(event, "project", "N/A");
+        const timestamp = getStringValue(event, "timestamp", "N/A");
+        const id = getStringValue(event, "id");
 
         output += `## ${title}\n\n`;
         output += `**Level**: ${level}\n`;
         output += `**Location**: ${culprit}\n`;
-        output += `**Project**: ${event.project || "N/A"}\n`;
-        output += `**Timestamp**: ${event.timestamp || "N/A"}\n`;
-        if (event.id) {
-          output += `**Event ID**: ${event.id}\n`;
+        output += `**Project**: ${project}\n`;
+        output += `**Timestamp**: ${timestamp}\n`;
+        if (id) {
+          output += `**Event ID**: ${id}\n`;
         }
         output += "\n";
       }
@@ -512,9 +513,12 @@ export default defineTool({
       output += "```console\n";
 
       for (const event of eventData) {
-        const timestamp = event.timestamp || "N/A";
-        const severity = (event.severity || "info").toUpperCase();
-        const message = event.message || "No message";
+        const timestamp = getStringValue(event, "timestamp", "N/A");
+        const severity = getStringValue(event, "severity", "info");
+        const message = getStringValue(event, "message", "No message");
+
+        // Safely uppercase the severity
+        const severityUpper = severity.toUpperCase();
 
         // Get severity emoji with proper typing
         const severityEmojis: Record<string, string> = {
@@ -526,10 +530,10 @@ export default defineTool({
           DEBUG: "⚫",
           TRACE: "⚫",
         };
-        const severityEmoji = severityEmojis[severity] || "🔵";
+        const severityEmoji = severityEmojis[severityUpper] || "🔵";
 
         // Standard log format with emoji and proper spacing
-        output += `${timestamp} ${severityEmoji} [${severity.padEnd(5)}] ${message}\n`;
+        output += `${timestamp} ${severityEmoji} [${severityUpper.padEnd(5)}] ${message}\n`;
       }
 
       output += "```\n\n";
@@ -539,22 +543,29 @@ export default defineTool({
 
       for (let i = 0; i < eventData.length; i++) {
         const event = eventData[i];
-        const severity = event.severity || "info";
-        const severityNum = event.severity_number;
+        const severity = getStringValue(event, "severity", "info");
+        const severityNum = getNumberValue(event, "severity_number");
+        const message = getStringValue(event, "message", "No message");
+        const timestamp = getStringValue(event, "timestamp", "N/A");
+        const projectId =
+          getStringValue(event, "project.id") ||
+          getStringValue(event, "project", "N/A");
+        const trace = getStringValue(event, "trace");
+        const itemId = getStringValue(event, "sentry.item_id");
 
         output += `### Log ${i + 1}\n`;
-        output += `- **Message**: ${event.message || "No message"}\n`;
+        output += `- **Message**: ${message}\n`;
         output += `- **Severity**: ${severity}${severityNum ? ` (level ${severityNum})` : ""}\n`;
-        output += `- **Timestamp**: ${event.timestamp || "N/A"}\n`;
-        output += `- **Project**: ${event["project.id"] || event.project || "N/A"}\n`;
+        output += `- **Timestamp**: ${timestamp}\n`;
+        output += `- **Project**: ${projectId}\n`;
 
-        if (event.trace) {
-          output += `- **Trace ID**: ${event.trace}\n`;
-          output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, event.trace)}\n`;
+        if (trace) {
+          output += `- **Trace ID**: ${trace}\n`;
+          output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
         }
 
-        if (event["sentry.item_id"]) {
-          output += `- **Item ID**: ${event["sentry.item_id"]}\n`;
+        if (itemId) {
+          output += `- **Item ID**: ${itemId}\n`;
         }
 
         output += "\n";
@@ -570,23 +581,29 @@ export default defineTool({
       output += `Found ${eventData.length} trace${eventData.length === 1 ? "" : "s"}/span${eventData.length === 1 ? "" : "s"}:\n\n`;
 
       for (const event of eventData) {
-        const spanOp = event["span.op"] || "unknown";
+        const spanOp = getStringValue(event, "span.op", "unknown");
         const spanDescription =
-          event["span.description"] || event.transaction || "Unknown";
-        const duration = event["span.duration"];
+          getStringValue(event, "span.description") ||
+          getStringValue(event, "transaction") ||
+          "Unknown";
+        const duration = getNumberValue(event, "span.duration");
+        const transaction = getStringValue(event, "transaction", "N/A");
+        const trace = getStringValue(event, "trace");
+        const project = getStringValue(event, "project", "N/A");
+        const timestamp = getStringValue(event, "timestamp", "N/A");
 
         output += `## ${spanDescription}\n\n`;
         output += `**Operation**: ${spanOp}\n`;
-        output += `**Transaction**: ${event.transaction || "N/A"}\n`;
-        if (event.trace) {
-          output += `**Trace ID**: ${event.trace}\n`;
-          output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, event.trace)}\n`;
+        output += `**Transaction**: ${transaction}\n`;
+        if (trace) {
+          output += `**Trace ID**: ${trace}\n`;
+          output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
         }
-        output += `**Project**: ${event.project || "N/A"}\n`;
+        output += `**Project**: ${project}\n`;
         if (duration !== undefined) {
           output += `**Duration**: ${duration}ms\n`;
         }
-        output += `**Timestamp**: ${event.timestamp || "N/A"}\n`;
+        output += `**Timestamp**: ${timestamp}\n`;
         output += "\n";
       }
 
