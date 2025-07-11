@@ -77,7 +77,6 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public eventId?: string,
   ) {
     // HACK: improving this error message for the LLMs
     let finalMessage = message;
@@ -89,11 +88,6 @@ export class ApiError extends Error {
     ) {
       finalMessage =
         "You do not have access to query across multiple projects. Please select a project for your query.";
-    }
-
-    // Include event ID in the message for debugging
-    if (eventId) {
-      finalMessage += ` (Event ID: ${eventId})`;
     }
 
     super(finalMessage);
@@ -307,30 +301,16 @@ export class SentryApiService {
       }
 
       if (parsed) {
-        // Try to extract event ID from error response for debugging
-        let eventId: string | undefined;
-        if (typeof parsed === "object" && parsed !== null) {
-          const errorObj = parsed as any;
-          eventId = errorObj.event_id || errorObj.eventId || errorObj.id;
-        }
-
         const { data, success, error } = ApiErrorSchema.safeParse(parsed);
 
         if (success) {
-          throw new ApiError(data.detail, response.status, eventId);
+          throw new ApiError(data.detail, response.status);
         }
 
         console.error(
           `[sentryApi] Failed to parse error response: ${errorText}`,
           error,
         );
-
-        // If we found an event ID, include it in a more helpful error
-        if (eventId) {
-          throw new Error(
-            `API request failed: ${response.status} ${response.statusText}. Event ID: ${eventId}\n${errorText}`,
-          );
-        }
       }
 
       throw new Error(
