@@ -2,17 +2,6 @@
 
 This directory contains detailed specifications for features in the Sentry MCP server. Each feature has its own subdirectory with related design documents, technical specifications, and implementation guides.
 
-## Directory Structure
-
-```
-specs/
-├── README.md                    # This file
-├── search-events/              # Generic event search with LLM agent
-│   ├── search-events-design.md         # Architecture and implementation plan
-│   ├── search-events-tool-spec.md      # Tool interface specification
-│   └── search-events-agent-prompts.md  # LLM agent prompt engineering
-└── [future-feature]/           # Future feature specifications
-```
 
 ## Purpose
 
@@ -49,11 +38,10 @@ When adding a new feature specification:
 ## Current Specifications
 
 ### search-events
-A unified event search tool that uses an embedded LLM agent to translate natural language queries into Sentry's search syntax. This replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
+A unified event search tool that uses OpenAI GPT-4o to translate natural language queries into Sentry's search syntax. Replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
 
-- **Status**: In Design
-- **Target Release**: TBD
-- **Key Benefits**: Reduces tool count, improves UX, more flexible searching
+- **Status**: ✅ Complete
+- **Key Benefits**: Reduces tool count (20→19), improves UX, accessible to non-technical users
 
 ## Specification Template
 
