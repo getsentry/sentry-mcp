@@ -117,22 +117,29 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
-    // Get org-specific tags
-    // TODO: Replace with correct API endpoint that returns all searchable fields
-    // Currently using listTags as a placeholder - this only returns custom tags
-    const customTags: Record<string, string> = {};
+    // Get all searchable attributes from the trace-items attributes endpoint
+    const customAttributes: Record<string, string> = {};
     try {
-      const tags = await apiService.listTags({ organizationSlug });
-      for (const tag of tags) {
-        customTags[tag.key] = tag.name || tag.key;
+      const attributesResponse = await apiService.listTraceItemAttributes({
+        organizationSlug,
+      });
+
+      // The response contains an array of attribute objects
+      // Each attribute has 'key' and optionally 'name' fields
+      if (Array.isArray(attributesResponse)) {
+        for (const attr of attributesResponse) {
+          if (attr.key) {
+            customAttributes[attr.key] = attr.name || attr.key;
+          }
+        }
       }
     } catch (error) {
-      // If we can't get tags, continue with just common fields
-      console.error("Failed to fetch custom tags:", error);
+      // If we can't get attributes, continue with just common fields
+      console.error("Failed to fetch trace item attributes:", error);
     }
 
-    // Combine common fields with custom tags
-    const allFields = { ...COMMON_SENTRY_FIELDS, ...customTags };
+    // Combine common fields with custom attributes
+    const allFields = { ...COMMON_SENTRY_FIELDS, ...customAttributes };
 
     // Create the system prompt for the LLM
     const systemPrompt = `You are a Sentry query translator. Convert natural language queries to Sentry's search syntax.
