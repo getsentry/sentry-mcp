@@ -392,17 +392,7 @@ export default defineTool({
         "project",
         "title",
       ],
-      logs: [
-        "sentry.item_id",
-        "project.id",
-        "trace",
-        "severity_number",
-        "severity",
-        "timestamp",
-        "tags[sentry.timestamp_precise,number]",
-        "sentry.observed_timestamp_nanos",
-        "message",
-      ],
+      logs: ["timestamp", "project", "message", "severity", "trace"],
       spans: [
         "id",
         "span.op",
