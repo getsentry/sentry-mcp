@@ -49,6 +49,7 @@ export function TaskRunner(model: LanguageModel = defaultModel) {
       args: ["run", "start"],
       env: {
         SENTRY_ACCESS_TOKEN: process.env.SENTRY_ACCESS_TOKEN!,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
       },
     });
     const mcpClient = await experimental_createMCPClient({
