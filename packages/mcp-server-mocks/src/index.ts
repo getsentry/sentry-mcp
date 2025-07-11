@@ -31,6 +31,7 @@ import eventAttachmentsFixture from "./fixtures/event-attachments.json";
 import tagsFixture from "./fixtures/tags.json";
 import projectFixture from "./fixtures/project.json";
 import teamFixture from "./fixtures/team.json";
+import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json";
 
 /**
  * Standard organization payload for mock responses.
@@ -770,6 +771,11 @@ export const restHandlers = buildHandlers([
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/tags/",
     fetch: () => HttpResponse.json(tagsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/trace-items/attributes/",
+    fetch: () => HttpResponse.json(traceItemsAttributesFixture),
   },
   {
     method: "get",

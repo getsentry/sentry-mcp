@@ -28,11 +28,13 @@ describe("search_events", () => {
       text: 'message:"timeout" AND level:error',
     } as any);
 
-    // Mock the tags API response
+    // Mock the trace-items attributes API response
     mswServer.use(
-      http.get("*/api/0/organizations/test-org/tags/", () =>
+      http.get("*/api/0/organizations/test-org/trace-items/attributes/", () =>
         HttpResponse.json([
-          { key: "custom.tag", name: "Custom Tag", totalValues: 100 },
+          { key: "custom.tag", name: "Custom Tag" },
+          { key: "span.op", name: "Span Operation" },
+          { key: "transaction", name: "Transaction" },
         ]),
       ),
     );
@@ -140,7 +142,7 @@ describe("search_events", () => {
     } as any);
 
     mswServer.use(
-      http.get("*/api/0/organizations/test-org/tags/", () =>
+      http.get("*/api/0/organizations/test-org/trace-items/attributes/", () =>
         HttpResponse.json([]),
       ),
       http.get("*/api/0/organizations/test-org/events/", ({ request }) => {
@@ -191,7 +193,7 @@ describe("search_events", () => {
     } as any);
 
     mswServer.use(
-      http.get("*/api/0/organizations/test-org/tags/", () =>
+      http.get("*/api/0/organizations/test-org/trace-items/attributes/", () =>
         HttpResponse.json([]),
       ),
       http.get("*/api/0/organizations/test-org/events/", () =>
@@ -231,7 +233,7 @@ describe("search_events", () => {
     } as any);
 
     mswServer.use(
-      http.get("*/api/0/organizations/test-org/tags/", () =>
+      http.get("*/api/0/organizations/test-org/trace-items/attributes/", () =>
         HttpResponse.json([]),
       ),
       http.get("*/api/0/organizations/test-org/events/", () =>
@@ -258,12 +260,12 @@ describe("search_events", () => {
     ).rejects.toThrow();
   });
 
-  it("includes custom tags in query translation", async () => {
+  it("includes custom attributes in query translation", async () => {
     mswServer.use(
-      http.get("*/api/0/organizations/test-org/tags/", () =>
+      http.get("*/api/0/organizations/test-org/trace-items/attributes/", () =>
         HttpResponse.json([
-          { key: "customer.tier", name: "Customer Tier", totalValues: 50 },
-          { key: "feature.flag", name: "Feature Flag", totalValues: 75 },
+          { key: "customer.tier", name: "Customer Tier" },
+          { key: "feature.flag", name: "Feature Flag" },
         ]),
       ),
     );
@@ -294,7 +296,7 @@ describe("search_events", () => {
       },
     );
 
-    // Verify custom tags were included in the system prompt
+    // Verify custom attributes were included in the system prompt
     expect(mockGenerateText).toHaveBeenCalled();
     const callArgs = mockGenerateText.mock.calls[0][0];
     expect(callArgs.system).toContain("customer.tier: Customer Tier");
@@ -307,7 +309,7 @@ describe("search_events", () => {
     } as any);
 
     mswServer.use(
-      http.get("*/api/0/organizations/test-org/tags/", () =>
+      http.get("*/api/0/organizations/test-org/trace-items/attributes/", () =>
         HttpResponse.json([]),
       ),
       http.get("*/api/0/organizations/test-org/events/", ({ request }) => {

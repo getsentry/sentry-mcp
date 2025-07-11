@@ -863,6 +863,33 @@ export class SentryApiService {
   }
 
   /**
+   * Lists trace item attributes available for search queries.
+   *
+   * Returns all available fields/attributes that can be used in event searches,
+   * including both built-in fields and custom tags.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param opts Request options
+   * @returns Array of available attributes with metadata
+   */
+  async listTraceItemAttributes(
+    {
+      organizationSlug,
+    }: {
+      organizationSlug: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/trace-items/attributes/`,
+      undefined,
+      opts,
+    );
+    return body;
+  }
+
+  /**
    * Lists issues within an organization or project.
    *
    * Issues represent groups of similar errors or problems in your application.
