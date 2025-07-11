@@ -4,7 +4,6 @@ import { defineTool } from "./utils/defineTool";
 import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
 import type { ServerContext } from "../types";
 import type { SentryApiService } from "../api-client";
-import { EventsResponseSchema } from "../api-client/schema";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
