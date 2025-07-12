@@ -189,14 +189,17 @@ const DATASET_CONFIGS = {
 - severity_number is numeric (21=fatal, 17=error, 13=warning, 9=info, 5=debug, 1=trace)
 - IMPORTANT: For time-based filtering in logs, do NOT use timestamp filters in the query
 - Instead, time filtering for logs is handled by the statsPeriod parameter (not part of the query string)
-- Keep your query focused on message content, severity levels, and other attributes only`,
+- Keep your query focused on message content, severity levels, and other attributes only
+- When user asks for "error logs", interpret this as logs with severity:error`,
     examples: `- "warning logs about memory" → severity:warning AND message:"*memory*"
 - "error logs from database" → severity:error AND message:"*database*"
 - "debug logs" → severity:debug
 - "critical system alerts" → severity_number:>=17
 - "recent logs" → (no timestamp filter needed - time range handled separately)
 - "logs from last hour" → (no timestamp filter needed - time range handled separately)
-- "API error logs" → severity:error AND message:"*API*"`,
+- "API error logs" → severity:error AND message:"*API*"
+- "error logs from the last hour" → severity:error
+- "show me error logs" → severity:error`,
   },
   spans: {
     rules: `- For traces/spans, focus on: span.op, span.description, span.duration, transaction
@@ -243,38 +246,47 @@ Important:
 export default defineTool({
   name: "search_events",
   description: [
-    "Search for events in Sentry using natural language queries.",
+    "Search for individual error events, log entries, or trace spans using natural language queries.",
     "",
-    "This tool accepts plain English descriptions and translates them to Sentry's search syntax.",
-    "It searches across errors, traces/spans, and logs in your Sentry organization.",
+    "🔍 USE THIS TOOL WHEN USERS ASK FOR:",
+    "- 'error logs', 'log entries', 'show me logs'",
+    "- 'find errors that occurred', 'error events from last hour'",
+    "- 'database timeout errors', 'specific error occurrences'",
+    "- 'slow queries', 'API calls taking over X seconds'",
+    "- Any query about INDIVIDUAL events/occurrences with time/performance filters",
     "",
-    "Use this tool when you need to:",
-    "- Find errors, traces, or logs using natural language",
-    "- Search for problems without knowing Sentry's query syntax",
-    "- Analyze patterns across different types of telemetry data",
+    "❌ DO NOT USE for 'issues', 'problems', or when users want grouped summaries",
+    "",
+    "CRITICAL DISTINCTION:",
+    "- Events = Individual occurrences (use search_events)",
+    "- Issues = Grouped problems (use find_issues)",
+    "",
+    "Dataset Selection:",
+    "- Users say 'error logs' → dataset='logs' (log entries with error severity)",
+    "- Users say 'exceptions'/'crashes' → dataset='errors' (error events)",
+    "- Users say 'slow queries'/'performance' → dataset='spans' (trace data)",
     "",
     "<examples>",
-    "### Find database timeouts in traces",
+    "### Error logs from last hour",
     "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='database timeouts in checkout flow from last hour', dataset='spans')",
-    "```",
-    "",
-    "### Find errors with specific messages",
-    "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='null pointer exceptions in production', dataset='errors')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='error logs from last hour', dataset='logs')",
     "```",
     "",
-    "### Find logs with warnings",
+    "### Database connection errors",
     "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='warning logs about memory usage', dataset='logs')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='database connection errors', dataset='errors')",
+    "```",
+    "",
+    "### Slow database queries",
+    "```",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='slow database queries over 100ms', dataset='spans')",
     "```",
     "</examples>",
     "",
     "<hints>",
-    "- Be specific in your natural language query for better results",
-    "- You can mention time ranges, error types, performance thresholds, etc.",
-    "- The tool will explain how it translated your query if includeExplanation is true",
-    "- Dataset defaults to 'errors' for exception/error data",
+    "- Be specific for better results",
+    "- Can mention time ranges, error types, performance thresholds",
+    "- CRITICAL: 'error logs' means dataset='logs' NOT dataset='errors'",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -383,16 +395,22 @@ export default defineTool({
     // Select fields based on dataset - these are the fields we want to retrieve from the API
     const DATASET_API_FIELDS = {
       errors: [
-        "id",
-        "message",
+        "issue",
+        "title",
+        "project",
+        "last_seen()",
+        "count()",
         "level",
         "culprit",
-        "type",
+      ],
+      logs: [
         "timestamp",
         "project",
-        "title",
+        "message",
+        "severity",
+        "trace",
+        "sentry.item_id",
       ],
-      logs: ["timestamp", "project", "message", "severity", "trace"],
       spans: [
         "id",
         "span.op",
@@ -408,6 +426,14 @@ export default defineTool({
 
     const fields = DATASET_API_FIELDS[dataset];
 
+    // Determine the appropriate sort parameter based on dataset
+    const sortParam =
+      dataset === "errors"
+        ? "-last_seen"
+        : dataset === "spans"
+          ? "-span.duration"
+          : "-timestamp";
+
     const eventsResponse = await withApiErrorHandling(
       () =>
         apiService.searchEvents({
@@ -417,8 +443,9 @@ export default defineTool({
           limit: params.limit,
           projectSlug: projectId, // API requires numeric project ID, not slug
           dataset: dataset === "logs" ? "ourlogs" : dataset,
-          // For logs, use a default time window since timestamp filters don't work in queries
-          ...(dataset === "logs" && { statsPeriod: "24h" }),
+          sort: sortParam,
+          // For logs and errors, use a default time window
+          ...(dataset !== "spans" && { statsPeriod: "24h" }),
         }),
       {
         organizationSlug,
@@ -470,29 +497,35 @@ export default defineTool({
       output += `Found ${eventData.length} error${eventData.length === 1 ? "" : "s"}:\n\n`;
 
       for (const event of eventData) {
-        const title =
-          getStringValue(event, "title") ||
-          getStringValue(event, "message") ||
-          "Unknown Error";
-        const level = getStringValue(event, "level", "error");
-        const culprit = getStringValue(event, "culprit", "Unknown");
+        const title = getStringValue(event, "title", "Unknown Error");
+        const issue = getStringValue(event, "issue");
         const project = getStringValue(event, "project", "N/A");
-        const timestamp = getStringValue(event, "timestamp", "N/A");
-        const id = getStringValue(event, "id");
+        const lastSeen = getStringValue(event, "last_seen()", "N/A");
+        const level = getStringValue(event, "level");
+        const culprit = getStringValue(event, "culprit");
+        const count = getNumberValue(event, "count()");
 
         output += `## ${title}\n\n`;
-        output += `**Level**: ${level}\n`;
-        output += `**Location**: ${culprit}\n`;
+        output += `**Issue ID**: ${issue}\n`;
         output += `**Project**: ${project}\n`;
-        output += `**Timestamp**: ${timestamp}\n`;
-        if (id) {
-          output += `**Event ID**: ${id}\n`;
+        if (level) {
+          output += `**Level**: ${level}\n`;
+        }
+        if (culprit) {
+          output += `**Location**: ${culprit}\n`;
+        }
+        output += `**Last seen**: ${lastSeen}\n`;
+        if (count !== undefined) {
+          output += `**Occurrences**: ${count}\n`;
+        }
+        if (issue) {
+          output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue)}\n`;
         }
         output += "\n";
       }
 
       output += "## Next Steps\n\n";
-      output += "- Get more details about a specific error: Use the Event ID\n";
+      output += "- Get more details about a specific error: Use the Issue ID\n";
       output += "- View error groups: Navigate to the Issues page in Sentry\n";
       output +=
         "- Set up alerts: Configure alert rules for these error patterns\n";
