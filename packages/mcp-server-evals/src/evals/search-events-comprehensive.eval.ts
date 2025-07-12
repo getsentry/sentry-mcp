@@ -69,7 +69,7 @@ describeEval("search-events-comprehensive", {
     ];
   },
   task: TaskRunner({ logToolCalls: true }),
-  scorers: [ToolUsage("search_events"), Factuality()],
+  scorers: [ToolUsage(["search_events", "find_issues"]), Factuality()],
   threshold: 0.6,
   timeout: 60000,
 });

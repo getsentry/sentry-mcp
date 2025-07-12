@@ -37,7 +37,7 @@ describeEval("get-issue", {
     ];
   },
   task: TaskRunner(),
-  scorers: [ToolUsage("get_issue_details"), Factuality()],
+  scorers: [ToolUsage(["get_issue_details", "find_issues"]), Factuality()],
   threshold: 0.6,
   timeout: 30000,
 });

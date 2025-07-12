@@ -246,50 +246,46 @@ Important:
 export default defineTool({
   name: "search_events",
   description: [
-    "Search for individual events (error occurrences, log entries, or spans) in Sentry using natural language queries.",
+    "Search for individual error events, log entries, or trace spans using natural language queries.",
     "",
-    "IMPORTANT: This tool searches for individual events, NOT grouped issues. Use find_issues for grouped errors.",
-    "This tool accepts plain English descriptions and translates them to Sentry's search syntax.",
-    "It searches across individual error events, traces/spans, and log entries in your Sentry organization.",
+    "🔍 USE THIS TOOL WHEN USERS ASK FOR:",
+    "- 'error logs', 'log entries', 'show me logs'",
+    "- 'find errors that occurred', 'error events from last hour'",
+    "- 'database timeout errors', 'specific error occurrences'",
+    "- 'slow queries', 'API calls taking over X seconds'",
+    "- Any query about INDIVIDUAL events/occurrences with time/performance filters",
     "",
-    "IMPORTANT Dataset Selection Rules:",
-    "- When user mentions 'logs' or 'log entries' → use dataset='logs'",
-    "- When user mentions 'error logs' → use dataset='logs' (these are log entries with error severity)",
-    "- When user mentions 'exceptions', 'crashes', or individual 'errors' → use dataset='errors' (default)",
-    "- When user mentions 'traces', 'spans', or 'performance' → use dataset='spans'",
+    "❌ DO NOT USE for 'issues', 'problems', or when users want grouped summaries",
     "",
-    "Use this tool when you need to:",
-    "- Find individual error occurrences, traces, or log entries using natural language",
-    "- Search for specific events without knowing Sentry's query syntax",
-    "- Analyze patterns across different types of telemetry data",
+    "CRITICAL DISTINCTION:",
+    "- Events = Individual occurrences (use search_events)",
+    "- Issues = Grouped problems (use find_issues)",
+    "",
+    "Dataset Selection:",
+    "- Users say 'error logs' → dataset='logs' (log entries with error severity)",
+    "- Users say 'exceptions'/'crashes' → dataset='errors' (error events)",
+    "- Users say 'slow queries'/'performance' → dataset='spans' (trace data)",
     "",
     "<examples>",
-    "### Find error logs (log entries with error severity)",
+    "### Error logs from last hour",
     "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='Show me error logs from the last hour', dataset='logs')",
-    "```",
-    "",
-    "### Find database timeouts in traces",
-    "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='database timeouts in checkout flow from last hour', dataset='spans')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='error logs from last hour', dataset='logs')",
     "```",
     "",
-    "### Find errors/exceptions with specific messages",
+    "### Database connection errors",
     "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='null pointer exceptions in production', dataset='errors')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='database connection errors', dataset='errors')",
     "```",
     "",
-    "### Find logs with warnings",
+    "### Slow database queries",
     "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='warning logs about memory usage', dataset='logs')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='slow database queries over 100ms', dataset='spans')",
     "```",
     "</examples>",
     "",
     "<hints>",
-    "- Be specific in your natural language query for better results",
-    "- You can mention time ranges, error types, performance thresholds, etc.",
-    "- The tool will explain how it translated your query if includeExplanation is true",
-    "- Dataset defaults to 'errors' for exception/error data",
+    "- Be specific for better results",
+    "- Can mention time ranges, error types, performance thresholds",
     "- CRITICAL: 'error logs' means dataset='logs' NOT dataset='errors'",
     "</hints>",
   ].join("\n"),
@@ -398,7 +394,15 @@ export default defineTool({
 
     // Select fields based on dataset - these are the fields we want to retrieve from the API
     const DATASET_API_FIELDS = {
-      errors: ["issue", "title", "project", "last_seen()", "count()"],
+      errors: [
+        "issue",
+        "title",
+        "project",
+        "last_seen()",
+        "count()",
+        "level",
+        "culprit",
+      ],
       logs: [
         "timestamp",
         "project",
@@ -497,11 +501,19 @@ export default defineTool({
         const issue = getStringValue(event, "issue");
         const project = getStringValue(event, "project", "N/A");
         const lastSeen = getStringValue(event, "last_seen()", "N/A");
+        const level = getStringValue(event, "level");
+        const culprit = getStringValue(event, "culprit");
         const count = getNumberValue(event, "count()");
 
         output += `## ${title}\n\n`;
         output += `**Issue ID**: ${issue}\n`;
         output += `**Project**: ${project}\n`;
+        if (level) {
+          output += `**Level**: ${level}\n`;
+        }
+        if (culprit) {
+          output += `**Location**: ${culprit}\n`;
+        }
         output += `**Last seen**: ${lastSeen}\n`;
         if (count !== undefined) {
           output += `**Occurrences**: ${count}\n`;
