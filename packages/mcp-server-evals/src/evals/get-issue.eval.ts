@@ -1,5 +1,5 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, FIXTURES, TaskRunner } from "./utils";
+import { Factuality, FIXTURES, TaskRunner, ToolUsage } from "./utils";
 
 describeEval("get-issue", {
   data: async () => {
@@ -37,7 +37,7 @@ describeEval("get-issue", {
     ];
   },
   task: TaskRunner(),
-  scorers: [Factuality()],
+  scorers: [ToolUsage(["get_issue_details", "find_issues"]), Factuality()],
   threshold: 0.6,
   timeout: 30000,
 });

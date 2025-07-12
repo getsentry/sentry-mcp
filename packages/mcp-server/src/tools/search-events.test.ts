@@ -1,0 +1,656 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer } from "@sentry/mcp-server-mocks";
+import searchEvents from "./search-events.js";
+import { generateText } from "ai";
+
+// Mock the AI SDK
+vi.mock("@ai-sdk/openai", () => ({
+  openai: vi.fn(() => "mocked-model"),
+}));
+
+vi.mock("ai", () => ({
+  generateText: vi.fn(() => Promise.resolve({ text: "mocked query" })),
+}));
+
+describe("search_events", () => {
+  const mockGenerateText = vi.mocked(generateText);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Set a mock API key for all tests since we're mocking the AI SDK
+    process.env.OPENAI_API_KEY = "test-key";
+  });
+
+  it("translates semantic query and returns results", async () => {
+    // Mock the AI response
+    mockGenerateText.mockResolvedValueOnce({
+      text: 'message:"timeout" AND level:error',
+    } as any);
+
+    // Mock the trace-items attributes API response for both string and number types
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("itemType")).toBe("span");
+          const attributeType = url.searchParams.get("attributeType");
+          expect(["string", "number"].includes(attributeType!)).toBe(true);
+
+          if (attributeType === "string") {
+            return HttpResponse.json([
+              { key: "custom.tag", name: "Custom Tag" },
+              { key: "span.op", name: "Span Operation" },
+              { key: "transaction", name: "Transaction" },
+            ]);
+          }
+          return HttpResponse.json([
+            { key: "span.duration", name: "Span Duration" },
+            { key: "custom.number", name: "Custom Number" },
+          ]);
+        },
+      ),
+    );
+
+    // Mock the events API response with spans data
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "span1",
+              "span.op": "db.query",
+              "span.description": "SELECT * FROM users WHERE timeout",
+              "span.duration": 5234,
+              transaction: "/api/checkout",
+              timestamp: "2024-01-15T10:30:00Z",
+              project: "backend",
+              trace: "abc123def456",
+            },
+            {
+              id: "span2",
+              "span.op": "cache.get",
+              "span.description": "GET user:session:timeout",
+              "span.duration": 1500,
+              transaction: "/api/checkout",
+              timestamp: "2024-01-15T10:25:00Z",
+              project: "backend",
+              trace: "xyz789ghi012",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "database timeouts in the last hour",
+        includeExplanation: true,
+        limit: 10,
+        dataset: "spans",
+        projectSlug: undefined,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    // Verify the AI was called with the right prompt
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "mocked-model",
+        prompt: "database timeouts in the last hour",
+        temperature: 0.1,
+        system: expect.stringContaining("You are a Sentry query translator"),
+      }),
+    );
+
+    // Check the output
+    expect(result).toMatchInlineSnapshot(`
+      "# Search Results for "database timeouts in the last hour"
+
+      ⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.
+
+      ## Query Translation
+      Natural language: "database timeouts in the last hour"
+      Sentry query: \`message:"timeout" AND level:error\`
+
+      **📊 View these results in Sentry**: https://test-org.sentry.io/explore/traces/?query=message%3A%22timeout%22+AND+level%3Aerror
+      _Please share this link with the user to view the search results in their Sentry dashboard._
+
+      Found 2 traces/spans:
+
+      ## SELECT * FROM users WHERE timeout
+
+      **Operation**: db.query
+      **Transaction**: /api/checkout
+      **Trace ID**: abc123def456
+      **Trace URL**: https://test-org.sentry.io/explore/traces/trace/abc123def456
+      **Project**: backend
+      **Duration**: 5234ms
+      **Timestamp**: 2024-01-15T10:30:00Z
+
+      ## GET user:session:timeout
+
+      **Operation**: cache.get
+      **Transaction**: /api/checkout
+      **Trace ID**: xyz789ghi012
+      **Trace URL**: https://test-org.sentry.io/explore/traces/trace/xyz789ghi012
+      **Project**: backend
+      **Duration**: 1500ms
+      **Timestamp**: 2024-01-15T10:25:00Z
+
+      ## Next Steps
+
+      - View the full trace: Click on the Trace URL above
+      - Search for related spans: Modify your query to be more specific
+      - Export data: Use the Sentry web interface for advanced analysis
+      "
+    `);
+  });
+
+  it("filters by project when specified", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "transaction.duration:>5000",
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("itemType")).toBe("span");
+          const attributeType = url.searchParams.get("attributeType");
+          expect(["string", "number"].includes(attributeType!)).toBe(true);
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/projects/", () =>
+        HttpResponse.json([
+          {
+            id: "123456",
+            slug: "frontend",
+            name: "Frontend App",
+            platform: "javascript",
+          },
+        ]),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const query = url.searchParams.get("query");
+          const project = url.searchParams.get("project");
+          expect(query).toBe("transaction.duration:>5000");
+          expect(project).toBe("123456"); // Should be the numeric ID now
+
+          return HttpResponse.json({
+            data: [
+              {
+                id: "span1",
+                "span.op": "http.server",
+                "span.description": "GET /api/users",
+                "span.duration": 8500,
+                transaction: "/api/users",
+                timestamp: "2024-01-15T10:30:00Z",
+                project: "frontend",
+                trace: "def456abc123",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "slow API calls",
+        projectSlug: "frontend",
+        limit: 10,
+        dataset: "spans",
+        includeExplanation: false,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    expect(result).toContain("Found 1 trace/span:");
+    expect(result).toContain("GET /api/users");
+    expect(result).toContain("**Operation**: http.server");
+    expect(result).toContain("**Duration**: 8500ms");
+    expect(result).toContain("**📊 View these results in Sentry**:");
+    expect(result).toContain(
+      "https://test-org.sentry.io/explore/traces/?query=transaction.duration%3A%3E5000&project=123456",
+    );
+    expect(result).toContain(
+      "_Please share this link with the user to view the search results in their Sentry dashboard._",
+    );
+  });
+
+  it("handles empty results gracefully", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: 'message:"nonexistent error"',
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("itemType")).toBe("span");
+          const attributeType = url.searchParams.get("attributeType");
+          expect(["string", "number"].includes(attributeType!)).toBe(true);
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({ data: [] }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "errors that don't exist",
+        limit: 10,
+        dataset: "spans",
+        includeExplanation: false,
+        projectSlug: undefined,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    expect(result).toMatchInlineSnapshot(`
+      "# Search Results for "errors that don't exist"
+
+      ⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.
+
+      **📊 View these results in Sentry**: https://test-org.sentry.io/explore/traces/?query=message%3A%22nonexistent+error%22
+      _Please share this link with the user to view the search results in their Sentry dashboard._
+
+      No results found.
+
+      Try being more specific or using different terms in your search.
+      "
+    `);
+  });
+
+  it("handles API errors gracefully", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "level:error",
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("itemType")).toBe("span");
+          const attributeType = url.searchParams.get("attributeType");
+          expect(["string", "number"].includes(attributeType!)).toBe(true);
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({ detail: "Rate limit exceeded" }, { status: 429 }),
+      ),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          naturalLanguageQuery: "recent errors",
+          limit: 10,
+          dataset: "spans",
+          includeExplanation: false,
+          projectSlug: undefined,
+          regionUrl: undefined,
+        },
+        {
+          accessToken: "test-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("includes custom attributes in query translation", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("itemType")).toBe("span");
+          const attributeType = url.searchParams.get("attributeType");
+          expect(["string", "number"].includes(attributeType!)).toBe(true);
+
+          if (attributeType === "string") {
+            return HttpResponse.json([
+              { key: "customer.tier", name: "Customer Tier" },
+              { key: "feature.flag", name: "Feature Flag" },
+            ]);
+          }
+          return HttpResponse.json([
+            { key: "custom.count", name: "Custom Count" },
+          ]);
+        },
+      ),
+    );
+
+    mockGenerateText.mockResolvedValueOnce({
+      text: 'customer.tier:"premium" AND level:error',
+    } as any);
+
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({ data: [] }),
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "errors from premium customers",
+        limit: 10,
+        dataset: "spans",
+        includeExplanation: false,
+        projectSlug: undefined,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    // Verify custom attributes were included in the system prompt
+    expect(mockGenerateText).toHaveBeenCalled();
+    const callArgs = mockGenerateText.mock.calls[0][0];
+    expect(callArgs.system).toContain("customer.tier: Customer Tier");
+    expect(callArgs.system).toContain("feature.flag: Feature Flag");
+  });
+
+  it("defaults to errors dataset when not specified", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: 'message:"connection refused"',
+    } as any);
+
+    mswServer.use(
+      // Should use listTags for errors dataset by default
+      http.get("https://sentry.io/api/0/organizations/test-org/tags/", () =>
+        HttpResponse.json([
+          { key: "environment", name: "Environment", totalValues: 3 },
+        ]),
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "error1",
+              message: "Connection refused",
+              level: "error",
+              culprit: "network.connect",
+              title: "Connection refused",
+              timestamp: "2024-01-15T10:30:00Z",
+              project: "backend",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "connection refused errors",
+        limit: 10,
+        includeExplanation: false,
+        // Note: dataset is not specified, should default to "errors"
+      } as any,
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    expect(result).toContain("Found 1 error:");
+    expect(result).toContain("Connection refused");
+    expect(result).toContain("**Level**: error");
+  });
+
+  it("handles errors dataset with listTags", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: 'level:error AND message:"null pointer"',
+    } as any);
+
+    mswServer.use(
+      // For errors dataset, it uses listTags instead of trace-items attributes
+      http.get("https://sentry.io/api/0/organizations/test-org/tags/", () =>
+        HttpResponse.json([
+          { key: "browser", name: "Browser", totalValues: 10 },
+          { key: "device", name: "Device", totalValues: 5 },
+          { key: "os", name: "Operating System", totalValues: 8 },
+        ]),
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
+        HttpResponse.json({
+          data: [
+            {
+              id: "error1",
+              message: "Uncaught TypeError: Cannot read property 'foo' of null",
+              level: "error",
+              culprit: "app.js in handleClick",
+              title: "TypeError: Cannot read property 'foo' of null",
+              timestamp: "2024-01-15T10:30:00Z",
+              project: "frontend",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "null pointer exceptions",
+        limit: 10,
+        dataset: "errors",
+        includeExplanation: false,
+        projectSlug: undefined,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    expect(result).toContain("Found 1 error:");
+    expect(result).toContain("TypeError: Cannot read property 'foo' of null");
+    expect(result).toContain("**Level**: error");
+    expect(result).toContain("**Location**: app.js in handleClick");
+  });
+
+  it("handles non-existent project gracefully", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "level:error",
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("itemType")).toBe("span");
+          const attributeType = url.searchParams.get("attributeType");
+          expect(["string", "number"].includes(attributeType!)).toBe(true);
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get("https://sentry.io/api/0/organizations/test-org/projects/", () =>
+        HttpResponse.json([
+          {
+            id: "123456",
+            slug: "frontend",
+            name: "Frontend App",
+            platform: "javascript",
+          },
+        ]),
+      ),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          naturalLanguageQuery: "errors",
+          projectSlug: "non-existent-project",
+          limit: 10,
+          dataset: "spans",
+          includeExplanation: false,
+          regionUrl: undefined,
+        },
+        {
+          accessToken: "test-token",
+          userId: "1",
+          organizationSlug: null,
+        },
+      ),
+    ).rejects.toThrow(
+      "Project 'non-existent-project' not found in organization 'test-org'",
+    );
+  });
+
+  it("handles timestamp queries with correct format", async () => {
+    // Test that timestamp queries use the correct format
+    mockGenerateText.mockResolvedValueOnce({
+      text: 'message:"timeout" AND timestamp:-1h', // Correct format without operator
+    } as any);
+
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/tags/", () =>
+        HttpResponse.json([]),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const query = url.searchParams.get("query");
+
+          // Verify the query has correct timestamp format
+          expect(query).toBe('message:"timeout" AND timestamp:-1h');
+
+          return HttpResponse.json({
+            data: [
+              {
+                id: "error1",
+                message: "Request timeout",
+                level: "error",
+                culprit: "api.request",
+                title: "Timeout Error",
+                timestamp: "2024-01-15T10:30:00Z",
+                project: "backend",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "timeout errors in the last hour",
+        limit: 10,
+        dataset: "errors",
+        includeExplanation: true,
+        projectSlug: undefined,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    // Verify the translation is shown correctly with timestamp
+    expect(result).toContain(
+      'Sentry query: `message:"timeout" AND timestamp:-1h`',
+    );
+    expect(result).toContain("Found 1 error:");
+    expect(result).toContain("Timeout Error");
+
+    // Verify the AI was called with system prompt that includes timestamp format
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining("timestamp:-1h"),
+      }),
+    );
+  });
+
+  it("respects the limit parameter", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "level:error",
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("itemType")).toBe("span");
+          const attributeType = url.searchParams.get("attributeType");
+          expect(["string", "number"].includes(attributeType!)).toBe(true);
+          return HttpResponse.json([]);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("per_page")).toBe("5");
+
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "errors",
+        limit: 5,
+        dataset: "spans",
+        includeExplanation: false,
+        projectSlug: undefined,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+  });
+});

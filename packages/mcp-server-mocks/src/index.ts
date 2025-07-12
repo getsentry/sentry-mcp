@@ -31,6 +31,13 @@ import eventAttachmentsFixture from "./fixtures/event-attachments.json";
 import tagsFixture from "./fixtures/tags.json";
 import projectFixture from "./fixtures/project.json";
 import teamFixture from "./fixtures/team.json";
+import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json";
+import traceItemsAttributesSpansStringFixture from "./fixtures/trace-items-attributes-spans-string.json";
+import traceItemsAttributesSpansNumberFixture from "./fixtures/trace-items-attributes-spans-number.json";
+import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json";
+import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json";
+
+import { generateMockResponse } from "./mock-data-generator";
 
 /**
  * Standard organization payload for mock responses.
@@ -519,70 +526,92 @@ export const restHandlers = buildHandlers([
       const query = url.searchParams.get("query");
       const fields = url.searchParams.getAll("field");
 
-      if (dataset === "spans") {
-        //[sentryApi] GET https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=spans&per_page=10&referrer=sentry-mcp&sort=-span.duration&allowAggregateConditions=0&useRpc=1&field=id&field=trace&field=span.op&field=span.description&field=span.duration&field=transaction&field=project&field=timestamp&query=is_transaction%3Atrue
-        if (query !== "is_transaction:true") {
-          return HttpResponse.json(EmptyEventsSpansPayload);
-        }
-
-        if (url.searchParams.get("useRpc") !== "1") {
-          return HttpResponse.json("Invalid useRpc", { status: 400 });
-        }
-
-        if (
-          !fields.includes("id") ||
-          !fields.includes("trace") ||
-          !fields.includes("span.op") ||
-          !fields.includes("span.description") ||
-          !fields.includes("span.duration")
-        ) {
-          return HttpResponse.json("Invalid fields", { status: 400 });
-        }
-        return HttpResponse.json(EventsSpansPayload);
+      // Basic validation
+      if (!dataset) {
+        return HttpResponse.json("Missing dataset", { status: 400 });
       }
-      if (dataset === "errors") {
-        //https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=errors&per_page=10&referrer=sentry-mcp&sort=-count&statsPeriod=1w&field=issue&field=title&field=project&field=last_seen%28%29&field=count%28%29&query=
 
-        if (
-          !fields.includes("issue") ||
-          !fields.includes("title") ||
-          !fields.includes("project") ||
-          !fields.includes("last_seen()") ||
-          !fields.includes("count()")
-        ) {
-          return HttpResponse.json("Invalid fields", { status: 400 });
+      if (dataset === "spans" && url.searchParams.get("useRpc") !== "1") {
+        return HttpResponse.json("Invalid useRpc", { status: 400 });
+      }
+
+      // Validate fields based on dataset
+      if (fields.length === 0) {
+        return HttpResponse.json("No fields specified", { status: 400 });
+      }
+
+      if (dataset === "spans") {
+        const hasSpanFields = fields.some(
+          (f) =>
+            f.includes("span.") ||
+            f === "id" ||
+            f === "trace" ||
+            f === "transaction",
+        );
+        if (!hasSpanFields) {
+          return HttpResponse.json("Invalid fields for spans dataset", {
+            status: 400,
+          });
         }
+      } else if (dataset === "errors") {
+        const hasErrorFields = fields.some(
+          (f) =>
+            f === "issue" ||
+            f === "title" ||
+            f === "message" ||
+            f === "level" ||
+            f.includes("error.") ||
+            f.includes("last_seen") ||
+            f.includes("count"),
+        );
+        if (!hasErrorFields) {
+          return HttpResponse.json("Invalid fields for errors dataset", {
+            status: 400,
+          });
+        }
+      } else if (dataset === "ourlogs") {
+        const hasLogFields = fields.some(
+          (f) =>
+            f === "timestamp" ||
+            f === "message" ||
+            f === "severity" ||
+            f === "project" ||
+            f === "trace" ||
+            f.includes("sentry."),
+        );
+        if (!hasLogFields) {
+          return HttpResponse.json("Invalid fields for logs dataset", {
+            status: 400,
+          });
+        }
+      }
 
-        if (
-          !["-count", "-last_seen"].includes(
-            url.searchParams.get("sort") as string,
-          )
-        ) {
+      // Validate sort parameter
+      const sort = url.searchParams.get("sort");
+      if (sort) {
+        const validSorts = [
+          "-count",
+          "-last_seen",
+          "-timestamp",
+          "count",
+          "last_seen",
+          "timestamp",
+          "-span.duration",
+          "span.duration",
+        ];
+        if (!validSorts.includes(sort)) {
           return HttpResponse.json("Invalid sort", { status: 400 });
         }
-
-        // TODO: this is not correct, but itll fix test flakiness for now
-        const sortedQuery = query ? query?.split(" ").sort().join(" ") : null;
-        if (
-          ![
-            null,
-            "",
-            "error.handled:false",
-            "error.unhandled:true",
-            "error.handled:false is:unresolved",
-            "error.unhandled:true is:unresolved",
-            "is:unresolved project:cloudflare-mcp",
-            "project:cloudflare-mcp",
-            "user.email:david@sentry.io",
-          ].includes(sortedQuery)
-        ) {
-          return HttpResponse.json(EmptyEventsErrorsPayload);
-        }
-
-        return HttpResponse.json(EventsErrorsPayload);
       }
 
-      return HttpResponse.json("Invalid dataset", { status: 400 });
+      try {
+        // Use the dynamic mock data generator
+        const response = generateMockResponse(dataset, query || "", fields);
+        return HttpResponse.json(response);
+      } catch (error) {
+        console.error("Error generating mock response:", error);
+        return HttpResponse.json("Internal error", { status: 500 });
+      }
     },
   },
   {
@@ -773,8 +802,79 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/trace-items/attributes/",
+    fetch: ({ request }) => {
+      const url = new URL(request.url);
+      const itemType = url.searchParams.get("itemType");
+      const attributeType = url.searchParams.get("attributeType");
+
+      // Validate required parameters
+      if (!itemType) {
+        return HttpResponse.json(
+          { detail: "itemType parameter is required" },
+          { status: 400 },
+        );
+      }
+
+      if (!attributeType) {
+        return HttpResponse.json(
+          { detail: "attributeType parameter is required" },
+          { status: 400 },
+        );
+      }
+
+      // Validate itemType values
+      if (!["span", "logs"].includes(itemType)) {
+        return HttpResponse.json(
+          {
+            detail: `Invalid itemType '${itemType}'. Must be 'span' or 'logs'`,
+          },
+          { status: 400 },
+        );
+      }
+
+      // Validate attributeType values
+      if (!["string", "number"].includes(attributeType)) {
+        return HttpResponse.json(
+          {
+            detail: `Invalid attributeType '${attributeType}'. Must be 'string' or 'number'`,
+          },
+          { status: 400 },
+        );
+      }
+
+      // Return appropriate fixture based on parameters
+      if (itemType === "span") {
+        if (attributeType === "string") {
+          return HttpResponse.json(traceItemsAttributesSpansStringFixture);
+        }
+        return HttpResponse.json(traceItemsAttributesSpansNumberFixture);
+      }
+      if (itemType === "logs") {
+        if (attributeType === "string") {
+          return HttpResponse.json(traceItemsAttributesLogsStringFixture);
+        }
+        return HttpResponse.json(traceItemsAttributesLogsNumberFixture);
+      }
+
+      // Fallback (should not reach here with valid inputs)
+      return HttpResponse.json(traceItemsAttributesFixture);
+    },
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
     fetch: () => HttpResponse.json(autofixStateFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
   },
   {
     method: "post",
@@ -1194,3 +1294,6 @@ export const mswServer = setupServer(
 
 // Export fixtures for use in tests
 export { autofixStateFixture };
+
+// Export mock data generator functions
+export { generateMockResponse, parseQuery } from "./mock-data-generator";

@@ -133,6 +133,48 @@ expect(result.timestamp).toMatchInlineSnapshot(); // ❌
 
 ## Evaluation Testing
 
+Evaluation tests use AI models to verify that tools work correctly with natural language inputs.
+
+### Prerequisites
+
+1. **Environment Setup**:
+   ```bash
+   # Required: OpenAI API key for AI-powered tests
+   echo "OPENAI_API_KEY=your-key-here" >> .env
+   
+   # Optional: Anthropic API key for Anthropic model tests
+   echo "ANTHROPIC_API_KEY=your-key-here" >> .env
+   ```
+
+2. **Build the Project**:
+   ```bash
+   # Build all packages before running evals
+   pnpm run build
+   ```
+
+### Running Eval Tests
+
+```bash
+# Run all eval tests
+cd packages/mcp-server-evals
+pnpm test
+
+# Run specific eval file
+pnpm exec vitest run src/evals/search-events.eval.ts
+
+# Run specific test by name
+pnpm exec vitest run src/evals/list-issues.eval.ts -t "jane@sentry.io"
+
+# Run with verbose output
+pnpm exec vitest run src/evals/search-events.eval.ts --reporter=verbose
+
+# Run with increased timeout (default is 30s)
+pnpm exec vitest run src/evals/search-events.eval.ts --test-timeout=60000
+
+# Debug a failing test
+pnpm exec vitest run src/evals/search-events.eval.ts -t "database timeouts" --reporter=tap
+```
+
 ### Eval Test Structure
 
 ```typescript
@@ -148,20 +190,83 @@ describeEval("tool-name", {
   ],
   task: TaskRunner(),      // Uses AI to call tools
   scorers: [Factuality()], // Validates output
-  threshold: 0.6,
-  timeout: 30000
+  threshold: 0.6,          // Minimum score to pass (0-1)
+  timeout: 60000          // Timeout in milliseconds
 });
 ```
 
-### Running Evals
+### Writing Effective Eval Tests
 
-```bash
-# Requires OPENAI_API_KEY in .env
-pnpm eval
+1. **Input Specificity**: Be specific about organization/project names
+   ```typescript
+   // Good - specific context
+   input: `Find errors in sentry-mcp-evals/cloudflare-mcp project`
+   
+   // Bad - too vague
+   input: `Find errors`
+   ```
 
-# Run specific eval
-pnpm eval tool-name
-```
+2. **Expected Output**: Focus on key content, not exact formatting
+   ```typescript
+   expected: [
+     "Found",           // Key indicator
+     "error",          // Content type
+     "/explore/errors/" // URL pattern
+   ].join("\n")
+   ```
+
+3. **Dataset Selection**: Be clear about what type of data you want
+   ```typescript
+   // For grouped issues
+   input: `What issues are affecting users?`
+   
+   // For individual events
+   input: `Show me the latest error logs`
+   ```
+
+### Debugging Failed Evals
+
+1. **Check Tool Selection**:
+   - The AI might be using the wrong tool
+   - Update tool descriptions to be clearer
+   - Check `dist/toolDefinitions.js` after building
+
+2. **Verify Mock Data**:
+   - Ensure mock server returns appropriate data
+   - Check `packages/mcp-server-mocks/src/mock-data-generator.ts`
+   - Test query parsing logic
+
+3. **Score Analysis**:
+   - Factuality scorer can be strict
+   - Check the rationale in test output
+   - Consider adjusting threshold if needed
+
+4. **Timeout Issues**:
+   - Some tests require OpenAI API calls (slow)
+   - Increase timeout for complex queries
+   - Run tests individually to isolate issues
+
+### Best Practices
+
+1. **Test Organization**:
+   - Group related tests in the same file
+   - Use descriptive test names
+   - Add comments explaining complex scenarios
+
+2. **Mock Data Alignment**:
+   - Ensure mocks return data matching test expectations
+   - Update mock generator when adding new test cases
+   - Test both positive and negative scenarios
+
+3. **Performance Considerations**:
+   - Run evals in CI with appropriate timeouts
+   - Cache AI responses when possible
+   - Use smaller test sets for quick feedback
+
+4. **Maintenance**:
+   - Update evals when tool behavior changes
+   - Keep mock data realistic and current
+   - Document any special requirements
 
 ## Test Data Management
 

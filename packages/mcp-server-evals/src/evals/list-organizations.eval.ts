@@ -1,5 +1,5 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, FIXTURES, TaskRunner } from "./utils";
+import { Factuality, FIXTURES, TaskRunner, ToolUsage } from "./utils";
 
 describeEval("list-organizations", {
   data: async () => {
@@ -11,7 +11,7 @@ describeEval("list-organizations", {
     ];
   },
   task: TaskRunner(),
-  scorers: [Factuality()],
+  scorers: [ToolUsage("find_organizations"), Factuality()],
   threshold: 0.6,
   timeout: 30000,
 });

@@ -1,0 +1,642 @@
+import { z } from "zod";
+import { setTag } from "@sentry/core";
+import { defineTool } from "./utils/defineTool";
+import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
+import type { ServerContext } from "../types";
+import type { SentryApiService } from "../api-client";
+import {
+  ParamOrganizationSlug,
+  ParamRegionUrl,
+  ParamProjectSlug,
+} from "../schema";
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
+import { logError } from "../logging";
+
+// Type for flexible event data that can contain any fields
+type FlexibleEventData = Record<string, unknown>;
+
+// Helper to safely get a string value from event data
+function getStringValue(
+  event: FlexibleEventData,
+  key: string,
+  defaultValue = "",
+): string {
+  const value = event[key];
+  return typeof value === "string" ? value : defaultValue;
+}
+
+// Helper to safely get a number value from event data
+function getNumberValue(
+  event: FlexibleEventData,
+  key: string,
+): number | undefined {
+  const value = event[key];
+  return typeof value === "number" ? value : undefined;
+}
+
+// Helper function to fetch custom attributes for a dataset
+async function fetchCustomAttributes(
+  apiService: SentryApiService,
+  organizationSlug: string,
+  dataset: "errors" | "logs" | "spans",
+): Promise<Record<string, string>> {
+  const customAttributes: Record<string, string> = {};
+
+  try {
+    if (dataset === "errors") {
+      // TODO: For errors dataset, we currently need to use the old listTags API
+      // This will be updated in the future to use the new trace-items attributes API
+      const tagsResponse = await apiService.listTags({
+        organizationSlug,
+      });
+
+      for (const tag of tagsResponse) {
+        if (tag.key && !tag.key.startsWith("sentry:")) {
+          customAttributes[tag.key] = tag.name || tag.key;
+        }
+      }
+    } else {
+      // For logs and spans datasets, use the trace-items attributes endpoint
+      const itemType = dataset === "logs" ? "logs" : "span";
+      const attributesResponse = await apiService.listTraceItemAttributes({
+        organizationSlug,
+        itemType,
+      });
+
+      for (const attr of attributesResponse) {
+        if (attr.key) {
+          customAttributes[attr.key] = attr.name || attr.key;
+        }
+      }
+    }
+  } catch (error) {
+    // If we can't get custom attributes, continue with just common fields
+    logError(error, {
+      search_events: {
+        dataset,
+        organizationSlug,
+        operation:
+          dataset === "errors" ? "listTags" : "listTraceItemAttributes",
+        ...(dataset !== "errors" && {
+          itemType: dataset === "logs" ? "logs" : "span",
+        }),
+      },
+    });
+  }
+
+  return customAttributes;
+}
+
+// Base fields common to all datasets
+const BASE_COMMON_FIELDS = {
+  project: "Project slug",
+  timestamp: "When the event occurred",
+  environment: "Environment (production, staging, development)",
+  release: "Release version",
+  platform: "Platform (javascript, python, etc.)",
+  "user.id": "User ID",
+  "user.email": "User email",
+  "sdk.name": "SDK name",
+  "sdk.version": "SDK version",
+};
+
+// Dataset-specific field definitions
+const DATASET_FIELDS = {
+  spans: {
+    // Span-specific fields
+    "span.op": "Span operation type (e.g., http.client, db.query, cache.get)",
+    "span.description": "Detailed description of the span operation",
+    "span.duration": "Duration of the span in milliseconds",
+    "span.status": "Span status (ok, cancelled, unknown, etc.)",
+    "span.self_time": "Time spent in this span excluding child spans",
+
+    // Transaction fields
+    transaction: "Transaction name/route",
+    "transaction.duration": "Total transaction duration in milliseconds",
+    "transaction.op": "Transaction operation type",
+    "transaction.status": "Transaction status",
+    is_transaction: "Whether this span is a transaction (true/false)",
+
+    // Trace fields
+    trace: "Trace ID",
+    "trace.span_id": "Span ID within the trace",
+    "trace.parent_span_id": "Parent span ID",
+
+    // HTTP fields
+    "http.method": "HTTP method (GET, POST, etc.)",
+    "http.status_code": "HTTP response status code",
+    "http.url": "Full HTTP URL",
+
+    // Database fields
+    "db.system": "Database system (postgresql, mysql, etc.)",
+    "db.operation": "Database operation (SELECT, INSERT, etc.)",
+  },
+  errors: {
+    // Error-specific fields
+    message: "Error message",
+    level: "Error level (error, warning, info, debug)",
+    "error.type": "Error type/exception class",
+    "error.value": "Error value/description",
+    "error.handled": "Whether the error was handled (true/false)",
+    culprit: "Code location that caused the error",
+    title: "Error title/grouping",
+
+    // Stack trace fields
+    "stack.filename": "File where error occurred",
+    "stack.function": "Function where error occurred",
+    "stack.module": "Module where error occurred",
+    "stack.abs_path": "Absolute path to file",
+
+    // Additional context fields
+    "os.name": "Operating system name",
+    "browser.name": "Browser name",
+    "device.family": "Device family",
+  },
+  logs: {
+    // Log-specific fields
+    message: "Log message",
+    severity: "Log severity level",
+    severity_number: "Numeric severity level",
+    "sentry.item_id": "Sentry item ID",
+    "sentry.observed_timestamp_nanos": "Observed timestamp in nanoseconds",
+
+    // Trace context
+    trace: "Trace ID",
+  },
+};
+
+// Dataset-specific rules and examples
+const DATASET_CONFIGS = {
+  errors: {
+    rules: `- For errors, focus on: message, level, error.type, error.handled
+- Use level field for severity (error, warning, info, debug)
+- Use error.handled:false for unhandled exceptions/crashes
+- For filename searches: Use stack.filename for suffix-based search (e.g., stack.filename:"**/index.js" or stack.filename:"**/components/Button.tsx")
+- When searching for errors in specific files, prefer including the parent folder to avoid ambiguity (e.g., stack.filename:"**/components/index.js" instead of just stack.filename:"**/index.js")`,
+    examples: `- "null pointer exceptions" → error.type:"NullPointerException" OR message:"*null pointer*"
+- "unhandled errors in production" → error.handled:false AND environment:production
+- "database connection errors" → message:"*database*" AND message:"*connection*" AND level:error
+- "authentication failures" → message:"*auth*" AND (message:"*failed*" OR message:"*denied*")
+- "timeout errors in the last hour" → message:"*timeout*" AND level:error AND timestamp:-1h
+- "production errors from last 24 hours" → level:error AND environment:production AND timestamp:-24h
+- "errors in Button.tsx file" → stack.filename:"**/Button.tsx"
+- "errors in any index.js file in components folder" → stack.filename:"**/components/index.js"`,
+  },
+  logs: {
+    rules: `- For logs, focus on: message, severity, severity_number
+- Use severity field for log levels (fatal, error, warning, info, debug, trace)
+- severity_number is numeric (21=fatal, 17=error, 13=warning, 9=info, 5=debug, 1=trace)
+- IMPORTANT: For time-based filtering in logs, do NOT use timestamp filters in the query
+- Instead, time filtering for logs is handled by the statsPeriod parameter (not part of the query string)
+- Keep your query focused on message content, severity levels, and other attributes only
+- When user asks for "error logs", interpret this as logs with severity:error`,
+    examples: `- "warning logs about memory" → severity:warning AND message:"*memory*"
+- "error logs from database" → severity:error AND message:"*database*"
+- "debug logs" → severity:debug
+- "critical system alerts" → severity_number:>=17
+- "recent logs" → (no timestamp filter needed - time range handled separately)
+- "logs from last hour" → (no timestamp filter needed - time range handled separately)
+- "API error logs" → severity:error AND message:"*API*"
+- "error logs from the last hour" → severity:error
+- "show me error logs" → severity:error`,
+  },
+  spans: {
+    rules: `- For traces/spans, focus on: span.op, span.description, span.duration, transaction
+- Use is_transaction:true for transaction spans only
+- Use span.duration for performance queries (value is in milliseconds)`,
+    examples: `- "database queries" → span.op:db OR span.op:db.query
+- "slow API calls over 5 seconds" → span.duration:>5000 AND span.op:http*
+- "checkout flow traces" → transaction:"*checkout*" OR span.description:"*checkout*"
+- "redis timeout errors" → span.op:cache.get* AND span.description:"*timeout*"
+- "http requests to external APIs" → span.op:http.client
+- "slow database queries in the last hour" → span.op:db.query AND span.duration:>1000 AND timestamp:-1h
+- "recent failed transactions" → is_transaction:true AND span.status:internal_error AND timestamp:-30m`,
+  },
+};
+
+// Base system prompt template
+const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. Convert natural language queries to Sentry's search syntax for the {dataset} dataset.
+
+Available fields to search:
+{fields}
+
+Query syntax rules:
+- Use field:value for exact matches
+- Use field:>value or field:<value for numeric comparisons
+- Use AND, OR, NOT for boolean logic
+- Use quotes for phrases with spaces
+- Use wildcards (*) for partial matches
+- For timestamp filters:
+  - Spans/Errors datasets: Use timestamp:-1h format (e.g., timestamp:-1h for last hour, timestamp:-24h for last day)  
+  - Logs dataset: Do NOT include timestamp filters in query - time filtering handled separately
+  - Absolute times: Use comparison operators with ISO dates (e.g., timestamp:<=2025-07-11T04:52:50.511Z)
+- IMPORTANT: For relative durations, use format WITHOUT operators (timestamp:-1h NOT timestamp:>-1h)
+{datasetRules}
+
+Examples:
+{datasetExamples}
+
+Important:
+- Do NOT include project: filters in your query (project filtering is handled separately)
+- For spans/errors: When user mentions time periods like "last hour" or "past day", include timestamp:-1h or timestamp:-24h in the query
+- For logs: When user mentions time periods, do NOT include any timestamp filters in the query - time filtering is handled automatically
+- Return ONLY the Sentry query string, no explanation`;
+
+export default defineTool({
+  name: "search_events",
+  description: [
+    "Search for individual error events, log entries, or trace spans using natural language queries.",
+    "",
+    "🔍 USE THIS TOOL WHEN USERS ASK FOR:",
+    "- 'error logs', 'log entries', 'show me logs'",
+    "- 'find errors that occurred', 'error events from last hour'",
+    "- 'database timeout errors', 'specific error occurrences'",
+    "- 'slow queries', 'API calls taking over X seconds'",
+    "- Any query about INDIVIDUAL events/occurrences with time/performance filters",
+    "",
+    "❌ DO NOT USE for 'issues', 'problems', or when users want grouped summaries",
+    "",
+    "CRITICAL DISTINCTION:",
+    "- Events = Individual occurrences (use search_events)",
+    "- Issues = Grouped problems (use find_issues)",
+    "",
+    "Dataset Selection:",
+    "- Users say 'error logs' → dataset='logs' (log entries with error severity)",
+    "- Users say 'exceptions'/'crashes' → dataset='errors' (error events)",
+    "- Users say 'slow queries'/'performance' → dataset='spans' (trace data)",
+    "",
+    "<examples>",
+    "### Error logs from last hour",
+    "```",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='error logs from last hour', dataset='logs')",
+    "```",
+    "",
+    "### Database connection errors",
+    "```",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='database connection errors', dataset='errors')",
+    "```",
+    "",
+    "### Slow database queries",
+    "```",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='slow database queries over 100ms', dataset='spans')",
+    "```",
+    "</examples>",
+    "",
+    "<hints>",
+    "- Be specific for better results",
+    "- Can mention time ranges, error types, performance thresholds",
+    "- CRITICAL: 'error logs' means dataset='logs' NOT dataset='errors'",
+    "</hints>",
+  ].join("\n"),
+  inputSchema: {
+    organizationSlug: ParamOrganizationSlug,
+    naturalLanguageQuery: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("Natural language description of what you want to search for"),
+    dataset: z
+      .enum(["spans", "errors", "logs"])
+      .optional()
+      .default("errors")
+      .describe(
+        "The dataset to search in (errors for exceptions, spans for traces/performance, logs for log data)",
+      ),
+    projectSlug: ParamProjectSlug.optional(),
+    regionUrl: ParamRegionUrl.optional(),
+    limit: z
+      .number()
+      .min(1)
+      .max(100)
+      .optional()
+      .default(10)
+      .describe("Maximum number of results to return"),
+    includeExplanation: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe("Include explanation of how the query was translated"),
+  },
+  async handler(params, context: ServerContext) {
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl,
+    });
+    const organizationSlug = params.organizationSlug;
+
+    setTag("organization.slug", organizationSlug);
+    if (params.projectSlug) setTag("project.slug", params.projectSlug);
+
+    // Use errors dataset by default if not specified
+    const dataset = params.dataset || "errors";
+
+    // Get the dataset-specific fields
+    const datasetSpecificFields = DATASET_FIELDS[dataset];
+
+    // Fetch custom attributes based on dataset
+    const customAttributes = await fetchCustomAttributes(
+      apiService,
+      organizationSlug,
+      dataset,
+    );
+
+    // Combine base fields, dataset-specific fields, and custom attributes
+    const allFields = {
+      ...BASE_COMMON_FIELDS,
+      ...datasetSpecificFields,
+      ...customAttributes,
+    };
+
+    // Get dataset configuration
+    const datasetConfig = DATASET_CONFIGS[dataset] || DATASET_CONFIGS.spans;
+
+    // Build the system prompt
+    const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace("{dataset}", dataset)
+      .replace(
+        "{fields}",
+        Object.entries(allFields)
+          .map(([key, desc]) => `- ${key}: ${desc}`)
+          .join("\n"),
+      )
+      .replace("{datasetRules}", datasetConfig.rules)
+      .replace("{datasetExamples}", datasetConfig.examples);
+
+    // Check if OpenAI API key is available
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error(
+        "OPENAI_API_KEY environment variable is required for semantic search",
+      );
+    }
+
+    // Use the AI SDK to translate the query
+    const { text: sentryQuery } = await generateText({
+      model: openai("gpt-4o"),
+      system: systemPrompt,
+      prompt: params.naturalLanguageQuery,
+      temperature: 0.1, // Low temperature for more consistent translations
+    });
+
+    // Convert project slug to ID if needed
+    let projectId: string | undefined;
+    if (params.projectSlug) {
+      // The events endpoint requires numeric project IDs, not slugs
+      // Fetch the project to get its ID
+      const projects = await apiService.listProjects(organizationSlug);
+      const project = projects.find((p) => p.slug === params.projectSlug);
+      if (!project) {
+        throw new Error(
+          `Project '${params.projectSlug}' not found in organization '${organizationSlug}'`,
+        );
+      }
+      // Convert to string to ensure consistent type
+      projectId = String(project.id);
+    }
+
+    // Select fields based on dataset - these are the fields we want to retrieve from the API
+    const DATASET_API_FIELDS = {
+      errors: [
+        "issue",
+        "title",
+        "project",
+        "last_seen()",
+        "count()",
+        "level",
+        "culprit",
+      ],
+      logs: [
+        "timestamp",
+        "project",
+        "message",
+        "severity",
+        "trace",
+        "sentry.item_id",
+      ],
+      spans: [
+        "id",
+        "span.op",
+        "span.description",
+        "span.duration",
+        "transaction",
+        "timestamp",
+        "project",
+        "trace",
+        "transaction.span_id",
+      ],
+    };
+
+    const fields = DATASET_API_FIELDS[dataset];
+
+    // Determine the appropriate sort parameter based on dataset
+    const sortParam =
+      dataset === "errors"
+        ? "-last_seen"
+        : dataset === "spans"
+          ? "-span.duration"
+          : "-timestamp";
+
+    const eventsResponse = await withApiErrorHandling(
+      () =>
+        apiService.searchEvents({
+          organizationSlug,
+          query: sentryQuery,
+          fields,
+          limit: params.limit,
+          projectSlug: projectId, // API requires numeric project ID, not slug
+          dataset: dataset === "logs" ? "ourlogs" : dataset,
+          sort: sortParam,
+          // For logs and errors, use a default time window
+          ...(dataset !== "spans" && { statsPeriod: "24h" }),
+        }),
+      {
+        organizationSlug,
+        projectSlug: params.projectSlug,
+      },
+    );
+
+    // Generate the Sentry explorer URL
+    const explorerUrl = apiService.getEventsExplorerUrl(
+      organizationSlug,
+      sentryQuery,
+      projectId, // Pass the numeric project ID for URL generation
+      dataset, // dataset is already correct for URL generation (logs, spans, errors)
+    );
+
+    // Format the output with prominent rendering instructions
+    let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+
+    // Add clear rendering directive at the top
+    if (dataset === "logs") {
+      output += `⚠️ **IMPORTANT**: Display these logs in console format with monospace font, color-coded severity (🔴 ERROR, 🟡 WARN, 🔵 INFO), and preserve timestamps.\n\n`;
+    } else if (dataset === "errors") {
+      output += `⚠️ **IMPORTANT**: Display these errors as highlighted alert cards with color-coded severity levels and clickable Event IDs.\n\n`;
+    } else {
+      output += `⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.\n\n`;
+    }
+
+    if (params.includeExplanation) {
+      output += `## Query Translation\n`;
+      output += `Natural language: "${params.naturalLanguageQuery}"\n`;
+      output += `Sentry query: \`${sentryQuery}\`\n\n`;
+    }
+
+    output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
+    output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+
+    // Type-safe access to event data
+    // Since searchEvents returns unknown, we need to safely access the data property
+    const responseData = eventsResponse as { data?: unknown[] };
+    const eventData = (responseData.data || []) as FlexibleEventData[];
+
+    if (eventData.length === 0) {
+      output += `No results found.\n\n`;
+      output += `Try being more specific or using different terms in your search.\n`;
+      return output;
+    }
+
+    if (dataset === "errors") {
+      output += `Found ${eventData.length} error${eventData.length === 1 ? "" : "s"}:\n\n`;
+
+      for (const event of eventData) {
+        const title = getStringValue(event, "title", "Unknown Error");
+        const issue = getStringValue(event, "issue");
+        const project = getStringValue(event, "project", "N/A");
+        const lastSeen = getStringValue(event, "last_seen()", "N/A");
+        const level = getStringValue(event, "level");
+        const culprit = getStringValue(event, "culprit");
+        const count = getNumberValue(event, "count()");
+
+        output += `## ${title}\n\n`;
+        output += `**Issue ID**: ${issue}\n`;
+        output += `**Project**: ${project}\n`;
+        if (level) {
+          output += `**Level**: ${level}\n`;
+        }
+        if (culprit) {
+          output += `**Location**: ${culprit}\n`;
+        }
+        output += `**Last seen**: ${lastSeen}\n`;
+        if (count !== undefined) {
+          output += `**Occurrences**: ${count}\n`;
+        }
+        if (issue) {
+          output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue)}\n`;
+        }
+        output += "\n";
+      }
+
+      output += "## Next Steps\n\n";
+      output += "- Get more details about a specific error: Use the Issue ID\n";
+      output += "- View error groups: Navigate to the Issues page in Sentry\n";
+      output +=
+        "- Set up alerts: Configure alert rules for these error patterns\n";
+    } else if (dataset === "logs") {
+      output += `Found ${eventData.length} log${eventData.length === 1 ? "" : "s"}:\n\n`;
+
+      output += "```console\n";
+
+      for (const event of eventData) {
+        const timestamp = getStringValue(event, "timestamp", "N/A");
+        const severity = getStringValue(event, "severity", "info");
+        const message = getStringValue(event, "message", "No message");
+
+        // Safely uppercase the severity
+        const severityUpper = severity.toUpperCase();
+
+        // Get severity emoji with proper typing
+        const severityEmojis: Record<string, string> = {
+          ERROR: "🔴",
+          FATAL: "🔴",
+          WARN: "🟡",
+          WARNING: "🟡",
+          INFO: "🔵",
+          DEBUG: "⚫",
+          TRACE: "⚫",
+        };
+        const severityEmoji = severityEmojis[severityUpper] || "🔵";
+
+        // Standard log format with emoji and proper spacing
+        output += `${timestamp} ${severityEmoji} [${severityUpper.padEnd(5)}] ${message}\n`;
+      }
+
+      output += "```\n\n";
+
+      // Add detailed metadata for each log entry
+      output += "## Log Details\n\n";
+
+      for (let i = 0; i < eventData.length; i++) {
+        const event = eventData[i];
+        const severity = getStringValue(event, "severity", "info");
+        const severityNum = getNumberValue(event, "severity_number");
+        const message = getStringValue(event, "message", "No message");
+        const timestamp = getStringValue(event, "timestamp", "N/A");
+        const projectId =
+          getStringValue(event, "project.id") ||
+          getStringValue(event, "project", "N/A");
+        const trace = getStringValue(event, "trace");
+        const itemId = getStringValue(event, "sentry.item_id");
+
+        output += `### Log ${i + 1}\n`;
+        output += `- **Message**: ${message}\n`;
+        output += `- **Severity**: ${severity}${severityNum ? ` (level ${severityNum})` : ""}\n`;
+        output += `- **Timestamp**: ${timestamp}\n`;
+        output += `- **Project**: ${projectId}\n`;
+
+        if (trace) {
+          output += `- **Trace ID**: ${trace}\n`;
+          output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
+        }
+
+        if (itemId) {
+          output += `- **Item ID**: ${itemId}\n`;
+        }
+
+        output += "\n";
+      }
+
+      output += "## Next Steps\n\n";
+      output += "- View related traces: Click on the Trace URL if available\n";
+      output +=
+        "- Filter by severity: Adjust your query to focus on specific log levels\n";
+      output += "- Export logs: Use the Sentry web interface for bulk export\n";
+    } else {
+      // Spans dataset
+      output += `Found ${eventData.length} trace${eventData.length === 1 ? "" : "s"}/span${eventData.length === 1 ? "" : "s"}:\n\n`;
+
+      for (const event of eventData) {
+        const spanOp = getStringValue(event, "span.op", "unknown");
+        const spanDescription =
+          getStringValue(event, "span.description") ||
+          getStringValue(event, "transaction") ||
+          "Unknown";
+        const duration = getNumberValue(event, "span.duration");
+        const transaction = getStringValue(event, "transaction", "N/A");
+        const trace = getStringValue(event, "trace");
+        const project = getStringValue(event, "project", "N/A");
+        const timestamp = getStringValue(event, "timestamp", "N/A");
+
+        output += `## ${spanDescription}\n\n`;
+        output += `**Operation**: ${spanOp}\n`;
+        output += `**Transaction**: ${transaction}\n`;
+        if (trace) {
+          output += `**Trace ID**: ${trace}\n`;
+          output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
+        }
+        output += `**Project**: ${project}\n`;
+        if (duration !== undefined) {
+          output += `**Duration**: ${duration}ms\n`;
+        }
+        output += `**Timestamp**: ${timestamp}\n`;
+        output += "\n";
+      }
+
+      output += "## Next Steps\n\n";
+      output += "- View the full trace: Click on the Trace URL above\n";
+      output +=
+        "- Search for related spans: Modify your query to be more specific\n";
+      output +=
+        "- Export data: Use the Sentry web interface for advanced analysis\n";
+    }
+
+    return output;
+  },
+});

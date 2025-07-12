@@ -30,6 +30,7 @@ catalog:
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
   commander: ^14.0.0
+  date-fns: ^3.6.0
   dotenv: ^16.6.1
   dotenv-cli: ^8.0.0
   hono: ^4.8.3
