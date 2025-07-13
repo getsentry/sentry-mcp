@@ -6,7 +6,7 @@ describeEval("create-dsn", {
     return [
       {
         input: `Create a new DSN named "Production" for '${FIXTURES.organizationSlug}/${FIXTURES.projectSlug}'`,
-        expectedTools: [
+        expected: [
           {
             name: "create_dsn",
             arguments: {

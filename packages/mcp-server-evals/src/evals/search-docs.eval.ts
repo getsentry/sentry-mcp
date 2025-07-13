@@ -7,7 +7,7 @@ describeEval("search-docs", {
       {
         input:
           "I need documentation on how to set up error tracking with Sentry in JavaScript",
-        expectedTools: [
+        expected: [
           {
             name: "search_docs",
             arguments: {
@@ -20,7 +20,7 @@ describeEval("search-docs", {
       {
         input:
           "I need help configuring Sentry with React components and error boundaries",
-        expectedTools: [
+        expected: [
           {
             name: "search_docs",
             arguments: {
@@ -32,7 +32,7 @@ describeEval("search-docs", {
       },
       {
         input: "What is Sentry's rate limiting and how does it work?",
-        expectedTools: [
+        expected: [
           {
             name: "search_docs",
             arguments: {

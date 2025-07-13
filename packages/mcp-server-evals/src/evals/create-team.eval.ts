@@ -6,7 +6,7 @@ describeEval("create-team", {
     return [
       {
         input: `Create a new team in Sentry for '${FIXTURES.organizationSlug}' called 'the-goats' response with **only** the team slug and no other text.`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},

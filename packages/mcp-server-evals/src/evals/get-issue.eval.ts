@@ -6,7 +6,7 @@ describeEval("get-issue", {
     return [
       {
         input: `Explain CLOUDFLARE-MCP-41 from Sentry in ${FIXTURES.organizationSlug}.`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},
@@ -23,7 +23,7 @@ describeEval("get-issue", {
       },
       {
         input: `Explain the event with ID 7ca573c0f4814912aaa9bdc77d1a7d51 from Sentry in ${FIXTURES.organizationSlug}.`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},

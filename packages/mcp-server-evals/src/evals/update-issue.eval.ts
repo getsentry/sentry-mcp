@@ -7,7 +7,7 @@ describeEval("update-issue", {
       // Core use case: Resolve an issue
       {
         input: `Resolve the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug}. Output only the new status as a single word.`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},
@@ -26,7 +26,7 @@ describeEval("update-issue", {
       // Core use case: Assign an issue
       {
         input: `Assign the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug} to 'john.doe'. Output only the assigned username.`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},
@@ -45,7 +45,7 @@ describeEval("update-issue", {
       // Core use case: Using issue URL (alternative input method)
       {
         input: `Resolve the issue at ${FIXTURES.issueUrl}. Output only the new status as a single word.`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},

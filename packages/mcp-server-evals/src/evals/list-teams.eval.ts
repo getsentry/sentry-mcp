@@ -6,7 +6,7 @@ describeEval("list-teams", {
     return [
       {
         input: `What teams do I have access to in Sentry for '${FIXTURES.organizationSlug}'`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},
@@ -22,7 +22,7 @@ describeEval("list-teams", {
       },
       {
         input: `Do I have access to the team '${FIXTURES.teamSlug}' for '${FIXTURES.organizationSlug}'`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},
@@ -38,7 +38,7 @@ describeEval("list-teams", {
       },
       {
         input: `Do I have access to the team 'an-imaginary-team' for '${FIXTURES.organizationSlug}'`,
-        expectedTools: [
+        expected: [
           {
             name: "find_organizations",
             arguments: {},

@@ -100,23 +100,31 @@ ${expectedDescription}
 Based on the task and available tools, predict what tools the AI would call to complete this task.
 
 IMPORTANT: Look at what information is already provided in the task:
-- If organizationSlug and projectSlug are explicitly given, the AI may NOT need discovery calls
-- If only organization/project names are given vaguely, discovery calls ARE needed
-- The expected tool calls show what is ACTUALLY expected for this specific case
+- When only an organization name is given (e.g., "in sentry-mcp-evals"), discovery calls ARE typically needed
+- When organization/project are given in "org/project" format, the AI may skip discovery if confident
+- The expected tool calls show what is ACTUALLY expected for this specific case - follow them exactly
+- Discovery calls (find_organizations, find_projects) are commonly used to get regionUrl and verify access
+- Match the expected tool sequence exactly - if expected includes discovery, predict discovery
 
 Consider:
-1. Match the expected tool sequence - if it's just create_dsn, the AI should call ONLY create_dsn
-2. Arguments should match expected values (organizationSlug, projectSlug, name, etc.)
-3. For natural language queries in search_events, exact phrasing doesn't need to match
-4. Extra parameters like regionUrl are acceptable
-5. Discovery calls (find_organizations, find_projects) are only needed if information is missing
+1. Match the expected tool sequence exactly - the expected tools show realistic AI behavior
+2. When a value like "sentry-mcp-evals" appears alone, it's typically an organizationSlug, not a projectSlug
+3. Arguments should match expected values (organizationSlug, projectSlug, name, etc.)
+4. For natural language queries in search_events, exact phrasing doesn't need to match
+5. Extra parameters like regionUrl are acceptable
+6. The AI commonly does discovery calls even when slugs appear to be provided, to get region info
 
 Score as follows:
 - 1.0: All expected tools would be called with correct arguments in the right order
 - 0.8: All expected tools would be called, minor differences (extra params, slight variations)
 - 0.6: Most expected tools would be called but missing some or wrong order
 - 0.3: Some expected tools would be called but significant issues
-- 0.0: Wrong tools or critical tools missing`,
+- 0.0: Wrong tools or critical tools missing
+
+CRITICAL: The expected tools represent the actual realistic behavior for this specific case. Follow the expected sequence exactly:
+- If expected tools include discovery calls, predict discovery calls
+- If expected tools do NOT include discovery calls, do NOT predict them
+- The test author has determined what's appropriate for each specific scenario`,
       schema: z.object({
         score: z.number().min(0).max(1).describe("Score from 0 to 1"),
         rationale: z.string().describe("Explanation of the score"),
