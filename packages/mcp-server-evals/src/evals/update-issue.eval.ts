@@ -47,10 +47,6 @@ describeEval("update-issue", {
         input: `Resolve the issue at ${FIXTURES.issueUrl}. Output only the new status as a single word.`,
         expectedTools: [
           {
-            name: "find_organizations",
-            arguments: {},
-          },
-          {
             name: "update_issue",
             arguments: {
               issueUrl: FIXTURES.issueUrl,

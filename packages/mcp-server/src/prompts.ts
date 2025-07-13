@@ -29,7 +29,7 @@ export const PROMPT_HANDLERS = {
       "",
       "You should use the tool `search_events` with a natural language query to find errors in Sentry.",
       "",
-      "For example: `search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='errors in file ${filename}')`",
+      `For example: \`search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='errors in file ${filename}')\``,
       "",
       "If the filename is ambiguous, such as something like `index.ts`, and in most cases, you should include its direct parent.",
       "For example: if the file is `app/utils/index.ts`, you should search for `errors in file utils/index.ts` or `errors in file app/utils/index.ts` depending on if the file is actually part of the applications source path.",
