@@ -9,6 +9,7 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../schema";
+import { ProjectSchema } from "../api-client/schema";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { logError } from "../logging";
@@ -470,25 +471,6 @@ function buildSystemPrompt(
     .replace("{datasetExamples}", datasetConfig.examples);
 }
 
-/**
- * Convert project slug to numeric ID
- */
-async function getProjectId(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  projectSlug: string,
-): Promise<string> {
-  const projects = await apiService.listProjects(organizationSlug);
-  const project = projects.find((p) => p.slug === projectSlug);
-  if (!project) {
-    throw new Error(
-      `Project '${projectSlug}' not found in organization '${organizationSlug}'`,
-    );
-  }
-  // Convert to string to ensure consistent type
-  return String(project.id);
-}
-
 // Base system prompt template
 const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. Convert natural language queries to Sentry's search syntax for the {dataset} dataset.
 
@@ -642,11 +624,6 @@ export default defineTool({
       temperature: 0.1, // Low temperature for more consistent translations
     });
 
-    // Convert project slug to ID if needed
-    const projectId = params.projectSlug
-      ? await getProjectId(apiService, organizationSlug, params.projectSlug)
-      : undefined;
-
     // Select fields based on dataset - these are the fields we want to retrieve from the API
     const DATASET_API_FIELDS = {
       errors: [
@@ -688,6 +665,24 @@ export default defineTool({
         : dataset === "spans"
           ? "-span.duration"
           : "-timestamp";
+
+    // Convert project slug to ID if needed - the search API requires numeric IDs
+    let projectId: string | undefined;
+    if (params.projectSlug) {
+      // The project details endpoint accepts both slug and ID
+      // We fetch the single project to get its numeric ID for the search API
+      try {
+        const project = await apiService.getProject({
+          organizationSlug,
+          projectSlugOrId: params.projectSlug,
+        });
+        projectId = String(project.id);
+      } catch (error) {
+        throw new Error(
+          `Project '${params.projectSlug}' not found in organization '${organizationSlug}'`,
+        );
+      }
+    }
 
     const eventsResponse = await withApiErrorHandling(
       () =>

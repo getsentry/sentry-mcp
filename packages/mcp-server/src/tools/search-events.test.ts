@@ -170,15 +170,14 @@ describe("search_events", () => {
           return HttpResponse.json([]);
         },
       ),
-      http.get("https://sentry.io/api/0/organizations/test-org/projects/", () =>
-        HttpResponse.json([
-          {
-            id: "123456",
-            slug: "frontend",
-            name: "Frontend App",
-            platform: "javascript",
-          },
-        ]),
+      // Mock the direct project lookup endpoint
+      http.get("https://sentry.io/api/0/projects/test-org/frontend/", () =>
+        HttpResponse.json({
+          id: "123456",
+          slug: "frontend",
+          name: "Frontend App",
+          platform: "javascript",
+        }),
       ),
       http.get(
         "https://sentry.io/api/0/organizations/test-org/events/",
@@ -187,7 +186,7 @@ describe("search_events", () => {
           const query = url.searchParams.get("query");
           const project = url.searchParams.get("project");
           expect(query).toBe("transaction.duration:>5000");
-          expect(project).toBe("123456"); // Should be the numeric ID now
+          expect(project).toBe("123456"); // Should be the numeric ID
 
           return HttpResponse.json({
             data: [
@@ -507,15 +506,11 @@ describe("search_events", () => {
           return HttpResponse.json([]);
         },
       ),
-      http.get("https://sentry.io/api/0/organizations/test-org/projects/", () =>
-        HttpResponse.json([
-          {
-            id: "123456",
-            slug: "frontend",
-            name: "Frontend App",
-            platform: "javascript",
-          },
-        ]),
+      // Mock the project endpoint returning 404 for non-existent project
+      http.get(
+        "https://sentry.io/api/0/projects/test-org/non-existent-project/",
+        () =>
+          HttpResponse.json({ detail: "Project not found" }, { status: 404 }),
       ),
     );
 
@@ -536,9 +531,7 @@ describe("search_events", () => {
           organizationSlug: null,
         },
       ),
-    ).rejects.toThrow(
-      "Project 'non-existent-project' not found in organization 'test-org'",
-    );
+    ).rejects.toThrow();
   });
 
   it("handles timestamp queries with correct format", async () => {

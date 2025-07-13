@@ -638,6 +638,33 @@ export class SentryApiService {
   }
 
   /**
+   * Gets a single project by slug or ID.
+   *
+   * @param params Project fetch parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlugOrId Project slug or numeric ID
+   * @param opts Request options
+   * @returns Project data
+   */
+  async getProject(
+    {
+      organizationSlug,
+      projectSlugOrId,
+    }: {
+      organizationSlug: string;
+      projectSlugOrId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Project> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlugOrId}/`,
+      undefined,
+      opts,
+    );
+    return ProjectSchema.parse(body);
+  }
+
+  /**
    * Creates a new project within a team.
    *
    * @param params Project creation parameters
