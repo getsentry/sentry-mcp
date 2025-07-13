@@ -6,7 +6,7 @@ import type { ServerContext } from "../types";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
-  ParamProjectSlugOrAll,
+  ParamProjectId,
   ParamTransaction,
   ParamQuery,
 } from "../schema";
@@ -35,15 +35,15 @@ export default defineTool({
     "</examples>",
     "",
     "<hints>",
-    "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
-    "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `find_organizations()` first.",
+    "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectId>.",
+    "- If only one parameter is provided, and it could be either `organizationSlug` or `projectId`, its probably `organizationSlug`, but if you're really uncertain you might want to call `find_organizations()` first.",
     "- You can use the `find_tags()` tool to see what user-defined tags are available.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.optional(),
-    projectSlug: ParamProjectSlugOrAll.optional(),
+    projectId: ParamProjectId.optional(),
     transaction: ParamTransaction.optional(),
     query: ParamQuery.optional(),
     sortBy: z
@@ -61,16 +61,18 @@ export default defineTool({
     const organizationSlug = params.organizationSlug;
 
     setTag("organization.slug", organizationSlug);
-    if (params.projectSlug) setTag("project.slug", params.projectSlug);
+    if (params.projectId) setTag("project.id", params.projectId);
 
     const eventList = await apiService.searchSpans({
       organizationSlug,
-      projectSlug: params.projectSlug,
+      projectId: params.projectId,
       transaction: params.transaction,
       query: params.query,
       sortBy: params.sortBy as "timestamp" | "duration" | undefined,
     });
-    let output = `# Transactions in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
+    let output = `# Transactions in **${organizationSlug}${
+      params.projectId ? `/${params.projectId}` : ""
+    }**\n\n`;
     if (params.query)
       output += `These spans match the query \`${params.query}\`\n`;
     if (params.transaction)
@@ -90,7 +92,10 @@ export default defineTool({
       output += `**Duration**: ${eventSummary["span.duration"]}\n`;
       output += `**Timestamp**: ${eventSummary.timestamp}\n`;
       output += `**Project**: ${eventSummary.project}\n`;
-      output += `**URL**: ${apiService.getTraceUrl(organizationSlug, eventSummary.trace)}\n\n`;
+      output += `**URL**: ${apiService.getTraceUrl(
+        organizationSlug,
+        eventSummary.trace,
+      )}\n\n`;
     }
     return output;
   },

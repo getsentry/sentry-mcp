@@ -40,6 +40,13 @@ export const ParamProjectSlugOrAll = z
     "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
   );
 
+export const ParamProjectId = z
+  .string()
+  .trim()
+  .describe(
+    "The project's numeric ID (as a string). This is different from the project slug - it's a numeric identifier used by Sentry's search API.",
+  );
+
 export const ParamIssueShortId = z
   .string()
   .toUpperCase()

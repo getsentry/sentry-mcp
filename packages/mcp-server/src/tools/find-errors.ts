@@ -6,7 +6,7 @@ import type { ServerContext } from "../types";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
-  ParamProjectSlugOrAll,
+  ParamProjectId,
   ParamTransaction,
   ParamQuery,
 } from "../schema";
@@ -33,14 +33,14 @@ export default defineTool({
     "### Find recent crashes from the 'peated' project",
     "",
     "```",
-    "find_errors(organizationSlug='my-organization', query='is:unresolved error.handled:false', projectSlug='peated', sortBy='last_seen')",
+    "find_errors(organizationSlug='my-organization', query='is:unresolved error.handled:false', projectId='4505138086019073', sortBy='last_seen')",
     "```",
     "",
     "</examples>",
     "",
     "<hints>",
-    "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.",
-    "- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you should call `find_organizations()` first.",
+    "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectId>.",
+    "- If only one parameter is provided, and it could be either `organizationSlug` or `projectId`, its probably `organizationSlug`, but if you're really uncertain you should call `find_organizations()` first.",
     "- If you are looking for issues, in a way that you might be looking for something like 'unresolved errors', you should use the `find_issues()` tool",
     "- You can use the `find_tags()` tool to see what user-defined tags are available.",
     "</hints>",
@@ -48,7 +48,7 @@ export default defineTool({
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.optional(),
-    projectSlug: ParamProjectSlugOrAll.optional(),
+    projectId: ParamProjectId.optional(),
     filename: z
       .string()
       .trim()
@@ -71,13 +71,13 @@ export default defineTool({
     const organizationSlug = params.organizationSlug;
 
     setTag("organization.slug", organizationSlug);
-    if (params.projectSlug) setTag("project.slug", params.projectSlug);
+    if (params.projectId) setTag("project.id", params.projectId);
 
     const eventList = await withApiErrorHandling(
       () =>
         apiService.searchErrors({
           organizationSlug,
-          projectSlug: params.projectSlug,
+          projectId: params.projectId,
           filename: params.filename,
           query: params.query,
           transaction: params.transaction,
@@ -85,10 +85,12 @@ export default defineTool({
         }),
       {
         organizationSlug,
-        projectSlug: params.projectSlug,
+        projectId: params.projectId,
       },
     );
-    let output = `# Errors in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
+    let output = `# Errors in **${organizationSlug}${
+      params.projectId ? `/${params.projectId}` : ""
+    }**\n\n`;
     if (params.query)
       output += `These errors match the query \`${params.query}\`\n`;
     if (params.filename)
@@ -103,7 +105,10 @@ export default defineTool({
       output += `## ${eventSummary.issue}\n\n`;
       output += `**Description**: ${eventSummary.title}\n`;
       output += `**Issue ID**: ${eventSummary.issue}\n`;
-      output += `**URL**: ${apiService.getIssueUrl(organizationSlug, eventSummary.issue)}\n`;
+      output += `**URL**: ${apiService.getIssueUrl(
+        organizationSlug,
+        eventSummary.issue,
+      )}\n`;
       output += `**Project**: ${eventSummary.project}\n`;
       output += `**Last Seen**: ${eventSummary["last_seen()"]}\n`;
       output += `**Occurrences**: ${eventSummary["count()"]}\n\n`;

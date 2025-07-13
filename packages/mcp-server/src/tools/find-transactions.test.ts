@@ -6,7 +6,7 @@ describe("find_transactions", () => {
     const result = await findTransactions.handler(
       {
         organizationSlug: "sentry-mcp-evals",
-        projectSlug: undefined,
+        projectId: undefined,
         transaction: undefined,
         query: undefined,
         sortBy: "duration",

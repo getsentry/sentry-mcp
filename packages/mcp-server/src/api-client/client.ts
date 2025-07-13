@@ -352,8 +352,9 @@ export class SentryApiService {
 
       // Generic non-JSON error
       throw new Error(
-        `Expected JSON response but received ${contentType || "unknown content type"} ` +
-          `(${response.status} ${response.statusText})`,
+        `Expected JSON response but received ${
+          contentType || "unknown content type"
+        } ` + `(${response.status} ${response.statusText})`,
       );
     }
 
@@ -361,7 +362,9 @@ export class SentryApiService {
       return await response.json();
     } catch (error) {
       throw new Error(
-        `Failed to parse JSON response: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to parse JSON response: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }
@@ -1112,14 +1115,14 @@ export class SentryApiService {
   async searchErrors(
     {
       organizationSlug,
-      projectSlug,
+      projectId,
       filename,
       transaction,
       query,
       sortBy = "last_seen",
     }: {
       organizationSlug: string;
-      projectSlug?: string;
+      projectId?: string;
       filename?: string;
       transaction?: string;
       query?: string;
@@ -1137,8 +1140,8 @@ export class SentryApiService {
     if (query) {
       sentryQuery.push(query);
     }
-    if (projectSlug) {
-      sentryQuery.push(`project:${projectSlug}`);
+    if (projectId) {
+      sentryQuery.push(`project:${projectId}`);
     }
 
     const queryParams = new URLSearchParams();
@@ -1169,13 +1172,13 @@ export class SentryApiService {
   async searchSpans(
     {
       organizationSlug,
-      projectSlug,
+      projectId,
       transaction,
       query,
       sortBy = "timestamp",
     }: {
       organizationSlug: string;
-      projectSlug?: string;
+      projectId?: string;
       transaction?: string;
       query?: string;
       sortBy?: "timestamp" | "duration";
@@ -1189,8 +1192,8 @@ export class SentryApiService {
     if (query) {
       sentryQuery.push(query);
     }
-    if (projectSlug) {
-      sentryQuery.push(`project:${projectSlug}`);
+    if (projectId) {
+      sentryQuery.push(`project:${projectId}`);
     }
 
     const queryParams = new URLSearchParams();

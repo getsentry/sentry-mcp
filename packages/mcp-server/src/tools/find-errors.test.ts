@@ -6,7 +6,7 @@ describe("find_errors", () => {
     const result = await findErrors.handler(
       {
         organizationSlug: "sentry-mcp-evals",
-        projectSlug: undefined,
+        projectId: undefined,
         filename: undefined,
         transaction: undefined,
         query: undefined,
