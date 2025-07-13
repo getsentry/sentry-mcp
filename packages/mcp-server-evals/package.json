@@ -11,7 +11,7 @@
     "build": "tsc -b",
     "dev": "tsc -w",
     "start": "tsx src/bin/start-mock-stdio.ts",
-    "eval": "vitest --config=vitest.config.ts",
+    "eval": "node ../../node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@22.16.0_jiti@2.4.2_lightningcss@1.30.1_msw_501df2efd9157bb15a75863018a31aa5/node_modules/vitest/vitest.mjs --config=vitest.config.ts",
     "eval:ci": "vitest run --coverage --reporter=vitest-evals/reporter --reporter=junit --outputFile=eval.junit.xml"
   },
   "dependencies": {

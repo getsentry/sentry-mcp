@@ -157,8 +157,8 @@ catalogs:
       specifier: ^3.2.4
       version: 3.2.4
     vitest-evals:
-      specifier: ^0.3.0
-      version: 0.3.0
+      specifier: ^0.4.0
+      version: 0.4.0
     workers-mcp:
       specifier: 0.1.0-3
       version: 0.1.0-3
@@ -214,7 +214,7 @@ importers:
         version: 3.2.4(@types/debug@4.1.12)(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
       vitest-evals:
         specifier: 'catalog:'
-        version: 0.3.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0))
+        version: 0.4.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0))
 
   packages/mcp-cloudflare:
     dependencies:
@@ -4460,8 +4460,8 @@ packages:
       yaml:
         optional: true
 
-  vitest-evals@0.3.0:
-    resolution: {integrity: sha512-pZm7+/n4htjgsSXW6aEsaD8tz+O8LxFbFYsjryzluVqkeN3S8RGug2vh913e8GrAJXIxDBkXUO5xcHmn0gzphg==}
+  vitest-evals@0.4.0:
+    resolution: {integrity: sha512-tvKIc8sCtK7LZnSTFLh5C7BlDzSZhefKzCR68QNShVa7gkiepg7CZH8j3T6ZBWwIa5VgfmFkZ1Iv5NKzUpSfGQ==}
     peerDependencies:
       tinyrainbow: '*'
       vitest: '*'
@@ -8939,7 +8939,7 @@ snapshots:
       tsx: 4.20.3
       yaml: 2.8.0
 
-  vitest-evals@0.3.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)):
+  vitest-evals@0.4.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)):
     dependencies:
       tinyrainbow: 2.0.0
       vitest: 3.2.4(@types/debug@4.1.12)(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)

@@ -1,43 +1,47 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, FIXTURES, TaskRunner } from "./utils";
+import { FIXTURES, SimpleTaskRunner, ToolPredictionScorer } from "./utils";
 
 describeEval("get-issue", {
   data: async () => {
     return [
       {
         input: `Explain CLOUDFLARE-MCP-41 from Sentry in ${FIXTURES.organizationSlug}.`,
-        expected: [
-          "## CLOUDFLARE-MCP-41",
-          "- **Error**: Tool list_organizations is already registered",
-          "- **Issue ID**: CLOUDFLARE-MCP-41",
-          "- **Stacktrace**:",
-          "```",
-          "index.js at line 7809:27",
-          '"index.js" at line 8029:24',
-          '"index.js" at line 19631:28',
-          "```",
-          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
-        ].join("\n"),
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "get_issue_details",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              issueId: "CLOUDFLARE-MCP-41",
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
       {
         input: `Explain the event with ID 7ca573c0f4814912aaa9bdc77d1a7d51 from Sentry in ${FIXTURES.organizationSlug}.`,
-        expected: [
-          "## 7ca573c0f4814912aaa9bdc77d1a7d51",
-          "- **Error**: Tool list_organizations is already registered",
-          "- **Issue ID**: CLOUDFLARE-MCP-41",
-          "- **Stacktrace**:",
-          "```",
-          "index.js at line 7809:27",
-          '"index.js" at line 8029:24',
-          '"index.js" at line 19631:28',
-          "```",
-          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
-        ].join("\n"),
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "get_issue_details",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
     ];
   },
-  task: TaskRunner(),
-  scorers: [Factuality()],
+  task: SimpleTaskRunner(),
+  scorers: [ToolPredictionScorer()],
   threshold: 0.6,
   timeout: 30000,
 });

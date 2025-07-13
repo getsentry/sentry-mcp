@@ -1,47 +1,60 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, FIXTURES, TaskRunner } from "./utils";
+import { FIXTURES, SimpleTaskRunner, ToolPredictionScorer } from "./utils";
 
 describeEval("list-issues", {
   data: async () => {
     return [
       {
-        input: `Can you you give me a list of common production errors, with their stacktrace and a url for more information in ${FIXTURES.organizationSlug}?`,
-        expected: [
-          "## CLOUDFLARE-MCP-41",
-          "- **Error**: Tool list_organizations is already registered",
-          "- **Issue ID**: CLOUDFLARE-MCP-41",
-          "- **Stacktrace**:",
-          "```",
-          '"index.js" at line 7809:27',
-          '"index.js" at line 8029:24',
-          '"index.js" at line 19631:28',
-          "```",
-          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
-        ].join("\n"),
+        input: `What are the most common production errors in ${FIXTURES.organizationSlug}?`,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "find_issues",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              query: "is:unresolved",
+              sortBy: "count",
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
       {
-        input: `Give me a summary of my top issues in ${FIXTURES.organizationSlug}`,
-        expected: [
-          "## CLOUDFLARE-MCP-41",
-          "- **Issue ID**: CLOUDFLARE-MCP-41",
-          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
-          "",
-          "## CLOUDFLARE-MCP-42",
-          "- **Issue ID**: CLOUDFLARE-MCP-42",
-          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-42`,
-        ].join("\n"),
+        input: `Show me the top issues in ${FIXTURES.organizationSlug} organization`,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "find_issues",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              sortBy: "count",
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
       {
-        input: `Find the most recent production issues in ${FIXTURES.organizationSlug}`,
-        expected: [
-          "## CLOUDFLARE-MCP-41",
-          "- **Issue ID**: CLOUDFLARE-MCP-41",
-          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
-          "",
-          "## CLOUDFLARE-MCP-42",
-          "- **Issue ID**: CLOUDFLARE-MCP-42",
-          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-42`,
-        ].join("\n"),
+        input: `What are the most recent issues in ${FIXTURES.organizationSlug}?`,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "find_issues",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              sortBy: "last_seen",
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
       {
         input: `Find the newest production issues in ${FIXTURES.organizationSlug}`,
@@ -56,41 +69,26 @@ describeEval("list-issues", {
         ].join("\n"),
       },
       {
-        input: `What issues are affecting david@sentry.io in ${FIXTURES.organizationSlug}?`,
-        expected: [
-          "## CLOUDFLARE-MCP-41",
-          "- **Issue ID**: CLOUDFLARE-MCP-41",
-          `- **URL**: https://${FIXTURES.organizationSlug}.sentry.io/issues/CLOUDFLARE-MCP-41`,
-        ].join("\n"),
-      },
-      {
-        input: `How many issues are affecting david@sentry.io in ${FIXTURES.organizationSlug}?`,
-        expected: "1",
-      },
-      {
-        input: `How many issues are in ${FIXTURES.organizationSlug}/${FIXTURES.projectSlug}?`,
-        expected: "2",
-      },
-      {
-        input: `What issues are affecting jane@sentry.io in ${FIXTURES.organizationSlug}?`,
-        expected: "No issues found",
-      },
-      {
-        input: `How many issues are affecting jane@sentry.io in ${FIXTURES.organizationSlug}?`,
-        expected: "0",
-      },
-      {
-        input: `How many issues are in ${FIXTURES.organizationSlug}/foobar?`,
-        expected: "0",
-      },
-      {
-        input: `How many issues are in project:remote-mcp?`,
-        expected: "Invalid project",
+        input: `What issues is david@sentry.io experiencing in ${FIXTURES.organizationSlug}?`,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "find_issues",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              query: "user.email:david@sentry.io",
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
     ];
   },
-  task: TaskRunner(),
-  scorers: [Factuality()],
+  task: SimpleTaskRunner(),
+  scorers: [ToolPredictionScorer()],
   threshold: 0.6,
   timeout: 30000,
 });

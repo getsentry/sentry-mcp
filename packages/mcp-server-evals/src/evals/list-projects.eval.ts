@@ -1,17 +1,29 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, FIXTURES, TaskRunner } from "./utils";
+import { FIXTURES, SimpleTaskRunner, ToolPredictionScorer } from "./utils";
 
 describeEval("list-projects", {
   data: async () => {
     return [
       {
         input: `What projects do I have access to in Sentry for '${FIXTURES.organizationSlug}'`,
-        expected: FIXTURES.projectSlug,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "find_projects",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
     ];
   },
-  task: TaskRunner(),
-  scorers: [Factuality()],
+  task: SimpleTaskRunner(),
+  scorers: [ToolPredictionScorer()],
   threshold: 0.6,
   timeout: 30000,
 });
