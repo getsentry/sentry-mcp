@@ -215,6 +215,280 @@ const DATASET_CONFIGS = {
   },
 };
 
+/**
+ * Format error event results for display
+ */
+function formatErrorResults(
+  eventData: FlexibleEventData[],
+  params: { naturalLanguageQuery: string; includeExplanation?: boolean },
+  apiService: SentryApiService,
+  organizationSlug: string,
+  explorerUrl: string,
+  sentryQuery: string,
+): string {
+  let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+  output += `⚠️ **IMPORTANT**: Display these errors as highlighted alert cards with color-coded severity levels and clickable Event IDs.\n\n`;
+
+  if (params.includeExplanation) {
+    output += `## Query Translation\n`;
+    output += `Natural language: "${params.naturalLanguageQuery}"\n`;
+    output += `Sentry query: \`${sentryQuery}\`\n\n`;
+  }
+
+  output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
+  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+
+  if (eventData.length === 0) {
+    output += `No results found.\n\n`;
+    output += `Try being more specific or using different terms in your search.\n`;
+    return output;
+  }
+
+  output += `Found ${eventData.length} error${eventData.length === 1 ? "" : "s"}:\n\n`;
+
+  for (const event of eventData) {
+    const title = getStringValue(event, "title", "Unknown Error");
+    const issue = getStringValue(event, "issue");
+    const project = getStringValue(event, "project", "N/A");
+    const lastSeen = getStringValue(event, "last_seen()", "N/A");
+    const level = getStringValue(event, "level");
+    const culprit = getStringValue(event, "culprit");
+    const count = getNumberValue(event, "count()");
+
+    output += `## ${title}\n\n`;
+    output += `**Issue ID**: ${issue}\n`;
+    output += `**Project**: ${project}\n`;
+    if (level) {
+      output += `**Level**: ${level}\n`;
+    }
+    if (culprit) {
+      output += `**Location**: ${culprit}\n`;
+    }
+    output += `**Last seen**: ${lastSeen}\n`;
+    if (count !== undefined) {
+      output += `**Occurrences**: ${count}\n`;
+    }
+    if (issue) {
+      output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue)}\n`;
+    }
+    output += "\n";
+  }
+
+  output += "## Next Steps\n\n";
+  output += "- Get more details about a specific error: Use the Issue ID\n";
+  output += "- View error groups: Navigate to the Issues page in Sentry\n";
+  output += "- Set up alerts: Configure alert rules for these error patterns\n";
+
+  return output;
+}
+
+/**
+ * Format log event results for display
+ */
+function formatLogResults(
+  eventData: FlexibleEventData[],
+  params: { naturalLanguageQuery: string; includeExplanation?: boolean },
+  apiService: SentryApiService,
+  organizationSlug: string,
+  explorerUrl: string,
+  sentryQuery: string,
+): string {
+  let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+  output += `⚠️ **IMPORTANT**: Display these logs in console format with monospace font, color-coded severity (🔴 ERROR, 🟡 WARN, 🔵 INFO), and preserve timestamps.\n\n`;
+
+  if (params.includeExplanation) {
+    output += `## Query Translation\n`;
+    output += `Natural language: "${params.naturalLanguageQuery}"\n`;
+    output += `Sentry query: \`${sentryQuery}\`\n\n`;
+  }
+
+  output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
+  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+
+  if (eventData.length === 0) {
+    output += `No results found.\n\n`;
+    output += `Try being more specific or using different terms in your search.\n`;
+    return output;
+  }
+
+  output += `Found ${eventData.length} log${eventData.length === 1 ? "" : "s"}:\n\n`;
+
+  output += "```console\n";
+
+  for (const event of eventData) {
+    const timestamp = getStringValue(event, "timestamp", "N/A");
+    const severity = getStringValue(event, "severity", "info");
+    const message = getStringValue(event, "message", "No message");
+
+    // Safely uppercase the severity
+    const severityUpper = severity.toUpperCase();
+
+    // Get severity emoji with proper typing
+    const severityEmojis: Record<string, string> = {
+      ERROR: "🔴",
+      FATAL: "🔴",
+      WARN: "🟡",
+      WARNING: "🟡",
+      INFO: "🔵",
+      DEBUG: "⚫",
+      TRACE: "⚫",
+    };
+    const severityEmoji = severityEmojis[severityUpper] || "🔵";
+
+    // Standard log format with emoji and proper spacing
+    output += `${timestamp} ${severityEmoji} [${severityUpper.padEnd(5)}] ${message}\n`;
+  }
+
+  output += "```\n\n";
+
+  // Add detailed metadata for each log entry
+  output += "## Log Details\n\n";
+
+  for (let i = 0; i < eventData.length; i++) {
+    const event = eventData[i];
+    const severity = getStringValue(event, "severity", "info");
+    const severityNum = getNumberValue(event, "severity_number");
+    const message = getStringValue(event, "message", "No message");
+    const timestamp = getStringValue(event, "timestamp", "N/A");
+    const projectId =
+      getStringValue(event, "project.id") ||
+      getStringValue(event, "project", "N/A");
+    const trace = getStringValue(event, "trace");
+    const itemId = getStringValue(event, "sentry.item_id");
+
+    output += `### Log ${i + 1}\n`;
+    output += `- **Message**: ${message}\n`;
+    output += `- **Severity**: ${severity}${severityNum ? ` (level ${severityNum})` : ""}\n`;
+    output += `- **Timestamp**: ${timestamp}\n`;
+    output += `- **Project**: ${projectId}\n`;
+
+    if (trace) {
+      output += `- **Trace ID**: ${trace}\n`;
+      output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
+    }
+
+    if (itemId) {
+      output += `- **Item ID**: ${itemId}\n`;
+    }
+
+    output += "\n";
+  }
+
+  output += "## Next Steps\n\n";
+  output += "- View related traces: Click on the Trace URL if available\n";
+  output +=
+    "- Filter by severity: Adjust your query to focus on specific log levels\n";
+  output += "- Export logs: Use the Sentry web interface for bulk export\n";
+
+  return output;
+}
+
+/**
+ * Format span/trace event results for display
+ */
+function formatSpanResults(
+  eventData: FlexibleEventData[],
+  params: { naturalLanguageQuery: string; includeExplanation?: boolean },
+  apiService: SentryApiService,
+  organizationSlug: string,
+  explorerUrl: string,
+  sentryQuery: string,
+): string {
+  let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+  output += `⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.\n\n`;
+
+  if (params.includeExplanation) {
+    output += `## Query Translation\n`;
+    output += `Natural language: "${params.naturalLanguageQuery}"\n`;
+    output += `Sentry query: \`${sentryQuery}\`\n\n`;
+  }
+
+  output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
+  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+
+  if (eventData.length === 0) {
+    output += `No results found.\n\n`;
+    output += `Try being more specific or using different terms in your search.\n`;
+    return output;
+  }
+
+  output += `Found ${eventData.length} trace${eventData.length === 1 ? "" : "s"}/span${eventData.length === 1 ? "" : "s"}:\n\n`;
+
+  for (const event of eventData) {
+    const spanOp = getStringValue(event, "span.op", "unknown");
+    const spanDescription =
+      getStringValue(event, "span.description") ||
+      getStringValue(event, "transaction") ||
+      "Unknown";
+    const duration = getNumberValue(event, "span.duration");
+    const transaction = getStringValue(event, "transaction", "N/A");
+    const trace = getStringValue(event, "trace");
+    const project = getStringValue(event, "project", "N/A");
+    const timestamp = getStringValue(event, "timestamp", "N/A");
+
+    output += `## ${spanDescription}\n\n`;
+    output += `**Operation**: ${spanOp}\n`;
+    output += `**Transaction**: ${transaction}\n`;
+    if (trace) {
+      output += `**Trace ID**: ${trace}\n`;
+      output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
+    }
+    output += `**Project**: ${project}\n`;
+    if (duration !== undefined) {
+      output += `**Duration**: ${duration}ms\n`;
+    }
+    output += `**Timestamp**: ${timestamp}\n`;
+    output += "\n";
+  }
+
+  output += "## Next Steps\n\n";
+  output += "- View the full trace: Click on the Trace URL above\n";
+  output +=
+    "- Search for related spans: Modify your query to be more specific\n";
+  output +=
+    "- Export data: Use the Sentry web interface for advanced analysis\n";
+
+  return output;
+}
+
+/**
+ * Build the system prompt for AI query translation
+ */
+function buildSystemPrompt(
+  dataset: "spans" | "errors" | "logs",
+  allFields: Record<string, string>,
+  datasetConfig: { rules: string; examples: string },
+): string {
+  return SYSTEM_PROMPT_TEMPLATE.replace("{dataset}", dataset)
+    .replace(
+      "{fields}",
+      Object.entries(allFields)
+        .map(([key, desc]) => `- ${key}: ${desc}`)
+        .join("\n"),
+    )
+    .replace("{datasetRules}", datasetConfig.rules)
+    .replace("{datasetExamples}", datasetConfig.examples);
+}
+
+/**
+ * Convert project slug to numeric ID
+ */
+async function getProjectId(
+  apiService: SentryApiService,
+  organizationSlug: string,
+  projectSlug: string,
+): Promise<string> {
+  const projects = await apiService.listProjects(organizationSlug);
+  const project = projects.find((p) => p.slug === projectSlug);
+  if (!project) {
+    throw new Error(
+      `Project '${projectSlug}' not found in organization '${organizationSlug}'`,
+    );
+  }
+  // Convert to string to ensure consistent type
+  return String(project.id);
+}
+
 // Base system prompt template
 const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. Convert natural language queries to Sentry's search syntax for the {dataset} dataset.
 
@@ -351,15 +625,7 @@ export default defineTool({
     const datasetConfig = DATASET_CONFIGS[dataset] || DATASET_CONFIGS.spans;
 
     // Build the system prompt
-    const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace("{dataset}", dataset)
-      .replace(
-        "{fields}",
-        Object.entries(allFields)
-          .map(([key, desc]) => `- ${key}: ${desc}`)
-          .join("\n"),
-      )
-      .replace("{datasetRules}", datasetConfig.rules)
-      .replace("{datasetExamples}", datasetConfig.examples);
+    const systemPrompt = buildSystemPrompt(dataset, allFields, datasetConfig);
 
     // Check if OpenAI API key is available
     if (!process.env.OPENAI_API_KEY) {
@@ -377,20 +643,9 @@ export default defineTool({
     });
 
     // Convert project slug to ID if needed
-    let projectId: string | undefined;
-    if (params.projectSlug) {
-      // The events endpoint requires numeric project IDs, not slugs
-      // Fetch the project to get its ID
-      const projects = await apiService.listProjects(organizationSlug);
-      const project = projects.find((p) => p.slug === params.projectSlug);
-      if (!project) {
-        throw new Error(
-          `Project '${params.projectSlug}' not found in organization '${organizationSlug}'`,
-        );
-      }
-      // Convert to string to ensure consistent type
-      projectId = String(project.id);
-    }
+    const projectId = params.projectSlug
+      ? await getProjectId(apiService, organizationSlug, params.projectSlug)
+      : undefined;
 
     // Select fields based on dataset - these are the fields we want to retrieve from the API
     const DATASET_API_FIELDS = {
@@ -461,182 +716,40 @@ export default defineTool({
       dataset, // dataset is already correct for URL generation (logs, spans, errors)
     );
 
-    // Format the output with prominent rendering instructions
-    let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
-
-    // Add clear rendering directive at the top
-    if (dataset === "logs") {
-      output += `⚠️ **IMPORTANT**: Display these logs in console format with monospace font, color-coded severity (🔴 ERROR, 🟡 WARN, 🔵 INFO), and preserve timestamps.\n\n`;
-    } else if (dataset === "errors") {
-      output += `⚠️ **IMPORTANT**: Display these errors as highlighted alert cards with color-coded severity levels and clickable Event IDs.\n\n`;
-    } else {
-      output += `⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.\n\n`;
-    }
-
-    if (params.includeExplanation) {
-      output += `## Query Translation\n`;
-      output += `Natural language: "${params.naturalLanguageQuery}"\n`;
-      output += `Sentry query: \`${sentryQuery}\`\n\n`;
-    }
-
-    output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
-    output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
-
     // Type-safe access to event data
     // Since searchEvents returns unknown, we need to safely access the data property
     const responseData = eventsResponse as { data?: unknown[] };
     const eventData = (responseData.data || []) as FlexibleEventData[];
 
-    if (eventData.length === 0) {
-      output += `No results found.\n\n`;
-      output += `Try being more specific or using different terms in your search.\n`;
-      return output;
+    // Format results based on dataset
+    switch (dataset) {
+      case "errors":
+        return formatErrorResults(
+          eventData,
+          params,
+          apiService,
+          organizationSlug,
+          explorerUrl,
+          sentryQuery,
+        );
+      case "logs":
+        return formatLogResults(
+          eventData,
+          params,
+          apiService,
+          organizationSlug,
+          explorerUrl,
+          sentryQuery,
+        );
+      case "spans":
+        return formatSpanResults(
+          eventData,
+          params,
+          apiService,
+          organizationSlug,
+          explorerUrl,
+          sentryQuery,
+        );
     }
-
-    if (dataset === "errors") {
-      output += `Found ${eventData.length} error${eventData.length === 1 ? "" : "s"}:\n\n`;
-
-      for (const event of eventData) {
-        const title = getStringValue(event, "title", "Unknown Error");
-        const issue = getStringValue(event, "issue");
-        const project = getStringValue(event, "project", "N/A");
-        const lastSeen = getStringValue(event, "last_seen()", "N/A");
-        const level = getStringValue(event, "level");
-        const culprit = getStringValue(event, "culprit");
-        const count = getNumberValue(event, "count()");
-
-        output += `## ${title}\n\n`;
-        output += `**Issue ID**: ${issue}\n`;
-        output += `**Project**: ${project}\n`;
-        if (level) {
-          output += `**Level**: ${level}\n`;
-        }
-        if (culprit) {
-          output += `**Location**: ${culprit}\n`;
-        }
-        output += `**Last seen**: ${lastSeen}\n`;
-        if (count !== undefined) {
-          output += `**Occurrences**: ${count}\n`;
-        }
-        if (issue) {
-          output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue)}\n`;
-        }
-        output += "\n";
-      }
-
-      output += "## Next Steps\n\n";
-      output += "- Get more details about a specific error: Use the Issue ID\n";
-      output += "- View error groups: Navigate to the Issues page in Sentry\n";
-      output +=
-        "- Set up alerts: Configure alert rules for these error patterns\n";
-    } else if (dataset === "logs") {
-      output += `Found ${eventData.length} log${eventData.length === 1 ? "" : "s"}:\n\n`;
-
-      output += "```console\n";
-
-      for (const event of eventData) {
-        const timestamp = getStringValue(event, "timestamp", "N/A");
-        const severity = getStringValue(event, "severity", "info");
-        const message = getStringValue(event, "message", "No message");
-
-        // Safely uppercase the severity
-        const severityUpper = severity.toUpperCase();
-
-        // Get severity emoji with proper typing
-        const severityEmojis: Record<string, string> = {
-          ERROR: "🔴",
-          FATAL: "🔴",
-          WARN: "🟡",
-          WARNING: "🟡",
-          INFO: "🔵",
-          DEBUG: "⚫",
-          TRACE: "⚫",
-        };
-        const severityEmoji = severityEmojis[severityUpper] || "🔵";
-
-        // Standard log format with emoji and proper spacing
-        output += `${timestamp} ${severityEmoji} [${severityUpper.padEnd(5)}] ${message}\n`;
-      }
-
-      output += "```\n\n";
-
-      // Add detailed metadata for each log entry
-      output += "## Log Details\n\n";
-
-      for (let i = 0; i < eventData.length; i++) {
-        const event = eventData[i];
-        const severity = getStringValue(event, "severity", "info");
-        const severityNum = getNumberValue(event, "severity_number");
-        const message = getStringValue(event, "message", "No message");
-        const timestamp = getStringValue(event, "timestamp", "N/A");
-        const projectId =
-          getStringValue(event, "project.id") ||
-          getStringValue(event, "project", "N/A");
-        const trace = getStringValue(event, "trace");
-        const itemId = getStringValue(event, "sentry.item_id");
-
-        output += `### Log ${i + 1}\n`;
-        output += `- **Message**: ${message}\n`;
-        output += `- **Severity**: ${severity}${severityNum ? ` (level ${severityNum})` : ""}\n`;
-        output += `- **Timestamp**: ${timestamp}\n`;
-        output += `- **Project**: ${projectId}\n`;
-
-        if (trace) {
-          output += `- **Trace ID**: ${trace}\n`;
-          output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
-        }
-
-        if (itemId) {
-          output += `- **Item ID**: ${itemId}\n`;
-        }
-
-        output += "\n";
-      }
-
-      output += "## Next Steps\n\n";
-      output += "- View related traces: Click on the Trace URL if available\n";
-      output +=
-        "- Filter by severity: Adjust your query to focus on specific log levels\n";
-      output += "- Export logs: Use the Sentry web interface for bulk export\n";
-    } else {
-      // Spans dataset
-      output += `Found ${eventData.length} trace${eventData.length === 1 ? "" : "s"}/span${eventData.length === 1 ? "" : "s"}:\n\n`;
-
-      for (const event of eventData) {
-        const spanOp = getStringValue(event, "span.op", "unknown");
-        const spanDescription =
-          getStringValue(event, "span.description") ||
-          getStringValue(event, "transaction") ||
-          "Unknown";
-        const duration = getNumberValue(event, "span.duration");
-        const transaction = getStringValue(event, "transaction", "N/A");
-        const trace = getStringValue(event, "trace");
-        const project = getStringValue(event, "project", "N/A");
-        const timestamp = getStringValue(event, "timestamp", "N/A");
-
-        output += `## ${spanDescription}\n\n`;
-        output += `**Operation**: ${spanOp}\n`;
-        output += `**Transaction**: ${transaction}\n`;
-        if (trace) {
-          output += `**Trace ID**: ${trace}\n`;
-          output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
-        }
-        output += `**Project**: ${project}\n`;
-        if (duration !== undefined) {
-          output += `**Duration**: ${duration}ms\n`;
-        }
-        output += `**Timestamp**: ${timestamp}\n`;
-        output += "\n";
-      }
-
-      output += "## Next Steps\n\n";
-      output += "- View the full trace: Click on the Trace URL above\n";
-      output +=
-        "- Search for related spans: Modify your query to be more specific\n";
-      output +=
-        "- Export data: Use the Sentry web interface for advanced analysis\n";
-    }
-
-    return output;
   },
 });
