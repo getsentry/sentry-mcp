@@ -227,7 +227,7 @@ export class SentryApiService {
 
     // Check if fetch is available, otherwise provide a helpful error message
     if (typeof globalThis.fetch === "undefined") {
-      throw new Error(
+      throw new ConfigurationError(
         "fetch is not available. Please use Node.js >= 18 or ensure fetch is available in your environment.",
       );
     }
