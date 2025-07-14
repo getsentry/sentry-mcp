@@ -106,7 +106,7 @@ export const ProjectSchema = z.object({
   id: z.union([z.string(), z.number()]),
   slug: z.string(),
   name: z.string(),
-  platform: z.string().nullable(),
+  platform: z.string().nullable().optional(),
 });
 
 export const ProjectListSchema = z.array(ProjectSchema);
@@ -188,7 +188,7 @@ export const IssueSchema = z.object({
   userCount: z.union([z.string(), z.number()]),
   permalink: z.string().url(),
   project: ProjectSchema,
-  platform: z.string().nullable(),
+  platform: z.string().nullable().optional(),
   status: z.string(),
   culprit: z.string(),
   type: z.union([z.literal("error"), z.literal("transaction"), z.unknown()]),
@@ -299,7 +299,7 @@ const BaseEventSchema = z.object({
   id: z.string(),
   title: z.string(),
   message: z.string().nullable(),
-  platform: z.string().nullable(),
+  platform: z.string().nullable().optional(),
   type: z.unknown(),
   entries: z.array(
     z.union([
