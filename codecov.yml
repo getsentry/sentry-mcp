@@ -7,6 +7,4 @@ coverage:
       default:
         informational: true
 
-comment:
-  layout: "reach, diff, flags, files"
-  behavior: "off"
+comment: false
