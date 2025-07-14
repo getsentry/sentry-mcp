@@ -1,5 +1,5 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, FIXTURES, TaskRunner } from "./utils";
+import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
 
 // Note: This eval requires OPENAI_API_KEY to be set in the environment
 // The search_events tool uses the AI SDK to translate natural language queries
@@ -81,7 +81,7 @@ describeEval("search-events", {
           "/explore/logs/",
           "## Log Entries",
           "## Rendering Suggestions",
-          "**For AI Agents**: Display logs in a terminal/console-like format"
+          "**For AI Agents**: Display logs in a terminal/console-like format",
         ].join("\n"),
       },
       {
@@ -91,13 +91,13 @@ describeEval("search-events", {
           "/explore/logs/",
           "Found 0 log",
           "## Log Entries",
-          "## Rendering Suggestions"
+          "## Rendering Suggestions",
         ].join("\n"),
       },
     ];
   },
-  task: TaskRunner(),
-  scorers: [Factuality()],
+  task: NoOpTaskRunner(),
+  scorers: [ToolPredictionScorer()],
   threshold: 0.6,
   timeout: 30000,
 });
