@@ -175,14 +175,31 @@ const DATASET_CONFIGS = {
 - Use error.handled:false for unhandled exceptions/crashes
 - For filename searches: Use stack.filename for suffix-based search (e.g., stack.filename:"**/index.js" or stack.filename:"**/components/Button.tsx")
 - When searching for errors in specific files, prefer including the parent folder to avoid ambiguity (e.g., stack.filename:"**/components/index.js" instead of just stack.filename:"**/index.js")`,
-    examples: `- "null pointer exceptions" → error.type:"NullPointerException" OR message:"*null pointer*"
-- "unhandled errors in production" → error.handled:false AND environment:production
-- "database connection errors" → message:"*database*" AND message:"*connection*" AND level:error
-- "authentication failures" → message:"*auth*" AND (message:"*failed*" OR message:"*denied*")
-- "timeout errors in the last hour" → message:"*timeout*" AND level:error AND timestamp:-1h
-- "production errors from last 24 hours" → level:error AND environment:production AND timestamp:-24h
-- "errors in Button.tsx file" → stack.filename:"**/Button.tsx"
-- "errors in any index.js file in components folder" → stack.filename:"**/components/index.js"`,
+    examples: `- "null pointer exceptions" → 
+  {
+    "query": "error.type:\\"NullPointerException\\" OR message:\\"*null pointer*\\"",
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"]
+  }
+- "unhandled errors in production" → 
+  {
+    "query": "error.handled:false AND environment:production",
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "error.handled", "environment"]
+  }
+- "database connection errors" → 
+  {
+    "query": "message:\\"*database*\\" AND message:\\"*connection*\\" AND level:error",
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"]
+  }
+- "show me user emails for authentication failures" → 
+  {
+    "query": "message:\\"*auth*\\" AND (message:\\"*failed*\\" OR message:\\"*denied*\\")",
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "user.email"]
+  }
+- "errors in Button.tsx file" → 
+  {
+    "query": "stack.filename:\\"**/Button.tsx\\"",
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "stack.filename"]
+  }`,
   },
   logs: {
     rules: `- For logs, focus on: message, severity, severity_number
@@ -192,27 +209,41 @@ const DATASET_CONFIGS = {
 - Instead, time filtering for logs is handled by the statsPeriod parameter (not part of the query string)
 - Keep your query focused on message content, severity levels, and other attributes only
 - When user asks for "error logs", interpret this as logs with severity:error`,
-    examples: `- "warning logs about memory" → severity:warning AND message:"*memory*"
-- "error logs from database" → severity:error AND message:"*database*"
-- "debug logs" → severity:debug
-- "critical system alerts" → severity_number:>=17
-- "recent logs" → (no timestamp filter needed - time range handled separately)
-- "logs from last hour" → (no timestamp filter needed - time range handled separately)
-- "API error logs" → severity:error AND message:"*API*"
-- "error logs from the last hour" → severity:error
-- "show me error logs" → severity:error`,
+    examples: `- "warning logs about memory" → 
+  {
+    "query": "severity:warning AND message:\\"*memory*\\"",
+    "fields": ["timestamp", "project", "message", "severity", "trace"]
+  }
+- "error logs from database" → 
+  {
+    "query": "severity:error AND message:\\"*database*\\"",
+    "fields": ["timestamp", "project", "message", "severity", "trace"]
+  }
+- "show me error logs with user context" → 
+  {
+    "query": "severity:error",
+    "fields": ["timestamp", "project", "message", "severity", "trace", "user.id", "user.email"]
+  }`,
   },
   spans: {
     rules: `- For traces/spans, focus on: span.op, span.description, span.duration, transaction
 - Use is_transaction:true for transaction spans only
 - Use span.duration for performance queries (value is in milliseconds)`,
-    examples: `- "database queries" → span.op:db OR span.op:db.query
-- "slow API calls over 5 seconds" → span.duration:>5000 AND span.op:http*
-- "checkout flow traces" → transaction:"*checkout*" OR span.description:"*checkout*"
-- "redis timeout errors" → span.op:cache.get* AND span.description:"*timeout*"
-- "http requests to external APIs" → span.op:http.client
-- "slow database queries in the last hour" → span.op:db.query AND span.duration:>1000 AND timestamp:-1h
-- "recent failed transactions" → is_transaction:true AND span.status:internal_error AND timestamp:-30m`,
+    examples: `- "database queries" → 
+  {
+    "query": "span.op:db OR span.op:db.query",
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace"]
+  }
+- "slow API calls over 5 seconds" → 
+  {
+    "query": "span.duration:>5000 AND span.op:http*",
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "http.method", "http.status_code"]
+  }
+- "show me database queries with their SQL" → 
+  {
+    "query": "span.op:db.query",
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.operation"]
+  }`,
   },
 };
 
@@ -551,6 +582,41 @@ function formatSpanResults(
   return output;
 }
 
+// Define recommended fields for each dataset
+const RECOMMENDED_FIELDS = {
+  errors: {
+    basic: [
+      "issue",
+      "title",
+      "project",
+      "timestamp",
+      "level",
+      "message",
+      "error.type",
+      "culprit",
+    ],
+    description:
+      "Basic error information including issue ID, title, severity, and location",
+  },
+  logs: {
+    basic: ["timestamp", "project", "message", "severity", "trace"],
+    description: "Essential log entry information",
+  },
+  spans: {
+    basic: [
+      "span.op",
+      "span.description",
+      "span.duration",
+      "transaction",
+      "timestamp",
+      "project",
+      "trace",
+    ],
+    description:
+      "Core span/trace information including operation, duration, and trace context",
+  },
+};
+
 /**
  * Build the system prompt for AI query translation
  */
@@ -559,7 +625,13 @@ function buildSystemPrompt(
   allFields: Record<string, string>,
   datasetConfig: { rules: string; examples: string },
 ): string {
+  const recommendedFields = RECOMMENDED_FIELDS[dataset];
+
   return SYSTEM_PROMPT_TEMPLATE.replace("{dataset}", dataset)
+    .replace(
+      "{recommendedFields}",
+      `${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}\n\n${recommendedFields.description}`,
+    )
     .replace(
       "{fields}",
       Object.entries(allFields)
@@ -571,12 +643,19 @@ function buildSystemPrompt(
 }
 
 // Base system prompt template
-const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. Convert natural language queries to Sentry's search syntax for the {dataset} dataset.
+const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. You need to:
+1. Convert the natural language query to Sentry's search syntax (the WHERE conditions)
+2. Decide which fields to return in the results (the SELECT fields)
 
-Available fields to search:
+For the {dataset} dataset:
+
+RECOMMENDED FIELDS TO RETURN:
+{recommendedFields}
+
+ALL AVAILABLE FIELDS:
 {fields}
 
-Query syntax rules:
+QUERY SYNTAX RULES:
 - Use field:value for exact matches
 - Use field:>value or field:<value for numeric comparisons
 - Use AND, OR, NOT for boolean logic
@@ -589,14 +668,21 @@ Query syntax rules:
 - IMPORTANT: For relative durations, use format WITHOUT operators (timestamp:-1h NOT timestamp:>-1h)
 {datasetRules}
 
-Examples:
+EXAMPLES:
 {datasetExamples}
 
-Important:
+YOUR RESPONSE FORMAT:
+Return a JSON object with two fields:
+- "query": The Sentry query string for filtering results
+- "fields": Array of field names to return in results
+
+IMPORTANT NOTES:
+- Always include the recommended fields unless the user specifically asks for different fields
+- Add any fields mentioned in the user's query to the fields array
+- If the user asks about a specific field (e.g., "show me user emails"), include that field
 - Do NOT include project: filters in your query (project filtering is handled separately)
-- For spans/errors: When user mentions time periods like "last hour" or "past day", include timestamp:-1h or timestamp:-24h in the query
-- For logs: When user mentions time periods, do NOT include any timestamp filters in the query - time filtering is handled automatically
-- Return ONLY the Sentry query string, no explanation`;
+- For spans/errors: When user mentions time periods, include timestamp filters in query
+- For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically`;
 
 export default defineTool({
   name: "search_events",
@@ -716,69 +802,32 @@ export default defineTool({
     }
 
     // Use the AI SDK to translate the query
-    const { text: sentryQuery } = await generateText({
+    const { text: aiResponse } = await generateText({
       model: openai("gpt-4o"),
       system: systemPrompt,
       prompt: params.naturalLanguageQuery,
       temperature: 0.1, // Low temperature for more consistent translations
     });
 
-    // Extract fields mentioned in the query
-    const extractFieldsFromQuery = (query: string): string[] => {
-      const fieldPattern = /(\w+(?:\.\w+)*):(?:"[^"]*"|[^\s]+)/g;
-      const fields = new Set<string>();
-      let match: RegExpExecArray | null = null;
+    // Parse the JSON response
+    let sentryQuery: string;
+    let requestedFields: string[];
 
-      while (true) {
-        match = fieldPattern.exec(query);
-        if (match === null) break;
-        fields.add(match[1]);
-      }
+    try {
+      const parsed = JSON.parse(aiResponse);
+      sentryQuery = parsed.query;
+      requestedFields = parsed.fields || [];
+    } catch (error) {
+      // Fallback for backward compatibility if AI returns just the query string
+      sentryQuery = aiResponse.trim();
+      requestedFields = [];
+    }
 
-      return Array.from(fields);
-    };
-
-    // Get fields from the query
-    const queryFields = extractFieldsFromQuery(sentryQuery);
-
-    // Define default fields for each dataset if no fields are found in query
-    const DEFAULT_FIELDS = {
-      errors: [
-        "issue",
-        "title",
-        "project",
-        "timestamp",
-        "level",
-        "message",
-        "error.type",
-      ],
-      logs: ["timestamp", "project", "message", "severity", "trace"],
-      spans: [
-        "span.op",
-        "span.description",
-        "span.duration",
-        "transaction",
-        "timestamp",
-        "project",
-        "trace",
-      ],
-    };
-
-    // Combine query fields with essential fields that should always be included
-    const ESSENTIAL_FIELDS = {
-      errors: ["issue", "project"],
-      logs: ["timestamp", "message", "project"],
-      spans: ["timestamp", "project"],
-    };
-
-    // Build final field list
-    const fieldsSet = new Set<string>([
-      ...ESSENTIAL_FIELDS[dataset],
-      ...queryFields,
-      ...(queryFields.length === 0 ? DEFAULT_FIELDS[dataset] : []),
-    ]);
-
-    const fields = Array.from(fieldsSet);
+    // Use the AI-requested fields, or fall back to recommended fields
+    const fields =
+      requestedFields.length > 0
+        ? requestedFields
+        : RECOMMENDED_FIELDS[dataset].basic;
 
     // Determine the appropriate sort parameter based on dataset
     const sortParam =
