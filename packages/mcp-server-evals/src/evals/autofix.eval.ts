@@ -6,7 +6,7 @@ describeEval("begin-issue-fix", {
     return [
       {
         input: `Whats the status on root causing this issue in Sentry?\n${FIXTURES.testIssueUrl}`,
-        expected: [
+        expectedTools: [
           {
             name: "analyze_issue_with_seer",
             arguments: {
@@ -17,7 +17,7 @@ describeEval("begin-issue-fix", {
       },
       {
         input: `Can you root cause this issue and retrieve the analysis?\n${FIXTURES.testIssueUrl}`,
-        expected: [
+        expectedTools: [
           {
             name: "analyze_issue_with_seer",
             arguments: {

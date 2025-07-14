@@ -6,7 +6,7 @@ describeEval("create-project", {
     return [
       {
         input: `Create a new project in Sentry for '${FIXTURES.organizationSlug}' called '${FIXTURES.projectSlug}' with the '${FIXTURES.teamSlug}' team. Output **only** the project slug and the SENTRY_DSN in the format of:\n<PROJECT_SLUG>\n<SENTRY_DSN>`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},

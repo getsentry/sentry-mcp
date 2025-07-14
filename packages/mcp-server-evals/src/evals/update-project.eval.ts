@@ -6,7 +6,7 @@ describeEval("update-project", {
     return [
       {
         input: `Update the project '${FIXTURES.projectSlug}' in organization '${FIXTURES.organizationSlug}' to change its name to 'Updated Project Name' and slug to 'updated-project-slug'. Output only the new project slug as plain text without any formatting:\nupdated-project-slug`,
-        expected: [
+        expectedTools: [
           {
             name: "update_project",
             arguments: {
@@ -20,7 +20,7 @@ describeEval("update-project", {
       },
       {
         input: `Assign the project '${FIXTURES.projectSlug}' in organization '${FIXTURES.organizationSlug}' to the team '${FIXTURES.teamSlug}'. Output only the team slug as plain text without any formatting:\nthe-goats`,
-        expected: [
+        expectedTools: [
           {
             name: "update_project",
             arguments: {

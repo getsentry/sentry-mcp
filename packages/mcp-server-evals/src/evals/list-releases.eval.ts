@@ -6,7 +6,7 @@ describeEval("list-releases", {
     return [
       {
         input: `Show me the releases in ${FIXTURES.organizationSlug}`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},
@@ -22,7 +22,7 @@ describeEval("list-releases", {
       },
       {
         input: `Show me a list of versions in ${FIXTURES.organizationSlug}/${FIXTURES.projectSlug}`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},

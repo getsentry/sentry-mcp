@@ -6,7 +6,7 @@ describeEval("list-projects", {
     return [
       {
         input: `What projects do I have access to in Sentry for '${FIXTURES.organizationSlug}'`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},

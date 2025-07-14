@@ -6,7 +6,7 @@ describeEval("list-dsns", {
     return [
       {
         input: `What is the SENTRY_DSN for ${FIXTURES.organizationSlug}/${FIXTURES.projectSlug}?`,
-        expected: [
+        expectedTools: [
           {
             name: "find_dsns",
             arguments: {

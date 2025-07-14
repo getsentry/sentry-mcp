@@ -6,7 +6,7 @@ describeEval("list-tags", {
     return [
       {
         input: `What are common tags in ${FIXTURES.organizationSlug}`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},

@@ -110,10 +110,15 @@ export function ToolPredictionScorer(model: LanguageModel = defaultModel) {
   return async function ToolPredictionScorer(opts: {
     input: string;
     output: string;
-    expected?: any;
+    expectedTools?: any;
     result?: any;
   }) {
-    const expectedTools = opts.expected || [];
+    // If expectedTools is not defined, skip this scorer
+    if (!opts.expectedTools) {
+      return null;
+    }
+
+    const expectedTools = opts.expectedTools;
 
     // Get available tools from the MCP server
     const AVAILABLE_TOOLS = await getAvailableTools();

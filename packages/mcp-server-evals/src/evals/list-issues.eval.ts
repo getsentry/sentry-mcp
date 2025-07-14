@@ -6,7 +6,7 @@ describeEval("list-issues", {
     return [
       {
         input: `What are the most common production errors in ${FIXTURES.organizationSlug}?`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},
@@ -24,7 +24,7 @@ describeEval("list-issues", {
       },
       {
         input: `Show me the top issues in ${FIXTURES.organizationSlug} organization`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},
@@ -41,7 +41,7 @@ describeEval("list-issues", {
       },
       {
         input: `What are the most recent issues in ${FIXTURES.organizationSlug}?`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},
@@ -58,7 +58,7 @@ describeEval("list-issues", {
       },
       {
         input: `Find the newest production issues in ${FIXTURES.organizationSlug}`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},
@@ -75,7 +75,7 @@ describeEval("list-issues", {
       },
       {
         input: `What issues is david@sentry.io experiencing in ${FIXTURES.organizationSlug}?`,
-        expected: [
+        expectedTools: [
           {
             name: "find_organizations",
             arguments: {},
