@@ -1,0 +1,26 @@
+[
+  {
+    "key": "span.duration",
+    "name": "Span Duration"
+  },
+  {
+    "key": "transaction.duration",
+    "name": "Transaction Duration"
+  },
+  {
+    "key": "http.status_code",
+    "name": "HTTP Status Code"
+  },
+  {
+    "key": "custom.count",
+    "name": "Custom Count"
+  },
+  {
+    "key": "custom.score",
+    "name": "Custom Score"
+  },
+  {
+    "key": "custom.latency_ms",
+    "name": "Custom Latency (ms)"
+  }
+]

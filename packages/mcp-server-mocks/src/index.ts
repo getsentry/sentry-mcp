@@ -31,6 +31,11 @@ import eventAttachmentsFixture from "./fixtures/event-attachments.json";
 import tagsFixture from "./fixtures/tags.json";
 import projectFixture from "./fixtures/project.json";
 import teamFixture from "./fixtures/team.json";
+import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json";
+import traceItemsAttributesSpansStringFixture from "./fixtures/trace-items-attributes-spans-string.json";
+import traceItemsAttributesSpansNumberFixture from "./fixtures/trace-items-attributes-spans-number.json";
+import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json";
+import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json";
 
 /**
  * Standard organization payload for mock responses.
@@ -770,6 +775,67 @@ export const restHandlers = buildHandlers([
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/tags/",
     fetch: () => HttpResponse.json(tagsFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/trace-items/attributes/",
+    fetch: ({ request }) => {
+      const url = new URL(request.url);
+      const itemType = url.searchParams.get("itemType");
+      const attributeType = url.searchParams.get("attributeType");
+
+      // Validate required parameters
+      if (!itemType) {
+        return HttpResponse.json(
+          { detail: "itemType parameter is required" },
+          { status: 400 },
+        );
+      }
+
+      if (!attributeType) {
+        return HttpResponse.json(
+          { detail: "attributeType parameter is required" },
+          { status: 400 },
+        );
+      }
+
+      // Validate itemType values
+      if (!["span", "logs"].includes(itemType)) {
+        return HttpResponse.json(
+          {
+            detail: `Invalid itemType '${itemType}'. Must be 'span' or 'logs'`,
+          },
+          { status: 400 },
+        );
+      }
+
+      // Validate attributeType values
+      if (!["string", "number"].includes(attributeType)) {
+        return HttpResponse.json(
+          {
+            detail: `Invalid attributeType '${attributeType}'. Must be 'string' or 'number'`,
+          },
+          { status: 400 },
+        );
+      }
+
+      // Return appropriate fixture based on parameters
+      if (itemType === "span") {
+        if (attributeType === "string") {
+          return HttpResponse.json(traceItemsAttributesSpansStringFixture);
+        }
+        return HttpResponse.json(traceItemsAttributesSpansNumberFixture);
+      }
+      if (itemType === "logs") {
+        if (attributeType === "string") {
+          return HttpResponse.json(traceItemsAttributesLogsStringFixture);
+        }
+        return HttpResponse.json(traceItemsAttributesLogsNumberFixture);
+      }
+
+      // Fallback (should not reach here with valid inputs)
+      return HttpResponse.json(traceItemsAttributesFixture);
+    },
   },
   {
     method: "get",

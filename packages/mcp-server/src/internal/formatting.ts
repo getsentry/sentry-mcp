@@ -271,7 +271,11 @@ function formatExceptionInterfaceOutput(
     if (isChained && index > 0) {
       parts.push("");
       parts.push(
-        getExceptionChainMessage(event.platform, index, exceptions.length),
+        getExceptionChainMessage(
+          event.platform || null,
+          index,
+          exceptions.length,
+        ),
       );
       parts.push("");
     }

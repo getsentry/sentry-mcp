@@ -89,6 +89,7 @@ export class ApiError extends Error {
       finalMessage =
         "You do not have access to query across multiple projects. Please select a project for your query.";
     }
+
     super(finalMessage);
   }
 }
@@ -436,6 +437,65 @@ export class SentryApiService {
   }
 
   /**
+   * Generates a Sentry events explorer URL for viewing search results.
+   *
+   * Creates a URL to the Explore Traces page with the provided query.
+   * Always uses HTTPS protocol.
+   *
+   * @param organizationSlug Organization identifier
+   * @param query Sentry search query
+   * @param projectSlug Optional project filter
+   * @returns Full HTTPS URL to the events explorer in Sentry UI
+   *
+   * @example
+   * ```typescript
+   * const url = apiService.getEventsExplorerUrl("my-org", "level:error", "backend");
+   * // https://my-org.sentry.io/explore/traces/?query=level%3Aerror&project=backend
+   * ```
+   */
+  getEventsExplorerUrl(
+    organizationSlug: string,
+    query: string,
+    projectSlug?: string,
+    dataset: "spans" | "errors" | "logs" = "spans",
+  ): string {
+    const params = new URLSearchParams();
+    params.set("query", query);
+    if (projectSlug) {
+      params.set("project", projectSlug);
+    }
+
+    let path: string;
+    if (dataset === "errors") {
+      // Errors use the legacy discover URL
+      params.set("dataset", "errors");
+      params.set("queryDataset", "error-events");
+      params.append("field", "title");
+      params.append("field", "project");
+      params.append("field", "user.display");
+      params.append("field", "timestamp");
+      params.set("sort", "-timestamp");
+      params.set("statsPeriod", "14d");
+      params.set("yAxis", "count()");
+      path = this.isSaas()
+        ? `https://${organizationSlug}.${this.host}/explore/discover/homepage/`
+        : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
+    } else if (dataset === "logs") {
+      // Logs use /explore/logs/
+      path = this.isSaas()
+        ? `https://${organizationSlug}.${this.host}/explore/logs/`
+        : `https://${this.host}/organizations/${organizationSlug}/explore/logs/`;
+    } else {
+      // Spans use /explore/traces/
+      path = this.isSaas()
+        ? `https://${organizationSlug}.${this.host}/explore/traces/`
+        : `https://${this.host}/organizations/${organizationSlug}/explore/traces/`;
+    }
+
+    return `${path}?${params.toString()}`;
+  }
+
+  /**
    * Retrieves the authenticated user's profile information.
    *
    * @param opts Request options including host override
@@ -475,9 +535,12 @@ export class SentryApiService {
     // For SaaS, try to use regions endpoint first
     try {
       // TODO: Sentry is currently not returning all orgs without hitting region endpoints
-      const regionData = UserRegionsSchema.parse(
-        await this.requestJSON("/users/me/regions/", undefined, opts),
+      const regionsBody = await this.requestJSON(
+        "/users/me/regions/",
+        undefined,
+        opts,
       );
+      const regionData = UserRegionsSchema.parse(regionsBody);
 
       return (
         await Promise.all(
@@ -572,6 +635,33 @@ export class SentryApiService {
       opts,
     );
     return ProjectListSchema.parse(body);
+  }
+
+  /**
+   * Gets a single project by slug or ID.
+   *
+   * @param params Project fetch parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectSlugOrId Project slug or numeric ID
+   * @param opts Request options
+   * @returns Project data
+   */
+  async getProject(
+    {
+      organizationSlug,
+      projectSlugOrId,
+    }: {
+      organizationSlug: string;
+      projectSlugOrId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Project> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlugOrId}/`,
+      undefined,
+      opts,
+    );
+    return ProjectSchema.parse(body);
   }
 
   /**
@@ -860,6 +950,63 @@ export class SentryApiService {
       opts,
     );
     return TagListSchema.parse(body);
+  }
+
+  /**
+   * Lists trace item attributes available for search queries.
+   *
+   * Returns all available fields/attributes that can be used in event searches,
+   * including both built-in fields and custom tags.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param opts Request options
+   * @returns Array of available attributes with metadata
+   */
+  async listTraceItemAttributes(
+    {
+      organizationSlug,
+      itemType = "span",
+    }: {
+      organizationSlug: string;
+      itemType?: "span" | "logs";
+    },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    // Fetch both string and number attributes
+    const [stringAttributes, numberAttributes] = await Promise.all([
+      this.fetchTraceItemAttributesByType(
+        organizationSlug,
+        itemType,
+        "string",
+        opts,
+      ),
+      this.fetchTraceItemAttributesByType(
+        organizationSlug,
+        itemType,
+        "number",
+        opts,
+      ),
+    ]);
+
+    // Combine and return all attributes
+    return [...stringAttributes, ...numberAttributes];
+  }
+
+  private async fetchTraceItemAttributesByType(
+    organizationSlug: string,
+    itemType: "span" | "logs",
+    attributeType: "string" | "number",
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("itemType", itemType);
+    queryParams.set("attributeType", attributeType);
+
+    const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
+
+    const body = await this.requestJSON(url, undefined, opts);
+    return Array.isArray(body) ? body : [];
   }
 
   /**
@@ -1218,6 +1365,56 @@ export class SentryApiService {
 
     const body = await this.requestJSON(apiUrl, undefined, opts);
     return SpansSearchResponseSchema.parse(body).data;
+  }
+
+  /**
+   * Searches for events in Sentry using a general query.
+   * This method is used by the search_events tool for semantic search.
+   */
+  async searchEvents(
+    {
+      organizationSlug,
+      query,
+      fields,
+      limit = 10,
+      projectSlug,
+      dataset = "spans",
+      statsPeriod,
+      sort = "-timestamp",
+    }: {
+      organizationSlug: string;
+      query: string;
+      fields: string[];
+      limit?: number;
+      projectSlug?: string;
+      dataset?: "spans" | "errors" | "ourlogs";
+      statsPeriod?: string;
+      sort?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", limit.toString());
+    queryParams.set("query", query);
+    queryParams.set("referrer", "sentry-mcp");
+    queryParams.set("dataset", dataset);
+    if (statsPeriod) {
+      queryParams.set("statsPeriod", statsPeriod);
+    }
+    queryParams.set("sort", sort);
+
+    // Add project filter if specified
+    if (projectSlug) {
+      queryParams.set("project", projectSlug);
+    }
+
+    // Add each field as a separate parameter
+    for (const field of fields) {
+      queryParams.append("field", field);
+    }
+
+    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
+    return await this.requestJSON(apiUrl, undefined, opts);
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
