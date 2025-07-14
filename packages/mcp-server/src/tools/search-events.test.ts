@@ -128,21 +128,23 @@ describe("search_events", () => {
       ## SELECT * FROM users WHERE timeout
 
       **Operation**: db.query
+      **Description**: SELECT * FROM users WHERE timeout
       **Transaction**: /api/checkout
+      **Duration**: 5234ms
       **Trace ID**: abc123def456
       **Trace URL**: https://test-org.sentry.io/explore/traces/trace/abc123def456
       **Project**: backend
-      **Duration**: 5234ms
       **Timestamp**: 2024-01-15T10:30:00Z
 
       ## GET user:session:timeout
 
       **Operation**: cache.get
+      **Description**: GET user:session:timeout
       **Transaction**: /api/checkout
+      **Duration**: 1500ms
       **Trace ID**: xyz789ghi012
       **Trace URL**: https://test-org.sentry.io/explore/traces/trace/xyz789ghi012
       **Project**: backend
-      **Duration**: 1500ms
       **Timestamp**: 2024-01-15T10:25:00Z
 
       ## Next Steps

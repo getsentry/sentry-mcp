@@ -247,31 +247,67 @@ function formatErrorResults(
 
   output += `Found ${eventData.length} error${eventData.length === 1 ? "" : "s"}:\n\n`;
 
+  // Define priority fields that should appear first if present
+  const priorityFields = [
+    "title",
+    "issue",
+    "project",
+    "level",
+    "error.type",
+    "message",
+    "culprit",
+    "timestamp",
+    "last_seen()",
+    "count()",
+  ];
+
   for (const event of eventData) {
-    const title = getStringValue(event, "title", "Unknown Error");
-    const issue = getStringValue(event, "issue");
-    const project = getStringValue(event, "project", "N/A");
-    const lastSeen = getStringValue(event, "last_seen()", "N/A");
-    const level = getStringValue(event, "level");
-    const culprit = getStringValue(event, "culprit");
-    const count = getNumberValue(event, "count()");
+    // Try to get a title from various possible fields
+    const title =
+      getStringValue(event, "title") ||
+      getStringValue(event, "message") ||
+      getStringValue(event, "error.value") ||
+      "Error Event";
 
     output += `## ${title}\n\n`;
-    output += `**Issue ID**: ${issue}\n`;
-    output += `**Project**: ${project}\n`;
-    if (level) {
-      output += `**Level**: ${level}\n`;
+
+    // Display priority fields first if they exist
+    for (const field of priorityFields) {
+      if (
+        field in event &&
+        event[field] !== null &&
+        event[field] !== undefined
+      ) {
+        const value = event[field];
+        const displayName =
+          field === "last_seen()"
+            ? "Last seen"
+            : field === "count()"
+              ? "Occurrences"
+              : field === "culprit"
+                ? "Location"
+                : field.charAt(0).toUpperCase() +
+                  field.slice(1).replace(/[._]/g, " ");
+
+        if (field === "issue" && typeof value === "string") {
+          output += `**Issue ID**: ${value}\n`;
+          output += `**URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
+        } else {
+          output += `**${displayName}**: ${value}\n`;
+        }
+      }
     }
-    if (culprit) {
-      output += `**Location**: ${culprit}\n`;
+
+    // Display any additional fields that weren't in the priority list
+    const displayedFields = new Set([...priorityFields, "id"]);
+    for (const [key, value] of Object.entries(event)) {
+      if (!displayedFields.has(key) && value !== null && value !== undefined) {
+        const displayName =
+          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
+        output += `**${displayName}**: ${value}\n`;
+      }
     }
-    output += `**Last seen**: ${lastSeen}\n`;
-    if (count !== undefined) {
-      output += `**Occurrences**: ${count}\n`;
-    }
-    if (issue) {
-      output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue)}\n`;
-    }
+
     output += "\n";
   }
 
@@ -345,31 +381,55 @@ function formatLogResults(
   // Add detailed metadata for each log entry
   output += "## Log Details\n\n";
 
+  // Define priority fields that should appear first if present
+  const priorityFields = [
+    "message",
+    "severity",
+    "severity_number",
+    "timestamp",
+    "project",
+    "trace",
+    "sentry.item_id",
+  ];
+
   for (let i = 0; i < eventData.length; i++) {
     const event = eventData[i];
-    const severity = getStringValue(event, "severity", "info");
-    const severityNum = getNumberValue(event, "severity_number");
-    const message = getStringValue(event, "message", "No message");
-    const timestamp = getStringValue(event, "timestamp", "N/A");
-    const projectId =
-      getStringValue(event, "project.id") ||
-      getStringValue(event, "project", "N/A");
-    const trace = getStringValue(event, "trace");
-    const itemId = getStringValue(event, "sentry.item_id");
 
     output += `### Log ${i + 1}\n`;
-    output += `- **Message**: ${message}\n`;
-    output += `- **Severity**: ${severity}${severityNum ? ` (level ${severityNum})` : ""}\n`;
-    output += `- **Timestamp**: ${timestamp}\n`;
-    output += `- **Project**: ${projectId}\n`;
 
-    if (trace) {
-      output += `- **Trace ID**: ${trace}\n`;
-      output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
+    // Display priority fields first
+    for (const field of priorityFields) {
+      if (
+        field in event &&
+        event[field] !== null &&
+        event[field] !== undefined
+      ) {
+        const value = event[field];
+        const displayName =
+          field === "severity_number"
+            ? "Severity number"
+            : field === "sentry.item_id"
+              ? "Item ID"
+              : field.charAt(0).toUpperCase() +
+                field.slice(1).replace(/[._]/g, " ");
+
+        if (field === "trace" && typeof value === "string") {
+          output += `- **Trace ID**: ${value}\n`;
+          output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+        } else {
+          output += `- **${displayName}**: ${value}\n`;
+        }
+      }
     }
 
-    if (itemId) {
-      output += `- **Item ID**: ${itemId}\n`;
+    // Display any additional fields
+    const displayedFields = new Set([...priorityFields, "id"]);
+    for (const [key, value] of Object.entries(event)) {
+      if (!displayedFields.has(key) && value !== null && value !== undefined) {
+        const displayName =
+          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
+        output += `- **${displayName}**: ${value}\n`;
+      }
     }
 
     output += "\n";
@@ -415,30 +475,69 @@ function formatSpanResults(
 
   output += `Found ${eventData.length} trace${eventData.length === 1 ? "" : "s"}/span${eventData.length === 1 ? "" : "s"}:\n\n`;
 
+  // Define priority fields that should appear first if present
+  const priorityFields = [
+    "span.op",
+    "span.description",
+    "transaction",
+    "span.duration",
+    "span.status",
+    "trace",
+    "project",
+    "timestamp",
+  ];
+
   for (const event of eventData) {
-    const spanOp = getStringValue(event, "span.op", "unknown");
-    const spanDescription =
+    // Try to get a title from various possible fields
+    const title =
       getStringValue(event, "span.description") ||
       getStringValue(event, "transaction") ||
-      "Unknown";
-    const duration = getNumberValue(event, "span.duration");
-    const transaction = getStringValue(event, "transaction", "N/A");
-    const trace = getStringValue(event, "trace");
-    const project = getStringValue(event, "project", "N/A");
-    const timestamp = getStringValue(event, "timestamp", "N/A");
+      getStringValue(event, "span.op") ||
+      "Span";
 
-    output += `## ${spanDescription}\n\n`;
-    output += `**Operation**: ${spanOp}\n`;
-    output += `**Transaction**: ${transaction}\n`;
-    if (trace) {
-      output += `**Trace ID**: ${trace}\n`;
-      output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, trace)}\n`;
+    output += `## ${title}\n\n`;
+
+    // Display priority fields first
+    for (const field of priorityFields) {
+      if (
+        field in event &&
+        event[field] !== null &&
+        event[field] !== undefined
+      ) {
+        const value = event[field];
+        const displayName =
+          field === "span.op"
+            ? "Operation"
+            : field === "span.description"
+              ? "Description"
+              : field === "span.duration"
+                ? "Duration"
+                : field === "span.status"
+                  ? "Status"
+                  : field.charAt(0).toUpperCase() +
+                    field.slice(1).replace(/[._]/g, " ");
+
+        if (field === "trace" && typeof value === "string") {
+          output += `**Trace ID**: ${value}\n`;
+          output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+        } else if (field === "span.duration" && typeof value === "number") {
+          output += `**${displayName}**: ${value}ms\n`;
+        } else {
+          output += `**${displayName}**: ${value}\n`;
+        }
+      }
     }
-    output += `**Project**: ${project}\n`;
-    if (duration !== undefined) {
-      output += `**Duration**: ${duration}ms\n`;
+
+    // Display any additional fields
+    const displayedFields = new Set([...priorityFields, "id"]);
+    for (const [key, value] of Object.entries(event)) {
+      if (!displayedFields.has(key) && value !== null && value !== undefined) {
+        const displayName =
+          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
+        output += `**${displayName}**: ${value}\n`;
+      }
     }
-    output += `**Timestamp**: ${timestamp}\n`;
+
     output += "\n";
   }
 
@@ -624,27 +723,37 @@ export default defineTool({
       temperature: 0.1, // Low temperature for more consistent translations
     });
 
-    // Select fields based on dataset - these are the fields we want to retrieve from the API
-    const DATASET_API_FIELDS = {
+    // Extract fields mentioned in the query
+    const extractFieldsFromQuery = (query: string): string[] => {
+      const fieldPattern = /(\w+(?:\.\w+)*):(?:"[^"]*"|[^\s]+)/g;
+      const fields = new Set<string>();
+      let match: RegExpExecArray | null = null;
+
+      while (true) {
+        match = fieldPattern.exec(query);
+        if (match === null) break;
+        fields.add(match[1]);
+      }
+
+      return Array.from(fields);
+    };
+
+    // Get fields from the query
+    const queryFields = extractFieldsFromQuery(sentryQuery);
+
+    // Define default fields for each dataset if no fields are found in query
+    const DEFAULT_FIELDS = {
       errors: [
         "issue",
         "title",
         "project",
-        "last_seen()",
-        "count()",
-        "level",
-        "culprit",
-      ],
-      logs: [
         "timestamp",
-        "project",
+        "level",
         "message",
-        "severity",
-        "trace",
-        "sentry.item_id",
+        "error.type",
       ],
+      logs: ["timestamp", "project", "message", "severity", "trace"],
       spans: [
-        "id",
         "span.op",
         "span.description",
         "span.duration",
@@ -652,11 +761,24 @@ export default defineTool({
         "timestamp",
         "project",
         "trace",
-        "transaction.span_id",
       ],
     };
 
-    const fields = DATASET_API_FIELDS[dataset];
+    // Combine query fields with essential fields that should always be included
+    const ESSENTIAL_FIELDS = {
+      errors: ["issue", "project"],
+      logs: ["timestamp", "message", "project"],
+      spans: ["timestamp", "project"],
+    };
+
+    // Build final field list
+    const fieldsSet = new Set<string>([
+      ...ESSENTIAL_FIELDS[dataset],
+      ...queryFields,
+      ...(queryFields.length === 0 ? DEFAULT_FIELDS[dataset] : []),
+    ]);
+
+    const fields = Array.from(fieldsSet);
 
     // Determine the appropriate sort parameter based on dataset
     const sortParam =
