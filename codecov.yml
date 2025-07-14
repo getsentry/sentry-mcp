@@ -6,3 +6,7 @@ coverage:
     patch:
       default:
         informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: "off"
