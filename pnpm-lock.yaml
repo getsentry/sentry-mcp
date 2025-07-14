@@ -388,6 +388,9 @@ importers:
       ai:
         specifier: 'catalog:'
         version: 4.3.16(react@19.1.0)(zod@3.25.72)
+      dotenv:
+        specifier: 'catalog:'
+        version: 16.6.1
       msw:
         specifier: 'catalog:'
         version: 2.10.2(@types/node@24.0.10)(typescript@5.8.3)

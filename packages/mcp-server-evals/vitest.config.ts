@@ -10,6 +10,6 @@ export default defineConfig({
       reporter: ["text", "json", "html"],
       include: ["**/*.ts"],
     },
-    setupFiles: ["dotenv/config"],
+    setupFiles: ["./src/setup-env.ts"],
   },
 });
