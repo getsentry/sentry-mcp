@@ -1,21 +1,53 @@
 import { describeEval } from "vitest-evals";
-import { Factuality, FIXTURES, TaskRunner } from "./utils";
+import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
 
 describeEval("list-releases", {
   data: async () => {
     return [
       {
         input: `Show me the releases in ${FIXTURES.organizationSlug}`,
-        expected: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "find_releases",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
       {
         input: `Show me a list of versions in ${FIXTURES.organizationSlug}/${FIXTURES.projectSlug}`,
-        expected: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "find_projects",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+          {
+            name: "find_releases",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              projectSlug: FIXTURES.projectSlug,
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
       },
     ];
   },
-  task: TaskRunner(),
-  scorers: [Factuality()],
+  task: NoOpTaskRunner(),
+  scorers: [ToolPredictionScorer()],
   threshold: 0.6,
   timeout: 30000,
 });

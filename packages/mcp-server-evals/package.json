@@ -21,6 +21,7 @@
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "ai": "catalog:",
+    "dotenv": "catalog:",
     "msw": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"
