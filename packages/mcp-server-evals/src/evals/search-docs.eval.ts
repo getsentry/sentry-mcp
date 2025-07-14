@@ -1,5 +1,5 @@
 import { describeEval } from "vitest-evals";
-import { SimpleTaskRunner, ToolPredictionScorer } from "./utils";
+import { NoOpTaskRunner, ToolPredictionScorer } from "./utils";
 
 describeEval("search-docs", {
   data: async () => {
@@ -44,7 +44,7 @@ describeEval("search-docs", {
       },
     ];
   },
-  task: SimpleTaskRunner(),
+  task: NoOpTaskRunner(),
   scorers: [ToolPredictionScorer()],
   threshold: 0.6,
   timeout: 30000,

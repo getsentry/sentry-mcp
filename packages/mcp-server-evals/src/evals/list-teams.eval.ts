@@ -1,5 +1,5 @@
 import { describeEval } from "vitest-evals";
-import { FIXTURES, SimpleTaskRunner, ToolPredictionScorer } from "./utils";
+import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
 
 describeEval("list-teams", {
   data: async () => {
@@ -54,7 +54,7 @@ describeEval("list-teams", {
       },
     ];
   },
-  task: SimpleTaskRunner(),
+  task: NoOpTaskRunner(),
   scorers: [ToolPredictionScorer()],
   threshold: 0.6,
   timeout: 30000,

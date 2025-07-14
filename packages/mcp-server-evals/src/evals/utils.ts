@@ -91,11 +91,12 @@ async function getAvailableTools(): Promise<string[]> {
 }
 
 /**
- * A simple task runner that doesn't execute tools, just passes the input through
- * for use with ToolPredictionScorer
+ * A no-op task runner that doesn't execute tools, just returns the input
+ * for use with ToolPredictionScorer. This allows tests to focus on predicting
+ * which tools would be called without actually executing them.
  */
-export function SimpleTaskRunner() {
-  return async function SimpleTaskRunner(input: string) {
+export function NoOpTaskRunner() {
+  return async function NoOpTaskRunner(input: string) {
     // Just return the input as the result, no tool execution
     return {
       result: input,
