@@ -20,7 +20,9 @@ export const Header: React.FC<HeaderProps> = ({
           <SentryIcon className="h-8 w-8 text-violet-400" />
           <div className="flex items-baseline gap-2">
             <h1 className="text-2xl font-bold whitespace-nowrap">Sentry MCP</h1>
-            <span className="text-sm text-muted-foreground">{LIB_VERSION}</span>
+            {LIB_VERSION !== "0.0.0" && (
+              <span className="text-sm text-muted-foreground">{LIB_VERSION}</span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
