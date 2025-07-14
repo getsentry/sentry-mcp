@@ -82,9 +82,6 @@ async function getAvailableTools(): Promise<string[]> {
     await client.close();
 
     return cachedTools;
-  } catch (error) {
-    // Fallback to empty array if connection fails
-    return [];
   } finally {
     mswServer.close();
   }
