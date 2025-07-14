@@ -810,18 +810,9 @@ export default defineTool({
     });
 
     // Parse the JSON response
-    let sentryQuery: string;
-    let requestedFields: string[];
-
-    try {
-      const parsed = JSON.parse(aiResponse);
-      sentryQuery = parsed.query;
-      requestedFields = parsed.fields || [];
-    } catch (error) {
-      // Fallback for backward compatibility if AI returns just the query string
-      sentryQuery = aiResponse.trim();
-      requestedFields = [];
-    }
+    const parsed = JSON.parse(aiResponse);
+    const sentryQuery = parsed.query;
+    const requestedFields = parsed.fields || [];
 
     // Use the AI-requested fields, or fall back to recommended fields
     const fields =

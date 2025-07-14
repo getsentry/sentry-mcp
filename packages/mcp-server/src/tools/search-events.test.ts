@@ -10,11 +10,63 @@ vi.mock("@ai-sdk/openai", () => ({
 }));
 
 vi.mock("ai", () => ({
-  generateText: vi.fn(() => Promise.resolve({ text: "mocked query" })),
+  generateText: vi.fn(() =>
+    Promise.resolve({
+      text: JSON.stringify({
+        query: "mocked query",
+        fields: [
+          "issue",
+          "title",
+          "project",
+          "timestamp",
+          "level",
+          "message",
+          "error.type",
+          "culprit",
+        ],
+      }),
+    }),
+  ),
 }));
 
 describe("search_events", () => {
   const mockGenerateText = vi.mocked(generateText);
+
+  // Helper to create JSON response for AI mocks
+  const mockAIResponse = (
+    query: string,
+    dataset: "errors" | "logs" | "spans" = "errors",
+  ) => {
+    const fieldSets = {
+      errors: [
+        "issue",
+        "title",
+        "project",
+        "timestamp",
+        "level",
+        "message",
+        "error.type",
+        "culprit",
+      ],
+      logs: ["timestamp", "project", "message", "severity", "trace"],
+      spans: [
+        "span.op",
+        "span.description",
+        "span.duration",
+        "transaction",
+        "timestamp",
+        "project",
+        "trace",
+      ],
+    };
+
+    return {
+      text: JSON.stringify({
+        query,
+        fields: fieldSets[dataset],
+      }),
+    } as any;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -24,9 +76,9 @@ describe("search_events", () => {
 
   it("translates semantic query and returns results", async () => {
     // Mock the AI response
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'message:"timeout" AND level:error',
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse('message:"timeout" AND level:error', "spans"),
+    );
 
     // Mock the trace-items attributes API response for both string and number types
     mswServer.use(
@@ -157,9 +209,9 @@ describe("search_events", () => {
   });
 
   it("filters by project when specified", async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: "transaction.duration:>5000",
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("transaction.duration:>5000", "spans"),
+    );
 
     mswServer.use(
       http.get(
@@ -239,9 +291,9 @@ describe("search_events", () => {
   });
 
   it("handles empty results gracefully", async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'message:"nonexistent error"',
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse('message:"nonexistent error"', "spans"),
+    );
 
     mswServer.use(
       http.get(
@@ -292,9 +344,9 @@ describe("search_events", () => {
   });
 
   it("handles API errors gracefully", async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: "level:error",
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("level:error", "spans"),
+    );
 
     mswServer.use(
       http.get(
@@ -355,9 +407,9 @@ describe("search_events", () => {
       ),
     );
 
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'customer.tier:"premium" AND level:error',
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse('customer.tier:"premium" AND level:error', "spans"),
+    );
 
     mswServer.use(
       http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
@@ -390,9 +442,9 @@ describe("search_events", () => {
   });
 
   it("defaults to errors dataset when not specified", async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'message:"connection refused"',
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse('message:"connection refused"', "errors"),
+    );
 
     mswServer.use(
       // Should use listTags for errors dataset by default
@@ -439,9 +491,9 @@ describe("search_events", () => {
   });
 
   it("handles errors dataset with listTags", async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'level:error AND message:"null pointer"',
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse('level:error AND message:"null pointer"', "errors"),
+    );
 
     mswServer.use(
       // For errors dataset, it uses listTags instead of trace-items attributes
@@ -493,9 +545,9 @@ describe("search_events", () => {
   });
 
   it("handles non-existent project gracefully", async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: "level:error",
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("level:error", "spans"),
+    );
 
     mswServer.use(
       http.get(
@@ -538,9 +590,9 @@ describe("search_events", () => {
 
   it("handles timestamp queries with correct format", async () => {
     // Test that timestamp queries use the correct format
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'message:"timeout" AND timestamp:-1h', // Correct format without operator
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse('message:"timeout" AND timestamp:-1h', "errors"),
+    );
 
     mswServer.use(
       http.get("https://sentry.io/api/0/organizations/test-org/tags/", () =>
@@ -605,9 +657,9 @@ describe("search_events", () => {
   });
 
   it("respects the limit parameter", async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: "level:error",
-    } as any);
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("level:error", "spans"),
+    );
 
     mswServer.use(
       http.get(
