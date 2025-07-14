@@ -1,6 +1,9 @@
 import { openai } from "@ai-sdk/openai";
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
+import { experimental_createMCPClient } from "ai";
+import { Experimental_StdioMCPTransport } from "ai/mcp-stdio";
+import { mswServer } from "@sentry/mcp-server-mocks";
 
 /**
  * IMPORTANT: Keep evaluation tests minimal!
@@ -27,6 +30,66 @@ export const FIXTURES = {
 
 const defaultModel = openai("gpt-4o");
 
+// Cache for available tools to avoid reconnecting for each test
+let cachedTools: string[] | null = null;
+
+/**
+ * Get available tools from the MCP server by connecting to it directly.
+ * This ensures the tool list stays in sync with what's actually registered.
+ */
+async function getAvailableTools(): Promise<string[]> {
+  if (cachedTools) {
+    return cachedTools;
+  }
+
+  // Start MSW mocks for API isolation
+  mswServer.listen({
+    onUnhandledRequest: (req, print) => {
+      if (req.url.startsWith("https://api.openai.com/")) {
+        return;
+      }
+      // Ignore unhandled requests during tool discovery
+    },
+  });
+
+  try {
+    // Use pnpm exec to run the binary from the workspace
+    const transport = new Experimental_StdioMCPTransport({
+      command: "pnpm",
+      args: ["exec", "sentry-mcp", "--access-token=mocked-access-token"],
+      env: {
+        ...process.env,
+        SENTRY_ACCESS_TOKEN: "mocked-access-token",
+        SENTRY_HOST: "sentry.io",
+      },
+    });
+
+    const client = await experimental_createMCPClient({
+      transport,
+    });
+
+    // Discover available tools
+    const toolsMap = await client.tools();
+
+    // Convert tools to the format expected by the scorer
+    cachedTools = Object.entries(toolsMap).map(([name, tool]) => {
+      // Extract the first line of description for a concise summary
+      const shortDescription = (tool as any).description?.split("\n")[0] || "";
+      return `${name} - ${shortDescription}`;
+    });
+
+    // Clean up
+    await client.close();
+
+    return cachedTools;
+  } catch (error) {
+    // Fallback to empty array if connection fails
+    return [];
+  } finally {
+    mswServer.close();
+  }
+}
+
 /**
  * A simple task runner that doesn't execute tools, just passes the input through
  * for use with ToolPredictionScorer
@@ -46,28 +109,6 @@ export function SimpleTaskRunner() {
  * This is much faster than actually running the tools and checking what was called.
  */
 export function ToolPredictionScorer(model: LanguageModel = defaultModel) {
-  // List of available Sentry MCP tools for context
-  const AVAILABLE_TOOLS = [
-    "find_organizations - List organizations the user has access to",
-    "find_teams - List teams in an organization",
-    "find_projects - List projects in an organization",
-    "find_issues - Search for grouped error issues in Sentry",
-    "find_releases - List releases/versions for a project",
-    "find_tags - List available tags for filtering in an organization",
-    "find_dsns - Get DSN configuration for a project",
-    "search_events - Search individual error events, logs, or traces using natural language",
-    "get_issue_details - Get detailed information about a specific issue including stacktrace",
-    "update_issue - Update issue status (resolve/ignore) or assignment",
-    "create_project - Create a new project in Sentry",
-    "create_team - Create a new team in an organization",
-    "create_dsn - Create an additional DSN for an existing project",
-    "update_project - Update project settings like name or platform",
-    "analyze_issue_with_seer - Get AI-powered root cause analysis for an issue",
-    "search_docs - Search Sentry documentation for any topic (setup, features, concepts, rate limiting, etc.)",
-    "get_doc - Retrieve full documentation content from a specific path",
-    "whoami - Get authenticated user info",
-  ];
-
   return async function ToolPredictionScorer(opts: {
     input: string;
     output: string;
@@ -75,6 +116,9 @@ export function ToolPredictionScorer(model: LanguageModel = defaultModel) {
     result?: any;
   }) {
     const expectedTools = opts.expected || [];
+
+    // Get available tools from the MCP server
+    const AVAILABLE_TOOLS = await getAvailableTools();
 
     // Generate a description of the expected tools for the prompt
     const expectedDescription = expectedTools
