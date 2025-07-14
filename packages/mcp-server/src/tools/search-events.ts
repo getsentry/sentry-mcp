@@ -11,7 +11,7 @@ import {
 } from "../schema";
 import { ProjectSchema } from "../api-client/schema";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { generateObject } from "ai";
 import { logError } from "../logging";
 
 // Type for flexible event data that can contain any fields
@@ -672,9 +672,15 @@ EXAMPLES:
 {datasetExamples}
 
 YOUR RESPONSE FORMAT:
-Return a JSON object with two fields:
-- "query": The Sentry query string for filtering results
-- "fields": Array of field names to return in results
+Return a JSON object with these fields:
+- "query": The Sentry query string for filtering results (REQUIRED)
+- "fields": Array of field names to return in results (OPTIONAL - will use defaults if not provided)
+- "error": Error message if you cannot translate the query (OPTIONAL)
+
+ERROR HANDLING:
+- If the user's query is impossible to translate to Sentry syntax, set "error" field with explanation
+- If the query asks for fields that don't exist in the dataset, set "error" field
+- If the query is ambiguous or unclear, set "error" field with clarification needed
 
 IMPORTANT NOTES:
 - Always include the recommended fields unless the user specifically asks for different fields
@@ -802,15 +808,39 @@ export default defineTool({
     }
 
     // Use the AI SDK to translate the query
-    const { text: aiResponse } = await generateText({
+    const { object: parsed } = await generateObject({
       model: openai("gpt-4o"),
       system: systemPrompt,
       prompt: params.naturalLanguageQuery,
       temperature: 0.1, // Low temperature for more consistent translations
+      schema: z.object({
+        query: z
+          .string()
+          .optional()
+          .describe("The Sentry query string for filtering results"),
+        fields: z
+          .array(z.string())
+          .optional()
+          .describe("Array of field names to return in results"),
+        error: z
+          .string()
+          .optional()
+          .describe("Error message if the query cannot be translated"),
+      }),
     });
 
-    // Parse the JSON response
-    const parsed = JSON.parse(aiResponse);
+    // Handle AI errors first
+    if (parsed.error) {
+      throw new Error(`AI could not translate query: ${parsed.error}`);
+    }
+
+    // Ensure we have a query
+    if (!parsed.query) {
+      throw new Error(
+        `AI did not provide a valid query for: "${params.naturalLanguageQuery}"`,
+      );
+    }
+
     const sentryQuery = parsed.query;
     const requestedFields = parsed.fields || [];
 

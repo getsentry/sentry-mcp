@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events.js";
-import { generateText } from "ai";
+import { generateObject } from "ai";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => ({
@@ -10,9 +10,9 @@ vi.mock("@ai-sdk/openai", () => ({
 }));
 
 vi.mock("ai", () => ({
-  generateText: vi.fn(() =>
+  generateObject: vi.fn(() =>
     Promise.resolve({
-      text: JSON.stringify({
+      object: {
         query: "mocked query",
         fields: [
           "issue",
@@ -24,18 +24,20 @@ vi.mock("ai", () => ({
           "error.type",
           "culprit",
         ],
-      }),
+        // error field is undefined by default (success case)
+      },
     }),
   ),
 }));
 
 describe("search_events", () => {
-  const mockGenerateText = vi.mocked(generateText);
+  const mockGenerateObject = vi.mocked(generateObject);
 
   // Helper to create JSON response for AI mocks
   const mockAIResponse = (
     query: string,
     dataset: "errors" | "logs" | "spans" = "errors",
+    errorMessage?: string,
   ) => {
     const fieldSets = {
       errors: [
@@ -60,11 +62,27 @@ describe("search_events", () => {
       ],
     };
 
+    const object = errorMessage
+      ? { error: errorMessage }
+      : { query, fields: fieldSets[dataset] };
+
     return {
-      text: JSON.stringify({
-        query,
-        fields: fieldSets[dataset],
-      }),
+      object,
+      finishReason: "stop" as const,
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      warnings: [] as const,
+      request: {},
+      response: {
+        id: "test-response-id",
+        timestamp: new Date(),
+        modelId: "gpt-4o",
+      },
+      experimental_providerMetadata: undefined,
+      logprobs: undefined,
+      get providerMetadata() {
+        return this.response;
+      },
+      toJsonResponse: () => ({ object }),
     } as any;
   };
 
@@ -76,7 +94,7 @@ describe("search_events", () => {
 
   it("translates semantic query and returns results", async () => {
     // Mock the AI response
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse('message:"timeout" AND level:error', "spans"),
     );
 
@@ -153,7 +171,7 @@ describe("search_events", () => {
     );
 
     // Verify the AI was called with the right prompt
-    expect(mockGenerateText).toHaveBeenCalledWith(
+    expect(mockGenerateObject).toHaveBeenCalledWith(
       expect.objectContaining({
         model: "mocked-model",
         prompt: "database timeouts in the last hour",
@@ -209,7 +227,7 @@ describe("search_events", () => {
   });
 
   it("filters by project when specified", async () => {
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse("transaction.duration:>5000", "spans"),
     );
 
@@ -291,7 +309,7 @@ describe("search_events", () => {
   });
 
   it("handles empty results gracefully", async () => {
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse('message:"nonexistent error"', "spans"),
     );
 
@@ -344,7 +362,7 @@ describe("search_events", () => {
   });
 
   it("handles API errors gracefully", async () => {
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse("level:error", "spans"),
     );
 
@@ -407,7 +425,7 @@ describe("search_events", () => {
       ),
     );
 
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse('customer.tier:"premium" AND level:error', "spans"),
     );
 
@@ -435,14 +453,14 @@ describe("search_events", () => {
     );
 
     // Verify custom attributes were included in the system prompt
-    expect(mockGenerateText).toHaveBeenCalled();
-    const callArgs = mockGenerateText.mock.calls[0][0];
+    expect(mockGenerateObject).toHaveBeenCalled();
+    const callArgs = mockGenerateObject.mock.calls[0][0];
     expect(callArgs.system).toContain("customer.tier: Customer Tier");
     expect(callArgs.system).toContain("feature.flag: Feature Flag");
   });
 
   it("defaults to errors dataset when not specified", async () => {
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse('message:"connection refused"', "errors"),
     );
 
@@ -474,10 +492,10 @@ describe("search_events", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "connection refused errors",
+        dataset: "errors" as const,
         limit: 10,
         includeExplanation: false,
-        // Note: dataset is not specified, should default to "errors"
-      } as any,
+      },
       {
         accessToken: "test-token",
         userId: "1",
@@ -491,7 +509,7 @@ describe("search_events", () => {
   });
 
   it("handles errors dataset with listTags", async () => {
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse('level:error AND message:"null pointer"', "errors"),
     );
 
@@ -545,7 +563,7 @@ describe("search_events", () => {
   });
 
   it("handles non-existent project gracefully", async () => {
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse("level:error", "spans"),
     );
 
@@ -590,7 +608,7 @@ describe("search_events", () => {
 
   it("handles timestamp queries with correct format", async () => {
     // Test that timestamp queries use the correct format
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse('message:"timeout" AND timestamp:-1h', "errors"),
     );
 
@@ -649,7 +667,7 @@ describe("search_events", () => {
     expect(result).toContain("Timeout Error");
 
     // Verify the AI was called with system prompt that includes timestamp format
-    expect(mockGenerateText).toHaveBeenCalledWith(
+    expect(mockGenerateObject).toHaveBeenCalledWith(
       expect.objectContaining({
         system: expect.stringContaining("timestamp:-1h"),
       }),
@@ -657,7 +675,7 @@ describe("search_events", () => {
   });
 
   it("respects the limit parameter", async () => {
-    mockGenerateText.mockResolvedValueOnce(
+    mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse("level:error", "spans"),
     );
 
@@ -700,4 +718,172 @@ describe("search_events", () => {
       },
     );
   });
+
+  it("should handle AI error responses gracefully", async () => {
+    // Mock AI returning an error
+    mockGenerateObject.mockResolvedValueOnce(
+      mockAIResponse(
+        "",
+        "errors",
+        "Cannot translate this query - it's too ambiguous",
+      ),
+    );
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          naturalLanguageQuery: "some impossible query",
+          dataset: "errors",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          accessToken: "test-token",
+          organizationSlug: "test-org",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(
+      "AI could not translate query: Cannot translate this query - it's too ambiguous",
+    );
+  });
+
+  it("should handle missing query from AI", async () => {
+    // Mock AI returning no query - using a custom object that doesn't include query
+    mockGenerateObject.mockResolvedValueOnce({
+      object: {
+        fields: ["timestamp", "message"],
+        // No query field
+      },
+      finishReason: "stop" as const,
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      warnings: [] as const,
+      request: {},
+      response: {
+        id: "test-response-id",
+        timestamp: new Date(),
+        modelId: "gpt-4o",
+      },
+      experimental_providerMetadata: undefined,
+      logprobs: undefined,
+      get providerMetadata() {
+        return this.response;
+      },
+      toJsonResponse: () => ({ object: { fields: ["timestamp", "message"] } }),
+    } as any);
+
+    await expect(
+      searchEvents.handler(
+        {
+          organizationSlug: "test-org",
+          naturalLanguageQuery: "test query",
+          dataset: "errors",
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          accessToken: "test-token",
+          organizationSlug: "test-org",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow('AI did not provide a valid query for: "test query"');
+  });
+});
+
+// Integration test that uses real OpenAI API
+describe("search_events integration test", () => {
+  it.skipIf(!process.env.OPENAI_API_KEY)(
+    "should work with real OpenAI API",
+    async () => {
+      // This test uses the real OpenAI API to ensure our generateObject integration works
+      // It only runs if OPENAI_API_KEY is set in the environment
+
+      // Mock the Sentry API calls but use real OpenAI
+      mswServer.use(
+        // Mock the tags endpoint for errors dataset
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/tags/",
+          () => {
+            return HttpResponse.json([
+              { key: "custom.field", name: "Custom Field" },
+            ]);
+          },
+          { once: true },
+        ),
+
+        // Mock the search events endpoint
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/events/",
+          () => {
+            return HttpResponse.json({
+              data: [
+                {
+                  issue: "TEST-123",
+                  title: "Test Error",
+                  project: "test-project",
+                  timestamp: "2025-07-14T20:49:44.000Z",
+                  level: "error",
+                  message: "Test error message",
+                  "error.type": "TestError",
+                  culprit: "test.js",
+                },
+              ],
+            });
+          },
+          { once: true },
+        ),
+      );
+
+      // Unmock the AI module for this test to use the real implementation
+      vi.doUnmock("ai");
+      vi.doUnmock("@ai-sdk/openai");
+
+      // Import the real module after unmocking
+      const realSearchEvents = await import("./search-events.js");
+
+      const result = await realSearchEvents.default.handler(
+        {
+          organizationSlug: "test-org",
+          naturalLanguageQuery: "database connection errors",
+          dataset: "errors" as const,
+          limit: 10,
+          includeExplanation: false,
+        },
+        {
+          accessToken: "test-token",
+          organizationSlug: "test-org",
+          userId: "test-user",
+        },
+      );
+
+      // Verify the result is a string (formatted output)
+      expect(typeof result).toBe("string");
+      expect(result).toContain("Search Results for");
+      expect(result).toContain("database connection errors");
+      expect(result).toContain("TEST-123");
+
+      // Re-mock for other tests
+      vi.doMock("ai", () => ({
+        generateObject: vi.fn(() =>
+          Promise.resolve({
+            object: {
+              query: "mocked query",
+              fields: [
+                "issue",
+                "title",
+                "project",
+                "timestamp",
+                "level",
+                "message",
+                "error.type",
+                "culprit",
+              ],
+            },
+          }),
+        ),
+      }));
+    },
+  );
 });
