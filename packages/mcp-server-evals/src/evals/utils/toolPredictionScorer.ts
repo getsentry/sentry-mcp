@@ -64,6 +64,47 @@ const defaultModel = openai("gpt-4o");
 /**
  * A scorer that uses AI to predict what tools would be called without executing them.
  * This is much faster than actually running the tools and checking what was called.
+ *
+ * @param model - Optional language model to use for predictions (defaults to gpt-4o)
+ * @returns A scorer function that compares predicted vs expected tool calls
+ *
+ * @example
+ * ```typescript
+ * import { ToolPredictionScorer } from './utils/toolPredictionScorer';
+ * import { NoOpTaskRunner } from './utils/runner';
+ * import { describeEval } from 'vitest-evals';
+ *
+ * describeEval("Sentry issue search", {
+ *   data: async () => [
+ *     {
+ *       input: "Find the newest issues in my-org",
+ *       expectedTools: [
+ *         { name: "find_organizations", arguments: {} },
+ *         { name: "find_issues", arguments: { organizationSlug: "my-org", sortBy: "first_seen" } }
+ *       ]
+ *     }
+ *   ],
+ *   task: NoOpTaskRunner(), // Don't execute tools, just predict them
+ *   scorers: [ToolPredictionScorer()],
+ *   threshold: 0.8
+ * });
+ * ```
+ *
+ * The scorer works by:
+ * 1. Connecting to the MCP server to get available tools and their descriptions
+ * 2. Using AI to predict what tools would be called for the given task
+ * 3. Comparing predictions against the expectedTools array
+ * 4. Returning a score from 0.0 to 1.0 based on accuracy
+ *
+ * Scoring criteria:
+ * - 1.0: All expected tools predicted with correct arguments in right order
+ * - 0.8: All expected tools predicted, minor differences (extra params, slight variations)
+ * - 0.6: Most expected tools predicted but missing some or wrong order
+ * - 0.3: Some expected tools predicted but significant issues
+ * - 0.0: Wrong tools or critical tools missing
+ *
+ * If `expectedTools` is not provided in test data, the scorer is automatically skipped
+ * and returns `{ score: null }` to allow other scorers to run without interference.
  */
 export function ToolPredictionScorer(model: LanguageModel = defaultModel) {
   return async function ToolPredictionScorer(
