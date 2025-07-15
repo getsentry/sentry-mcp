@@ -944,7 +944,7 @@ export default defineTool({
     // Check if OpenAI API key is available
     if (!process.env.OPENAI_API_KEY) {
       throw new ConfigurationError(
-        `OPENAI_API_KEY environment variable is required for semantic search. Query: "${params.naturalLanguageQuery}", Dataset: ${dataset}. Please set the OPENAI_API_KEY environment variable to use natural language search.`,
+        "OPENAI_API_KEY environment variable is required for semantic search",
       );
     }
 
