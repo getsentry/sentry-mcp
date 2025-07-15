@@ -902,6 +902,9 @@ Return a JSON object with these fields:
 - "query": The Sentry query string for filtering results (use empty string "" for no filters)
 - "fields": Array of field names to return in results (OPTIONAL - will use defaults if not provided)
 - "sort": Sort parameter for results (REQUIRED - YOU MUST ALWAYS SPECIFY THIS)
+- "isAggregate": Boolean indicating if this is an aggregate query (REQUIRED)
+- "aggregateFunctions": Array of aggregate function fields like ["count()", "avg(span.duration)"] (REQUIRED if isAggregate=true, empty array otherwise)
+- "groupByField": The field to group by, or null if no grouping (REQUIRED if isAggregate=true and there's a non-function field)
 - "error": Error message if you cannot translate the query (OPTIONAL)
 
 ERROR HANDLING:
@@ -921,7 +924,19 @@ IMPORTANT NOTES:
   - Numeric functions (avg, sum, min, max, percentiles) ONLY work with numeric fields
   - count() and count_unique() work with any field type
   - When using aggregate functions, results are grouped by non-function fields
-  - Dataset-specific functions must only be used with their respective datasets`;
+  - Dataset-specific functions must only be used with their respective datasets
+
+AGGREGATE QUERY RESPONSE STRUCTURE:
+When creating an aggregate query:
+1. Set isAggregate to true
+2. List all aggregate functions in aggregateFunctions array (e.g., ["count()", "avg(span.duration)"])
+3. Set groupByField to the single field you're grouping by (or null if just aggregating without grouping)
+4. Include all fields (both aggregate functions and groupBy field) in the fields array
+
+Examples:
+- "count of errors by type": isAggregate=true, aggregateFunctions=["count()"], groupByField="error.type", fields=["error.type", "count()"]
+- "average span duration": isAggregate=true, aggregateFunctions=["avg(span.duration)"], groupByField=null, fields=["avg(span.duration)"]
+- "most common transaction": isAggregate=true, aggregateFunctions=["count()"], groupByField="span.description", fields=["span.description", "count()"], sort="-count()"`;
 
 export default defineTool({
   name: "search_events",
@@ -1038,6 +1053,25 @@ export default defineTool({
           .describe(
             "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
           ),
+        isAggregate: z
+          .boolean()
+          .describe(
+            "Whether this is an aggregate query (true if using any aggregate functions)",
+          ),
+        aggregateFunctions: z
+          .array(z.string())
+          .optional()
+          .default([])
+          .describe(
+            "Array of aggregate function fields (e.g., ['count()', 'avg(span.duration)'])",
+          ),
+        groupByField: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            "The field to group by in aggregate queries (null if no grouping)",
+          ),
         error: z
           .string()
           .optional()
@@ -1114,7 +1148,7 @@ export default defineTool({
       },
     );
 
-    // Generate the Sentry explorer URL
+    // Generate the Sentry explorer URL with structured aggregate information
     const explorerUrl = apiService.getEventsExplorerUrl(
       organizationSlug,
       sentryQuery,
@@ -1122,6 +1156,11 @@ export default defineTool({
       dataset, // dataset is already correct for URL generation (logs, spans, errors)
       fields, // Pass fields to detect if it's an aggregate query
       sortParam, // Pass sort parameter for URL generation
+      {
+        isAggregate: parsed.isAggregate,
+        aggregateFunctions: parsed.aggregateFunctions || [],
+        groupByField: parsed.groupByField || null,
+      },
     );
 
     // Type-safe access to event data

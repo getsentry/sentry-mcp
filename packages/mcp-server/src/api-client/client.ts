@@ -461,6 +461,11 @@ export class SentryApiService {
     dataset: "spans" | "errors" | "logs" = "spans",
     fields?: string[],
     sort?: string,
+    aggregateInfo?: {
+      isAggregate: boolean;
+      aggregateFunctions: string[];
+      groupByField: string | null;
+    },
   ): string {
     const params = new URLSearchParams();
     params.set("query", query);
@@ -483,6 +488,7 @@ export class SentryApiService {
 
       // Add mode=aggregate for aggregate queries
       const isAggregateQuery =
+        aggregateInfo?.isAggregate ||
         fields?.some((field) => field.includes("(") && field.includes(")")) ||
         false;
       if (isAggregateQuery) {
@@ -501,37 +507,57 @@ export class SentryApiService {
     } else {
       // Spans use /explore/traces/
       const isAggregateQuery =
+        aggregateInfo?.isAggregate ||
         fields?.some((field) => field.includes("(") && field.includes(")")) ||
         false;
 
       if (isAggregateQuery) {
         params.set("mode", "aggregate");
 
-        // Add aggregate field information for spans
-        // Find the group by field (non-function fields)
-        const groupByFields =
-          fields?.filter(
-            (field) => !field.includes("(") && !field.includes(")"),
-          ) || [];
-        if (groupByFields.length > 0) {
-          // Use the first non-function field as the groupBy
-          params.append(
-            "aggregateField",
-            JSON.stringify({ groupBy: groupByFields[0] }),
-          );
-        }
+        // Use structured aggregate information if provided
+        if (aggregateInfo) {
+          // Add groupBy field if specified
+          if (aggregateInfo.groupByField) {
+            params.append(
+              "aggregateField",
+              JSON.stringify({ groupBy: aggregateInfo.groupByField }),
+            );
+          }
 
-        // Find aggregate function fields
-        const aggregateFunctions =
-          fields?.filter(
-            (field) => field.includes("(") && field.includes(")"),
-          ) || [];
-        if (aggregateFunctions.length > 0) {
-          // Add yAxes for aggregate functions
-          params.append(
-            "aggregateField",
-            JSON.stringify({ yAxes: aggregateFunctions }),
-          );
+          // Add aggregate functions (yAxes)
+          if (aggregateInfo.aggregateFunctions.length > 0) {
+            params.append(
+              "aggregateField",
+              JSON.stringify({ yAxes: aggregateInfo.aggregateFunctions }),
+            );
+          }
+        } else {
+          // Fallback to parsing fields (for backward compatibility)
+          // Find the group by field (non-function fields)
+          const groupByFields =
+            fields?.filter(
+              (field) => !field.includes("(") && !field.includes(")"),
+            ) || [];
+          if (groupByFields.length > 0) {
+            // Use the first non-function field as the groupBy
+            params.append(
+              "aggregateField",
+              JSON.stringify({ groupBy: groupByFields[0] }),
+            );
+          }
+
+          // Find aggregate function fields
+          const aggregateFunctions =
+            fields?.filter(
+              (field) => field.includes("(") && field.includes(")"),
+            ) || [];
+          if (aggregateFunctions.length > 0) {
+            // Add yAxes for aggregate functions
+            params.append(
+              "aggregateField",
+              JSON.stringify({ yAxes: aggregateFunctions }),
+            );
+          }
         }
       }
 
