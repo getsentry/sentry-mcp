@@ -676,6 +676,21 @@ describe("API query builders", () => {
 
       expect(params.get("sort")).toBe("-count");
     });
+
+    it("should safely handle malformed sort parameters", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+
+      // @ts-expect-error - accessing private method for testing
+      const params = apiService.buildDiscoverApiQuery({
+        query: "",
+        fields: ["title"],
+        limit: 10,
+        sort: "-count(((",
+      });
+
+      // Should not crash and should return the original sort if malformed
+      expect(params.get("sort")).toBe("-count(((");
+    });
   });
 
   describe("buildEapApiQuery", () => {
