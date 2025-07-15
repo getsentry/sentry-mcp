@@ -621,9 +621,11 @@ export class SentryApiService {
           urlParams.append("field", field);
         }
       }
-      if (sort) {
-        urlParams.set("sort", sort);
-      }
+    }
+
+    // Add sort parameter for all queries
+    if (sort) {
+      urlParams.set("sort", sort);
     }
 
     urlParams.set("statsPeriod", statsPeriod);
@@ -1597,7 +1599,7 @@ export class SentryApiService {
 
     // Sort parameter transformation for API compatibility
     let apiSort = params.sort;
-    if (params.sort.includes("(")) {
+    if (params.sort?.includes("(")) {
       // Transform: count(field) -> count_field, count() -> count
       // Use safer string manipulation to avoid ReDoS
       const parenStart = params.sort.indexOf("(");
@@ -1659,7 +1661,7 @@ export class SentryApiService {
 
     // Sort parameter transformation for API compatibility
     let apiSort = params.sort;
-    if (params.sort.includes("(")) {
+    if (params.sort?.includes("(")) {
       // Transform: count(field) -> count_field, count() -> count
       // Use safer string manipulation to avoid ReDoS
       const parenStart = params.sort.indexOf("(");
