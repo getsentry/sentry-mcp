@@ -36,6 +36,80 @@ function getNumberValue(
   return typeof value === "number" ? value : undefined;
 }
 
+// Helper to get a human-readable display name for a field
+function getFieldDisplayName(field: string): string {
+  // Special cases for known fields
+  const fieldDisplayNames: Record<string, string> = {
+    // Aggregate fields
+    "last_seen()": "Last seen (aggregate)",
+    "count()": "Total occurrences",
+
+    // Error fields
+    culprit: "Location",
+    "error.type": "Error type",
+    "error.value": "Error value",
+    "error.handled": "Handled",
+
+    // Stack fields
+    "stack.filename": "File",
+    "stack.function": "Function",
+    "stack.module": "Module",
+    "stack.abs_path": "Absolute path",
+
+    // Span fields
+    "span.op": "Operation",
+    "span.description": "Description",
+    "span.duration": "Duration",
+    "span.status": "Status",
+    "span.self_time": "Self time",
+
+    // Transaction fields
+    "transaction.duration": "Transaction duration",
+    "transaction.op": "Transaction operation",
+    "transaction.status": "Transaction status",
+    is_transaction: "Is transaction",
+
+    // Trace fields
+    "trace.span_id": "Span ID",
+    "trace.parent_span_id": "Parent span ID",
+
+    // HTTP fields
+    "http.method": "HTTP method",
+    "http.status_code": "HTTP status",
+    "http.url": "URL",
+
+    // Database fields
+    "db.system": "Database system",
+    "db.operation": "Database operation",
+
+    // User fields
+    "user.id": "User ID",
+    "user.email": "User email",
+
+    // SDK fields
+    "sdk.name": "SDK name",
+    "sdk.version": "SDK version",
+
+    // Context fields
+    "os.name": "Operating system",
+    "browser.name": "Browser",
+    "device.family": "Device",
+
+    // Log fields
+    severity_number: "Severity number",
+    "sentry.item_id": "Item ID",
+    "sentry.observed_timestamp_nanos": "Observed timestamp (nanos)",
+  };
+
+  // Return special case if found
+  if (fieldDisplayNames[field]) {
+    return fieldDisplayNames[field];
+  }
+
+  // Default: capitalize first letter and replace dots/underscores with spaces
+  return field.charAt(0).toUpperCase() + field.slice(1).replace(/[._]/g, " ");
+}
+
 // Helper function to fetch custom attributes for a dataset
 async function fetchCustomAttributes(
   apiService: SentryApiService,
@@ -132,6 +206,15 @@ const DATASET_FIELDS = {
     // Database fields
     "db.system": "Database system (postgresql, mysql, etc.)",
     "db.operation": "Database operation (SELECT, INSERT, etc.)",
+
+    // Aggregate functions for performance analysis
+    "count()": "Count of spans",
+    "avg(span.duration)": "Average duration",
+    "min(span.duration)": "Minimum duration",
+    "max(span.duration)": "Maximum duration",
+    "p50(span.duration)": "Median duration",
+    "p95(span.duration)": "95th percentile duration",
+    "p99(span.duration)": "99th percentile duration",
   },
   errors: {
     // Error-specific fields
@@ -154,9 +237,16 @@ const DATASET_FIELDS = {
     "browser.name": "Browser name",
     "device.family": "Device family",
 
-    // Aggregate fields (provide data about the issue group)
-    "last_seen()": "When this issue was last seen (aggregate)",
-    "count()": "Total number of occurrences of this issue (aggregate)",
+    // Aggregate functions (can be used with any numeric field or for counting)
+    "count()": "Count of events (when used alone or with grouping fields)",
+    "last_seen()": "Most recent timestamp (aggregate)",
+    "min()": "Minimum value of a field, e.g. min(span.duration)",
+    "max()": "Maximum value of a field, e.g. max(span.duration)",
+    "avg()": "Average value of a field, e.g. avg(span.duration)",
+    "sum()": "Sum of values, e.g. sum(span.self_time)",
+    "p50()": "50th percentile (median), e.g. p50(span.duration)",
+    "p95()": "95th percentile, e.g. p95(span.duration)",
+    "p99()": "99th percentile, e.g. p99(span.duration)",
   },
   logs: {
     // Log-specific fields
@@ -203,6 +293,16 @@ const DATASET_CONFIGS = {
   {
     "query": "stack.filename:\\"**/Button.tsx\\"",
     "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "stack.filename"]
+  }
+- "count errors by type in production" → 
+  {
+    "query": "environment:production",
+    "fields": ["error.type", "count()", "last_seen()"]
+  }
+- "most common errors last 24h" → 
+  {
+    "query": "level:error",
+    "fields": ["title", "error.type", "count()"]
   }`,
   },
   logs: {
@@ -247,6 +347,16 @@ const DATASET_CONFIGS = {
   {
     "query": "span.op:db.query",
     "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.operation"]
+  }
+- "average response time by endpoint" → 
+  {
+    "query": "is_transaction:true",
+    "fields": ["transaction", "count()", "avg(span.duration)", "p95(span.duration)"]
+  }
+- "slowest database queries by p95" → 
+  {
+    "query": "span.op:db*",
+    "fields": ["span.description", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"]
   }`,
   },
 };
@@ -314,15 +424,7 @@ function formatErrorResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName =
-          field === "last_seen()"
-            ? "Last seen (aggregate)"
-            : field === "count()"
-              ? "Total occurrences"
-              : field === "culprit"
-                ? "Location"
-                : field.charAt(0).toUpperCase() +
-                  field.slice(1).replace(/[._]/g, " ");
+        const displayName = getFieldDisplayName(field);
 
         if (field === "issue" && typeof value === "string") {
           output += `**Issue ID**: ${value}\n`;
@@ -337,8 +439,7 @@ function formatErrorResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName =
-          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
+        const displayName = getFieldDisplayName(key);
         output += `**${displayName}**: ${value}\n`;
       }
     }
@@ -440,13 +541,7 @@ function formatLogResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName =
-          field === "severity_number"
-            ? "Severity number"
-            : field === "sentry.item_id"
-              ? "Item ID"
-              : field.charAt(0).toUpperCase() +
-                field.slice(1).replace(/[._]/g, " ");
+        const displayName = getFieldDisplayName(field);
 
         if (field === "trace" && typeof value === "string") {
           output += `- **Trace ID**: ${value}\n`;
@@ -461,8 +556,7 @@ function formatLogResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName =
-          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
+        const displayName = getFieldDisplayName(key);
         output += `- **${displayName}**: ${value}\n`;
       }
     }
@@ -540,17 +634,7 @@ function formatSpanResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName =
-          field === "span.op"
-            ? "Operation"
-            : field === "span.description"
-              ? "Description"
-              : field === "span.duration"
-                ? "Duration"
-                : field === "span.status"
-                  ? "Status"
-                  : field.charAt(0).toUpperCase() +
-                    field.slice(1).replace(/[._]/g, " ");
+        const displayName = getFieldDisplayName(field);
 
         if (field === "trace" && typeof value === "string") {
           output += `**Trace ID**: ${value}\n`;
@@ -567,8 +651,7 @@ function formatSpanResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName =
-          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
+        const displayName = getFieldDisplayName(key);
         output += `**${displayName}**: ${value}\n`;
       }
     }
@@ -701,24 +784,29 @@ IMPORTANT NOTES:
 export default defineTool({
   name: "search_events",
   description: [
-    "Search for individual error events, log entries, or trace spans using natural language queries.",
+    "Search for error events, log entries, or trace spans with support for both individual events and SQL-like aggregations.",
     "",
-    "🔍 USE THIS TOOL WHEN USERS ASK FOR:",
-    "- 'error logs', 'log entries', 'show me logs'",
-    "- 'find errors that occurred', 'error events from last hour'",
-    "- 'database timeout errors', 'specific error occurrences'",
-    "- 'slow queries', 'API calls taking over X seconds'",
-    "- Any query about INDIVIDUAL events/occurrences with time/performance filters",
+    "🔍 QUERY MODES:",
+    "1. **Individual Events** - Returns raw event data with full details",
+    "   - Default behavior when fields contain no function() calls",
+    "   - Example fields: timestamp, message, error.type, user.email",
     "",
-    "❌ DO NOT USE for 'issues', 'problems', or when users want grouped summaries",
+    "2. **Aggregate Queries** - SQL-like grouping and aggregation",
+    "   - Activated when fields contain function() calls",
+    "   - Groups by all non-function fields automatically",
+    "   - Functions: count(), last_seen(), min(), max(), avg(), sum(), p50(), p95(), p99()",
+    "   - Example: fields=['project', 'error.type', 'count()'] groups by project and error.type",
     "",
-    "CRITICAL DISTINCTION:",
-    "- Events = Individual occurrences with full details (use search_events)",
-    "- Issues = Grouped problems with aggregate statistics (use find_issues)",
+    "📊 USE THIS TOOL FOR:",
+    "- 'show me error logs from the last hour' → Individual events",
+    "- 'count errors by type' → Aggregate query with count()",
+    "- 'slowest API calls' → Individual spans sorted by duration",
+    "- 'average response time by endpoint' → Aggregate with avg(span.duration)",
     "",
-    "NOTE: This tool returns individual events but can include aggregate fields:",
-    "- last_seen() - When the issue group was last seen",
-    "- count() - Total occurrences of the issue group",
+    "❌ DO NOT USE for 'issues' or 'problems' (use find_issues instead)",
+    "",
+    "NOTE: When returning individual events, aggregate fields like count() and last_seen()",
+    "provide statistics about the issue group the event belongs to.",
     "",
     "Dataset Selection:",
     "- Users say 'error logs' → dataset='logs' (log entries with error severity)",
