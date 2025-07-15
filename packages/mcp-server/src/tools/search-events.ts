@@ -218,52 +218,62 @@ const DATASET_CONFIGS = {
     examples: `- "null pointer exceptions" → 
   {
     "query": "error.type:\\"NullPointerException\\" OR message:\\"*null pointer*\\"",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"]
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"],
+    "sort": "-timestamp"
   }
 - "unhandled errors in production" → 
   {
     "query": "error.handled:false AND environment:production",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "error.handled", "environment"]
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "error.handled", "environment"],
+    "sort": "-timestamp"
   }
 - "database connection errors" → 
   {
     "query": "message:\\"*database*\\" AND message:\\"*connection*\\" AND level:error",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"]
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"],
+    "sort": "-timestamp"
   }
 - "show me user emails for authentication failures" → 
   {
     "query": "message:\\"*auth*\\" AND (message:\\"*failed*\\" OR message:\\"*denied*\\")",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "user.email"]
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "user.email"],
+    "sort": "-timestamp"
   }
 - "errors in Button.tsx file" → 
   {
     "query": "stack.filename:\\"**/Button.tsx\\"",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "stack.filename"]
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "stack.filename"],
+    "sort": "-timestamp"
   }
 - "count errors by type in production" → 
   {
     "query": "environment:production",
-    "fields": ["error.type", "count()", "last_seen()"]
+    "fields": ["error.type", "count()", "last_seen()"],
+    "sort": "-count()"
   }
 - "most common errors last 24h" → 
   {
     "query": "level:error",
-    "fields": ["title", "error.type", "count()"]
+    "fields": ["title", "error.type", "count()"],
+    "sort": "-count()"
   }
 - "unhandled errors rate by project" → 
   {
     "query": "",
-    "fields": ["project", "count()", "count_if(error.handled,equals,false)", "epm()"]
+    "fields": ["project", "count()", "count_if(error.handled,equals,false)", "epm()"],
+    "sort": "-count()"
   }
 - "unique users affected by errors" → 
   {
     "query": "level:error",
-    "fields": ["error.type", "count()", "count_unique(user.id)"]
+    "fields": ["error.type", "count()", "count_unique(user.id)"],
+    "sort": "-count_unique(user.id)"
   }
 - "what is the most common error" → 
   {
     "query": "",
-    "fields": ["title", "count()"]
+    "fields": ["title", "count()"],
+    "sort": "-count()"
   }`,
   },
   logs: {
@@ -277,37 +287,44 @@ const DATASET_CONFIGS = {
     examples: `- "warning logs about memory" → 
   {
     "query": "severity:warning AND message:\\"*memory*\\"",
-    "fields": ["timestamp", "project", "message", "severity", "trace"]
+    "fields": ["timestamp", "project", "message", "severity", "trace"],
+    "sort": "-timestamp"
   }
 - "error logs from database" → 
   {
     "query": "severity:error AND message:\\"*database*\\"",
-    "fields": ["timestamp", "project", "message", "severity", "trace"]
+    "fields": ["timestamp", "project", "message", "severity", "trace"],
+    "sort": "-timestamp"
   }
 - "show me error logs with user context" → 
   {
     "query": "severity:error",
-    "fields": ["timestamp", "project", "message", "severity", "trace", "user.id", "user.email"]
+    "fields": ["timestamp", "project", "message", "severity", "trace", "user.id", "user.email"],
+    "sort": "-timestamp"
   }
 - "what is the most common log" → 
   {
     "query": "",
-    "fields": ["message", "count()"]
+    "fields": ["message", "count()"],
+    "sort": "-count()"
   }
 - "most common error logs" → 
   {
     "query": "severity:error",
-    "fields": ["message", "count()"]
+    "fields": ["message", "count()"],
+    "sort": "-count()"
   }
 - "count logs by severity" → 
   {
     "query": "",
-    "fields": ["severity", "count()"]
+    "fields": ["severity", "count()"],
+    "sort": "-count()"
   }
 - "log volume by project" → 
   {
     "query": "",
-    "fields": ["project", "count()", "epm()"]
+    "fields": ["project", "count()", "epm()"],
+    "sort": "-count()"
   }`,
   },
   spans: {
@@ -317,27 +334,32 @@ const DATASET_CONFIGS = {
     examples: `- "database queries" → 
   {
     "query": "span.op:db OR span.op:db.query",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace"]
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace"],
+    "sort": "-span.duration"
   }
 - "slow API calls over 5 seconds" → 
   {
     "query": "span.duration:>5000 AND span.op:http*",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "http.method", "http.status_code"]
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "http.method", "http.status_code"],
+    "sort": "-span.duration"
   }
 - "show me database queries with their SQL" → 
   {
     "query": "span.op:db.query",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.operation"]
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.operation"],
+    "sort": "-span.duration"
   }
 - "average response time by endpoint" → 
   {
     "query": "is_transaction:true",
-    "fields": ["transaction", "count()", "avg(span.duration)", "p95(span.duration)"]
+    "fields": ["transaction", "count()", "avg(span.duration)", "p95(span.duration)"],
+    "sort": "-avg(span.duration)"
   }
 - "slowest database queries by p95" → 
   {
     "query": "span.op:db*",
-    "fields": ["span.description", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"]
+    "fields": ["span.description", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"],
+    "sort": "-p95(span.duration)"
   }`,
   },
 };
@@ -778,10 +800,35 @@ QUERY SYNTAX RULES:
 EXAMPLES:
 {datasetExamples}
 
+SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
+1. DEFAULT SORTING:
+   - errors dataset: Use "-timestamp" (newest first)
+   - spans dataset: Use "-span.duration" (slowest first)  
+   - logs dataset: Use "-timestamp" (newest first)
+
+2. SORTING SYNTAX:
+   - Use "-" prefix for descending order (e.g., "-timestamp" for newest first)
+   - Use field name without prefix for ascending order (e.g., "timestamp" for oldest first)
+   - For individual event queries: sort by any field in the dataset
+   - For aggregate queries: sort by aggregate function results (e.g., "-count()" for highest count first)
+
+3. AGGREGATE QUERY SORTING:
+   - When using aggregate functions, sort by the function result
+   - Examples: "-count()" for highest count, "-avg(span.duration)" for slowest average
+   - Common patterns: "-count()", "-sum(field)", "-avg(field)", "-max(field)"
+
+4. IMPORTANT SORTING REQUIREMENTS:
+   - YOU MUST ALWAYS INCLUDE A SORT PARAMETER
+   - If user asks for "most common", use "-count()"
+   - If user asks for "slowest", use "-span.duration" or "-avg(span.duration)"
+   - If user asks for "latest" or "recent", use "-timestamp"
+   - If unsure, use the default sort for the dataset
+
 YOUR RESPONSE FORMAT:
 Return a JSON object with these fields:
 - "query": The Sentry query string for filtering results (use empty string "" for no filters)
 - "fields": Array of field names to return in results (OPTIONAL - will use defaults if not provided)
+- "sort": Sort parameter for results (REQUIRED - YOU MUST ALWAYS SPECIFY THIS)
 - "error": Error message if you cannot translate the query (OPTIONAL)
 
 ERROR HANDLING:
@@ -796,10 +843,6 @@ IMPORTANT NOTES:
 - Do NOT include project: filters in your query (project filtering is handled separately)
 - For spans/errors: When user mentions time periods, include timestamp filters in query
 - For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically
-- CRITICAL: Results are sorted automatically, so you MUST include sort fields in your field selection:
-  - For errors: Always include "timestamp" field (results sorted by most recent)
-  - For spans: Always include "span.duration" field (results sorted by slowest)
-  - For logs: Always include "timestamp" field (results sorted by most recent)
 - AGGREGATE FUNCTION RULES:
   - Numeric functions (avg, sum, min, max, percentiles) ONLY work with numeric fields
   - count() and count_unique() work with any field type
@@ -916,6 +959,11 @@ export default defineTool({
           .array(z.string())
           .optional()
           .describe("Array of field names to return in results"),
+        sort: z
+          .string()
+          .describe(
+            "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
+          ),
         error: z
           .string()
           .optional()
@@ -926,6 +974,11 @@ export default defineTool({
     // Handle AI errors first
     if (parsed.error) {
       throw new Error(`AI could not translate query: ${parsed.error}`);
+    }
+
+    // Validate that sort parameter was provided
+    if (!parsed.sort) {
+      throw new Error(`AI did not provide required sort parameter for query`);
     }
 
     // Use empty string as default if no query is provided
@@ -939,26 +992,8 @@ export default defineTool({
         ? requestedFields
         : RECOMMENDED_FIELDS[dataset].basic;
 
-    // Check if this is an aggregate query (contains any function calls)
-    const isAggregateQuery = fields.some(
-      (field) => field.includes("(") && field.includes(")"),
-    );
-
-    // Determine the appropriate sort parameter based on dataset and query type
-    let sortParam: string;
-    if (isAggregateQuery) {
-      // For aggregate queries, sort by the count field if present, otherwise omit sort
-      const countField = fields.find((f) => f.includes("count()"));
-      sortParam = countField ? `-${countField}` : "";
-    } else {
-      // For non-aggregate queries, use default sorting
-      sortParam =
-        dataset === "errors"
-          ? "-timestamp"
-          : dataset === "spans"
-            ? "-span.duration"
-            : "-timestamp";
-    }
+    // Use the AI-provided sort parameter
+    const sortParam = parsed.sort;
 
     // Convert project slug to ID if needed - the search API requires numeric IDs
     let projectId: string | undefined;
@@ -987,7 +1022,7 @@ export default defineTool({
           limit: params.limit,
           projectSlug: projectId, // API requires numeric project ID, not slug
           dataset: dataset === "logs" ? "ourlogs" : dataset,
-          ...(sortParam && { sort: sortParam }), // Only include sort if not empty
+          sort: sortParam,
           // For logs and errors, use a default time window
           ...(dataset !== "spans" && { statsPeriod: "24h" }),
         }),

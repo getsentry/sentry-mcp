@@ -24,6 +24,7 @@ vi.mock("ai", () => ({
           "error.type",
           "culprit",
         ],
+        sort: "-timestamp", // Added required sort parameter
         // error field is undefined by default (success case)
       },
     }),
@@ -62,9 +63,15 @@ describe("search_events", () => {
       ],
     };
 
+    const sortParams = {
+      errors: "-timestamp",
+      logs: "-timestamp",
+      spans: "-span.duration",
+    };
+
     const object = errorMessage
       ? { error: errorMessage }
-      : { query, fields: fieldSets[dataset] };
+      : { query, fields: fieldSets[dataset], sort: sortParams[dataset] };
 
     return {
       object,
@@ -754,6 +761,7 @@ describe("search_events", () => {
     mockGenerateObject.mockResolvedValueOnce({
       object: {
         fields: ["timestamp", "message"],
+        sort: "-timestamp",
         // No query field
       },
       finishReason: "stop" as const,
