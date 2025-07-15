@@ -366,6 +366,12 @@ const DATASET_CONFIGS = {
     "query": "span.op:db*",
     "fields": ["span.description", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"],
     "sort": "-p95(span.duration)"
+  }
+- "most common transaction" → 
+  {
+    "query": "is_transaction:true",
+    "fields": ["transaction", "count()"],
+    "sort": "-count()"
   }`,
   },
 };
@@ -896,6 +902,8 @@ Return a JSON object with these fields:
 - "query": The Sentry query string for filtering results (use empty string "" for no filters)
 - "fields": Array of field names to return in results (OPTIONAL - will use defaults if not provided)
 - "sort": Sort parameter for results (REQUIRED - YOU MUST ALWAYS SPECIFY THIS)
+- "aggregateFunctions": Array of aggregate function fields like ["count()", "avg(span.duration)"] (OPTIONAL - empty array or omit for non-aggregate queries)
+- "groupByFields": Array of fields to group by (OPTIONAL - only used with aggregate queries)
 - "error": Error message if you cannot translate the query (OPTIONAL)
 
 ERROR HANDLING:
@@ -915,7 +923,20 @@ IMPORTANT NOTES:
   - Numeric functions (avg, sum, min, max, percentiles) ONLY work with numeric fields
   - count() and count_unique() work with any field type
   - When using aggregate functions, results are grouped by non-function fields
-  - Dataset-specific functions must only be used with their respective datasets`;
+  - Dataset-specific functions must only be used with their respective datasets
+
+AGGREGATE QUERY RESPONSE STRUCTURE:
+When creating an aggregate query:
+1. List all aggregate functions in aggregateFunctions array (e.g., ["count()", "avg(span.duration)"])
+2. Set groupByFields to an array of fields you're grouping by (omit or use empty array if just aggregating without grouping)
+3. Include all fields (both aggregate functions and groupBy fields) in the fields array
+4. The query is automatically treated as aggregate if aggregateFunctions has any items
+
+Examples:
+- "count of errors by type": aggregateFunctions=["count()"], groupByFields=["error.type"], fields=["error.type", "count()"]
+- "average span duration": aggregateFunctions=["avg(span.duration)"], fields=["avg(span.duration)"]
+- "most common transaction": aggregateFunctions=["count()"], groupByFields=["span.description"], fields=["span.description", "count()"], sort="-count()"
+- "p50 duration by model and operation": aggregateFunctions=["p50(span.duration)"], groupByFields=["ai.model.id", "ai.operationId"], fields=["ai.model.id", "ai.operationId", "p50(span.duration)"], sort="-p50(span.duration)"`;
 
 export default defineTool({
   name: "search_events",
@@ -1032,6 +1053,20 @@ export default defineTool({
           .describe(
             "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
           ),
+        aggregateFunctions: z
+          .array(z.string())
+          .optional()
+          .default([])
+          .describe(
+            "Array of aggregate function fields (e.g., ['count()', 'avg(span.duration)'])",
+          ),
+        groupByFields: z
+          .array(z.string())
+          .optional()
+          .default([])
+          .describe(
+            "Array of fields to group by in aggregate queries (empty array if no grouping)",
+          ),
         error: z
           .string()
           .optional()
@@ -1108,13 +1143,16 @@ export default defineTool({
       },
     );
 
-    // Generate the Sentry explorer URL
+    // Generate the Sentry explorer URL with structured aggregate information
     const explorerUrl = apiService.getEventsExplorerUrl(
       organizationSlug,
       sentryQuery,
       projectId, // Pass the numeric project ID for URL generation
       dataset, // dataset is already correct for URL generation (logs, spans, errors)
       fields, // Pass fields to detect if it's an aggregate query
+      sortParam, // Pass sort parameter for URL generation
+      parsed.aggregateFunctions || [],
+      parsed.groupByFields || [],
     );
 
     // Type-safe access to event data
