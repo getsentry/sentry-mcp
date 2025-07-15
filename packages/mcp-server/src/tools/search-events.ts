@@ -366,6 +366,12 @@ const DATASET_CONFIGS = {
     "query": "span.op:db*",
     "fields": ["span.description", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"],
     "sort": "-p95(span.duration)"
+  }
+- "most common transaction" → 
+  {
+    "query": "is_transaction:true",
+    "fields": ["transaction", "count()"],
+    "sort": "-count()"
   }`,
   },
 };
@@ -1115,6 +1121,7 @@ export default defineTool({
       projectId, // Pass the numeric project ID for URL generation
       dataset, // dataset is already correct for URL generation (logs, spans, errors)
       fields, // Pass fields to detect if it's an aggregate query
+      sortParam, // Pass sort parameter for URL generation
     );
 
     // Type-safe access to event data

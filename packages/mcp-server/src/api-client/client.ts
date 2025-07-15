@@ -460,6 +460,7 @@ export class SentryApiService {
     projectSlug?: string,
     dataset: "spans" | "errors" | "logs" = "spans",
     fields?: string[],
+    sort?: string,
   ): string {
     const params = new URLSearchParams();
     params.set("query", query);
@@ -499,6 +500,56 @@ export class SentryApiService {
         : `https://${this.host}/organizations/${organizationSlug}/explore/logs/`;
     } else {
       // Spans use /explore/traces/
+      const isAggregateQuery =
+        fields?.some((field) => field.includes("(") && field.includes(")")) ||
+        false;
+
+      if (isAggregateQuery) {
+        params.set("mode", "aggregate");
+
+        // Add aggregate field information for spans
+        // Find the group by field (non-function fields)
+        const groupByFields =
+          fields?.filter(
+            (field) => !field.includes("(") && !field.includes(")"),
+          ) || [];
+        if (groupByFields.length > 0) {
+          // Use the first non-function field as the groupBy
+          params.append(
+            "aggregateField",
+            JSON.stringify({ groupBy: groupByFields[0] }),
+          );
+        }
+
+        // Find aggregate function fields
+        const aggregateFunctions =
+          fields?.filter(
+            (field) => field.includes("(") && field.includes(")"),
+          ) || [];
+        if (aggregateFunctions.length > 0) {
+          // Add yAxes for aggregate functions
+          params.append(
+            "aggregateField",
+            JSON.stringify({ yAxes: aggregateFunctions }),
+          );
+        }
+      }
+
+      // Add fields to the URL for spans
+      if (fields && fields.length > 0) {
+        for (const field of fields) {
+          params.append("field", field);
+        }
+      }
+
+      // Add sort parameter if provided
+      if (sort) {
+        params.set("sort", sort);
+      }
+
+      // Add default statsPeriod for spans
+      params.set("statsPeriod", "24h");
+
       path = this.isSaas()
         ? `https://${organizationSlug}.sentry.io/explore/traces/`
         : `https://${this.host}/organizations/${organizationSlug}/explore/traces/`;
