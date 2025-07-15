@@ -1599,9 +1599,18 @@ export class SentryApiService {
     let apiSort = params.sort;
     if (params.sort.includes("(")) {
       // Transform: count(field) -> count_field, count() -> count
-      apiSort = params.sort.replace(/\(([^)]*)\)/g, (match, field) => {
-        return field ? `_${field.replace(/\./g, "_")}` : "";
-      });
+      // Use safer string manipulation to avoid ReDoS
+      const parenStart = params.sort.indexOf("(");
+      const parenEnd = params.sort.indexOf(")", parenStart);
+      if (parenStart !== -1 && parenEnd !== -1) {
+        const beforeParen = params.sort.substring(0, parenStart);
+        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
+        const afterParen = params.sort.substring(parenEnd + 1);
+        const transformedInside = insideParen
+          ? `_${insideParen.replace(/\./g, "_")}`
+          : "";
+        apiSort = beforeParen + transformedInside + afterParen;
+      }
     }
     queryParams.set("sort", apiSort);
 
@@ -1652,9 +1661,18 @@ export class SentryApiService {
     let apiSort = params.sort;
     if (params.sort.includes("(")) {
       // Transform: count(field) -> count_field, count() -> count
-      apiSort = params.sort.replace(/\(([^)]*)\)/g, (match, field) => {
-        return field ? `_${field.replace(/\./g, "_")}` : "";
-      });
+      // Use safer string manipulation to avoid ReDoS
+      const parenStart = params.sort.indexOf("(");
+      const parenEnd = params.sort.indexOf(")", parenStart);
+      if (parenStart !== -1 && parenEnd !== -1) {
+        const beforeParen = params.sort.substring(0, parenStart);
+        const insideParen = params.sort.substring(parenStart + 1, parenEnd);
+        const afterParen = params.sort.substring(parenEnd + 1);
+        const transformedInside = insideParen
+          ? `_${insideParen.replace(/\./g, "_")}`
+          : "";
+        apiSort = beforeParen + transformedInside + afterParen;
+      }
     }
     queryParams.set("sort", apiSort);
 
