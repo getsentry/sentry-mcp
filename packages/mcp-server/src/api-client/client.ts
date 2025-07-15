@@ -437,22 +437,168 @@ export class SentryApiService {
       : `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`;
   }
 
+  // ================================================================================
+  // URL BUILDERS FOR DIFFERENT SENTRY APIS
+  // ================================================================================
+
+  /**
+   * Builds a URL for the legacy Discover API (used by errors dataset).
+   *
+   * The Discover API is the older query interface that includes aggregate
+   * functions directly in the field list.
+   *
+   * @example
+   * // URL format: /explore/discover/homepage/?field=title&field=count_unique(user)
+   * buildDiscoverUrl("my-org", "level:error", "123", ["title", "count_unique(user)"], "-timestamp")
+   */
+  private buildDiscoverUrl(
+    organizationSlug: string,
+    query: string,
+    projectSlug?: string,
+    fields?: string[],
+    sort?: string,
+  ): string {
+    const params = new URLSearchParams();
+
+    // Discover API specific parameters
+    params.set("dataset", "errors");
+    params.set("queryDataset", "error-events");
+    params.set("query", query);
+
+    if (projectSlug) {
+      params.set("project", projectSlug);
+    }
+
+    // Discover API includes aggregate functions directly in field list
+    if (fields && fields.length > 0) {
+      for (const field of fields) {
+        params.append("field", field);
+      }
+    } else {
+      // Default fields for Discover
+      params.append("field", "title");
+      params.append("field", "project");
+      params.append("field", "user.display");
+      params.append("field", "timestamp");
+    }
+
+    params.set("sort", sort || "-timestamp");
+    params.set("statsPeriod", "24h");
+    params.set("yAxis", "count()");
+
+    const path = this.isSaas()
+      ? `https://${organizationSlug}.sentry.io/explore/discover/homepage/`
+      : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
+
+    return `${path}?${params.toString()}`;
+  }
+
+  /**
+   * Builds a URL for the modern EAP (Event Analytics Platform) API used by spans/logs.
+   *
+   * The EAP API uses structured aggregate queries with separate aggregateField
+   * parameters containing JSON objects for groupBy and yAxes.
+   *
+   * @example
+   * // URL format: /explore/traces/?aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
+   * buildEapUrl("my-org", "span.op:db", "123", ["span.op", "count()"], "-count()", ["count()"], ["span.op"])
+   */
+  private buildEapUrl(
+    organizationSlug: string,
+    query: string,
+    dataset: "spans" | "logs",
+    projectSlug?: string,
+    fields?: string[],
+    sort?: string,
+    aggregateFunctions?: string[],
+    groupByFields?: string[],
+  ): string {
+    const params = new URLSearchParams();
+    params.set("query", query);
+
+    if (projectSlug) {
+      params.set("project", projectSlug);
+    }
+
+    // Determine if this is an aggregate query
+    const isAggregateQuery =
+      (aggregateFunctions?.length ?? 0) > 0 ||
+      fields?.some((field) => field.includes("(") && field.includes(")")) ||
+      false;
+
+    if (isAggregateQuery) {
+      params.set("mode", "aggregate");
+
+      // EAP API uses structured aggregate parameters
+      if (
+        (aggregateFunctions?.length ?? 0) > 0 ||
+        (groupByFields?.length ?? 0) > 0
+      ) {
+        // Add each groupBy field as a separate aggregateField parameter
+        if (groupByFields && groupByFields.length > 0) {
+          for (const field of groupByFields) {
+            params.append("aggregateField", JSON.stringify({ groupBy: field }));
+          }
+        }
+
+        // Add aggregate functions (yAxes)
+        if (aggregateFunctions && aggregateFunctions.length > 0) {
+          params.append(
+            "aggregateField",
+            JSON.stringify({ yAxes: aggregateFunctions }),
+          );
+        }
+      } else {
+        // Fallback: parse fields to extract aggregate info
+        const parsedGroupByFields =
+          fields?.filter(
+            (field) => !field.includes("(") && !field.includes(")"),
+          ) || [];
+        const parsedAggregateFunctions =
+          fields?.filter(
+            (field) => field.includes("(") && field.includes(")"),
+          ) || [];
+
+        for (const field of parsedGroupByFields) {
+          params.append("aggregateField", JSON.stringify({ groupBy: field }));
+        }
+
+        if (parsedAggregateFunctions.length > 0) {
+          params.append(
+            "aggregateField",
+            JSON.stringify({ yAxes: parsedAggregateFunctions }),
+          );
+        }
+      }
+    }
+
+    // Add fields for EAP
+    if (fields && fields.length > 0) {
+      for (const field of fields) {
+        params.append("field", field);
+      }
+    }
+
+    if (sort) {
+      params.set("sort", sort);
+    }
+
+    params.set("statsPeriod", "24h");
+
+    const basePath = dataset === "logs" ? "logs" : "traces";
+    const path = this.isSaas()
+      ? `https://${organizationSlug}.sentry.io/explore/${basePath}/`
+      : `https://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
+
+    return `${path}?${params.toString()}`;
+  }
+
   /**
    * Generates a Sentry events explorer URL for viewing search results.
    *
-   * Creates a URL to the appropriate Explore page based on the dataset.
-   * Always uses HTTPS protocol.
-   *
-   * IMPORTANT: Different datasets handle aggregate queries differently:
-   *
-   * - **Errors dataset**: Uses the legacy Discover API. Aggregate functions are included
-   *   directly in the field list (e.g., field=count_unique(user)). Does NOT use the
-   *   aggregateField parameter or mode=aggregate.
-   *   Example: field=title&field=project&field=count_unique(user)
-   *
-   * - **Spans dataset**: Uses the modern Explore Traces API. Aggregate queries use
-   *   separate aggregateField parameters with JSON objects for groupBy and yAxes.
-   *   Example: aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
+   * Routes to the appropriate API based on dataset:
+   * - Errors: Uses legacy Discover API
+   * - Spans/Logs: Uses modern EAP (Event Analytics Platform) API
    *
    * @param organizationSlug Organization identifier
    * @param query Sentry search query
@@ -460,8 +606,8 @@ export class SentryApiService {
    * @param dataset Dataset type (spans, errors, or logs)
    * @param fields Array of fields to include in results
    * @param sort Sort parameter (e.g., "-timestamp", "-count()")
-   * @param aggregateFunctions Array of aggregate functions (only used for spans dataset)
-   * @param groupByFields Array of fields to group by (only used for spans dataset)
+   * @param aggregateFunctions Array of aggregate functions (only used for EAP datasets)
+   * @param groupByFields Array of fields to group by (only used for EAP datasets)
    * @returns Full HTTPS URL to the events explorer in Sentry UI
    */
   getEventsExplorerUrl(
@@ -474,135 +620,28 @@ export class SentryApiService {
     aggregateFunctions?: string[],
     groupByFields?: string[],
   ): string {
-    const params = new URLSearchParams();
-    params.set("query", query);
-    if (projectSlug) {
-      params.set("project", projectSlug);
-    }
-
-    let path: string;
     if (dataset === "errors") {
-      // Errors dataset uses the legacy discover URL and handles aggregates differently than spans
-      // The errors dataset includes aggregate fields directly in the field list, not as separate aggregateField params
-      // Example: field=title&field=project&field=count_unique(user)&field=timestamp
-      params.set("dataset", "errors");
-      params.set("queryDataset", "error-events");
-
-      // For errors dataset, use the provided fields directly or fall back to defaults
-      if (fields && fields.length > 0) {
-        // Use the fields provided by the AI, which may include aggregate functions
-        for (const field of fields) {
-          params.append("field", field);
-        }
-      } else {
-        // Default fields for errors when none provided
-        params.append("field", "title");
-        params.append("field", "project");
-        params.append("field", "user.display");
-        params.append("field", "timestamp");
-      }
-
-      // Use the provided sort or default to -timestamp
-      if (sort) {
-        params.set("sort", sort);
-      } else {
-        params.set("sort", "-timestamp");
-      }
-
-      params.set("statsPeriod", "24h");
-      params.set("yAxis", "count()");
-
-      // For SaaS, always use organizationSlug.sentry.io regardless of the API host (which might be regional)
-      path = this.isSaas()
-        ? `https://${organizationSlug}.sentry.io/explore/discover/homepage/`
-        : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
-    } else if (dataset === "logs") {
-      // Logs dataset - currently minimal URL support
-      // TODO: Add proper field and aggregate handling for logs dataset if needed
-      path = this.isSaas()
-        ? `https://${organizationSlug}.sentry.io/explore/logs/`
-        : `https://${this.host}/organizations/${organizationSlug}/explore/logs/`;
-    } else {
-      // Spans dataset uses the modern Explore Traces API with structured aggregate support
-      const isAggregateQuery =
-        (aggregateFunctions?.length ?? 0) > 0 ||
-        fields?.some((field) => field.includes("(") && field.includes(")")) ||
-        false;
-
-      if (isAggregateQuery) {
-        params.set("mode", "aggregate");
-
-        // Use structured aggregate information if provided
-        if (
-          (aggregateFunctions?.length ?? 0) > 0 ||
-          (groupByFields?.length ?? 0) > 0
-        ) {
-          // Add each groupBy field as a separate aggregateField parameter
-          if (groupByFields && groupByFields.length > 0) {
-            for (const field of groupByFields) {
-              params.append(
-                "aggregateField",
-                JSON.stringify({ groupBy: field }),
-              );
-            }
-          }
-
-          // Add aggregate functions (yAxes)
-          if (aggregateFunctions && aggregateFunctions.length > 0) {
-            params.append(
-              "aggregateField",
-              JSON.stringify({ yAxes: aggregateFunctions }),
-            );
-          }
-        } else {
-          // Fallback to parsing fields (for backward compatibility)
-          // Find the group by field (non-function fields)
-          const parsedGroupByFields =
-            fields?.filter(
-              (field) => !field.includes("(") && !field.includes(")"),
-            ) || [];
-
-          // Add each group by field as a separate aggregateField
-          for (const field of parsedGroupByFields) {
-            params.append("aggregateField", JSON.stringify({ groupBy: field }));
-          }
-
-          // Find aggregate function fields
-          const parsedAggregateFunctions =
-            fields?.filter(
-              (field) => field.includes("(") && field.includes(")"),
-            ) || [];
-          if (parsedAggregateFunctions.length > 0) {
-            // Add yAxes for aggregate functions
-            params.append(
-              "aggregateField",
-              JSON.stringify({ yAxes: parsedAggregateFunctions }),
-            );
-          }
-        }
-      }
-
-      // Add fields to the URL for spans
-      if (fields && fields.length > 0) {
-        for (const field of fields) {
-          params.append("field", field);
-        }
-      }
-
-      // Add sort parameter if provided
-      if (sort) {
-        params.set("sort", sort);
-      }
-
-      // Add default statsPeriod for spans
-      params.set("statsPeriod", "24h");
-
-      path = this.isSaas()
-        ? `https://${organizationSlug}.sentry.io/explore/traces/`
-        : `https://${this.host}/organizations/${organizationSlug}/explore/traces/`;
+      // Route to legacy Discover API
+      return this.buildDiscoverUrl(
+        organizationSlug,
+        query,
+        projectSlug,
+        fields,
+        sort,
+      );
     }
 
-    return `${path}?${params.toString()}`;
+    // Route to modern EAP API (spans and logs)
+    return this.buildEapUrl(
+      organizationSlug,
+      query,
+      dataset,
+      projectSlug,
+      fields,
+      sort,
+      aggregateFunctions,
+      groupByFields,
+    );
   }
 
   /**
@@ -1478,12 +1517,14 @@ export class SentryApiService {
   }
 
   /**
-   * Searches for events in Sentry using a general query.
+   * Searches for events in Sentry using the unified events API.
    * This method is used by the search_events tool for semantic search.
    *
-   * Note: The API handles aggregate queries the same way for all datasets.
-   * Aggregate functions are included directly in the field list.
-   * The difference in URL generation (getEventsExplorerUrl) is only for the web UI.
+   * IMPORTANT: This API endpoint handles all datasets (errors, spans, logs) uniformly.
+   * All datasets include aggregate functions directly in the field list.
+   *
+   * The difference between Discover API and EAP API only exists in the web UI URLs
+   * (see getEventsExplorerUrl). The programmatic API is consistent across datasets.
    */
   async searchEvents(
     {
