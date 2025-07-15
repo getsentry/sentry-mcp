@@ -190,7 +190,8 @@ export class SentryApiService {
    * @returns True if using Sentry SaaS, false for self-hosted instances
    */
   private isSaas(): boolean {
-    return this.host === "sentry.io";
+    // Check if it's the main sentry.io domain or a regional domain (e.g., us.sentry.io, de.sentry.io)
+    return this.host === "sentry.io" || this.host.endsWith(".sentry.io");
   }
 
   /**
