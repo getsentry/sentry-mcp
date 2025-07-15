@@ -199,27 +199,27 @@ describe("search_events", () => {
 
       **span.op**: db.query
       **span.description**: SELECT * FROM users WHERE timeout
-      **Transaction**: /api/checkout
+      **transaction**: /api/checkout
       **span.duration**: 5234ms
-      **Trace**: abc123def456
-      **Trace URL**: https://test-org.sentry.io/explore/traces/trace/abc123def456
-      **Project**: backend
-      **Timestamp**: 2024-01-15T10:30:00Z
+      **trace**: abc123def456
+      **trace_url**: https://test-org.sentry.io/explore/traces/trace/abc123def456
+      **project**: backend
+      **timestamp**: 2024-01-15T10:30:00Z
 
       ## GET user:session:timeout
 
       **span.op**: cache.get
       **span.description**: GET user:session:timeout
-      **Transaction**: /api/checkout
+      **transaction**: /api/checkout
       **span.duration**: 1500ms
-      **Trace**: xyz789ghi012
-      **Trace URL**: https://test-org.sentry.io/explore/traces/trace/xyz789ghi012
-      **Project**: backend
-      **Timestamp**: 2024-01-15T10:25:00Z
+      **trace**: xyz789ghi012
+      **trace_url**: https://test-org.sentry.io/explore/traces/trace/xyz789ghi012
+      **project**: backend
+      **timestamp**: 2024-01-15T10:25:00Z
 
       ## Next Steps
 
-      - View the full trace: Click on the Trace URL above
+      - View the full trace: Click on the trace_url above
       - Search for related spans: Modify your query to be more specific
       - Export data: Use the Sentry web interface for advanced analysis
       "
@@ -505,7 +505,7 @@ describe("search_events", () => {
 
     expect(result).toContain("Found 1 error:");
     expect(result).toContain("Connection refused");
-    expect(result).toContain("**Level**: error");
+    expect(result).toContain("**level**: error");
   });
 
   it("handles errors dataset with listTags", async () => {
@@ -558,8 +558,8 @@ describe("search_events", () => {
 
     expect(result).toContain("Found 1 error:");
     expect(result).toContain("TypeError: Cannot read property 'foo' of null");
-    expect(result).toContain("**Level**: error");
-    expect(result).toContain("**Location**: app.js in handleClick");
+    expect(result).toContain("**level**: error");
+    expect(result).toContain("**culprit**: app.js in handleClick");
   });
 
   it("handles non-existent project gracefully", async () => {

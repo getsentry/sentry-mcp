@@ -36,48 +36,6 @@ function getNumberValue(
   return typeof value === "number" ? value : undefined;
 }
 
-// Helper to get a human-readable display name for a field
-function getFieldDisplayName(field: string): string {
-  // Special cases for aggregate fields
-  const specialCases: Record<string, string> = {
-    // Aggregate fields - these need special handling
-    "last_seen()": "Last seen (aggregate)",
-    "count()": "Total occurrences",
-
-    // Common fields that should be titleized
-    culprit: "Location",
-  };
-
-  // Return special case if found
-  if (specialCases[field]) {
-    return specialCases[field];
-  }
-
-  // List of common/standard fields that should be titleized
-  const commonFields = new Set([
-    "timestamp",
-    "project",
-    "environment",
-    "release",
-    "platform",
-    "level",
-    "message",
-    "title",
-    "issue",
-    "trace",
-    "transaction",
-    "severity",
-  ]);
-
-  // If it's a common field, titleize it
-  if (commonFields.has(field)) {
-    return field.charAt(0).toUpperCase() + field.slice(1);
-  }
-
-  // Default: return the field name as-is (for attributes)
-  return field;
-}
-
 // Helper function to fetch custom attributes for a dataset
 async function fetchCustomAttributes(
   apiService: SentryApiService,
@@ -422,13 +380,12 @@ function formatErrorResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName = getFieldDisplayName(field);
 
         if (field === "issue" && typeof value === "string") {
-          output += `**Issue**: ${value}\n`;
-          output += `**Issue URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
+          output += `**${field}**: ${value}\n`;
+          output += `**issue_url**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
         } else {
-          output += `**${displayName}**: ${value}\n`;
+          output += `**${field}**: ${value}\n`;
         }
       }
     }
@@ -437,8 +394,7 @@ function formatErrorResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName = getFieldDisplayName(key);
-        output += `**${displayName}**: ${value}\n`;
+        output += `**${key}**: ${value}\n`;
       }
     }
 
@@ -539,13 +495,12 @@ function formatLogResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName = getFieldDisplayName(field);
 
         if (field === "trace" && typeof value === "string") {
-          output += `- **Trace**: ${value}\n`;
-          output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+          output += `- **${field}**: ${value}\n`;
+          output += `- **trace_url**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
         } else {
-          output += `- **${displayName}**: ${value}\n`;
+          output += `- **${field}**: ${value}\n`;
         }
       }
     }
@@ -554,8 +509,7 @@ function formatLogResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName = getFieldDisplayName(key);
-        output += `- **${displayName}**: ${value}\n`;
+        output += `- **${key}**: ${value}\n`;
       }
     }
 
@@ -563,7 +517,7 @@ function formatLogResults(
   }
 
   output += "## Next Steps\n\n";
-  output += "- View related traces: Click on the Trace URL if available\n";
+  output += "- View related traces: Click on the trace_url if available\n";
   output +=
     "- Filter by severity: Adjust your query to focus on specific log levels\n";
   output += "- Export logs: Use the Sentry web interface for bulk export\n";
@@ -632,15 +586,14 @@ function formatSpanResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName = getFieldDisplayName(field);
 
         if (field === "trace" && typeof value === "string") {
-          output += `**Trace**: ${value}\n`;
-          output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+          output += `**${field}**: ${value}\n`;
+          output += `**trace_url**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
         } else if (field === "span.duration" && typeof value === "number") {
-          output += `**${displayName}**: ${value}ms\n`;
+          output += `**${field}**: ${value}ms\n`;
         } else {
-          output += `**${displayName}**: ${value}\n`;
+          output += `**${field}**: ${value}\n`;
         }
       }
     }
@@ -649,8 +602,7 @@ function formatSpanResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName = getFieldDisplayName(key);
-        output += `**${displayName}**: ${value}\n`;
+        output += `**${key}**: ${value}\n`;
       }
     }
 
@@ -658,7 +610,7 @@ function formatSpanResults(
   }
 
   output += "## Next Steps\n\n";
-  output += "- View the full trace: Click on the Trace URL above\n";
+  output += "- View the full trace: Click on the trace_url above\n";
   output +=
     "- Search for related spans: Modify your query to be more specific\n";
   output +=
