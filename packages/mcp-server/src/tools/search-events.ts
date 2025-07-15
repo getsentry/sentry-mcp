@@ -259,6 +259,11 @@ const DATASET_CONFIGS = {
   {
     "query": "level:error",
     "fields": ["error.type", "count()", "count_unique(user.id)"]
+  }
+- "what is the most common error" → 
+  {
+    "query": "",
+    "fields": ["title", "count()"]
   }`,
   },
   logs: {
@@ -283,6 +288,26 @@ const DATASET_CONFIGS = {
   {
     "query": "severity:error",
     "fields": ["timestamp", "project", "message", "severity", "trace", "user.id", "user.email"]
+  }
+- "what is the most common log" → 
+  {
+    "query": "",
+    "fields": ["message", "count()"]
+  }
+- "most common error logs" → 
+  {
+    "query": "severity:error",
+    "fields": ["message", "count()"]
+  }
+- "count logs by severity" → 
+  {
+    "query": "",
+    "fields": ["severity", "count()"]
+  }
+- "log volume by project" → 
+  {
+    "query": "",
+    "fields": ["project", "count()", "epm()"]
   }`,
   },
   spans: {
