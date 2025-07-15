@@ -38,76 +38,44 @@ function getNumberValue(
 
 // Helper to get a human-readable display name for a field
 function getFieldDisplayName(field: string): string {
-  // Special cases for known fields
-  const fieldDisplayNames: Record<string, string> = {
-    // Aggregate fields
+  // Special cases for aggregate fields
+  const specialCases: Record<string, string> = {
+    // Aggregate fields - these need special handling
     "last_seen()": "Last seen (aggregate)",
     "count()": "Total occurrences",
 
-    // Error fields
+    // Common fields that should be titleized
     culprit: "Location",
-    "error.type": "Error type",
-    "error.value": "Error value",
-    "error.handled": "Handled",
-
-    // Stack fields
-    "stack.filename": "File",
-    "stack.function": "Function",
-    "stack.module": "Module",
-    "stack.abs_path": "Absolute path",
-
-    // Span fields
-    "span.op": "Operation",
-    "span.description": "Description",
-    "span.duration": "Duration",
-    "span.status": "Status",
-    "span.self_time": "Self time",
-
-    // Transaction fields
-    "transaction.duration": "Transaction duration",
-    "transaction.op": "Transaction operation",
-    "transaction.status": "Transaction status",
-    is_transaction: "Is transaction",
-
-    // Trace fields
-    "trace.span_id": "Span ID",
-    "trace.parent_span_id": "Parent span ID",
-
-    // HTTP fields
-    "http.method": "HTTP method",
-    "http.status_code": "HTTP status",
-    "http.url": "URL",
-
-    // Database fields
-    "db.system": "Database system",
-    "db.operation": "Database operation",
-
-    // User fields
-    "user.id": "User ID",
-    "user.email": "User email",
-
-    // SDK fields
-    "sdk.name": "SDK name",
-    "sdk.version": "SDK version",
-
-    // Context fields
-    "os.name": "Operating system",
-    "browser.name": "Browser",
-    "device.family": "Device",
-
-    // Log fields
-    severity_number: "Severity number",
-    "sentry.item_id": "Item ID",
-    "sentry.observed_timestamp_nanos": "Observed timestamp (nanos)",
   };
 
   // Return special case if found
-  if (fieldDisplayNames[field]) {
-    return fieldDisplayNames[field];
+  if (specialCases[field]) {
+    return specialCases[field];
   }
 
-  // Default: capitalize first letter and replace dots/underscores with spaces
-  return field.charAt(0).toUpperCase() + field.slice(1).replace(/[._]/g, " ");
+  // List of common/standard fields that should be titleized
+  const commonFields = new Set([
+    "timestamp",
+    "project",
+    "environment",
+    "release",
+    "platform",
+    "level",
+    "message",
+    "title",
+    "issue",
+    "trace",
+    "transaction",
+    "severity",
+  ]);
+
+  // If it's a common field, titleize it
+  if (commonFields.has(field)) {
+    return field.charAt(0).toUpperCase() + field.slice(1);
+  }
+
+  // Default: return the field name as-is (for attributes)
+  return field;
 }
 
 // Helper function to fetch custom attributes for a dataset
@@ -457,8 +425,8 @@ function formatErrorResults(
         const displayName = getFieldDisplayName(field);
 
         if (field === "issue" && typeof value === "string") {
-          output += `**Issue ID**: ${value}\n`;
-          output += `**URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
+          output += `**Issue**: ${value}\n`;
+          output += `**Issue URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
         } else {
           output += `**${displayName}**: ${value}\n`;
         }
@@ -574,7 +542,7 @@ function formatLogResults(
         const displayName = getFieldDisplayName(field);
 
         if (field === "trace" && typeof value === "string") {
-          output += `- **Trace ID**: ${value}\n`;
+          output += `- **Trace**: ${value}\n`;
           output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
         } else {
           output += `- **${displayName}**: ${value}\n`;
@@ -667,7 +635,7 @@ function formatSpanResults(
         const displayName = getFieldDisplayName(field);
 
         if (field === "trace" && typeof value === "string") {
-          output += `**Trace ID**: ${value}\n`;
+          output += `**Trace**: ${value}\n`;
           output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
         } else if (field === "span.duration" && typeof value === "number") {
           output += `**${displayName}**: ${value}ms\n`;

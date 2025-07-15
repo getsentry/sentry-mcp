@@ -197,22 +197,22 @@ describe("search_events", () => {
 
       ## SELECT * FROM users WHERE timeout
 
-      **Operation**: db.query
-      **Description**: SELECT * FROM users WHERE timeout
+      **span.op**: db.query
+      **span.description**: SELECT * FROM users WHERE timeout
       **Transaction**: /api/checkout
-      **Duration**: 5234ms
-      **Trace ID**: abc123def456
+      **span.duration**: 5234ms
+      **Trace**: abc123def456
       **Trace URL**: https://test-org.sentry.io/explore/traces/trace/abc123def456
       **Project**: backend
       **Timestamp**: 2024-01-15T10:30:00Z
 
       ## GET user:session:timeout
 
-      **Operation**: cache.get
-      **Description**: GET user:session:timeout
+      **span.op**: cache.get
+      **span.description**: GET user:session:timeout
       **Transaction**: /api/checkout
-      **Duration**: 1500ms
-      **Trace ID**: xyz789ghi012
+      **span.duration**: 1500ms
+      **Trace**: xyz789ghi012
       **Trace URL**: https://test-org.sentry.io/explore/traces/trace/xyz789ghi012
       **Project**: backend
       **Timestamp**: 2024-01-15T10:25:00Z
@@ -297,8 +297,8 @@ describe("search_events", () => {
 
     expect(result).toContain("Found 1 trace/span:");
     expect(result).toContain("GET /api/users");
-    expect(result).toContain("**Operation**: http.server");
-    expect(result).toContain("**Duration**: 8500ms");
+    expect(result).toContain("**span.op**: http.server");
+    expect(result).toContain("**span.duration**: 8500ms");
     expect(result).toContain("**📊 View these results in Sentry**:");
     expect(result).toContain(
       "https://test-org.sentry.io/explore/traces/?query=transaction.duration%3A%3E5000&project=123456",
