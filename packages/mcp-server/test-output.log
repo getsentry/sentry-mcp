@@ -1,0 +1,34 @@
+
+> @sentry/mcp-server@0.16.0 test:ci /Users/dcramer/src/sentry-mcp/packages/mcp-server
+> pnpm run generate-tool-definitions && vitest run --coverage --reporter=junit --outputFile=tests.junit.xml
+
+
+> @sentry/mcp-server@0.16.0 generate-tool-definitions /Users/dcramer/src/sentry-mcp/packages/mcp-server
+> tsx scripts/generate-tool-definitions.ts
+
+Generating tool definitions...
+✅ Generated tool definitions for 19 tools
+📄 Output: /Users/dcramer/src/sentry-mcp/packages/mcp-server/dist/toolDefinitions.js
+
+Tools included:
+  1. whoami (0 parameters)
+  2. find_organizations (0 parameters)
+  3. find_teams (2 parameters)
+  4. find_projects (2 parameters)
+  5. find_issues (5 parameters)
+  6. find_releases (4 parameters)
+  7. find_tags (2 parameters)
+  8. get_issue_details (5 parameters)
+  9. get_event_attachment (5 parameters)
+  10. update_issue (6 parameters)
+  11. search_events (7 parameters)
+  12. create_team (3 parameters)
+  13. create_project (5 parameters)
+  14. update_project (7 parameters)
+  15. create_dsn (4 parameters)
+  16. find_dsns (3 parameters)
+  17. analyze_issue_with_seer (5 parameters)
+  18. search_docs (3 parameters)
+  19. get_doc (1 parameters)
+JUNIT report written to /Users/dcramer/src/sentry-mcp/packages/mcp-server/tests.junit.xml
+ ELIFECYCLE  Command failed with exit code 1.
