@@ -819,6 +819,10 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
 
 4. IMPORTANT SORTING REQUIREMENTS:
    - YOU MUST ALWAYS INCLUDE A SORT PARAMETER
+   - CRITICAL: The field you sort by MUST be included in your fields array
+   - If sorting by "-timestamp", include "timestamp" in fields
+   - If sorting by "-count()", include "count()" in fields
+   - If sorting by "-span.duration", include "span.duration" in fields
    - If user asks for "most common", use "-count()"
    - If user asks for "slowest", use "-span.duration" or "-avg(span.duration)"
    - If user asks for "latest" or "recent", use "-timestamp"
@@ -840,6 +844,7 @@ IMPORTANT NOTES:
 - Always include the recommended fields unless the user specifically asks for different fields
 - Add any fields mentioned in the user's query to the fields array
 - If the user asks about a specific field (e.g., "show me user emails"), include that field
+- CRITICAL: The field you're sorting by MUST be included in your fields array (e.g., if sort is "-timestamp", fields must include "timestamp")
 - Do NOT include project: filters in your query (project filtering is handled separately)
 - For spans/errors: When user mentions time periods, include timestamp filters in query
 - For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically
