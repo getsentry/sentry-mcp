@@ -13,6 +13,7 @@ import { ProjectSchema } from "../api-client/schema";
 import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { logError } from "../logging";
+import { ConfigurationError } from "../errors";
 
 // Type for flexible event data that can contain any fields
 type FlexibleEventData = Record<string, unknown>;
@@ -942,8 +943,8 @@ export default defineTool({
 
     // Check if OpenAI API key is available
     if (!process.env.OPENAI_API_KEY) {
-      throw new Error(
-        "OPENAI_API_KEY environment variable is required for semantic search",
+      throw new ConfigurationError(
+        `OPENAI_API_KEY environment variable is required for semantic search. Query: "${params.naturalLanguageQuery}", Dataset: ${dataset}. Please set the OPENAI_API_KEY environment variable to use natural language search.`,
       );
     }
 
@@ -978,12 +979,16 @@ export default defineTool({
 
     // Handle AI errors first
     if (parsed.error) {
-      throw new Error(`AI could not translate query: ${parsed.error}`);
+      throw new Error(
+        `AI could not translate query "${params.naturalLanguageQuery}" for ${dataset} dataset. Error: ${parsed.error}. AI response: ${JSON.stringify(parsed, null, 2)}`,
+      );
     }
 
     // Validate that sort parameter was provided
     if (!parsed.sort) {
-      throw new Error(`AI did not provide required sort parameter for query`);
+      throw new Error(
+        `AI response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}. The AI must specify how to sort results (e.g., '-timestamp' for newest first, '-count()' for highest count).`,
+      );
     }
 
     // Use empty string as default if no query is provided

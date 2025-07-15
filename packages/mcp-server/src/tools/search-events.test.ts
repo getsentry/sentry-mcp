@@ -752,7 +752,7 @@ describe("search_events", () => {
         },
       ),
     ).rejects.toThrow(
-      "AI could not translate query: Cannot translate this query - it's too ambiguous",
+      /AI could not translate query "some impossible query" for errors dataset.*Cannot translate this query - it's too ambiguous/,
     );
   });
 
