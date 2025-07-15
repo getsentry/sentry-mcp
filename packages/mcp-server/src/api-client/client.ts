@@ -966,10 +966,10 @@ export class SentryApiService {
   async listTraceItemAttributes(
     {
       organizationSlug,
-      itemType = "span",
+      itemType = "spans",
     }: {
       organizationSlug: string;
-      itemType?: "span" | "logs";
+      itemType?: "spans" | "logs";
     },
     opts?: RequestOptions,
   ): Promise<any> {
@@ -995,7 +995,7 @@ export class SentryApiService {
 
   private async fetchTraceItemAttributesByType(
     organizationSlug: string,
-    itemType: "span" | "logs",
+    itemType: "spans" | "logs",
     attributeType: "string" | "number",
     opts?: RequestOptions,
   ): Promise<any> {
