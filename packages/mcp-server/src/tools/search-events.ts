@@ -153,6 +153,10 @@ const DATASET_FIELDS = {
     "os.name": "Operating system name",
     "browser.name": "Browser name",
     "device.family": "Device family",
+
+    // Aggregate fields (provide data about the issue group)
+    "last_seen()": "When this issue was last seen (aggregate)",
+    "count()": "Total number of occurrences of this issue (aggregate)",
   },
   logs: {
     // Log-specific fields
@@ -288,6 +292,8 @@ function formatErrorResults(
     "message",
     "culprit",
     "timestamp",
+    "last_seen()", // Aggregate field - when the issue was last seen
+    "count()", // Aggregate field - total occurrences of this issue
   ];
 
   for (const event of eventData) {
@@ -309,10 +315,14 @@ function formatErrorResults(
       ) {
         const value = event[field];
         const displayName =
-          field === "culprit"
-            ? "Location"
-            : field.charAt(0).toUpperCase() +
-              field.slice(1).replace(/[._]/g, " ");
+          field === "last_seen()"
+            ? "Last seen (aggregate)"
+            : field === "count()"
+              ? "Total occurrences"
+              : field === "culprit"
+                ? "Location"
+                : field.charAt(0).toUpperCase() +
+                  field.slice(1).replace(/[._]/g, " ");
 
         if (field === "issue" && typeof value === "string") {
           output += `**Issue ID**: ${value}\n`;
@@ -703,8 +713,12 @@ export default defineTool({
     "❌ DO NOT USE for 'issues', 'problems', or when users want grouped summaries",
     "",
     "CRITICAL DISTINCTION:",
-    "- Events = Individual occurrences (use search_events)",
-    "- Issues = Grouped problems (use find_issues)",
+    "- Events = Individual occurrences with full details (use search_events)",
+    "- Issues = Grouped problems with aggregate statistics (use find_issues)",
+    "",
+    "NOTE: This tool returns individual events but can include aggregate fields:",
+    "- last_seen() - When the issue group was last seen",
+    "- count() - Total occurrences of the issue group",
     "",
     "Dataset Selection:",
     "- Users say 'error logs' → dataset='logs' (log entries with error severity)",
