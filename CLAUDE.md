@@ -87,6 +87,14 @@ When making changes, consider these areas:
 - Run `pnpm run test` for affected components
 - See `docs/quality-checks.mdc` for complete checklist
 
+## Pull Request Creation
+
+**MANDATORY when creating PRs:**
+- MUST read `docs/pr-management.mdc` for PR guidelines and template
+- Follow the PR description structure in the documentation
+- Use proper commit message format as specified
+- Include Claude Code attribution in PR descriptions
+
 ## Component Limits
 
 **IMPORTANT**: 
@@ -104,6 +112,7 @@ When making changes, consider these areas:
 - `docs/api-patterns.mdc` - API usage
 - `docs/architecture.mdc` - System design
 - `docs/quality-checks.mdc` - Required quality checks
+- `docs/pr-management.mdc` - Pull request guidelines and templates
 
 ## Claude Code Notes
 
