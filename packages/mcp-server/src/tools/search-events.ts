@@ -1037,6 +1037,10 @@ export default defineTool({
           .optional()
           .describe("Error message if the query cannot be translated"),
       }),
+      experimental_telemetry: {
+        isEnabled: true,
+        functionId: `search_events_${dataset}`,
+      },
     });
 
     // Handle AI errors first
