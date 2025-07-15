@@ -27,10 +27,10 @@ gh pr create --title "feat: add new search functionality" --body "$(cat <<'EOF'
 - Add natural language search for events
 - Implement AI-powered query translation
 
-## Test plan
-- [ ] Unit tests pass
-- [ ] Integration tests verify query translation
-- [ ] Manual testing with sample queries
+## Changes
+- Added search_events tool with AI integration
+- Implemented dataset-specific formatting
+- Added comprehensive test coverage
 
 🤖 Generated with [Claude Code](https://claude.ai/code)
 EOF
@@ -223,19 +223,13 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## Changes Made
 <!-- Detailed list of specific changes -->
-- [ ] Added new tool for X
-- [ ] Updated API client to handle Y  
-- [ ] Fixed issue with Z
-
-## Test Plan
-<!-- How to verify the changes work -->
-- [ ] Unit tests pass
-- [ ] Integration tests verify behavior
-- [ ] Manual testing steps completed
+- Added new tool for X
+- Updated API client to handle Y  
+- Fixed issue with Z
 
 ## Breaking Changes
 <!-- If any breaking changes -->
-- [ ] None
+- None
 <!-- OR -->
 - Updated tool interface (see migration guide)
 
@@ -254,16 +248,10 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 Add natural language search capability for Sentry events, logs, and spans using AI-powered query translation.
 
 ## Changes Made  
-- [ ] Implemented `search_events` tool with OpenAI integration
-- [ ] Added comprehensive test suite with MSW mocks
-- [ ] Created dataset-specific formatting for errors, logs, spans
-- [ ] Added field selection and custom attribute support
-
-## Test Plan
-- [ ] All unit tests pass (`pnpm test`)
-- [ ] TypeScript compilation successful (`pnpm tsc`)
-- [ ] Linting passes (`pnpm lint`)
-- [ ] Manual testing with sample queries
+- Implemented `search_events` tool with OpenAI integration
+- Added comprehensive test suite with MSW mocks
+- Created dataset-specific formatting for errors, logs, spans
+- Added field selection and custom attribute support
 
 🤖 Generated with [Claude Code](https://claude.ai/code)
 ```

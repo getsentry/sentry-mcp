@@ -132,6 +132,22 @@ const DATASET_FIELDS = {
     // Database fields
     "db.system": "Database system (postgresql, mysql, etc.)",
     "db.operation": "Database operation (SELECT, INSERT, etc.)",
+
+    // Aggregate functions (SPANS dataset only - require numeric fields except count/count_unique)
+    "count()": "Count of spans",
+    "count_unique(field)": "Count of unique values, e.g. count_unique(user.id)",
+    "avg(field)": "Average of numeric field, e.g. avg(span.duration)",
+    "sum(field)": "Sum of numeric field, e.g. sum(span.self_time)",
+    "min(field)": "Minimum of numeric field, e.g. min(span.duration)",
+    "max(field)": "Maximum of numeric field, e.g. max(span.duration)",
+    "p50(field)": "50th percentile (median), e.g. p50(span.duration)",
+    "p75(field)": "75th percentile, e.g. p75(span.duration)",
+    "p90(field)": "90th percentile, e.g. p90(span.duration)",
+    "p95(field)": "95th percentile, e.g. p95(span.duration)",
+    "p99(field)": "99th percentile, e.g. p99(span.duration)",
+    "p100(field)": "100th percentile (max), e.g. p100(span.duration)",
+    "epm()": "Events per minute rate",
+    "failure_rate()": "Percentage of failed spans",
   },
   errors: {
     // Error-specific fields
@@ -153,6 +169,15 @@ const DATASET_FIELDS = {
     "os.name": "Operating system name",
     "browser.name": "Browser name",
     "device.family": "Device family",
+
+    // Aggregate functions (ERRORS dataset only)
+    "count()": "Count of error events",
+    "count_unique(field)": "Count of unique values, e.g. count_unique(user.id)",
+    "count_if(field,equals,value)":
+      "Conditional count, e.g. count_if(error.handled,equals,false)",
+    "last_seen()": "Most recent timestamp of the group",
+    "eps()": "Events per second rate",
+    "epm()": "Events per minute rate",
   },
   logs: {
     // Log-specific fields
@@ -164,6 +189,21 @@ const DATASET_FIELDS = {
 
     // Trace context
     trace: "Trace ID",
+
+    // Aggregate functions (LOGS dataset only - require numeric fields except count/count_unique)
+    "count()": "Count of log entries",
+    "count_unique(field)": "Count of unique values, e.g. count_unique(user.id)",
+    "avg(field)": "Average of numeric field, e.g. avg(severity_number)",
+    "sum(field)": "Sum of numeric field",
+    "min(field)": "Minimum of numeric field",
+    "max(field)": "Maximum of numeric field",
+    "p50(field)": "50th percentile (median)",
+    "p75(field)": "75th percentile",
+    "p90(field)": "90th percentile",
+    "p95(field)": "95th percentile",
+    "p99(field)": "99th percentile",
+    "p100(field)": "100th percentile (max)",
+    "epm()": "Events per minute rate",
   },
 };
 
@@ -199,6 +239,26 @@ const DATASET_CONFIGS = {
   {
     "query": "stack.filename:\\"**/Button.tsx\\"",
     "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "stack.filename"]
+  }
+- "count errors by type in production" → 
+  {
+    "query": "environment:production",
+    "fields": ["error.type", "count()", "last_seen()"]
+  }
+- "most common errors last 24h" → 
+  {
+    "query": "level:error",
+    "fields": ["title", "error.type", "count()"]
+  }
+- "unhandled errors rate by project" → 
+  {
+    "query": "",
+    "fields": ["project", "count()", "count_if(error.handled,equals,false)", "epm()"]
+  }
+- "unique users affected by errors" → 
+  {
+    "query": "level:error",
+    "fields": ["error.type", "count()", "count_unique(user.id)"]
   }`,
   },
   logs: {
@@ -243,6 +303,16 @@ const DATASET_CONFIGS = {
   {
     "query": "span.op:db.query",
     "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.operation"]
+  }
+- "average response time by endpoint" → 
+  {
+    "query": "is_transaction:true",
+    "fields": ["transaction", "count()", "avg(span.duration)", "p95(span.duration)"]
+  }
+- "slowest database queries by p95" → 
+  {
+    "query": "span.op:db*",
+    "fields": ["span.description", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"]
   }`,
   },
 };
@@ -288,8 +358,8 @@ function formatErrorResults(
     "message",
     "culprit",
     "timestamp",
-    "last_seen()",
-    "count()",
+    "last_seen()", // Aggregate field - when the issue was last seen
+    "count()", // Aggregate field - total occurrences of this issue
   ];
 
   for (const event of eventData) {
@@ -310,21 +380,12 @@ function formatErrorResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName =
-          field === "last_seen()"
-            ? "Last seen"
-            : field === "count()"
-              ? "Occurrences"
-              : field === "culprit"
-                ? "Location"
-                : field.charAt(0).toUpperCase() +
-                  field.slice(1).replace(/[._]/g, " ");
 
         if (field === "issue" && typeof value === "string") {
           output += `**Issue ID**: ${value}\n`;
-          output += `**URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
+          output += `**Issue URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
         } else {
-          output += `**${displayName}**: ${value}\n`;
+          output += `**${field}**: ${value}\n`;
         }
       }
     }
@@ -333,9 +394,7 @@ function formatErrorResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName =
-          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
-        output += `**${displayName}**: ${value}\n`;
+        output += `**${key}**: ${value}\n`;
       }
     }
 
@@ -436,19 +495,12 @@ function formatLogResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName =
-          field === "severity_number"
-            ? "Severity number"
-            : field === "sentry.item_id"
-              ? "Item ID"
-              : field.charAt(0).toUpperCase() +
-                field.slice(1).replace(/[._]/g, " ");
 
         if (field === "trace" && typeof value === "string") {
           output += `- **Trace ID**: ${value}\n`;
           output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
         } else {
-          output += `- **${displayName}**: ${value}\n`;
+          output += `- **${field}**: ${value}\n`;
         }
       }
     }
@@ -457,9 +509,7 @@ function formatLogResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName =
-          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
-        output += `- **${displayName}**: ${value}\n`;
+        output += `- **${key}**: ${value}\n`;
       }
     }
 
@@ -536,25 +586,14 @@ function formatSpanResults(
         event[field] !== undefined
       ) {
         const value = event[field];
-        const displayName =
-          field === "span.op"
-            ? "Operation"
-            : field === "span.description"
-              ? "Description"
-              : field === "span.duration"
-                ? "Duration"
-                : field === "span.status"
-                  ? "Status"
-                  : field.charAt(0).toUpperCase() +
-                    field.slice(1).replace(/[._]/g, " ");
 
         if (field === "trace" && typeof value === "string") {
           output += `**Trace ID**: ${value}\n`;
           output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
         } else if (field === "span.duration" && typeof value === "number") {
-          output += `**${displayName}**: ${value}ms\n`;
+          output += `**${field}**: ${value}ms\n`;
         } else {
-          output += `**${displayName}**: ${value}\n`;
+          output += `**${field}**: ${value}\n`;
         }
       }
     }
@@ -563,9 +602,7 @@ function formatSpanResults(
     const displayedFields = new Set([...priorityFields, "id"]);
     for (const [key, value] of Object.entries(event)) {
       if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        const displayName =
-          key.charAt(0).toUpperCase() + key.slice(1).replace(/[._]/g, " ");
-        output += `**${displayName}**: ${value}\n`;
+        output += `**${key}**: ${value}\n`;
       }
     }
 
@@ -596,7 +633,7 @@ const RECOMMENDED_FIELDS = {
       "culprit",
     ],
     description:
-      "Basic error information including issue ID, title, severity, and location",
+      "Basic error information including issue ID, title, timestamp, severity, and location",
   },
   logs: {
     basic: ["timestamp", "project", "message", "severity", "trace"],
@@ -627,6 +664,36 @@ function buildSystemPrompt(
 ): string {
   const recommendedFields = RECOMMENDED_FIELDS[dataset];
 
+  // Define aggregate functions for each dataset
+  const aggregateFunctions = {
+    errors: `ERRORS dataset aggregate functions:
+- count(): Count of error events
+- count_unique(field): Count unique values (e.g., count_unique(user.id))
+- count_if(field,equals,value): Conditional count (e.g., count_if(error.handled,equals,false))
+- last_seen(): Most recent timestamp in the group
+- eps(): Events per second rate
+- epm(): Events per minute rate`,
+    spans: `SPANS dataset aggregate functions:
+- count(): Count of spans
+- count_unique(field): Count unique values (e.g., count_unique(user.id))
+- avg(field): Average of numeric field (e.g., avg(span.duration))
+- sum(field): Sum of numeric field (e.g., sum(span.self_time))
+- min(field): Minimum value (e.g., min(span.duration))
+- max(field): Maximum value (e.g., max(span.duration))
+- p50(field), p75(field), p90(field), p95(field), p99(field), p100(field): Percentiles
+- epm(): Events per minute rate
+- failure_rate(): Percentage of failed spans`,
+    logs: `LOGS dataset aggregate functions:
+- count(): Count of log entries
+- count_unique(field): Count unique values (e.g., count_unique(user.id))
+- avg(field): Average of numeric field (e.g., avg(severity_number))
+- sum(field): Sum of numeric field
+- min(field): Minimum value
+- max(field): Maximum value
+- p50(field), p75(field), p90(field), p95(field), p99(field), p100(field): Percentiles
+- epm(): Events per minute rate`,
+  };
+
   return SYSTEM_PROMPT_TEMPLATE.replace("{dataset}", dataset)
     .replace(
       "{recommendedFields}",
@@ -638,6 +705,7 @@ function buildSystemPrompt(
         .map(([key, desc]) => `- ${key}: ${desc}`)
         .join("\n"),
     )
+    .replace("{aggregateFunctions}", aggregateFunctions[dataset])
     .replace("{datasetRules}", datasetConfig.rules)
     .replace("{datasetExamples}", datasetConfig.examples);
 }
@@ -646,6 +714,7 @@ function buildSystemPrompt(
 const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. You need to:
 1. Convert the natural language query to Sentry's search syntax (the WHERE conditions)
 2. Decide which fields to return in the results (the SELECT fields)
+3. Understand when to use aggregate functions vs individual events
 
 For the {dataset} dataset:
 
@@ -654,6 +723,19 @@ RECOMMENDED FIELDS TO RETURN:
 
 ALL AVAILABLE FIELDS:
 {fields}
+
+AGGREGATE FUNCTIONS BY DATASET:
+{aggregateFunctions}
+
+QUERY MODES:
+1. INDIVIDUAL EVENTS (default): Returns raw event data
+   - Used when fields contain no function() calls
+   - Returns actual event occurrences with full details
+
+2. AGGREGATE QUERIES: SQL-like grouping and aggregation
+   - Activated when ANY field contains a function() call
+   - Automatically groups by ALL non-function fields in the field list
+   - Example: fields=['project', 'error.type', 'count()'] groups by project and error.type
 
 QUERY SYNTAX RULES:
 - Use field:value for exact matches
@@ -688,53 +770,38 @@ IMPORTANT NOTES:
 - If the user asks about a specific field (e.g., "show me user emails"), include that field
 - Do NOT include project: filters in your query (project filtering is handled separately)
 - For spans/errors: When user mentions time periods, include timestamp filters in query
-- For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically`;
+- For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically
+- CRITICAL: Results are sorted automatically, so you MUST include sort fields in your field selection:
+  - For errors: Always include "timestamp" field (results sorted by most recent)
+  - For spans: Always include "span.duration" field (results sorted by slowest)
+  - For logs: Always include "timestamp" field (results sorted by most recent)
+- AGGREGATE FUNCTION RULES:
+  - Numeric functions (avg, sum, min, max, percentiles) ONLY work with numeric fields
+  - count() and count_unique() work with any field type
+  - When using aggregate functions, results are grouped by non-function fields
+  - Dataset-specific functions must only be used with their respective datasets`;
 
 export default defineTool({
   name: "search_events",
   description: [
-    "Search for individual error events, log entries, or trace spans using natural language queries.",
+    "Search for error events, log entries, or trace spans. Supports both individual event queries and SQL-like aggregations.",
     "",
-    "🔍 USE THIS TOOL WHEN USERS ASK FOR:",
-    "- 'error logs', 'log entries', 'show me logs'",
-    "- 'find errors that occurred', 'error events from last hour'",
-    "- 'database timeout errors', 'specific error occurrences'",
-    "- 'slow queries', 'API calls taking over X seconds'",
-    "- Any query about INDIVIDUAL events/occurrences with time/performance filters",
+    "Automatically uses natural language to search across Sentry data, returning either:",
+    "- Individual events with full details (default)",
+    "- Aggregated results when using functions like count(), avg(), sum(), etc.",
     "",
-    "❌ DO NOT USE for 'issues', 'problems', or when users want grouped summaries",
+    "Datasets:",
+    "- errors: Exception/crash events",
+    "- logs: Log entries (use for 'error logs')",
+    "- spans: Performance/trace data",
     "",
-    "CRITICAL DISTINCTION:",
-    "- Events = Individual occurrences (use search_events)",
-    "- Issues = Grouped problems (use find_issues)",
-    "",
-    "Dataset Selection:",
-    "- Users say 'error logs' → dataset='logs' (log entries with error severity)",
-    "- Users say 'exceptions'/'crashes' → dataset='errors' (error events)",
-    "- Users say 'slow queries'/'performance' → dataset='spans' (trace data)",
+    "❌ DO NOT USE for 'issues' or 'problems' (use find_issues instead)",
     "",
     "<examples>",
-    "### Error logs from last hour",
-    "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='error logs from last hour', dataset='logs')",
-    "```",
-    "",
-    "### Database connection errors",
-    "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='database connection errors', dataset='errors')",
-    "```",
-    "",
-    "### Slow database queries",
-    "```",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='slow database queries over 100ms', dataset='spans')",
-    "```",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='database errors in the last hour', dataset='errors')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='count of errors by type', dataset='errors')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='slowest API calls', dataset='spans')",
     "</examples>",
-    "",
-    "<hints>",
-    "- Be specific for better results",
-    "- Can mention time ranges, error types, performance thresholds",
-    "- CRITICAL: 'error logs' means dataset='logs' NOT dataset='errors'",
-    "</hints>",
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
@@ -853,7 +920,7 @@ export default defineTool({
     // Determine the appropriate sort parameter based on dataset
     const sortParam =
       dataset === "errors"
-        ? "-last_seen"
+        ? "-timestamp"
         : dataset === "spans"
           ? "-span.duration"
           : "-timestamp";
