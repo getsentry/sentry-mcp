@@ -201,8 +201,8 @@ describe("search_events", () => {
       **span.description**: SELECT * FROM users WHERE timeout
       **transaction**: /api/checkout
       **span.duration**: 5234ms
-      **trace**: abc123def456
-      **trace_url**: https://test-org.sentry.io/explore/traces/trace/abc123def456
+      **Trace ID**: abc123def456
+      **Trace URL**: https://test-org.sentry.io/explore/traces/trace/abc123def456
       **project**: backend
       **timestamp**: 2024-01-15T10:30:00Z
 
@@ -212,14 +212,14 @@ describe("search_events", () => {
       **span.description**: GET user:session:timeout
       **transaction**: /api/checkout
       **span.duration**: 1500ms
-      **trace**: xyz789ghi012
-      **trace_url**: https://test-org.sentry.io/explore/traces/trace/xyz789ghi012
+      **Trace ID**: xyz789ghi012
+      **Trace URL**: https://test-org.sentry.io/explore/traces/trace/xyz789ghi012
       **project**: backend
       **timestamp**: 2024-01-15T10:25:00Z
 
       ## Next Steps
 
-      - View the full trace: Click on the trace_url above
+      - View the full trace: Click on the Trace URL above
       - Search for related spans: Modify your query to be more specific
       - Export data: Use the Sentry web interface for advanced analysis
       "

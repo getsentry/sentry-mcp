@@ -382,8 +382,8 @@ function formatErrorResults(
         const value = event[field];
 
         if (field === "issue" && typeof value === "string") {
-          output += `**${field}**: ${value}\n`;
-          output += `**issue_url**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
+          output += `**Issue ID**: ${value}\n`;
+          output += `**Issue URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
         } else {
           output += `**${field}**: ${value}\n`;
         }
@@ -497,8 +497,8 @@ function formatLogResults(
         const value = event[field];
 
         if (field === "trace" && typeof value === "string") {
-          output += `- **${field}**: ${value}\n`;
-          output += `- **trace_url**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+          output += `- **Trace ID**: ${value}\n`;
+          output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
         } else {
           output += `- **${field}**: ${value}\n`;
         }
@@ -517,7 +517,7 @@ function formatLogResults(
   }
 
   output += "## Next Steps\n\n";
-  output += "- View related traces: Click on the trace_url if available\n";
+  output += "- View related traces: Click on the Trace URL if available\n";
   output +=
     "- Filter by severity: Adjust your query to focus on specific log levels\n";
   output += "- Export logs: Use the Sentry web interface for bulk export\n";
@@ -588,8 +588,8 @@ function formatSpanResults(
         const value = event[field];
 
         if (field === "trace" && typeof value === "string") {
-          output += `**${field}**: ${value}\n`;
-          output += `**trace_url**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+          output += `**Trace ID**: ${value}\n`;
+          output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
         } else if (field === "span.duration" && typeof value === "number") {
           output += `**${field}**: ${value}ms\n`;
         } else {
@@ -610,7 +610,7 @@ function formatSpanResults(
   }
 
   output += "## Next Steps\n\n";
-  output += "- View the full trace: Click on the trace_url above\n";
+  output += "- View the full trace: Click on the Trace URL above\n";
   output +=
     "- Search for related spans: Modify your query to be more specific\n";
   output +=
