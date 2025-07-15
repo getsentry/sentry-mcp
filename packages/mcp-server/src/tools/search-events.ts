@@ -939,13 +939,26 @@ export default defineTool({
         ? requestedFields
         : RECOMMENDED_FIELDS[dataset].basic;
 
-    // Determine the appropriate sort parameter based on dataset
-    const sortParam =
-      dataset === "errors"
-        ? "-timestamp"
-        : dataset === "spans"
-          ? "-span.duration"
-          : "-timestamp";
+    // Check if this is an aggregate query (contains any function calls)
+    const isAggregateQuery = fields.some(
+      (field) => field.includes("(") && field.includes(")"),
+    );
+
+    // Determine the appropriate sort parameter based on dataset and query type
+    let sortParam: string;
+    if (isAggregateQuery) {
+      // For aggregate queries, sort by the count field if present, otherwise omit sort
+      const countField = fields.find((f) => f.includes("count()"));
+      sortParam = countField ? `-${countField}` : "";
+    } else {
+      // For non-aggregate queries, use default sorting
+      sortParam =
+        dataset === "errors"
+          ? "-timestamp"
+          : dataset === "spans"
+            ? "-span.duration"
+            : "-timestamp";
+    }
 
     // Convert project slug to ID if needed - the search API requires numeric IDs
     let projectId: string | undefined;
@@ -974,7 +987,7 @@ export default defineTool({
           limit: params.limit,
           projectSlug: projectId, // API requires numeric project ID, not slug
           dataset: dataset === "logs" ? "ourlogs" : dataset,
-          sort: sortParam,
+          ...(sortParam && { sort: sortParam }), // Only include sort if not empty
           // For logs and errors, use a default time window
           ...(dataset !== "spans" && { statsPeriod: "24h" }),
         }),

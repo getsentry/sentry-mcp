@@ -106,12 +106,18 @@ async function logAndFormatError(error: unknown) {
   }
 
   if (isApiError(error)) {
+    // Log 500+ errors to Sentry for debugging
+    const eventId = error.status >= 500 ? logError(error) : undefined;
+
     return [
       "**Error**",
       `There was an HTTP ${error.status} error with your request to the Sentry API.`,
       `${error.message}`,
+      eventId ? `**Event ID**: ${eventId}` : "",
       `You may be able to resolve the issue by addressing the concern and trying again.`,
-    ].join("\n\n");
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   const eventId = logError(error);
