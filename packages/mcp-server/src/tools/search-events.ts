@@ -904,7 +904,7 @@ Return a JSON object with these fields:
 - "sort": Sort parameter for results (REQUIRED - YOU MUST ALWAYS SPECIFY THIS)
 - "isAggregate": Boolean indicating if this is an aggregate query (REQUIRED)
 - "aggregateFunctions": Array of aggregate function fields like ["count()", "avg(span.duration)"] (REQUIRED if isAggregate=true, empty array otherwise)
-- "groupByField": The field to group by, or null if no grouping (REQUIRED if isAggregate=true and there's a non-function field)
+- "groupByFields": Array of fields to group by (REQUIRED if isAggregate=true, empty array if no grouping)
 - "error": Error message if you cannot translate the query (OPTIONAL)
 
 ERROR HANDLING:
@@ -930,13 +930,14 @@ AGGREGATE QUERY RESPONSE STRUCTURE:
 When creating an aggregate query:
 1. Set isAggregate to true
 2. List all aggregate functions in aggregateFunctions array (e.g., ["count()", "avg(span.duration)"])
-3. Set groupByField to the single field you're grouping by (or null if just aggregating without grouping)
-4. Include all fields (both aggregate functions and groupBy field) in the fields array
+3. Set groupByFields to an array of fields you're grouping by (empty array if just aggregating without grouping)
+4. Include all fields (both aggregate functions and groupBy fields) in the fields array
 
 Examples:
-- "count of errors by type": isAggregate=true, aggregateFunctions=["count()"], groupByField="error.type", fields=["error.type", "count()"]
-- "average span duration": isAggregate=true, aggregateFunctions=["avg(span.duration)"], groupByField=null, fields=["avg(span.duration)"]
-- "most common transaction": isAggregate=true, aggregateFunctions=["count()"], groupByField="span.description", fields=["span.description", "count()"], sort="-count()"`;
+- "count of errors by type": isAggregate=true, aggregateFunctions=["count()"], groupByFields=["error.type"], fields=["error.type", "count()"]
+- "average span duration": isAggregate=true, aggregateFunctions=["avg(span.duration)"], groupByFields=[], fields=["avg(span.duration)"]
+- "most common transaction": isAggregate=true, aggregateFunctions=["count()"], groupByFields=["span.description"], fields=["span.description", "count()"], sort="-count()"
+- "p50 duration by model and operation": isAggregate=true, aggregateFunctions=["p50(span.duration)"], groupByFields=["ai.model.id", "ai.operationId"], fields=["ai.model.id", "ai.operationId", "p50(span.duration)"], sort="-p50(span.duration)"`;
 
 export default defineTool({
   name: "search_events",
@@ -1065,12 +1066,12 @@ export default defineTool({
           .describe(
             "Array of aggregate function fields (e.g., ['count()', 'avg(span.duration)'])",
           ),
-        groupByField: z
-          .string()
-          .nullable()
+        groupByFields: z
+          .array(z.string())
           .optional()
+          .default([])
           .describe(
-            "The field to group by in aggregate queries (null if no grouping)",
+            "Array of fields to group by in aggregate queries (empty array if no grouping)",
           ),
         error: z
           .string()
@@ -1156,11 +1157,9 @@ export default defineTool({
       dataset, // dataset is already correct for URL generation (logs, spans, errors)
       fields, // Pass fields to detect if it's an aggregate query
       sortParam, // Pass sort parameter for URL generation
-      {
-        isAggregate: parsed.isAggregate,
-        aggregateFunctions: parsed.aggregateFunctions || [],
-        groupByField: parsed.groupByField || null,
-      },
+      parsed.isAggregate,
+      parsed.aggregateFunctions || [],
+      parsed.groupByFields || [],
     );
 
     // Type-safe access to event data
