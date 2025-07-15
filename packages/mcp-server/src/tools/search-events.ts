@@ -59,7 +59,7 @@ async function fetchCustomAttributes(
       }
     } else {
       // For logs and spans datasets, use the trace-items attributes endpoint
-      const itemType = dataset === "logs" ? "logs" : "span";
+      const itemType = dataset === "logs" ? "logs" : "spans";
       const attributesResponse = await apiService.listTraceItemAttributes({
         organizationSlug,
         itemType,
@@ -80,7 +80,7 @@ async function fetchCustomAttributes(
         operation:
           dataset === "errors" ? "listTags" : "listTraceItemAttributes",
         ...(dataset !== "errors" && {
-          itemType: dataset === "logs" ? "logs" : "span",
+          itemType: dataset === "logs" ? "logs" : "spans",
         }),
       },
     });

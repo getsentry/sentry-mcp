@@ -104,7 +104,7 @@ describe("search_events", () => {
         "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
         ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("itemType")).toBe("span");
+          expect(url.searchParams.get("itemType")).toBe("spans");
           const attributeType = url.searchParams.get("attributeType");
           expect(["string", "number"].includes(attributeType!)).toBe(true);
 
@@ -236,7 +236,7 @@ describe("search_events", () => {
         "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
         ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("itemType")).toBe("span");
+          expect(url.searchParams.get("itemType")).toBe("spans");
           const attributeType = url.searchParams.get("attributeType");
           expect(["string", "number"].includes(attributeType!)).toBe(true);
           return HttpResponse.json([]);
@@ -318,7 +318,7 @@ describe("search_events", () => {
         "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
         ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("itemType")).toBe("span");
+          expect(url.searchParams.get("itemType")).toBe("spans");
           const attributeType = url.searchParams.get("attributeType");
           expect(["string", "number"].includes(attributeType!)).toBe(true);
           return HttpResponse.json([]);
@@ -371,7 +371,7 @@ describe("search_events", () => {
         "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
         ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("itemType")).toBe("span");
+          expect(url.searchParams.get("itemType")).toBe("spans");
           const attributeType = url.searchParams.get("attributeType");
           expect(["string", "number"].includes(attributeType!)).toBe(true);
           return HttpResponse.json([]);
@@ -408,7 +408,7 @@ describe("search_events", () => {
         "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
         ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("itemType")).toBe("span");
+          expect(url.searchParams.get("itemType")).toBe("spans");
           const attributeType = url.searchParams.get("attributeType");
           expect(["string", "number"].includes(attributeType!)).toBe(true);
 
@@ -572,7 +572,7 @@ describe("search_events", () => {
         "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
         ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("itemType")).toBe("span");
+          expect(url.searchParams.get("itemType")).toBe("spans");
           const attributeType = url.searchParams.get("attributeType");
           expect(["string", "number"].includes(attributeType!)).toBe(true);
           return HttpResponse.json([]);
@@ -684,7 +684,7 @@ describe("search_events", () => {
         "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
         ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("itemType")).toBe("span");
+          expect(url.searchParams.get("itemType")).toBe("spans");
           const attributeType = url.searchParams.get("attributeType");
           expect(["string", "number"].includes(attributeType!)).toBe(true);
           return HttpResponse.json([]);
