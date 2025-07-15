@@ -37,6 +37,11 @@ function getNumberValue(
   return typeof value === "number" ? value : undefined;
 }
 
+// Helper to check if fields contain aggregate functions
+function isAggregateQuery(fields: string[]): boolean {
+  return fields.some((field) => field.includes("(") && field.includes(")"));
+}
+
 // Helper function to fetch custom attributes for a dataset
 async function fetchCustomAttributes(
   apiService: SentryApiService,
@@ -375,9 +380,16 @@ function formatErrorResults(
   organizationSlug: string,
   explorerUrl: string,
   sentryQuery: string,
+  fields: string[],
 ): string {
   let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
-  output += `⚠️ **IMPORTANT**: Display these errors as highlighted alert cards with color-coded severity levels and clickable Event IDs.\n\n`;
+
+  // Check if this is an aggregate query and adjust display instructions
+  if (isAggregateQuery(fields)) {
+    output += `⚠️ **IMPORTANT**: Display these aggregate results as a data table with proper column alignment and formatting.\n\n`;
+  } else {
+    output += `⚠️ **IMPORTANT**: Display these errors as highlighted alert cards with color-coded severity levels and clickable Event IDs.\n\n`;
+  }
 
   if (params.includeExplanation) {
     output += `## Query Translation\n`;
@@ -394,59 +406,71 @@ function formatErrorResults(
     return output;
   }
 
-  output += `Found ${eventData.length} error${eventData.length === 1 ? "" : "s"}:\n\n`;
+  output += `Found ${eventData.length} ${isAggregateQuery(fields) ? "aggregate result" : "error"}${eventData.length === 1 ? "" : "s"}:\n\n`;
 
-  // Define priority fields that should appear first if present
-  const priorityFields = [
-    "title",
-    "issue",
-    "project",
-    "level",
-    "error.type",
-    "message",
-    "culprit",
-    "timestamp",
-    "last_seen()", // Aggregate field - when the issue was last seen
-    "count()", // Aggregate field - total occurrences of this issue
-  ];
+  // For aggregate queries, just output the raw data - the agent will format it as a table
+  if (isAggregateQuery(fields)) {
+    output += "```json\n";
+    output += JSON.stringify(eventData, null, 2);
+    output += "\n```\n\n";
+  } else {
+    // For individual errors, format with details
+    // Define priority fields that should appear first if present
+    const priorityFields = [
+      "title",
+      "issue",
+      "project",
+      "level",
+      "error.type",
+      "message",
+      "culprit",
+      "timestamp",
+      "last_seen()", // Aggregate field - when the issue was last seen
+      "count()", // Aggregate field - total occurrences of this issue
+    ];
 
-  for (const event of eventData) {
-    // Try to get a title from various possible fields
-    const title =
-      getStringValue(event, "title") ||
-      getStringValue(event, "message") ||
-      getStringValue(event, "error.value") ||
-      "Error Event";
+    for (const event of eventData) {
+      // Try to get a title from various possible fields
+      const title =
+        getStringValue(event, "title") ||
+        getStringValue(event, "message") ||
+        getStringValue(event, "error.value") ||
+        "Error Event";
 
-    output += `## ${title}\n\n`;
+      output += `## ${title}\n\n`;
 
-    // Display priority fields first if they exist
-    for (const field of priorityFields) {
-      if (
-        field in event &&
-        event[field] !== null &&
-        event[field] !== undefined
-      ) {
-        const value = event[field];
+      // Display priority fields first if they exist
+      for (const field of priorityFields) {
+        if (
+          field in event &&
+          event[field] !== null &&
+          event[field] !== undefined
+        ) {
+          const value = event[field];
 
-        if (field === "issue" && typeof value === "string") {
-          output += `**Issue ID**: ${value}\n`;
-          output += `**Issue URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
-        } else {
-          output += `**${field}**: ${value}\n`;
+          if (field === "issue" && typeof value === "string") {
+            output += `**Issue ID**: ${value}\n`;
+            output += `**Issue URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
+          } else {
+            output += `**${field}**: ${value}\n`;
+          }
         }
       }
-    }
 
-    // Display any additional fields that weren't in the priority list
-    const displayedFields = new Set([...priorityFields, "id"]);
-    for (const [key, value] of Object.entries(event)) {
-      if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        output += `**${key}**: ${value}\n`;
+      // Display any additional fields that weren't in the priority list
+      const displayedFields = new Set([...priorityFields, "id"]);
+      for (const [key, value] of Object.entries(event)) {
+        if (
+          !displayedFields.has(key) &&
+          value !== null &&
+          value !== undefined
+        ) {
+          output += `**${key}**: ${value}\n`;
+        }
       }
-    }
 
-    output += "\n";
+      output += "\n";
+    }
   }
 
   output += "## Next Steps\n\n";
@@ -467,9 +491,16 @@ function formatLogResults(
   organizationSlug: string,
   explorerUrl: string,
   sentryQuery: string,
+  fields: string[],
 ): string {
   let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
-  output += `⚠️ **IMPORTANT**: Display these logs in console format with monospace font, color-coded severity (🔴 ERROR, 🟡 WARN, 🔵 INFO), and preserve timestamps.\n\n`;
+
+  // Check if this is an aggregate query and adjust display instructions
+  if (isAggregateQuery(fields)) {
+    output += `⚠️ **IMPORTANT**: Display these aggregate results as a data table with proper column alignment and formatting.\n\n`;
+  } else {
+    output += `⚠️ **IMPORTANT**: Display these logs in console format with monospace font, color-coded severity (🔴 ERROR, 🟡 WARN, 🔵 INFO), and preserve timestamps.\n\n`;
+  }
 
   if (params.includeExplanation) {
     output += `## Query Translation\n`;
@@ -486,82 +517,94 @@ function formatLogResults(
     return output;
   }
 
-  output += `Found ${eventData.length} log${eventData.length === 1 ? "" : "s"}:\n\n`;
+  output += `Found ${eventData.length} ${isAggregateQuery(fields) ? "aggregate result" : "log"}${eventData.length === 1 ? "" : "s"}:\n\n`;
 
-  output += "```console\n";
+  // For aggregate queries, just output the raw data - the agent will format it as a table
+  if (isAggregateQuery(fields)) {
+    output += "```json\n";
+    output += JSON.stringify(eventData, null, 2);
+    output += "\n```\n\n";
+  } else {
+    // For individual logs, format as console output
+    output += "```console\n";
 
-  for (const event of eventData) {
-    const timestamp = getStringValue(event, "timestamp", "N/A");
-    const severity = getStringValue(event, "severity", "info");
-    const message = getStringValue(event, "message", "No message");
+    for (const event of eventData) {
+      const timestamp = getStringValue(event, "timestamp", "N/A");
+      const severity = getStringValue(event, "severity", "info");
+      const message = getStringValue(event, "message", "No message");
 
-    // Safely uppercase the severity
-    const severityUpper = severity.toUpperCase();
+      // Safely uppercase the severity
+      const severityUpper = severity.toUpperCase();
 
-    // Get severity emoji with proper typing
-    const severityEmojis: Record<string, string> = {
-      ERROR: "🔴",
-      FATAL: "🔴",
-      WARN: "🟡",
-      WARNING: "🟡",
-      INFO: "🔵",
-      DEBUG: "⚫",
-      TRACE: "⚫",
-    };
-    const severityEmoji = severityEmojis[severityUpper] || "🔵";
+      // Get severity emoji with proper typing
+      const severityEmojis: Record<string, string> = {
+        ERROR: "🔴",
+        FATAL: "🔴",
+        WARN: "🟡",
+        WARNING: "🟡",
+        INFO: "🔵",
+        DEBUG: "⚫",
+        TRACE: "⚫",
+      };
+      const severityEmoji = severityEmojis[severityUpper] || "🔵";
 
-    // Standard log format with emoji and proper spacing
-    output += `${timestamp} ${severityEmoji} [${severityUpper.padEnd(5)}] ${message}\n`;
-  }
+      // Standard log format with emoji and proper spacing
+      output += `${timestamp} ${severityEmoji} [${severityUpper.padEnd(5)}] ${message}\n`;
+    }
 
-  output += "```\n\n";
+    output += "```\n\n";
 
-  // Add detailed metadata for each log entry
-  output += "## Log Details\n\n";
+    // Add detailed metadata for each log entry
+    output += "## Log Details\n\n";
 
-  // Define priority fields that should appear first if present
-  const priorityFields = [
-    "message",
-    "severity",
-    "severity_number",
-    "timestamp",
-    "project",
-    "trace",
-    "sentry.item_id",
-  ];
+    // Define priority fields that should appear first if present
+    const priorityFields = [
+      "message",
+      "severity",
+      "severity_number",
+      "timestamp",
+      "project",
+      "trace",
+      "sentry.item_id",
+    ];
 
-  for (let i = 0; i < eventData.length; i++) {
-    const event = eventData[i];
+    for (let i = 0; i < eventData.length; i++) {
+      const event = eventData[i];
 
-    output += `### Log ${i + 1}\n`;
+      output += `### Log ${i + 1}\n`;
 
-    // Display priority fields first
-    for (const field of priorityFields) {
-      if (
-        field in event &&
-        event[field] !== null &&
-        event[field] !== undefined
-      ) {
-        const value = event[field];
+      // Display priority fields first
+      for (const field of priorityFields) {
+        if (
+          field in event &&
+          event[field] !== null &&
+          event[field] !== undefined
+        ) {
+          const value = event[field];
 
-        if (field === "trace" && typeof value === "string") {
-          output += `- **Trace ID**: ${value}\n`;
-          output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
-        } else {
-          output += `- **${field}**: ${value}\n`;
+          if (field === "trace" && typeof value === "string") {
+            output += `- **Trace ID**: ${value}\n`;
+            output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+          } else {
+            output += `- **${field}**: ${value}\n`;
+          }
         }
       }
-    }
 
-    // Display any additional fields
-    const displayedFields = new Set([...priorityFields, "id"]);
-    for (const [key, value] of Object.entries(event)) {
-      if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        output += `- **${key}**: ${value}\n`;
+      // Display any additional fields
+      const displayedFields = new Set([...priorityFields, "id"]);
+      for (const [key, value] of Object.entries(event)) {
+        if (
+          !displayedFields.has(key) &&
+          value !== null &&
+          value !== undefined
+        ) {
+          output += `- **${key}**: ${value}\n`;
+        }
       }
-    }
 
-    output += "\n";
+      output += "\n";
+    }
   }
 
   output += "## Next Steps\n\n";
@@ -583,9 +626,16 @@ function formatSpanResults(
   organizationSlug: string,
   explorerUrl: string,
   sentryQuery: string,
+  fields: string[],
 ): string {
   let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
-  output += `⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.\n\n`;
+
+  // Check if this is an aggregate query and adjust display instructions
+  if (isAggregateQuery(fields)) {
+    output += `⚠️ **IMPORTANT**: Display these aggregate results as a data table with proper column alignment and formatting.\n\n`;
+  } else {
+    output += `⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.\n\n`;
+  }
 
   if (params.includeExplanation) {
     output += `## Query Translation\n`;
@@ -602,59 +652,71 @@ function formatSpanResults(
     return output;
   }
 
-  output += `Found ${eventData.length} trace${eventData.length === 1 ? "" : "s"}/span${eventData.length === 1 ? "" : "s"}:\n\n`;
+  output += `Found ${eventData.length} ${isAggregateQuery(fields) ? `aggregate result${eventData.length === 1 ? "" : "s"}` : `trace${eventData.length === 1 ? "" : "s"}/span${eventData.length === 1 ? "" : "s"}`}:\n\n`;
 
-  // Define priority fields that should appear first if present
-  const priorityFields = [
-    "span.op",
-    "span.description",
-    "transaction",
-    "span.duration",
-    "span.status",
-    "trace",
-    "project",
-    "timestamp",
-  ];
+  // For aggregate queries, just output the raw data - the agent will format it as a table
+  if (isAggregateQuery(fields)) {
+    output += "```json\n";
+    output += JSON.stringify(eventData, null, 2);
+    output += "\n```\n\n";
+  } else {
+    // For individual spans, format with details
+    // Define priority fields that should appear first if present
+    const priorityFields = [
+      "span.op",
+      "span.description",
+      "transaction",
+      "span.duration",
+      "span.status",
+      "trace",
+      "project",
+      "timestamp",
+    ];
 
-  for (const event of eventData) {
-    // Try to get a title from various possible fields
-    const title =
-      getStringValue(event, "span.description") ||
-      getStringValue(event, "transaction") ||
-      getStringValue(event, "span.op") ||
-      "Span";
+    for (const event of eventData) {
+      // Try to get a title from various possible fields
+      const title =
+        getStringValue(event, "span.description") ||
+        getStringValue(event, "transaction") ||
+        getStringValue(event, "span.op") ||
+        "Span";
 
-    output += `## ${title}\n\n`;
+      output += `## ${title}\n\n`;
 
-    // Display priority fields first
-    for (const field of priorityFields) {
-      if (
-        field in event &&
-        event[field] !== null &&
-        event[field] !== undefined
-      ) {
-        const value = event[field];
+      // Display priority fields first
+      for (const field of priorityFields) {
+        if (
+          field in event &&
+          event[field] !== null &&
+          event[field] !== undefined
+        ) {
+          const value = event[field];
 
-        if (field === "trace" && typeof value === "string") {
-          output += `**Trace ID**: ${value}\n`;
-          output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
-        } else if (field === "span.duration" && typeof value === "number") {
-          output += `**${field}**: ${value}ms\n`;
-        } else {
-          output += `**${field}**: ${value}\n`;
+          if (field === "trace" && typeof value === "string") {
+            output += `**Trace ID**: ${value}\n`;
+            output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+          } else if (field === "span.duration" && typeof value === "number") {
+            output += `**${field}**: ${value}ms\n`;
+          } else {
+            output += `**${field}**: ${value}\n`;
+          }
         }
       }
-    }
 
-    // Display any additional fields
-    const displayedFields = new Set([...priorityFields, "id"]);
-    for (const [key, value] of Object.entries(event)) {
-      if (!displayedFields.has(key) && value !== null && value !== undefined) {
-        output += `**${key}**: ${value}\n`;
+      // Display any additional fields
+      const displayedFields = new Set([...priorityFields, "id"]);
+      for (const [key, value] of Object.entries(event)) {
+        if (
+          !displayedFields.has(key) &&
+          value !== null &&
+          value !== undefined
+        ) {
+          output += `**${key}**: ${value}\n`;
+        }
       }
-    }
 
-    output += "\n";
+      output += "\n";
+    }
   }
 
   output += "## Next Steps\n\n";
@@ -1065,6 +1127,7 @@ export default defineTool({
           organizationSlug,
           explorerUrl,
           sentryQuery,
+          fields,
         );
       case "logs":
         return formatLogResults(
@@ -1074,6 +1137,7 @@ export default defineTool({
           organizationSlug,
           explorerUrl,
           sentryQuery,
+          fields,
         );
       case "spans":
         return formatSpanResults(
@@ -1083,6 +1147,7 @@ export default defineTool({
           organizationSlug,
           explorerUrl,
           sentryQuery,
+          fields,
         );
     }
   },
