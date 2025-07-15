@@ -1114,6 +1114,7 @@ export default defineTool({
       sentryQuery,
       projectId, // Pass the numeric project ID for URL generation
       dataset, // dataset is already correct for URL generation (logs, spans, errors)
+      fields, // Pass fields to detect if it's an aggregate query
     );
 
     // Type-safe access to event data
