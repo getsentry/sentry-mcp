@@ -451,46 +451,71 @@ export class SentryApiService {
    * // URL format: /explore/discover/homepage/?field=title&field=count_unique(user)
    * buildDiscoverUrl("my-org", "level:error", "123", ["title", "count_unique(user)"], "-timestamp")
    */
-  private buildDiscoverUrl(
-    organizationSlug: string,
-    query: string,
-    projectSlug?: string,
-    fields?: string[],
-    sort?: string,
-  ): string {
-    const params = new URLSearchParams();
+  private buildDiscoverUrl(params: {
+    organizationSlug: string;
+    query: string;
+    projectSlug?: string;
+    fields?: string[];
+    sort?: string;
+    statsPeriod?: string;
+    aggregateFunctions?: string[];
+    groupByFields?: string[];
+  }): string {
+    const {
+      organizationSlug,
+      query,
+      projectSlug,
+      fields,
+      sort,
+      statsPeriod = "24h",
+      aggregateFunctions,
+      groupByFields,
+    } = params;
+
+    const urlParams = new URLSearchParams();
 
     // Discover API specific parameters
-    params.set("dataset", "errors");
-    params.set("queryDataset", "error-events");
-    params.set("query", query);
+    urlParams.set("dataset", "errors");
+    urlParams.set("queryDataset", "error-events");
+    urlParams.set("query", query);
 
     if (projectSlug) {
-      params.set("project", projectSlug);
+      urlParams.set("project", projectSlug);
     }
 
     // Discover API includes aggregate functions directly in field list
     if (fields && fields.length > 0) {
       for (const field of fields) {
-        params.append("field", field);
+        urlParams.append("field", field);
       }
     } else {
       // Default fields for Discover
-      params.append("field", "title");
-      params.append("field", "project");
-      params.append("field", "user.display");
-      params.append("field", "timestamp");
+      urlParams.append("field", "title");
+      urlParams.append("field", "project");
+      urlParams.append("field", "user.display");
+      urlParams.append("field", "timestamp");
     }
 
-    params.set("sort", sort || "-timestamp");
-    params.set("statsPeriod", "24h");
-    params.set("yAxis", "count()");
+    urlParams.set("sort", sort || "-timestamp");
+    urlParams.set("statsPeriod", statsPeriod);
+
+    // Check if this is an aggregate query
+    const isAggregate = (aggregateFunctions?.length ?? 0) > 0;
+    if (isAggregate) {
+      urlParams.set("mode", "aggregate");
+      // For aggregate queries in Discover, set yAxis to the first aggregate function
+      if (aggregateFunctions && aggregateFunctions.length > 0) {
+        urlParams.set("yAxis", aggregateFunctions[0]);
+      }
+    } else {
+      urlParams.set("yAxis", "count()");
+    }
 
     const path = this.isSaas()
       ? `https://${organizationSlug}.sentry.io/explore/discover/homepage/`
       : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
 
-    return `${path}?${params.toString()}`;
+    return `${path}?${urlParams.toString()}`;
   }
 
   /**
@@ -503,21 +528,34 @@ export class SentryApiService {
    * // URL format: /explore/traces/?aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
    * buildEapUrl("my-org", "span.op:db", "123", ["span.op", "count()"], "-count()", ["count()"], ["span.op"])
    */
-  private buildEapUrl(
-    organizationSlug: string,
-    query: string,
-    dataset: "spans" | "logs",
-    projectSlug?: string,
-    fields?: string[],
-    sort?: string,
-    aggregateFunctions?: string[],
-    groupByFields?: string[],
-  ): string {
-    const params = new URLSearchParams();
-    params.set("query", query);
+  private buildEapUrl(params: {
+    organizationSlug: string;
+    query: string;
+    dataset: "spans" | "logs";
+    projectSlug?: string;
+    fields?: string[];
+    sort?: string;
+    statsPeriod?: string;
+    aggregateFunctions?: string[];
+    groupByFields?: string[];
+  }): string {
+    const {
+      organizationSlug,
+      query,
+      dataset,
+      projectSlug,
+      fields,
+      sort,
+      statsPeriod = "24h",
+      aggregateFunctions,
+      groupByFields,
+    } = params;
+
+    const urlParams = new URLSearchParams();
+    urlParams.set("query", query);
 
     if (projectSlug) {
-      params.set("project", projectSlug);
+      urlParams.set("project", projectSlug);
     }
 
     // Determine if this is an aggregate query
@@ -527,8 +565,6 @@ export class SentryApiService {
       false;
 
     if (isAggregateQuery) {
-      params.set("mode", "aggregate");
-
       // EAP API uses structured aggregate parameters
       if (
         (aggregateFunctions?.length ?? 0) > 0 ||
@@ -537,13 +573,16 @@ export class SentryApiService {
         // Add each groupBy field as a separate aggregateField parameter
         if (groupByFields && groupByFields.length > 0) {
           for (const field of groupByFields) {
-            params.append("aggregateField", JSON.stringify({ groupBy: field }));
+            urlParams.append(
+              "aggregateField",
+              JSON.stringify({ groupBy: field }),
+            );
           }
         }
 
         // Add aggregate functions (yAxes)
         if (aggregateFunctions && aggregateFunctions.length > 0) {
-          params.append(
+          urlParams.append(
             "aggregateField",
             JSON.stringify({ yAxes: aggregateFunctions }),
           );
@@ -560,37 +599,41 @@ export class SentryApiService {
           ) || [];
 
         for (const field of parsedGroupByFields) {
-          params.append("aggregateField", JSON.stringify({ groupBy: field }));
+          urlParams.append(
+            "aggregateField",
+            JSON.stringify({ groupBy: field }),
+          );
         }
 
         if (parsedAggregateFunctions.length > 0) {
-          params.append(
+          urlParams.append(
             "aggregateField",
             JSON.stringify({ yAxes: parsedAggregateFunctions }),
           );
         }
       }
-    }
 
-    // Add fields for EAP
-    if (fields && fields.length > 0) {
-      for (const field of fields) {
-        params.append("field", field);
+      urlParams.set("mode", "aggregate");
+    } else {
+      // Non-aggregate query, add individual fields
+      if (fields && fields.length > 0) {
+        for (const field of fields) {
+          urlParams.append("field", field);
+        }
+      }
+      if (sort) {
+        urlParams.set("sort", sort);
       }
     }
 
-    if (sort) {
-      params.set("sort", sort);
-    }
-
-    params.set("statsPeriod", "24h");
+    urlParams.set("statsPeriod", statsPeriod);
 
     const basePath = dataset === "logs" ? "logs" : "traces";
     const path = this.isSaas()
       ? `https://${organizationSlug}.sentry.io/explore/${basePath}/`
       : `https://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
 
-    return `${path}?${params.toString()}`;
+    return `${path}?${urlParams.toString()}`;
   }
 
   /**
@@ -622,17 +665,19 @@ export class SentryApiService {
   ): string {
     if (dataset === "errors") {
       // Route to legacy Discover API
-      return this.buildDiscoverUrl(
+      return this.buildDiscoverUrl({
         organizationSlug,
         query,
         projectSlug,
         fields,
         sort,
-      );
+        aggregateFunctions,
+        groupByFields,
+      });
     }
 
     // Route to modern EAP API (spans and logs)
-    return this.buildEapUrl(
+    return this.buildEapUrl({
       organizationSlug,
       query,
       dataset,
@@ -641,7 +686,7 @@ export class SentryApiService {
       sort,
       aggregateFunctions,
       groupByFields,
-    );
+    });
   }
 
   /**
@@ -1516,15 +1561,118 @@ export class SentryApiService {
     return SpansSearchResponseSchema.parse(body).data;
   }
 
+  // ================================================================================
+  // API QUERY BUILDERS FOR DIFFERENT SENTRY APIS
+  // ================================================================================
+
+  /**
+   * Builds query parameters for the legacy Discover API (primarily used by errors dataset).
+   *
+   * Note: While the API endpoint is the same for all datasets, we maintain separate
+   * builders to make future divergence easier and to keep the code organized.
+   */
+  private buildDiscoverApiQuery(params: {
+    query: string;
+    fields: string[];
+    limit: number;
+    projectSlug?: string;
+    statsPeriod?: string;
+    sort: string;
+  }): URLSearchParams {
+    const queryParams = new URLSearchParams();
+
+    // Basic parameters
+    queryParams.set("per_page", params.limit.toString());
+    queryParams.set("query", params.query);
+    queryParams.set("referrer", "sentry-mcp");
+    queryParams.set("dataset", "errors");
+
+    if (params.statsPeriod) {
+      queryParams.set("statsPeriod", params.statsPeriod);
+    }
+
+    if (params.projectSlug) {
+      queryParams.set("project", params.projectSlug);
+    }
+
+    // Sort parameter transformation for API compatibility
+    let apiSort = params.sort;
+    if (params.sort.includes("(")) {
+      // Transform: count(field) -> count_field, count() -> count
+      apiSort = params.sort.replace(/\(([^)]*)\)/g, (match, field) => {
+        return field ? `_${field.replace(/\./g, "_")}` : "";
+      });
+    }
+    queryParams.set("sort", apiSort);
+
+    // Add fields
+    for (const field of params.fields) {
+      queryParams.append("field", field);
+    }
+
+    return queryParams;
+  }
+
+  /**
+   * Builds query parameters for the modern EAP API (used by spans/logs datasets).
+   *
+   * Includes dataset-specific parameters like sampling for spans.
+   */
+  private buildEapApiQuery(params: {
+    query: string;
+    fields: string[];
+    limit: number;
+    projectSlug?: string;
+    dataset: "spans" | "ourlogs";
+    statsPeriod?: string;
+    sort: string;
+  }): URLSearchParams {
+    const queryParams = new URLSearchParams();
+
+    // Basic parameters
+    queryParams.set("per_page", params.limit.toString());
+    queryParams.set("query", params.query);
+    queryParams.set("referrer", "sentry-mcp");
+    queryParams.set("dataset", params.dataset);
+
+    if (params.statsPeriod) {
+      queryParams.set("statsPeriod", params.statsPeriod);
+    }
+
+    if (params.projectSlug) {
+      queryParams.set("project", params.projectSlug);
+    }
+
+    // Dataset-specific parameters
+    if (params.dataset === "spans") {
+      queryParams.set("sampling", "NORMAL");
+    }
+
+    // Sort parameter transformation for API compatibility
+    let apiSort = params.sort;
+    if (params.sort.includes("(")) {
+      // Transform: count(field) -> count_field, count() -> count
+      apiSort = params.sort.replace(/\(([^)]*)\)/g, (match, field) => {
+        return field ? `_${field.replace(/\./g, "_")}` : "";
+      });
+    }
+    queryParams.set("sort", apiSort);
+
+    // Add fields
+    for (const field of params.fields) {
+      queryParams.append("field", field);
+    }
+
+    return queryParams;
+  }
+
   /**
    * Searches for events in Sentry using the unified events API.
    * This method is used by the search_events tool for semantic search.
    *
-   * IMPORTANT: This API endpoint handles all datasets (errors, spans, logs) uniformly.
-   * All datasets include aggregate functions directly in the field list.
-   *
-   * The difference between Discover API and EAP API only exists in the web UI URLs
-   * (see getEventsExplorerUrl). The programmatic API is consistent across datasets.
+   * Routes to the appropriate query builder based on dataset, even though
+   * the underlying API endpoint is the same. This separation makes the code
+   * cleaner and allows for future API divergence.
    */
   async searchEvents(
     {
@@ -1548,44 +1696,29 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ) {
-    const queryParams = new URLSearchParams();
-    queryParams.set("per_page", limit.toString());
-    queryParams.set("query", query);
+    let queryParams: URLSearchParams;
 
-    queryParams.set("referrer", "sentry-mcp");
-
-    queryParams.set("dataset", dataset);
-    if (statsPeriod) {
-      queryParams.set("statsPeriod", statsPeriod);
-    }
-
-    // Add sampling parameter for spans dataset
-    if (dataset === "spans") {
-      queryParams.set("sampling", "NORMAL");
-    }
-
-    // Transform sort parameter for API compatibility
-    // The API expects underscores instead of parentheses for aggregate functions
-    // e.g., "-count()" becomes "-count", "-count(span.duration)" becomes "-count_span_duration"
-    let apiSort = sort;
-    if (sort.includes("(")) {
-      // Transform aggregate function sorts: count(field) -> count_field
-      apiSort = sort.replace(/\(([^)]*)\)/g, (match, field) => {
-        // Remove the parentheses if field is empty (e.g., "count()" -> "count")
-        // Otherwise replace with underscore (e.g., "count(span.duration)" -> "count_span_duration")
-        return field ? `_${field.replace(/\./g, "_")}` : "";
+    if (dataset === "errors") {
+      // Use Discover API query builder
+      queryParams = this.buildDiscoverApiQuery({
+        query,
+        fields,
+        limit,
+        projectSlug,
+        statsPeriod,
+        sort,
       });
-    }
-    queryParams.set("sort", apiSort);
-
-    // Add project filter if specified
-    if (projectSlug) {
-      queryParams.set("project", projectSlug);
-    }
-
-    // Add each field as a separate parameter
-    for (const field of fields) {
-      queryParams.append("field", field);
+    } else {
+      // Use EAP API query builder for spans and logs
+      queryParams = this.buildEapApiQuery({
+        query,
+        fields,
+        limit,
+        projectSlug,
+        dataset,
+        statsPeriod,
+        sort,
+      });
     }
 
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;

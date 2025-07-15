@@ -80,7 +80,7 @@ describe("getEventsExplorerUrl", () => {
       "level:error AND message:timeout",
     );
     expect(result).toMatchInlineSnapshot(
-      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror+AND+message%3Atimeout"`,
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror+AND+message%3Atimeout&statsPeriod=24h"`,
     );
   });
   it("should work with self-hosted", () => {
@@ -90,7 +90,7 @@ describe("getEventsExplorerUrl", () => {
       "level:error AND message:timeout",
     );
     expect(result).toMatchInlineSnapshot(
-      `"https://sentry.example.com/organizations/sentry-mcp/explore/traces/?query=level%3Aerror+AND+message%3Atimeout"`,
+      `"https://sentry.example.com/organizations/sentry-mcp/explore/traces/?query=level%3Aerror+AND+message%3Atimeout&statsPeriod=24h"`,
     );
   });
   it("should include project parameter when provided", () => {
@@ -101,7 +101,7 @@ describe("getEventsExplorerUrl", () => {
       "backend",
     );
     expect(result).toMatchInlineSnapshot(
-      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror&project=backend"`,
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror&project=backend&statsPeriod=24h"`,
     );
   });
   it("should properly encode special characters in query", () => {
@@ -111,19 +111,16 @@ describe("getEventsExplorerUrl", () => {
       'message:"database timeout" AND level:error',
     );
     expect(result).toMatchInlineSnapshot(
-      `"https://sentry-mcp.sentry.io/explore/traces/?query=message%3A%22database+timeout%22+AND+level%3Aerror"`,
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=message%3A%22database+timeout%22+AND+level%3Aerror&statsPeriod=24h"`,
     );
   });
   it("should always use HTTPS protocol", () => {
     const apiService = new SentryApiService({
       host: "localhost:8000",
     });
-    const result = apiService.getEventsExplorerUrl(
-      "sentry-mcp",
-      "level:error",
-    );
+    const result = apiService.getEventsExplorerUrl("sentry-mcp", "level:error");
     expect(result).toMatchInlineSnapshot(
-      `"https://localhost:8000/organizations/sentry-mcp/explore/traces/?query=level%3Aerror"`,
+      `"https://localhost:8000/organizations/sentry-mcp/explore/traces/?query=level%3Aerror&statsPeriod=24h"`,
     );
   });
 });
@@ -629,5 +626,364 @@ describe("Content-Type validation", () => {
     await expect(apiService.listOrganizations()).rejects.toThrow(
       "Expected JSON response but received HTML (200 OK). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.",
     );
+  });
+});
+
+describe("API query builders", () => {
+  describe("buildDiscoverApiQuery", () => {
+    it("should build correct query for errors dataset", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+
+      // @ts-expect-error - accessing private method for testing
+      const params = apiService.buildDiscoverApiQuery({
+        query: "level:error",
+        fields: ["title", "project", "count()"],
+        limit: 50,
+        projectSlug: "backend",
+        statsPeriod: "24h",
+        sort: "-count()",
+      });
+
+      expect(params.toString()).toMatchInlineSnapshot(
+        `"per_page=50&query=level%3Aerror&referrer=sentry-mcp&dataset=errors&statsPeriod=24h&project=backend&sort=-count&field=title&field=project&field=count%28%29"`,
+      );
+    });
+
+    it("should transform aggregate sort parameters correctly", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+
+      // @ts-expect-error - accessing private method for testing
+      const params = apiService.buildDiscoverApiQuery({
+        query: "",
+        fields: ["error.type", "count()", "count_unique(user)"],
+        limit: 10,
+        sort: "-count(span.duration)",
+      });
+
+      expect(params.get("sort")).toBe("-count_span_duration");
+    });
+
+    it("should handle empty aggregate functions in sort", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+
+      // @ts-expect-error - accessing private method for testing
+      const params = apiService.buildDiscoverApiQuery({
+        query: "",
+        fields: ["title", "count()"],
+        limit: 10,
+        sort: "-count()",
+      });
+
+      expect(params.get("sort")).toBe("-count");
+    });
+  });
+
+  describe("buildEapApiQuery", () => {
+    it("should build correct query for spans dataset with sampling", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+
+      // @ts-expect-error - accessing private method for testing
+      const params = apiService.buildEapApiQuery({
+        query: "span.op:db",
+        fields: ["span.op", "span.description", "span.duration"],
+        limit: 20,
+        projectSlug: "frontend",
+        dataset: "spans",
+        statsPeriod: "1h",
+        sort: "-span.duration",
+      });
+
+      expect(params.toString()).toMatchInlineSnapshot(
+        `"per_page=20&query=span.op%3Adb&referrer=sentry-mcp&dataset=spans&statsPeriod=1h&project=frontend&sampling=NORMAL&sort=-span.duration&field=span.op&field=span.description&field=span.duration"`,
+      );
+    });
+
+    it("should build correct query for logs dataset without sampling", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+
+      // @ts-expect-error - accessing private method for testing
+      const params = apiService.buildEapApiQuery({
+        query: "severity:error",
+        fields: ["timestamp", "message", "severity"],
+        limit: 30,
+        dataset: "ourlogs",
+        sort: "-timestamp",
+      });
+
+      expect(params.toString()).toMatchInlineSnapshot(
+        `"per_page=30&query=severity%3Aerror&referrer=sentry-mcp&dataset=ourlogs&sort=-timestamp&field=timestamp&field=message&field=severity"`,
+      );
+
+      // Verify sampling is not added for logs
+      expect(params.has("sampling")).toBe(false);
+    });
+
+    it("should transform complex aggregate sorts with dots", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+
+      // @ts-expect-error - accessing private method for testing
+      const params = apiService.buildEapApiQuery({
+        query: "",
+        fields: ["span.op", "avg(span.self_time)"],
+        limit: 10,
+        dataset: "spans",
+        sort: "-avg(span.self_time)",
+      });
+
+      expect(params.get("sort")).toBe("-avg_span_self_time");
+    });
+  });
+
+  describe("searchEvents integration", () => {
+    it("should route errors dataset to Discover API builder", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      // Mock the API response
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () => Promise.resolve({ data: [] }),
+      });
+
+      await apiService.searchEvents({
+        organizationSlug: "test-org",
+        query: "level:error",
+        fields: ["title", "count()"],
+        dataset: "errors",
+        sort: "-count()",
+      });
+
+      // Verify the URL contains correct parameters
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("dataset=errors"),
+        expect.any(Object),
+      );
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("sort=-count"),
+        expect.any(Object),
+      );
+    });
+
+    it("should route spans dataset to EAP API builder with sampling", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      // Mock the API response
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () => Promise.resolve({ data: [] }),
+      });
+
+      await apiService.searchEvents({
+        organizationSlug: "test-org",
+        query: "span.op:http",
+        fields: ["span.op", "span.duration"],
+        dataset: "spans",
+      });
+
+      // Verify the URL contains correct parameters
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("dataset=spans"),
+        expect.any(Object),
+      );
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("sampling=NORMAL"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe("Web URL builders", () => {
+    describe("buildDiscoverUrl", () => {
+      it("should build correct URL for errors dataset on SaaS", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildDiscoverUrl({
+          organizationSlug: "my-org",
+          query: "level:error",
+          projectSlug: "backend",
+          fields: ["title", "project", "timestamp"],
+          sort: "-timestamp",
+        });
+
+        expect(url).toMatchInlineSnapshot(
+          `"https://my-org.sentry.io/explore/discover/homepage/?dataset=errors&queryDataset=error-events&query=level%3Aerror&project=backend&field=title&field=project&field=timestamp&sort=-timestamp&statsPeriod=24h&yAxis=count%28%29"`,
+        );
+      });
+
+      it("should include aggregate mode and yAxis for aggregate queries", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildDiscoverUrl({
+          organizationSlug: "my-org",
+          query: "is:unresolved",
+          fields: ["title", "count()"],
+          sort: "-count()",
+          aggregateFunctions: ["count()"],
+          groupByFields: ["title"],
+        });
+
+        expect(url).toContain("mode=aggregate");
+        expect(url).toContain("yAxis=count%28%29");
+        expect(url).toContain("field=title");
+        expect(url).toContain("field=count%28%29");
+      });
+
+      it("should build correct URL for self-hosted", () => {
+        const apiService = new SentryApiService({ host: "sentry.example.com" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildDiscoverUrl({
+          organizationSlug: "my-org",
+          query: "level:error",
+          fields: ["title", "project"],
+        });
+
+        expect(url).toMatchInlineSnapshot(
+          `"https://sentry.example.com/organizations/my-org/explore/discover/homepage/?dataset=errors&queryDataset=error-events&query=level%3Aerror&field=title&field=project&sort=-timestamp&statsPeriod=24h&yAxis=count%28%29"`,
+        );
+      });
+    });
+
+    describe("buildEapUrl", () => {
+      it("should build correct URL for spans dataset with aggregate fields", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildEapUrl({
+          organizationSlug: "my-org",
+          query: "is_transaction:True",
+          dataset: "spans",
+          projectSlug: "123456",
+          fields: ["span.description", "count()"],
+          sort: "-count()",
+          aggregateFunctions: ["count()"],
+          groupByFields: ["span.description"],
+        });
+
+        expect(url).toContain("https://my-org.sentry.io/explore/traces/");
+        expect(url).toContain("mode=aggregate");
+        expect(url).toContain(
+          `aggregateField=%7B%22groupBy%22%3A%22span.description%22%7D`,
+        );
+        expect(url).toContain(
+          `aggregateField=%7B%22yAxes%22%3A%5B%22count%28%29%22%5D%7D`,
+        );
+        expect(url).toContain("project=123456");
+        expect(url).toContain("query=is_transaction%3ATrue");
+        expect(url).toContain("statsPeriod=24h");
+      });
+
+      it("should not include empty groupBy in aggregateField", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildEapUrl({
+          organizationSlug: "my-org",
+          query: "span.op:db",
+          dataset: "spans",
+          fields: ["count()"],
+          sort: "-count()",
+          aggregateFunctions: ["count()"],
+          groupByFields: [],
+        });
+
+        expect(url).toContain("mode=aggregate");
+        expect(url).toContain(
+          `aggregateField=%7B%22yAxes%22%3A%5B%22count%28%29%22%5D%7D`,
+        );
+        expect(url).not.toContain("groupBy");
+      });
+
+      it("should handle multiple groupBy fields", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildEapUrl({
+          organizationSlug: "my-org",
+          query: "",
+          dataset: "spans",
+          fields: ["span.op", "span.description", "count()"],
+          sort: "-count()",
+          aggregateFunctions: ["count()"],
+          groupByFields: ["span.op", "span.description"],
+        });
+
+        expect(url).toContain(
+          `aggregateField=%7B%22groupBy%22%3A%22span.op%22%7D`,
+        );
+        expect(url).toContain(
+          `aggregateField=%7B%22groupBy%22%3A%22span.description%22%7D`,
+        );
+        expect(url).toContain(
+          `aggregateField=%7B%22yAxes%22%3A%5B%22count%28%29%22%5D%7D`,
+        );
+      });
+
+      it("should handle non-aggregate queries", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildEapUrl({
+          organizationSlug: "my-org",
+          query: "span.op:http",
+          dataset: "spans",
+          fields: ["span.op", "span.description", "span.duration"],
+          sort: "-span.duration",
+        });
+
+        expect(url).not.toContain("mode=aggregate");
+        expect(url).not.toContain("aggregateField");
+        expect(url).toContain("field=span.op");
+        expect(url).toContain("field=span.description");
+        expect(url).toContain("field=span.duration");
+        expect(url).toContain("sort=-span.duration");
+      });
+
+      it("should use correct path for logs dataset", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildEapUrl({
+          organizationSlug: "my-org",
+          query: "severity:error",
+          dataset: "logs",
+          fields: ["timestamp", "message"],
+        });
+
+        expect(url).toContain("/explore/logs/");
+        expect(url).not.toContain("/explore/traces/");
+      });
+
+      it("should handle self-hosted URLs correctly", () => {
+        const apiService = new SentryApiService({ host: "sentry.example.com" });
+
+        // @ts-expect-error - accessing private method for testing
+        const url = apiService.buildEapUrl({
+          organizationSlug: "my-org",
+          query: "",
+          dataset: "spans",
+          fields: ["span.op"],
+        });
+
+        expect(url).toMatchInlineSnapshot(
+          `"https://sentry.example.com/organizations/my-org/explore/traces/?query=&field=span.op&statsPeriod=24h"`,
+        );
+      });
+    });
   });
 });
