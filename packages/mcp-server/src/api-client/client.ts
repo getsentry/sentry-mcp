@@ -458,6 +458,7 @@ export class SentryApiService {
     query: string,
     projectSlug?: string,
     dataset: "spans" | "errors" | "logs" = "spans",
+    fields?: string[],
   ): string {
     const params = new URLSearchParams();
     params.set("query", query);
@@ -477,18 +478,28 @@ export class SentryApiService {
       params.set("sort", "-timestamp");
       params.set("statsPeriod", "14d");
       params.set("yAxis", "count()");
+
+      // Add mode=aggregate for aggregate queries
+      const isAggregateQuery =
+        fields?.some((field) => field.includes("(") && field.includes(")")) ||
+        false;
+      if (isAggregateQuery) {
+        params.set("mode", "aggregate");
+      }
+
+      // For SaaS, always use organizationSlug.sentry.io regardless of the API host (which might be regional)
       path = this.isSaas()
-        ? `https://${organizationSlug}.${this.host}/explore/discover/homepage/`
+        ? `https://${organizationSlug}.sentry.io/explore/discover/homepage/`
         : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
     } else if (dataset === "logs") {
       // Logs use /explore/logs/
       path = this.isSaas()
-        ? `https://${organizationSlug}.${this.host}/explore/logs/`
+        ? `https://${organizationSlug}.sentry.io/explore/logs/`
         : `https://${this.host}/organizations/${organizationSlug}/explore/logs/`;
     } else {
       // Spans use /explore/traces/
       path = this.isSaas()
-        ? `https://${organizationSlug}.${this.host}/explore/traces/`
+        ? `https://${organizationSlug}.sentry.io/explore/traces/`
         : `https://${this.host}/organizations/${organizationSlug}/explore/traces/`;
     }
 
