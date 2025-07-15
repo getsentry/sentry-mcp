@@ -590,13 +590,14 @@ const RECOMMENDED_FIELDS = {
       "title",
       "project",
       "timestamp",
+      "last_seen",
       "level",
       "message",
       "error.type",
       "culprit",
     ],
     description:
-      "Basic error information including issue ID, title, severity, and location",
+      "Basic error information including issue ID, title, severity, location, and when last seen",
   },
   logs: {
     basic: ["timestamp", "project", "message", "severity", "trace"],
@@ -688,7 +689,11 @@ IMPORTANT NOTES:
 - If the user asks about a specific field (e.g., "show me user emails"), include that field
 - Do NOT include project: filters in your query (project filtering is handled separately)
 - For spans/errors: When user mentions time periods, include timestamp filters in query
-- For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically`;
+- For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically
+- CRITICAL: Results are sorted automatically, so you MUST include sort fields in your field selection:
+  - For errors: Always include "last_seen" field (results sorted by most recent)
+  - For spans: Always include "span.duration" field (results sorted by slowest)
+  - For logs: Always include "timestamp" field (results sorted by most recent)`;
 
 export default defineTool({
   name: "search_events",
