@@ -755,7 +755,7 @@ EXAMPLES:
 
 YOUR RESPONSE FORMAT:
 Return a JSON object with these fields:
-- "query": The Sentry query string for filtering results (REQUIRED)
+- "query": The Sentry query string for filtering results (use empty string "" for no filters)
 - "fields": Array of field names to return in results (OPTIONAL - will use defaults if not provided)
 - "error": Error message if you cannot translate the query (OPTIONAL)
 
@@ -884,7 +884,9 @@ export default defineTool({
         query: z
           .string()
           .optional()
-          .describe("The Sentry query string for filtering results"),
+          .describe(
+            "The Sentry query string for filtering results (empty string returns all recent events)",
+          ),
         fields: z
           .array(z.string())
           .optional()
@@ -901,14 +903,9 @@ export default defineTool({
       throw new Error(`AI could not translate query: ${parsed.error}`);
     }
 
-    // Ensure we have a query
-    if (!parsed.query) {
-      throw new Error(
-        `AI did not provide a valid query for: "${params.naturalLanguageQuery}"`,
-      );
-    }
-
-    const sentryQuery = parsed.query;
+    // Use empty string as default if no query is provided
+    // This allows fetching all recent events when no specific filter is needed
+    const sentryQuery = parsed.query || "";
     const requestedFields = parsed.fields || [];
 
     // Use the AI-requested fields, or fall back to recommended fields

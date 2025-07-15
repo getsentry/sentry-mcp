@@ -749,7 +749,7 @@ describe("search_events", () => {
     );
   });
 
-  it("should handle missing query from AI", async () => {
+  it("should handle missing query from AI by using empty query", async () => {
     // Mock AI returning no query - using a custom object that doesn't include query
     mockGenerateObject.mockResolvedValueOnce({
       object: {
@@ -773,22 +773,51 @@ describe("search_events", () => {
       toJsonResponse: () => ({ object: { fields: ["timestamp", "message"] } }),
     } as any);
 
-    await expect(
-      searchEvents.handler(
-        {
-          organizationSlug: "test-org",
-          naturalLanguageQuery: "test query",
-          dataset: "errors",
-          limit: 10,
-          includeExplanation: false,
-        },
-        {
-          accessToken: "test-token",
-          organizationSlug: "test-org",
-          userId: "1",
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/tags/", () =>
+        HttpResponse.json([]),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          const query = url.searchParams.get("query");
+
+          // Should use empty string as query
+          expect(query).toBe("");
+
+          return HttpResponse.json({
+            data: [
+              {
+                id: "error1",
+                message: "Latest error",
+                level: "error",
+                timestamp: "2024-01-15T10:30:00Z",
+                project: "backend",
+              },
+            ],
+          });
         },
       ),
-    ).rejects.toThrow('AI did not provide a valid query for: "test query"');
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "latest logs",
+        dataset: "errors",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        organizationSlug: "test-org",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("Found 1 error:");
+    expect(result).toContain("Latest error");
   });
 });
 
