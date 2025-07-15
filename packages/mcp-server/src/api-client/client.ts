@@ -1485,12 +1485,32 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("per_page", limit.toString());
     queryParams.set("query", query);
+
     queryParams.set("referrer", "sentry-mcp");
+
     queryParams.set("dataset", dataset);
     if (statsPeriod) {
       queryParams.set("statsPeriod", statsPeriod);
     }
-    queryParams.set("sort", sort);
+
+    // Add sampling parameter for spans dataset
+    if (dataset === "spans") {
+      queryParams.set("sampling", "NORMAL");
+    }
+
+    // Transform sort parameter for API compatibility
+    // The API expects underscores instead of parentheses for aggregate functions
+    // e.g., "-count()" becomes "-count", "-count(span.duration)" becomes "-count_span_duration"
+    let apiSort = sort;
+    if (sort.includes("(")) {
+      // Transform aggregate function sorts: count(field) -> count_field
+      apiSort = sort.replace(/\(([^)]*)\)/g, (match, field) => {
+        // Remove the parentheses if field is empty (e.g., "count()" -> "count")
+        // Otherwise replace with underscore (e.g., "count(span.duration)" -> "count_span_duration")
+        return field ? `_${field.replace(/\./g, "_")}` : "";
+      });
+    }
+    queryParams.set("sort", apiSort);
 
     // Add project filter if specified
     if (projectSlug) {
