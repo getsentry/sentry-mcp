@@ -440,19 +440,29 @@ export class SentryApiService {
   /**
    * Generates a Sentry events explorer URL for viewing search results.
    *
-   * Creates a URL to the Explore Traces page with the provided query.
+   * Creates a URL to the appropriate Explore page based on the dataset.
    * Always uses HTTPS protocol.
+   *
+   * IMPORTANT: Different datasets handle aggregate queries differently:
+   *
+   * - **Errors dataset**: Uses the legacy Discover API. Aggregate functions are included
+   *   directly in the field list (e.g., field=count_unique(user)). Does NOT use the
+   *   aggregateField parameter or mode=aggregate.
+   *   Example: field=title&field=project&field=count_unique(user)
+   *
+   * - **Spans dataset**: Uses the modern Explore Traces API. Aggregate queries use
+   *   separate aggregateField parameters with JSON objects for groupBy and yAxes.
+   *   Example: aggregateField={"groupBy":"span.op"}&aggregateField={"yAxes":["count()"]}
    *
    * @param organizationSlug Organization identifier
    * @param query Sentry search query
    * @param projectSlug Optional project filter
+   * @param dataset Dataset type (spans, errors, or logs)
+   * @param fields Array of fields to include in results
+   * @param sort Sort parameter (e.g., "-timestamp", "-count()")
+   * @param aggregateFunctions Array of aggregate functions (only used for spans dataset)
+   * @param groupByFields Array of fields to group by (only used for spans dataset)
    * @returns Full HTTPS URL to the events explorer in Sentry UI
-   *
-   * @example
-   * ```typescript
-   * const url = apiService.getEventsExplorerUrl("my-org", "level:error", "backend");
-   * // https://my-org.sentry.io/explore/traces/?query=level%3Aerror&project=backend
-   * ```
    */
   getEventsExplorerUrl(
     organizationSlug: string,
@@ -472,37 +482,48 @@ export class SentryApiService {
 
     let path: string;
     if (dataset === "errors") {
-      // Errors use the legacy discover URL
+      // Errors dataset uses the legacy discover URL and handles aggregates differently than spans
+      // The errors dataset includes aggregate fields directly in the field list, not as separate aggregateField params
+      // Example: field=title&field=project&field=count_unique(user)&field=timestamp
       params.set("dataset", "errors");
       params.set("queryDataset", "error-events");
-      params.append("field", "title");
-      params.append("field", "project");
-      params.append("field", "user.display");
-      params.append("field", "timestamp");
-      params.set("sort", "-timestamp");
-      params.set("statsPeriod", "14d");
-      params.set("yAxis", "count()");
 
-      // Add mode=aggregate for aggregate queries
-      const isAggregateQuery =
-        (aggregateFunctions?.length ?? 0) > 0 ||
-        fields?.some((field) => field.includes("(") && field.includes(")")) ||
-        false;
-      if (isAggregateQuery) {
-        params.set("mode", "aggregate");
+      // For errors dataset, use the provided fields directly or fall back to defaults
+      if (fields && fields.length > 0) {
+        // Use the fields provided by the AI, which may include aggregate functions
+        for (const field of fields) {
+          params.append("field", field);
+        }
+      } else {
+        // Default fields for errors when none provided
+        params.append("field", "title");
+        params.append("field", "project");
+        params.append("field", "user.display");
+        params.append("field", "timestamp");
       }
+
+      // Use the provided sort or default to -timestamp
+      if (sort) {
+        params.set("sort", sort);
+      } else {
+        params.set("sort", "-timestamp");
+      }
+
+      params.set("statsPeriod", "24h");
+      params.set("yAxis", "count()");
 
       // For SaaS, always use organizationSlug.sentry.io regardless of the API host (which might be regional)
       path = this.isSaas()
         ? `https://${organizationSlug}.sentry.io/explore/discover/homepage/`
         : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
     } else if (dataset === "logs") {
-      // Logs use /explore/logs/
+      // Logs dataset - currently minimal URL support
+      // TODO: Add proper field and aggregate handling for logs dataset if needed
       path = this.isSaas()
         ? `https://${organizationSlug}.sentry.io/explore/logs/`
         : `https://${this.host}/organizations/${organizationSlug}/explore/logs/`;
     } else {
-      // Spans use /explore/traces/
+      // Spans dataset uses the modern Explore Traces API with structured aggregate support
       const isAggregateQuery =
         (aggregateFunctions?.length ?? 0) > 0 ||
         fields?.some((field) => field.includes("(") && field.includes(")")) ||
@@ -1459,6 +1480,10 @@ export class SentryApiService {
   /**
    * Searches for events in Sentry using a general query.
    * This method is used by the search_events tool for semantic search.
+   *
+   * Note: The API handles aggregate queries the same way for all datasets.
+   * Aggregate functions are included directly in the field list.
+   * The difference in URL generation (getEventsExplorerUrl) is only for the web UI.
    */
   async searchEvents(
     {
