@@ -197,7 +197,7 @@ describe("search_events", () => {
       Natural language: "database timeouts in the last hour"
       Sentry query: \`message:"timeout" AND level:error\`
 
-      **📊 View these results in Sentry**: https://test-org.sentry.io/explore/traces/?query=message%3A%22timeout%22+AND+level%3Aerror
+      **📊 View these results in Sentry**: https://test-org.sentry.io/explore/traces/?query=message%3A%22timeout%22+AND+level%3Aerror&field=span.op&field=span.description&field=span.duration&field=transaction&field=timestamp&field=project&field=trace&sort=-span.duration&statsPeriod=24h
       _Please share this link with the user to view the search results in their Sentry dashboard._
 
       Found 2 traces/spans:
@@ -358,7 +358,7 @@ describe("search_events", () => {
 
       ⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.
 
-      **📊 View these results in Sentry**: https://test-org.sentry.io/explore/traces/?query=message%3A%22nonexistent+error%22
+      **📊 View these results in Sentry**: https://test-org.sentry.io/explore/traces/?query=message%3A%22nonexistent+error%22&field=span.op&field=span.description&field=span.duration&field=transaction&field=timestamp&field=project&field=trace&sort=-span.duration&statsPeriod=24h
       _Please share this link with the user to view the search results in their Sentry dashboard._
 
       No results found.

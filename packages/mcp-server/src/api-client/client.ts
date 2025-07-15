@@ -461,7 +461,6 @@ export class SentryApiService {
     dataset: "spans" | "errors" | "logs" = "spans",
     fields?: string[],
     sort?: string,
-    isAggregate?: boolean,
     aggregateFunctions?: string[],
     groupByFields?: string[],
   ): string {
@@ -486,7 +485,7 @@ export class SentryApiService {
 
       // Add mode=aggregate for aggregate queries
       const isAggregateQuery =
-        isAggregate ||
+        (aggregateFunctions?.length ?? 0) > 0 ||
         fields?.some((field) => field.includes("(") && field.includes(")")) ||
         false;
       if (isAggregateQuery) {
@@ -505,7 +504,7 @@ export class SentryApiService {
     } else {
       // Spans use /explore/traces/
       const isAggregateQuery =
-        isAggregate ||
+        (aggregateFunctions?.length ?? 0) > 0 ||
         fields?.some((field) => field.includes("(") && field.includes(")")) ||
         false;
 
@@ -513,7 +512,10 @@ export class SentryApiService {
         params.set("mode", "aggregate");
 
         // Use structured aggregate information if provided
-        if (isAggregate && (groupByFields || aggregateFunctions)) {
+        if (
+          (aggregateFunctions?.length ?? 0) > 0 ||
+          (groupByFields?.length ?? 0) > 0
+        ) {
           // Add each groupBy field as a separate aggregateField parameter
           if (groupByFields && groupByFields.length > 0) {
             for (const field of groupByFields) {
