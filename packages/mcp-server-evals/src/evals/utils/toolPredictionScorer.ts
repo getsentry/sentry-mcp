@@ -200,6 +200,10 @@ export function ToolPredictionScorer(model: LanguageModel = defaultModel) {
         expectedDescription,
       ),
       schema: predictionSchema,
+      experimental_telemetry: {
+        isEnabled: true,
+        functionId: "tool_prediction_scorer",
+      },
     });
 
     return {

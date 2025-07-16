@@ -27,6 +27,7 @@ export default function getSentryConfig(env: Env): SentryConfig {
     integrations: [
       Sentry.consoleLoggingIntegration(),
       Sentry.zodErrorsIntegration(),
+      Sentry.vercelAIIntegration(),
     ],
   };
 }
