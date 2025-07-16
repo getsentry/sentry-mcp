@@ -8,6 +8,6 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: getsentry/action-onlyrobots@main
+      - uses: getsentry/action-onlyrobots@v1
         with:
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
