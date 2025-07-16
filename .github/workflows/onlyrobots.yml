@@ -1,0 +1,13 @@
+name: OnlyRobots PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: getsentry/action-onlyrobots@main
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
