@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:mcp.sentry.dev)",
+      "WebFetch(domain:docs.sentry.io)",
+      "WebFetch(domain:develop.sentry.dev)",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(grep:*)",
+      "Bash(jq:*)",
+      "Bash(pnpx vitest:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm run typecheck:*)",
+      "Bash(pnpm run check:*)",
+      "Bash(pnpm run:*)",
+      "Bash(pnpx tsx:*)",
+      "mcp__sentry__*"
+    ],
+    "deny": []
+  },
+  "enableAllProjectMcpServers": true,
+  "includeCoAuthoredBy": false,
+  "enabledMcpjsonServers": ["sentry"]
+}
