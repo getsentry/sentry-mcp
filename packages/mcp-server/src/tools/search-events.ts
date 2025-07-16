@@ -42,13 +42,25 @@ function isAggregateQuery(fields: string[]): boolean {
   return fields.some((field) => field.includes("(") && field.includes(")"));
 }
 
+// Helper to store field type information for validation
+interface FieldInfo {
+  description: string;
+  type?: "string" | "number";
+}
+
 // Helper function to fetch custom attributes for a dataset
 async function fetchCustomAttributes(
   apiService: SentryApiService,
   organizationSlug: string,
   dataset: "errors" | "logs" | "spans",
-): Promise<Record<string, string>> {
+  projectId?: string,
+  timeParams?: { statsPeriod?: string; start?: string; end?: string },
+): Promise<{
+  attributes: Record<string, string>;
+  fieldTypes: Record<string, "string" | "number">;
+}> {
   const customAttributes: Record<string, string> = {};
+  const fieldTypes: Record<string, "string" | "number"> = {};
 
   try {
     if (dataset === "errors") {
@@ -56,6 +68,11 @@ async function fetchCustomAttributes(
       // This will be updated in the future to use the new trace-items attributes API
       const tagsResponse = await apiService.listTags({
         organizationSlug,
+        dataset: "events",
+        project: projectId,
+        statsPeriod: "14d",
+        useCache: true,
+        useFlagsBackend: true,
       });
 
       for (const tag of tagsResponse) {
@@ -69,11 +86,17 @@ async function fetchCustomAttributes(
       const attributesResponse = await apiService.listTraceItemAttributes({
         organizationSlug,
         itemType,
+        project: projectId,
+        statsPeriod: "14d",
       });
 
       for (const attr of attributesResponse) {
         if (attr.key) {
           customAttributes[attr.key] = attr.name || attr.key;
+          // Track field type from the attribute response
+          if (attr.type) {
+            fieldTypes[attr.key] = attr.type as "string" | "number";
+          }
         }
       }
     }
@@ -92,7 +115,7 @@ async function fetchCustomAttributes(
     });
   }
 
-  return customAttributes;
+  return { attributes: customAttributes, fieldTypes };
 }
 
 // Base fields common to all datasets
@@ -106,6 +129,21 @@ const BASE_COMMON_FIELDS = {
   "user.email": "User email",
   "sdk.name": "SDK name",
   "sdk.version": "SDK version",
+};
+
+// Known numeric fields for each dataset
+const NUMERIC_FIELDS: Record<string, Set<string>> = {
+  spans: new Set([
+    "span.duration",
+    "span.self_time",
+    "transaction.duration",
+    "http.status_code",
+  ]),
+  errors: new Set([
+    // Most error fields are strings/categories
+    "stack.lineno",
+  ]),
+  logs: new Set(["severity_number", "sentry.observed_timestamp_nanos"]),
 };
 
 // Dataset-specific field definitions
@@ -269,6 +307,20 @@ const DATASET_CONFIGS = {
     "fields": ["project", "count()", "count_if(error.handled,equals,false)", "epm()"],
     "sort": "-count()"
   }
+- "errors in the last hour" → 
+  {
+    "query": "",
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"],
+    "sort": "-timestamp",
+    "timeRange": {"statsPeriod": "1h"}
+  }
+- "database errors between June 19-20" → 
+  {
+    "query": "message:\"*database*\"",
+    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"],
+    "sort": "-timestamp",
+    "timeRange": {"start": "2025-06-19T00:00:00", "end": "2025-06-20T23:59:59"}
+  }
 - "unique users affected by errors" → 
   {
     "query": "level:error",
@@ -336,23 +388,28 @@ const DATASET_CONFIGS = {
   spans: {
     rules: `- For traces/spans, focus on: span.op, span.description, span.duration, transaction
 - Use is_transaction:true for transaction spans only
-- Use span.duration for performance queries (value is in milliseconds)`,
+- Use span.duration for performance queries (value is in milliseconds)
+- IMPORTANT: Use has: queries for attribute-based filtering instead of span.op patterns:
+  - For HTTP requests: use "has:request.url" instead of "span.op:http*"
+  - For database queries: use "has:db.statement" or "has:db.system" instead of "span.op:db*"
+  - For AI/LLM calls: use "has:ai.model.id" or "has:mcp.tool.name"
+  - This approach is more flexible and captures all relevant spans regardless of their operation type`,
     examples: `- "database queries" → 
   {
-    "query": "span.op:db OR span.op:db.query",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace"],
+    "query": "has:db.statement",
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.statement"],
     "sort": "-span.duration"
   }
 - "slow API calls over 5 seconds" → 
   {
-    "query": "span.duration:>5000 AND span.op:http*",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "http.method", "http.status_code"],
+    "query": "has:request.url AND span.duration:>5000",
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "request.url", "request.method", "span.status_code"],
     "sort": "-span.duration"
   }
 - "show me database queries with their SQL" → 
   {
-    "query": "span.op:db.query",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.operation"],
+    "query": "has:db.statement",
+    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.statement"],
     "sort": "-span.duration"
   }
 - "average response time by endpoint" → 
@@ -363,14 +420,27 @@ const DATASET_CONFIGS = {
   }
 - "slowest database queries by p95" → 
   {
-    "query": "span.op:db*",
-    "fields": ["span.description", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"],
+    "query": "has:db.statement",
+    "fields": ["db.statement", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"],
     "sort": "-p95(span.duration)"
+  }
+- "API calls in the last 30 minutes" → 
+  {
+    "query": "has:request.url",
+    "fields": ["id", "span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "request.url", "request.method"],
+    "sort": "-timestamp",
+    "timeRange": {"statsPeriod": "30m"}
   }
 - "most common transaction" → 
   {
     "query": "is_transaction:true",
     "fields": ["transaction", "count()"],
+    "sort": "-count()"
+  }
+- "top 10 tool call spans by usage" → 
+  {
+    "query": "has:mcp.tool.name",
+    "fields": ["mcp.tool.name", "count()"],
     "sort": "-count()"
   }`,
   },
@@ -669,6 +739,7 @@ function formatSpanResults(
     // For individual spans, format with details
     // Define priority fields that should appear first if present
     const priorityFields = [
+      "id",
       "span.op",
       "span.description",
       "transaction",
@@ -736,6 +807,7 @@ function formatSpanResults(
 }
 
 // Define recommended fields for each dataset
+// These match what Sentry UI uses for non-aggregate queries
 const RECOMMENDED_FIELDS = {
   errors: {
     basic: [
@@ -757,6 +829,7 @@ const RECOMMENDED_FIELDS = {
   },
   spans: {
     basic: [
+      "id",
       "span.op",
       "span.description",
       "span.duration",
@@ -766,7 +839,7 @@ const RECOMMENDED_FIELDS = {
       "trace",
     ],
     description:
-      "Core span/trace information including operation, duration, and trace context",
+      "Core span/trace information including span ID, operation, duration, and trace context",
   },
 };
 
@@ -847,11 +920,15 @@ QUERY MODES:
 1. INDIVIDUAL EVENTS (default): Returns raw event data
    - Used when fields contain no function() calls
    - Returns actual event occurrences with full details
+   - Include default fields plus any user-requested fields
 
 2. AGGREGATE QUERIES: SQL-like grouping and aggregation
    - Activated when ANY field contains a function() call
+   - Fields should ONLY include: aggregate functions + groupBy fields
+   - DO NOT include default fields (id, timestamp, etc.) in aggregate queries
    - Automatically groups by ALL non-function fields in the field list
-   - Example: fields=['project', 'error.type', 'count()'] groups by project and error.type
+   - Example: fields=['ai.model.id', 'count()'] groups by ai.model.id and shows count
+   - Example: fields=['ai.model.id', 'ai.model.provider', 'avg(span.duration)'] groups by model and provider
 
 QUERY SYNTAX RULES:
 - Use field:value for exact matches
@@ -900,10 +977,16 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
 YOUR RESPONSE FORMAT:
 Return a JSON object with these fields:
 - "query": The Sentry query string for filtering results (use empty string "" for no filters)
-- "fields": Array of field names to return in results (OPTIONAL - will use defaults if not provided)
+- "fields": Array of field names to return in results
+  - For individual event queries: OPTIONAL (will use recommended fields if not provided)
+  - For aggregate queries: REQUIRED (must include aggregate functions like "count()", "avg(span.duration)" AND any groupBy fields)
+  - The system will automatically detect aggregate queries by the presence of function fields
 - "sort": Sort parameter for results (REQUIRED - YOU MUST ALWAYS SPECIFY THIS)
-- "aggregateFunctions": Array of aggregate function fields like ["count()", "avg(span.duration)"] (OPTIONAL - empty array or omit for non-aggregate queries)
-- "groupByFields": Array of fields to group by (OPTIONAL - only used with aggregate queries)
+- "timeRange": Time range parameters (OPTIONAL - only include if user specifies a time period)
+  - Use ONLY ONE of these formats:
+  - Relative: {"statsPeriod": "24h"} for last 24 hours, "7d" for last 7 days, etc.
+  - Absolute: {"start": "2025-06-19T07:00:00", "end": "2025-06-20T06:59:59"} for specific date ranges
+  - If no time is specified, omit this field entirely (defaults to last 14 days)
 - "error": Error message if you cannot translate the query (OPTIONAL)
 
 ERROR HANDLING:
@@ -912,7 +995,10 @@ ERROR HANDLING:
 - If the query is ambiguous or unclear, set "error" field with clarification needed
 
 IMPORTANT NOTES:
-- Always include the recommended fields unless the user specifically asks for different fields
+- FIELDS ARRAY REQUIREMENTS:
+  - For individual event queries: Optional (recommended fields will be used if not provided)
+  - For aggregate queries: REQUIRED and must contain ONLY aggregate functions and groupBy fields
+  - Do NOT mix regular fields with aggregate functions unless they are groupBy fields
 - Add any fields mentioned in the user's query to the fields array
 - If the user asks about a specific field (e.g., "show me user emails"), include that field
 - CRITICAL: The field you're sorting by MUST be included in your fields array (e.g., if sort is "-timestamp", fields must include "timestamp")
@@ -927,16 +1013,16 @@ IMPORTANT NOTES:
 
 AGGREGATE QUERY RESPONSE STRUCTURE:
 When creating an aggregate query:
-1. List all aggregate functions in aggregateFunctions array (e.g., ["count()", "avg(span.duration)"])
-2. Set groupByFields to an array of fields you're grouping by (omit or use empty array if just aggregating without grouping)
-3. Include all fields (both aggregate functions and groupBy fields) in the fields array
-4. The query is automatically treated as aggregate if aggregateFunctions has any items
+1. Include ALL aggregate functions (e.g., "count()", "avg(span.duration)") in the fields array
+2. Include ALL groupBy fields (non-function fields) in the fields array
+3. The query is automatically treated as aggregate if ANY field contains a function (has parentheses)
+4. IMPORTANT: For aggregate queries, ONLY include the aggregate functions and groupBy fields - do NOT include default fields like timestamp, id, etc.
 
 Examples:
-- "count of errors by type": aggregateFunctions=["count()"], groupByFields=["error.type"], fields=["error.type", "count()"]
-- "average span duration": aggregateFunctions=["avg(span.duration)"], fields=["avg(span.duration)"]
-- "most common transaction": aggregateFunctions=["count()"], groupByFields=["span.description"], fields=["span.description", "count()"], sort="-count()"
-- "p50 duration by model and operation": aggregateFunctions=["p50(span.duration)"], groupByFields=["ai.model.id", "ai.operationId"], fields=["ai.model.id", "ai.operationId", "p50(span.duration)"], sort="-p50(span.duration)"`;
+- "count of errors by type": fields=["error.type", "count()"]
+- "average span duration": fields=["avg(span.duration)"]
+- "most common transaction": fields=["span.description", "count()"], sort="-count()"
+- "p50 duration by model and operation": fields=["ai.model.id", "ai.operationId", "p50(span.duration)"], sort="-p50(span.duration)"`;
 
 export default defineTool({
   name: "search_events",
@@ -953,6 +1039,8 @@ export default defineTool({
     "- spans: Performance/trace data",
     "",
     "❌ DO NOT USE for 'issues' or 'problems' (use find_issues instead)",
+    "",
+    "📚 For detailed API patterns and examples, see: docs/search-events-api-patterns.md",
     "",
     "<examples>",
     "search_events(organizationSlug='my-org', naturalLanguageQuery='database errors in the last hour', dataset='errors')",
@@ -1001,15 +1089,33 @@ export default defineTool({
     // Use errors dataset by default if not specified
     const dataset = params.dataset || "errors";
 
+    // Convert project slug to ID if needed - we need this for attribute fetching
+    let projectId: string | undefined;
+    if (params.projectSlug) {
+      try {
+        const project = await apiService.getProject({
+          organizationSlug,
+          projectSlugOrId: params.projectSlug,
+        });
+        projectId = String(project.id);
+      } catch (error) {
+        throw new Error(
+          `Project '${params.projectSlug}' not found in organization '${organizationSlug}'`,
+        );
+      }
+    }
+
     // Get the dataset-specific fields
     const datasetSpecificFields = DATASET_FIELDS[dataset];
 
     // Fetch custom attributes based on dataset
-    const customAttributes = await fetchCustomAttributes(
-      apiService,
-      organizationSlug,
-      dataset,
-    );
+    const { attributes: customAttributes, fieldTypes: customFieldTypes } =
+      await fetchCustomAttributes(
+        apiService,
+        organizationSlug,
+        dataset,
+        projectId,
+      );
 
     // Combine base fields, dataset-specific fields, and custom attributes
     const allFields = {
@@ -1017,6 +1123,20 @@ export default defineTool({
       ...datasetSpecificFields,
       ...customAttributes,
     };
+
+    // Build complete field type map
+    const allFieldTypes = new Map<string, "string" | "number">();
+
+    // Add known numeric fields
+    const datasetNumericFields = NUMERIC_FIELDS[dataset] || new Set();
+    for (const field of datasetNumericFields) {
+      allFieldTypes.set(field, "number");
+    }
+
+    // Add custom field types
+    for (const [field, type] of Object.entries(customFieldTypes)) {
+      allFieldTypes.set(field, type);
+    }
 
     // Get dataset configuration
     const datasetConfig = DATASET_CONFIGS[dataset] || DATASET_CONFIGS.spans;
@@ -1047,25 +1167,29 @@ export default defineTool({
         fields: z
           .array(z.string())
           .optional()
-          .describe("Array of field names to return in results"),
+          .describe(
+            "Array of field names to return in results. REQUIRED for aggregate queries (include only aggregate functions and groupBy fields). Optional for individual event queries (will use recommended fields if not provided).",
+          ),
         sort: z
           .string()
           .describe(
             "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
           ),
-        aggregateFunctions: z
-          .array(z.string())
+        timeRange: z
+          .union([
+            z.object({
+              statsPeriod: z
+                .string()
+                .describe("Relative time period like '1h', '24h', '7d'"),
+            }),
+            z.object({
+              start: z.string().describe("ISO 8601 start time"),
+              end: z.string().describe("ISO 8601 end time"),
+            }),
+          ])
           .optional()
-          .default([])
           .describe(
-            "Array of aggregate function fields (e.g., ['count()', 'avg(span.duration)'])",
-          ),
-        groupByFields: z
-          .array(z.string())
-          .optional()
-          .default([])
-          .describe(
-            "Array of fields to group by in aggregate queries (empty array if no grouping)",
+            "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
           ),
         error: z
           .string()
@@ -1097,31 +1221,88 @@ export default defineTool({
     const sentryQuery = parsed.query || "";
     const requestedFields = parsed.fields || [];
 
-    // Use the AI-requested fields, or fall back to recommended fields
-    const fields =
-      requestedFields.length > 0
-        ? requestedFields
-        : RECOMMENDED_FIELDS[dataset].basic;
+    // Determine if this is an aggregate query by checking if any field contains a function
+    const isAggregateQuery = requestedFields.some(
+      (field) => field.includes("(") && field.includes(")"),
+    );
+
+    // For aggregate queries, we should only use the fields provided by the AI
+    // For non-aggregate queries, we can use recommended fields as fallback
+    let fields: string[];
+
+    if (isAggregateQuery) {
+      // For aggregate queries, fields must be provided and should only include
+      // aggregate functions and groupBy fields
+      if (!requestedFields || requestedFields.length === 0) {
+        throw new Error(
+          `AI response missing required 'fields' for aggregate query. The AI must specify which fields to return. For aggregate queries, include only the aggregate functions (like count(), avg()) and groupBy fields.`,
+        );
+      }
+      fields = requestedFields;
+    } else {
+      // For non-aggregate queries, use AI-provided fields or fall back to recommended fields
+      fields =
+        requestedFields && requestedFields.length > 0
+          ? requestedFields
+          : RECOMMENDED_FIELDS[dataset].basic;
+    }
 
     // Use the AI-provided sort parameter
     const sortParam = parsed.sort;
 
-    // Convert project slug to ID if needed - the search API requires numeric IDs
-    let projectId: string | undefined;
-    if (params.projectSlug) {
-      // The project details endpoint accepts both slug and ID
-      // We fetch the single project to get its numeric ID for the search API
-      try {
-        const project = await apiService.getProject({
-          organizationSlug,
-          projectSlugOrId: params.projectSlug,
-        });
-        projectId = String(project.id);
-      } catch (error) {
-        throw new Error(
-          `Project '${params.projectSlug}' not found in organization '${organizationSlug}'`,
-        );
+    // Validate aggregate functions use appropriate field types
+    if (isAggregateQuery) {
+      const numericAggregateFunctions = [
+        "avg",
+        "sum",
+        "min",
+        "max",
+        "p50",
+        "p75",
+        "p90",
+        "p95",
+        "p99",
+        "p100",
+      ];
+
+      // Extract aggregate functions from fields array
+      const aggregateFunctions = fields.filter(
+        (field) => field.includes("(") && field.includes(")"),
+      );
+
+      for (const func of aggregateFunctions) {
+        // Extract function name and field from patterns like "avg(span.duration)"
+        const match = func.match(/^(\w+)\(([^)]+)\)$/);
+        if (match) {
+          const [, funcName, fieldName] = match;
+
+          // Check if this is a numeric function
+          if (numericAggregateFunctions.includes(funcName)) {
+            // Check if the field is numeric
+            const fieldType = allFieldTypes.get(fieldName);
+            if (fieldType !== "number") {
+              throw new Error(
+                `Invalid aggregate function: ${func}. The ${funcName}() function requires a numeric field, but "${fieldName}" is ${fieldType ? `a ${fieldType} field` : "not a known numeric field"}. Use count() or count_unique() for non-numeric fields.`,
+              );
+            }
+          }
+        }
       }
+    }
+
+    // Extract time range parameters from parsed response
+    const timeParams: { statsPeriod?: string; start?: string; end?: string } =
+      {};
+    if (parsed.timeRange) {
+      if ("statsPeriod" in parsed.timeRange) {
+        timeParams.statsPeriod = parsed.timeRange.statsPeriod;
+      } else if ("start" in parsed.timeRange && "end" in parsed.timeRange) {
+        timeParams.start = parsed.timeRange.start;
+        timeParams.end = parsed.timeRange.end;
+      }
+    } else {
+      // Default time window if not specified
+      timeParams.statsPeriod = "14d";
     }
 
     const eventsResponse = await withApiErrorHandling(
@@ -1134,8 +1315,7 @@ export default defineTool({
           projectSlug: projectId, // API requires numeric project ID, not slug
           dataset: dataset === "logs" ? "ourlogs" : dataset,
           sort: sortParam,
-          // For logs and errors, use a default time window
-          ...(dataset !== "spans" && { statsPeriod: "24h" }),
+          ...timeParams, // Spread the time parameters
         }),
       {
         organizationSlug,
@@ -1144,6 +1324,14 @@ export default defineTool({
     );
 
     // Generate the Sentry explorer URL with structured aggregate information
+    // Derive aggregate functions and groupBy fields from the fields array
+    const aggregateFunctions = fields.filter(
+      (field) => field.includes("(") && field.includes(")"),
+    );
+    const groupByFields = fields.filter(
+      (field) => !field.includes("(") || !field.includes(")"),
+    );
+
     const explorerUrl = apiService.getEventsExplorerUrl(
       organizationSlug,
       sentryQuery,
@@ -1151,8 +1339,8 @@ export default defineTool({
       dataset, // dataset is already correct for URL generation (logs, spans, errors)
       fields, // Pass fields to detect if it's an aggregate query
       sortParam, // Pass sort parameter for URL generation
-      parsed.aggregateFunctions || [],
-      parsed.groupByFields || [],
+      aggregateFunctions,
+      groupByFields,
     );
 
     // Type-safe access to event data
