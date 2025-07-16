@@ -20,6 +20,7 @@ import {
 import { RECOMMENDED_FIELDS } from "./config";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
+import { logError } from "../../logging";
 
 /**
  * Translate query with error feedback for self-correction
@@ -49,18 +50,32 @@ async function translateQueryWithErrorFeedback(
 
       // Log successful self-correction if this was a retry
       if (previousError && attempt > 0) {
-        console.error(
-          `Search Events Agent successful self-correction: previousError=${previousError}, attempt=${attempt + 1}, originalQuery=${params.naturalLanguageQuery}, dataset=${result.dataset}, organizationSlug=${params.organizationSlug}, correctedQuery=${result.query}, correctedFields=${JSON.stringify(result.fields)}`,
-        );
+        logError("Search Events Agent successful self-correction", {
+          search_events_agent: {
+            previousError,
+            attempt: attempt + 1,
+            originalQuery: params.naturalLanguageQuery,
+            dataset: result.dataset,
+            organizationSlug: params.organizationSlug,
+            correctedQuery: result.query,
+            correctedFields: result.fields,
+          },
+        });
       }
 
       return result;
     } catch (error) {
       if (error instanceof UserInputError && attempt < maxRetries) {
         // Log the error feedback scenario for monitoring and improvement
-        console.error(
-          `Search Events Agent error feedback: error=${error.message}, attempt=${attempt + 1}, maxRetries=${maxRetries + 1}, originalQuery=${params.naturalLanguageQuery}, organizationSlug=${params.organizationSlug}`,
-        );
+        logError("Search Events Agent error feedback", {
+          search_events_agent: {
+            error: error.message,
+            attempt: attempt + 1,
+            maxRetries: maxRetries + 1,
+            originalQuery: params.naturalLanguageQuery,
+            organizationSlug: params.organizationSlug,
+          },
+        });
 
         // Feed the validation error back to the agent for self-correction
         previousError = error.message;
