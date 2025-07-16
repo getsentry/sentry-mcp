@@ -147,15 +147,20 @@ export default defineTool({
     const recommendedFields = RECOMMENDED_FIELDS[dataset];
 
     // Translate the natural language query using AI
-    const parsed = await translateQuery({
-      naturalLanguageQuery: params.naturalLanguageQuery,
-      dataset,
+    const parsed = await translateQuery(
+      {
+        naturalLanguageQuery: params.naturalLanguageQuery,
+        dataset,
+        organizationSlug,
+        projectId,
+        allFields,
+        datasetConfig,
+        recommendedFields,
+      },
+      apiService,
       organizationSlug,
       projectId,
-      allFields,
-      datasetConfig,
-      recommendedFields,
-    });
+    );
 
     // Handle AI errors first
     if (parsed.error) {

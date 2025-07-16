@@ -1,0 +1,104 @@
+{
+  "namespace": "url",
+  "description": "Attributes describing URL.",
+  "attributes": {
+    "url.domain": {
+      "description": "Domain extracted from the `url.full`, such as \"opentelemetry.io\".\n",
+      "type": "string",
+      "note": "In some cases a URL may refer to an IP and/or port directly, without a domain name. In this case, the IP address would go to the domain field. If the URL contains a [literal IPv6 address](https://www.rfc-editor.org/rfc/rfc2732#section-2) enclosed by `[` and `]`, the `[` and `]` characters should also be captured in the domain field.\n",
+      "stability": "development",
+      "examples": [
+        "www.foo.bar",
+        "opentelemetry.io",
+        "3.12.167.2",
+        "[1080:0:0:0:8:800:200C:417A]"
+      ]
+    },
+    "url.extension": {
+      "description": "The file extension extracted from the `url.full`, excluding the leading dot.\n",
+      "type": "string",
+      "note": "The file extension is only set if it exists, as not every url has a file extension. When the file name has multiple extensions `example.tar.gz`, only the last one should be captured `gz`, not `tar.gz`.\n",
+      "stability": "development",
+      "examples": ["png", "gz"]
+    },
+    "url.fragment": {
+      "description": "The [URI fragment](https://www.rfc-editor.org/rfc/rfc3986#section-3.5) component\n",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["SemConv"]
+    },
+    "url.full": {
+      "description": "Absolute URL describing a network resource according to [RFC3986](https://www.rfc-editor.org/rfc/rfc3986)",
+      "type": "string",
+      "note": "For network calls, URL usually has `scheme://host[:port][path][?query][#fragment]` format, where the fragment\nis not transmitted over HTTP, but if it is known, it SHOULD be included nevertheless.\n\n`url.full` MUST NOT contain credentials passed via URL in form of `https://username:password@www.example.com/`.\nIn such case username and password SHOULD be redacted and attribute's value SHOULD be `https://REDACTED:REDACTED@www.example.com/`.\n\n`url.full` SHOULD capture the absolute URL when it is available (or can be reconstructed).\n\nSensitive content provided in `url.full` SHOULD be scrubbed when instrumentations can identify it.\n\n![Development](https://img.shields.io/badge/-development-blue)\nQuery string values for the following keys SHOULD be redacted by default and replaced by the\nvalue `REDACTED`:\n\n* [`AWSAccessKeyId`](https://docs.aws.amazon.com/AmazonS3/latest/userguide/RESTAuthentication.html#RESTAuthenticationQueryStringAuth)\n* [`Signature`](https://docs.aws.amazon.com/AmazonS3/latest/userguide/RESTAuthentication.html#RESTAuthenticationQueryStringAuth)\n* [`sig`](https://learn.microsoft.com/azure/storage/common/storage-sas-overview#sas-token)\n* [`X-Goog-Signature`](https://cloud.google.com/storage/docs/access-control/signed-urls)\n\nThis list is subject to change over time.\n\nWhen a query string value is redacted, the query string key SHOULD still be preserved, e.g.\n`https://www.example.com/path?color=blue&sig=REDACTED`.\n",
+      "stability": "stable",
+      "examples": [
+        "https://www.foo.bar/search?q=OpenTelemetry#SemConv",
+        "//localhost"
+      ]
+    },
+    "url.original": {
+      "description": "Unmodified original URL as seen in the event source.\n",
+      "type": "string",
+      "note": "In network monitoring, the observed URL may be a full URL, whereas in access logs, the URL is often just represented as a path. This field is meant to represent the URL as it was observed, complete or not.\n`url.original` might contain credentials passed via URL in form of `https://username:password@www.example.com/`. In such case password and username SHOULD NOT be redacted and attribute's value SHOULD remain the same.\n",
+      "stability": "development",
+      "examples": [
+        "https://www.foo.bar/search?q=OpenTelemetry#SemConv",
+        "search?q=OpenTelemetry"
+      ]
+    },
+    "url.path": {
+      "description": "The [URI path](https://www.rfc-editor.org/rfc/rfc3986#section-3.3) component\n",
+      "type": "string",
+      "note": "Sensitive content provided in `url.path` SHOULD be scrubbed when instrumentations can identify it.\n",
+      "stability": "stable",
+      "examples": ["/search"]
+    },
+    "url.port": {
+      "description": "Port extracted from the `url.full`\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["443"]
+    },
+    "url.query": {
+      "description": "The [URI query](https://www.rfc-editor.org/rfc/rfc3986#section-3.4) component\n",
+      "type": "string",
+      "note": "Sensitive content provided in `url.query` SHOULD be scrubbed when instrumentations can identify it.\n\n![Development](https://img.shields.io/badge/-development-blue)\nQuery string values for the following keys SHOULD be redacted by default and replaced by the value `REDACTED`:\n\n* [`AWSAccessKeyId`](https://docs.aws.amazon.com/AmazonS3/latest/userguide/RESTAuthentication.html#RESTAuthenticationQueryStringAuth)\n* [`Signature`](https://docs.aws.amazon.com/AmazonS3/latest/userguide/RESTAuthentication.html#RESTAuthenticationQueryStringAuth)\n* [`sig`](https://learn.microsoft.com/azure/storage/common/storage-sas-overview#sas-token)\n* [`X-Goog-Signature`](https://cloud.google.com/storage/docs/access-control/signed-urls)\n\nThis list is subject to change over time.\n\nWhen a query string value is redacted, the query string key SHOULD still be preserved, e.g.\n`q=OpenTelemetry&sig=REDACTED`.\n",
+      "stability": "stable",
+      "examples": ["q=OpenTelemetry"]
+    },
+    "url.registered_domain": {
+      "description": "The highest registered url domain, stripped of the subdomain.\n",
+      "type": "string",
+      "note": "This value can be determined precisely with the [public suffix list](https://publicsuffix.org/). For example, the registered domain for `foo.example.com` is `example.com`. Trying to approximate this by simply taking the last two labels will not work well for TLDs such as `co.uk`.\n",
+      "stability": "development",
+      "examples": ["example.com", "foo.co.uk"]
+    },
+    "url.scheme": {
+      "description": "The [URI scheme](https://www.rfc-editor.org/rfc/rfc3986#section-3.1) component identifying the used protocol.\n",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["https", "ftp", "telnet"]
+    },
+    "url.subdomain": {
+      "description": "The subdomain portion of a fully qualified domain name includes all of the names except the host name under the registered_domain. In a partially qualified domain, or if the qualification level of the full name cannot be determined, subdomain contains all of the names below the registered domain.\n",
+      "type": "string",
+      "note": "The subdomain portion of `www.east.mydomain.co.uk` is `east`. If the domain has multiple levels of subdomain, such as `sub2.sub1.example.com`, the subdomain field should contain `sub2.sub1`, with no trailing period.\n",
+      "stability": "development",
+      "examples": ["east", "sub2.sub1"]
+    },
+    "url.template": {
+      "description": "The low-cardinality template of an [absolute path reference](https://www.rfc-editor.org/rfc/rfc3986#section-4.2).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["/users/{id}", "/users/:id", "/users?id={id}"]
+    },
+    "url.top_level_domain": {
+      "description": "The effective top level domain (eTLD), also known as the domain suffix, is the last part of the domain name. For example, the top level domain for example.com is `com`.\n",
+      "type": "string",
+      "note": "This value can be determined precisely with the [public suffix list](https://publicsuffix.org/).\n",
+      "stability": "development",
+      "examples": ["com", "co.uk"]
+    }
+  }
+}

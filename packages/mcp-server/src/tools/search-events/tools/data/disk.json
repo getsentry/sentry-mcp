@@ -1,0 +1,12 @@
+{
+  "namespace": "disk",
+  "description": "These attributes may be used for any disk related operation.\n",
+  "attributes": {
+    "disk.io.direction": {
+      "description": "The disk IO operation direction.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["read", "write"]
+    }
+  }
+}

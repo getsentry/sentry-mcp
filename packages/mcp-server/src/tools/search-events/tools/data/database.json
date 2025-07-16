@@ -1,0 +1,150 @@
+{
+  "namespace": "database",
+  "description": "This group defines the attributes used to describe telemetry in the context of databases.\n",
+  "attributes": {
+    "db.collection.name": {
+      "description": "The name of a collection (table, container) within the database.",
+      "type": "string",
+      "note": "It is RECOMMENDED to capture the value as provided by the application\nwithout attempting to do any case normalization.\n\nThe collection name SHOULD NOT be extracted from `db.query.text`,\nwhen the database system supports query text with multiple collections\nin non-batch operations.\n\nFor batch operations, if the individual operations are known to have the same\ncollection name then that collection name SHOULD be used.\n",
+      "stability": "stable",
+      "examples": ["public.users", "customers"]
+    },
+    "db.namespace": {
+      "description": "The name of the database, fully qualified within the server address and port.\n",
+      "type": "string",
+      "note": "If a database system has multiple namespace components, they SHOULD be concatenated from the most general to the most specific namespace component, using `|` as a separator between the components. Any missing components (and their associated separators) SHOULD be omitted.\nSemantic conventions for individual database systems SHOULD document what `db.namespace` means in the context of that system.\nIt is RECOMMENDED to capture the value as provided by the application without attempting to do any case normalization.\n",
+      "stability": "stable",
+      "examples": ["customers", "test.users"]
+    },
+    "db.operation.name": {
+      "description": "The name of the operation or command being executed.\n",
+      "type": "string",
+      "note": "It is RECOMMENDED to capture the value as provided by the application\nwithout attempting to do any case normalization.\n\nThe operation name SHOULD NOT be extracted from `db.query.text`,\nwhen the database system supports query text with multiple operations\nin non-batch operations.\n\nIf spaces can occur in the operation name, multiple consecutive spaces\nSHOULD be normalized to a single space.\n\nFor batch operations, if the individual operations are known to have the same operation name\nthen that operation name SHOULD be used prepended by `BATCH `,\notherwise `db.operation.name` SHOULD be `BATCH` or some other database\nsystem specific term if more applicable.\n",
+      "stability": "stable",
+      "examples": ["findAndModify", "HMSET", "SELECT"]
+    },
+    "db.query.text": {
+      "description": "The database query being executed.\n",
+      "type": "string",
+      "note": "For sanitization see [Sanitization of `db.query.text`](/docs/database/database-spans.md#sanitization-of-dbquerytext).\nFor batch operations, if the individual operations are known to have the same query text then that query text SHOULD be used, otherwise all of the individual query texts SHOULD be concatenated with separator `; ` or some other database system specific separator if more applicable.\nParameterized query text SHOULD NOT be sanitized. Even though parameterized query text can potentially have sensitive data, by using a parameterized query the user is giving a strong signal that any sensitive data will be passed as parameter values, and the benefit to observability of capturing the static part of the query text by default outweighs the risk.\n",
+      "stability": "stable",
+      "examples": [
+        "SELECT * FROM wuser_table where username = ?",
+        "SET mykey ?"
+      ]
+    },
+    "db.query.parameter": {
+      "description": "A database query parameter, with `<key>` being the parameter name, and the attribute value being a string representation of the parameter value.\n",
+      "type": "string",
+      "note": "If a query parameter has no name and instead is referenced only by index,\nthen `<key>` SHOULD be the 0-based index.\n\n`db.query.parameter.<key>` SHOULD match\nup with the parameterized placeholders present in `db.query.text`.\n\n`db.query.parameter.<key>` SHOULD NOT be captured on batch operations.\n\nExamples:\n\n- For a query `SELECT * FROM users where username =  %s` with the parameter `\"jdoe\"`,\n  the attribute `db.query.parameter.0` SHOULD be set to `\"jdoe\"`.\n\n- For a query `\"SELECT * FROM users WHERE username = %(username)s;` with parameter\n  `username = \"jdoe\"`, the attribute `db.query.parameter.username` SHOULD be set to `\"jdoe\"`.\n",
+      "stability": "development",
+      "examples": ["someval", "55"]
+    },
+    "db.query.summary": {
+      "description": "Low cardinality summary of a database query.\n",
+      "type": "string",
+      "note": "The query summary describes a class of database queries and is useful\nas a grouping key, especially when analyzing telemetry for database\ncalls involving complex queries.\n\nSummary may be available to the instrumentation through\ninstrumentation hooks or other means. If it is not available, instrumentations\nthat support query parsing SHOULD generate a summary following\n[Generating query summary](/docs/database/database-spans.md#generating-a-summary-of-the-query)\nsection.\n",
+      "stability": "stable",
+      "examples": [
+        "SELECT wuser_table",
+        "INSERT shipping_details SELECT orders",
+        "get user by id"
+      ]
+    },
+    "db.stored_procedure.name": {
+      "description": "The name of a stored procedure within the database.",
+      "type": "string",
+      "note": "It is RECOMMENDED to capture the value as provided by the application\nwithout attempting to do any case normalization.\n\nFor batch operations, if the individual operations are known to have the same\nstored procedure name then that stored procedure name SHOULD be used.\n",
+      "stability": "stable",
+      "examples": ["GetCustomer"]
+    },
+    "db.operation.parameter": {
+      "description": "A database operation parameter, with `<key>` being the parameter name, and the attribute value being a string representation of the parameter value.\n",
+      "type": "string",
+      "note": "For example, a client-side maximum number of rows to read from the database\nMAY be recorded as the `db.operation.parameter.max_rows` attribute.\n\n`db.query.text` parameters SHOULD be captured using `db.query.parameter.<key>`\ninstead of `db.operation.parameter.<key>`.\n",
+      "stability": "development",
+      "examples": ["someval", "55"]
+    },
+    "db.operation.batch.size": {
+      "description": "The number of queries included in a batch operation.",
+      "type": "number",
+      "note": "Operations are only considered batches when they contain two or more operations, and so `db.operation.batch.size` SHOULD never be `1`.\n",
+      "stability": "stable",
+      "examples": ["2", "3", "4"]
+    },
+    "db.response.status_code": {
+      "description": "Database response status code.",
+      "type": "string",
+      "note": "The status code returned by the database. Usually it represents an error code, but may also represent partial success, warning, or differentiate between various types of successful outcomes.\nSemantic conventions for individual database systems SHOULD document what `db.response.status_code` means in the context of that system.\n",
+      "stability": "stable",
+      "examples": ["102", "ORA-17002", "08P01", "404"]
+    },
+    "db.response.returned_rows": {
+      "description": "Number of rows returned by the operation.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["10", "30", "1000"]
+    },
+    "db.system.name": {
+      "description": "The database management system (DBMS) product as identified by the client instrumentation.",
+      "type": "string",
+      "note": "The actual DBMS may differ from the one identified by the client. For example, when using PostgreSQL client libraries to connect to a CockroachDB, the `db.system.name` is set to `postgresql` based on the instrumentation's best knowledge.\n",
+      "stability": "stable",
+      "examples": [
+        "other_sql",
+        "softwareag.adabas",
+        "actian.ingres",
+        "aws.dynamodb",
+        "aws.redshift",
+        "azure.cosmosdb",
+        "intersystems.cache",
+        "cassandra",
+        "clickhouse",
+        "cockroachdb",
+        "couchbase",
+        "couchdb",
+        "derby",
+        "elasticsearch",
+        "firebirdsql",
+        "gcp.spanner",
+        "geode",
+        "h2database",
+        "hbase",
+        "hive",
+        "hsqldb",
+        "ibm.db2",
+        "ibm.informix",
+        "ibm.netezza",
+        "influxdb",
+        "instantdb",
+        "mariadb",
+        "memcached",
+        "mongodb",
+        "microsoft.sql_server",
+        "mysql",
+        "neo4j",
+        "opensearch",
+        "oracle.db",
+        "postgresql",
+        "redis",
+        "sap.hana",
+        "sap.maxdb",
+        "sqlite",
+        "teradata",
+        "trino"
+      ]
+    },
+    "db.client.connection.state": {
+      "description": "The state of a connection in the pool",
+      "type": "string",
+      "stability": "development",
+      "examples": ["idle", "used"]
+    },
+    "db.client.connection.pool.name": {
+      "description": "The name of the connection pool; unique within the instrumented application. In case the connection pool implementation doesn't provide a name, instrumentation SHOULD use a combination of parameters that would make the name unique, for example, combining attributes `server.address`, `server.port`, and `db.namespace`, formatted as `server.address:server.port/db.namespace`. Instrumentations that generate connection pool name following different patterns SHOULD document it.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["myDataSource"]
+    }
+  }
+}

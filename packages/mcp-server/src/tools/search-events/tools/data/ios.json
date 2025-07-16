@@ -1,0 +1,19 @@
+{
+  "namespace": "ios",
+  "description": "This group describes iOS-specific attributes.\n",
+  "attributes": {
+    "ios.app.state": {
+      "description": "This attribute represents the state of the application.\n",
+      "type": "string",
+      "note": "The iOS lifecycle states are defined in the [UIApplicationDelegate documentation](https://developer.apple.com/documentation/uikit/uiapplicationdelegate), and from which the `OS terminology` column values are derived.\n",
+      "stability": "development",
+      "examples": [
+        "active",
+        "inactive",
+        "background",
+        "foreground",
+        "terminate"
+      ]
+    }
+  }
+}

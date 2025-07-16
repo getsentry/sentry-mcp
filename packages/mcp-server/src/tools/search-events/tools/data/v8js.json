@@ -1,0 +1,25 @@
+{
+  "namespace": "v8js",
+  "description": "Describes V8 JS Engine Runtime related attributes.",
+  "attributes": {
+    "v8js.gc.type": {
+      "description": "The type of garbage collection.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["major", "minor", "incremental", "weakcb"]
+    },
+    "v8js.heap.space.name": {
+      "description": "The name of the space type of heap memory.",
+      "type": "string",
+      "note": "Value can be retrieved from value `space_name` of [`v8.getHeapSpaceStatistics()`](https://nodejs.org/api/v8.html#v8getheapspacestatistics)\n",
+      "stability": "development",
+      "examples": [
+        "new_space",
+        "old_space",
+        "code_space",
+        "map_space",
+        "large_object_space"
+      ]
+    }
+  }
+}

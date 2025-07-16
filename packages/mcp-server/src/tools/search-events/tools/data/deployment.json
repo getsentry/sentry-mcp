@@ -1,0 +1,31 @@
+{
+  "namespace": "deployment",
+  "description": "This document defines attributes for software deployments.\n",
+  "attributes": {
+    "deployment.name": {
+      "description": "The name of the deployment.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["deploy my app", "deploy-frontend"]
+    },
+    "deployment.id": {
+      "description": "The id of the deployment.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1208"]
+    },
+    "deployment.status": {
+      "description": "The status of the deployment.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["failed", "succeeded"]
+    },
+    "deployment.environment.name": {
+      "description": "Name of the [deployment environment](https://wikipedia.org/wiki/Deployment_environment) (aka deployment tier).\n",
+      "type": "string",
+      "note": "`deployment.environment.name` does not affect the uniqueness constraints defined through\nthe `service.namespace`, `service.name` and `service.instance.id` resource attributes.\nThis implies that resources carrying the following attribute combinations MUST be\nconsidered to be identifying the same service:\n\n- `service.name=frontend`, `deployment.environment.name=production`\n- `service.name=frontend`, `deployment.environment.name=staging`.\n",
+      "stability": "development",
+      "examples": ["staging", "production"]
+    }
+  }
+}

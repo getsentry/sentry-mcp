@@ -56,6 +56,7 @@ When making changes, consider these areas:
 - **Tool Definitions**: Auto-generated JSON schemas for client consumption
 - **TypeScript Config**: Shared configurations in `mcp-server-tsconfig/`
 - **Packaging**: Multiple package coordination
+- **OpenTelemetry Namespaces**: Run `pnpm run generate-otel-namespaces` to update namespace documentation from OpenTelemetry specs
 
 ## 🔴 CRITICAL: Pre-Development Requirements
 

@@ -1,0 +1,35 @@
+{
+  "namespace": "mcp",
+  "description": "Model Context Protocol attributes for MCP tool calls and sessions",
+  "attributes": {
+    "mcp.tool.name": {
+      "description": "Tool name (e.g., find_issues, search_events)",
+      "type": "string",
+      "examples": [
+        "find_issues",
+        "search_events",
+        "get_issue_details",
+        "update_issue"
+      ]
+    },
+    "mcp.session.id": {
+      "description": "MCP session identifier",
+      "type": "string"
+    },
+    "mcp.transport": {
+      "description": "MCP transport protocol used",
+      "type": "string",
+      "examples": ["stdio", "http", "websocket"]
+    },
+    "mcp.request.id": {
+      "description": "MCP request identifier",
+      "type": "string"
+    },
+    "mcp.response.status": {
+      "description": "MCP response status",
+      "type": "string",
+      "examples": ["success", "error"]
+    }
+  },
+  "custom": true
+}

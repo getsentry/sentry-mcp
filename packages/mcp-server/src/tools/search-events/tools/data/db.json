@@ -1,0 +1,66 @@
+{
+  "namespace": "db",
+  "description": "Database operations attributes",
+  "attributes": {
+    "db.system.name": {
+      "description": "Identifies the database management system product",
+      "type": "string",
+      "examples": [
+        "postgresql",
+        "mysql",
+        "microsoft.sql_server",
+        "mongodb",
+        "redis",
+        "cassandra"
+      ]
+    },
+    "db.collection.name": {
+      "description": "Name of a collection (table, container) within the database",
+      "type": "string"
+    },
+    "db.namespace": {
+      "description": "Fully qualified database name within server address and port",
+      "type": "string"
+    },
+    "db.operation.name": {
+      "description": "Name of the operation or command being executed",
+      "type": "string",
+      "examples": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "CREATE",
+        "DROP",
+        "find",
+        "insert",
+        "update",
+        "delete"
+      ]
+    },
+    "db.response.status_code": {
+      "description": "Status code returned by the database",
+      "type": "string"
+    },
+    "db.operation.batch.size": {
+      "description": "Number of queries in a batch operation",
+      "type": "number"
+    },
+    "db.query.summary": {
+      "description": "Low-cardinality summary of a database query",
+      "type": "string"
+    },
+    "db.query.text": {
+      "description": "The actual database query being executed",
+      "type": "string"
+    },
+    "db.stored_procedure.name": {
+      "description": "Name of a stored procedure within the database",
+      "type": "string"
+    },
+    "db.query.parameter.<key>": {
+      "description": "Database query parameter values",
+      "type": "string"
+    }
+  }
+}

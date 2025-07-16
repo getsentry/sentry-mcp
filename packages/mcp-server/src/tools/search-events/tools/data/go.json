@@ -1,0 +1,12 @@
+{
+  "namespace": "go",
+  "description": "This document defines Go related attributes.\n",
+  "attributes": {
+    "go.memory.type": {
+      "description": "The type of memory.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["stack", "other"]
+    }
+  }
+}

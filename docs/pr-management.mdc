@@ -213,27 +213,40 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## PR Description Structure
 
+### Focus on Reviewer Needs
+
+**Good PR descriptions help reviewers understand:**
+- What problem was solved
+- What changes were made  
+- Why these changes were necessary
+- Any potential impact or risks
+
+**Avoid including:**
+- Test plans or instructions (CI handles testing)
+- Implementation details that are clear from the code
+- Line-by-line walkthroughs
+- Verbose explanations better suited for documentation
+
 ### Template
 
 ```markdown
 ## Summary
-<!-- Brief description of changes -->
-- What was added/changed/fixed
-- Why these changes were needed
+<!-- Brief description of what was changed and why -->
+Fixes [issue] by [solution approach]. This addresses [problem] and enables [benefit].
 
-## Changes Made
-<!-- Detailed list of specific changes -->
-- Added new tool for X
-- Updated API client to handle Y  
-- Fixed issue with Z
+### Key Changes
+<!-- High-level changes that reviewers should focus on -->
+- Fixed [specific issue]: [brief explanation]
+- Added [new feature]: [brief explanation]  
+- Refactored [component]: [brief explanation]
 
-## Breaking Changes
+### Breaking Changes
 <!-- If any breaking changes -->
 - None
 <!-- OR -->
 - Updated tool interface (see migration guide)
 
-## Dependencies
+### Dependencies
 <!-- Related PRs or external dependencies -->
 - Depends on #123
 - Requires Sentry API version X.Y
@@ -243,17 +256,42 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ### Real Examples
 
+**Good - Concise and reviewer-focused:**
 ```markdown
 ## Summary
-Add natural language search capability for Sentry events, logs, and spans using AI-powered query translation.
+Fixes search_events tool to properly understand OpenTelemetry semantic conventions and refactors the code into a clean module structure.
 
-## Changes Made  
-- Implemented `search_events` tool with OpenAI integration
-- Added comprehensive test suite with MSW mocks
-- Created dataset-specific formatting for errors, logs, spans
-- Added field selection and custom attribute support
+### Key Changes
+- Fixed semantic understanding: "agent calls" now correctly maps to GenAI conventions (`gen_ai.*`) instead of MCP tool calls
+- Refactored 1385-line monolithic file into 8 focused modules with clear responsibilities
+- Added dynamic semantic lookup for better attribute disambiguation
 
 🤖 Generated with [Claude Code](https://claude.ai/code)
+```
+
+**Bad - Too verbose with unnecessary details:**
+```markdown
+## Summary
+This PR implements comprehensive improvements to the search_events tool...
+
+### Technical Implementation Details
+- Uses OpenAI GPT-4 for natural language processing
+- Implements sophisticated caching mechanisms
+- Creates extensive test coverage with MSW mocks
+- Follows advanced TypeScript patterns
+
+### Test Plan
+1. Run `pnpm test` to verify all tests pass
+2. Test with various query types:
+   - "agent calls" should return GenAI spans
+   - "database errors" should return DB-related errors
+3. Verify the UI displays results correctly
+4. Check that performance remains optimal
+
+### File Structure Changes
+- src/tools/search-events.ts → src/tools/search-events/handler.ts
+- Added src/tools/search-events/agent.ts for AI logic
+- [... detailed file-by-file breakdown ...]
 ```
 
 ## Review Process Workflow
@@ -383,7 +421,7 @@ gh pr view --comments | grep -A5 -B5 "REQUESTED_CHANGES"
 ### Do's
 - ✅ Always verify AI feedback before implementing
 - ✅ Write clear, descriptive commit messages
-- ✅ Include test plan in PR descriptions
+- ✅ Focus PR descriptions on reviewer needs, not test plans
 - ✅ Respond promptly to review feedback
 - ✅ Run quality checks before pushing
 - ✅ Use GitHub CLI for efficient workflow

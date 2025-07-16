@@ -3,7 +3,6 @@ import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { ConfigurationError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
-import { enhanceSystemPromptWithSemantics } from "./tools/otel-semantics-lookup";
 
 // Type definitions
 export interface QueryTranslationResult {
@@ -43,7 +42,7 @@ const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. You need to:
 2. Decide which fields to return in the results (the SELECT fields)
 3. Understand when to use aggregate functions vs individual events
 
-IMPORTANT: You have access to a lookupAttributeSemantics tool that can help you find the right attributes for common query terms like "agent", "database", "tool calls", etc. Use this tool when you're unsure about which attributes to use for a query.
+IMPORTANT: When translating queries about "agent calls" or "AI", use gen_ai.* attributes (OpenTelemetry GenAI semantic conventions). For "tool calls", use mcp.* attributes. For database queries, use db.* attributes. For HTTP requests, use http.* attributes.
 
 For the {dataset} dataset:
 
@@ -224,6 +223,9 @@ function buildSystemPrompt(
  */
 export async function translateQuery(
   params: QueryTranslationParams,
+  apiService: SentryApiService,
+  organizationSlug: string,
+  projectId?: string,
 ): Promise<QueryTranslationResult> {
   // Check if OpenAI API key is available
   if (!process.env.OPENAI_API_KEY) {
@@ -240,16 +242,10 @@ export async function translateQuery(
     params.recommendedFields,
   );
 
-  // Enhance system prompt with dynamic attribute lookup
-  const enhancedSystemPrompt = enhanceSystemPromptWithSemantics(
-    systemPrompt,
-    params.naturalLanguageQuery,
-  );
-
   // Use the AI SDK to translate the query
   const { object: parsed } = await generateObject({
     model: openai("gpt-4o"),
-    system: enhancedSystemPrompt,
+    system: systemPrompt,
     prompt: params.naturalLanguageQuery,
     temperature: 0.1, // Low temperature for more consistent translations
     schema: z.object({

@@ -1,0 +1,26 @@
+{
+  "namespace": "webengine",
+  "description": "This document defines the attributes used to describe the packaged software running the application code.\n",
+  "attributes": {
+    "webengine.name": {
+      "description": "The name of the web engine.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["WildFly"]
+    },
+    "webengine.version": {
+      "description": "The version of the web engine.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["21.0.0"]
+    },
+    "webengine.description": {
+      "description": "Additional description of the web engine (e.g. detailed version and edition information).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "WildFly Full 21.0.0.Final (WildFly Core 13.0.1.Final) - 2.2.2.Final"
+      ]
+    }
+  }
+}

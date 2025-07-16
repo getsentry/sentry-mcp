@@ -1,0 +1,48 @@
+{
+  "namespace": "geo",
+  "description": "Geo fields can carry data about a specific location related to an event. This geolocation information can be derived from techniques such as Geo IP, or be user-supplied.\nNote: Geo attributes are typically used under another namespace, such as client.* and describe the location of the corresponding entity (device, end-user, etc). Semantic conventions that reference geo attributes (as a root namespace) or embed them (under their own namespace) SHOULD document what geo attributes describe in the scope of that convention.\n",
+  "attributes": {
+    "geo.locality.name": {
+      "description": "Locality name. Represents the name of a city, town, village, or similar populated place.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Montreal", "Berlin"]
+    },
+    "geo.continent.code": {
+      "description": "Two-letter code representing continent’s name.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["AF", "AN", "AS", "EU", "NA", "OC", "SA"]
+    },
+    "geo.country.iso_code": {
+      "description": "Two-letter ISO Country Code ([ISO 3166-1 alpha2](https://wikipedia.org/wiki/ISO_3166-1#Codes)).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["CA"]
+    },
+    "geo.location.lon": {
+      "description": "Longitude of the geo location in [WGS84](https://wikipedia.org/wiki/World_Geodetic_System#WGS84).\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["-73.61483"]
+    },
+    "geo.location.lat": {
+      "description": "Latitude of the geo location in [WGS84](https://wikipedia.org/wiki/World_Geodetic_System#WGS84).\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["45.505918"]
+    },
+    "geo.postal_code": {
+      "description": "Postal code associated with the location. Values appropriate for this field may also be known as a postcode or ZIP code and will vary widely from country to country.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["94040"]
+    },
+    "geo.region.iso_code": {
+      "description": "Region ISO code ([ISO 3166-2](https://wikipedia.org/wiki/ISO_3166-2)).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["CA-QC"]
+    }
+  }
+}

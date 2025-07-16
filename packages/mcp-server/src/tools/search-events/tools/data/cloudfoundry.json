@@ -1,0 +1,83 @@
+{
+  "namespace": "cloudfoundry",
+  "description": "CloudFoundry resource attributes.\n",
+  "attributes": {
+    "cloudfoundry.system.id": {
+      "description": "A guid or another name describing the event source.\n",
+      "type": "string",
+      "note": "CloudFoundry defines the `source_id` in the [Loggregator v2 envelope](https://github.com/cloudfoundry/loggregator-api#v2-envelope).\nIt is used for logs and metrics emitted by CloudFoundry. It is\nsupposed to contain the component name, e.g. \"gorouter\", for\nCloudFoundry components.\n\nWhen system components are instrumented, values from the\n[Bosh spec](https://bosh.io/docs/jobs/#properties-spec)\nshould be used. The `system.id` should be set to\n`spec.deployment/spec.name`.\n",
+      "stability": "development",
+      "examples": ["cf/gorouter"]
+    },
+    "cloudfoundry.system.instance.id": {
+      "description": "A guid describing the concrete instance of the event source.\n",
+      "type": "string",
+      "note": "CloudFoundry defines the `instance_id` in the [Loggregator v2 envelope](https://github.com/cloudfoundry/loggregator-api#v2-envelope).\nIt is used for logs and metrics emitted by CloudFoundry. It is\nsupposed to contain the vm id for CloudFoundry components.\n\nWhen system components are instrumented, values from the\n[Bosh spec](https://bosh.io/docs/jobs/#properties-spec)\nshould be used. The `system.instance.id` should be set to `spec.id`.\n",
+      "stability": "development",
+      "examples": ["218fc5a9-a5f1-4b54-aa05-46717d0ab26d"]
+    },
+    "cloudfoundry.app.name": {
+      "description": "The name of the application.\n",
+      "type": "string",
+      "note": "Application instrumentation should use the value from environment\nvariable `VCAP_APPLICATION.application_name`. This is the same value\nas reported by `cf apps`.\n",
+      "stability": "development",
+      "examples": ["my-app-name"]
+    },
+    "cloudfoundry.app.id": {
+      "description": "The guid of the application.\n",
+      "type": "string",
+      "note": "Application instrumentation should use the value from environment\nvariable `VCAP_APPLICATION.application_id`. This is the same value as\nreported by `cf app <app-name> --guid`.\n",
+      "stability": "development",
+      "examples": ["218fc5a9-a5f1-4b54-aa05-46717d0ab26d"]
+    },
+    "cloudfoundry.app.instance.id": {
+      "description": "The index of the application instance. 0 when just one instance is active.\n",
+      "type": "string",
+      "note": "CloudFoundry defines the `instance_id` in the [Loggregator v2 envelope](https://github.com/cloudfoundry/loggregator-api#v2-envelope).\nIt is used for logs and metrics emitted by CloudFoundry. It is\nsupposed to contain the application instance index for applications\ndeployed on the runtime.\n\nApplication instrumentation should use the value from environment\nvariable `CF_INSTANCE_INDEX`.\n",
+      "stability": "development",
+      "examples": ["0", "1"]
+    },
+    "cloudfoundry.space.name": {
+      "description": "The name of the CloudFoundry space the application is running in.\n",
+      "type": "string",
+      "note": "Application instrumentation should use the value from environment\nvariable `VCAP_APPLICATION.space_name`. This is the same value as\nreported by `cf spaces`.\n",
+      "stability": "development",
+      "examples": ["my-space-name"]
+    },
+    "cloudfoundry.space.id": {
+      "description": "The guid of the CloudFoundry space the application is running in.\n",
+      "type": "string",
+      "note": "Application instrumentation should use the value from environment\nvariable `VCAP_APPLICATION.space_id`. This is the same value as\nreported by `cf space <space-name> --guid`.\n",
+      "stability": "development",
+      "examples": ["218fc5a9-a5f1-4b54-aa05-46717d0ab26d"]
+    },
+    "cloudfoundry.org.name": {
+      "description": "The name of the CloudFoundry organization the app is running in.\n",
+      "type": "string",
+      "note": "Application instrumentation should use the value from environment\nvariable `VCAP_APPLICATION.org_name`. This is the same value as\nreported by `cf orgs`.\n",
+      "stability": "development",
+      "examples": ["my-org-name"]
+    },
+    "cloudfoundry.org.id": {
+      "description": "The guid of the CloudFoundry org the application is running in.\n",
+      "type": "string",
+      "note": "Application instrumentation should use the value from environment\nvariable `VCAP_APPLICATION.org_id`. This is the same value as\nreported by `cf org <org-name> --guid`.\n",
+      "stability": "development",
+      "examples": ["218fc5a9-a5f1-4b54-aa05-46717d0ab26d"]
+    },
+    "cloudfoundry.process.id": {
+      "description": "The UID identifying the process.\n",
+      "type": "string",
+      "note": "Application instrumentation should use the value from environment\nvariable `VCAP_APPLICATION.process_id`. It is supposed to be equal to\n`VCAP_APPLICATION.app_id` for applications deployed to the runtime.\nFor system components, this could be the actual PID.\n",
+      "stability": "development",
+      "examples": ["218fc5a9-a5f1-4b54-aa05-46717d0ab26d"]
+    },
+    "cloudfoundry.process.type": {
+      "description": "The type of process.\n",
+      "type": "string",
+      "note": "CloudFoundry applications can consist of multiple jobs. Usually the\nmain process will be of type `web`. There can be additional background\ntasks or side-cars with different process types.\n",
+      "stability": "development",
+      "examples": ["web"]
+    }
+  }
+}

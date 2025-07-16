@@ -1,0 +1,52 @@
+{
+  "namespace": "os",
+  "description": "The operating system (OS) on which the process represented by this resource is running.\n",
+  "attributes": {
+    "os.type": {
+      "description": "The operating system type.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "windows",
+        "linux",
+        "darwin",
+        "freebsd",
+        "netbsd",
+        "openbsd",
+        "dragonflybsd",
+        "hpux",
+        "aix",
+        "solaris",
+        "z_os",
+        "zos"
+      ]
+    },
+    "os.description": {
+      "description": "Human readable (not intended to be parsed) OS version information, like e.g. reported by `ver` or `lsb_release -a` commands.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "Microsoft Windows [Version 10.0.18363.778]",
+        "Ubuntu 18.04.1 LTS"
+      ]
+    },
+    "os.name": {
+      "description": "Human readable operating system name.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["iOS", "Android", "Ubuntu"]
+    },
+    "os.version": {
+      "description": "The version string of the operating system as defined in [Version Attributes](/docs/resource/README.md#version-attributes).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["14.2.1", "18.04.1"]
+    },
+    "os.build_id": {
+      "description": "Unique identifier for a particular build or compilation of the operating system.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["TQ3C.230805.001.B2", "20E247", "22621"]
+    }
+  }
+}

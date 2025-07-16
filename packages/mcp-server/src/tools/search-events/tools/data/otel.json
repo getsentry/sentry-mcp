@@ -1,0 +1,30 @@
+{
+  "namespace": "otel",
+  "description": "Attributes reserved for OpenTelemetry",
+  "attributes": {
+    "otel.status_code": {
+      "description": "Name of the code, either \"OK\" or \"ERROR\". MUST NOT be set if the status code is UNSET.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["OK", "ERROR"]
+    },
+    "otel.status_description": {
+      "description": "Description of the Status if it has a value, otherwise not set.",
+      "type": "string",
+      "stability": "stable",
+      "examples": ["resource not found"]
+    },
+    "otel.span.sampling_result": {
+      "description": "The result value of the sampler for this span",
+      "type": "string",
+      "stability": "development",
+      "examples": ["DROP", "RECORD_ONLY", "RECORD_AND_SAMPLE"]
+    },
+    "otel.span.parent.origin": {
+      "description": "Determines whether the span has a parent span, and if so, [whether it is a remote parent](https://opentelemetry.io/docs/specs/otel/trace/api/#isremote)",
+      "type": "string",
+      "stability": "development",
+      "examples": ["none", "local", "remote"]
+    }
+  }
+}

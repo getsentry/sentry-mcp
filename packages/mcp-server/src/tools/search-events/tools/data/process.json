@@ -1,0 +1,209 @@
+{
+  "namespace": "process",
+  "description": "An operating system process.\n",
+  "attributes": {
+    "process.pid": {
+      "description": "Process identifier (PID).\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1234"]
+    },
+    "process.parent_pid": {
+      "description": "Parent Process identifier (PPID).\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["111"]
+    },
+    "process.vpid": {
+      "description": "Virtual process identifier.\n",
+      "type": "number",
+      "note": "The process ID within a PID namespace. This is not necessarily unique across all processes on the host but it is unique within the process namespace that the process exists within.\n",
+      "stability": "development",
+      "examples": ["12"]
+    },
+    "process.session_leader.pid": {
+      "description": "The PID of the process's session leader. This is also the session ID (SID) of the process.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["14"]
+    },
+    "process.group_leader.pid": {
+      "description": "The PID of the process's group leader. This is also the process group ID (PGID) of the process.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["23"]
+    },
+    "process.executable.build_id.gnu": {
+      "description": "The GNU build ID as found in the `.note.gnu.build-id` ELF section (hex string).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["c89b11207f6479603b0d49bf291c092c2b719293"]
+    },
+    "process.executable.build_id.go": {
+      "description": "The Go build ID as retrieved by `go tool buildid <go executable>`.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "foh3mEXu7BLZjsN9pOwG/kATcXlYVCDEFouRMQed_/WwRFB1hPo9LBkekthSPG/x8hMC8emW2cCjXD0_1aY"
+      ]
+    },
+    "process.executable.build_id.htlhash": {
+      "description": "Profiling specific build ID for executables. See the OTel specification for Profiles for more information.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["600DCAFE4A110000F2BF38C493F5FB92"]
+    },
+    "process.executable.name": {
+      "description": "The name of the process executable. On Linux based systems, this SHOULD be set to the base name of the target of `/proc/[pid]/exe`. On Windows, this SHOULD be set to the base name of `GetProcessImageFileNameW`.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["otelcol"]
+    },
+    "process.executable.path": {
+      "description": "The full path to the process executable. On Linux based systems, can be set to the target of `proc/[pid]/exe`. On Windows, can be set to the result of `GetProcessImageFileNameW`.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["/usr/bin/cmd/otelcol"]
+    },
+    "process.command": {
+      "description": "The command used to launch the process (i.e. the command name). On Linux based systems, can be set to the zeroth string in `proc/[pid]/cmdline`. On Windows, can be set to the first parameter extracted from `GetCommandLineW`.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["cmd/otelcol"]
+    },
+    "process.command_line": {
+      "description": "The full command used to launch the process as a single string representing the full command. On Windows, can be set to the result of `GetCommandLineW`. Do not set this if you have to assemble it just for monitoring; use `process.command_args` instead. SHOULD NOT be collected by default unless there is sanitization that excludes sensitive data.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["C:\\cmd\\otecol --config=\"my directory\\config.yaml\""]
+    },
+    "process.command_args": {
+      "description": "All the command arguments (including the command/executable itself) as received by the process. On Linux-based systems (and some other Unixoid systems supporting procfs), can be set according to the list of null-delimited strings extracted from `proc/[pid]/cmdline`. For libc-based executables, this would be the full argv vector passed to `main`. SHOULD NOT be collected by default unless there is sanitization that excludes sensitive data.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["[\"cmd/otecol\",\"--config=config.yaml\"]"]
+    },
+    "process.args_count": {
+      "description": "Length of the process.command_args array\n",
+      "type": "number",
+      "note": "This field can be useful for querying or performing bucket analysis on how many arguments were provided to start a process. More arguments may be an indication of suspicious activity.\n",
+      "stability": "development",
+      "examples": ["4"]
+    },
+    "process.owner": {
+      "description": "The username of the user that owns the process.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["root"]
+    },
+    "process.user.id": {
+      "description": "The effective user ID (EUID) of the process.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1001"]
+    },
+    "process.user.name": {
+      "description": "The username of the effective user of the process.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["root"]
+    },
+    "process.real_user.id": {
+      "description": "The real user ID (RUID) of the process.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1000"]
+    },
+    "process.real_user.name": {
+      "description": "The username of the real user of the process.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["operator"]
+    },
+    "process.saved_user.id": {
+      "description": "The saved user ID (SUID) of the process.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1002"]
+    },
+    "process.saved_user.name": {
+      "description": "The username of the saved user.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["operator"]
+    },
+    "process.runtime.name": {
+      "description": "The name of the runtime of this process.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["OpenJDK Runtime Environment"]
+    },
+    "process.runtime.version": {
+      "description": "The version of the runtime of this process, as returned by the runtime without modification.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["14.0.2"]
+    },
+    "process.runtime.description": {
+      "description": "An additional description about the runtime of the process, for example a specific vendor customization of the runtime environment.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Eclipse OpenJ9 Eclipse OpenJ9 VM openj9-0.21.0"]
+    },
+    "process.title": {
+      "description": "Process title (proctitle)\n",
+      "type": "string",
+      "note": "In many Unix-like systems, process title (proctitle), is the string that represents the name or command line of a running process, displayed by system monitoring tools like ps, top, and htop.\n",
+      "stability": "development",
+      "examples": ["cat /etc/hostname", "xfce4-session", "bash"]
+    },
+    "process.creation.time": {
+      "description": "The date and time the process was created, in ISO 8601 format.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2023-11-21T09:25:34.853Z"]
+    },
+    "process.exit.time": {
+      "description": "The date and time the process exited, in ISO 8601 format.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2023-11-21T09:26:12.315Z"]
+    },
+    "process.exit.code": {
+      "description": "The exit code of the process.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["127"]
+    },
+    "process.interactive": {
+      "description": "Whether the process is connected to an interactive shell.\n",
+      "type": "boolean",
+      "stability": "development"
+    },
+    "process.working_directory": {
+      "description": "The working directory of the process.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["/root"]
+    },
+    "process.context_switch_type": {
+      "description": "Specifies whether the context switches for this data point were voluntary or involuntary.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["voluntary", "involuntary"]
+    },
+    "process.paging.fault_type": {
+      "description": "The type of page fault for this data point. Type `major` is for major/hard page faults, and `minor` is for minor/soft page faults.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["major", "minor"]
+    },
+    "process.environment_variable": {
+      "description": "Process environment variables, `<key>` being the environment variable name, the value being the environment variable value.\n",
+      "type": "string",
+      "note": "Examples:\n\n- an environment variable `USER` with value `\"ubuntu\"` SHOULD be recorded\nas the `process.environment_variable.USER` attribute with value `\"ubuntu\"`.\n\n- an environment variable `PATH` with value `\"/usr/local/bin:/usr/bin\"`\nSHOULD be recorded as the `process.environment_variable.PATH` attribute\nwith value `\"/usr/local/bin:/usr/bin\"`.\n",
+      "stability": "development",
+      "examples": ["ubuntu", "/usr/local/bin:/usr/bin"]
+    }
+  }
+}

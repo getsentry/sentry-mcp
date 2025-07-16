@@ -1,162 +1,207 @@
 import type { SentryApiService } from "../../../api-client";
+import { logError } from "../../../logging";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { z } from "zod";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Zod schemas for type-safe JSON parsing
+const AttributeSchema = z.object({
+  description: z.string(),
+  type: z.string(),
+  examples: z
+    .array(z.any())
+    .transform((arr) =>
+      arr.map((v) => (Array.isArray(v) ? JSON.stringify(v) : v.toString())),
+    )
+    .optional(),
+  note: z.string().optional(),
+  stability: z.string().optional(),
+});
+
+const NamespaceDataSchema = z.object({
+  namespace: z.string(),
+  description: z.string(),
+  attributes: z.record(z.string(), AttributeSchema),
+  custom: z.boolean().optional(),
+});
+
+const NamespacesIndexSchema = z.object({
+  generated: z.string(),
+  totalNamespaces: z.number(),
+  namespaces: z.array(
+    z.object({
+      namespace: z.string(),
+      description: z.string(),
+      custom: z.boolean().optional(),
+    }),
+  ),
+});
+
+// TypeScript types inferred from Zod schemas
+type NamespaceData = z.infer<typeof NamespaceDataSchema>;
+type NamespacesIndex = z.infer<typeof NamespacesIndexSchema>;
+
+// Load all namespace data from JSON files
+function loadNamespaceData(): Record<string, NamespaceData> {
+  const dataDir = resolve(__dirname, "data");
+  const namespaceData: Record<string, NamespaceData> = {};
+
+  try {
+    const files = readdirSync(dataDir).filter(
+      (f) => f.endsWith(".json") && f !== "__namespaces.json",
+    );
+
+    for (const file of files) {
+      const filePath = resolve(dataDir, file);
+      try {
+        const content = readFileSync(filePath, "utf8");
+        const parsed = JSON.parse(content);
+        const validated = NamespaceDataSchema.parse(parsed);
+        namespaceData[validated.namespace] = validated;
+      } catch (error) {
+        console.warn(`Failed to load namespace file ${file}:`, error);
+      }
+    }
+  } catch (error) {
+    logError(error as Error, { context: { operation: "loadNamespaceData" } });
+  }
+
+  return namespaceData;
+}
+
+// Cache the namespace data to avoid re-reading files
+const NAMESPACE_DATA = loadNamespaceData();
+
+// Load the namespaces index
+export function loadNamespacesIndex(): NamespacesIndex {
+  const indexPath = resolve(__dirname, "data", "__namespaces.json");
+  try {
+    const content = readFileSync(indexPath, "utf8");
+    const parsed = JSON.parse(content);
+    return NamespacesIndexSchema.parse(parsed);
+  } catch (error) {
+    logError(error as Error, { context: { operation: "loadNamespacesIndex" } });
+    // Return empty index if file doesn't exist or validation fails
+    return {
+      generated: new Date().toISOString(),
+      totalNamespaces: 0,
+      namespaces: [],
+    };
+  }
+}
+
+// Map common query terms to OpenTelemetry semantic conventions
+const SEMANTIC_MAPPINGS: Record<string, string> = {
+  agent: "gen_ai",
+  ai: "gen_ai",
+  llm: "gen_ai",
+  model: "gen_ai",
+  anthropic: "gen_ai",
+  openai: "gen_ai",
+  claude: "gen_ai",
+  database: "db",
+  db: "db",
+  sql: "db",
+  query: "db",
+  postgresql: "db",
+  mysql: "db",
+  redis: "db",
+  mongodb: "db",
+  http: "http",
+  api: "http",
+  request: "http",
+  response: "http",
+  get: "http",
+  post: "http",
+  tool: "mcp",
+  "tool calls": "mcp",
+  "tool call": "mcp",
+  mcp: "mcp",
+  rpc: "rpc",
+  grpc: "rpc",
+  messaging: "messaging",
+  queue: "messaging",
+  kafka: "messaging",
+  rabbitmq: "messaging",
+  k8s: "k8s",
+  kubernetes: "k8s",
+  container: "container",
+  docker: "container",
+  pod: "k8s",
+  cloud: "cloud",
+  aws: "aws",
+  azure: "azure",
+  gcp: "gcp",
+  network: "network",
+  tcp: "network",
+  udp: "network",
+};
 
 /**
- * Look up OpenTelemetry semantic conventions and attribute patterns
+ * Look up all attributes for a specific OpenTelemetry namespace
  */
 export async function lookupOtelSemantics(
-  query: string,
+  namespace: string,
+  searchTerm: string | undefined,
   dataset: "errors" | "logs" | "spans",
   apiService: SentryApiService,
   organizationSlug: string,
   projectId?: string,
 ): Promise<string> {
   try {
-    const lowerQuery = query.toLowerCase();
-
-    // Check for common semantic queries
-    if (
-      lowerQuery.includes("agent") ||
-      lowerQuery.includes("ai") ||
-      lowerQuery.includes("llm")
-    ) {
-      return "For AI/LLM/agent calls, use has:gen_ai.system or has:gen_ai.request.model. Common gen_ai attributes: gen_ai.system, gen_ai.request.model, gen_ai.operation.name, gen_ai.usage.input_tokens, gen_ai.usage.output_tokens";
+    // Get namespace data
+    const namespaceData = NAMESPACE_DATA[namespace];
+    if (!namespaceData) {
+      return `Namespace '${namespace}' not found. Available namespaces: ${Object.keys(NAMESPACE_DATA).slice(0, 10).join(", ")}...`;
     }
 
-    if (
-      lowerQuery.includes("tool") &&
-      (lowerQuery.includes("mcp") || lowerQuery.includes("call"))
-    ) {
-      return "For MCP tool calls, use has:mcp.tool.name. Common mcp attributes: mcp.tool.name, mcp.session.id, mcp.request.id, mcp.method.name, mcp.transport";
-    }
+    // Format attribute information
+    const attributes = Object.entries(namespaceData.attributes);
+    const attributeInfo = attributes
+      .slice(0, 20) // Limit to first 20 attributes
+      .map(([name, info]) => {
+        let desc = `${name}: ${info.description}`;
+        if (info.type !== "string") {
+          desc += ` (${info.type})`;
+        }
+        if (info.examples && info.examples.length > 0) {
+          desc += ` - examples: ${info.examples.slice(0, 3).join(", ")}`;
+        }
+        return desc;
+      })
+      .join("\n");
 
-    if (
-      lowerQuery.includes("database") ||
-      lowerQuery.includes("db") ||
-      lowerQuery.includes("sql")
-    ) {
-      return "For database queries, use has:db.statement or has:db.system. Common db attributes: db.system, db.statement, db.operation, db.name";
-    }
+    const hasPattern = `has:${namespace}.*`;
+    const totalAttrs = attributes.length;
 
-    if (
-      lowerQuery.includes("http") ||
-      lowerQuery.includes("api") ||
-      lowerQuery.includes("request")
-    ) {
-      return "For HTTP requests, use has:http.method or has:http.url. Common http attributes: http.method, http.status_code, http.url, http.request.method, http.response.status_code";
-    }
+    return `Namespace: ${namespace}
+Description: ${namespaceData.description}
+Total attributes: ${totalAttrs}
+Query pattern: ${hasPattern}
 
-    if (lowerQuery.includes("rpc") || lowerQuery.includes("grpc")) {
-      return "For RPC calls, use has:rpc.system or has:rpc.service. Common rpc attributes: rpc.system, rpc.service, rpc.method, rpc.grpc.status_code";
-    }
+Common attributes:
+${attributeInfo}
 
-    if (
-      lowerQuery.includes("messaging") ||
-      lowerQuery.includes("queue") ||
-      lowerQuery.includes("kafka")
-    ) {
-      return "For messaging systems, use has:messaging.system or has:messaging.destination.name. Common messaging attributes: messaging.system, messaging.operation, messaging.destination.name";
-    }
-
-    if (
-      lowerQuery.includes("kubernetes") ||
-      lowerQuery.includes("k8s") ||
-      lowerQuery.includes("pod")
-    ) {
-      return "For Kubernetes, use has:k8s.namespace.name or has:k8s.pod.name. Common k8s attributes: k8s.namespace.name, k8s.pod.name, k8s.container.name, k8s.node.name";
-    }
-
-    // For other queries, try to fetch actual attributes if possible
-    if (dataset !== "errors") {
-      const itemType = dataset === "logs" ? "logs" : "spans";
-      const attributeList = await apiService.listTraceItemAttributes({
-        organizationSlug,
-        itemType,
-        project: projectId,
-        statsPeriod: "14d",
-      });
-
-      const matchingAttrs = attributeList
-        .filter((attr) => attr.key?.toLowerCase().includes(lowerQuery))
-        .slice(0, 10);
-
-      if (matchingAttrs.length > 0) {
-        return `Found ${matchingAttrs.length} matching attributes: ${matchingAttrs.map((attr) => attr.key).join(", ")}`;
-      }
-    }
-
-    return "No specific attribute semantics found for this query. Try using namespace patterns like gen_ai.*, mcp.*, db.*, http.*";
+${totalAttrs > 20 ? `... and ${totalAttrs - 20} more attributes` : ""}`;
   } catch (error) {
-    return "Error looking up attribute semantics. Use standard OpenTelemetry conventions.";
+    return `Error looking up namespace '${namespace}'. Use standard OpenTelemetry conventions.`;
   }
 }
 
 /**
- * Enhance system prompt with dynamic attribute lookup based on query content
+ * Get detailed information about a specific namespace
  */
-export function enhanceSystemPromptWithSemantics(
-  systemPrompt: string,
-  naturalLanguageQuery: string,
-): string {
-  let enhanced = systemPrompt;
-  const naturalQueryLower = naturalLanguageQuery.toLowerCase();
+export function getNamespaceInfo(namespace: string): NamespaceData | undefined {
+  return NAMESPACE_DATA[namespace];
+}
 
-  if (
-    naturalQueryLower.includes("agent") ||
-    naturalQueryLower.includes("ai") ||
-    naturalQueryLower.includes("llm")
-  ) {
-    enhanced +=
-      "\n\nIMPORTANT: For AI/LLM/agent calls, use has:gen_ai.system or has:gen_ai.request.model. Common gen_ai attributes: gen_ai.system, gen_ai.request.model, gen_ai.operation.name, gen_ai.usage.input_tokens, gen_ai.usage.output_tokens";
-  }
-
-  if (
-    naturalQueryLower.includes("tool") &&
-    (naturalQueryLower.includes("mcp") || naturalQueryLower.includes("call"))
-  ) {
-    enhanced +=
-      "\n\nIMPORTANT: For MCP tool calls, use has:mcp.tool.name. Common mcp attributes: mcp.tool.name, mcp.session.id, mcp.request.id, mcp.method.name, mcp.transport";
-  }
-
-  if (
-    naturalQueryLower.includes("database") ||
-    naturalQueryLower.includes("db") ||
-    naturalQueryLower.includes("sql")
-  ) {
-    enhanced +=
-      "\n\nIMPORTANT: For database queries, use has:db.statement or has:db.system. Common db attributes: db.system, db.statement, db.operation, db.name";
-  }
-
-  if (
-    naturalQueryLower.includes("http") ||
-    naturalQueryLower.includes("api") ||
-    naturalQueryLower.includes("request")
-  ) {
-    enhanced +=
-      "\n\nIMPORTANT: For HTTP requests, use has:http.method or has:http.url. Common http attributes: http.method, http.status_code, http.url, http.request.method, http.response.status_code";
-  }
-
-  if (naturalQueryLower.includes("rpc") || naturalQueryLower.includes("grpc")) {
-    enhanced +=
-      "\n\nIMPORTANT: For RPC calls, use has:rpc.system or has:rpc.service. Common rpc attributes: rpc.system, rpc.service, rpc.method, rpc.grpc.status_code";
-  }
-
-  if (
-    naturalQueryLower.includes("messaging") ||
-    naturalQueryLower.includes("queue") ||
-    naturalQueryLower.includes("kafka")
-  ) {
-    enhanced +=
-      "\n\nIMPORTANT: For messaging systems, use has:messaging.system or has:messaging.destination.name. Common messaging attributes: messaging.system, messaging.operation, messaging.destination.name";
-  }
-
-  if (
-    naturalQueryLower.includes("kubernetes") ||
-    naturalQueryLower.includes("k8s") ||
-    naturalQueryLower.includes("pod")
-  ) {
-    enhanced +=
-      "\n\nIMPORTANT: For Kubernetes, use has:k8s.namespace.name or has:k8s.pod.name. Common k8s attributes: k8s.namespace.name, k8s.pod.name, k8s.container.name, k8s.node.name";
-  }
-
-  return enhanced;
+/**
+ * Get all available namespaces
+ */
+export function getAvailableNamespaces(): string[] {
+  return Object.keys(NAMESPACE_DATA);
 }

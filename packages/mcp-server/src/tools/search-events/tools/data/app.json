@@ -1,0 +1,39 @@
+{
+  "namespace": "app",
+  "description": "Describes attributes related to client-side applications (e.g. web apps or mobile apps).\n",
+  "attributes": {
+    "app.installation.id": {
+      "description": "A unique identifier representing the installation of an application on a specific device\n",
+      "type": "string",
+      "note": "Its value SHOULD persist across launches of the same application installation, including through application upgrades.\nIt SHOULD change if the application is uninstalled or if all applications of the vendor are uninstalled.\nAdditionally, users might be able to reset this value (e.g. by clearing application data).\nIf an app is installed multiple times on the same device (e.g. in different accounts on Android), each `app.installation.id` SHOULD have a different value.\nIf multiple OpenTelemetry SDKs are used within the same application, they SHOULD use the same value for `app.installation.id`.\nHardware IDs (e.g. serial number, IMEI, MAC address) MUST NOT be used as the `app.installation.id`.\n\nFor iOS, this value SHOULD be equal to the [vendor identifier](https://developer.apple.com/documentation/uikit/uidevice/identifierforvendor).\n\nFor Android, examples of `app.installation.id` implementations include:\n\n- [Firebase Installation ID](https://firebase.google.com/docs/projects/manage-installations).\n- A globally unique UUID which is persisted across sessions in your application.\n- [App set ID](https://developer.android.com/identity/app-set-id).\n- [`Settings.getString(Settings.Secure.ANDROID_ID)`](https://developer.android.com/reference/android/provider/Settings.Secure#ANDROID_ID).\n\nMore information about Android identifier best practices can be found [here](https://developer.android.com/training/articles/user-data-ids).\n",
+      "stability": "development",
+      "examples": ["2ab2916d-a51f-4ac8-80ee-45ac31a28092"]
+    },
+    "app.screen.coordinate.x": {
+      "description": "The x (horizontal) coordinate of a screen coordinate, in screen pixels.",
+      "type": "number",
+      "stability": "development",
+      "examples": ["0", "131"]
+    },
+    "app.screen.coordinate.y": {
+      "description": "The y (vertical) component of a screen coordinate, in screen pixels.\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["12", "99"]
+    },
+    "app.widget.id": {
+      "description": "An identifier that uniquely differentiates this widget from other widgets in the same application.\n",
+      "type": "string",
+      "note": "A widget is an application component, typically an on-screen visual GUI element.\n",
+      "stability": "development",
+      "examples": ["f9bc787d-ff05-48ad-90e1-fca1d46130b3", "submit_order_1829"]
+    },
+    "app.widget.name": {
+      "description": "The name of an application widget.",
+      "type": "string",
+      "note": "A widget is an application component, typically an on-screen visual GUI element.\n",
+      "stability": "development",
+      "examples": ["submit", "attack", "Clear Cart"]
+    }
+  }
+}

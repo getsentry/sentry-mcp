@@ -1,0 +1,24 @@
+{
+  "namespace": "heroku",
+  "description": "This document defines attributes for the Heroku platform on which application/s are running.\n",
+  "attributes": {
+    "heroku.release.creation_timestamp": {
+      "description": "Time and date the release was created\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2022-10-23T18:00:42Z"]
+    },
+    "heroku.release.commit": {
+      "description": "Commit hash for the current release\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["e6134959463efd8966b20e75b913cafe3f5ec"]
+    },
+    "heroku.app.id": {
+      "description": "Unique identifier for the application\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["2daa2797-e42b-4624-9322-ec3f968df4da"]
+    }
+  }
+}
