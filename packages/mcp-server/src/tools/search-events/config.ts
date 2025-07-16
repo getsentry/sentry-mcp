@@ -390,6 +390,26 @@ Query Patterns:
     "query": "has:gen_ai.usage.input_tokens",
     "fields": ["gen_ai.system", "sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)", "count()"],
     "sort": "-sum(gen_ai.usage.input_tokens)"
+  }
+- "how many tokens used today" → 
+  {
+    "query": "has:gen_ai.usage.input_tokens",
+    "fields": ["sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)", "count()"],
+    "sort": "-sum(gen_ai.usage.input_tokens)",
+    "timeRange": {"statsPeriod": "24h"}
+  }
+- "total input tokens by model" → 
+  {
+    "query": "has:gen_ai.usage.input_tokens",
+    "fields": ["gen_ai.request.model", "sum(gen_ai.usage.input_tokens)", "count()"],
+    "sort": "-sum(gen_ai.usage.input_tokens)"
+  }
+- "tokens used this week" → 
+  {
+    "query": "has:gen_ai.usage.input_tokens",
+    "fields": ["sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)", "count()"],
+    "sort": "-sum(gen_ai.usage.input_tokens)",
+    "timeRange": {"statsPeriod": "7d"}
   }`,
   },
 };

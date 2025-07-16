@@ -101,3 +101,17 @@ Once that's done you can run them using:
 ```shell
 pnpm eval
 ```
+
+## Development Notes
+
+### Automated Code Review
+
+This repository uses automated code review tools (like Cursor BugBot) to help identify potential issues in pull requests. These tools provide helpful feedback and suggestions, but **we do not recommend making these checks required** as the accuracy is still evolving and can produce false positives.
+
+The automated reviews should be treated as:
+- ✅ **Helpful suggestions** to consider during code review
+- ✅ **Starting points** for discussion and improvement  
+- ❌ **Not blocking requirements** for merging PRs
+- ❌ **Not replacements** for human code review
+
+When addressing automated feedback, focus on the underlying concerns rather than strictly following every suggestion.

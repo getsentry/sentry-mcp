@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { generateObject } from "ai";
+import { generateText, tool, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { ConfigurationError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
+import { lookupOtelSemantics } from "./tools/otel-semantics-lookup";
 
 // Type definitions
 export interface QueryTranslationResult {
@@ -42,7 +43,33 @@ const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. You need to:
 2. Decide which fields to return in the results (the SELECT fields)
 3. Understand when to use aggregate functions vs individual events
 
-IMPORTANT: When translating queries about "agent calls" or "AI", use gen_ai.* attributes (OpenTelemetry GenAI semantic conventions). For "tool calls", use mcp.* attributes. For database queries, use db.* attributes. For HTTP requests, use http.* attributes.
+CRITICAL DATASET SELECTION RULES:
+- Mathematical queries about token usage, costs, or AI metrics → ALWAYS use spans dataset
+- Queries asking for sums, averages, totals, or counts of usage → ALWAYS use spans dataset
+- Queries about "how many tokens", "total tokens", "token usage", "costs" → ALWAYS use spans dataset
+- Error messages, exceptions, crashes → use errors dataset
+- Log entries, log messages → use logs dataset
+- Performance data, traces, spans, AI calls → use spans dataset
+
+IMPORTANT SEMANTIC CONVENTIONS:
+- "agent calls", "AI calls", "LLM calls" → use gen_ai.* attributes (OpenTelemetry GenAI semantic conventions)
+- "tool calls", "MCP calls" → use mcp.* attributes
+- "database queries" → use db.* attributes
+- "HTTP requests", "API calls" → use http.* attributes
+- "token usage", "tokens used", "input tokens", "output tokens" → use gen_ai.usage.* attributes
+
+CRITICAL TOOL USAGE: You have access to the otelSemantics tool to look up OpenTelemetry semantic convention attributes. Use this tool when:
+- The query asks about concepts that should have OpenTelemetry attributes but you don't see them in the available fields
+- You need to find the correct attribute names for token usage, AI calls, database queries, HTTP requests, etc.
+
+WHEN TO USE THE TOOL:
+- "tokens used", "token usage", "input tokens", "output tokens" → call otelSemantics with namespace "gen_ai"
+- "agent calls", "AI calls", "LLM calls", "model usage" → call otelSemantics with namespace "gen_ai"
+- "database queries", "SQL", "DB operations" → call otelSemantics with namespace "db"
+- "HTTP requests", "API calls", "web requests" → call otelSemantics with namespace "http"
+- "tool calls", "MCP calls" → call otelSemantics with namespace "mcp"
+
+IMPORTANT: Always use the tool to get the exact attribute names before constructing your query, especially for mathematical operations like sum(gen_ai.usage.input_tokens).
 
 For the {dataset} dataset:
 
@@ -68,6 +95,16 @@ QUERY MODES:
    - Automatically groups by ALL non-function fields in the field list
    - Example: fields=['ai.model.id', 'count()'] groups by ai.model.id and shows count
    - Example: fields=['ai.model.id', 'ai.model.provider', 'avg(span.duration)'] groups by model and provider
+
+MATHEMATICAL QUERY PATTERNS:
+When user asks mathematical questions like "how many tokens", "total tokens used", "token usage today":
+- Use spans dataset (where OpenTelemetry data lives)
+- Use sum() function for total token counts: sum(gen_ai.usage.input_tokens), sum(gen_ai.usage.output_tokens)
+- Use has:gen_ai.usage.input_tokens to filter for AI calls with token data
+- For time-based queries ("today", "this week"), use timeRange parameter
+- Examples:
+  - "how many tokens used today" → query: "has:gen_ai.usage.input_tokens", fields: ["sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)"], timeRange: {"statsPeriod": "24h"}
+  - "total input tokens by model" → query: "has:gen_ai.usage.input_tokens", fields: ["gen_ai.request.model", "sum(gen_ai.usage.input_tokens)"]
 
 QUERY SYNTAX RULES:
 - Use field:value for exact matches
@@ -219,14 +256,134 @@ function buildSystemPrompt(
 }
 
 /**
- * Translate natural language query to Sentry search syntax using AI
+ * Create the otel-semantics-lookup tool for the AI agent
  */
-export async function translateQuery(
-  params: QueryTranslationParams,
+function createOtelLookupTool(
   apiService: SentryApiService,
   organizationSlug: string,
   projectId?: string,
-): Promise<QueryTranslationResult> {
+) {
+  return tool({
+    description:
+      "Look up OpenTelemetry semantic convention attributes for a specific namespace. OpenTelemetry attributes are universal standards that work across all datasets.",
+    parameters: z.object({
+      namespace: z
+        .string()
+        .describe(
+          "The OpenTelemetry namespace to look up (e.g., 'gen_ai', 'db', 'http', 'mcp')",
+        ),
+      searchTerm: z
+        .string()
+        .optional()
+        .describe("Optional search term to filter attributes"),
+      dataset: z
+        .enum(["spans", "errors", "logs"])
+        .describe(
+          "REQUIRED: Dataset to check attribute availability in. The agent MUST specify this based on their chosen dataset.",
+        ),
+    }),
+    execute: async ({ namespace, searchTerm, dataset }) => {
+      return await lookupOtelSemantics(
+        namespace,
+        searchTerm,
+        dataset,
+        apiService,
+        organizationSlug,
+        projectId,
+      );
+    },
+  });
+}
+
+/**
+ * Create a tool for the agent to query available attributes by dataset
+ */
+function createDatasetAttributesTool(
+  apiService: SentryApiService,
+  organizationSlug: string,
+  projectId?: string,
+) {
+  return tool({
+    description:
+      "Query available attributes and fields for a specific Sentry dataset to understand what data is available",
+    parameters: z.object({
+      dataset: z
+        .enum(["spans", "errors", "logs"])
+        .describe("The dataset to query attributes for"),
+    }),
+    execute: async ({ dataset }) => {
+      const { fetchCustomAttributes } = await import("./utils");
+      const {
+        BASE_COMMON_FIELDS,
+        DATASET_FIELDS,
+        RECOMMENDED_FIELDS,
+        NUMERIC_FIELDS,
+      } = await import("./config");
+
+      // Get custom attributes for this dataset
+      const { attributes: customAttributes, fieldTypes } =
+        await fetchCustomAttributes(
+          apiService,
+          organizationSlug,
+          dataset,
+          projectId,
+        );
+
+      // Combine all available fields
+      const allFields = {
+        ...BASE_COMMON_FIELDS,
+        ...DATASET_FIELDS[dataset],
+        ...customAttributes,
+      };
+
+      const recommendedFields = RECOMMENDED_FIELDS[dataset];
+
+      // Combine field types from both static config and dynamic API
+      const allFieldTypes = { ...fieldTypes };
+      const staticNumericFields = NUMERIC_FIELDS[dataset] || new Set();
+      for (const field of staticNumericFields) {
+        allFieldTypes[field] = "number";
+      }
+
+      return `Dataset: ${dataset}
+
+Available Fields (${Object.keys(allFields).length} total):
+${Object.entries(allFields)
+  .slice(0, 50) // Limit to first 50 to avoid overwhelming the agent
+  .map(([key, desc]) => `- ${key}: ${desc}`)
+  .join("\n")}
+${Object.keys(allFields).length > 50 ? `\n... and ${Object.keys(allFields).length - 50} more fields` : ""}
+
+Recommended Fields for ${dataset}:
+${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
+
+Field Types (CRITICAL for aggregate functions):
+${Object.entries(allFieldTypes)
+  .slice(0, 30) // Show more field types since this is critical for validation
+  .map(([key, type]) => `- ${key}: ${type}`)
+  .join("\n")}
+${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldTypes).length - 30} more fields` : ""}
+
+IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
+
+Use this information to construct appropriate queries for the ${dataset} dataset.`;
+    },
+  });
+}
+
+/**
+ * Translate natural language query to Sentry search syntax using AI
+ */
+export async function translateQuery(
+  params: Omit<
+    QueryTranslationParams,
+    "dataset" | "allFields" | "datasetConfig" | "recommendedFields"
+  >,
+  apiService: SentryApiService,
+  organizationSlug: string,
+  projectId?: string,
+  previousError?: string,
+): Promise<QueryTranslationResult & { dataset: "spans" | "errors" | "logs" }> {
   // Check if OpenAI API key is available
   if (!process.env.OPENAI_API_KEY) {
     throw new ConfigurationError(
@@ -234,66 +391,149 @@ export async function translateQuery(
     );
   }
 
-  // Build the system prompt
-  const systemPrompt = buildSystemPrompt(
-    params.dataset,
-    params.allFields,
-    params.datasetConfig,
-    params.recommendedFields,
+  // Build a dataset-agnostic system prompt
+  let systemPrompt = `You are a Sentry query translator. You need to:
+1. FIRST determine which dataset (spans, errors, or logs) is most appropriate for the query
+2. Query the available attributes for that dataset using the datasetAttributes tool
+3. Use the otelSemantics tool if you need OpenTelemetry semantic conventions
+4. Convert the natural language query to Sentry's search syntax
+5. Decide which fields to return in the results
+
+DATASET SELECTION GUIDELINES:
+- spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics
+- errors: Exceptions, crashes, error messages, stack traces, unhandled errors
+- logs: Log entries, log messages, severity levels, debugging information
+
+CRITICAL TOOL USAGE:
+1. Use datasetAttributes tool to discover what fields are available for your chosen dataset
+2. Use otelSemantics tool when you need specific OpenTelemetry attributes (gen_ai.*, db.*, http.*, etc.)
+
+QUERY MODES:
+1. INDIVIDUAL EVENTS (default): Returns raw event data
+   - Used when fields contain no function() calls
+   - Include recommended fields plus any user-requested fields
+
+2. AGGREGATE QUERIES: SQL-like grouping and aggregation
+   - Activated when ANY field contains a function() call
+   - Fields should ONLY include: aggregate functions + groupBy fields
+   - Automatically groups by ALL non-function fields
+
+MATHEMATICAL QUERY PATTERNS:
+When user asks mathematical questions like "how many tokens", "total tokens used", "token usage today":
+- Use spans dataset (where OpenTelemetry data lives)
+- Use datasetAttributes tool to find available token fields
+- Use sum() function for total counts: sum(gen_ai.usage.input_tokens), sum(gen_ai.usage.output_tokens)
+- For time-based queries ("today", "this week"), use timeRange parameter
+
+YOUR RESPONSE FORMAT:
+Return a JSON object with these fields:
+- "dataset": Which dataset you determined to use ("spans", "errors", or "logs")
+- "query": The Sentry query string for filtering results
+- "fields": Array of field names to return in results
+- "sort": Sort parameter for results (REQUIRED)
+- "timeRange": Time range parameters (optional)
+- "error": Error message if you cannot translate the query (optional)
+
+PROCESS:
+1. Analyze the user's query
+2. Determine appropriate dataset
+3. Use datasetAttributes tool to discover available fields
+4. Use otelSemantics tool if needed for OpenTelemetry attributes
+5. Construct the final query with proper fields and sort parameters`;
+
+  // Add error feedback if this is a retry
+  if (previousError) {
+    systemPrompt += `
+
+IMPORTANT ERROR CORRECTION:
+Your previous query translation failed with this error:
+${previousError}
+
+Please analyze the error and correct your approach. Common issues:
+- Using numeric functions (sum, avg, min, max, percentiles) on non-numeric fields
+- Using incorrect field names (use the otelSemantics tool to look up correct names)
+- Missing required fields in the fields array for aggregate queries
+- Invalid sort parameter not included in fields array
+
+Fix the issue and try again with the corrected query.`;
+  }
+
+  // Create tools for the agent
+  const datasetAttributesTool = createDatasetAttributesTool(
+    apiService,
+    organizationSlug,
+    projectId,
+  );
+  const otelLookupTool = createOtelLookupTool(
+    apiService,
+    organizationSlug,
+    projectId,
   );
 
-  // Use the AI SDK to translate the query
-  const { object: parsed } = await generateObject({
+  // Use the AI SDK to translate the query with tools and structured output
+  const result = await generateText({
     model: openai("gpt-4o"),
     system: systemPrompt,
     prompt: params.naturalLanguageQuery,
+    tools: {
+      datasetAttributes: datasetAttributesTool,
+      otelSemantics: otelLookupTool,
+    },
     temperature: 0.1, // Low temperature for more consistent translations
-    schema: z.object({
-      query: z
-        .string()
-        .optional()
-        .describe(
-          "The Sentry query string for filtering results (empty string returns all recent events)",
-        ),
-      fields: z
-        .array(z.string())
-        .optional()
-        .describe(
-          "Array of field names to return in results. REQUIRED for aggregate queries (include only aggregate functions and groupBy fields). Optional for individual event queries (will use recommended fields if not provided).",
-        ),
-      sort: z
-        .string()
-        .describe(
-          "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
-        ),
-      timeRange: z
-        .union([
-          z.object({
-            statsPeriod: z
-              .string()
-              .describe("Relative time period like '1h', '24h', '7d'"),
-          }),
-          z.object({
-            start: z.string().describe("ISO 8601 start time"),
-            end: z.string().describe("ISO 8601 end time"),
-          }),
-        ])
-        .optional()
-        .describe(
-          "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
-        ),
-      error: z
-        .string()
-        .optional()
-        .describe("Error message if the query cannot be translated"),
+    experimental_output: Output.object({
+      schema: z.object({
+        dataset: z
+          .enum(["spans", "errors", "logs"])
+          .describe("Which dataset to use for the query"),
+        query: z
+          .string()
+          .optional()
+          .describe(
+            "The Sentry query string for filtering results (empty string returns all recent events)",
+          ),
+        fields: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Array of field names to return in results. REQUIRED for aggregate queries (include only aggregate functions and groupBy fields). Optional for individual event queries (will use recommended fields if not provided).",
+          ),
+        sort: z
+          .string()
+          .describe(
+            "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
+          ),
+        timeRange: z
+          .union([
+            z.object({
+              statsPeriod: z
+                .string()
+                .describe("Relative time period like '1h', '24h', '7d'"),
+            }),
+            z.object({
+              start: z.string().describe("ISO 8601 start time"),
+              end: z.string().describe("ISO 8601 end time"),
+            }),
+          ])
+          .optional()
+          .describe(
+            "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
+          ),
+        error: z
+          .string()
+          .optional()
+          .describe("Error message if the query cannot be translated"),
+      }),
     }),
     experimental_telemetry: {
       isEnabled: true,
-      functionId: `search_events_${params.dataset}`,
+      functionId: "search_events_agent",
     },
   });
 
+  const parsed = result.experimental_output;
+
   return {
+    dataset: parsed.dataset,
     query: parsed.query || "",
     fields: parsed.fields,
     sort: parsed.sort,
