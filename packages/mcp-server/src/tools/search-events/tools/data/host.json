@@ -1,0 +1,111 @@
+{
+  "namespace": "host",
+  "description": "A host is defined as a computing instance. For example, physical servers, virtual machines, switches or disk array.\n",
+  "attributes": {
+    "host.id": {
+      "description": "Unique host ID. For Cloud, this must be the instance_id assigned by the cloud provider. For non-containerized systems, this should be the `machine-id`. See the table below for the sources to use to determine the `machine-id` based on operating system.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["fdbf79e8af94cb7f9e8df36789187052"]
+    },
+    "host.name": {
+      "description": "Name of the host. On Unix systems, it may contain what the hostname command returns, or the fully qualified hostname, or another name specified by the user.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["opentelemetry-test"]
+    },
+    "host.type": {
+      "description": "Type of host. For Cloud, this must be the machine type.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["n1-standard-1"]
+    },
+    "host.arch": {
+      "description": "The CPU architecture the host system is running on.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "amd64",
+        "arm32",
+        "arm64",
+        "ia64",
+        "ppc32",
+        "ppc64",
+        "s390x",
+        "x86"
+      ]
+    },
+    "host.image.name": {
+      "description": "Name of the VM image or OS install the host was instantiated from.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "infra-ami-eks-worker-node-7d4ec78312",
+        "CentOS-8-x86_64-1905"
+      ]
+    },
+    "host.image.id": {
+      "description": "VM image ID or host OS image ID. For Cloud, this value is from the provider.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["ami-07b06b442921831e5"]
+    },
+    "host.image.version": {
+      "description": "The version string of the VM image or host OS as defined in [Version Attributes](/docs/resource/README.md#version-attributes).\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["0.1"]
+    },
+    "host.ip": {
+      "description": "Available IP addresses of the host, excluding loopback interfaces.\n",
+      "type": "string",
+      "note": "IPv4 Addresses MUST be specified in dotted-quad notation. IPv6 addresses MUST be specified in the [RFC 5952](https://www.rfc-editor.org/rfc/rfc5952.html) format.\n",
+      "stability": "development",
+      "examples": ["[\"192.168.1.140\",\"fe80::abc2:4a28:737a:609e\"]"]
+    },
+    "host.mac": {
+      "description": "Available MAC addresses of the host, excluding loopback interfaces.\n",
+      "type": "string",
+      "note": "MAC Addresses MUST be represented in [IEEE RA hexadecimal form](https://standards.ieee.org/wp-content/uploads/import/documents/tutorials/eui.pdf): as hyphen-separated octets in uppercase hexadecimal form from most to least significant.\n",
+      "stability": "development",
+      "examples": ["[\"AC-DE-48-23-45-67\",\"AC-DE-48-23-45-67-01-9F\"]"]
+    },
+    "host.cpu.vendor.id": {
+      "description": "Processor manufacturer identifier. A maximum 12-character string.\n",
+      "type": "string",
+      "note": "[CPUID](https://wiki.osdev.org/CPUID) command returns the vendor ID string in EBX, EDX and ECX registers. Writing these to memory in this order results in a 12-character string.\n",
+      "stability": "development",
+      "examples": ["GenuineIntel"]
+    },
+    "host.cpu.family": {
+      "description": "Family or generation of the CPU.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["6", "PA-RISC 1.1e"]
+    },
+    "host.cpu.model.id": {
+      "description": "Model identifier. It provides more granular information about the CPU, distinguishing it from other CPUs within the same family.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["6", "9000/778/B180L"]
+    },
+    "host.cpu.model.name": {
+      "description": "Model designation of the processor.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz"]
+    },
+    "host.cpu.stepping": {
+      "description": "Stepping or core revisions.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["1", "r1p1"]
+    },
+    "host.cpu.cache.l2.size": {
+      "description": "The amount of level 2 memory cache available to the processor (in Bytes).\n",
+      "type": "number",
+      "stability": "development",
+      "examples": ["12288000"]
+    }
+  }
+}

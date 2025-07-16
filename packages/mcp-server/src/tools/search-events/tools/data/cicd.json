@@ -1,0 +1,125 @@
+{
+  "namespace": "cicd",
+  "description": "This group describes attributes specific to pipelines within a Continuous Integration and Continuous Deployment (CI/CD) system. A [pipeline](https://wikipedia.org/wiki/Pipeline_(computing)) in this case is a series of steps that are performed in order to deliver a new version of software. This aligns with the [Britannica](https://www.britannica.com/dictionary/pipeline) definition of a pipeline where a **pipeline** is the system for developing and producing something. In the context of CI/CD, a pipeline produces or delivers software.\n",
+  "attributes": {
+    "cicd.pipeline.name": {
+      "description": "The human readable name of the pipeline within a CI/CD system.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "Build and Test",
+        "Lint",
+        "Deploy Go Project",
+        "deploy_to_environment"
+      ]
+    },
+    "cicd.pipeline.run.id": {
+      "description": "The unique identifier of a pipeline run within a CI/CD system.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["120912"]
+    },
+    "cicd.pipeline.run.url.full": {
+      "description": "The [URL](https://wikipedia.org/wiki/URL) of the pipeline run, providing the complete address in order to locate and identify the pipeline run.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "https://github.com/open-telemetry/semantic-conventions/actions/runs/9753949763?pr=1075"
+      ]
+    },
+    "cicd.pipeline.run.state": {
+      "description": "The pipeline run goes through these states during its lifecycle.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["pending", "executing", "finalizing"]
+    },
+    "cicd.pipeline.task.name": {
+      "description": "The human readable name of a task within a pipeline. Task here most closely aligns with a [computing process](https://wikipedia.org/wiki/Pipeline_(computing)) in a pipeline. Other terms for tasks include commands, steps, and procedures.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Run GoLang Linter", "Go Build", "go-test", "deploy_binary"]
+    },
+    "cicd.pipeline.task.run.id": {
+      "description": "The unique identifier of a task run within a pipeline.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["12097"]
+    },
+    "cicd.pipeline.task.run.url.full": {
+      "description": "The [URL](https://wikipedia.org/wiki/URL) of the pipeline task run, providing the complete address in order to locate and identify the pipeline task run.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "https://github.com/open-telemetry/semantic-conventions/actions/runs/9753949763/job/26920038674?pr=1075"
+      ]
+    },
+    "cicd.pipeline.task.run.result": {
+      "description": "The result of a task run.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "success",
+        "failure",
+        "error",
+        "timeout",
+        "cancellation",
+        "skip"
+      ]
+    },
+    "cicd.pipeline.task.type": {
+      "description": "The type of the task within a pipeline.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["build", "test", "deploy"]
+    },
+    "cicd.pipeline.result": {
+      "description": "The result of a pipeline run.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "success",
+        "failure",
+        "error",
+        "timeout",
+        "cancellation",
+        "skip"
+      ]
+    },
+    "cicd.pipeline.action.name": {
+      "description": "The kind of action a pipeline run is performing.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["BUILD", "RUN", "SYNC"]
+    },
+    "cicd.worker.id": {
+      "description": "The unique identifier of a worker within a CICD system.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["abc123", "10.0.1.2", "controller"]
+    },
+    "cicd.worker.name": {
+      "description": "The name of a worker within a CICD system.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["agent-abc", "controller", "Ubuntu LTS"]
+    },
+    "cicd.worker.url.full": {
+      "description": "The [URL](https://wikipedia.org/wiki/URL) of the worker, providing the complete address in order to locate and identify the worker.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["https://cicd.example.org/worker/abc123"]
+    },
+    "cicd.worker.state": {
+      "description": "The state of a CICD worker / agent.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["available", "busy", "offline"]
+    },
+    "cicd.system.component": {
+      "description": "The name of a component of the CICD system.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["controller", "scheduler", "agent"]
+    }
+  }
+}

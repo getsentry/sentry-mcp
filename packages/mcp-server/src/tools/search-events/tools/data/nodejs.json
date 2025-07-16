@@ -1,0 +1,12 @@
+{
+  "namespace": "nodejs",
+  "description": "Describes Node.js related attributes.",
+  "attributes": {
+    "nodejs.eventloop.state": {
+      "description": "The state of event loop time.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["active", "idle"]
+    }
+  }
+}

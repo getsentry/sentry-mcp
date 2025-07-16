@@ -1,0 +1,12 @@
+{
+  "namespace": "log",
+  "description": "This document defines log attributes\n",
+  "attributes": {
+    "log.iostream": {
+      "description": "The stream associated with the log. See below for a list of well-known values.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["stdout", "stderr"]
+    }
+  }
+}

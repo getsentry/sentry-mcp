@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchEvents from "./search-events.js";
+import searchEvents from "./search-events";
 import { generateObject } from "ai";
 
 // Mock the AI SDK
@@ -1037,7 +1037,7 @@ describe("search_events integration test", () => {
       vi.doUnmock("@ai-sdk/openai");
 
       // Import the real module after unmocking
-      const realSearchEvents = await import("./search-events.js");
+      const realSearchEvents = await import("./search-events");
 
       const result = await realSearchEvents.default.handler(
         {

@@ -83,12 +83,14 @@
     "test:ci": "pnpm run generate-tool-definitions && vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "tsc": "tsc --noEmit",
     "test:watch": "vitest watch",
-    "generate-tool-definitions": "tsx scripts/generate-tool-definitions.ts"
+    "generate-tool-definitions": "tsx scripts/generate-tool-definitions.ts",
+    "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts"
   },
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "msw": "catalog:",
+    "yaml": "^2.6.1",
     "zod-to-json-schema": "catalog:"
   },
   "dependencies": {

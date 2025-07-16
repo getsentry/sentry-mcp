@@ -1,0 +1,20 @@
+{
+  "namespace": "enduser",
+  "description": "Describes the end user.\n",
+  "attributes": {
+    "enduser.id": {
+      "description": "Unique identifier of an end user in the system. It maybe a username, email address, or other identifier.",
+      "type": "string",
+      "note": "Unique identifier of an end user in the system.\n\n> [!Warning]\n> This field contains sensitive (PII) information.\n",
+      "stability": "development",
+      "examples": ["username"]
+    },
+    "enduser.pseudo.id": {
+      "description": "Pseudonymous identifier of an end user. This identifier should be a random value that is not directly linked or associated with the end user's actual identity.\n",
+      "type": "string",
+      "note": "Pseudonymous identifier of an end user.\n\n> [!Warning]\n> This field contains sensitive (linkable PII) information.\n",
+      "stability": "development",
+      "examples": ["QdH5CAWJgqVT4rOr0qtumf"]
+    }
+  }
+}

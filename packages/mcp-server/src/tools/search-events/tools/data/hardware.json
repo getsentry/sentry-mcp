@@ -1,0 +1,52 @@
+{
+  "namespace": "hardware",
+  "description": "Attributes for hardware.\n",
+  "attributes": {
+    "hw.id": {
+      "description": "An identifier for the hardware component, unique within the monitored host\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["win32battery_battery_testsysa33_1"]
+    },
+    "hw.name": {
+      "description": "An easily-recognizable name for the hardware component\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["eth0"]
+    },
+    "hw.parent": {
+      "description": "Unique identifier of the parent component (typically the `hw.id` attribute of the enclosure, or disk controller)\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["dellStorage_perc_0"]
+    },
+    "hw.type": {
+      "description": "Type of the component\n",
+      "type": "string",
+      "note": "Describes the category of the hardware component for which `hw.state` is being reported. For example, `hw.type=temperature` along with `hw.state=degraded` would indicate that the temperature of the hardware component has been reported as `degraded`.\n",
+      "stability": "development",
+      "examples": [
+        "battery",
+        "cpu",
+        "disk_controller",
+        "enclosure",
+        "fan",
+        "gpu",
+        "logical_disk",
+        "memory",
+        "network",
+        "physical_disk",
+        "power_supply",
+        "tape_drive",
+        "temperature",
+        "voltage"
+      ]
+    },
+    "hw.state": {
+      "description": "The current state of the component\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["ok", "degraded", "failed"]
+    }
+  }
+}

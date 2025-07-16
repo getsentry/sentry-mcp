@@ -1,0 +1,27 @@
+{
+  "namespace": "cpu",
+  "description": "Attributes specific to a cpu instance.",
+  "attributes": {
+    "cpu.mode": {
+      "description": "The mode of the CPU",
+      "type": "string",
+      "stability": "development",
+      "examples": [
+        "user",
+        "system",
+        "nice",
+        "idle",
+        "iowait",
+        "interrupt",
+        "steal",
+        "kernel"
+      ]
+    },
+    "cpu.logical_number": {
+      "description": "The logical CPU number [0..n-1]",
+      "type": "number",
+      "stability": "development",
+      "examples": ["1"]
+    }
+  }
+}

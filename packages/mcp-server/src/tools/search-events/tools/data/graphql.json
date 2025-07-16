@@ -1,0 +1,25 @@
+{
+  "namespace": "graphql",
+  "description": "This document defines attributes for GraphQL.",
+  "attributes": {
+    "graphql.operation.name": {
+      "description": "The name of the operation being executed.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["findBookById"]
+    },
+    "graphql.operation.type": {
+      "description": "The type of the operation being executed.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["query", "mutation", "subscription"]
+    },
+    "graphql.document": {
+      "description": "The GraphQL document being executed.",
+      "type": "string",
+      "note": "The value may be sanitized to exclude sensitive information.",
+      "stability": "development",
+      "examples": ["query findBookById { bookById(id: ?) { name } }"]
+    }
+  }
+}

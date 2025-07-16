@@ -1,0 +1,43 @@
+{
+  "namespace": "user",
+  "description": "Describes information about the user.",
+  "attributes": {
+    "user.email": {
+      "description": "User email address.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["a.einstein@example.com"]
+    },
+    "user.full_name": {
+      "description": "User's full name\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["Albert Einstein"]
+    },
+    "user.hash": {
+      "description": "Unique user hash to correlate information for a user in anonymized form.\n",
+      "type": "string",
+      "note": "Useful if `user.id` or `user.name` contain confidential information and cannot be used.\n",
+      "stability": "development",
+      "examples": ["364fc68eaf4c8acec74a4e52d7d1feaa"]
+    },
+    "user.id": {
+      "description": "Unique identifier of the user.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["S-1-5-21-202424912787-2692429404-2351956786-1000"]
+    },
+    "user.name": {
+      "description": "Short name or login/username of the user.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["a.einstein"]
+    },
+    "user.roles": {
+      "description": "Array of user roles at the time of the event.\n",
+      "type": "string",
+      "stability": "development",
+      "examples": ["[\"admin\",\"reporting_user\"]"]
+    }
+  }
+}

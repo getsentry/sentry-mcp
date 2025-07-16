@@ -1,0 +1,12 @@
+{
+  "namespace": "cpython",
+  "description": "This document defines CPython related attributes.\n",
+  "attributes": {
+    "cpython.gc.generation": {
+      "description": "Value of the garbage collector collection generation.",
+      "type": "string",
+      "stability": "development",
+      "examples": ["0", "1", "2"]
+    }
+  }
+}
