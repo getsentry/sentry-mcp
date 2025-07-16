@@ -259,14 +259,13 @@ function buildSystemPrompt(
  * Create the otel-semantics-lookup tool for the AI agent
  */
 function createOtelLookupTool(
-  dataset: "spans" | "errors" | "logs",
   apiService: SentryApiService,
   organizationSlug: string,
   projectId?: string,
 ) {
   return tool({
     description:
-      "Look up OpenTelemetry semantic convention attributes for a specific namespace",
+      "Look up OpenTelemetry semantic convention attributes for a specific namespace. OpenTelemetry attributes are universal standards that work across all datasets.",
     parameters: z.object({
       namespace: z
         .string()
@@ -277,8 +276,13 @@ function createOtelLookupTool(
         .string()
         .optional()
         .describe("Optional search term to filter attributes"),
+      dataset: z
+        .enum(["spans", "errors", "logs"])
+        .describe(
+          "REQUIRED: Dataset to check attribute availability in. The agent MUST specify this based on their chosen dataset.",
+        ),
     }),
-    execute: async ({ namespace, searchTerm }) => {
+    execute: async ({ namespace, searchTerm, dataset }) => {
       return await lookupOtelSemantics(
         namespace,
         searchTerm,
@@ -309,8 +313,12 @@ function createDatasetAttributesTool(
     }),
     execute: async ({ dataset }) => {
       const { fetchCustomAttributes } = await import("./utils");
-      const { BASE_COMMON_FIELDS, DATASET_FIELDS, RECOMMENDED_FIELDS } =
-        await import("./config");
+      const {
+        BASE_COMMON_FIELDS,
+        DATASET_FIELDS,
+        RECOMMENDED_FIELDS,
+        NUMERIC_FIELDS,
+      } = await import("./config");
 
       // Get custom attributes for this dataset
       const { attributes: customAttributes, fieldTypes } =
@@ -330,6 +338,13 @@ function createDatasetAttributesTool(
 
       const recommendedFields = RECOMMENDED_FIELDS[dataset];
 
+      // Combine field types from both static config and dynamic API
+      const allFieldTypes = { ...fieldTypes };
+      const staticNumericFields = NUMERIC_FIELDS[dataset] || new Set();
+      for (const field of staticNumericFields) {
+        allFieldTypes[field] = "number";
+      }
+
       return `Dataset: ${dataset}
 
 Available Fields (${Object.keys(allFields).length} total):
@@ -342,11 +357,14 @@ ${Object.keys(allFields).length > 50 ? `\n... and ${Object.keys(allFields).lengt
 Recommended Fields for ${dataset}:
 ${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
 
-Field Types Available:
-${Object.entries(fieldTypes)
-  .slice(0, 20)
+Field Types (CRITICAL for aggregate functions):
+${Object.entries(allFieldTypes)
+  .slice(0, 30) // Show more field types since this is critical for validation
   .map(([key, type]) => `- ${key}: ${type}`)
   .join("\n")}
+${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldTypes).length - 30} more fields` : ""}
+
+IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
 
 Use this information to construct appropriate queries for the ${dataset} dataset.`;
     },
@@ -440,18 +458,17 @@ Please analyze the error and correct your approach. Common issues:
 Fix the issue and try again with the corrected query.`;
   }
 
-  // Create tools for the agent - note: otelLookupTool will use dataset from the agent's choice
+  // Create tools for the agent
   const datasetAttributesTool = createDatasetAttributesTool(
     apiService,
     organizationSlug,
     projectId,
   );
   const otelLookupTool = createOtelLookupTool(
-    "spans",
     apiService,
     organizationSlug,
     projectId,
-  ); // Default to spans, agent will specify
+  );
 
   // Use the AI SDK to translate the query with tools and structured output
   const result = await generateText({
