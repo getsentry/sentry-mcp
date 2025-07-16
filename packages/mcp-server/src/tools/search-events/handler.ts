@@ -12,19 +12,68 @@ import {
   ParamProjectSlug,
 } from "../../schema";
 import { translateQuery } from "./agent";
-import { fetchCustomAttributes } from "./utils";
 import {
   formatErrorResults,
   formatLogResults,
   formatSpanResults,
 } from "./formatters";
-import {
-  BASE_COMMON_FIELDS,
-  DATASET_FIELDS,
-  DATASET_CONFIGS,
-  NUMERIC_FIELDS,
-  RECOMMENDED_FIELDS,
-} from "./config";
+import { RECOMMENDED_FIELDS } from "./config";
+import { UserInputError } from "../../errors";
+import type { SentryApiService } from "../../api-client";
+
+/**
+ * Translate query with error feedback for self-correction
+ */
+async function translateQueryWithErrorFeedback(
+  params: {
+    naturalLanguageQuery: string;
+    organizationSlug: string;
+    projectId?: string;
+  },
+  apiService: SentryApiService,
+  organizationSlug: string,
+  projectId?: string,
+  maxRetries = 1,
+) {
+  let previousError: string | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await translateQuery(
+        params,
+        apiService,
+        organizationSlug,
+        projectId,
+        previousError,
+      );
+
+      // Log successful self-correction if this was a retry
+      if (previousError && attempt > 0) {
+        console.error(
+          `Search Events Agent successful self-correction: previousError=${previousError}, attempt=${attempt + 1}, originalQuery=${params.naturalLanguageQuery}, dataset=${result.dataset}, organizationSlug=${params.organizationSlug}, correctedQuery=${result.query}, correctedFields=${JSON.stringify(result.fields)}`,
+        );
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof UserInputError && attempt < maxRetries) {
+        // Log the error feedback scenario for monitoring and improvement
+        console.error(
+          `Search Events Agent error feedback: error=${error.message}, attempt=${attempt + 1}, maxRetries=${maxRetries + 1}, originalQuery=${params.naturalLanguageQuery}, organizationSlug=${params.organizationSlug}`,
+        );
+
+        // Feed the validation error back to the agent for self-correction
+        previousError = error.message;
+        continue;
+      }
+      // Re-throw if it's not a UserInputError or we've exceeded retries
+      throw error;
+    }
+  }
+
+  // This should never be reached due to the throw above, but TypeScript needs it
+  throw new Error("Unexpected error in translateQueryWithErrorFeedback");
+}
 
 export default defineTool({
   name: "search_events",
@@ -35,19 +84,21 @@ export default defineTool({
     "- Individual events with full details (default)",
     "- Aggregated results when using functions like count(), avg(), sum(), etc.",
     "",
-    "Datasets:",
+    "Dataset Selection (AI agent determines the appropriate dataset):",
     "- errors: Exception/crash events",
     "- logs: Log entries (use for 'error logs')",
-    "- spans: Performance/trace data",
+    "- spans: Performance/trace data, AI/LLM calls, token usage",
+    "",
+    "Intelligence: AI agent analyzes the query to choose the correct dataset and fields",
     "",
     "❌ DO NOT USE for 'issues' or 'problems' (use find_issues instead)",
     "",
     "📚 For detailed API patterns and examples, see: docs/search-events-api-patterns.md",
     "",
     "<examples>",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='database errors in the last hour', dataset='errors')",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='count of errors by type', dataset='errors')",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='slowest API calls', dataset='spans')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='database errors in the last hour')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='how many tokens used today')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='slowest API calls')",
     "</examples>",
   ].join("\n"),
   inputSchema: {
@@ -57,13 +108,6 @@ export default defineTool({
       .trim()
       .min(1)
       .describe("Natural language description of what you want to search for"),
-    dataset: z
-      .enum(["spans", "errors", "logs"])
-      .optional()
-      .default("errors")
-      .describe(
-        "The dataset to search in (errors for exceptions, spans for traces/performance, logs for log data)",
-      ),
     projectSlug: ParamProjectSlug.optional(),
     regionUrl: ParamRegionUrl.optional(),
     limit: z
@@ -88,8 +132,7 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
-    // Use errors dataset by default if not specified
-    const dataset = params.dataset || "errors";
+    // The agent will determine the dataset based on the query content
 
     // Convert project slug to ID if needed - we need this for attribute fetching
     let projectId: string | undefined;
@@ -107,72 +150,37 @@ export default defineTool({
       }
     }
 
-    // Get the dataset-specific fields
-    const datasetSpecificFields = DATASET_FIELDS[dataset];
-
-    // Fetch custom attributes based on dataset
-    const { attributes: customAttributes, fieldTypes: customFieldTypes } =
-      await fetchCustomAttributes(
-        apiService,
-        organizationSlug,
-        dataset,
-        projectId,
-      );
-
-    // Combine base fields, dataset-specific fields, and custom attributes
-    const allFields = {
-      ...BASE_COMMON_FIELDS,
-      ...datasetSpecificFields,
-      ...customAttributes,
-    };
-
-    // Build complete field type map
-    const allFieldTypes = new Map<string, "string" | "number">();
-
-    // Add known numeric fields
-    const datasetNumericFields = NUMERIC_FIELDS[dataset] || new Set();
-    for (const field of datasetNumericFields) {
-      allFieldTypes.set(field, "number");
-    }
-
-    // Add custom field types
-    for (const [field, type] of Object.entries(customFieldTypes)) {
-      allFieldTypes.set(field, type);
-    }
-
-    // Get dataset configuration
-    const datasetConfig = DATASET_CONFIGS[dataset] || DATASET_CONFIGS.spans;
-
-    // Get recommended fields for this dataset
-    const recommendedFields = RECOMMENDED_FIELDS[dataset];
-
-    // Translate the natural language query using AI
-    const parsed = await translateQuery(
+    // Translate the natural language query using Search Events Agent with error feedback
+    // The agent will determine the dataset and fetch the appropriate attributes
+    const parsed = await translateQueryWithErrorFeedback(
       {
         naturalLanguageQuery: params.naturalLanguageQuery,
-        dataset,
         organizationSlug,
         projectId,
-        allFields,
-        datasetConfig,
-        recommendedFields,
       },
       apiService,
       organizationSlug,
       projectId,
+      1, // Max 1 retry with error feedback
     );
 
-    // Handle AI errors first
+    // Get the dataset chosen by the agent
+    const dataset = parsed.dataset;
+
+    // Get recommended fields for this dataset (for fallback when no fields are provided)
+    const recommendedFields = RECOMMENDED_FIELDS[dataset];
+
+    // Handle Search Events Agent errors first
     if (parsed.error) {
       throw new Error(
-        `AI could not translate query "${params.naturalLanguageQuery}" for ${dataset} dataset. Error: ${parsed.error}. AI response: ${JSON.stringify(parsed, null, 2)}`,
+        `Search Events Agent could not translate query "${params.naturalLanguageQuery}" for ${dataset} dataset. Error: ${parsed.error}. Agent response: ${JSON.stringify(parsed, null, 2)}`,
       );
     }
 
     // Validate that sort parameter was provided
     if (!parsed.sort) {
-      throw new Error(
-        `AI response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}. The AI must specify how to sort results (e.g., '-timestamp' for newest first, '-count()' for highest count).`,
+      throw new UserInputError(
+        `Search Events Agent response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}. The agent must specify how to sort results (e.g., '-timestamp' for newest first, '-count()' for highest count).`,
       );
     }
 
@@ -194,7 +202,7 @@ export default defineTool({
       // For aggregate queries, fields must be provided and should only include
       // aggregate functions and groupBy fields
       if (!requestedFields || requestedFields.length === 0) {
-        throw new Error(
+        throw new UserInputError(
           `AI response missing required 'fields' for aggregate query. The AI must specify which fields to return. For aggregate queries, include only the aggregate functions (like count(), avg()) and groupBy fields.`,
         );
       }
@@ -209,46 +217,6 @@ export default defineTool({
 
     // Use the AI-provided sort parameter
     const sortParam = parsed.sort;
-
-    // Validate aggregate functions use appropriate field types
-    if (isAggregateQuery) {
-      const numericAggregateFunctions = [
-        "avg",
-        "sum",
-        "min",
-        "max",
-        "p50",
-        "p75",
-        "p90",
-        "p95",
-        "p99",
-        "p100",
-      ];
-
-      // Extract aggregate functions from fields array
-      const aggregateFunctions = fields.filter(
-        (field) => field.includes("(") && field.includes(")"),
-      );
-
-      for (const func of aggregateFunctions) {
-        // Extract function name and field from patterns like "avg(span.duration)"
-        const match = func.match(/^(\w+)\(([^)]+)\)$/);
-        if (match) {
-          const [, funcName, fieldName] = match;
-
-          // Check if this is a numeric function
-          if (numericAggregateFunctions.includes(funcName)) {
-            // Check if the field is numeric
-            const fieldType = allFieldTypes.get(fieldName);
-            if (fieldType !== "number") {
-              throw new Error(
-                `Invalid aggregate function: ${func}. The ${funcName}() function requires a numeric field, but "${fieldName}" is ${fieldType ? `a ${fieldType} field` : "not a known numeric field"}. Use count() or count_unique() for non-numeric fields.`,
-              );
-            }
-          }
-        }
-      }
-    }
 
     // Extract time range parameters from parsed response
     const timeParams: { statsPeriod?: string; start?: string; end?: string } =
@@ -303,10 +271,30 @@ export default defineTool({
       groupByFields,
     );
 
-    // Type-safe access to event data
-    // Since searchEvents returns unknown, we need to safely access the data property
-    const responseData = eventsResponse as { data?: unknown[] };
-    const eventData = (responseData.data || []) as Record<string, unknown>[];
+    // Type-safe access to event data with proper validation
+    function isValidResponse(
+      response: unknown,
+    ): response is { data?: unknown[] } {
+      return typeof response === "object" && response !== null;
+    }
+
+    function isValidEventArray(
+      data: unknown,
+    ): data is Record<string, unknown>[] {
+      return (
+        Array.isArray(data) &&
+        data.every((item) => typeof item === "object" && item !== null)
+      );
+    }
+
+    if (!isValidResponse(eventsResponse)) {
+      throw new Error("Invalid response format from Sentry API");
+    }
+
+    const eventData = eventsResponse.data;
+    if (!isValidEventArray(eventData)) {
+      throw new Error("Invalid event data format from Sentry API");
+    }
 
     // Format results based on dataset
     switch (dataset) {

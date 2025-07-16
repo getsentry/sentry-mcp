@@ -73,9 +73,9 @@ export async function fetchCustomAttributes(
       for (const attr of attributesResponse) {
         if (attr.key) {
           customAttributes[attr.key] = attr.name || attr.key;
-          // Track field type from the attribute response
-          if (attr.type) {
-            fieldTypes[attr.key] = attr.type as "string" | "number";
+          // Track field type from the attribute response with validation
+          if (attr.type && (attr.type === "string" || attr.type === "number")) {
+            fieldTypes[attr.key] = attr.type;
           }
         }
       }
