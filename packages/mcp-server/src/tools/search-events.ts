@@ -1329,7 +1329,7 @@ export default defineTool({
       (field) => field.includes("(") && field.includes(")"),
     );
     const groupByFields = fields.filter(
-      (field) => !field.includes("(") || !field.includes(")"),
+      (field) => !field.includes("(") && !field.includes(")"),
     );
 
     const explorerUrl = apiService.getEventsExplorerUrl(

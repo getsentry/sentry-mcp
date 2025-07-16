@@ -860,6 +860,132 @@ describe("search_events", () => {
     expect(result).toContain("Found 1 error:");
     expect(result).toContain("Latest error");
   });
+
+  it("should correctly filter groupByFields excluding malformed aggregate functions", async () => {
+    // Mock AI returning fields including a malformed aggregate function
+    mockGenerateObject.mockReset();
+    mockGenerateObject.mockResolvedValueOnce({
+      object: {
+        query: "",
+        fields: [
+          "span.op",
+          "count()",
+          "count(", // Malformed - missing closing parenthesis
+          "avg(span.duration", // Malformed - missing closing parenthesis
+          "span.description",
+        ],
+        sort: "-count()",
+      },
+      finishReason: "stop" as const,
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      warnings: [] as const,
+      request: {},
+      response: {
+        id: "test-response-id",
+        timestamp: new Date(),
+        modelId: "gpt-4o",
+      },
+      experimental_providerMetadata: undefined,
+      logprobs: undefined,
+      get providerMetadata() {
+        return this.response;
+      },
+      toJsonResponse: () => ({
+        object: {
+          query: "",
+          fields: [
+            "span.op",
+            "count()",
+            "count(",
+            "avg(span.duration",
+            "span.description",
+          ],
+          sort: "-count()",
+        },
+      }),
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        () => HttpResponse.json([]),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+
+          // Verify that only proper fields are included in the request
+          const fields = url.searchParams.getAll("field");
+          expect(fields).toContain("span.op");
+          expect(fields).toContain("count()");
+          expect(fields).toContain("count(");
+          expect(fields).toContain("avg(span.duration");
+          expect(fields).toContain("span.description");
+
+          return HttpResponse.json({
+            data: [
+              {
+                "span.op": "db.query",
+                "count()": 100,
+                "span.description": "SELECT * FROM users",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "aggregate query with malformed fields",
+        dataset: "spans",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        organizationSlug: "test-org",
+        userId: "1",
+      },
+    );
+
+    // The result should include the Sentry URL
+    expect(result).toContain("View these results in Sentry");
+
+    // Extract the URL from the result to verify groupByFields filtering
+    // Handle the fact that result could be a string or structured output
+    const resultText = typeof result === "string" ? result : result.toString();
+    const urlMatch = resultText.match(/https:\/\/[^\s]+/);
+    expect(urlMatch).toBeTruthy();
+
+    if (urlMatch) {
+      const url = new URL(urlMatch[0]);
+
+      // Verify that only fields without both parentheses are in groupBy
+      const aggregateFields = url.searchParams.getAll("aggregateField");
+
+      // Check that groupBy fields only include span.op and span.description
+      const groupByFields = aggregateFields
+        .map((field) => JSON.parse(decodeURIComponent(field)))
+        .filter((field) => field.groupBy)
+        .map((field) => field.groupBy);
+
+      expect(groupByFields).toContain("span.op");
+      expect(groupByFields).toContain("span.description");
+      expect(groupByFields).not.toContain("count(");
+      expect(groupByFields).not.toContain("avg(span.duration");
+
+      // Check that yAxes only includes properly formed aggregate functions
+      const yAxesFields = aggregateFields
+        .map((field) => JSON.parse(decodeURIComponent(field)))
+        .filter((field) => field.yAxes)
+        .flatMap((field) => field.yAxes);
+
+      expect(yAxesFields).toContain("count()");
+    }
+  });
 });
 
 // Integration test that uses real OpenAI API
