@@ -1108,7 +1108,11 @@ export class SentryApiService {
    *
    * @param params Query parameters
    * @param params.organizationSlug Organization identifier
-   * @param params.dataset Dataset to query tags for ("errors" or "search_issues")
+   * @param params.dataset Dataset to query tags for ("events", "errors" or "search_issues")
+   * @param params.project Numeric project ID to filter tags
+   * @param params.statsPeriod Time range for tag statistics (e.g., "24h", "7d")
+   * @param params.useCache Whether to use cached results
+   * @param params.useFlagsBackend Whether to use flags backend features
    * @param opts Request options
    * @returns Array of available tags with metadata
    *
@@ -1116,7 +1120,10 @@ export class SentryApiService {
    * ```typescript
    * const tags = await apiService.listTags({
    *   organizationSlug: "my-org",
-   *   dataset: "errors"
+   *   dataset: "events",
+   *   project: "123456",
+   *   statsPeriod: "24h",
+   *   useCache: true
    * });
    * tags.forEach(tag => console.log(`${tag.key}: ${tag.name}`));
    * ```
@@ -1125,17 +1132,54 @@ export class SentryApiService {
     {
       organizationSlug,
       dataset,
+      project,
+      statsPeriod,
+      start,
+      end,
+      useCache,
+      useFlagsBackend,
     }: {
       organizationSlug: string;
-      dataset?: "errors" | "search_issues";
+      dataset?: "events" | "errors" | "search_issues";
+      project?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      useCache?: boolean;
+      useFlagsBackend?: boolean;
     },
     opts?: RequestOptions,
   ): Promise<TagList> {
-    // TODO: this supports project in the query, but needs fixed
-    // to accept slugs
     const searchQuery = new URLSearchParams();
     if (dataset) {
       searchQuery.set("dataset", dataset);
+    }
+    if (project) {
+      searchQuery.set("project", project);
+    }
+    // Validate time parameters - can't use both relative and absolute
+    if (statsPeriod && (start || end)) {
+      throw new Error(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new Error(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+    // Use either relative time (statsPeriod) or absolute time (start/end)
+    if (statsPeriod) {
+      searchQuery.set("statsPeriod", statsPeriod);
+    } else if (start && end) {
+      searchQuery.set("start", start);
+      searchQuery.set("end", end);
+    }
+    if (useCache !== undefined) {
+      searchQuery.set("useCache", useCache ? "1" : "0");
+    }
+    if (useFlagsBackend !== undefined) {
+      searchQuery.set("useFlagsBackend", useFlagsBackend ? "1" : "0");
     }
 
     const body = await this.requestJSON(
@@ -1156,48 +1200,116 @@ export class SentryApiService {
    *
    * @param params Query parameters
    * @param params.organizationSlug Organization identifier
+   * @param params.itemType Item type to query attributes for ("spans" or "logs")
+   * @param params.project Numeric project ID to filter attributes
+   * @param params.statsPeriod Time range for attribute statistics (e.g., "24h", "7d")
    * @param opts Request options
-   * @returns Array of available attributes with metadata
+   * @returns Array of available attributes with metadata including type
    */
   async listTraceItemAttributes(
     {
       organizationSlug,
       itemType = "spans",
+      project,
+      statsPeriod,
+      start,
+      end,
     }: {
       organizationSlug: string;
       itemType?: "spans" | "logs";
+      project?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
     },
     opts?: RequestOptions,
-  ): Promise<any> {
+  ): Promise<Array<{ key: string; name: string; type: "string" | "number" }>> {
     // Fetch both string and number attributes
     const [stringAttributes, numberAttributes] = await Promise.all([
       this.fetchTraceItemAttributesByType(
         organizationSlug,
         itemType,
         "string",
+        project,
+        statsPeriod,
+        start,
+        end,
         opts,
       ),
       this.fetchTraceItemAttributesByType(
         organizationSlug,
         itemType,
         "number",
+        project,
+        statsPeriod,
+        start,
+        end,
         opts,
       ),
     ]);
 
-    // Combine and return all attributes
-    return [...stringAttributes, ...numberAttributes];
+    // Combine attributes with explicit type information
+    const allAttributes: Array<{
+      key: string;
+      name: string;
+      type: "string" | "number";
+    }> = [];
+
+    // Add string attributes
+    for (const attr of stringAttributes) {
+      allAttributes.push({
+        key: attr.key,
+        name: attr.name || attr.key,
+        type: "string",
+      });
+    }
+
+    // Add number attributes
+    for (const attr of numberAttributes) {
+      allAttributes.push({
+        key: attr.key,
+        name: attr.name || attr.key,
+        type: "number",
+      });
+    }
+
+    return allAttributes;
   }
 
   private async fetchTraceItemAttributesByType(
     organizationSlug: string,
     itemType: "spans" | "logs",
     attributeType: "string" | "number",
+    project?: string,
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
     opts?: RequestOptions,
   ): Promise<any> {
     const queryParams = new URLSearchParams();
     queryParams.set("itemType", itemType);
     queryParams.set("attributeType", attributeType);
+    if (project) {
+      queryParams.set("project", project);
+    }
+    // Validate time parameters - can't use both relative and absolute
+    if (statsPeriod && (start || end)) {
+      throw new Error(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new Error(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+    // Use either relative time (statsPeriod) or absolute time (start/end)
+    if (statsPeriod) {
+      queryParams.set("statsPeriod", statsPeriod);
+    } else if (start && end) {
+      queryParams.set("start", start);
+      queryParams.set("end", end);
+    }
 
     const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
 
@@ -1579,6 +1691,8 @@ export class SentryApiService {
     limit: number;
     projectSlug?: string;
     statsPeriod?: string;
+    start?: string;
+    end?: string;
     sort: string;
   }): URLSearchParams {
     const queryParams = new URLSearchParams();
@@ -1589,8 +1703,23 @@ export class SentryApiService {
     queryParams.set("referrer", "sentry-mcp");
     queryParams.set("dataset", "errors");
 
+    // Validate time parameters - can't use both relative and absolute
+    if (params.statsPeriod && (params.start || params.end)) {
+      throw new Error(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((params.start && !params.end) || (!params.start && params.end)) {
+      throw new Error(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+    // Use either relative time (statsPeriod) or absolute time (start/end)
     if (params.statsPeriod) {
       queryParams.set("statsPeriod", params.statsPeriod);
+    } else if (params.start && params.end) {
+      queryParams.set("start", params.start);
+      queryParams.set("end", params.end);
     }
 
     if (params.projectSlug) {
@@ -1636,6 +1765,8 @@ export class SentryApiService {
     projectSlug?: string;
     dataset: "spans" | "ourlogs";
     statsPeriod?: string;
+    start?: string;
+    end?: string;
     sort: string;
   }): URLSearchParams {
     const queryParams = new URLSearchParams();
@@ -1646,8 +1777,23 @@ export class SentryApiService {
     queryParams.set("referrer", "sentry-mcp");
     queryParams.set("dataset", params.dataset);
 
+    // Validate time parameters - can't use both relative and absolute
+    if (params.statsPeriod && (params.start || params.end)) {
+      throw new Error(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((params.start && !params.end) || (!params.start && params.end)) {
+      throw new Error(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+    // Use either relative time (statsPeriod) or absolute time (start/end)
     if (params.statsPeriod) {
       queryParams.set("statsPeriod", params.statsPeriod);
+    } else if (params.start && params.end) {
+      queryParams.set("start", params.start);
+      queryParams.set("end", params.end);
     }
 
     if (params.projectSlug) {
@@ -1703,6 +1849,8 @@ export class SentryApiService {
       projectSlug,
       dataset = "spans",
       statsPeriod,
+      start,
+      end,
       sort = "-timestamp",
     }: {
       organizationSlug: string;
@@ -1712,6 +1860,8 @@ export class SentryApiService {
       projectSlug?: string;
       dataset?: "spans" | "errors" | "ourlogs";
       statsPeriod?: string;
+      start?: string;
+      end?: string;
       sort?: string;
     },
     opts?: RequestOptions,
@@ -1726,6 +1876,8 @@ export class SentryApiService {
         limit,
         projectSlug,
         statsPeriod,
+        start,
+        end,
         sort,
       });
     } else {
@@ -1737,6 +1889,8 @@ export class SentryApiService {
         projectSlug,
         dataset,
         statsPeriod,
+        start,
+        end,
         sort,
       });
     }

@@ -10,25 +10,7 @@ vi.mock("@ai-sdk/openai", () => ({
 }));
 
 vi.mock("ai", () => ({
-  generateObject: vi.fn(() =>
-    Promise.resolve({
-      object: {
-        query: "mocked query",
-        fields: [
-          "issue",
-          "title",
-          "project",
-          "timestamp",
-          "level",
-          "message",
-          "error.type",
-          "culprit",
-        ],
-        sort: "-timestamp", // Added required sort parameter
-        // error field is undefined by default (success case)
-      },
-    }),
-  ),
+  generateObject: vi.fn(),
 }));
 
 describe("search_events", () => {
@@ -39,6 +21,7 @@ describe("search_events", () => {
     query: string,
     dataset: "errors" | "logs" | "spans" = "errors",
     errorMessage?: string,
+    customFields?: string[],
   ) => {
     const fieldSets = {
       errors: [
@@ -71,7 +54,11 @@ describe("search_events", () => {
 
     const object = errorMessage
       ? { error: errorMessage }
-      : { query, fields: fieldSets[dataset], sort: sortParams[dataset] };
+      : {
+          query,
+          fields: customFields || fieldSets[dataset],
+          sort: sortParams[dataset],
+        };
 
     return {
       object,
@@ -97,6 +84,10 @@ describe("search_events", () => {
     vi.clearAllMocks();
     // Set a mock API key for all tests since we're mocking the AI SDK
     process.env.OPENAI_API_KEY = "test-key";
+    // Set up default successful mock response
+    mockGenerateObject.mockResolvedValue(
+      mockAIResponse("mocked query", "errors"),
+    );
   });
 
   it("translates semantic query and returns results", async () => {
@@ -204,6 +195,7 @@ describe("search_events", () => {
 
       ## SELECT * FROM users WHERE timeout
 
+      **id**: span1
       **span.op**: db.query
       **span.description**: SELECT * FROM users WHERE timeout
       **transaction**: /api/checkout
@@ -215,6 +207,7 @@ describe("search_events", () => {
 
       ## GET user:session:timeout
 
+      **id**: span2
       **span.op**: cache.get
       **span.description**: GET user:session:timeout
       **transaction**: /api/checkout
@@ -614,9 +607,24 @@ describe("search_events", () => {
   });
 
   it("handles timestamp queries with correct format", async () => {
-    // Test that timestamp queries use the correct format
+    // Clear the default mock and set up the specific one for this test
+    mockGenerateObject.mockReset();
     mockGenerateObject.mockResolvedValueOnce(
-      mockAIResponse('message:"timeout" AND timestamp:-1h', "errors"),
+      mockAIResponse(
+        'message:"timeout" AND timestamp:-1h',
+        "errors",
+        undefined,
+        [
+          "issue",
+          "title",
+          "project",
+          "timestamp",
+          "level",
+          "message",
+          "error.type",
+          "culprit",
+        ],
+      ),
     );
 
     mswServer.use(
@@ -728,6 +736,7 @@ describe("search_events", () => {
 
   it("should handle AI error responses gracefully", async () => {
     // Mock AI returning an error
+    mockGenerateObject.mockReset();
     mockGenerateObject.mockResolvedValueOnce(
       mockAIResponse(
         "",
@@ -752,17 +761,27 @@ describe("search_events", () => {
         },
       ),
     ).rejects.toThrow(
-      /AI could not translate query "some impossible query" for errors dataset.*Cannot translate this query - it's too ambiguous/,
+      'AI could not translate query "some impossible query" for errors dataset. Error: Cannot translate this query - it\'s too ambiguous',
     );
   });
 
   it("should handle missing query from AI by using empty query", async () => {
     // Mock AI returning no query - using a custom object that doesn't include query
+    mockGenerateObject.mockReset();
     mockGenerateObject.mockResolvedValueOnce({
       object: {
-        fields: ["timestamp", "message"],
+        fields: [
+          "timestamp",
+          "project",
+          "message",
+          "level",
+          "issue",
+          "error.type",
+          "culprit",
+          "title",
+        ],
         sort: "-timestamp",
-        // No query field
+        // No query field - will default to empty string
       },
       finishReason: "stop" as const,
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
@@ -778,7 +797,21 @@ describe("search_events", () => {
       get providerMetadata() {
         return this.response;
       },
-      toJsonResponse: () => ({ object: { fields: ["timestamp", "message"] } }),
+      toJsonResponse: () => ({
+        object: {
+          fields: [
+            "timestamp",
+            "project",
+            "message",
+            "level",
+            "issue",
+            "error.type",
+            "culprit",
+            "title",
+          ],
+          sort: "-timestamp",
+        },
+      }),
     } as any);
 
     mswServer.use(
@@ -826,6 +859,132 @@ describe("search_events", () => {
 
     expect(result).toContain("Found 1 error:");
     expect(result).toContain("Latest error");
+  });
+
+  it("should correctly filter groupByFields excluding malformed aggregate functions", async () => {
+    // Mock AI returning fields including a malformed aggregate function
+    mockGenerateObject.mockReset();
+    mockGenerateObject.mockResolvedValueOnce({
+      object: {
+        query: "",
+        fields: [
+          "span.op",
+          "count()",
+          "count(", // Malformed - missing closing parenthesis
+          "avg(span.duration", // Malformed - missing closing parenthesis
+          "span.description",
+        ],
+        sort: "-count()",
+      },
+      finishReason: "stop" as const,
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      warnings: [] as const,
+      request: {},
+      response: {
+        id: "test-response-id",
+        timestamp: new Date(),
+        modelId: "gpt-4o",
+      },
+      experimental_providerMetadata: undefined,
+      logprobs: undefined,
+      get providerMetadata() {
+        return this.response;
+      },
+      toJsonResponse: () => ({
+        object: {
+          query: "",
+          fields: [
+            "span.op",
+            "count()",
+            "count(",
+            "avg(span.duration",
+            "span.description",
+          ],
+          sort: "-count()",
+        },
+      }),
+    } as any);
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        () => HttpResponse.json([]),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+
+          // Verify that only proper fields are included in the request
+          const fields = url.searchParams.getAll("field");
+          expect(fields).toContain("span.op");
+          expect(fields).toContain("count()");
+          expect(fields).toContain("count(");
+          expect(fields).toContain("avg(span.duration");
+          expect(fields).toContain("span.description");
+
+          return HttpResponse.json({
+            data: [
+              {
+                "span.op": "db.query",
+                "count()": 100,
+                "span.description": "SELECT * FROM users",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "aggregate query with malformed fields",
+        dataset: "spans",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        organizationSlug: "test-org",
+        userId: "1",
+      },
+    );
+
+    // The result should include the Sentry URL
+    expect(result).toContain("View these results in Sentry");
+
+    // Extract the URL from the result to verify groupByFields filtering
+    // Handle the fact that result could be a string or structured output
+    const resultText = typeof result === "string" ? result : result.toString();
+    const urlMatch = resultText.match(/https:\/\/[^\s]+/);
+    expect(urlMatch).toBeTruthy();
+
+    if (urlMatch) {
+      const url = new URL(urlMatch[0]);
+
+      // Verify that only fields without both parentheses are in groupBy
+      const aggregateFields = url.searchParams.getAll("aggregateField");
+
+      // Check that groupBy fields only include span.op and span.description
+      const groupByFields = aggregateFields
+        .map((field) => JSON.parse(decodeURIComponent(field)))
+        .filter((field) => field.groupBy)
+        .map((field) => field.groupBy);
+
+      expect(groupByFields).toContain("span.op");
+      expect(groupByFields).toContain("span.description");
+      expect(groupByFields).not.toContain("count(");
+      expect(groupByFields).not.toContain("avg(span.duration");
+
+      // Check that yAxes only includes properly formed aggregate functions
+      const yAxesFields = aggregateFields
+        .map((field) => JSON.parse(decodeURIComponent(field)))
+        .filter((field) => field.yAxes)
+        .flatMap((field) => field.yAxes);
+
+      expect(yAxesFields).toContain("count()");
+    }
   });
 });
 

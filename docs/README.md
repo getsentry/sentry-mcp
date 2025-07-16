@@ -24,6 +24,7 @@ This directory serves a dual purpose:
 - `adding-prompts.mdc` - Guidelines for adding new prompts
 - `adding-new-resources.mdc` - How to add new MCP resources
 - `api-client-patterns.mdc` - Working with the Sentry API client
+- `search-events-api-patterns.md` - Comprehensive guide to search_events API patterns
 - `using-api-mocks.mdc` - Testing with API mocks
 
 ### Infrastructure and Operations
