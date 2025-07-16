@@ -20,6 +20,7 @@ import {
 import { RECOMMENDED_FIELDS } from "./config";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
+import { ApiError } from "../../api-client";
 import { logError } from "../../logging";
 
 /**
@@ -248,23 +249,38 @@ export default defineTool({
       timeParams.statsPeriod = "14d";
     }
 
-    const eventsResponse = await withApiErrorHandling(
-      () =>
-        apiService.searchEvents({
+    let eventsResponse: unknown;
+    try {
+      eventsResponse = await withApiErrorHandling(
+        () =>
+          apiService.searchEvents({
+            organizationSlug,
+            query: sentryQuery,
+            fields,
+            limit: params.limit,
+            projectSlug: projectId, // API requires numeric project ID, not slug
+            dataset: dataset === "logs" ? "ourlogs" : dataset,
+            sort: sortParam,
+            ...timeParams, // Spread the time parameters
+          }),
+        {
           organizationSlug,
-          query: sentryQuery,
-          fields,
-          limit: params.limit,
-          projectSlug: projectId, // API requires numeric project ID, not slug
-          dataset: dataset === "logs" ? "ourlogs" : dataset,
-          sort: sortParam,
-          ...timeParams, // Spread the time parameters
-        }),
-      {
-        organizationSlug,
-        projectSlug: params.projectSlug,
-      },
-    );
+          projectSlug: params.projectSlug,
+        },
+      );
+    } catch (error) {
+      // Convert API validation errors to UserInputError for agent self-correction
+      if (
+        error instanceof ApiError &&
+        (error.status === 400 || error.status === 422)
+      ) {
+        // 400 Bad Request and 422 Unprocessable Entity typically indicate input validation issues
+        throw new UserInputError(error.message);
+      }
+
+      // Re-throw other errors (5xx, network errors, etc.) as-is
+      throw error;
+    }
 
     // Generate the Sentry explorer URL with structured aggregate information
     // Derive aggregate functions and groupBy fields from the fields array
