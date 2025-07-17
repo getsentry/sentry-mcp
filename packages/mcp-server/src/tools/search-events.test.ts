@@ -310,12 +310,16 @@ describe("search_events", () => {
 
   it("should correctly handle user agent queries", async () => {
     // Mock AI response for user agent query in spans dataset
-    mockGenerateText.mockResolvedValueOnce(
-      mockAIResponse("spans", "has:user_agent.original", [
-        "user_agent.original",
-        "count()",
-      ]),
-    );
+    mockGenerateText.mockResolvedValueOnce({
+      experimental_output: {
+        dataset: "spans",
+        query: "has:mcp.tool.name AND has:user_agent.original",
+        fields: ["user_agent.original", "count()"],
+        sort: "-count()",
+        timeRange: { statsPeriod: "24h" },
+      },
+      warnings: [],
+    });
 
     // Mock the Sentry API response
     mswServer.use(
@@ -324,7 +328,11 @@ describe("search_events", () => {
         ({ request }) => {
           const url = new URL(request.url);
           expect(url.searchParams.get("dataset")).toBe("spans");
-          expect(url.searchParams.get("query")).toBe("has:user_agent.original");
+          expect(url.searchParams.get("query")).toBe(
+            "has:mcp.tool.name AND has:user_agent.original",
+          );
+          expect(url.searchParams.get("sort")).toBe("-count"); // API transforms count() to count
+          expect(url.searchParams.get("statsPeriod")).toBe("24h");
           // Verify it's using user_agent.original, not user.id
           expect(url.searchParams.getAll("field")).toContain(
             "user_agent.original",
