@@ -1,0 +1,22 @@
+name: OnlyRobots PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    environment: Actions
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: getsentry/action-onlyrobots@v1.1.0
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
