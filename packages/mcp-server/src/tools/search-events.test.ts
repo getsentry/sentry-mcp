@@ -308,6 +308,77 @@ describe("search_events", () => {
     ).rejects.toThrow("missing required 'sort' parameter");
   });
 
+  it("should correctly handle user agent queries", async () => {
+    // Mock AI response for user agent query in spans dataset
+    mockGenerateText.mockResolvedValueOnce({
+      experimental_output: {
+        dataset: "spans",
+        query: "has:mcp.tool.name AND has:user_agent.original",
+        fields: ["user_agent.original", "count()"],
+        sort: "-count()",
+        timeRange: { statsPeriod: "24h" },
+      },
+      warnings: [],
+    });
+
+    // Mock the Sentry API response
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(
+            "has:mcp.tool.name AND has:user_agent.original",
+          );
+          expect(url.searchParams.get("sort")).toBe("-count"); // API transforms count() to count
+          expect(url.searchParams.get("statsPeriod")).toBe("24h");
+          // Verify it's using user_agent.original, not user.id
+          expect(url.searchParams.getAll("field")).toContain(
+            "user_agent.original",
+          );
+          expect(url.searchParams.getAll("field")).toContain("count()");
+          return HttpResponse.json({
+            data: [
+              {
+                "user_agent.original":
+                  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                "count()": 150,
+              },
+              {
+                "user_agent.original":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "count()": 120,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery:
+          "which user agents have the most tool calls yesterday",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalled();
+    expect(result).toContain("Mozilla/5.0");
+    expect(result).toContain("150");
+    expect(result).toContain("120");
+    // Should NOT contain user.id references
+    expect(result).not.toContain("user.id");
+  });
+
   it.skip("integration test - should work with real OpenAI API", async () => {
     // This test is skipped by default but can be enabled for integration testing
     // Requires real OPENAI_API_KEY environment variable
