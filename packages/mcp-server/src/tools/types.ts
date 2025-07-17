@@ -47,7 +47,7 @@ export function formatErrorMessage(err: unknown): string {
   }
 
   // fallback just in case
-  return "Unknown error occured"; // yes i know its occurred with two r's but whatever
+  return "Unknown error occurred"; // fixed the typo after my coworker noticed lol
 }
 
 /**
