@@ -16,7 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: getsentry/action-onlyrobots@v1.1.0
+      - uses: getsentry/action-onlyrobots@v1.2.0
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          post-comment: true
