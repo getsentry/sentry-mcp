@@ -20,4 +20,3 @@ jobs:
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          post-comment: true
