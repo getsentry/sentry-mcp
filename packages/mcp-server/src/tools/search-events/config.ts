@@ -228,6 +228,18 @@ export const DATASET_CONFIGS = {
     "query": "",
     "fields": ["title", "count()"],
     "sort": "-count()"
+  }
+- "errors by browser" → 
+  {
+    "query": "has:user_agent.original",
+    "fields": ["user_agent.original", "count()"],
+    "sort": "-count()"
+  }
+- "which user agents have the most errors" → 
+  {
+    "query": "level:error AND has:user_agent.original",
+    "fields": ["user_agent.original", "count()", "count_unique(user.id)"],
+    "sort": "-count()"
   }`,
   },
   logs: {
@@ -410,6 +422,25 @@ Query Patterns:
     "fields": ["sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)", "count()"],
     "sort": "-sum(gen_ai.usage.input_tokens)",
     "timeRange": {"statsPeriod": "7d"}
+  }
+- "which user agents have the most tool calls yesterday" → 
+  {
+    "query": "has:mcp.tool.name AND has:user_agent.original",
+    "fields": ["user_agent.original", "count()"],
+    "sort": "-count()",
+    "timeRange": {"statsPeriod": "24h"}
+  }
+- "top 10 browsers by API calls" → 
+  {
+    "query": "has:http.method AND has:user_agent.original",
+    "fields": ["user_agent.original", "count()"],
+    "sort": "-count()"
+  }
+- "most common clients making database queries" → 
+  {
+    "query": "has:db.statement AND has:user_agent.original",
+    "fields": ["user_agent.original", "count()", "avg(span.duration)"],
+    "sort": "-count()"
   }`,
   },
 };

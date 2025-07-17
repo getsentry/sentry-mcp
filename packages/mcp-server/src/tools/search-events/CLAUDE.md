@@ -50,6 +50,12 @@ The module has deep knowledge of OpenTelemetry semantic conventions:
 - **k8s.*** - Kubernetes attributes
 - **mcp.*** - Model Context Protocol attributes (custom)
 
+## User Agent Field Mapping
+
+- **user_agent.original** - Contains the raw user agent string from browsers/clients
+- Common queries: "user agents", "browsers", "clients" all map to `user_agent.original`
+- The AI agent is specifically trained to avoid mapping these to `user.id` fields
+
 ## Important Notes
 
 - "Agent calls" refers to OpenTelemetry GenAI semantic conventions (`gen_ai.*` attributes), NOT MCP tool calls (`mcp.*` attributes)

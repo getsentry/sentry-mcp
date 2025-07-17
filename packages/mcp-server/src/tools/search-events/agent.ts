@@ -57,6 +57,7 @@ IMPORTANT SEMANTIC CONVENTIONS:
 - "database queries" → use db.* attributes
 - "HTTP requests", "API calls" → use http.* attributes
 - "token usage", "tokens used", "input tokens", "output tokens" → use gen_ai.usage.* attributes
+- "user agents", "user agent strings", "browser", "client" → use user_agent.original attribute
 
 CRITICAL TOOL USAGE: You have access to the otelSemantics tool to look up OpenTelemetry semantic convention attributes. Use this tool when:
 - The query asks about concepts that should have OpenTelemetry attributes but you don't see them in the available fields
@@ -68,6 +69,7 @@ WHEN TO USE THE TOOL:
 - "database queries", "SQL", "DB operations" → call otelSemantics with namespace "db"
 - "HTTP requests", "API calls", "web requests" → call otelSemantics with namespace "http"
 - "tool calls", "MCP calls" → call otelSemantics with namespace "mcp"
+- "user agents", "browser", "client", "user agent strings" → call datasetAttributes to find user_agent fields
 
 IMPORTANT: Always use the tool to get the exact attribute names before constructing your query, especially for mathematical operations like sum(gen_ai.usage.input_tokens).
 
@@ -400,13 +402,14 @@ export async function translateQuery(
 5. Decide which fields to return in the results
 
 DATASET SELECTION GUIDELINES:
-- spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics
-- errors: Exceptions, crashes, error messages, stack traces, unhandled errors
+- spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics, user agent data
+- errors: Exceptions, crashes, error messages, stack traces, unhandled errors, browser/client errors
 - logs: Log entries, log messages, severity levels, debugging information
 
 CRITICAL TOOL USAGE:
 1. Use datasetAttributes tool to discover what fields are available for your chosen dataset
 2. Use otelSemantics tool when you need specific OpenTelemetry attributes (gen_ai.*, db.*, http.*, etc.)
+3. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - ALWAYS use the datasetAttributes tool to find the correct field name (typically user_agent.original) instead of assuming it's related to user.id
 
 QUERY MODES:
 1. INDIVIDUAL EVENTS (default): Returns raw event data
