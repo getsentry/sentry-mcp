@@ -116,6 +116,11 @@ export default defineTool({
     "search_events(organizationSlug='my-org', naturalLanguageQuery='how many tokens used today')",
     "search_events(organizationSlug='my-org', naturalLanguageQuery='slowest API calls')",
     "</examples>",
+    "",
+    "<hints>",
+    "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.",
+    "- Parse org/project notation directly without calling find_organizations or find_projects.",
+    "</hints>",
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
