@@ -63,6 +63,7 @@
       "default": "./dist/resources.js"
     },
     "./toolDefinitions": {
+      "types": "./dist/toolDefinitions.ts",
       "default": "./dist/toolDefinitions.js"
     },
     "./types": {
@@ -75,9 +76,8 @@
     }
   },
   "scripts": {
-    "prebuild": "pnpm run generate-otel-data-bundle",
+    "prebuild": "pnpm run generate-tool-definitions",
     "build": "tsdown",
-    "postbuild": "pnpm run generate-tool-definitions",
     "dev": "pnpm run generate-tool-definitions && tsc -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
@@ -86,8 +86,7 @@
     "tsc": "tsc --noEmit",
     "test:watch": "vitest watch",
     "generate-tool-definitions": "tsx scripts/generate-tool-definitions.ts",
-    "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts",
-    "generate-otel-data-bundle": "tsx scripts/generate-otel-data-bundle.ts"
+    "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts"
   },
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",

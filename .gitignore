@@ -62,5 +62,4 @@ coverage
 .env.sentry-build-plugin
 
 # Generated files
-packages/mcp-server/src/tools/search-events/tools/data/otel-data-bundle.ts
-packages/mcp-server/src/tools/search-events/tools/otel-semantics-lookup.original.ts
+packages/mcp-server/src/toolDefinitions.json
