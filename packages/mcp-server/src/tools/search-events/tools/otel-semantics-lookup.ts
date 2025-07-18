@@ -161,7 +161,7 @@ interface NamespaceData {
     {
       description: string;
       type: string;
-      examples?: Array<string | number | boolean>;
+      examples?: Array<any>;
       note?: string;
       stability?: string;
     }
@@ -232,7 +232,14 @@ export async function lookupOtelSemantics(
     }
 
     if (attr.examples && attr.examples.length > 0) {
-      response += `- **Examples:** ${attr.examples.map((ex) => `\`${ex}\``).join(", ")}\n`;
+      response += `- **Examples:** ${attr.examples
+        .map((ex) => {
+          // Handle complex types that might need stringification
+          const exStr =
+            typeof ex === "object" ? JSON.stringify(ex) : String(ex);
+          return `\`${exStr}\``;
+        })
+        .join(", ")}\n`;
     }
 
     if (attr.note) {

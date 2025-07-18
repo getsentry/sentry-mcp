@@ -112,7 +112,12 @@
           },
           {
             "type": "string",
-            "enum": ["last_seen", "first_seen", "count", "userCount"],
+            "enum": [
+              "last_seen",
+              "first_seen",
+              "count",
+              "userCount"
+            ],
             "description": "Sort the results either by the last time they occurred, the first time they occurred, the count of occurrences, or the number of users affected."
           }
         ],
