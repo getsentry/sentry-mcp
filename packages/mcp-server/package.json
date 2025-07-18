@@ -75,16 +75,19 @@
     }
   },
   "scripts": {
-    "build": "tsdown && pnpm run generate-tool-definitions",
+    "prebuild": "pnpm run generate-otel-data-bundle",
+    "build": "tsdown",
+    "postbuild": "pnpm run generate-tool-definitions",
     "dev": "pnpm run generate-tool-definitions && tsc -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
-    "test": "pnpm run generate-tool-definitions && vitest",
-    "test:ci": "pnpm run generate-tool-definitions && vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
+    "test": "vitest",
+    "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "tsc": "tsc --noEmit",
     "test:watch": "vitest watch",
     "generate-tool-definitions": "tsx scripts/generate-tool-definitions.ts",
-    "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts"
+    "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts",
+    "generate-otel-data-bundle": "tsx scripts/generate-otel-data-bundle.ts"
   },
   "devDependencies": {
     "@sentry/mcp-server-mocks": "workspace:*",
