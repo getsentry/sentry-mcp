@@ -1,101 +1,173 @@
 import type { SentryApiService } from "../../../api-client";
-import { logError } from "../../../logging";
-import { z } from "zod";
 
-// Import the bundled data (will be generated at build time)
-import { namespaceDataBundle, namespacesIndex } from "./data/otel-data-bundle";
+// Import all JSON files directly
+import android from "./data/android.json";
+import app from "./data/app.json";
+import artifact from "./data/artifact.json";
+import aspnetcore from "./data/aspnetcore.json";
+import aws from "./data/aws.json";
+import azure from "./data/azure.json";
+import browser from "./data/browser.json";
+import cassandra from "./data/cassandra.json";
+import cicd from "./data/cicd.json";
+import client from "./data/client.json";
+import cloud from "./data/cloud.json";
+import cloudevents from "./data/cloudevents.json";
+import cloudfoundry from "./data/cloudfoundry.json";
+import code from "./data/code.json";
+import container from "./data/container.json";
+import cpu from "./data/cpu.json";
+import cpython from "./data/cpython.json";
+import database from "./data/database.json";
+import db from "./data/db.json";
+import deployment from "./data/deployment.json";
+import destination from "./data/destination.json";
+import device from "./data/device.json";
+import disk from "./data/disk.json";
+import dns from "./data/dns.json";
+import dotnet from "./data/dotnet.json";
+import elasticsearch from "./data/elasticsearch.json";
+import enduser from "./data/enduser.json";
+import error from "./data/error.json";
+import faas from "./data/faas.json";
+import feature_flags from "./data/feature_flags.json";
+import file from "./data/file.json";
+import gcp from "./data/gcp.json";
+import gen_ai from "./data/gen_ai.json";
+import geo from "./data/geo.json";
+import go from "./data/go.json";
+import graphql from "./data/graphql.json";
+import hardware from "./data/hardware.json";
+import heroku from "./data/heroku.json";
+import host from "./data/host.json";
+import http from "./data/http.json";
+import ios from "./data/ios.json";
+import jvm from "./data/jvm.json";
+import k8s from "./data/k8s.json";
+import linux from "./data/linux.json";
+import log from "./data/log.json";
+import mcp from "./data/mcp.json";
+import messaging from "./data/messaging.json";
+import network from "./data/network.json";
+import nodejs from "./data/nodejs.json";
+import oci from "./data/oci.json";
+import opentracing from "./data/opentracing.json";
+import os from "./data/os.json";
+import otel from "./data/otel.json";
+import peer from "./data/peer.json";
+import process from "./data/process.json";
+import profile from "./data/profile.json";
+import rpc from "./data/rpc.json";
+import server from "./data/server.json";
+import service from "./data/service.json";
+import session from "./data/session.json";
+import signalr from "./data/signalr.json";
+import source from "./data/source.json";
+import system from "./data/system.json";
+import telemetry from "./data/telemetry.json";
+import test from "./data/test.json";
+import thread from "./data/thread.json";
+import tls from "./data/tls.json";
+import url from "./data/url.json";
+import user from "./data/user.json";
+import v8js from "./data/v8js.json";
+import vcs from "./data/vcs.json";
+import webengine from "./data/webengine.json";
+import zos from "./data/zos.json";
 
-// Zod schemas for type-safe JSON parsing
-const AttributeSchema = z.object({
-  description: z.string(),
-  type: z.string(),
-  examples: z
-    .array(z.any())
-    .transform((arr) =>
-      arr.map((v) => (Array.isArray(v) ? JSON.stringify(v) : v.toString())),
-    )
-    .optional(),
-  note: z.string().optional(),
-  stability: z.string().optional(),
-});
+// Create the namespaceData object
+const namespaceData: Record<string, NamespaceData> = {
+  android,
+  app,
+  artifact,
+  aspnetcore,
+  aws,
+  azure,
+  browser,
+  cassandra,
+  cicd,
+  client,
+  cloud,
+  cloudevents,
+  cloudfoundry,
+  code,
+  container,
+  cpu,
+  cpython,
+  database,
+  db,
+  deployment,
+  destination,
+  device,
+  disk,
+  dns,
+  dotnet,
+  elasticsearch,
+  enduser,
+  error,
+  faas,
+  feature_flags,
+  file,
+  gcp,
+  gen_ai,
+  geo,
+  go,
+  graphql,
+  hardware,
+  heroku,
+  host,
+  http,
+  ios,
+  jvm,
+  k8s,
+  linux,
+  log,
+  mcp,
+  messaging,
+  network,
+  nodejs,
+  oci,
+  opentracing,
+  os,
+  otel,
+  peer,
+  process,
+  profile,
+  rpc,
+  server,
+  service,
+  session,
+  signalr,
+  source,
+  system,
+  telemetry,
+  test,
+  thread,
+  tls,
+  url,
+  user,
+  v8js,
+  vcs,
+  webengine,
+  zos,
+};
 
-const NamespaceDataSchema = z.object({
-  namespace: z.string(),
-  description: z.string(),
-  attributes: z.record(z.string(), AttributeSchema),
-  custom: z.boolean().optional(),
-});
-
-const NamespacesIndexSchema = z.object({
-  generated: z.string(),
-  totalNamespaces: z.number(),
-  namespaces: z.array(
-    z.object({
-      namespace: z.string(),
-      description: z.string(),
-      custom: z.boolean().optional(),
-    }),
-  ),
-});
-
-// TypeScript types inferred from Zod schemas
-type NamespaceData = z.infer<typeof NamespaceDataSchema>;
-type NamespacesIndex = z.infer<typeof NamespacesIndexSchema>;
-
-// Cache for parsed data
-let parsedNamespaceData: Record<string, NamespaceData> | null = null;
-let parsedIndex: NamespacesIndex | null = null;
-
-// Load all namespace data from bundled module
-function loadNamespaceData(): Record<string, NamespaceData> {
-  if (parsedNamespaceData) {
-    return parsedNamespaceData;
-  }
-
-  const data: Record<string, NamespaceData> = {};
-
-  for (const [key, value] of Object.entries(namespaceDataBundle)) {
-    try {
-      const parsed = NamespaceDataSchema.parse(value);
-      data[key] = parsed;
-    } catch (error) {
-      logError({
-        message: `Failed to parse namespace data for ${key}`,
-        error,
-      });
+// TypeScript types
+interface NamespaceData {
+  namespace: string;
+  description: string;
+  attributes: Record<
+    string,
+    {
+      description: string;
+      type: string;
+      examples?: Array<string | number | boolean>;
+      note?: string;
+      stability?: string;
     }
-  }
-
-  parsedNamespaceData = data;
-  return data;
+  >;
+  custom?: boolean;
 }
-
-// Load namespaces index
-function loadNamespacesIndex(): NamespacesIndex | null {
-  if (parsedIndex) {
-    return parsedIndex;
-  }
-
-  try {
-    parsedIndex = NamespacesIndexSchema.parse(namespacesIndex);
-    return parsedIndex;
-  } catch (error) {
-    logError({
-      message: "Failed to parse namespaces index",
-      error,
-    });
-    return null;
-  }
-}
-
-// Initialize data
-const namespaceData = loadNamespaceData();
-const index = loadNamespacesIndex();
-
-// Create a namespace description lookup
-const namespaceDescriptions = new Map<string, string>(
-  index?.namespaces.map((ns) => [ns.namespace, ns.description]) || [],
-);
 
 /**
  * Lookup OpenTelemetry semantic convention attributes for a given namespace

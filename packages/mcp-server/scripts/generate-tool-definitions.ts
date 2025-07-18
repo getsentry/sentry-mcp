@@ -19,8 +19,8 @@ import { z } from "zod";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Import tools from the source directory
-const tools = await import("../src/tools/index.js");
+// Import tools from the source directory (TypeScript)
+const tools = await import("../src/tools/index.ts");
 
 /**
  * Convert Zod schema object to JSON Schema properties
@@ -50,7 +50,7 @@ function generateToolDefinitions() {
   const toolsDefault = tools.default;
 
   if (!toolsDefault || typeof toolsDefault !== "object") {
-    throw new Error("Failed to import tools from src/tools/index.js");
+    throw new Error("Failed to import tools from src/tools/index.ts");
   }
 
   return Object.entries(toolsDefault).map(([key, tool]) => {
@@ -90,45 +90,9 @@ async function main() {
 
     const definitions = generateToolDefinitions();
 
-    // Ensure dist directory exists
-    const distDir = path.join(__dirname, "../dist");
-    if (!fs.existsSync(distDir)) {
-      fs.mkdirSync(distDir, { recursive: true });
-    }
-
-    // Write the definitions to JavaScript file
-    const outputPath = path.join(distDir, "toolDefinitions.js");
-    const jsContent = `export default ${JSON.stringify(definitions, null, 2)};`;
-    fs.writeFileSync(outputPath, jsContent);
-
-    // Write TypeScript declaration file
-    const dtsPath = path.join(distDir, "toolDefinitions.d.ts");
-    const dtsContent = `// JSON Schema property type definition
-export interface JsonSchemaProperty {
-  type: string;
-  description: string;
-  enum?: string[];
-  default?: any;
-  format?: string;
-  minLength?: number;
-  maxLength?: number;
-  minimum?: number;
-  maximum?: number;
-}
-
-// Tool definition interface with proper JSON Schema types
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  inputSchema: Record<string, JsonSchemaProperty>;
-}
-
-// Array of tool definitions with proper typing
-export type ToolDefinitions = ToolDefinition[];
-
-declare const toolDefinitions: ToolDefinitions;
-export default toolDefinitions;`;
-    fs.writeFileSync(dtsPath, dtsContent);
+    // Write the definitions to JSON file in src directory for prebuild bundling
+    const outputPath = path.join(__dirname, "../src/toolDefinitions.json");
+    fs.writeFileSync(outputPath, JSON.stringify(definitions, null, 2));
 
     console.log(
       `✅ Generated tool definitions for ${definitions.length} tools`,
