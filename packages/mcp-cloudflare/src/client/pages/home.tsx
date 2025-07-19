@@ -155,39 +155,39 @@ export default function Home({ onChatClick }: HomeProps) {
             organization, otherwise you should mention it in the prompt.
           </Note>
           <Accordion type="single" collapsible className="w-full space-y-1">
-            {TOOL_DEFINITIONS.sort((a: ToolDefinition, b: ToolDefinition) =>
-              a.name.localeCompare(b.name),
-            ).map((tool: ToolDefinition) => (
-              <AccordionItem value={tool.name} key={tool.name}>
-                <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
-                  {tool.name}
-                </AccordionTrigger>
-                <AccordionContent className="py-4">
-                  <Prose>
-                    <p className="mb-0">{tool.description.split("\n")[0]}</p>
-                  </Prose>
-                  {tool.inputSchema &&
-                  Object.keys(tool.inputSchema).length > 0 ? (
-                    <dl className="space-y-3 mt-6">
-                      {Object.entries(tool.inputSchema).map(
-                        ([key, property]: [string, ToolParameter]) => {
-                          return (
-                            <div className="p-3 bg-black/30" key={key}>
-                              <dt className="text-sm font-medium text-violet-300">
-                                {key}
-                              </dt>
-                              <dd className="text-sm text-slate-300 mt-1">
-                                {property.description}
-                              </dd>
-                            </div>
-                          );
-                        },
-                      )}
-                    </dl>
-                  ) : null}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
+            {TOOL_DEFINITIONS.sort((a, b) => a.name.localeCompare(b.name)).map(
+              (tool) => (
+                <AccordionItem value={tool.name} key={tool.name}>
+                  <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
+                    {tool.name}
+                  </AccordionTrigger>
+                  <AccordionContent className="py-4">
+                    <Prose>
+                      <p className="mb-0">{tool.description.split("\n")[0]}</p>
+                    </Prose>
+                    {tool.inputSchema &&
+                    Object.keys(tool.inputSchema).length > 0 ? (
+                      <dl className="space-y-3 mt-6">
+                        {Object.entries(tool.inputSchema).map(
+                          ([key, property]) => {
+                            return (
+                              <div className="p-3 bg-black/30" key={key}>
+                                <dt className="text-sm font-medium text-violet-300">
+                                  {key}
+                                </dt>
+                                <dd className="text-sm text-slate-300 mt-1">
+                                  {property.description}
+                                </dd>
+                              </div>
+                            );
+                          },
+                        )}
+                      </dl>
+                    ) : null}
+                  </AccordionContent>
+                </AccordionItem>
+              ),
+            )}
           </Accordion>
         </Section>
 
