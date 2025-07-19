@@ -1,4 +1,3 @@
-// Re-export the generated tool definitions JSON
 import toolDefinitionsData from "./toolDefinitions.json";
 
 // Type definition for a tool parameter
@@ -18,7 +17,6 @@ export interface ToolDefinition {
   inputSchema: Record<string, ToolParameter>;
 }
 
-// Type the imported JSON data
 const toolDefinitions: ToolDefinition[] = toolDefinitionsData;
 
 export default toolDefinitions;

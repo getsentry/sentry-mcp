@@ -233,12 +233,10 @@ export async function lookupOtelSemantics(
 
     if (attr.examples && attr.examples.length > 0) {
       response += `- **Examples:** ${attr.examples
-        .map((ex) => {
-          // Handle complex types that might need stringification
-          const exStr =
-            typeof ex === "object" ? JSON.stringify(ex) : String(ex);
-          return `\`${exStr}\``;
-        })
+        .map(
+          (ex) =>
+            `\`${typeof ex === "object" ? JSON.stringify(ex) : String(ex)}\``,
+        )
         .join(", ")}\n`;
     }
 

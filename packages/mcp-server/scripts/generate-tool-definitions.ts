@@ -19,7 +19,7 @@ import { z } from "zod";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Import tools from the source directory (TypeScript)
+// Import tools from the source directory
 const tools = await import("../src/tools/index.ts");
 
 /**
