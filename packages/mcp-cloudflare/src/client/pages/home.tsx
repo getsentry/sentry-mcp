@@ -1,7 +1,4 @@
-import TOOL_DEFINITIONS, {
-  type ToolDefinition,
-  type ToolParameter,
-} from "@sentry/mcp-server/toolDefinitions";
+import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
 import { RESOURCES } from "@sentry/mcp-server/resources";
 import { PROMPT_DEFINITIONS } from "@sentry/mcp-server/promptDefinitions";
 import { Link } from "../components/ui/base";
