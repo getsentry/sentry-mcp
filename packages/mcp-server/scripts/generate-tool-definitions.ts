@@ -23,21 +23,27 @@ const __dirname = path.dirname(__filename);
 const tools = await import("../src/tools/index.ts");
 
 /**
- * Convert Zod schema object to JSON Schema properties
+ * Convert Zod schema object to simplified parameter definitions
+ * Only extracts description since that's all the UI needs
  */
-function convertInputSchemaToJsonSchema(inputSchema: Record<string, any>) {
+function convertInputSchemaToSimplified(inputSchema: Record<string, any>) {
   if (!inputSchema || Object.keys(inputSchema).length === 0) {
     return {};
   }
 
   const properties: Record<string, any> = {};
 
-  // Convert each individual Zod schema to JSON Schema
+  // Extract only the description from each Zod schema
   for (const [key, zodSchema] of Object.entries(inputSchema)) {
+    // Get the full JSON Schema to extract description
     const jsonSchema = zodToJsonSchema(zodSchema, {
-      $refStrategy: "none", // Don't use $ref for cleaner output
+      $refStrategy: "none",
     });
-    properties[key] = jsonSchema;
+
+    // Only include description field for UI display
+    properties[key] = {
+      description: jsonSchema.description || "",
+    };
   }
 
   return properties;
@@ -68,8 +74,8 @@ function generateToolDefinitions() {
       throw new Error(`Tool ${key} is missing name or description`);
     }
 
-    // Convert Zod schemas to JSON Schema
-    const inputSchema = convertInputSchemaToJsonSchema(
+    // Convert Zod schemas to simplified format for UI
+    const inputSchema = convertInputSchemaToSimplified(
       toolObj.inputSchema || {},
     );
 

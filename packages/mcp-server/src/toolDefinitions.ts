@@ -1,10 +1,11 @@
-import type { JSONSchema7 } from "json-schema";
 import toolDefinitionsData from "./toolDefinitions.json";
 
-// Tool parameter is just a JSON Schema v7 definition
-export type ToolParameter = JSONSchema7;
+// Simplified tool parameter with just description for UI display
+export interface ToolParameter {
+  description: string;
+}
 
-// Tool definition with JSON Schema for each parameter
+// Tool definition for UI consumption
 export interface ToolDefinition {
   name: string;
   description: string;
