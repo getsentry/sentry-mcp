@@ -69,5 +69,8 @@
       "simple-git-hooks",
       "workerd"
     ]
+  },
+  "devDependencies": {
+    "@types/json-schema": "^7.0.15"
   }
 }

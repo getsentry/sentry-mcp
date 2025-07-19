@@ -1,44 +1,17 @@
-import { z } from "zod";
+import type { JSONSchema7 } from "json-schema";
 import toolDefinitionsData from "./toolDefinitions.json";
 
-// Zod schema for tool parameter
-const ToolParameterSchema = z
-  .object({
-    type: z.string().optional(),
-    description: z.string().optional(),
-    anyOf: z.array(z.any()).optional(),
-    $schema: z.string().optional(),
-    enum: z.array(z.string()).optional(),
-    // Allow additional properties for flexibility
-  })
-  .passthrough();
+// Tool parameter is just a JSON Schema v7 definition
+export type ToolParameter = JSONSchema7;
 
-// Zod schema for tool definition
-const ToolDefinitionSchema = z.object({
-  name: z.string(),
-  description: z.string(),
-  inputSchema: z.record(z.string(), ToolParameterSchema),
-});
-
-// Array of tool definitions
-const ToolDefinitionsSchema = z.array(ToolDefinitionSchema);
-
-// Parse and validate the imported JSON data
-const parseResult = ToolDefinitionsSchema.safeParse(toolDefinitionsData);
-
-if (!parseResult.success) {
-  throw new Error(
-    `Invalid tool definitions JSON structure: ${parseResult.error.message}`,
-  );
+// Tool definition with JSON Schema for each parameter
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: Record<string, ToolParameter>;
 }
 
-const toolDefinitions = parseResult.data;
-
-// Export inferred types from Zod schemas
-export type ToolParameter = z.infer<typeof ToolParameterSchema>;
-export type ToolDefinition = z.infer<typeof ToolDefinitionSchema>;
-
-// Export schemas for reuse if needed
-export { ToolParameterSchema, ToolDefinitionSchema, ToolDefinitionsSchema };
+// Type assertion - we trust the build process generates valid data
+const toolDefinitions = toolDefinitionsData as ToolDefinition[];
 
 export default toolDefinitions;
