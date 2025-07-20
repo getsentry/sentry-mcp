@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { generateText, tool, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { ConfigurationError } from "../../errors";
+import { ConfigurationError, UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
 import { lookupOtelSemantics } from "./tools/otel-semantics-lookup";
 
@@ -285,14 +285,21 @@ function createOtelLookupTool(
         ),
     }),
     execute: async ({ namespace, searchTerm, dataset }) => {
-      return await lookupOtelSemantics(
-        namespace,
-        searchTerm,
-        dataset,
-        apiService,
-        organizationSlug,
-        projectId,
-      );
+      try {
+        return await lookupOtelSemantics(
+          namespace,
+          searchTerm,
+          dataset,
+          apiService,
+          organizationSlug,
+          projectId,
+        );
+      } catch (error) {
+        if (error instanceof UserInputError) {
+          return `Error: ${error.message}`;
+        }
+        throw error;
+      }
     },
   });
 }
@@ -314,40 +321,41 @@ function createDatasetAttributesTool(
         .describe("The dataset to query attributes for"),
     }),
     execute: async ({ dataset }) => {
-      const { fetchCustomAttributes } = await import("./utils");
-      const {
-        BASE_COMMON_FIELDS,
-        DATASET_FIELDS,
-        RECOMMENDED_FIELDS,
-        NUMERIC_FIELDS,
-      } = await import("./config");
+      try {
+        const { fetchCustomAttributes } = await import("./utils");
+        const {
+          BASE_COMMON_FIELDS,
+          DATASET_FIELDS,
+          RECOMMENDED_FIELDS,
+          NUMERIC_FIELDS,
+        } = await import("./config");
 
-      // Get custom attributes for this dataset
-      const { attributes: customAttributes, fieldTypes } =
-        await fetchCustomAttributes(
-          apiService,
-          organizationSlug,
-          dataset,
-          projectId,
-        );
+        // Get custom attributes for this dataset
+        const { attributes: customAttributes, fieldTypes } =
+          await fetchCustomAttributes(
+            apiService,
+            organizationSlug,
+            dataset,
+            projectId,
+          );
 
-      // Combine all available fields
-      const allFields = {
-        ...BASE_COMMON_FIELDS,
-        ...DATASET_FIELDS[dataset],
-        ...customAttributes,
-      };
+        // Combine all available fields
+        const allFields = {
+          ...BASE_COMMON_FIELDS,
+          ...DATASET_FIELDS[dataset],
+          ...customAttributes,
+        };
 
-      const recommendedFields = RECOMMENDED_FIELDS[dataset];
+        const recommendedFields = RECOMMENDED_FIELDS[dataset];
 
-      // Combine field types from both static config and dynamic API
-      const allFieldTypes = { ...fieldTypes };
-      const staticNumericFields = NUMERIC_FIELDS[dataset] || new Set();
-      for (const field of staticNumericFields) {
-        allFieldTypes[field] = "number";
-      }
+        // Combine field types from both static config and dynamic API
+        const allFieldTypes = { ...fieldTypes };
+        const staticNumericFields = NUMERIC_FIELDS[dataset] || new Set();
+        for (const field of staticNumericFields) {
+          allFieldTypes[field] = "number";
+        }
 
-      return `Dataset: ${dataset}
+        return `Dataset: ${dataset}
 
 Available Fields (${Object.keys(allFields).length} total):
 ${Object.entries(allFields)
@@ -369,6 +377,12 @@ ${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldType
 IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
 
 Use this information to construct appropriate queries for the ${dataset} dataset.`;
+      } catch (error) {
+        if (error instanceof UserInputError) {
+          return `Error: ${error.message}`;
+        }
+        throw error;
+      }
     },
   });
 }
