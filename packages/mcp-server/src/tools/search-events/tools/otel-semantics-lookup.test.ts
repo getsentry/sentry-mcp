@@ -1,37 +1,12 @@
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SentryApiService } from "../../../api-client";
-import { readFileSync, readdirSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
-// Mock the file system module
-vi.mock("fs", () => ({
-  readFileSync: vi.fn(),
-  readdirSync: vi.fn(),
-}));
 
 vi.mock("../../../logging", () => ({
   logError: vi.fn(),
 }));
 
-// Import after mocks are set up
-import {
-  lookupOtelSemantics,
-  loadNamespacesIndex,
-  getNamespaceInfo,
-  getAvailableNamespaces,
-} from "./otel-semantics-lookup";
-
-const mockReadFileSync = readFileSync as Mock;
-const mockReaddirSync = readdirSync as Mock;
+// Import the actual function - no mocking needed since build runs first
+import { lookupOtelSemantics } from "./otel-semantics-lookup";
 
 describe("otel-semantics-lookup", () => {
   beforeEach(() => {
@@ -40,80 +15,8 @@ describe("otel-semantics-lookup", () => {
 
   const mockApiService = {} as SentryApiService;
 
-  // Helper to set up namespace data
-  function setupNamespaceData(namespaces: Record<string, any>) {
-    const files = Object.keys(namespaces).map((ns) => `${ns}.json`);
-    files.push("__namespaces.json");
-
-    mockReaddirSync.mockReturnValue(files);
-
-    mockReadFileSync.mockImplementation((path: string) => {
-      const pathStr = path.toString();
-
-      // Handle namespace index
-      if (pathStr.includes("__namespaces.json")) {
-        return JSON.stringify({
-          generated: "2025-01-01T00:00:00Z",
-          totalNamespaces: Object.keys(namespaces).length,
-          namespaces: Object.entries(namespaces).map(([ns, data]) => ({
-            namespace: ns,
-            description: data.description || "Test namespace",
-          })),
-        });
-      }
-
-      // Handle individual namespace files
-      for (const [ns, data] of Object.entries(namespaces)) {
-        if (pathStr.includes(`${ns}.json`)) {
-          return JSON.stringify(data);
-        }
-      }
-
-      return "{}";
-    });
-  }
-
-  describe("loadNamespacesIndex", () => {
-    it("should load and parse namespaces index file", () => {
-      setupNamespaceData({
-        gen_ai: {
-          namespace: "gen_ai",
-          description: "GenAI operations",
-          attributes: {},
-        },
-        db: {
-          namespace: "db",
-          description: "Database operations",
-          attributes: {},
-        },
-      });
-
-      const result = loadNamespacesIndex();
-
-      expect(result.totalNamespaces).toBe(2);
-      expect(result.namespaces).toHaveLength(2);
-      expect(result.namespaces[0].namespace).toBe("gen_ai");
-      expect(result.namespaces[1].namespace).toBe("db");
-    });
-
-    it("should return empty index on error", () => {
-      mockReadFileSync.mockImplementation(() => {
-        throw new Error("File not found");
-      });
-      mockReaddirSync.mockReturnValue([]);
-
-      const result = loadNamespacesIndex();
-
-      expect(result.totalNamespaces).toBe(0);
-      expect(result.namespaces).toEqual([]);
-    });
-  });
-
   describe("lookupOtelSemantics", () => {
     it("should return namespace information for valid namespace", async () => {
-      // Note: Since the module loads data at import time, we need to test
-      // with whatever namespaces are actually available in the data directory
-      // For unit tests, we'll just verify the function structure works
       const result = await lookupOtelSemantics(
         "gen_ai",
         undefined,
@@ -122,34 +25,83 @@ describe("otel-semantics-lookup", () => {
         "test-org",
       );
 
-      // The result should either contain namespace info or a not found message
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe("string");
+      expect(result).toContain("# OpenTelemetry Semantic Conventions: gen_ai");
+      expect(result).toContain("## Attributes");
+      expect(result).toContain("`gen_ai.usage.input_tokens`");
+      expect(result).toContain("`gen_ai.usage.output_tokens`");
+      expect(result).toContain("- **Type:**");
+      expect(result).toContain("- **Description:**");
     });
 
-    it("should handle invalid namespace", async () => {
-      const result = await lookupOtelSemantics(
-        "definitely_invalid_namespace_that_does_not_exist",
+    it("should handle namespace with underscore and dash interchangeably", async () => {
+      const result1 = await lookupOtelSemantics(
+        "gen_ai",
+        undefined,
+        "spans",
+        mockApiService,
+        "test-org",
+      );
+      const result2 = await lookupOtelSemantics(
+        "gen-ai",
         undefined,
         "spans",
         mockApiService,
         "test-org",
       );
 
-      expect(result).toContain("not found");
-    });
-  });
-
-  describe("helper functions", () => {
-    it("should get namespace info", () => {
-      const info = getNamespaceInfo("gen_ai");
-      // Either returns namespace data or undefined
-      expect(info === undefined || typeof info === "object").toBe(true);
+      expect(result1).toBe(result2);
     });
 
-    it("should get available namespaces", () => {
-      const namespaces = getAvailableNamespaces();
-      expect(Array.isArray(namespaces)).toBe(true);
+    it("should filter attributes by search term", async () => {
+      const result = await lookupOtelSemantics(
+        "http",
+        "method",
+        "spans",
+        mockApiService,
+        "test-org",
+      );
+
+      expect(result).toContain("matching)");
+      expect(result).toContain("`http.request.method`");
+    });
+
+    it("should show custom namespace note for mcp", async () => {
+      const result = await lookupOtelSemantics(
+        "mcp",
+        undefined,
+        "spans",
+        mockApiService,
+        "test-org",
+      );
+
+      expect(result).toContain("**Note:** This is a custom namespace");
+    });
+
+    it("should handle invalid namespace", async () => {
+      const result = await lookupOtelSemantics(
+        "totally_invalid_namespace_that_does_not_exist",
+        undefined,
+        "spans",
+        mockApiService,
+        "test-org",
+      );
+
+      expect(result).toContain(
+        "Namespace 'totally_invalid_namespace_that_does_not_exist' not found",
+      );
+    });
+
+    it("should suggest similar namespaces", async () => {
+      const result = await lookupOtelSemantics(
+        "gen",
+        undefined,
+        "spans",
+        mockApiService,
+        "test-org",
+      );
+
+      expect(result).toContain("Did you mean:");
+      expect(result).toContain("gen_ai");
     });
   });
 });

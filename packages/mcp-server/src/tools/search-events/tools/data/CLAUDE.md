@@ -36,6 +36,10 @@ The generation script (`scripts/generate-otel-namespaces.ts`) fetches YAML files
 
 **Caching**: The script caches downloaded YAML files in `.cache/` directory to avoid repeated network requests. Clear the cache to force fresh downloads.
 
+### JSON Import Handling
+
+The JSON files are imported directly in the TypeScript code and bundled by tsdown/rolldown at build time. This approach works seamlessly with Cloudflare Workers since all data is embedded in the JavaScript bundle.
+
 ### Custom Namespaces
 
 Some namespaces are maintained manually for attributes not yet in the OpenTelemetry specification:

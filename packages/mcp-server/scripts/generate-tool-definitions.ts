@@ -7,6 +7,9 @@
  *
  * This file is used by the mcp-cloudflare client to display tool documentation
  * without importing server-side code that has Node.js dependencies.
+ *
+ * Note: In dev mode, this script runs once at startup. If you modify tool definitions,
+ * you'll need to restart the dev server to regenerate this file.
  */
 
 import * as fs from "node:fs";
@@ -20,24 +23,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Import tools from the source directory
-const tools = await import("../src/tools/index.js");
+const tools = await import("../src/tools/index.ts");
 
 /**
- * Convert Zod schema object to JSON Schema properties
+ * Convert Zod schema object to simplified parameter definitions
+ * Only extracts description since that's all the UI needs
  */
-function convertInputSchemaToJsonSchema(inputSchema: Record<string, any>) {
+function convertInputSchemaToSimplified(inputSchema: Record<string, any>) {
   if (!inputSchema || Object.keys(inputSchema).length === 0) {
     return {};
   }
 
   const properties: Record<string, any> = {};
 
-  // Convert each individual Zod schema to JSON Schema
+  // Extract only the description from each Zod schema
   for (const [key, zodSchema] of Object.entries(inputSchema)) {
+    // Get the full JSON Schema to extract description
     const jsonSchema = zodToJsonSchema(zodSchema, {
-      $refStrategy: "none", // Don't use $ref for cleaner output
+      $refStrategy: "none",
     });
-    properties[key] = jsonSchema;
+
+    // Only include description field for UI display
+    properties[key] = {
+      description: jsonSchema.description || "",
+    };
   }
 
   return properties;
@@ -50,7 +59,7 @@ function generateToolDefinitions() {
   const toolsDefault = tools.default;
 
   if (!toolsDefault || typeof toolsDefault !== "object") {
-    throw new Error("Failed to import tools from src/tools/index.js");
+    throw new Error("Failed to import tools from src/tools/index.ts");
   }
 
   return Object.entries(toolsDefault).map(([key, tool]) => {
@@ -68,8 +77,8 @@ function generateToolDefinitions() {
       throw new Error(`Tool ${key} is missing name or description`);
     }
 
-    // Convert Zod schemas to JSON Schema
-    const inputSchema = convertInputSchemaToJsonSchema(
+    // Convert Zod schemas to simplified format for UI
+    const inputSchema = convertInputSchemaToSimplified(
       toolObj.inputSchema || {},
     );
 
@@ -90,45 +99,9 @@ async function main() {
 
     const definitions = generateToolDefinitions();
 
-    // Ensure dist directory exists
-    const distDir = path.join(__dirname, "../dist");
-    if (!fs.existsSync(distDir)) {
-      fs.mkdirSync(distDir, { recursive: true });
-    }
-
-    // Write the definitions to JavaScript file
-    const outputPath = path.join(distDir, "toolDefinitions.js");
-    const jsContent = `export default ${JSON.stringify(definitions, null, 2)};`;
-    fs.writeFileSync(outputPath, jsContent);
-
-    // Write TypeScript declaration file
-    const dtsPath = path.join(distDir, "toolDefinitions.d.ts");
-    const dtsContent = `// JSON Schema property type definition
-export interface JsonSchemaProperty {
-  type: string;
-  description: string;
-  enum?: string[];
-  default?: any;
-  format?: string;
-  minLength?: number;
-  maxLength?: number;
-  minimum?: number;
-  maximum?: number;
-}
-
-// Tool definition interface with proper JSON Schema types
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  inputSchema: Record<string, JsonSchemaProperty>;
-}
-
-// Array of tool definitions with proper typing
-export type ToolDefinitions = ToolDefinition[];
-
-declare const toolDefinitions: ToolDefinitions;
-export default toolDefinitions;`;
-    fs.writeFileSync(dtsPath, dtsContent);
+    // Write the definitions to JSON file in src directory for prebuild bundling
+    const outputPath = path.join(__dirname, "../src/toolDefinitions.json");
+    fs.writeFileSync(outputPath, JSON.stringify(definitions, null, 2));
 
     console.log(
       `✅ Generated tool definitions for ${definitions.length} tools`,

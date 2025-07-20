@@ -1,148 +1,176 @@
 import type { SentryApiService } from "../../../api-client";
-import { logError } from "../../../logging";
-import { readFileSync, readdirSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { z } from "zod";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Import all JSON files directly
+import android from "./data/android.json";
+import app from "./data/app.json";
+import artifact from "./data/artifact.json";
+import aspnetcore from "./data/aspnetcore.json";
+import aws from "./data/aws.json";
+import azure from "./data/azure.json";
+import browser from "./data/browser.json";
+import cassandra from "./data/cassandra.json";
+import cicd from "./data/cicd.json";
+import client from "./data/client.json";
+import cloud from "./data/cloud.json";
+import cloudevents from "./data/cloudevents.json";
+import cloudfoundry from "./data/cloudfoundry.json";
+import code from "./data/code.json";
+import container from "./data/container.json";
+import cpu from "./data/cpu.json";
+import cpython from "./data/cpython.json";
+import database from "./data/database.json";
+import db from "./data/db.json";
+import deployment from "./data/deployment.json";
+import destination from "./data/destination.json";
+import device from "./data/device.json";
+import disk from "./data/disk.json";
+import dns from "./data/dns.json";
+import dotnet from "./data/dotnet.json";
+import elasticsearch from "./data/elasticsearch.json";
+import enduser from "./data/enduser.json";
+import error from "./data/error.json";
+import faas from "./data/faas.json";
+import feature_flags from "./data/feature_flags.json";
+import file from "./data/file.json";
+import gcp from "./data/gcp.json";
+import gen_ai from "./data/gen_ai.json";
+import geo from "./data/geo.json";
+import go from "./data/go.json";
+import graphql from "./data/graphql.json";
+import hardware from "./data/hardware.json";
+import heroku from "./data/heroku.json";
+import host from "./data/host.json";
+import http from "./data/http.json";
+import ios from "./data/ios.json";
+import jvm from "./data/jvm.json";
+import k8s from "./data/k8s.json";
+import linux from "./data/linux.json";
+import log from "./data/log.json";
+import mcp from "./data/mcp.json";
+import messaging from "./data/messaging.json";
+import network from "./data/network.json";
+import nodejs from "./data/nodejs.json";
+import oci from "./data/oci.json";
+import opentracing from "./data/opentracing.json";
+import os from "./data/os.json";
+import otel from "./data/otel.json";
+import peer from "./data/peer.json";
+import process from "./data/process.json";
+import profile from "./data/profile.json";
+import rpc from "./data/rpc.json";
+import server from "./data/server.json";
+import service from "./data/service.json";
+import session from "./data/session.json";
+import signalr from "./data/signalr.json";
+import source from "./data/source.json";
+import system from "./data/system.json";
+import telemetry from "./data/telemetry.json";
+import test from "./data/test.json";
+import thread from "./data/thread.json";
+import tls from "./data/tls.json";
+import url from "./data/url.json";
+import user from "./data/user.json";
+import v8js from "./data/v8js.json";
+import vcs from "./data/vcs.json";
+import webengine from "./data/webengine.json";
+import zos from "./data/zos.json";
 
-// Zod schemas for type-safe JSON parsing
-const AttributeSchema = z.object({
-  description: z.string(),
-  type: z.string(),
-  examples: z
-    .array(z.any())
-    .transform((arr) =>
-      arr.map((v) => (Array.isArray(v) ? JSON.stringify(v) : v.toString())),
-    )
-    .optional(),
-  note: z.string().optional(),
-  stability: z.string().optional(),
-});
-
-const NamespaceDataSchema = z.object({
-  namespace: z.string(),
-  description: z.string(),
-  attributes: z.record(z.string(), AttributeSchema),
-  custom: z.boolean().optional(),
-});
-
-const NamespacesIndexSchema = z.object({
-  generated: z.string(),
-  totalNamespaces: z.number(),
-  namespaces: z.array(
-    z.object({
-      namespace: z.string(),
-      description: z.string(),
-      custom: z.boolean().optional(),
-    }),
-  ),
-});
-
-// TypeScript types inferred from Zod schemas
-type NamespaceData = z.infer<typeof NamespaceDataSchema>;
-type NamespacesIndex = z.infer<typeof NamespacesIndexSchema>;
-
-// Load all namespace data from JSON files
-function loadNamespaceData(): Record<string, NamespaceData> {
-  const dataDir = resolve(__dirname, "data");
-  const namespaceData: Record<string, NamespaceData> = {};
-
-  try {
-    const files = readdirSync(dataDir).filter(
-      (f) => f.endsWith(".json") && f !== "__namespaces.json",
-    );
-
-    for (const file of files) {
-      const filePath = resolve(dataDir, file);
-      try {
-        const content = readFileSync(filePath, "utf8");
-        const parsed = JSON.parse(content);
-        const validated = NamespaceDataSchema.parse(parsed);
-        namespaceData[validated.namespace] = validated;
-      } catch (error) {
-        console.warn(`Failed to load namespace file ${file}:`, error);
-      }
-    }
-  } catch (error) {
-    logError(error as Error, { context: { operation: "loadNamespaceData" } });
-  }
-
-  return namespaceData;
-}
-
-// Cache the namespace data to avoid re-reading files
-const NAMESPACE_DATA = loadNamespaceData();
-
-// Load the namespaces index
-export function loadNamespacesIndex(): NamespacesIndex {
-  const indexPath = resolve(__dirname, "data", "__namespaces.json");
-  try {
-    const content = readFileSync(indexPath, "utf8");
-    const parsed = JSON.parse(content);
-    return NamespacesIndexSchema.parse(parsed);
-  } catch (error) {
-    logError(error as Error, { context: { operation: "loadNamespacesIndex" } });
-    // Return empty index if file doesn't exist or validation fails
-    return {
-      generated: new Date().toISOString(),
-      totalNamespaces: 0,
-      namespaces: [],
-    };
-  }
-}
-
-// Map common query terms to OpenTelemetry semantic conventions
-const SEMANTIC_MAPPINGS: Record<string, string> = {
-  agent: "gen_ai",
-  ai: "gen_ai",
-  llm: "gen_ai",
-  model: "gen_ai",
-  anthropic: "gen_ai",
-  openai: "gen_ai",
-  claude: "gen_ai",
-  database: "db",
-  db: "db",
-  sql: "db",
-  query: "db",
-  postgresql: "db",
-  mysql: "db",
-  redis: "db",
-  mongodb: "db",
-  http: "http",
-  api: "http",
-  request: "http",
-  response: "http",
-  get: "http",
-  post: "http",
-  tool: "mcp",
-  "tool calls": "mcp",
-  "tool call": "mcp",
-  mcp: "mcp",
-  rpc: "rpc",
-  grpc: "rpc",
-  messaging: "messaging",
-  queue: "messaging",
-  kafka: "messaging",
-  rabbitmq: "messaging",
-  k8s: "k8s",
-  kubernetes: "k8s",
-  container: "container",
-  docker: "container",
-  pod: "k8s",
-  cloud: "cloud",
-  aws: "aws",
-  azure: "azure",
-  gcp: "gcp",
-  network: "network",
-  tcp: "network",
-  udp: "network",
+// Create the namespaceData object
+const namespaceData: Record<string, NamespaceData> = {
+  android,
+  app,
+  artifact,
+  aspnetcore,
+  aws,
+  azure,
+  browser,
+  cassandra,
+  cicd,
+  client,
+  cloud,
+  cloudevents,
+  cloudfoundry,
+  code,
+  container,
+  cpu,
+  cpython,
+  database,
+  db,
+  deployment,
+  destination,
+  device,
+  disk,
+  dns,
+  dotnet,
+  elasticsearch,
+  enduser,
+  error,
+  faas,
+  feature_flags,
+  file,
+  gcp,
+  gen_ai,
+  geo,
+  go,
+  graphql,
+  hardware,
+  heroku,
+  host,
+  http,
+  ios,
+  jvm,
+  k8s,
+  linux,
+  log,
+  mcp,
+  messaging,
+  network,
+  nodejs,
+  oci,
+  opentracing,
+  os,
+  otel,
+  peer,
+  process,
+  profile,
+  rpc,
+  server,
+  service,
+  session,
+  signalr,
+  source,
+  system,
+  telemetry,
+  test,
+  thread,
+  tls,
+  url,
+  user,
+  v8js,
+  vcs,
+  webengine,
+  zos,
 };
 
+// TypeScript types
+interface NamespaceData {
+  namespace: string;
+  description: string;
+  attributes: Record<
+    string,
+    {
+      description: string;
+      type: string;
+      examples?: Array<any>;
+      note?: string;
+      stability?: string;
+    }
+  >;
+  custom?: boolean;
+}
+
 /**
- * Look up all attributes for a specific OpenTelemetry namespace
+ * Lookup OpenTelemetry semantic convention attributes for a given namespace
  */
 export async function lookupOtelSemantics(
   namespace: string,
@@ -152,56 +180,72 @@ export async function lookupOtelSemantics(
   organizationSlug: string,
   projectId?: string,
 ): Promise<string> {
-  try {
-    // Get namespace data
-    const namespaceData = NAMESPACE_DATA[namespace];
-    if (!namespaceData) {
-      return `Namespace '${namespace}' not found. Available namespaces: ${Object.keys(NAMESPACE_DATA).slice(0, 10).join(", ")}...`;
+  // Normalize namespace (replace - with _)
+  const normalizedNamespace = namespace.replace(/-/g, "_");
+
+  // Check if namespace exists
+  const data = namespaceData[normalizedNamespace];
+  if (!data) {
+    // Try to find similar namespaces
+    const allNamespaces = Object.keys(namespaceData);
+    const suggestions = allNamespaces
+      .filter((ns) => ns.includes(namespace) || namespace.includes(ns))
+      .slice(0, 3);
+
+    return suggestions.length > 0
+      ? `Namespace '${namespace}' not found. Did you mean: ${suggestions.join(", ")}?`
+      : `Namespace '${namespace}' not found. Use 'list' to see all available namespaces.`;
+  }
+
+  // Format the response
+  let response = `# OpenTelemetry Semantic Conventions: ${data.namespace}\n\n`;
+  response += `${data.description}\n\n`;
+
+  if (data.custom) {
+    response +=
+      "**Note:** This is a custom namespace, not part of standard OpenTelemetry conventions.\n\n";
+  }
+
+  // Filter attributes if searchTerm is provided
+  let attributes = Object.entries(data.attributes);
+  if (searchTerm) {
+    const lowerSearch = searchTerm.toLowerCase();
+    attributes = attributes.filter(
+      ([key, attr]) =>
+        key.toLowerCase().includes(lowerSearch) ||
+        attr.description.toLowerCase().includes(lowerSearch),
+    );
+  }
+
+  response += `## Attributes (${attributes.length} ${searchTerm ? "matching" : "total"})\n\n`;
+
+  // Sort attributes by key
+  const sortedAttributes = attributes.sort(([a], [b]) => a.localeCompare(b));
+
+  for (const [key, attr] of sortedAttributes) {
+    response += `### \`${key}\`\n`;
+    response += `- **Type:** ${attr.type}\n`;
+    response += `- **Description:** ${attr.description}\n`;
+
+    if (attr.stability) {
+      response += `- **Stability:** ${attr.stability}\n`;
     }
 
-    // Format attribute information
-    const attributes = Object.entries(namespaceData.attributes);
-    const attributeInfo = attributes
-      .slice(0, 20) // Limit to first 20 attributes
-      .map(([name, info]) => {
-        let desc = `${name}: ${info.description}`;
-        if (info.type !== "string") {
-          desc += ` (${info.type})`;
-        }
-        if (info.examples && info.examples.length > 0) {
-          desc += ` - examples: ${info.examples.slice(0, 3).join(", ")}`;
-        }
-        return desc;
-      })
-      .join("\n");
+    if (attr.examples && attr.examples.length > 0) {
+      response += `- **Examples:** ${attr.examples
+        .map(
+          (ex) =>
+            `\`${typeof ex === "object" ? JSON.stringify(ex) : String(ex)}\``,
+        )
+        .join(", ")}\n`;
+    }
 
-    const hasPattern = `has:${namespace}.*`;
-    const totalAttrs = attributes.length;
+    if (attr.note) {
+      response += `- **Note:** ${attr.note}\n`;
+    }
 
-    return `Namespace: ${namespace}
-Description: ${namespaceData.description}
-Total attributes: ${totalAttrs}
-Query pattern: ${hasPattern}
-
-Common attributes:
-${attributeInfo}
-
-${totalAttrs > 20 ? `... and ${totalAttrs - 20} more attributes` : ""}`;
-  } catch (error) {
-    return `Error looking up namespace '${namespace}'. Use standard OpenTelemetry conventions.`;
+    response += "\n";
   }
-}
 
-/**
- * Get detailed information about a specific namespace
- */
-export function getNamespaceInfo(namespace: string): NamespaceData | undefined {
-  return NAMESPACE_DATA[namespace];
-}
-
-/**
- * Get all available namespaces
- */
-export function getAvailableNamespaces(): string[] {
-  return Object.keys(NAMESPACE_DATA);
+  return response;
 }

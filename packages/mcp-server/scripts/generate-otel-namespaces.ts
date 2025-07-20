@@ -285,7 +285,7 @@ function convertYamlToJson(
   }
 
   return {
-    namespace: namespace.replace("-", "_"), // Convert hyphen to underscore for consistency
+    namespace: namespace.replace(/-/g, "_"), // Convert all hyphens to underscores for consistency
     description: group.brief,
     attributes,
   };
@@ -322,7 +322,10 @@ async function generateNamespaceFiles() {
   }> = [];
 
   for (const namespace of KNOWN_NAMESPACES) {
-    const outputPath = resolve(DATA_DIR, `${namespace.replace("-", "_")}.json`);
+    const outputPath = resolve(
+      DATA_DIR,
+      `${namespace.replace(/-/g, "_")}.json`,
+    );
 
     // Check if file exists and has custom content (not from OpenTelemetry)
     if (existsSync(outputPath)) {

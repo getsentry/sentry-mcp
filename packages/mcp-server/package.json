@@ -63,6 +63,7 @@
       "default": "./dist/resources.js"
     },
     "./toolDefinitions": {
+      "types": "./dist/toolDefinitions.ts",
       "default": "./dist/toolDefinitions.js"
     },
     "./types": {
@@ -75,11 +76,13 @@
     }
   },
   "scripts": {
-    "build": "tsdown && pnpm run generate-tool-definitions",
-    "dev": "pnpm run generate-tool-definitions && tsc -w",
+    "prebuild": "pnpm run generate-tool-definitions",
+    "build": "tsdown",
+    "dev": "pnpm run generate-tool-definitions && tsdown -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
-    "test": "pnpm run generate-tool-definitions && vitest",
+    "pretest": "pnpm run generate-tool-definitions",
+    "test": "vitest",
     "test:ci": "pnpm run generate-tool-definitions && vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
     "tsc": "tsc --noEmit",
     "test:watch": "vitest watch",
