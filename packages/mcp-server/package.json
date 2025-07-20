@@ -78,7 +78,7 @@
   "scripts": {
     "prebuild": "pnpm run generate-tool-definitions",
     "build": "tsdown",
-    "dev": "pnpm run generate-tool-definitions && tsc -w",
+    "dev": "pnpm run generate-tool-definitions && tsdown -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
     "test": "vitest",

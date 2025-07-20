@@ -7,6 +7,9 @@
  *
  * This file is used by the mcp-cloudflare client to display tool documentation
  * without importing server-side code that has Node.js dependencies.
+ *
+ * Note: In dev mode, this script runs once at startup. If you modify tool definitions,
+ * you'll need to restart the dev server to regenerate this file.
  */
 
 import * as fs from "node:fs";
