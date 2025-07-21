@@ -3,7 +3,7 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "./utils/defineTool";
 import { apiServiceFromContext } from "./utils/api-utils";
 import type { ServerContext } from "../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import { ParamOrganizationSlug, ParamRegionUrl, ResponseType } from "../schema";
 
 export default defineTool({
   name: "create_team",
@@ -32,6 +32,7 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.optional(),
     name: z.string().trim().describe("The name of the team to create."),
+    responseType: ResponseType.optional(),
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {

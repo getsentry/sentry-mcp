@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineTool } from "./utils/defineTool";
 import { apiServiceFromContext } from "./utils/api-utils";
 import type { ServerContext } from "../types";
+import { ResponseType } from "../schema";
 
 export default defineTool({
   name: "whoami",
@@ -11,7 +12,9 @@ export default defineTool({
     "Use this tool when you need to:",
     "- Get the user's name and email address.",
   ].join("\n"),
-  inputSchema: {},
+  inputSchema: {
+    responseType: ResponseType.optional(),
+  },
   async handler(params, context: ServerContext) {
     // User data endpoints (like /auth/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers

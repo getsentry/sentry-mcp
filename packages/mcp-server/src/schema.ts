@@ -121,3 +121,8 @@ export const ParamAttachmentId = z
   .string()
   .trim()
   .describe("The ID of the attachment to download.");
+
+export const ResponseType = z
+  .enum(["md", "json"])
+  .default("md")
+  .describe("The format of the tool's response. Defaults to markdown.");

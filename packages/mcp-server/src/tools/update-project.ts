@@ -12,6 +12,7 @@ import {
   ParamProjectSlug,
   ParamPlatform,
   ParamTeamSlug,
+  ResponseType,
 } from "../schema";
 
 export default defineTool({
@@ -69,6 +70,7 @@ export default defineTool({
     teamSlug: ParamTeamSlug.optional().describe(
       "The team to assign this project to. Note: this will replace the current team assignment.",
     ),
+    responseType: ResponseType.optional(),
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
