@@ -408,6 +408,17 @@ export async function configureServer({
                       content: output,
                     };
                   }
+                  // if the tool returns a plain object, convert to JSON text
+                  if (typeof output === "object" && output !== null) {
+                    return {
+                      content: [
+                        {
+                          type: "text" as const,
+                          text: JSON.stringify(output),
+                        },
+                      ],
+                    };
+                  }
                   throw new Error(`Invalid tool output: ${output}`);
                 } catch (error) {
                   span.setStatus({
