@@ -103,6 +103,7 @@ export default defineTool({
         event,
         apiService,
         autofixState,
+        responseType: params.responseType,
       });
     }
 
@@ -165,6 +166,7 @@ export default defineTool({
       event,
       apiService,
       autofixState,
+      responseType: params.responseType,
     });
   },
 });

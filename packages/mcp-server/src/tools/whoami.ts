@@ -17,6 +17,12 @@ export default defineTool({
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
     const user = await apiService.getAuthenticatedUser();
-    return `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
+    const mdOutput = `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
+    if (params.responseType === "json") {
+      return {
+        user,
+      };
+    }
+    return mdOutput;
   },
 });

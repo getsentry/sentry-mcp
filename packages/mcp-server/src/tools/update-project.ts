@@ -124,12 +124,12 @@ export default defineTool({
       }
     }
 
-    let output = `# Updated Project in **${organizationSlug}**\n\n`;
-    output += `**ID**: ${project.id}\n`;
-    output += `**Slug**: ${project.slug}\n`;
-    output += `**Name**: ${project.name}\n`;
+    let mdOutput = `# Updated Project in **${organizationSlug}**\n\n`;
+    mdOutput += `**ID**: ${project.id}\n`;
+    mdOutput += `**Slug**: ${project.slug}\n`;
+    mdOutput += `**Name**: ${project.name}\n`;
     if (project.platform) {
-      output += `**Platform**: ${project.platform}\n`;
+      mdOutput += `**Platform**: ${project.platform}\n`;
     }
 
     // Display what was updated
@@ -141,16 +141,24 @@ export default defineTool({
       updates.push(`team assignment to "${params.teamSlug}"`);
 
     if (updates.length > 0) {
-      output += `\n## Updates Applied\n`;
-      output += updates.map((update) => `- Updated ${update}`).join("\n");
-      output += `\n`;
+      mdOutput += `\n## Updates Applied\n`;
+      mdOutput += updates.map((update) => `- Updated ${update}`).join("\n");
+      mdOutput += `\n`;
     }
 
-    output += "\n# Using this information\n\n";
-    output += `- The project is now accessible at slug: \`${project.slug}\`\n`;
+    mdOutput += "\n# Using this information\n\n";
+    mdOutput += `- The project is now accessible at slug: \`${project.slug}\`\n`;
     if (params.teamSlug) {
-      output += `- The project is now assigned to the \`${params.teamSlug}\` team\n`;
+      mdOutput += `- The project is now assigned to the \`${params.teamSlug}\` team\n`;
     }
-    return output;
+
+    if (params.responseType === "json") {
+      return {
+        organizationSlug,
+        project,
+      };
+    }
+
+    return mdOutput;
   },
 });

@@ -45,12 +45,20 @@ export default defineTool({
       organizationSlug,
       name: params.name,
     });
-    let output = `# New Team in **${organizationSlug}**\n\n`;
-    output += `**ID**: ${team.id}\n`;
-    output += `**Slug**: ${team.slug}\n`;
-    output += `**Name**: ${team.name}\n`;
-    output += "# Using this information\n\n";
-    output += `- You should always inform the user of the Team Slug value.\n`;
-    return output;
+    let mdOutput = `# New Team in **${organizationSlug}**\n\n`;
+    mdOutput += `**ID**: ${team.id}\n`;
+    mdOutput += `**Slug**: ${team.slug}\n`;
+    mdOutput += `**Name**: ${team.name}\n`;
+    mdOutput += "# Using this information\n\n";
+    mdOutput += `- You should always inform the user of the Team Slug value.\n`;
+
+    if (params.responseType === "json") {
+      return {
+        organizationSlug,
+        team,
+      };
+    }
+
+    return mdOutput;
   },
 });

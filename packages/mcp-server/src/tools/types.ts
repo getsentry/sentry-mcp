@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import type { ServerContext } from "../types";
 import type {
   TextContent,
@@ -6,16 +6,26 @@ import type {
   EmbeddedResource,
 } from "@modelcontextprotocol/sdk/types.js";
 
+export const ResponseTypeSchema = z.enum(["md", "json"]).default("md");
+
 export interface ToolConfig<
   TSchema extends Record<string, z.ZodType> = Record<string, z.ZodType>,
 > {
   name: string;
   description: string;
-  inputSchema: TSchema;
+  inputSchema: TSchema & {
+    responseType?: typeof ResponseTypeSchema;
+  };
   handler: (
-    params: z.infer<z.ZodObject<TSchema>>,
+    params: z.infer<z.ZodObject<TSchema>> & {
+      responseType?: "md" | "json";
+    },
     context: ServerContext,
-  ) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
+  ) => Promise<
+    | string
+    | Record<string, unknown>
+    | (TextContent | ImageContent | EmbeddedResource)[]
+  >;
 }
 
 /**

@@ -19,4 +19,23 @@ describe("whoami", () => {
     `,
     );
   });
+  it("returns json", async () => {
+    const result = await whoami.handler(
+      { responseType: "json" },
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+    expect(result).toMatchInlineSnapshot(`
+      {
+        "user": {
+          "email": "john.doe@example.com",
+          "id": "1",
+          "name": "John Doe",
+        },
+      }
+    `);
+  });
 });

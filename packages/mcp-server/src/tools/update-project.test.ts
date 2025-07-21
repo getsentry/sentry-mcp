@@ -73,4 +73,31 @@ describe("update_project", () => {
       "
     `);
   });
+  it("returns json", async () => {
+    const result = await updateProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        name: undefined,
+        slug: undefined,
+        platform: undefined,
+        teamSlug: "backend-team",
+        regionUrl: undefined,
+        responseType: "json",
+      },
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+    expect(result).toMatchObject({
+      organizationSlug: "sentry-mcp-evals",
+      project: {
+        id: "4509106749636608",
+        slug: "cloudflare-mcp",
+        name: "cloudflare-mcp",
+      },
+    });
+  });
 });
