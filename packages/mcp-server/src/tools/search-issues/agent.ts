@@ -30,6 +30,7 @@ export async function translateQuery(
     naturalLanguageQuery: string;
     organizationSlug: string;
     projectSlug?: string;
+    projectId?: string;
   },
   apiService: SentryApiService,
   previousError?: string,
@@ -51,7 +52,7 @@ export async function translateQuery(
       apiService,
       params.organizationSlug,
       "search_issues",
-      params.projectSlug,
+      params.projectId,
     ),
     whoami: whoamiTool,
   };

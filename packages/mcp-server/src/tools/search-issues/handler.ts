@@ -24,6 +24,7 @@ async function translateQueryWithErrorFeedback(
     naturalLanguageQuery: string;
     organizationSlug: string;
     projectSlug?: string;
+    projectId?: string;
   },
   apiService: SentryApiService,
   maxRetries = 1,
@@ -32,7 +33,16 @@ async function translateQueryWithErrorFeedback(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await translateQuery(params, apiService, previousError);
+      return await translateQuery(
+        {
+          naturalLanguageQuery: params.naturalLanguageQuery,
+          organizationSlug: params.organizationSlug,
+          projectSlug: params.projectSlug,
+          projectId: params.projectId,
+        },
+        apiService,
+        previousError,
+      );
     } catch (error) {
       if (error instanceof UserInputError && attempt < maxRetries) {
         // Feed the validation error back to the agent for self-correction
@@ -112,9 +122,28 @@ export default defineTool({
       setTag("search_issues.projectSlug", params.projectSlug);
     }
 
+    // Convert project slug to ID if needed - required for the agent's field discovery
+    let projectId: string | undefined;
+    if (params.projectSlug) {
+      try {
+        const project = await apiService.getProject({
+          organizationSlug: params.organizationSlug,
+          projectSlugOrId: params.projectSlug,
+        });
+        projectId = String(project.id);
+      } catch (error) {
+        throw new Error(
+          `Project '${params.projectSlug}' not found in organization '${params.organizationSlug}'`,
+        );
+      }
+    }
+
     // Translate natural language to Sentry query
     const translatedQuery = await translateQueryWithErrorFeedback(
-      params,
+      {
+        ...params,
+        projectId,
+      },
       apiService,
       1, // max retries
     );

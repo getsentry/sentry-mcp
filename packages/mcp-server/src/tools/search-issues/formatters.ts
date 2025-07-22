@@ -13,11 +13,11 @@ export function formatIssueResults(
   const host = regionUrl ? new URL(regionUrl).host : "sentry.io";
   const isSaas = host === "sentry.io" || host.endsWith(".sentry.io");
 
-  let output = `# Issues in **${organizationSlug}**`;
+  let output = `# Issues in **${organizationSlug}`;
   if (projectSlug) {
-    output += `/**${projectSlug}**`;
+    output += `/${projectSlug}`;
   }
-  output += "\n\n";
+  output += "**\n\n";
 
   if (issues.length === 0) {
     output += "No issues found matching your search criteria.\n\n";
