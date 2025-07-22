@@ -3,7 +3,8 @@ import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { ConfigurationError, UserInputError } from "../../errors";
-import { createDatasetFieldsTool } from "../../agent-tools";
+import { createDatasetFieldsTool } from "../../agent-tools/discover-dataset-fields";
+import { createWhoamiTool } from "../../agent-tools/whoami";
 import { systemPrompt } from "./config";
 
 // Schema for agent output
@@ -42,14 +43,7 @@ export async function translateQuery(
   }
 
   // Create whoami tool for 'me' references
-  const whoamiTool = tool({
-    description: "Get the current authenticated user's information",
-    parameters: z.object({}),
-    execute: async () => {
-      const user = await apiService.getAuthenticatedUser();
-      return `Current user: ${user.name} (${user.email}, ID: ${user.id})`;
-    },
-  });
+  const whoamiTool = createWhoamiTool(apiService);
 
   // Create the agent tools
   const tools = {

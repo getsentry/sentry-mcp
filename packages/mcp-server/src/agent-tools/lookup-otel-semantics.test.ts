@@ -6,7 +6,7 @@ vi.mock("../logging", () => ({
 }));
 
 // Import the actual function - no mocking needed since build runs first
-import { lookupOtelSemantics } from "./otel-semantics-lookup";
+import { lookupOtelSemantics } from "./lookup-otel-semantics";
 
 describe("otel-semantics-lookup", () => {
   beforeEach(() => {

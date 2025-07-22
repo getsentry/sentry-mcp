@@ -3,7 +3,8 @@ import { generateText, tool, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { ConfigurationError, UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
-import { lookupOtelSemantics } from "../../agent-tools";
+import { lookupOtelSemantics } from "../../agent-tools/lookup-otel-semantics";
+import { createWhoamiTool } from "../../agent-tools/whoami";
 
 // Type definitions
 export interface QueryTranslationResult {
@@ -430,27 +431,7 @@ Use this information to construct appropriate queries for the ${dataset} dataset
   });
 }
 
-/**
- * Create the whoami tool for the AI agent to resolve 'me' references
- */
-function createWhoamiTool(apiService: SentryApiService) {
-  return tool({
-    description:
-      "Get the authenticated user's information including user ID and email. Use this when you need to resolve 'me' references in queries for user.id or user.email fields.",
-    parameters: z.object({}),
-    execute: async () => {
-      try {
-        const user = await apiService.getAuthenticatedUser();
-        return `Authenticated user: ${user.name} (${user.email}), User ID: ${user.id}`;
-      } catch (error) {
-        if (error instanceof UserInputError) {
-          return `Error: ${error.message}`;
-        }
-        throw error;
-      }
-    },
-  });
-}
+// Whoami tool is now imported from agent-tools
 
 /**
  * Translate natural language query to Sentry search syntax using AI

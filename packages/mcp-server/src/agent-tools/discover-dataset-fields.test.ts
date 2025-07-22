@@ -1,36 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { createDatasetFieldsTool } from "./dataset-fields";
+import {
+  discoverDatasetFields,
+  getFieldExamples,
+  getCommonPatterns,
+} from "./discover-dataset-fields";
 import { SentryApiService } from "../api-client";
-import type { ToolExecutionOptions } from "ai";
 
-// No need to mock AI SDK - we're just testing the execute function logic
+// Test the core logic functions directly without AI SDK complexity
 
 describe("dataset-fields agent tool", () => {
   let apiService: SentryApiService;
-  let mockOptions: ToolExecutionOptions;
 
   beforeEach(() => {
     vi.clearAllMocks();
     apiService = new SentryApiService({
       accessToken: "test-token",
     });
-    mockOptions = {
-      toolCallId: "test-call-id",
-      messages: [],
-    };
   });
 
-  describe("createDatasetFieldsTool", () => {
+  describe("discoverDatasetFields", () => {
     it("should discover fields for search_issues dataset", async () => {
-      const tool = createDatasetFieldsTool(
-        apiService,
-        "sentry-mcp-evals",
-        "search_issues",
-        "4509062593708032",
-      );
-
       // Mock the tags API response for issues
       mswServer.use(
         http.get(
@@ -73,9 +64,11 @@ describe("dataset-fields agent tool", () => {
         ),
       );
 
-      const result = await tool.execute(
-        { includeExamples: false },
-        mockOptions,
+      const result = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "search_issues",
+        { projectId: "4509062593708032", includeExamples: false },
       );
 
       expect(result.dataset).toBe("search_issues");
@@ -91,13 +84,6 @@ describe("dataset-fields agent tool", () => {
     });
 
     it("should discover fields for events dataset with examples", async () => {
-      const tool = createDatasetFieldsTool(
-        apiService,
-        "sentry-mcp-evals",
-        "events",
-        "4509062593708032",
-      );
-
       // Mock the tags API response for events
       mswServer.use(
         http.get(
@@ -122,7 +108,12 @@ describe("dataset-fields agent tool", () => {
         ),
       );
 
-      const result = await tool.execute({ includeExamples: true }, mockOptions);
+      const result = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "events",
+        { projectId: "4509062593708032", includeExamples: true },
+      );
 
       expect(result.dataset).toBe("events");
       expect(result.fields).toHaveLength(2);
@@ -146,12 +137,6 @@ describe("dataset-fields agent tool", () => {
     });
 
     it("should handle API errors gracefully", async () => {
-      const tool = createDatasetFieldsTool(
-        apiService,
-        "sentry-mcp-evals",
-        "errors",
-      );
-
       // Mock API error
       mswServer.use(
         http.get(
@@ -165,18 +150,13 @@ describe("dataset-fields agent tool", () => {
       );
 
       await expect(
-        tool.execute({ includeExamples: false }, mockOptions),
+        discoverDatasetFields(apiService, "sentry-mcp-evals", "errors", {
+          includeExamples: false,
+        }),
       ).rejects.toThrow();
     });
 
     it("should provide appropriate examples for each dataset type", async () => {
-      // Test search_issues examples
-      const searchIssuesTool = createDatasetFieldsTool(
-        apiService,
-        "sentry-mcp-evals",
-        "search_issues",
-      );
-
       mswServer.use(
         http.get(
           "https://sentry.io/api/0/organizations/sentry-mcp-evals/tags/",
@@ -188,9 +168,11 @@ describe("dataset-fields agent tool", () => {
         ),
       );
 
-      const issuesResult = await searchIssuesTool.execute(
+      const issuesResult = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "search_issues",
         { includeExamples: true },
-        mockOptions,
       );
 
       expect(issuesResult.fields[0].examples).toEqual([
@@ -205,11 +187,6 @@ describe("dataset-fields agent tool", () => {
       ]);
 
       // Test events examples
-      const eventsTool = createDatasetFieldsTool(
-        apiService,
-        "sentry-mcp-evals",
-        "events",
-      );
 
       mswServer.use(
         http.get(
@@ -222,9 +199,11 @@ describe("dataset-fields agent tool", () => {
         ),
       );
 
-      const eventsResult = await eventsTool.execute(
+      const eventsResult = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "events",
         { includeExamples: true },
-        mockOptions,
       );
 
       expect(eventsResult.fields[0].examples).toEqual([
@@ -241,18 +220,6 @@ describe("dataset-fields agent tool", () => {
     });
 
     it("should provide correct common patterns for different datasets", async () => {
-      const searchIssuesTool = createDatasetFieldsTool(
-        apiService,
-        "sentry-mcp-evals",
-        "search_issues",
-      );
-
-      const eventsTool = createDatasetFieldsTool(
-        apiService,
-        "sentry-mcp-evals",
-        "events",
-      );
-
       // Mock minimal API response
       mswServer.use(
         http.get(
@@ -262,9 +229,11 @@ describe("dataset-fields agent tool", () => {
       );
 
       // Test patterns are returned correctly for each dataset type
-      const issuesResult = await searchIssuesTool.execute(
+      const issuesResult = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "search_issues",
         { includeExamples: false },
-        mockOptions,
       );
       expect(issuesResult.commonPatterns).toEqual(
         expect.arrayContaining([
@@ -276,9 +245,11 @@ describe("dataset-fields agent tool", () => {
         ]),
       );
 
-      const eventsResult = await eventsTool.execute(
+      const eventsResult = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "events",
         { includeExamples: false },
-        mockOptions,
       );
       expect(eventsResult.commonPatterns).toEqual(
         expect.arrayContaining([
@@ -286,6 +257,77 @@ describe("dataset-fields agent tool", () => {
           { pattern: "has:http.method", description: "HTTP requests" },
         ]),
       );
+    });
+  });
+
+  describe("getFieldExamples", () => {
+    it("should return examples for search_issues fields", () => {
+      expect(getFieldExamples("assignedOrSuggested", "search_issues")).toEqual([
+        "email@example.com",
+        "team-slug",
+        "me",
+      ]);
+      expect(getFieldExamples("is", "search_issues")).toEqual([
+        "unresolved",
+        "resolved",
+        "ignored",
+      ]);
+    });
+
+    it("should return examples for events fields", () => {
+      expect(getFieldExamples("http.method", "events")).toEqual([
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+      ]);
+      expect(getFieldExamples("db.system", "events")).toEqual([
+        "postgresql",
+        "mysql",
+        "redis",
+      ]);
+    });
+
+    it("should return common examples for unknown fields", () => {
+      expect(getFieldExamples("level", "search_issues")).toEqual([
+        "error",
+        "warning",
+        "info",
+        "debug",
+        "fatal",
+      ]);
+      expect(getFieldExamples("unknown", "search_issues")).toBeUndefined();
+    });
+  });
+
+  describe("getCommonPatterns", () => {
+    it("should return patterns for search_issues", () => {
+      const patterns = getCommonPatterns("search_issues");
+      expect(patterns).toContainEqual({
+        pattern: "is:unresolved",
+        description: "Open issues",
+      });
+      expect(patterns).toContainEqual({
+        pattern: "firstSeen:-24h",
+        description: "New issues from last 24 hours",
+      });
+    });
+
+    it("should return patterns for events", () => {
+      const patterns = getCommonPatterns("events");
+      expect(patterns).toContainEqual({
+        pattern: "level:error",
+        description: "Error events",
+      });
+      expect(patterns).toContainEqual({
+        pattern: "has:http.method",
+        description: "HTTP requests",
+      });
+    });
+
+    it("should return empty array for unknown datasets", () => {
+      const patterns = getCommonPatterns("unknown");
+      expect(patterns).toEqual([]);
     });
   });
 });

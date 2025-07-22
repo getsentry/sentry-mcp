@@ -2,13 +2,69 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../api-client";
 
+export type DatasetType = "events" | "errors" | "search_issues";
+
+export interface DatasetField {
+  key: string;
+  name: string;
+  totalValues: number;
+  examples?: string[];
+}
+
+export interface DatasetFieldsResult {
+  dataset: string;
+  fields: DatasetField[];
+  commonPatterns: Array<{ pattern: string; description: string }>;
+}
+
+/**
+ * Discover available fields for a dataset by querying Sentry's tags API
+ */
+export async function discoverDatasetFields(
+  apiService: SentryApiService,
+  organizationSlug: string,
+  dataset: DatasetType,
+  options: {
+    projectId?: string;
+    includeExamples?: boolean;
+  } = {},
+): Promise<DatasetFieldsResult> {
+  const { projectId, includeExamples = false } = options;
+
+  // Get available tags for the dataset
+  const tags = await apiService.listTags({
+    organizationSlug,
+    dataset,
+    project: projectId,
+    statsPeriod: "14d",
+  });
+
+  // Filter out internal Sentry tags and format
+  const fields = tags
+    .filter((tag) => !tag.key.startsWith("sentry:"))
+    .map((tag) => ({
+      key: tag.key,
+      name: tag.name,
+      totalValues: tag.totalValues,
+      examples: includeExamples
+        ? getFieldExamples(tag.key, dataset)
+        : undefined,
+    }));
+
+  return {
+    dataset,
+    fields,
+    commonPatterns: getCommonPatterns(dataset),
+  };
+}
+
 /**
  * Create a tool for discovering available fields in a dataset
  */
 export function createDatasetFieldsTool(
   apiService: SentryApiService,
   organizationSlug: string,
-  dataset: "events" | "errors" | "search_issues",
+  dataset: DatasetType,
   projectId?: string,
 ) {
   return tool({
@@ -20,31 +76,10 @@ export function createDatasetFieldsTool(
         .describe("Include example values for each field"),
     }),
     execute: async ({ includeExamples }) => {
-      // Get available tags for the dataset
-      const tags = await apiService.listTags({
-        organizationSlug,
-        dataset,
-        project: projectId,
-        statsPeriod: "14d",
+      return discoverDatasetFields(apiService, organizationSlug, dataset, {
+        projectId,
+        includeExamples,
       });
-
-      // Filter out internal Sentry tags and format
-      const fields = tags
-        .filter((tag) => !tag.key.startsWith("sentry:"))
-        .map((tag) => ({
-          key: tag.key,
-          name: tag.name,
-          totalValues: tag.totalValues,
-          examples: includeExamples
-            ? getFieldExamples(tag.key, dataset)
-            : undefined,
-        }));
-
-      return {
-        dataset,
-        fields,
-        commonPatterns: getCommonPatterns(dataset),
-      };
     },
   });
 }
@@ -52,7 +87,10 @@ export function createDatasetFieldsTool(
 /**
  * Get example values for common fields
  */
-function getFieldExamples(key: string, dataset: string): string[] | undefined {
+export function getFieldExamples(
+  key: string,
+  dataset: string,
+): string[] | undefined {
   const commonExamples: Record<string, string[]> = {
     level: ["error", "warning", "info", "debug", "fatal"],
     environment: ["production", "staging", "development"],
@@ -86,7 +124,7 @@ function getFieldExamples(key: string, dataset: string): string[] | undefined {
 /**
  * Get common search patterns for a dataset
  */
-function getCommonPatterns(dataset: string) {
+export function getCommonPatterns(dataset: string) {
   if (dataset === "search_issues") {
     return [
       { pattern: "is:unresolved", description: "Open issues" },
