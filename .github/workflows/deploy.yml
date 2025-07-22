@@ -50,6 +50,8 @@ jobs:
 
       - name: Build
         run: pnpm build
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
