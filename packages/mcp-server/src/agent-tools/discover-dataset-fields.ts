@@ -72,7 +72,7 @@ export function createDatasetFieldsTool(
     parameters: z.object({
       includeExamples: z
         .boolean()
-        .optional()
+        .default(false)
         .describe("Include example values for each field"),
     }),
     execute: async ({ includeExamples }) => {
