@@ -214,6 +214,27 @@ describeEval("search-events", {
           },
         ],
       },
+      {
+        input: `Show me errors affecting me in ${FIXTURES.organizationSlug}`,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "whoami",
+            arguments: {},
+          },
+          {
+            name: "search_events",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              naturalLanguageQuery: "errors affecting user.id:12345",
+              dataset: "errors",
+            },
+          },
+        ],
+      },
     ];
   },
   task: NoOpTaskRunner(),
