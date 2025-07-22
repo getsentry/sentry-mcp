@@ -185,18 +185,18 @@ export default defineTool({
       1, // Max 1 retry with error feedback
     );
 
-    // Get the dataset chosen by the agent
-    const dataset = parsed.dataset;
-
-    // Get recommended fields for this dataset (for fallback when no fields are provided)
-    const recommendedFields = RECOMMENDED_FIELDS[dataset];
-
     // Handle Search Events Agent errors first
     if (parsed.error) {
       throw new Error(
-        `Search Events Agent could not translate query "${params.naturalLanguageQuery}" for ${dataset} dataset. Error: ${parsed.error}. Agent response: ${JSON.stringify(parsed, null, 2)}`,
+        `Search Events Agent could not translate query "${params.naturalLanguageQuery}". Error: ${parsed.error}`,
       );
     }
+
+    // Get the dataset chosen by the agent (should be defined when no error)
+    const dataset = parsed.dataset!;
+
+    // Get recommended fields for this dataset (for fallback when no fields are provided)
+    const recommendedFields = RECOMMENDED_FIELDS[dataset];
 
     // Validate that sort parameter was provided
     if (!parsed.sort) {

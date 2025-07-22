@@ -399,7 +399,7 @@ export async function translateQuery(
   organizationSlug: string,
   projectId?: string,
   previousError?: string,
-): Promise<QueryTranslationResult & { dataset: "spans" | "errors" | "logs" }> {
+): Promise<QueryTranslationResult & { dataset?: "spans" | "errors" | "logs" }> {
   // Check if OpenAI API key is available
   if (!process.env.OPENAI_API_KEY) {
     throw new ConfigurationError(
@@ -501,6 +501,7 @@ Fix the issue and try again with the corrected query.`;
       schema: z.object({
         dataset: z
           .enum(["spans", "errors", "logs"])
+          .optional()
           .describe("Which dataset to use for the query"),
         query: z
           .string()
@@ -516,6 +517,7 @@ Fix the issue and try again with the corrected query.`;
           ),
         sort: z
           .string()
+          .optional()
           .describe(
             "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
           ),
@@ -539,6 +541,23 @@ Fix the issue and try again with the corrected query.`;
           .string()
           .optional()
           .describe("Error message if the query cannot be translated"),
+      }).superRefine((data, ctx) => {
+        if (!data.error) { // If no error is present, dataset and sort must be defined
+          if (data.dataset === undefined) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Dataset is required when no error is returned.",
+              path: ["dataset"]
+            });
+          }
+          if (data.sort === undefined) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Sort is required when no error is returned.",
+              path: ["sort"]
+            });
+          }
+        }
       }),
     }),
     experimental_telemetry: {
