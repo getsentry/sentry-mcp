@@ -61,6 +61,12 @@ IMPORTANT SEMANTIC CONVENTIONS:
 - "token usage", "tokens used", "input tokens", "output tokens" → use gen_ai.usage.* attributes
 - "user agents", "user agent strings", "browser", "client" → use user_agent.original attribute
 
+CRITICAL - HANDLING "ME" REFERENCES:
+- If the query contains "me", "my", "myself", or "affecting me", you CANNOT resolve this directly
+- Instead, return an error explaining that the user should first call the 'whoami' tool to get their user ID
+- Suggest the exact query format they should use after getting their user ID (e.g., "user.id:12345")
+- Example error: "Cannot resolve 'me' reference. Please first use the 'whoami' tool to get your user ID, then search for 'user.id:<your-id>'"
+
 CRITICAL TOOL USAGE: You have access to the otelSemantics tool to look up OpenTelemetry semantic convention attributes. Use this tool when:
 - The query asks about concepts that should have OpenTelemetry attributes but you don't see them in the available fields
 - You need to find the correct attribute names for token usage, AI calls, database queries, HTTP requests, etc.
@@ -457,6 +463,11 @@ CRITICAL TOOL USAGE:
 1. Use datasetAttributes tool to discover what fields are available for your chosen dataset
 2. Use otelSemantics tool when you need specific OpenTelemetry attributes (gen_ai.*, db.*, http.*, etc.)
 3. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - ALWAYS use the datasetAttributes tool to find the correct field name (typically user_agent.original) instead of assuming it's related to user.id
+
+CRITICAL - HANDLING "ME" REFERENCES:
+- If the query contains "me", "my", "myself", or "affecting me", you CANNOT resolve this directly
+- Return an error message instructing the user to first call the 'whoami' tool
+- Example: "Cannot resolve 'me' in the query. Please first use the 'whoami' tool to get your user ID, then search for 'user.id:<your-id>' or 'user.email:<your-email>'"
 
 QUERY MODES:
 1. INDIVIDUAL EVENTS (default): Returns raw event data
