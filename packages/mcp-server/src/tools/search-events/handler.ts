@@ -107,7 +107,7 @@ export default defineTool({
     "",
     "Intelligence: AI agent analyzes the query to choose the correct dataset and fields",
     "",
-    "❌ DO NOT USE for 'issues' or 'problems' (use find_issues instead)",
+    "❌ DO NOT USE for 'issues' or 'problems' (use search_issues instead)",
     "",
     "📚 For detailed API patterns and examples, see: docs/search-events-api-patterns.md",
     "",

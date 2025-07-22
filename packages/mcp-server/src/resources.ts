@@ -10,11 +10,11 @@
  * @example Resource Definition
  * ```typescript
  * {
- *   name: "sentry-query-syntax",
- *   uri: "https://github.com/getsentry/sentry-ai-rules/blob/main/api/query-syntax.mdc",
- *   mimeType: "text/plain",
- *   description: "Sentry search query syntax reference for filtering issues and events.",
- *   handler: defaultGitHubHandler,
+ *   name: "sentry-docs-platform",
+ *   template: new ResourceTemplate("https://docs.sentry.io/platforms/{platform}/"),
+ *   mimeType: "text/markdown",
+ *   description: "Sentry SDK documentation for {platform}",
+ *   handler: sentryDocsHandler,
  * }
  * ```
  */
@@ -157,14 +157,6 @@ async function sentryDocsHandler(
 import { SENTRY_PLATFORMS_BASE, SENTRY_FRAMEWORKS } from "./constants";
 
 export const RESOURCES: ResourceConfig[] = [
-  {
-    name: "sentry-query-syntax",
-    uri: "https://github.com/getsentry/sentry-ai-rules/blob/main/api/query-syntax.mdc",
-    mimeType: "text/plain",
-    description:
-      "Use these rules to understand common query parameters when searching Sentry for information.",
-    handler: defaultGitHubHandler,
-  } as UriResourceConfig,
   // Platform documentation with dynamic segments
   {
     name: "sentry-docs-platform",

@@ -3,10 +3,10 @@
   "description": "Model Context Protocol attributes for MCP tool calls and sessions",
   "attributes": {
     "mcp.tool.name": {
-      "description": "Tool name (e.g., find_issues, search_events)",
+      "description": "Tool name (e.g., search_issues, search_events)",
       "type": "string",
       "examples": [
-        "find_issues",
+        "search_issues",
         "search_events",
         "get_issue_details",
         "update_issue"

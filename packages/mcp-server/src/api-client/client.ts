@@ -1355,11 +1355,13 @@ export class SentryApiService {
       projectSlug,
       query,
       sortBy,
+      limit = 10,
     }: {
       organizationSlug: string;
       projectSlug?: string;
       query?: string;
       sortBy?: "user" | "freq" | "date" | "new";
+      limit?: number;
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -1369,7 +1371,7 @@ export class SentryApiService {
     }
 
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "10");
+    queryParams.set("per_page", String(limit));
     queryParams.set("referrer", "sentry-mcp");
     if (sortBy) queryParams.set("sort", sortBy);
     queryParams.set("statsPeriod", "24h");

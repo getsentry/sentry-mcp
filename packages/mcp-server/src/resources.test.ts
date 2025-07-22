@@ -12,18 +12,18 @@ beforeEach(() => {
 describe("resources", () => {
   describe("isTemplateResource", () => {
     it("should correctly identify template resources", () => {
-      const staticResource = RESOURCES.find(
-        (r) => r.name === "sentry-query-syntax",
-      );
       const templateResource = RESOURCES.find(
         (r) => r.name === "sentry-docs-platform",
       );
+      const guideResource = RESOURCES.find(
+        (r) => r.name === "sentry-docs-platform-guide",
+      );
 
-      expect(staticResource).toBeDefined();
       expect(templateResource).toBeDefined();
+      expect(guideResource).toBeDefined();
 
-      expect(isTemplateResource(staticResource!)).toBe(false);
       expect(isTemplateResource(templateResource!)).toBe(true);
+      expect(isTemplateResource(guideResource!)).toBe(true);
     });
   });
 
@@ -140,40 +140,6 @@ describe("resources", () => {
           {} as RequestHandlerExtra<any, any>,
         ),
       ).rejects.not.toThrow(UserInputError);
-    });
-  });
-
-  describe("defaultGitHubHandler", () => {
-    it("should fetch raw GitHub content", async () => {
-      const mockContent = "# Query Syntax Documentation";
-
-      mswServer.use(
-        http.get(
-          "https://raw.githubusercontent.com/getsentry/sentry-ai-rules/main/api/query-syntax.mdc",
-          () => {
-            return HttpResponse.text(mockContent);
-          },
-        ),
-      );
-
-      const syntaxResource = RESOURCES.find(
-        (r) => r.name === "sentry-query-syntax",
-      );
-      expect(syntaxResource).toBeDefined();
-
-      const result = await syntaxResource!.handler(
-        new URL(
-          "https://github.com/getsentry/sentry-ai-rules/blob/main/api/query-syntax.mdc",
-        ),
-        {} as RequestHandlerExtra<any, any>,
-      );
-
-      expect(result.contents).toHaveLength(1);
-      expect(result.contents[0]).toEqual({
-        uri: "https://github.com/getsentry/sentry-ai-rules/blob/main/api/query-syntax.mdc",
-        mimeType: "text/plain",
-        text: mockContent,
-      });
     });
   });
 });

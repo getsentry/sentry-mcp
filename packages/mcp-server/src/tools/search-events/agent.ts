@@ -3,7 +3,7 @@ import { generateText, tool, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { ConfigurationError, UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
-import { lookupOtelSemantics } from "./tools/otel-semantics-lookup";
+import { lookupOtelSemantics } from "../../agent-tools";
 
 // Type definitions
 export interface QueryTranslationResult {
@@ -62,21 +62,27 @@ IMPORTANT SEMANTIC CONVENTIONS:
 - "user agents", "user agent strings", "browser", "client" → use user_agent.original attribute
 
 CRITICAL - HANDLING "ME" REFERENCES:
-- If the query contains "me", "my", "myself", or "affecting me", you CANNOT resolve this directly
-- Instead, return an error explaining that the user should first call the 'whoami' tool to get their user ID
-- Suggest the exact query format they should use after getting their user ID (e.g., "user.id:12345")
-- Example error: "Cannot resolve 'me' reference. Please first use the 'whoami' tool to get your user ID, then search for 'user.id:<your-id>'"
+- If the query contains "me", "my", "myself", or "affecting me" in the context of user.id or user.email fields, use the whoami tool to get the user's ID and email
+- For assignedTo fields, you can use "me" directly without translation (e.g., assignedTo:me works as-is)
+- After calling whoami, replace "me" references with the actual user.id or user.email values
+- If whoami fails, return an error explaining the issue
 
-CRITICAL TOOL USAGE: You have access to the otelSemantics tool to look up OpenTelemetry semantic convention attributes. Use this tool when:
-- The query asks about concepts that should have OpenTelemetry attributes but you don't see them in the available fields
-- You need to find the correct attribute names for token usage, AI calls, database queries, HTTP requests, etc.
+CRITICAL TOOL USAGE: You have access to three tools:
 
-WHEN TO USE THE TOOL:
-- "tokens used", "token usage", "input tokens", "output tokens" → call otelSemantics with namespace "gen_ai"
-- "agent calls", "AI calls", "LLM calls", "model usage" → call otelSemantics with namespace "gen_ai"
-- "database queries", "SQL", "DB operations" → call otelSemantics with namespace "db"
-- "HTTP requests", "API calls", "web requests" → call otelSemantics with namespace "http"
-- "tool calls", "MCP calls" → call otelSemantics with namespace "mcp"
+1. otelSemantics - Look up OpenTelemetry semantic convention attributes. Use when:
+   - "tokens used", "token usage", "input tokens", "output tokens" → call otelSemantics with namespace "gen_ai"
+   - "agent calls", "AI calls", "LLM calls", "model usage" → call otelSemantics with namespace "gen_ai"
+   - "database queries", "SQL", "DB operations" → call otelSemantics with namespace "db"
+   - "HTTP requests", "API calls", "web requests" → call otelSemantics with namespace "http"
+   - "tool calls", "MCP calls" → call otelSemantics with namespace "mcp"
+
+2. datasetAttributes - Query available fields for a dataset. Use when you need to understand what fields are available.
+
+3. whoami - Get authenticated user information. Use when:
+   - Query contains "me", "my", "myself" in context of user.id or user.email fields
+   - Need to resolve user identity for search queries
+
+SPECIFIC FIELD MAPPINGS:
 - "user agents", "browser", "client", "user agent strings" → call datasetAttributes to find user_agent fields
 
 IMPORTANT: Always use the tool to get the exact attribute names before constructing your query, especially for mathematical operations like sum(gen_ai.usage.input_tokens).
@@ -425,6 +431,28 @@ Use this information to construct appropriate queries for the ${dataset} dataset
 }
 
 /**
+ * Create the whoami tool for the AI agent to resolve 'me' references
+ */
+function createWhoamiTool(apiService: SentryApiService) {
+  return tool({
+    description:
+      "Get the authenticated user's information including user ID and email. Use this when you need to resolve 'me' references in queries for user.id or user.email fields.",
+    parameters: z.object({}),
+    execute: async () => {
+      try {
+        const user = await apiService.getAuthenticatedUser();
+        return `Authenticated user: ${user.name} (${user.email}), User ID: ${user.id}`;
+      } catch (error) {
+        if (error instanceof UserInputError) {
+          return `Error: ${error.message}`;
+        }
+        throw error;
+      }
+    },
+  });
+}
+
+/**
  * Translate natural language query to Sentry search syntax using AI
  */
 export async function translateQuery(
@@ -462,12 +490,14 @@ DATASET SELECTION GUIDELINES:
 CRITICAL TOOL USAGE:
 1. Use datasetAttributes tool to discover what fields are available for your chosen dataset
 2. Use otelSemantics tool when you need specific OpenTelemetry attributes (gen_ai.*, db.*, http.*, etc.)
-3. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - ALWAYS use the datasetAttributes tool to find the correct field name (typically user_agent.original) instead of assuming it's related to user.id
+3. Use whoami tool when queries contain "me" references for user.id or user.email fields
+4. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - ALWAYS use the datasetAttributes tool to find the correct field name (typically user_agent.original) instead of assuming it's related to user.id
 
 CRITICAL - HANDLING "ME" REFERENCES:
-- If the query contains "me", "my", "myself", or "affecting me", you CANNOT resolve this directly
-- Return an error message instructing the user to first call the 'whoami' tool
-- Example: "Cannot resolve 'me' in the query. Please first use the 'whoami' tool to get your user ID, then search for 'user.id:<your-id>' or 'user.email:<your-email>'"
+- If the query contains "me", "my", "myself", or "affecting me" in the context of user.id or user.email fields, use the whoami tool to get the user's ID and email
+- For assignedTo fields, you can use "me" directly without translation (e.g., assignedTo:me works as-is)
+- After calling whoami, replace "me" references with the actual user.id or user.email values
+- If whoami fails, return an error explaining the issue
 
 QUERY MODES:
 1. INDIVIDUAL EVENTS (default): Returns raw event data
@@ -549,6 +579,7 @@ Fix the issue and try again with the corrected query.`;
     organizationSlug,
     projectId,
   );
+  const whoamiTool = createWhoamiTool(apiService);
 
   // Use the AI SDK to translate the query with tools and structured output
   const result = await generateText({
@@ -558,6 +589,7 @@ Fix the issue and try again with the corrected query.`;
     tools: {
       datasetAttributes: datasetAttributesTool,
       otelSemantics: otelLookupTool,
+      whoami: whoamiTool,
     },
     maxSteps: 5, // Allow up to 5 sequential tool calls for complex queries requiring multiple lookups
     temperature: 0.1, // Low temperature for more consistent translations

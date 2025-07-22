@@ -24,7 +24,7 @@ export default defineTool({
     "- Provide a Sentry issue URL",
     "",
     "❌ DO NOT USE for:",
-    "- General searching or listing issues (use find_issues)",
+    "- General searching or listing issues (use search_issues)",
     "- Root cause analysis (use analyze_issue_with_seer)",
     "",
     "TRIGGER PATTERNS:",

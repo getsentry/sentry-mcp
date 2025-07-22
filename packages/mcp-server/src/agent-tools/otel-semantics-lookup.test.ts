@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SentryApiService } from "../../../api-client";
+import type { SentryApiService } from "../api-client";
 
-vi.mock("../../../logging", () => ({
+vi.mock("../logging", () => ({
   logError: vi.fn(),
 }));
 
