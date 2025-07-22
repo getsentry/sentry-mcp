@@ -21,7 +21,6 @@ import { RECOMMENDED_FIELDS } from "./config";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
 import { ApiError } from "../../api-client";
-import { logError } from "../../logging";
 
 /**
  * Translate query with error feedback for self-correction
@@ -33,8 +32,6 @@ async function translateQueryWithErrorFeedback(
     projectId?: string;
   },
   apiService: SentryApiService,
-  organizationSlug: string,
-  projectId?: string,
   maxRetries = 1,
 ) {
   let previousError: string | undefined;
@@ -44,40 +41,14 @@ async function translateQueryWithErrorFeedback(
       const result = await translateQuery(
         params,
         apiService,
-        organizationSlug,
-        projectId,
+        params.organizationSlug,
+        params.projectId,
         previousError,
       );
-
-      // Log successful self-correction if this was a retry
-      if (previousError && attempt > 0) {
-        logError("Search Events Agent successful self-correction", {
-          search_events_agent: {
-            previousError,
-            attempt: attempt + 1,
-            originalQuery: params.naturalLanguageQuery,
-            dataset: result.dataset,
-            organizationSlug: params.organizationSlug,
-            correctedQuery: result.query,
-            correctedFields: result.fields,
-          },
-        });
-      }
 
       return result;
     } catch (error) {
       if (error instanceof UserInputError && attempt < maxRetries) {
-        // Log the error feedback scenario for monitoring and improvement
-        logError("Search Events Agent error feedback", {
-          search_events_agent: {
-            error: error.message,
-            attempt: attempt + 1,
-            maxRetries: maxRetries + 1,
-            originalQuery: params.naturalLanguageQuery,
-            organizationSlug: params.organizationSlug,
-          },
-        });
-
         // Feed the validation error back to the agent for self-correction
         previousError = error.message;
         continue;
@@ -180,8 +151,6 @@ export default defineTool({
         projectId,
       },
       apiService,
-      organizationSlug,
-      projectId,
       1, // Max 1 retry with error feedback
     );
 

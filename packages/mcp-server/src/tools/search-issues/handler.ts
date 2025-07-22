@@ -15,7 +15,6 @@ import { translateQuery } from "./agent";
 import { formatIssueResults } from "./formatters";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
-import { logError } from "../../logging";
 
 /**
  * Translate query with error feedback for self-correction
@@ -33,35 +32,9 @@ async function translateQueryWithErrorFeedback(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = await translateQuery(params, apiService, previousError);
-
-      // Log successful self-correction if this was a retry
-      if (previousError && attempt > 0) {
-        logError("Search Issues Agent successful self-correction", {
-          search_issues_agent: {
-            previousError,
-            attempt: attempt + 1,
-            originalQuery: params.naturalLanguageQuery,
-            organizationSlug: params.organizationSlug,
-            correctedQuery: result.query,
-          },
-        });
-      }
-
-      return result;
+      return await translateQuery(params, apiService, previousError);
     } catch (error) {
       if (error instanceof UserInputError && attempt < maxRetries) {
-        // Log the error feedback scenario
-        logError("Search Issues Agent error feedback", {
-          search_issues_agent: {
-            error: error.message,
-            attempt: attempt + 1,
-            maxRetries: maxRetries + 1,
-            originalQuery: params.naturalLanguageQuery,
-            organizationSlug: params.organizationSlug,
-          },
-        });
-
         // Feed the validation error back to the agent for self-correction
         previousError = error.message;
         continue;
@@ -71,7 +44,7 @@ async function translateQueryWithErrorFeedback(
     }
   }
 
-  // This should never be reached due to the throw above
+  // This should never be reached due to the throw above, but TypeScript needs it
   throw new Error("Unexpected error in translateQueryWithErrorFeedback");
 }
 

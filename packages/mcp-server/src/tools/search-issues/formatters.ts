@@ -11,6 +11,7 @@ export function formatIssueResults(
   regionUrl?: string,
 ): string {
   const host = regionUrl ? new URL(regionUrl).host : "sentry.io";
+  const isSaas = host === "sentry.io" || host.endsWith(".sentry.io");
 
   let output = `# Issues in **${organizationSlug}**`;
   if (projectSlug) {
@@ -29,7 +30,10 @@ export function formatIssueResults(
 
   // Format each issue
   issues.forEach((issue, index) => {
-    const issueUrl = `https://${host}/organizations/${organizationSlug}/issues/${issue.id}/`;
+    // Generate issue URL with proper SaaS/self-hosted logic using shortId
+    const issueUrl = isSaas
+      ? `https://${organizationSlug}.${host}/issues/${issue.shortId}`
+      : `https://${host}/organizations/${organizationSlug}/issues/${issue.shortId}`;
 
     output += `## ${index + 1}. [${issue.shortId}](${issueUrl})\n\n`;
     output += `**${issue.title}**\n\n`;
@@ -64,7 +68,13 @@ export function formatIssueResults(
   });
 
   // Add search link
-  const searchUrl = buildSearchUrl(host, organizationSlug, projectSlug, query);
+  const searchUrl = buildSearchUrl(
+    host,
+    isSaas,
+    organizationSlug,
+    projectSlug,
+    query,
+  );
   output += `[View in Sentry Issues](${searchUrl})\n\n`;
 
   output += "<!-- display as issue cards -->";
@@ -77,11 +87,14 @@ export function formatIssueResults(
  */
 function buildSearchUrl(
   host: string,
+  isSaas: boolean,
   organizationSlug: string,
   projectSlug?: string,
   query?: string,
 ): string {
-  let url = `https://${host}/organizations/${organizationSlug}/issues/`;
+  let url = isSaas
+    ? `https://${organizationSlug}.${host}/issues/`
+    : `https://${host}/organizations/${organizationSlug}/issues/`;
 
   const params = new URLSearchParams();
   if (projectSlug) {
