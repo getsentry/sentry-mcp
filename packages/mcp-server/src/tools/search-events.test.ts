@@ -24,6 +24,8 @@ describe("search_events", () => {
     query = "test query",
     fields?: string[],
     errorMessage?: string,
+    sort?: string,
+    timeRange?: { statsPeriod: string } | { start: string; end: string },
   ) => {
     const defaultFields = {
       errors: ["issue", "title", "project", "timestamp", "level", "message"],
@@ -50,7 +52,8 @@ describe("search_events", () => {
           dataset,
           query,
           fields: fields || defaultFields[dataset],
-          sort: defaultSorts[dataset],
+          sort: sort || defaultSorts[dataset],
+          ...(timeRange && { timeRange }),
         };
 
     return {
@@ -310,16 +313,16 @@ describe("search_events", () => {
 
   it("should correctly handle user agent queries", async () => {
     // Mock AI response for user agent query in spans dataset
-    mockGenerateText.mockResolvedValueOnce({
-      experimental_output: {
-        dataset: "spans",
-        query: "has:mcp.tool.name AND has:user_agent.original",
-        fields: ["user_agent.original", "count()"],
-        sort: "-count()",
-        timeRange: { statsPeriod: "24h" },
-      },
-      warnings: [],
-    });
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        "has:mcp.tool.name AND has:user_agent.original",
+        ["user_agent.original", "count()"],
+        undefined,
+        "-count()",
+        { statsPeriod: "24h" },
+      ),
+    );
 
     // Mock the Sentry API response
     mswServer.use(
