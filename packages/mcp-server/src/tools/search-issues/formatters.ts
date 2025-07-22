@@ -32,7 +32,7 @@ export function formatIssueResults(
   issues.forEach((issue, index) => {
     // Generate issue URL with proper SaaS/self-hosted logic using shortId
     const issueUrl = isSaas
-      ? `https://${organizationSlug}.${host}/issues/${issue.shortId}`
+      ? `https://${organizationSlug}.sentry.io/issues/${issue.shortId}`
       : `https://${host}/organizations/${organizationSlug}/issues/${issue.shortId}`;
 
     output += `## ${index + 1}. [${issue.shortId}](${issueUrl})\n\n`;
