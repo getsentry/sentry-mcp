@@ -39,9 +39,11 @@ export interface QueryTranslationParams {
 
 // Base system prompt template
 const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. You need to:
-1. Convert the natural language query to Sentry's search syntax (the WHERE conditions)
-2. Decide which fields to return in the results (the SELECT fields)
+1. Convert the natural language query to Sentry's search syntax
+2. Decide which fields to return in the results
 3. Understand when to use aggregate functions vs individual events
+
+CRITICAL: Sentry does NOT use SQL syntax. Do NOT generate SQL-like queries.
 
 CRITICAL DATASET SELECTION RULES:
 - Mathematical queries about token usage, costs, or AI metrics → ALWAYS use spans dataset
@@ -90,7 +92,7 @@ QUERY MODES:
    - Returns actual event occurrences with full details
    - Include default fields plus any user-requested fields
 
-2. AGGREGATE QUERIES: SQL-like grouping and aggregation
+2. AGGREGATE QUERIES: Grouping and aggregation (NOT SQL)
    - Activated when ANY field contains a function() call
    - Fields should ONLY include: aggregate functions + groupBy fields
    - DO NOT include default fields (id, timestamp, etc.) in aggregate queries
@@ -119,6 +121,14 @@ QUERY SYNTAX RULES:
   - Logs dataset: Do NOT include timestamp filters in query - time filtering handled separately
   - Absolute times: Use comparison operators with ISO dates (e.g., timestamp:<=2025-07-11T04:52:50.511Z)
 - IMPORTANT: For relative durations, use format WITHOUT operators (timestamp:-1h NOT timestamp:>-1h)
+
+CRITICAL - DO NOT USE SQL SYNTAX:
+- NEVER use SQL functions like yesterday(), today(), now(), IS NOT NULL, IS NULL
+- NEVER use SQL date functions - use timeRange parameter instead
+- For "yesterday": Use timeRange: {"statsPeriod": "24h"}, NOT timestamp >= yesterday()
+- For field existence: Use has:field_name, NOT field_name IS NOT NULL
+- For field absence: Use !has:field_name, NOT field_name IS NULL
+- Time filtering MUST use timeRange parameter, NOT SQL date functions in query
 {datasetRules}
 
 EXAMPLES:
@@ -166,6 +176,27 @@ Return a JSON object with these fields:
   - Absolute: {"start": "2025-06-19T07:00:00", "end": "2025-06-20T06:59:59"} for specific date ranges
   - If no time is specified, omit this field entirely (defaults to last 14 days)
 - "error": Error message if you cannot translate the query (OPTIONAL)
+
+CORRECT EXAMPLES (FOLLOW THESE PATTERNS):
+- "models used for token consumption yesterday":
+  {
+    "query": "has:gen_ai.usage.input_tokens",
+    "fields": ["gen_ai.request.model", "sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)"],
+    "sort": "-sum(gen_ai.usage.input_tokens)",
+    "timeRange": {"statsPeriod": "24h"}
+  }
+- "errors with null user IDs":
+  {
+    "query": "!has:user.id",
+    "fields": ["error.type", "title", "timestamp"],
+    "sort": "-timestamp"
+  }
+
+INCORRECT EXAMPLES (NEVER DO THIS):
+- BAD: "query": "timestamp >= yesterday() AND gen_ai.usage.input_tokens IS NOT NULL"
+- BAD: "query": "user.id IS NULL"
+- BAD: "query": "timestamp > now() - 24h"
+- GOOD: Use timeRange parameter and has: operator instead
 
 ERROR HANDLING:
 - If the user's query is impossible to translate to Sentry syntax, set "error" field with explanation
@@ -412,8 +443,10 @@ export async function translateQuery(
 1. FIRST determine which dataset (spans, errors, or logs) is most appropriate for the query
 2. Query the available attributes for that dataset using the datasetAttributes tool
 3. Use the otelSemantics tool if you need OpenTelemetry semantic conventions
-4. Convert the natural language query to Sentry's search syntax
+4. Convert the natural language query to Sentry's search syntax (NOT SQL syntax)
 5. Decide which fields to return in the results
+
+CRITICAL: Sentry does NOT use SQL syntax. Do NOT generate SQL-like queries.
 
 DATASET SELECTION GUIDELINES:
 - spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics, user agent data
@@ -430,10 +463,17 @@ QUERY MODES:
    - Used when fields contain no function() calls
    - Include recommended fields plus any user-requested fields
 
-2. AGGREGATE QUERIES: SQL-like grouping and aggregation
+2. AGGREGATE QUERIES: Grouping and aggregation (NOT SQL)
    - Activated when ANY field contains a function() call
    - Fields should ONLY include: aggregate functions + groupBy fields
    - Automatically groups by ALL non-function fields
+
+CRITICAL - DO NOT USE SQL SYNTAX:
+- NEVER use SQL functions like yesterday(), today(), now(), IS NOT NULL, IS NULL
+- NEVER use SQL date functions - use timeRange parameter instead
+- For "yesterday": Use timeRange: {"statsPeriod": "24h"}, NOT timestamp >= yesterday()
+- For field existence: Use has:field_name, NOT field_name IS NOT NULL
+- For field absence: Use !has:field_name, NOT field_name IS NULL
 
 MATHEMATICAL QUERY PATTERNS:
 When user asks mathematical questions like "how many tokens", "total tokens used", "token usage today":
@@ -451,6 +491,12 @@ Return a JSON object with these fields:
 - "timeRange": Time range parameters (optional)
 - "error": Error message if you cannot translate the query (optional)
 
+CORRECT QUERY PATTERNS (FOLLOW THESE):
+- For field existence: Use has:field_name (NOT field_name IS NOT NULL)
+- For field absence: Use !has:field_name (NOT field_name IS NULL)
+- For time periods: Use timeRange parameter (NOT SQL date functions)
+- Example: "models used yesterday" → query: "has:gen_ai.usage.input_tokens", timeRange: {"statsPeriod": "24h"}
+
 PROCESS:
 1. Analyze the user's query
 2. Determine appropriate dataset
@@ -467,10 +513,16 @@ Your previous query translation failed with this error:
 ${previousError}
 
 Please analyze the error and correct your approach. Common issues:
+- Using SQL syntax (IS NOT NULL, IS NULL, yesterday(), today(), etc.) - Use has: operator and timeRange instead
 - Using numeric functions (sum, avg, min, max, percentiles) on non-numeric fields
 - Using incorrect field names (use the otelSemantics tool to look up correct names)
 - Missing required fields in the fields array for aggregate queries
 - Invalid sort parameter not included in fields array
+
+REMEMBER:
+- For field existence: Use has:field_name (NOT field_name IS NOT NULL)
+- For field absence: Use !has:field_name (NOT field_name IS NULL)
+- For time periods: Use timeRange parameter (NOT SQL date functions like yesterday())
 
 Fix the issue and try again with the corrected query.`;
   }
