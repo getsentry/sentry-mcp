@@ -29,7 +29,7 @@ export async function translateQuery(
   params: {
     naturalLanguageQuery: string;
     organizationSlug: string;
-    projectSlug?: string;
+    projectSlugOrId?: string;
     projectId?: string;
   },
   apiService: SentryApiService,

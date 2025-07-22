@@ -6,7 +6,7 @@ import type { Issue } from "../../api-client";
 export function formatIssueResults(
   issues: Issue[],
   organizationSlug: string,
-  projectSlug: string | undefined,
+  projectSlugOrId: string | undefined,
   query: string,
   regionUrl?: string,
 ): string {
@@ -14,8 +14,8 @@ export function formatIssueResults(
   const isSaas = host === "sentry.io" || host.endsWith(".sentry.io");
 
   let output = `# Issues in **${organizationSlug}`;
-  if (projectSlug) {
-    output += `/${projectSlug}`;
+  if (projectSlugOrId) {
+    output += `/${projectSlugOrId}`;
   }
   output += "**\n\n";
 
@@ -72,7 +72,7 @@ export function formatIssueResults(
     host,
     isSaas,
     organizationSlug,
-    projectSlug,
+    projectSlugOrId,
     query,
   );
   output += `[View in Sentry Issues](${searchUrl})\n\n`;
@@ -89,7 +89,7 @@ function buildSearchUrl(
   host: string,
   isSaas: boolean,
   organizationSlug: string,
-  projectSlug?: string,
+  projectSlugOrId?: string,
   query?: string,
 ): string {
   let url = isSaas
@@ -97,8 +97,8 @@ function buildSearchUrl(
     : `https://${host}/organizations/${organizationSlug}/issues/`;
 
   const params = new URLSearchParams();
-  if (projectSlug) {
-    params.append("project", projectSlug);
+  if (projectSlugOrId) {
+    params.append("project", projectSlugOrId);
   }
   if (query) {
     params.append("query", query);

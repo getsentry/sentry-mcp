@@ -23,7 +23,7 @@ async function translateQueryWithErrorFeedback(
   params: {
     naturalLanguageQuery: string;
     organizationSlug: string;
-    projectSlug?: string;
+    projectSlugOrId?: string;
     projectId?: string;
   },
   apiService: SentryApiService,
@@ -37,7 +37,7 @@ async function translateQueryWithErrorFeedback(
         {
           naturalLanguageQuery: params.naturalLanguageQuery,
           organizationSlug: params.organizationSlug,
-          projectSlug: params.projectSlug,
+          projectSlugOrId: params.projectSlugOrId,
           projectId: params.projectId,
         },
         apiService,
@@ -86,8 +86,9 @@ export default defineTool({
     "</examples>",
     "",
     "<hints>",
-    "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.",
+    "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.",
     "- Parse org/project notation directly without calling find_organizations or find_projects.",
+    "- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -97,7 +98,10 @@ export default defineTool({
       .trim()
       .min(1)
       .describe("Natural language description of issues to search for"),
-    projectSlug: ParamProjectSlug.optional(),
+    projectSlugOrId: z
+      .string()
+      .optional()
+      .describe("The project's slug or numeric ID (optional)"),
     regionUrl: ParamRegionUrl.optional(),
     limit: z
       .number()
@@ -118,49 +122,57 @@ export default defineTool({
     });
 
     setTag("search_issues.organizationSlug", params.organizationSlug);
-    if (params.projectSlug) {
-      setTag("search_issues.projectSlug", params.projectSlug);
+    if (params.projectSlugOrId) {
+      setTag("search_issues.projectSlugOrId", params.projectSlugOrId);
     }
 
     // Convert project slug to ID if needed - required for the agent's field discovery
     let projectId: string | undefined;
-    if (params.projectSlug) {
-      try {
-        const project = await apiService.getProject({
-          organizationSlug: params.organizationSlug,
-          projectSlugOrId: params.projectSlug,
-        });
-        projectId = String(project.id);
-      } catch (error) {
-        throw new Error(
-          `Project '${params.projectSlug}' not found in organization '${params.organizationSlug}'`,
-        );
+    if (params.projectSlugOrId) {
+      // Check if it's already a numeric ID
+      if (/^\d+$/.test(params.projectSlugOrId)) {
+        projectId = params.projectSlugOrId;
+      } else {
+        // It's a slug, convert to ID
+        try {
+          const project = await apiService.getProject({
+            organizationSlug: params.organizationSlug,
+            projectSlugOrId: params.projectSlugOrId,
+          });
+          projectId = String(project.id);
+        } catch (error) {
+          throw new Error(
+            `Project '${params.projectSlugOrId}' not found in organization '${params.organizationSlug}'`,
+          );
+        }
       }
     }
 
     // Translate natural language to Sentry query
     const translatedQuery = await translateQueryWithErrorFeedback(
       {
-        ...params,
+        naturalLanguageQuery: params.naturalLanguageQuery,
+        organizationSlug: params.organizationSlug,
+        projectSlugOrId: params.projectSlugOrId,
         projectId,
       },
       apiService,
       1, // max retries
     );
 
-    // Execute the search
+    // Execute the search - listIssues accepts projectSlug directly
     const issues = await withApiErrorHandling(
       () =>
         apiService.listIssues({
           organizationSlug: params.organizationSlug,
-          projectSlug: params.projectSlug,
+          projectSlug: params.projectSlugOrId,
           query: translatedQuery.query,
           sortBy: translatedQuery.sort || "date",
           limit: params.limit,
         }),
       {
         organizationSlug: params.organizationSlug,
-        projectSlug: params.projectSlug,
+        projectSlug: params.projectSlugOrId,
         query: translatedQuery.query,
       },
     );
@@ -169,7 +181,7 @@ export default defineTool({
     let output = formatIssueResults(
       issues,
       params.organizationSlug,
-      params.projectSlug,
+      params.projectSlugOrId,
       translatedQuery.query,
       params.regionUrl,
     );
