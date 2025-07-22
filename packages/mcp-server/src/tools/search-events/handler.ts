@@ -21,7 +21,6 @@ import { RECOMMENDED_FIELDS } from "./config";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
 import { ApiError } from "../../api-client";
-import { logError } from "../../logging";
 
 /**
  * Translate query with error feedback for self-correction
@@ -33,8 +32,6 @@ async function translateQueryWithErrorFeedback(
     projectId?: string;
   },
   apiService: SentryApiService,
-  organizationSlug: string,
-  projectId?: string,
   maxRetries = 1,
 ) {
   let previousError: string | undefined;
@@ -44,40 +41,14 @@ async function translateQueryWithErrorFeedback(
       const result = await translateQuery(
         params,
         apiService,
-        organizationSlug,
-        projectId,
+        params.organizationSlug,
+        params.projectId,
         previousError,
       );
-
-      // Log successful self-correction if this was a retry
-      if (previousError && attempt > 0) {
-        logError("Search Events Agent successful self-correction", {
-          search_events_agent: {
-            previousError,
-            attempt: attempt + 1,
-            originalQuery: params.naturalLanguageQuery,
-            dataset: result.dataset,
-            organizationSlug: params.organizationSlug,
-            correctedQuery: result.query,
-            correctedFields: result.fields,
-          },
-        });
-      }
 
       return result;
     } catch (error) {
       if (error instanceof UserInputError && attempt < maxRetries) {
-        // Log the error feedback scenario for monitoring and improvement
-        logError("Search Events Agent error feedback", {
-          search_events_agent: {
-            error: error.message,
-            attempt: attempt + 1,
-            maxRetries: maxRetries + 1,
-            originalQuery: params.naturalLanguageQuery,
-            organizationSlug: params.organizationSlug,
-          },
-        });
-
         // Feed the validation error back to the agent for self-correction
         previousError = error.message;
         continue;
@@ -94,27 +65,36 @@ async function translateQueryWithErrorFeedback(
 export default defineTool({
   name: "search_events",
   description: [
-    "Search for error events, log entries, or trace spans. Supports both individual event queries and SQL-like aggregations.",
+    "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.",
     "",
-    "Automatically uses natural language to search across Sentry data, returning either:",
-    "- Individual events with full details (default)",
-    "- Aggregated results when using functions like count(), avg(), sum(), etc.",
+    "Supports TWO query types:",
+    "1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'",
+    "2. Individual events with timestamps: 'show me error logs from last hour'",
     "",
-    "Dataset Selection (AI agent determines the appropriate dataset):",
+    "🔢 USE THIS FOR ALL COUNTS/STATISTICS:",
+    "- 'how many errors today' → returns count",
+    "- 'count of database failures' → returns count",
+    "- 'total number of issues' → returns count",
+    "- 'average response time' → returns avg()",
+    "- 'sum of tokens used' → returns sum()",
+    "",
+    "📋 ALSO USE FOR INDIVIDUAL EVENTS:",
+    "- 'error logs from last hour' → returns event list",
+    "- 'database errors with timestamps' → returns event list",
+    "- 'trace spans for slow API calls' → returns span list",
+    "",
+    "Dataset Selection (AI automatically chooses):",
     "- errors: Exception/crash events",
-    "- logs: Log entries (use for 'error logs')",
-    "- spans: Performance/trace data, AI/LLM calls, token usage",
+    "- logs: Log entries",
+    "- spans: Performance data, AI/LLM calls, token usage",
     "",
-    "Intelligence: AI agent analyzes the query to choose the correct dataset and fields",
-    "",
-    "❌ DO NOT USE for 'issues' or 'problems' (use find_issues instead)",
-    "",
-    "📚 For detailed API patterns and examples, see: docs/search-events-api-patterns.md",
+    "❌ DO NOT USE for grouped issue lists → use search_issues",
     "",
     "<examples>",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='database errors in the last hour')",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='how many tokens used today')",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='slowest API calls')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')",
+    "search_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')",
     "</examples>",
     "",
     "<hints>",
@@ -180,8 +160,6 @@ export default defineTool({
         projectId,
       },
       apiService,
-      organizationSlug,
-      projectId,
       1, // Max 1 retry with error feedback
     );
 

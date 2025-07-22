@@ -2,9 +2,7 @@ import whoami from "./whoami";
 import findOrganizations from "./find-organizations";
 import findTeams from "./find-teams";
 import findProjects from "./find-projects";
-import findIssues from "./find-issues";
 import findReleases from "./find-releases";
-import findTags from "./find-tags";
 import getIssueDetails from "./get-issue-details";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
@@ -17,6 +15,7 @@ import findDsns from "./find-dsns";
 import analyzeIssueWithSeer from "./analyze-issue-with-seer";
 import searchDocs from "./search-docs";
 import getDoc from "./get-doc";
+import searchIssues from "./search-issues";
 
 // Default export: object mapping tool names to tools
 export default {
@@ -24,9 +23,7 @@ export default {
   find_organizations: findOrganizations,
   find_teams: findTeams,
   find_projects: findProjects,
-  find_issues: findIssues,
   find_releases: findReleases,
-  find_tags: findTags,
   get_issue_details: getIssueDetails,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
@@ -39,6 +36,7 @@ export default {
   analyze_issue_with_seer: analyzeIssueWithSeer,
   search_docs: searchDocs,
   get_doc: getDoc,
+  search_issues: searchIssues,
 } as const;
 
 // Type export

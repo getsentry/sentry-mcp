@@ -162,7 +162,7 @@ const KNOWN_NAMESPACES = [
   "security_rule",
 ];
 
-const DATA_DIR = resolve(__dirname, "../src/tools/search-events/tools/data");
+const DATA_DIR = resolve(__dirname, "../src/agent-tools/data");
 const CACHE_DIR = resolve(DATA_DIR, ".cache");
 const GITHUB_BASE_URL =
   "https://raw.githubusercontent.com/open-telemetry/semantic-conventions/main/model";

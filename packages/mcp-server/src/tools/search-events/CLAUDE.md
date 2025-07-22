@@ -15,19 +15,16 @@ search-events/
 ├── agent.ts                      # AI query translation engine
 ├── config.ts                     # Dataset configurations and field definitions
 ├── formatters.ts                 # Result formatting for different datasets
-├── utils.ts                      # Helper functions and utilities
-└── tools/                        # AI agent tools (for embedded agent)
-    └── otel-semantics-lookup.ts  # OpenTelemetry semantics lookup tool
+└── utils.ts                      # Helper functions and utilities
 ```
 
 ## Components
 
 - **handler.ts**: Main tool definition and orchestration
-- **agent.ts**: AI query translation using OpenAI
+- **agent.ts**: AI query translation using OpenAI (uses shared agent tools from `../../agent-tools/`)
 - **config.ts**: Dataset configurations and field definitions
 - **formatters.ts**: Result formatting for different datasets
 - **utils.ts**: Helper functions and utilities
-- **tools/otel-semantics-lookup.ts**: OpenTelemetry semantic lookup
 
 ## Data Flow
 
@@ -80,4 +77,4 @@ The module has deep knowledge of OpenTelemetry semantic conventions:
 
 ## Testing
 
-Tests are located in `../search-events.test.ts` and `tools/otel-semantics-lookup.test.ts`.
+Tests are located in `../search-events.test.ts` and `../../agent-tools/otel-semantics-lookup.test.ts`.

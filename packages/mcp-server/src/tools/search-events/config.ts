@@ -70,7 +70,7 @@ export const DATASET_FIELDS = {
     "gen_ai.usage.output_tokens": "Number of output tokens (numeric)",
 
     // MCP namespace (mcp.*) - for Model Context Protocol tool calls
-    "mcp.tool.name": "Tool name (e.g., find_issues, search_events)",
+    "mcp.tool.name": "Tool name (e.g., search_issues, search_events)",
     "mcp.session.id": "MCP session identifier",
 
     // Aggregate functions (SPANS dataset only - require numeric fields except count/count_unique)

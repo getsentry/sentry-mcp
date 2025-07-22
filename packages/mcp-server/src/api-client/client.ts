@@ -1,4 +1,10 @@
 import {
+  getIssueUrl as getIssueUrlUtil,
+  getTraceUrl as getTraceUrlUtil,
+  getEventsExplorerUrl as getEventsExplorerUrlUtil,
+  isSentryHost,
+} from "../utils/url-utils";
+import {
   OrganizationListSchema,
   ClientKeySchema,
   TeamListSchema,
@@ -190,8 +196,7 @@ export class SentryApiService {
    * @returns True if using Sentry SaaS, false for self-hosted instances
    */
   private isSaas(): boolean {
-    // Check if it's the main sentry.io domain or a regional domain (e.g., us.sentry.io, de.sentry.io)
-    return this.host === "sentry.io" || this.host.endsWith(".sentry.io");
+    return isSentryHost(this.host);
   }
 
   /**
@@ -411,9 +416,7 @@ export class SentryApiService {
    * ```
    */
   getIssueUrl(organizationSlug: string, issueId: string): string {
-    return this.isSaas()
-      ? `https://${organizationSlug}.${this.host}/issues/${issueId}`
-      : `https://${this.host}/organizations/${organizationSlug}/issues/${issueId}`;
+    return getIssueUrlUtil(this.host, organizationSlug, issueId);
   }
 
   /**
@@ -432,9 +435,7 @@ export class SentryApiService {
    * ```
    */
   getTraceUrl(organizationSlug: string, traceId: string): string {
-    return this.isSaas()
-      ? `https://${organizationSlug}.${this.host}/explore/traces/trace/${traceId}`
-      : `https://${this.host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`;
+    return getTraceUrlUtil(this.host, organizationSlug, traceId);
   }
 
   // ================================================================================
@@ -1355,11 +1356,13 @@ export class SentryApiService {
       projectSlug,
       query,
       sortBy,
+      limit = 10,
     }: {
       organizationSlug: string;
       projectSlug?: string;
       query?: string;
       sortBy?: "user" | "freq" | "date" | "new";
+      limit?: number;
     },
     opts?: RequestOptions,
   ): Promise<IssueList> {
@@ -1369,7 +1372,7 @@ export class SentryApiService {
     }
 
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "10");
+    queryParams.set("per_page", String(limit));
     queryParams.set("referrer", "sentry-mcp");
     if (sortBy) queryParams.set("sort", sortBy);
     queryParams.set("statsPeriod", "24h");

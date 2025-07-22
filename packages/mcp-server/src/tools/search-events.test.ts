@@ -381,45 +381,4 @@ describe("search_events", () => {
     // Should NOT contain user.id references
     expect(result).not.toContain("user.id");
   });
-
-  it.skip("integration test - should work with real OpenAI API", async () => {
-    // This test is skipped by default but can be enabled for integration testing
-    // Requires real OPENAI_API_KEY environment variable
-    if (!process.env.OPENAI_API_KEY?.startsWith("sk-")) {
-      return;
-    }
-
-    // Mock the Sentry API response
-    mswServer.use(
-      http.get("https://sentry.io/api/0/organizations/test-org/events/", () =>
-        HttpResponse.json({
-          data: [
-            {
-              id: "test1",
-              timestamp: "2024-01-15T10:30:00Z",
-              message: "Test error message",
-              level: "error",
-            },
-          ],
-        }),
-      ),
-    );
-
-    const result = await searchEvents.handler(
-      {
-        organizationSlug: "test-org",
-        naturalLanguageQuery: "error messages from today",
-        limit: 5,
-        includeExplanation: false,
-      },
-      {
-        accessToken: "test-token",
-        userId: "1",
-        organizationSlug: null,
-      },
-    );
-
-    expect(result).toContain("test1");
-    expect(result).toContain("Test error message");
-  });
 });

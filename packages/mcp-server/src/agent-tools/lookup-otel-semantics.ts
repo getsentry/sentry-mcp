@@ -1,4 +1,4 @@
-import type { SentryApiService } from "../../../api-client";
+import type { SentryApiService } from "../api-client";
 
 // Import all JSON files directly
 import android from "./data/android.json";
