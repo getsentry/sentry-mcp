@@ -30,16 +30,13 @@ interface UseMcpMetadataResult {
   refetch: () => Promise<void>;
 }
 
-export function useMcpMetadata(
-  authToken: string | null,
-  enabled = true,
-): UseMcpMetadataResult {
+export function useMcpMetadata(enabled = true): UseMcpMetadataResult {
   const [metadata, setMetadata] = useState<McpMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchMetadata = useCallback(async () => {
-    if (!authToken || !enabled) {
+    if (!enabled) {
       return;
     }
 
@@ -48,9 +45,7 @@ export function useMcpMetadata(
 
     try {
       const response = await fetch("/api/metadata", {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
+        credentials: "include", // Include cookies
       });
 
       if (!response.ok) {
@@ -68,7 +63,7 @@ export function useMcpMetadata(
     } finally {
       setIsLoading(false);
     }
-  }, [authToken, enabled]);
+  }, [enabled]);
 
   // Fetch metadata when auth token changes or component mounts
   useEffect(() => {
