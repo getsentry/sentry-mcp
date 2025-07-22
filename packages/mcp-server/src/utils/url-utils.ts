@@ -1,4 +1,126 @@
 /**
+ * Determines if a Sentry instance is SaaS or self-hosted based on the host.
+ * @param host The Sentry host (e.g., "sentry.io" or "sentry.company.com")
+ * @returns true if SaaS instance, false if self-hosted
+ */
+export function isSentryHost(host: string): boolean {
+  return host === "sentry.io" || host.endsWith(".sentry.io");
+}
+
+/**
+ * Generates a Sentry issue URL.
+ * @param host The Sentry host
+ * @param organizationSlug Organization identifier
+ * @param issueId Issue identifier (e.g., "PROJECT-123")
+ * @returns The complete issue URL
+ */
+export function getIssueUrl(
+  host: string,
+  organizationSlug: string,
+  issueId: string,
+): string {
+  const isSaas = isSentryHost(host);
+  return isSaas
+    ? `https://${organizationSlug}.${host}/issues/${issueId}`
+    : `https://${host}/organizations/${organizationSlug}/issues/${issueId}`;
+}
+
+/**
+ * Generates a Sentry issues search URL.
+ * @param host The Sentry host
+ * @param organizationSlug Organization identifier
+ * @param query Optional search query
+ * @param projectSlugOrId Optional project slug or ID
+ * @returns The complete issues search URL
+ */
+export function getIssuesSearchUrl(
+  host: string,
+  organizationSlug: string,
+  query?: string,
+  projectSlugOrId?: string,
+): string {
+  const isSaas = isSentryHost(host);
+  let url = isSaas
+    ? `https://${organizationSlug}.${host}/issues/`
+    : `https://${host}/organizations/${organizationSlug}/issues/`;
+
+  const params = new URLSearchParams();
+  if (projectSlugOrId) {
+    params.append("project", projectSlugOrId);
+  }
+  if (query) {
+    params.append("query", query);
+  }
+
+  const queryString = params.toString();
+  if (queryString) {
+    url += `?${queryString}`;
+  }
+
+  return url;
+}
+
+/**
+ * Generates a Sentry trace URL for performance investigation.
+ * @param host The Sentry host
+ * @param organizationSlug Organization identifier
+ * @param traceId Trace identifier
+ * @returns The complete trace URL
+ */
+export function getTraceUrl(
+  host: string,
+  organizationSlug: string,
+  traceId: string,
+): string {
+  const isSaas = isSentryHost(host);
+  return isSaas
+    ? `https://${organizationSlug}.${host}/explore/traces/trace/${traceId}`
+    : `https://${host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`;
+}
+
+/**
+ * Generates a Sentry events explorer URL.
+ * @param host The Sentry host
+ * @param organizationSlug Organization identifier
+ * @param query Search query
+ * @param dataset Dataset type
+ * @param projectSlug Optional project slug
+ * @param fields Optional fields to display
+ * @returns The complete events explorer URL
+ */
+export function getEventsExplorerUrl(
+  host: string,
+  organizationSlug: string,
+  query: string,
+  dataset: "spans" | "errors" | "logs" = "spans",
+  projectSlug?: string,
+  fields?: string[],
+): string {
+  const isSaas = isSentryHost(host);
+  let url = isSaas
+    ? `https://${organizationSlug}.${host}/explore/`
+    : `https://${host}/organizations/${organizationSlug}/explore/`;
+
+  const params = new URLSearchParams();
+  params.append("query", query);
+  params.append("dataset", dataset);
+  params.append("layout", "table");
+
+  if (projectSlug) {
+    params.append("project", projectSlug);
+  }
+
+  if (fields && fields.length > 0) {
+    for (const field of fields) {
+      params.append("field", field);
+    }
+  }
+
+  url += `?${params.toString()}`;
+  return url;
+}
+
+/**
  * Internal validation function that checks if a SENTRY_HOST value contains only hostname (no protocol).
  * Throws an error if validation fails instead of exiting the process.
  *

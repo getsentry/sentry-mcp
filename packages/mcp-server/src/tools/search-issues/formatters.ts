@@ -1,4 +1,5 @@
 import type { Issue } from "../../api-client";
+import { getIssueUrl, getIssuesSearchUrl } from "../../utils/url-utils";
 
 /**
  * Format issue search results for display
@@ -11,7 +12,6 @@ export function formatIssueResults(
   regionUrl?: string,
 ): string {
   const host = regionUrl ? new URL(regionUrl).host : "sentry.io";
-  const isSaas = host === "sentry.io" || host.endsWith(".sentry.io");
 
   let output = `# Issues in **${organizationSlug}`;
   if (projectSlugOrId) {
@@ -30,10 +30,8 @@ export function formatIssueResults(
 
   // Format each issue
   issues.forEach((issue, index) => {
-    // Generate issue URL with proper SaaS/self-hosted logic using shortId
-    const issueUrl = isSaas
-      ? `https://${organizationSlug}.sentry.io/issues/${issue.shortId}`
-      : `https://${host}/organizations/${organizationSlug}/issues/${issue.shortId}`;
+    // Generate issue URL using the utility function
+    const issueUrl = getIssueUrl(host, organizationSlug, issue.shortId);
 
     output += `## ${index + 1}. [${issue.shortId}](${issueUrl})\n\n`;
     output += `**${issue.title}**\n\n`;
@@ -68,48 +66,17 @@ export function formatIssueResults(
   });
 
   // Add search link
-  const searchUrl = buildSearchUrl(
+  const searchUrl = getIssuesSearchUrl(
     host,
-    isSaas,
     organizationSlug,
-    projectSlugOrId,
     query,
+    projectSlugOrId,
   );
   output += `[View in Sentry Issues](${searchUrl})\n\n`;
 
   output += "<!-- display as issue cards -->";
 
   return output;
-}
-
-/**
- * Build Sentry issues search URL
- */
-function buildSearchUrl(
-  host: string,
-  isSaas: boolean,
-  organizationSlug: string,
-  projectSlugOrId?: string,
-  query?: string,
-): string {
-  let url = isSaas
-    ? `https://${organizationSlug}.${host}/issues/`
-    : `https://${host}/organizations/${organizationSlug}/issues/`;
-
-  const params = new URLSearchParams();
-  if (projectSlugOrId) {
-    params.append("project", projectSlugOrId);
-  }
-  if (query) {
-    params.append("query", query);
-  }
-
-  const queryString = params.toString();
-  if (queryString) {
-    url += `?${queryString}`;
-  }
-
-  return url;
 }
 
 /**
