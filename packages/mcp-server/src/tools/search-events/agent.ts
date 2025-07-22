@@ -7,9 +7,9 @@ import { lookupOtelSemantics } from "./tools/otel-semantics-lookup";
 
 // Type definitions
 export interface QueryTranslationResult {
-  query: string;
+  query?: string;
   fields?: string[];
-  sort: string;
+  sort?: string;
   timeRange?:
     | {
         statsPeriod: string;
@@ -498,67 +498,70 @@ Fix the issue and try again with the corrected query.`;
     },
     temperature: 0.1, // Low temperature for more consistent translations
     experimental_output: Output.object({
-      schema: z.object({
-        dataset: z
-          .enum(["spans", "errors", "logs"])
-          .optional()
-          .describe("Which dataset to use for the query"),
-        query: z
-          .string()
-          .optional()
-          .describe(
-            "The Sentry query string for filtering results (empty string returns all recent events)",
-          ),
-        fields: z
-          .array(z.string())
-          .optional()
-          .describe(
-            "Array of field names to return in results. REQUIRED for aggregate queries (include only aggregate functions and groupBy fields). Optional for individual event queries (will use recommended fields if not provided).",
-          ),
-        sort: z
-          .string()
-          .optional()
-          .describe(
-            "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
-          ),
-        timeRange: z
-          .union([
-            z.object({
-              statsPeriod: z
-                .string()
-                .describe("Relative time period like '1h', '24h', '7d'"),
-            }),
-            z.object({
-              start: z.string().describe("ISO 8601 start time"),
-              end: z.string().describe("ISO 8601 end time"),
-            }),
-          ])
-          .optional()
-          .describe(
-            "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
-          ),
-        error: z
-          .string()
-          .optional()
-          .describe("Error message if the query cannot be translated"),
-      }).superRefine((data, ctx) => {
-        if (!data.error) { // If no error is present, dataset and sort must be defined
-          if (data.dataset === undefined) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: "Dataset is required when no error is returned.",
-              path: ["dataset"]
-            });
+      schema: z
+        .object({
+          dataset: z
+            .enum(["spans", "errors", "logs"])
+            .optional()
+            .describe("Which dataset to use for the query"),
+          query: z
+            .string()
+            .optional()
+            .describe(
+              "The Sentry query string for filtering results (empty string returns all recent events)",
+            ),
+          fields: z
+            .array(z.string())
+            .optional()
+            .describe(
+              "Array of field names to return in results. REQUIRED for aggregate queries (include only aggregate functions and groupBy fields). Optional for individual event queries (will use recommended fields if not provided).",
+            ),
+          sort: z
+            .string()
+            .optional()
+            .describe(
+              "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
+            ),
+          timeRange: z
+            .union([
+              z.object({
+                statsPeriod: z
+                  .string()
+                  .describe("Relative time period like '1h', '24h', '7d'"),
+              }),
+              z.object({
+                start: z.string().describe("ISO 8601 start time"),
+                end: z.string().describe("ISO 8601 end time"),
+              }),
+            ])
+            .optional()
+            .describe(
+              "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
+            ),
+          error: z
+            .string()
+            .optional()
+            .describe("Error message if the query cannot be translated"),
+        })
+        .superRefine((data, ctx) => {
+          if (!data.error) {
+            // If no error is present, dataset and sort must be defined
+            if (data.dataset === undefined) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Dataset is required when no error is returned.",
+                path: ["dataset"],
+              });
+            }
+            if (data.sort === undefined) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Sort is required when no error is returned.",
+                path: ["sort"],
+              });
+            }
           }
-          if (data.sort === undefined) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: "Sort is required when no error is returned.",
-              path: ["sort"]
-            });
-          }
-        }
-      }),
+        }),
     }),
     experimental_telemetry: {
       isEnabled: true,
@@ -566,11 +569,22 @@ Fix the issue and try again with the corrected query.`;
     },
   });
 
-  const parsed = result.experimental_output;
+  let parsed: any;
+  try {
+    parsed = result.experimental_output;
+  } catch (error) {
+    // If the AI SDK failed to parse the output, return a safe error object
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Return a safe error response that matches our schema
+    return {
+      error: `AI failed to generate a valid query translation. This may happen when the query is too complex or ambiguous. Please try rephrasing your query. Details: ${errorMessage}`,
+    };
+  }
 
   return {
     dataset: parsed.dataset,
-    query: parsed.query || "",
+    query: parsed.query,
     fields: parsed.fields,
     sort: parsed.sort,
     timeRange: parsed.timeRange,
