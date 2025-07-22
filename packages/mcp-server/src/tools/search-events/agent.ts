@@ -496,6 +496,7 @@ Fix the issue and try again with the corrected query.`;
       datasetAttributes: datasetAttributesTool,
       otelSemantics: otelLookupTool,
     },
+    maxSteps: 5, // Allow up to 5 sequential tool calls for complex queries requiring multiple lookups
     temperature: 0.1, // Low temperature for more consistent translations
     experimental_output: Output.object({
       schema: z
