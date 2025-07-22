@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { z } from "zod";
 import { SCOPES } from "../../constants";
 import type { Env } from "../types";
 import { createErrorPage, createSuccessPage } from "../lib/html-utils";
@@ -26,7 +27,7 @@ function isDevelopmentEnvironment(url: string): boolean {
 }
 
 // Get secure cookie options based on environment
-function getSecureCookieOptions(url: string, maxAge?: number) {
+export function getSecureCookieOptions(url: string, maxAge?: number) {
   const isDev = isDevelopmentEnvironment(url);
   return {
     httpOnly: true,
@@ -37,40 +38,58 @@ function getSecureCookieOptions(url: string, maxAge?: number) {
   };
 }
 
-// OAuth client registration interface (RFC 7591)
-interface ClientRegistrationRequest {
-  client_name: string;
-  client_uri?: string;
-  redirect_uris: string[];
-  grant_types: string[];
-  response_types: string[];
-  token_endpoint_auth_method: string;
-  scope: string;
-}
+// OAuth client registration schemas (RFC 7591)
+const ClientRegistrationRequestSchema = z.object({
+  client_name: z.string(),
+  client_uri: z.string().optional(),
+  redirect_uris: z.array(z.string()),
+  grant_types: z.array(z.string()),
+  response_types: z.array(z.string()),
+  token_endpoint_auth_method: z.string(),
+  scope: z.string(),
+});
 
-interface ClientRegistrationResponse {
-  client_id: string;
-  redirect_uris: string[];
-  client_name?: string;
-  client_uri?: string;
-  grant_types?: string[];
-  response_types?: string[];
-  token_endpoint_auth_method?: string;
-  registration_client_uri?: string;
-  client_id_issued_at?: number;
-}
+type ClientRegistrationRequest = z.infer<
+  typeof ClientRegistrationRequestSchema
+>;
 
-// Token exchange interface - this is what the MCP server's OAuth returns
-interface TokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in?: number;
-  refresh_token?: string;
-  scope?: string;
-}
+const ClientRegistrationResponseSchema = z.object({
+  client_id: z.string(),
+  redirect_uris: z.array(z.string()),
+  client_name: z.string().optional(),
+  client_uri: z.string().optional(),
+  grant_types: z.array(z.string()).optional(),
+  response_types: z.array(z.string()).optional(),
+  token_endpoint_auth_method: z.string().optional(),
+  registration_client_uri: z.string().optional(),
+  client_id_issued_at: z.number().optional(),
+});
+
+type ClientRegistrationResponse = z.infer<
+  typeof ClientRegistrationResponseSchema
+>;
+
+// Token exchange schema - this is what the MCP server's OAuth returns
+const TokenResponseSchema = z.object({
+  access_token: z.string(),
+  token_type: z.string(),
+  expires_in: z.number().optional(),
+  refresh_token: z.string().optional(),
+  scope: z.string().optional(),
+});
+
+type TokenResponse = z.infer<typeof TokenResponseSchema>;
+
+// Auth data schema (same as in chat.ts)
+const AuthDataSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string(),
+  expires_at: z.string(),
+  token_type: z.string(),
+});
 
 // Get or register OAuth client with the MCP server
-async function getOrRegisterChatClient(
+export async function getOrRegisterChatClient(
   env: Env,
   redirectUri: string,
 ): Promise<string> {
@@ -81,9 +100,9 @@ async function getOrRegisterChatClient(
     CHAT_CLIENT_REGISTRATION_KEY,
   );
   if (existingRegistration) {
-    const registration = JSON.parse(
-      existingRegistration,
-    ) as ClientRegistrationResponse;
+    const registration = ClientRegistrationResponseSchema.parse(
+      JSON.parse(existingRegistration),
+    );
     // Verify the redirect URI matches (in case the deployment URL changed)
     if (registration.redirect_uris?.includes(redirectUri)) {
       return registration.client_id;
@@ -126,8 +145,9 @@ async function getOrRegisterChatClient(
     );
   }
 
-  const registrationResponse =
-    (await response.json()) as ClientRegistrationResponse;
+  const registrationResponse = ClientRegistrationResponseSchema.parse(
+    await response.json(),
+  );
 
   // Store the registration in KV for future use
   await env.OAUTH_KV.put(
@@ -174,7 +194,8 @@ async function exchangeCodeForToken(
     throw new Error(`Token exchange failed: ${response.status} - ${error}`);
   }
 
-  return response.json() as Promise<TokenResponse>;
+  const data = await response.json();
+  return TokenResponseSchema.parse(data);
 }
 
 // HTML template helpers are now imported from ../lib/html-utils
@@ -276,9 +297,25 @@ export default new Hono<{
         clientId,
       );
 
-      // Return a success page that passes the MCP token to the parent window
-      // The MCP token is all we need - it handles Sentry authentication internally
-      return c.html(createSuccessPage(tokenResponse.access_token));
+      // Store complete auth data in secure cookie
+      const authData = {
+        access_token: tokenResponse.access_token,
+        refresh_token: tokenResponse.refresh_token || "", // Ensure we always have a refresh token
+        expires_at: new Date(
+          Date.now() + (tokenResponse.expires_in || 28800) * 1000,
+        ).toISOString(),
+        token_type: tokenResponse.token_type,
+      };
+
+      setCookie(
+        c,
+        "sentry_auth_data",
+        JSON.stringify(authData),
+        getSecureCookieOptions(c.req.url, 30 * 24 * 60 * 60), // 30 days max
+      );
+
+      // Return a success page - auth is now handled via cookies
+      return c.html(createSuccessPage());
     } catch (error) {
       logError(error);
       return c.html(
@@ -293,9 +330,30 @@ export default new Hono<{
   })
 
   /**
+   * Check authentication status
+   */
+  .get("/status", async (c) => {
+    const authDataCookie = getCookie(c, "sentry_auth_data");
+
+    if (!authDataCookie) {
+      return c.json({ authenticated: false }, 401);
+    }
+
+    try {
+      AuthDataSchema.parse(JSON.parse(authDataCookie));
+      return c.json({ authenticated: true });
+    } catch {
+      return c.json({ authenticated: false }, 401);
+    }
+  })
+
+  /**
    * Logout endpoint to clear authentication
    */
   .post("/logout", async (c) => {
+    // Clear auth cookie
+    deleteCookie(c, "sentry_auth_data", getSecureCookieOptions(c.req.url));
+
     // In a real implementation, you might want to revoke the token
     // For now, we'll just return success since the frontend handles token removal
     return c.json({ success: true });

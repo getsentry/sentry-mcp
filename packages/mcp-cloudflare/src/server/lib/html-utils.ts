@@ -208,16 +208,15 @@ export function createHtmlPage(options: HtmlPageOptions): string {
  * Creates a success page for OAuth flows
  */
 export function createSuccessPage(
-  accessToken: string,
   options: Partial<HtmlPageOptions> = {},
 ): string {
   const bodyScript = `
-    // Pass the MCP token to the parent window
+    // Notify parent window of success
     if (window.opener) {
       window.opener.postMessage({
         type: 'SENTRY_AUTH_SUCCESS',
         data: {
-          accessToken: ${JSON.stringify(accessToken)}
+          // No token needed - auth handled via cookies
         }
       }, '*');
     }

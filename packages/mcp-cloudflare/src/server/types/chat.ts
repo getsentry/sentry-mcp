@@ -6,6 +6,7 @@
 export type ErrorName =
   // 400-level errors (client errors)
   | "MISSING_AUTH_TOKEN"
+  | "INVALID_AUTH_DATA"
   | "INVALID_MESSAGES_FORMAT"
   // 401-level errors (authentication)
   | "AUTH_EXPIRED"

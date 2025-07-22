@@ -13,7 +13,6 @@ import {
   isOAuthErrorMessage,
 } from "../components/chat/types";
 
-const TOKEN_KEY = "sentry_access_token";
 const POPUP_CHECK_INTERVAL = 1000;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,7 +24,6 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authToken, setAuthToken] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState("");
 
@@ -33,14 +31,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const popupRef = useRef<Window | null>(null);
   const intervalRef = useRef<number | null>(null);
 
-  // Initialize from localStorage
+  // Check if authenticated by making a request to the server
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      setAuthToken(token);
-      setIsAuthenticated(true);
-    }
-    setIsLoading(false);
+    // Check authentication status
+    fetch("/api/auth/status", { credentials: "include" })
+      .then((res) => res.ok)
+      .then((authenticated) => {
+        setIsAuthenticated(authenticated);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+        setIsLoading(false);
+      });
   }, []);
 
   // Handle OAuth messages
@@ -50,16 +53,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (event.origin !== window.location.origin) return;
 
       if (isOAuthSuccessMessage(event.data)) {
-        const { accessToken } = event.data.data;
-
-        // Update state
-        setAuthToken(accessToken);
+        // Auth succeeded - cookies were set server-side
         setIsAuthenticated(true);
         setIsAuthenticating(false);
         setAuthError("");
-
-        // Save to storage
-        localStorage.setItem(TOKEN_KEY, accessToken);
 
         // Cleanup
         if (intervalRef.current) {
@@ -141,21 +138,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setIsAuthenticated(false);
-    setAuthToken("");
-    localStorage.removeItem(TOKEN_KEY);
   }, []);
 
   const clearAuthState = useCallback(() => {
     setIsAuthenticated(false);
-    setAuthToken("");
     setAuthError("");
-    localStorage.removeItem(TOKEN_KEY);
   }, []);
 
   const value: AuthContextType = {
     isLoading,
     isAuthenticated,
-    authToken,
+    authToken: "", // Keep for backward compatibility
     isAuthenticating,
     authError,
     handleOAuthLogin,

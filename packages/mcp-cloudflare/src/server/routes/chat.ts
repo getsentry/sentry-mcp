@@ -1,7 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { openai } from "@ai-sdk/openai";
 import { streamText, type ToolSet } from "ai";
 import { experimental_createMCPClient } from "ai";
+import { z } from "zod";
 import type { Env } from "../types";
 import { logError } from "@sentry/mcp-server/logging";
 import type {
@@ -18,6 +19,92 @@ function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
   return errorResponse;
 }
 
+const AuthDataSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string(),
+  expires_at: z.string(),
+  token_type: z.string(),
+});
+
+type AuthData = z.infer<typeof AuthDataSchema>;
+
+const TokenResponseSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string(),
+  expires_in: z.number().optional(),
+  token_type: z.string(),
+});
+
+async function refreshTokenIfNeeded(
+  c: Context<{ Bindings: Env }>,
+): Promise<{ token: string; authData: AuthData } | null> {
+  const { getCookie, setCookie, deleteCookie } = await import("hono/cookie");
+
+  const authDataCookie = getCookie(c, "sentry_auth_data");
+  if (!authDataCookie) {
+    return null;
+  }
+
+  try {
+    const authData = AuthDataSchema.parse(JSON.parse(authDataCookie));
+
+    if (!authData.refresh_token) {
+      return null;
+    }
+
+    // Import OAuth functions
+    const { getOrRegisterChatClient } = await import("./chat-oauth");
+
+    // Get the MCP host and client ID
+    const redirectUri = new URL("/api/auth/callback", c.req.url).href;
+    const clientId = await getOrRegisterChatClient(c.env, redirectUri);
+    const mcpHost = new URL(c.req.url).origin;
+    const tokenUrl = `${mcpHost}/oauth/token`;
+
+    // Exchange refresh token for new tokens
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: clientId,
+      refresh_token: authData.refresh_token,
+    });
+
+    const response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+        "User-Agent": "Sentry MCP Chat Demo",
+      },
+      body: body.toString(),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      logError(`Token refresh failed: ${response.status} - ${error}`);
+      const { getSecureCookieOptions } = await import("./chat-oauth");
+      deleteCookie(c, "sentry_auth_data", getSecureCookieOptions(c.req.url));
+      return null;
+    }
+
+    const tokenResponse = TokenResponseSchema.parse(await response.json());
+
+    // Prepare new auth data
+    const newAuthData = {
+      access_token: tokenResponse.access_token,
+      refresh_token: tokenResponse.refresh_token,
+      expires_at: new Date(
+        Date.now() + (tokenResponse.expires_in || 28800) * 1000,
+      ).toISOString(),
+      token_type: tokenResponse.token_type,
+    };
+
+    return { token: tokenResponse.access_token, authData: newAuthData };
+  } catch (error) {
+    logError(error);
+    return null;
+  }
+}
+
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   // Validate that we have an OpenAI API key
   if (!c.env.OPENAI_API_KEY) {
@@ -31,9 +118,11 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     );
   }
 
-  // Get the authorization header for MCP authentication
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  // Get the access token from cookie
+  const { getCookie } = await import("hono/cookie");
+  const authDataCookie = getCookie(c, "sentry_auth_data");
+
+  if (!authDataCookie) {
     return c.json(
       createErrorResponse({
         error: "Authorization required",
@@ -43,7 +132,19 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     );
   }
 
-  const accessToken = authHeader.substring(7); // Remove "Bearer " prefix
+  let accessToken: string;
+  try {
+    const authData = AuthDataSchema.parse(JSON.parse(authDataCookie));
+    accessToken = authData.access_token;
+  } catch (error) {
+    return c.json(
+      createErrorResponse({
+        error: "Invalid auth data",
+        name: "INVALID_AUTH_DATA",
+      }),
+      401,
+    );
+  }
 
   // Rate limiting check - use a hash of the access token as the key
   // Note: Rate limiting bindings are "unsafe" (beta) and may not be available in development
@@ -167,6 +268,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     // Create MCP client connection to the SSE endpoint
     let mcpClient: MCPClient | null = null;
     const tools: ToolSet = {};
+    let currentAccessToken = accessToken;
 
     try {
       // Get the current request URL to construct the SSE endpoint URL
@@ -179,7 +281,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           type: "sse" as const,
           url: sseUrl,
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${currentAccessToken}`,
           },
         },
       });
@@ -193,21 +295,75 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       // Check if this is an authentication error
       const authInfo = analyzeAuthError(error);
       if (authInfo.isAuthError) {
+        // Attempt token refresh
+        const refreshResult = await refreshTokenIfNeeded(c);
+        if (refreshResult) {
+          try {
+            // Retry with new token
+            currentAccessToken = refreshResult.token;
+            const requestUrl = new URL(c.req.url);
+            const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
+
+            mcpClient = await experimental_createMCPClient({
+              name: "sentry",
+              transport: {
+                type: "sse" as const,
+                url: sseUrl,
+                headers: {
+                  Authorization: `Bearer ${currentAccessToken}`,
+                },
+              },
+            });
+
+            Object.assign(tools, await mcpClient.tools());
+            console.log(
+              `Connected to ${sseUrl} with ${Object.keys(tools).length} tools after refresh`,
+            );
+
+            // Update cookie with new auth data
+            const { setCookie } = await import("hono/cookie");
+            const { getSecureCookieOptions } = await import("./chat-oauth");
+            setCookie(
+              c,
+              "sentry_auth_data",
+              JSON.stringify(refreshResult.authData),
+              getSecureCookieOptions(c.req.url, 30 * 24 * 60 * 60),
+            );
+          } catch (retryError) {
+            if (authInfo.statusCode === 403) {
+              return c.json(
+                createErrorResponse(getAuthErrorResponse(authInfo)),
+                403,
+              );
+            }
+            return c.json(
+              createErrorResponse(getAuthErrorResponse(authInfo)),
+              401,
+            );
+          }
+        } else {
+          if (authInfo.statusCode === 403) {
+            return c.json(
+              createErrorResponse(getAuthErrorResponse(authInfo)),
+              403,
+            );
+          }
+          return c.json(
+            createErrorResponse(getAuthErrorResponse(authInfo)),
+            401,
+          );
+        }
+      } else {
+        const eventId = logError(error);
         return c.json(
-          createErrorResponse(getAuthErrorResponse(authInfo)),
-          authInfo.statusCode || (401 as any),
+          createErrorResponse({
+            error: "Failed to connect to MCP server",
+            name: "MCP_CONNECTION_FAILED",
+            eventId,
+          }),
+          500,
         );
       }
-
-      const eventId = logError(error);
-      return c.json(
-        createErrorResponse({
-          error: "Failed to connect to MCP server",
-          name: "MCP_CONNECTION_FAILED",
-          eventId,
-        }),
-        500,
-      );
     }
 
     const result = streamText({

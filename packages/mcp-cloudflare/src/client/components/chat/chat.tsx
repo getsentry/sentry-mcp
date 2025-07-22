@@ -20,7 +20,6 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
   const {
     isLoading,
     isAuthenticated,
-    authToken,
     isAuthenticating,
     authError,
     handleOAuthLogin,
@@ -35,7 +34,7 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     metadata: mcpMetadata,
     isLoading: isMetadataLoading,
     error: metadataError,
-  } = useMcpMetadata(authToken, isAuthenticated);
+  } = useMcpMetadata(isAuthenticated);
 
   // Initialize streaming simulation first (without scroll callback)
   const {
@@ -58,7 +57,7 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     append,
   } = useChat({
     api: "/api/chat",
-    headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+    // No auth header needed - server reads from cookie
     // No ID to disable useChat's built-in persistence
     // We handle persistence manually via usePersistedChat hook
     initialMessages,
@@ -209,12 +208,11 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
   }, []);
 
   // Track previous auth state to detect logout events
-  const prevAuthStateRef = useRef({ isAuthenticated, authToken });
+  const prevAuthStateRef = useRef(isAuthenticated);
 
   // Clear messages when user logs out (auth state changes from authenticated to not)
   useEffect(() => {
-    const prevState = prevAuthStateRef.current;
-    const wasAuthenticated = prevState.isAuthenticated;
+    const wasAuthenticated = prevAuthStateRef.current;
 
     // Detect logout: was authenticated but now isn't
     if (wasAuthenticated && !isAuthenticated) {
@@ -222,40 +220,32 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
     }
 
     // Update the ref for next comparison
-    prevAuthStateRef.current = { isAuthenticated, authToken };
-  }, [isAuthenticated, authToken, clearMessages]);
+    prevAuthStateRef.current = isAuthenticated;
+  }, [isAuthenticated, clearMessages]);
 
   // Save messages when they change
   useEffect(() => {
     saveMessages(messages);
   }, [messages, saveMessages]);
 
-  // Only clear messages on explicit logout, not during reauthentication
-  // This is now handled in the handleLogout function
-
-  // Track if we had an auth error before and the token when it happened
+  // Track if we had an auth error before
   const hadAuthErrorRef = useRef(false);
-  const authTokenWhenErrorRef = useRef<string>("");
-  const retriedRef = useRef(false);
+  const wasAuthenticatedRef = useRef(isAuthenticated);
 
   // Handle auth error detection and retry after reauthentication
   useEffect(() => {
-    // If we get an auth error, record it and the current token
+    // If we get an auth error, record it
     if (error && isAuthError(error) && !hadAuthErrorRef.current) {
       hadAuthErrorRef.current = true;
-      authTokenWhenErrorRef.current = authToken;
-      retriedRef.current = false;
     }
 
-    // If we had an auth error and the token changed (reauthentication), retry once
+    // If we had an auth error and just re-authenticated, retry once
     if (
       hadAuthErrorRef.current &&
-      authToken &&
-      authToken !== authTokenWhenErrorRef.current &&
-      !retriedRef.current
+      !wasAuthenticatedRef.current &&
+      isAuthenticated
     ) {
       hadAuthErrorRef.current = false;
-      retriedRef.current = true;
       // Retry the failed message
       reload();
     }
@@ -263,10 +253,11 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
     // Reset retry state on successful completion (no error)
     if (!error) {
       hadAuthErrorRef.current = false;
-      retriedRef.current = false;
-      authTokenWhenErrorRef.current = "";
     }
-  }, [authToken, error, reload]);
+
+    // Update auth state ref
+    wasAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated, error, reload]);
 
   // Handle slash commands
   const handleSlashCommand = useCallback(
