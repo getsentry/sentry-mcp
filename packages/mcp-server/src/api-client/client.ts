@@ -700,7 +700,9 @@ export class SentryApiService {
    * @throws {ApiError} If authentication fails or user not found
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
-    const body = await this.requestJSON("/auth/", undefined, opts);
+    // Auth endpoints only exist on the main API server, never on regional endpoints
+    // Always use the configured host, ignoring any regional overrides
+    const body = await this.requestJSON("/auth/", undefined, {});
     return UserSchema.parse(body);
   }
 
@@ -732,10 +734,11 @@ export class SentryApiService {
     // For SaaS, try to use regions endpoint first
     try {
       // TODO: Sentry is currently not returning all orgs without hitting region endpoints
+      // The regions endpoint only exists on the main API server, not on regional endpoints
       const regionsBody = await this.requestJSON(
         "/users/me/regions/",
         undefined,
-        opts,
+        {}, // Don't pass opts to ensure we use the main host
       );
       const regionData = UserRegionsSchema.parse(regionsBody);
 
