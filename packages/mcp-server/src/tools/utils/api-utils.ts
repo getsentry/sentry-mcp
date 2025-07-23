@@ -55,52 +55,38 @@ export function apiServiceFromContext(
  * @param error - The error to handle
  * @param params - The parameters that were used in the API call
  * @returns Never - always throws an error
- * @throws {UserInputError} For errors that are clearly user input issues
+ * @throws {UserInputError} For 4xx errors that are likely user input issues
  * @throws {Error} For other errors
  */
 export function handleApiError(
   error: unknown,
   params?: Record<string, unknown>,
 ): never {
-  if (error instanceof ApiError && error.status === 404) {
-    // Build a list of all provided parameters
-    const paramsList: string[] = [];
-    if (params) {
-      for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== null && value !== "") {
-          paramsList.push(`${key}: '${value}'`);
+  if (error instanceof ApiError) {
+    // For 4xx errors, convert to UserInputError with status code in message
+    // This provides agents with the specific error type while using the appropriate error class
+    if (error.status >= 400 && error.status < 500) {
+      let message = `API error (${error.status}): ${error.message}`;
+
+      // For 404s, add helpful context about parameters if available
+      if (error.status === 404 && params) {
+        const paramsList: string[] = [];
+        for (const [key, value] of Object.entries(params)) {
+          if (value !== undefined && value !== null && value !== "") {
+            paramsList.push(`${key}: '${value}'`);
+          }
+        }
+
+        if (paramsList.length > 0) {
+          message = `Resource not found (404): ${error.message}\nPlease verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`;
         }
       }
-    }
 
-    if (paramsList.length > 0) {
-      throw new UserInputError(
-        `Resource not found. Please verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`,
-      );
-    }
-
-    // Fallback to generic message if no params provided
-    throw new UserInputError(
-      `Resource not found (404). Please verify that all provided identifiers are correct and you have access to the requested resources.`,
-    );
-  }
-
-  // For other API errors, check if they're likely user input issues
-  if (error instanceof ApiError) {
-    // 400 Bad Request often indicates invalid parameters
-    if (error.status === 400) {
-      throw new UserInputError(`Invalid request: ${error.message}`);
-    }
-
-    // 403 Forbidden might be a permissions issue but could also be wrong org/project
-    if (error.status === 403) {
-      throw new UserInputError(
-        `Access denied: ${error.message}. Please verify you have access to this resource.`,
-      );
+      throw new UserInputError(message, { cause: error });
     }
   }
 
-  // Re-throw any other errors as-is
+  // Re-throw any other errors as-is (including 5xx server errors)
   throw error;
 }
 

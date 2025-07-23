@@ -10,21 +10,47 @@ export function formatIssueResults(
   projectSlugOrId: string | undefined,
   query: string,
   regionUrl?: string,
+  naturalLanguageQuery?: string,
+  skipHeader = false,
 ): string {
   const host = regionUrl ? new URL(regionUrl).host : "sentry.io";
 
-  let output = `# Issues in **${organizationSlug}`;
-  if (projectSlugOrId) {
-    output += `/${projectSlugOrId}`;
+  let output = "";
+
+  // Skip header section if requested (when called from handler with includeExplanation)
+  if (!skipHeader) {
+    // Use natural language query in title if provided, otherwise fall back to org/project
+    if (naturalLanguageQuery) {
+      output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+    } else {
+      output = `# Issues in **${organizationSlug}`;
+      if (projectSlugOrId) {
+        output += `/${projectSlugOrId}`;
+      }
+      output += "**\n\n";
+    }
+
+    // Add display instructions for UI
+    output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
   }
-  output += "**\n\n";
 
   if (issues.length === 0) {
     output += "No issues found matching your search criteria.\n\n";
-    output += `**Query**: \`${query}\`\n\n`;
     output += "Try adjusting your search criteria or time range.";
     return output;
   }
+
+  // Generate search URL for viewing results
+  const searchUrl = getIssuesSearchUrl(
+    host,
+    organizationSlug,
+    query,
+    projectSlugOrId,
+  );
+
+  // Add view link with emoji and guidance text (like search_events)
+  output += `**📊 View these results in Sentry**: ${searchUrl}\n`;
+  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   output += `Found **${issues.length}** issue${issues.length === 1 ? "" : "s"}:\n\n`;
 
@@ -65,16 +91,14 @@ export function formatIssueResults(
     output += "\n";
   });
 
-  // Add search link
-  const searchUrl = getIssuesSearchUrl(
-    host,
-    organizationSlug,
-    query,
-    projectSlugOrId,
-  );
-  output += `[View in Sentry Issues](${searchUrl})\n\n`;
-
-  output += "<!-- display as issue cards -->";
+  // Add next steps section (like search_events)
+  output += "## Next Steps\n\n";
+  output +=
+    "- Get more details about a specific issue: Use the Issue ID with get_issue_details\n";
+  output +=
+    "- Update issue status: Use update_issue to resolve or assign issues\n";
+  output +=
+    "- View event counts: Use search_events for aggregated statistics\n";
 
   return output;
 }

@@ -20,7 +20,7 @@ describe("handleApiError", () => {
         issueId: "PROJ-123",
       }),
     ).toThrow(
-      "Resource not found. Please verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - issueId: 'PROJ-123'",
+      "Resource not found (404): Not Found\nPlease verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - issueId: 'PROJ-123'",
     );
   });
 
@@ -37,7 +37,7 @@ describe("handleApiError", () => {
         emptyString: "",
       }),
     ).toThrow(
-      "Resource not found. Please verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - projectSlug: 'my-project'\n  - limit: '0'",
+      "Resource not found (404): Not Found\nPlease verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - projectSlug: 'my-project'\n  - limit: '0'",
     );
   });
 
@@ -45,7 +45,7 @@ describe("handleApiError", () => {
     const error = new ApiError("Not Found", 404);
 
     expect(() => handleApiError(error, {})).toThrow(
-      "Resource not found (404). Please verify that all provided identifiers are correct and you have access to the requested resources.",
+      "API error (404): Not Found",
     );
   });
 
@@ -55,16 +55,14 @@ describe("handleApiError", () => {
     expect(() => handleApiError(error)).toThrow(UserInputError);
 
     expect(() => handleApiError(error)).toThrow(
-      "Invalid request: Invalid parameters",
+      "API error (400): Invalid parameters",
     );
   });
 
   it("converts 403 errors to UserInputError with access message", () => {
     const error = new ApiError("Forbidden", 403);
 
-    expect(() => handleApiError(error)).toThrow(
-      "Access denied: Forbidden. Please verify you have access to this resource.",
-    );
+    expect(() => handleApiError(error)).toThrow("API error (403): Forbidden");
   });
 
   it("re-throws non-API errors unchanged", () => {
@@ -98,7 +96,7 @@ describe("withApiErrorHandling", () => {
         },
       ),
     ).rejects.toThrow(
-      "Resource not found. Please verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - issueId: 'PROJ-123'",
+      "Resource not found (404): Not Found\nPlease verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - issueId: 'PROJ-123'",
     );
   });
 });

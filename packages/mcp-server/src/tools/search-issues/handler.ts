@@ -182,26 +182,47 @@ export default defineTool({
       },
     );
 
-    // Format the results
-    let output = formatIssueResults(
-      issues,
-      params.organizationSlug,
-      params.projectSlugOrId,
-      translatedQuery.query,
-      params.regionUrl,
-    );
+    // Build output with explanation first (if requested), then results
+    let output = "";
 
-    // Add explanation if requested
+    // Add explanation section before results (like search_events)
     if (params.includeExplanation) {
-      output += "\n\n## Query Translation\n\n";
-      output += `**Natural Language**: ${params.naturalLanguageQuery}\n\n`;
-      output += `**Sentry Query**: \`${translatedQuery.query}\``;
+      // Start with title including natural language query
+      output += `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+      output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
+
+      output += `## Query Translation\n`;
+      output += `Natural language: "${params.naturalLanguageQuery}"\n`;
+      output += `Sentry query: \`${translatedQuery.query}\``;
       if (translatedQuery.sort) {
-        output += `\n**Sort**: ${translatedQuery.sort}`;
+        output += `\nSort: ${translatedQuery.sort}`;
       }
       if (translatedQuery.explanation) {
         output += `\n\n${translatedQuery.explanation}`;
       }
+      output += `\n\n`;
+
+      // Format results without the header since we already added it
+      output += formatIssueResults(
+        issues,
+        params.organizationSlug,
+        params.projectSlugOrId,
+        translatedQuery.query,
+        params.regionUrl,
+        params.naturalLanguageQuery,
+        true, // skipHeader = true
+      );
+    } else {
+      // Format results with natural language query for title
+      output = formatIssueResults(
+        issues,
+        params.organizationSlug,
+        params.projectSlugOrId,
+        translatedQuery.query,
+        params.regionUrl,
+        params.naturalLanguageQuery,
+        false, // skipHeader = false (default)
+      );
     }
 
     return output;
