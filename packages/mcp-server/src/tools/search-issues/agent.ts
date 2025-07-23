@@ -33,18 +33,13 @@ export async function translateQuery(
     projectId?: string;
   },
   apiService: SentryApiService,
-  previousError?: string,
 ): Promise<IssueQuery> {
-  // Get OpenAI API key
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  // Check for OpenAI API key
+  if (!process.env.OPENAI_API_KEY) {
     throw new ConfigurationError(
       "OpenAI API key not configured. Set OPENAI_API_KEY environment variable.",
     );
   }
-
-  // Create whoami tool for 'me' references
-  const whoamiTool = createWhoamiTool(apiService);
 
   // Create the agent tools
   const tools = {
@@ -54,20 +49,14 @@ export async function translateQuery(
       "search_issues",
       params.projectId,
     ),
-    whoami: whoamiTool,
+    whoami: createWhoamiTool(apiService),
   };
 
   try {
-    // Build the prompt with error feedback if provided
-    let prompt = params.naturalLanguageQuery;
-    if (previousError) {
-      prompt = `${params.naturalLanguageQuery}\n\nPrevious attempt failed with: ${previousError}\nPlease correct the query.`;
-    }
-
     const result = await generateText({
       model: openai("gpt-4o", { structuredOutputs: true }),
       system: systemPrompt,
-      prompt,
+      prompt: params.naturalLanguageQuery,
       tools,
       maxSteps: 3,
       experimental_output: Output.object({
@@ -84,13 +73,6 @@ export async function translateQuery(
       throw new Error("Failed to generate query");
     }
 
-    // Validate the query doesn't have SQL-like syntax
-    if (query.query.includes("SELECT") || query.query.includes("FROM")) {
-      throw new UserInputError(
-        "Generated SQL-like syntax instead of Sentry query syntax. Please try rephrasing your query.",
-      );
-    }
-
     return query;
   } catch (error) {
     if (
@@ -98,13 +80,6 @@ export async function translateQuery(
       error instanceof ConfigurationError
     ) {
       throw error;
-    }
-
-    // Handle OpenAI API errors
-    if (error instanceof Error && error.message.includes("API key")) {
-      throw new ConfigurationError(
-        "OpenAI API key is invalid or not configured properly.",
-      );
     }
 
     throw new Error(

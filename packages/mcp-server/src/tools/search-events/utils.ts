@@ -1,5 +1,8 @@
+import { tool } from "ai";
+import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { logError } from "../../logging";
+import { UserInputError } from "../../errors";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
@@ -96,4 +99,86 @@ export async function fetchCustomAttributes(
   }
 
   return { attributes: customAttributes, fieldTypes };
+}
+
+/**
+ * Create a tool for the agent to query available attributes by dataset
+ */
+export function createDatasetAttributesTool(
+  apiService: SentryApiService,
+  organizationSlug: string,
+  projectId?: string,
+) {
+  return tool({
+    description:
+      "Query available attributes and fields for a specific Sentry dataset to understand what data is available",
+    parameters: z.object({
+      dataset: z
+        .enum(["spans", "errors", "logs"])
+        .describe("The dataset to query attributes for"),
+    }),
+    execute: async ({ dataset }) => {
+      try {
+        const {
+          BASE_COMMON_FIELDS,
+          DATASET_FIELDS,
+          RECOMMENDED_FIELDS,
+          NUMERIC_FIELDS,
+        } = await import("./config");
+
+        // Get custom attributes for this dataset
+        const { attributes: customAttributes, fieldTypes } =
+          await fetchCustomAttributes(
+            apiService,
+            organizationSlug,
+            dataset,
+            projectId,
+          );
+
+        // Combine all available fields
+        const allFields = {
+          ...BASE_COMMON_FIELDS,
+          ...DATASET_FIELDS[dataset],
+          ...customAttributes,
+        };
+
+        const recommendedFields = RECOMMENDED_FIELDS[dataset];
+
+        // Combine field types from both static config and dynamic API
+        const allFieldTypes = { ...fieldTypes };
+        const staticNumericFields = NUMERIC_FIELDS[dataset] || new Set();
+        for (const field of staticNumericFields) {
+          allFieldTypes[field] = "number";
+        }
+
+        return `Dataset: ${dataset}
+
+Available Fields (${Object.keys(allFields).length} total):
+${Object.entries(allFields)
+  .slice(0, 50) // Limit to first 50 to avoid overwhelming the agent
+  .map(([key, desc]) => `- ${key}: ${desc}`)
+  .join("\n")}
+${Object.keys(allFields).length > 50 ? `\n... and ${Object.keys(allFields).length - 50} more fields` : ""}
+
+Recommended Fields for ${dataset}:
+${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
+
+Field Types (CRITICAL for aggregate functions):
+${Object.entries(allFieldTypes)
+  .slice(0, 30) // Show more field types since this is critical for validation
+  .map(([key, type]) => `- ${key}: ${type}`)
+  .join("\n")}
+${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldTypes).length - 30} more fields` : ""}
+
+IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
+
+Use this information to construct appropriate queries for the ${dataset} dataset.`;
+      } catch (error) {
+        if (error instanceof UserInputError) {
+          return `Error: ${error.message}`;
+        }
+        throw error;
+      }
+    },
+  });
 }

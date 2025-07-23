@@ -16,48 +16,6 @@ import { formatIssueResults } from "./formatters";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
 
-/**
- * Translate query with error feedback for self-correction
- */
-async function translateQueryWithErrorFeedback(
-  params: {
-    naturalLanguageQuery: string;
-    organizationSlug: string;
-    projectSlugOrId?: string;
-    projectId?: string;
-  },
-  apiService: SentryApiService,
-  maxRetries = 1,
-) {
-  let previousError: string | undefined;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await translateQuery(
-        {
-          naturalLanguageQuery: params.naturalLanguageQuery,
-          organizationSlug: params.organizationSlug,
-          projectSlugOrId: params.projectSlugOrId,
-          projectId: params.projectId,
-        },
-        apiService,
-        previousError,
-      );
-    } catch (error) {
-      if (error instanceof UserInputError && attempt < maxRetries) {
-        // Feed the validation error back to the agent for self-correction
-        previousError = error.message;
-        continue;
-      }
-      // Re-throw if it's not a UserInputError or we've exceeded retries
-      throw error;
-    }
-  }
-
-  // This should never be reached due to the throw above, but TypeScript needs it
-  throw new Error("Unexpected error in translateQueryWithErrorFeedback");
-}
-
 export default defineTool({
   name: "search_issues",
   description: [
@@ -160,7 +118,7 @@ export default defineTool({
     }
 
     // Translate natural language to Sentry query
-    const translatedQuery = await translateQueryWithErrorFeedback(
+    const translatedQuery = await translateQuery(
       {
         naturalLanguageQuery: params.naturalLanguageQuery,
         organizationSlug: params.organizationSlug,
@@ -168,7 +126,6 @@ export default defineTool({
         projectId,
       },
       apiService,
-      1, // max retries
     );
 
     // Execute the search - listIssues accepts projectSlug directly

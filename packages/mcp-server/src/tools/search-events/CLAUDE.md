@@ -1,80 +1,100 @@
-# search-events Module
+# search_events Tool - Embedded Agent Documentation
 
-This module implements the `search_events` MCP tool for natural language search across Sentry telemetry data.
+This tool embeds an AI agent (GPT-4o) to translate natural language queries into Sentry's event search syntax.
 
 ## Architecture Overview
 
-The search-events tool uses an embedded AI agent to translate natural language queries into Sentry search syntax.
+The `search_events` tool uses an "agent-in-tool" pattern:
 
-## Module Structure
+1. **MCP Tool Handler** (`handler.ts`) - Receives natural language query from calling agent
+2. **Embedded AI Agent** (`agent.ts`) - Translates to Sentry search syntax 
+3. **API Execution** - Runs the translated query against Sentry's API
+4. **Result Formatting** - Returns formatted results to calling agent
 
-```
-search-events/
-├── index.ts                      # Export handler (public API)
-├── handler.ts                    # Main tool definition and orchestration
-├── agent.ts                      # AI query translation engine
-├── config.ts                     # Dataset configurations and field definitions
-├── formatters.ts                 # Result formatting for different datasets
-└── utils.ts                      # Helper functions and utilities
-```
+## Embedded Agent Behavior
 
-## Components
+### Available Tools
 
-- **handler.ts**: Main tool definition and orchestration
-- **agent.ts**: AI query translation using OpenAI (uses shared agent tools from `../../agent-tools/`)
-- **config.ts**: Dataset configurations and field definitions
-- **formatters.ts**: Result formatting for different datasets
-- **utils.ts**: Helper functions and utilities
+The embedded agent has access to three tools:
 
-## Data Flow
+1. **datasetAttributes** - Discovers available fields for the chosen dataset
+2. **otelSemantics** - Looks up OpenTelemetry semantic conventions
+3. **whoami** - Resolves "me" references to actual user IDs
 
-1. **Input Processing**: Natural language query received via MCP
-2. **Context Building**: Fetch custom attributes and build field mappings
-3. **AI Translation**: Use embedded agent to translate query to Sentry syntax
-4. **Query Execution**: Execute translated query against Sentry API
-5. **Result Formatting**: Format results based on dataset and query type
-6. **Output**: Return formatted results with Sentry dashboard links
+### Translation Flow
 
-## OpenTelemetry Semantic Conventions
+1. Analyzes natural language query to determine dataset (spans/errors/logs)
+2. Calls `datasetAttributes` to discover available fields
+3. May call `otelSemantics` for standardized field names
+4. Generates structured query with fields, sort, and timeRange
 
-The module has deep knowledge of OpenTelemetry semantic conventions:
+### Key Query Patterns
 
-- **gen_ai.*** - GenAI attributes for AI/LLM/Agent calls
-- **db.*** - Database attributes (STABLE in 2025)
-- **http.*** - HTTP attributes (STABLE in 2025)
-- **rpc.*** - RPC attributes
-- **messaging.*** - Messaging system attributes
-- **k8s.*** - Kubernetes attributes
-- **mcp.*** - Model Context Protocol attributes (custom)
+#### Distinct/Unique Values
+- "distinct tool names" → `fields: ['mcp.tool.name', 'count()'], sort: '-count()'`
+- Always uses aggregate mode with count()
 
-## User Agent Field Mapping
+#### Traffic/Volume Queries  
+- "how much traffic" → `fields: ['count()'], sort: '-count()'`
+- "traffic by X" → `fields: ['X', 'count()'], sort: '-count()'`
 
-- **user_agent.original** - Contains the raw user agent string from browsers/clients
-- Common queries: "user agents", "browsers", "clients" all map to `user_agent.original`
-- The AI agent is specifically trained to avoid mapping these to `user.id` fields
+#### Mathematical Queries
+- "total tokens used" → `fields: ['sum(gen_ai.usage.input_tokens)', 'sum(gen_ai.usage.output_tokens)']`
+- Uses spans dataset for OpenTelemetry metrics
 
-## Important Notes
+#### Time Series (NOT SUPPORTED)
+- "X over time" → Returns error: "Time series aggregations are not currently supported."
 
-- "Agent calls" refers to OpenTelemetry GenAI semantic conventions (`gen_ai.*` attributes), NOT MCP tool calls (`mcp.*` attributes)
-- The AI agent validates that numeric functions only use numeric fields
-- Translation failures are handled gracefully with error messages
+## Error Handling
 
-## Usage Examples
+The tool follows the MCP philosophy of single-attempt error handling:
 
-```typescript
-// Agent calls (GenAI spans)
-"top 10 agent call spans by usage" → has:gen_ai.system
+1. **Agent generates query** - Using static system prompt
+2. **Validation Error** - Returns clear UserInputError to calling agent
+3. **Calling agent decides** - Whether to retry with corrections
 
-// MCP tool calls  
-"top 10 tool call spans by usage" → has:mcp.tool.name
+Common validation errors:
+- Missing sort parameter
+- Sort field not included in fields array
+- Missing fields for aggregate queries
+- Invalid field names or syntax
 
-// Database queries
-"database errors" → has:db.statement
+This approach enables better LLM prompt caching and cleaner error boundaries.
 
-// HTTP requests
-"API call performance" → has:http.method
-```
+## Limitations
 
-## Testing
+1. **No Time Series** - Cannot do "over time" aggregations
+2. **Dataset Constraints**:
+   - Equations only work in spans dataset
+   - Numeric aggregations limited by field types
+   - Timestamp filtering differs between datasets
+3. **Project Scope** - Fields vary by project based on instrumented data
 
-Tests are located in `../search-events.test.ts` and `../../agent-tools/otel-semantics-lookup.test.ts`.
+## Common Issues and Solutions
+
+### Issue: "Sort field not in fields array"
+**Cause**: Agent specified sort by a field not included in the fields array
+**Solution**: Error message guides agent to include the sort field
+
+### Issue: "Time series not supported"
+**Cause**: User asked for data "over time"
+**Solution**: Return clear error message, no retry
+
+### Issue: "Invalid aggregate function on non-numeric field"
+**Cause**: Using avg(), sum() etc. on string fields
+**Solution**: Agent uses field type information from datasetAttributes
+
+## Testing Queries
+
+Test various query patterns:
+- Simple counts: "how many errors today"
+- Distinct values: "distinct user agents"
+- Grouped aggregations: "errors by type"
+- Token usage: "total tokens used by model"
+- Time-filtered: "errors in the last hour"
+
+## Future Improvements
+
+1. ~~Consider removing retry mechanism - let calling agent handle retries~~ ✅ Done
+2. Add support for time bucketing fields (timestamp.to_hour, timestamp.to_day)
+3. Extract createOtelLookupTool and createDatasetAttributesTool to shared modules

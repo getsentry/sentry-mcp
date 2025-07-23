@@ -3,8 +3,9 @@ import { generateText, tool, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { ConfigurationError, UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
-import { lookupOtelSemantics } from "../../agent-tools/lookup-otel-semantics";
+import { createOtelLookupTool } from "../../agent-tools/lookup-otel-semantics";
 import { createWhoamiTool } from "../../agent-tools/whoami";
+import { createDatasetAttributesTool } from "./utils";
 
 // Type definitions
 export interface QueryTranslationResult {
@@ -38,423 +39,6 @@ export interface QueryTranslationParams {
   };
 }
 
-// Base system prompt template
-const SYSTEM_PROMPT_TEMPLATE = `You are a Sentry query translator. You need to:
-1. Convert the natural language query to Sentry's search syntax
-2. Decide which fields to return in the results
-3. Understand when to use aggregate functions vs individual events
-
-CRITICAL: Sentry does NOT use SQL syntax. Do NOT generate SQL-like queries.
-
-CRITICAL DATASET SELECTION RULES:
-- Mathematical queries about token usage, costs, or AI metrics → ALWAYS use spans dataset
-- Queries asking for sums, averages, totals, or counts of usage → ALWAYS use spans dataset
-- Queries about "how many tokens", "total tokens", "token usage", "costs" → ALWAYS use spans dataset
-- Error messages, exceptions, crashes → use errors dataset
-- Log entries, log messages → use logs dataset
-- Performance data, traces, spans, AI calls → use spans dataset
-
-IMPORTANT SEMANTIC CONVENTIONS:
-- "agent calls", "AI calls", "LLM calls" → use gen_ai.* attributes (OpenTelemetry GenAI semantic conventions)
-- "tool calls", "MCP calls" → use mcp.* attributes
-- "database queries" → use db.* attributes
-- "HTTP requests", "API calls" → use http.* attributes
-- "token usage", "tokens used", "input tokens", "output tokens" → use gen_ai.usage.* attributes
-- "user agents", "user agent strings", "browser", "client" → use user_agent.original attribute
-
-CRITICAL - HANDLING "ME" REFERENCES:
-- If the query contains "me", "my", "myself", or "affecting me" in the context of user.id or user.email fields, use the whoami tool to get the user's ID and email
-- For assignedTo fields, you can use "me" directly without translation (e.g., assignedTo:me works as-is)
-- After calling whoami, replace "me" references with the actual user.id or user.email values
-- If whoami fails, return an error explaining the issue
-
-CRITICAL TOOL USAGE: You have access to three tools:
-
-1. otelSemantics - Look up OpenTelemetry semantic convention attributes. Use when:
-   - "tokens used", "token usage", "input tokens", "output tokens" → call otelSemantics with namespace "gen_ai"
-   - "agent calls", "AI calls", "LLM calls", "model usage" → call otelSemantics with namespace "gen_ai"
-   - "database queries", "SQL", "DB operations" → call otelSemantics with namespace "db"
-   - "HTTP requests", "API calls", "web requests" → call otelSemantics with namespace "http"
-   - "tool calls", "MCP calls" → call otelSemantics with namespace "mcp"
-
-2. datasetAttributes - Query available fields for a dataset. Use when you need to understand what fields are available.
-
-3. whoami - Get authenticated user information. Use when:
-   - Query contains "me", "my", "myself" in context of user.id or user.email fields
-   - Need to resolve user identity for search queries
-
-AMBIGUOUS QUERY HANDLING:
-When encountering unclear terms like "XYZ calls" or "calls using XYZ":
-1. Use datasetAttributes tool to discover available fields and understand project context
-2. Based on project's available attributes, infer the most likely meaning:
-   - If project has mcp.tool.name attributes → likely MCP tool calls  
-   - If project has gen_ai.request.model attributes → likely AI/agent calls
-   - If project has many span.op variations → likely operation-based calls
-3. Choose the single most appropriate field and use wildcards: mcp.tool.name:"*XYZ*" or span.op:"*XYZ*"
-
-SPECIFIC FIELD MAPPINGS:
-- "user agents", "browser", "client", "user agent strings" → call datasetAttributes to find user_agent fields
-
-IMPORTANT: Always use the tool to get the exact attribute names before constructing your query, especially for mathematical operations like sum(gen_ai.usage.input_tokens).
-
-For the {dataset} dataset:
-
-RECOMMENDED FIELDS TO RETURN:
-{recommendedFields}
-
-ALL AVAILABLE FIELDS:
-{fields}
-
-AGGREGATE FUNCTIONS BY DATASET:
-{aggregateFunctions}
-
-QUERY MODES:
-1. INDIVIDUAL EVENTS (default): Returns raw event data
-   - Used when fields contain no function() calls
-   - Returns actual event occurrences with full details
-   - Include default fields plus any user-requested fields
-
-2. AGGREGATE QUERIES: Grouping and aggregation (NOT SQL)
-   - Activated when ANY field contains a function() call
-   - Fields should ONLY include: aggregate functions + groupBy fields
-   - DO NOT include default fields (id, timestamp, etc.) in aggregate queries
-   - Automatically groups by ALL non-function fields in the field list
-   - Example: fields=['ai.model.id', 'count()'] groups by ai.model.id and shows count
-   - Example: fields=['ai.model.id', 'ai.model.provider', 'avg(span.duration)'] groups by model and provider
-
-MATHEMATICAL QUERY PATTERNS:
-When user asks mathematical questions like "how many tokens", "total tokens used", "token usage today":
-- Use spans dataset (where OpenTelemetry data lives)
-- Use sum() function for total token counts: sum(gen_ai.usage.input_tokens), sum(gen_ai.usage.output_tokens)
-- Use has:gen_ai.usage.input_tokens to filter for AI calls with token data
-- For time-based queries ("today", "this week"), use timeRange parameter
-- Examples:
-  - "how many tokens used today" → query: "has:gen_ai.usage.input_tokens", fields: ["sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)"], timeRange: {"statsPeriod": "24h"}
-  - "total input tokens by model" → query: "has:gen_ai.usage.input_tokens", fields: ["gen_ai.request.model", "sum(gen_ai.usage.input_tokens)"]
-
-QUERY SYNTAX RULES:
-- Use field:value for exact matches
-- Use field:>value or field:<value for numeric comparisons
-- Use AND, OR, NOT for boolean logic
-- Use quotes for phrases with spaces
-- Use wildcards (*) for partial matches
-- For timestamp filters:
-  - Spans/Errors datasets: Use timestamp:-1h format (e.g., timestamp:-1h for last hour, timestamp:-24h for last day)  
-  - Logs dataset: Do NOT include timestamp filters in query - time filtering handled separately
-  - Absolute times: Use comparison operators with ISO dates (e.g., timestamp:<=2025-07-11T04:52:50.511Z)
-- IMPORTANT: For relative durations, use format WITHOUT operators (timestamp:-1h NOT timestamp:>-1h)
-
-CRITICAL - DO NOT USE SQL SYNTAX:
-- NEVER use SQL functions like yesterday(), today(), now(), IS NOT NULL, IS NULL
-- NEVER use SQL date functions - use timeRange parameter instead
-- For "yesterday": Use timeRange: {"statsPeriod": "24h"}, NOT timestamp >= yesterday()
-- For field existence: Use has:field_name, NOT field_name IS NOT NULL
-- For field absence: Use !has:field_name, NOT field_name IS NULL
-- Time filtering MUST use timeRange parameter, NOT SQL date functions in query
-{datasetRules}
-
-EXAMPLES:
-{datasetExamples}
-
-SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
-1. DEFAULT SORTING:
-   - errors dataset: Use "-timestamp" (newest first)
-   - spans dataset: Use "-span.duration" (slowest first)  
-   - logs dataset: Use "-timestamp" (newest first)
-
-2. SORTING SYNTAX:
-   - Use "-" prefix for descending order (e.g., "-timestamp" for newest first)
-   - Use field name without prefix for ascending order (e.g., "timestamp" for oldest first)
-   - For individual event queries: sort by any field in the dataset
-   - For aggregate queries: sort by aggregate function results (e.g., "-count()" for highest count first)
-
-3. AGGREGATE QUERY SORTING:
-   - When using aggregate functions, sort by the function result
-   - Examples: "-count()" for highest count, "-avg(span.duration)" for slowest average
-   - Common patterns: "-count()", "-sum(field)", "-avg(field)", "-max(field)"
-
-4. IMPORTANT SORTING REQUIREMENTS:
-   - YOU MUST ALWAYS INCLUDE A SORT PARAMETER
-   - CRITICAL: The field you sort by MUST be included in your fields array
-   - If sorting by "-timestamp", include "timestamp" in fields
-   - If sorting by "-count()", include "count()" in fields
-   - If sorting by "-span.duration", include "span.duration" in fields
-   - If user asks for "most common", use "-count()"
-   - If user asks for "slowest", use "-span.duration" or "-avg(span.duration)"
-   - If user asks for "latest" or "recent", use "-timestamp"
-   - If unsure, use the default sort for the dataset
-   
-   VALIDATION: Before returning your response, verify:
-   - If sort is "-timestamp", fields MUST contain "timestamp"
-   - If sort is "-count()", fields MUST contain "count()"
-   - If sort is any "-field", fields MUST contain "field"
-   - This is MANDATORY - Sentry will reject queries where sort field is not in the selected fields
-
-YOUR RESPONSE FORMAT:
-Return a JSON object with these fields:
-- "query": The Sentry query string for filtering results (use empty string "" for no filters)
-- "fields": Array of field names to return in results
-  - For individual event queries: OPTIONAL (will use recommended fields if not provided)
-  - For aggregate queries: REQUIRED (must include aggregate functions like "count()", "avg(span.duration)" AND any groupBy fields)
-  - The system will automatically detect aggregate queries by the presence of function fields
-- "sort": Sort parameter for results (REQUIRED - YOU MUST ALWAYS SPECIFY THIS)
-- "timeRange": Time range parameters (OPTIONAL - only include if user specifies a time period)
-  - Use ONLY ONE of these formats:
-  - Relative: {"statsPeriod": "24h"} for last 24 hours, "7d" for last 7 days, etc.
-  - Absolute: {"start": "2025-06-19T07:00:00", "end": "2025-06-20T06:59:59"} for specific date ranges
-  - If no time is specified, omit this field entirely (defaults to last 14 days)
-- "error": Error message if you cannot translate the query (OPTIONAL)
-
-CORRECT EXAMPLES (FOLLOW THESE PATTERNS):
-- "models used for token consumption yesterday":
-  {
-    "query": "has:gen_ai.usage.input_tokens",
-    "fields": ["gen_ai.request.model", "sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)"],
-    "sort": "-sum(gen_ai.usage.input_tokens)",
-    "timeRange": {"statsPeriod": "24h"}
-  }
-- "gen_ai.operation.name values" (showing unique values):
-  {
-    "query": "has:gen_ai.operation.name",
-    "fields": ["gen_ai.operation.name", "count()"],
-    "sort": "-count()"
-  }
-- "errors with null user IDs":
-  {
-    "query": "!has:user.id",
-    "fields": ["error.type", "title", "timestamp"],
-    "sort": "-timestamp"
-  }
-
-INCORRECT EXAMPLES (NEVER DO THIS):
-- BAD: "query": "timestamp >= yesterday() AND gen_ai.usage.input_tokens IS NOT NULL"
-- BAD: "query": "user.id IS NULL"
-- BAD: "query": "timestamp > now() - 24h"
-- GOOD: Use timeRange parameter and has: operator instead
-
-ERROR HANDLING:
-- If the user's query is impossible to translate to Sentry syntax, set "error" field with explanation
-- If the query asks for fields that don't exist in the dataset, set "error" field
-- If the query is ambiguous or unclear, set "error" field with clarification needed
-
-IMPORTANT NOTES:
-- FIELDS ARRAY REQUIREMENTS:
-  - For individual event queries: Optional (recommended fields will be used if not provided)
-  - For aggregate queries: REQUIRED and must contain ONLY aggregate functions and groupBy fields
-  - Do NOT mix regular fields with aggregate functions unless they are groupBy fields
-- Add any fields mentioned in the user's query to the fields array
-- If the user asks about a specific field (e.g., "show me user emails"), include that field
-- CRITICAL: The field you're sorting by MUST be included in your fields array (e.g., if sort is "-timestamp", fields must include "timestamp")
-- VALIDATION REQUIREMENT: Sentry will REJECT queries where the sort field is not in the selected fields array. ALWAYS ensure your sort field is included in fields.
-- Do NOT include project: filters in your query (project filtering is handled separately)
-- For spans/errors: When user mentions time periods, include timestamp filters in query
-- For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically
-- AGGREGATE FUNCTION RULES:
-  - Numeric functions (avg, sum, min, max, percentiles) ONLY work with numeric fields
-  - count() and count_unique() work with any field type
-  - When using aggregate functions, results are grouped by non-function fields
-  - Dataset-specific functions must only be used with their respective datasets
-
-AGGREGATE QUERY RESPONSE STRUCTURE:
-When creating an aggregate query:
-1. Include ALL aggregate functions (e.g., "count()", "avg(span.duration)") in the fields array
-2. Include ALL groupBy fields (non-function fields) in the fields array
-3. The query is automatically treated as aggregate if ANY field contains a function (has parentheses)
-4. IMPORTANT: For aggregate queries, ONLY include the aggregate functions and groupBy fields - do NOT include default fields like timestamp, id, etc.
-
-Examples:
-- "count of errors by type": fields=["error.type", "count()"]
-- "average span duration": fields=["avg(span.duration)"]
-- "most common transaction": fields=["span.description", "count()"], sort="-count()"
-- "p50 duration by model and operation": fields=["ai.model.id", "ai.operationId", "p50(span.duration)"], sort="-p50(span.duration)"`;
-
-/**
- * Build the system prompt for AI query translation
- */
-function buildSystemPrompt(
-  dataset: "spans" | "errors" | "logs",
-  allFields: Record<string, string>,
-  datasetConfig: { rules: string; examples: string },
-  recommendedFields: { basic: string[]; description: string },
-): string {
-  // Define aggregate functions for each dataset
-  const aggregateFunctions = {
-    errors: `ERRORS dataset aggregate functions:
-- count(): Count of error events
-- count_unique(field): Count unique values (e.g., count_unique(user.id))
-- count_if(field,equals,value): Conditional count (e.g., count_if(error.handled,equals,false))
-- last_seen(): Most recent timestamp in the group
-- eps(): Events per second rate
-- epm(): Events per minute rate`,
-    spans: `SPANS dataset aggregate functions:
-- count(): Count of spans
-- count_unique(field): Count unique values (e.g., count_unique(user.id))
-- avg(field): Average of numeric field (e.g., avg(span.duration))
-- sum(field): Sum of numeric field (e.g., sum(span.self_time))
-- min(field): Minimum value (e.g., min(span.duration))
-- max(field): Maximum value (e.g., max(span.duration))
-- p50(field), p75(field), p90(field), p95(field), p99(field), p100(field): Percentiles
-- epm(): Events per minute rate
-- failure_rate(): Percentage of failed spans`,
-    logs: `LOGS dataset aggregate functions:
-- count(): Count of log entries
-- count_unique(field): Count unique values (e.g., count_unique(user.id))
-- avg(field): Average of numeric field (e.g., avg(severity_number))
-- sum(field): Sum of numeric field
-- min(field): Minimum value
-- max(field): Maximum value
-- p50(field), p75(field), p90(field), p95(field), p99(field), p100(field): Percentiles
-- epm(): Events per minute rate`,
-  };
-
-  return SYSTEM_PROMPT_TEMPLATE.replace("{dataset}", dataset)
-    .replace(
-      "{recommendedFields}",
-      `${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}\n\n${recommendedFields.description}`,
-    )
-    .replace(
-      "{fields}",
-      Object.entries(allFields)
-        .map(([key, desc]) => `- ${key}: ${desc}`)
-        .join("\n"),
-    )
-    .replace("{aggregateFunctions}", aggregateFunctions[dataset])
-    .replace("{datasetRules}", datasetConfig.rules)
-    .replace("{datasetExamples}", datasetConfig.examples);
-}
-
-/**
- * Create the otel-semantics-lookup tool for the AI agent
- */
-function createOtelLookupTool(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  projectId?: string,
-) {
-  return tool({
-    description:
-      "Look up OpenTelemetry semantic convention attributes for a specific namespace. OpenTelemetry attributes are universal standards that work across all datasets.",
-    parameters: z.object({
-      namespace: z
-        .string()
-        .describe(
-          "The OpenTelemetry namespace to look up (e.g., 'gen_ai', 'db', 'http', 'mcp')",
-        ),
-      searchTerm: z
-        .string()
-        .optional()
-        .describe("Optional search term to filter attributes"),
-      dataset: z
-        .enum(["spans", "errors", "logs"])
-        .describe(
-          "REQUIRED: Dataset to check attribute availability in. The agent MUST specify this based on their chosen dataset.",
-        ),
-    }),
-    execute: async ({ namespace, searchTerm, dataset }) => {
-      try {
-        return await lookupOtelSemantics(
-          namespace,
-          searchTerm,
-          dataset,
-          apiService,
-          organizationSlug,
-          projectId,
-        );
-      } catch (error) {
-        if (error instanceof UserInputError) {
-          return `Error: ${error.message}`;
-        }
-        throw error;
-      }
-    },
-  });
-}
-
-/**
- * Create a tool for the agent to query available attributes by dataset
- */
-function createDatasetAttributesTool(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  projectId?: string,
-) {
-  return tool({
-    description:
-      "Query available attributes and fields for a specific Sentry dataset to understand what data is available",
-    parameters: z.object({
-      dataset: z
-        .enum(["spans", "errors", "logs"])
-        .describe("The dataset to query attributes for"),
-    }),
-    execute: async ({ dataset }) => {
-      try {
-        const { fetchCustomAttributes } = await import("./utils");
-        const {
-          BASE_COMMON_FIELDS,
-          DATASET_FIELDS,
-          RECOMMENDED_FIELDS,
-          NUMERIC_FIELDS,
-        } = await import("./config");
-
-        // Get custom attributes for this dataset
-        const { attributes: customAttributes, fieldTypes } =
-          await fetchCustomAttributes(
-            apiService,
-            organizationSlug,
-            dataset,
-            projectId,
-          );
-
-        // Combine all available fields
-        const allFields = {
-          ...BASE_COMMON_FIELDS,
-          ...DATASET_FIELDS[dataset],
-          ...customAttributes,
-        };
-
-        const recommendedFields = RECOMMENDED_FIELDS[dataset];
-
-        // Combine field types from both static config and dynamic API
-        const allFieldTypes = { ...fieldTypes };
-        const staticNumericFields = NUMERIC_FIELDS[dataset] || new Set();
-        for (const field of staticNumericFields) {
-          allFieldTypes[field] = "number";
-        }
-
-        return `Dataset: ${dataset}
-
-Available Fields (${Object.keys(allFields).length} total):
-${Object.entries(allFields)
-  .slice(0, 50) // Limit to first 50 to avoid overwhelming the agent
-  .map(([key, desc]) => `- ${key}: ${desc}`)
-  .join("\n")}
-${Object.keys(allFields).length > 50 ? `\n... and ${Object.keys(allFields).length - 50} more fields` : ""}
-
-Recommended Fields for ${dataset}:
-${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
-
-Field Types (CRITICAL for aggregate functions):
-${Object.entries(allFieldTypes)
-  .slice(0, 30) // Show more field types since this is critical for validation
-  .map(([key, type]) => `- ${key}: ${type}`)
-  .join("\n")}
-${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldTypes).length - 30} more fields` : ""}
-
-IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
-
-Use this information to construct appropriate queries for the ${dataset} dataset.`;
-      } catch (error) {
-        if (error instanceof UserInputError) {
-          return `Error: ${error.message}`;
-        }
-        throw error;
-      }
-    },
-  });
-}
-
-// Whoami tool is now imported from agent-tools
-
 /**
  * Translate natural language query to Sentry search syntax using AI
  */
@@ -466,7 +50,6 @@ export async function translateQuery(
   apiService: SentryApiService,
   organizationSlug: string,
   projectId?: string,
-  previousError?: string,
 ): Promise<QueryTranslationResult & { dataset?: "spans" | "errors" | "logs" }> {
   // Check if OpenAI API key is available
   if (!process.env.OPENAI_API_KEY) {
@@ -476,7 +59,7 @@ export async function translateQuery(
   }
 
   // Build a dataset-agnostic system prompt
-  let systemPrompt = `You are a Sentry query translator. You need to:
+  const systemPrompt = `You are a Sentry query translator. You need to:
 1. FIRST determine which dataset (spans, errors, or logs) is most appropriate for the query
 2. Query the available attributes for that dataset using the datasetAttributes tool
 3. Use the otelSemantics tool if you need OpenTelemetry semantic conventions
@@ -498,6 +81,26 @@ CRITICAL TOOL USAGE:
 3. Use whoami tool when queries contain "me" references for user.id or user.email fields
 4. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - ALWAYS use the datasetAttributes tool to find the correct field name (typically user_agent.original) instead of assuming it's related to user.id
 
+CRITICAL - HANDLING "DISTINCT" OR "UNIQUE VALUES" QUERIES:
+When user asks for "distinct", "unique", "all values of", or "what are the X" queries:
+1. This ALWAYS requires an AGGREGATE query with count() function
+2. Pattern: fields=['field_name', 'count()'] to show distinct values with counts
+3. Sort by "-count()" to show most common values first
+4. Use datasetAttributes tool to verify the field exists before constructing query
+5. Examples:
+   - "distinct tool names" → fields=['mcp.tool.name', 'count()'], sort='-count()'
+   - "unique models" → fields=['gen_ai.request.model', 'count()'], sort='-count()'
+
+CRITICAL - TRAFFIC/VOLUME/COUNT QUERIES:
+When user asks about "traffic", "volume", "how much", "how many" (without specific metrics):
+1. This ALWAYS requires an AGGREGATE query with count() function
+2. For total counts: fields=['count()']
+3. For grouped counts: fields=['grouping_field', 'count()']
+4. Always include timeRange for period-specific queries
+5. Examples:
+   - "how much traffic in last 30 days" → fields=['count()'], timeRange: {"statsPeriod": "30d"}
+   - "traffic on mcp-server" → query: "project:mcp-server", fields=['count()']
+
 CRITICAL - HANDLING "ME" REFERENCES:
 - If the query contains "me", "my", "myself", or "affecting me" in the context of user.id or user.email fields, use the whoami tool to get the user's ID and email
 - For assignedTo fields, you can use "me" directly without translation (e.g., assignedTo:me works as-is)
@@ -513,6 +116,11 @@ QUERY MODES:
    - Activated when ANY field contains a function() call
    - Fields should ONLY include: aggregate functions + groupBy fields
    - Automatically groups by ALL non-function fields
+   - For aggregate queries, ONLY include the aggregate functions and groupBy fields - do NOT include default fields like timestamp, id, etc.
+
+CRITICAL LIMITATION - TIME SERIES NOT SUPPORTED:
+- Queries asking for data "over time", "by hour", "by day", "time series", or similar temporal groupings are NOT currently supported
+- If user asks for "X over time", return an error explaining: "Time series aggregations are not currently supported."
 
 CRITICAL - DO NOT USE SQL SYNTAX:
 - NEVER use SQL functions like yesterday(), today(), now(), IS NOT NULL, IS NULL
@@ -528,13 +136,45 @@ When user asks mathematical questions like "how many tokens", "total tokens used
 - Use sum() function for total counts: sum(gen_ai.usage.input_tokens), sum(gen_ai.usage.output_tokens)
 - For time-based queries ("today", "this week"), use timeRange parameter
 
+DERIVED METRICS AND CALCULATIONS (SPANS ONLY):
+When user asks for calculated metrics, ratios, or conversions:
+- Use equation fields with "equation|" prefix
+- Examples:
+  - "duration in milliseconds" → fields: ["equation|avg(span.duration) * 1000"]
+  - "total tokens" → fields: ["equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)"]
+  - "error rate percentage" → fields: ["equation|failure_rate() * 100"]
+  - "requests per second" → fields: ["equation|count() / 3600"] (for hourly data)
+- IMPORTANT: Equations are ONLY supported in the spans dataset, NOT in errors or logs
+
+SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
+1. DEFAULT SORTING:
+   - errors dataset: Use "-timestamp" (newest first)
+   - spans dataset: Use "-span.duration" (slowest first)  
+   - logs dataset: Use "-timestamp" (newest first)
+
+2. SORTING SYNTAX:
+   - Use "-" prefix for descending order (e.g., "-timestamp" for newest first)
+   - Use field name without prefix for ascending order
+   - For aggregate queries: sort by aggregate function results (e.g., "-count()" for highest count first)
+
+3. IMPORTANT SORTING REQUIREMENTS:
+   - YOU MUST ALWAYS INCLUDE A SORT PARAMETER
+   - CRITICAL: The field you sort by MUST be included in your fields array
+   - If sorting by "-timestamp", include "timestamp" in fields
+   - If sorting by "-count()", include "count()" in fields
+   - This is MANDATORY - Sentry will reject queries where sort field is not in the selected fields
+
 YOUR RESPONSE FORMAT:
 Return a JSON object with these fields:
 - "dataset": Which dataset you determined to use ("spans", "errors", or "logs")
-- "query": The Sentry query string for filtering results
+- "query": The Sentry query string for filtering results (use empty string "" for no filters)
 - "fields": Array of field names to return in results
-- "sort": Sort parameter for results (REQUIRED)
+  - For individual event queries: OPTIONAL (will use recommended fields if not provided)
+  - For aggregate queries: REQUIRED (must include aggregate functions AND any groupBy fields)
+- "sort": Sort parameter for results (REQUIRED - YOU MUST ALWAYS SPECIFY THIS)
 - "timeRange": Time range parameters (optional)
+  - Relative: {"statsPeriod": "24h"} for last 24 hours, "7d" for last 7 days, etc.
+  - Absolute: {"start": "2025-06-19T07:00:00", "end": "2025-06-20T06:59:59"} for specific date ranges
 - "error": Error message if you cannot translate the query (optional)
 
 CORRECT QUERY PATTERNS (FOLLOW THESE):
@@ -548,30 +188,17 @@ PROCESS:
 2. Determine appropriate dataset
 3. Use datasetAttributes tool to discover available fields
 4. Use otelSemantics tool if needed for OpenTelemetry attributes
-5. Construct the final query with proper fields and sort parameters`;
+5. Construct the final query with proper fields and sort parameters
 
-  // Add error feedback if this is a retry
-  if (previousError) {
-    systemPrompt += `
-
-IMPORTANT ERROR CORRECTION:
-Your previous query translation failed with this error:
-${previousError}
-
-Please analyze the error and correct your approach. Common issues:
+COMMON ERRORS TO AVOID:
 - Using SQL syntax (IS NOT NULL, IS NULL, yesterday(), today(), etc.) - Use has: operator and timeRange instead
 - Using numeric functions (sum, avg, min, max, percentiles) on non-numeric fields
 - Using incorrect field names (use the otelSemantics tool to look up correct names)
 - Missing required fields in the fields array for aggregate queries
 - Invalid sort parameter not included in fields array
-
-REMEMBER:
 - For field existence: Use has:field_name (NOT field_name IS NOT NULL)
 - For field absence: Use !has:field_name (NOT field_name IS NULL)
-- For time periods: Use timeRange parameter (NOT SQL date functions like yesterday())
-
-Fix the issue and try again with the corrected query.`;
-  }
+- For time periods: Use timeRange parameter (NOT SQL date functions like yesterday())`;
 
   // Create tools for the agent
   const datasetAttributesTool = createDatasetAttributesTool(
