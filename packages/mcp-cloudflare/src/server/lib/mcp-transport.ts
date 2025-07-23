@@ -67,11 +67,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
         } catch (error) {
           // Log the error but don't crash - the server can still function
           // without persisted state, it just won't survive hibernation
-          logError(error, {
-            operation: {
-              message: "Failed to persist MCP client info to storage",
-            },
-          });
+          logError(error);
         }
       },
     });
