@@ -701,8 +701,19 @@ export class SentryApiService {
    */
   async getAuthenticatedUser(opts?: RequestOptions): Promise<User> {
     // Auth endpoints only exist on the main API server, never on regional endpoints
-    // Always use the configured host, ignoring any regional overrides
-    const body = await this.requestJSON("/auth/", undefined, {});
+    let authHost: string | undefined;
+
+    if (this.isSaas()) {
+      // For SaaS, always use the main sentry.io host, not regional hosts
+      // This handles cases like us.sentry.io, eu.sentry.io, etc.
+      authHost = "sentry.io";
+    }
+    // For self-hosted, use the configured host (authHost remains undefined)
+
+    const body = await this.requestJSON("/auth/", undefined, {
+      ...opts,
+      host: authHost,
+    });
     return UserSchema.parse(body);
   }
 
