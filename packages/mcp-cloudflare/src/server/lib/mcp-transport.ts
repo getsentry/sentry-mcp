@@ -13,8 +13,6 @@ import getSentryConfig from "../sentry.config";
 // NOTE: Only store persistent user data in props (e.g., userId, accessToken).
 // Request-specific data like user agent should be captured per request.
 class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
-  private serverContext?: ServerContext; // Store the context for later updates
-
   server = new McpServer({
     name: "Sentry MCP",
     version: LIB_VERSION,
@@ -44,7 +42,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       await this.ctx.storage.get<ServerContext>("serverContext");
 
     // Initialize or restore the context
-    this.serverContext = persistedContext || {
+    const serverContext: ServerContext = persistedContext || {
       accessToken: this.props.accessToken,
       organizationSlug: this.props.organizationSlug,
       userId: this.props.id,
@@ -53,7 +51,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
 
     await configureServer({
       server: this.server,
-      context: this.serverContext,
+      context: serverContext,
       onToolComplete: () => {
         this.ctx.waitUntil(Sentry.flush(2000));
       },
@@ -61,7 +59,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
         try {
           // Persist the updated context to Durable Object storage
           // The context has already been updated by configureServer's oninitialized handler
-          await this.ctx.storage.put("serverContext", this.serverContext);
+          await this.ctx.storage.put("serverContext", serverContext);
         } catch (error) {
           // Log the error but don't crash - the server can still function
           // without persisted state, it just won't survive hibernation
