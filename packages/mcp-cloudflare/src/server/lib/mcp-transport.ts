@@ -3,6 +3,7 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "../types";
+import type { ServerContext } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import getSentryConfig from "../sentry.config";
 
@@ -12,7 +13,7 @@ import getSentryConfig from "../sentry.config";
 // NOTE: Only store persistent user data in props (e.g., userId, accessToken).
 // Request-specific data like user agent should be captured per request.
 class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
-  private serverContext?: any; // Store the context for later updates
+  private serverContext?: ServerContext; // Store the context for later updates
 
   server = new McpServer({
     name: "Sentry MCP",
@@ -39,7 +40,8 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
 
   async init() {
     // Load persisted state from Durable Object storage
-    const persistedContext = await this.ctx.storage.get<any>("serverContext");
+    const persistedContext =
+      await this.ctx.storage.get<ServerContext>("serverContext");
 
     // Initialize or restore the context
     this.serverContext = persistedContext || {
