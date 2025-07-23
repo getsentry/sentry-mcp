@@ -66,38 +66,23 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       this.cachedUserAgent = persistedUserAgent;
     }
 
-    // Set up the oninitialized hook before configuring the server
-    this.server.server.oninitialized = async () => {
-      const serverInstance = this.server.server as any;
-      const clientInfo = serverInstance._clientVersion;
-      const protocolVersion = serverInstance._protocolVersion;
-
-      if (clientInfo) {
-        // Update the context object with client information
-        this.serverContext.mcpClientName = clientInfo.name;
-        this.serverContext.mcpClientVersion = clientInfo.version;
-      }
-
-      if (protocolVersion) {
-        this.serverContext.mcpProtocolVersion = protocolVersion;
-      }
-
-      // Set server information
-      if (serverInstance._serverInfo) {
-        this.serverContext.mcpServerName = serverInstance._serverInfo.name;
-        this.serverContext.mcpServerVersion =
-          serverInstance._serverInfo.version;
-      }
-
-      // Persist the updated context to Durable Object storage
-      await this.ctx.storage.put("serverContext", this.serverContext);
-    };
-
     await configureServer({
       server: this.server,
       context: this.serverContext,
       onToolComplete: () => {
         this.ctx.waitUntil(Sentry.flush(2000));
+      },
+      onInitialized: async () => {
+        try {
+          // Persist the updated context to Durable Object storage
+          // The context has already been updated by configureServer's oninitialized handler
+          await this.ctx.storage.put("serverContext", this.serverContext);
+        } catch (error) {
+          // Log the error but don't crash - the server can still function
+          // without persisted state, it just won't survive hibernation
+          console.error("Failed to persist server context to storage:", error);
+          Sentry.captureException(error);
+        }
       },
     });
   }

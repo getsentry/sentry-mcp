@@ -297,7 +297,13 @@ export async function configureServer({
   server,
   context,
   onToolComplete,
-}: { server: McpServer; context: ServerContext; onToolComplete?: () => void }) {
+  onInitialized,
+}: {
+  server: McpServer;
+  context: ServerContext;
+  onToolComplete?: () => void;
+  onInitialized?: () => void | Promise<void>;
+}) {
   server.server.onerror = (error) => {
     logError(error);
   };
@@ -322,6 +328,19 @@ export async function configureServer({
     if (serverInstance._serverInfo) {
       context.mcpServerName = serverInstance._serverInfo.name;
       context.mcpServerVersion = serverInstance._serverInfo.version;
+    }
+
+    // Call the custom onInitialized handler if provided
+    // Note: MCP SDK doesn't support async callbacks, so we handle promises
+    // without awaiting to avoid blocking the initialization flow
+    if (onInitialized) {
+      const result = onInitialized();
+      if (result instanceof Promise) {
+        result.catch((error) => {
+          console.error("Error in onInitialized callback:", error);
+          logError(error);
+        });
+      }
     }
   };
 
