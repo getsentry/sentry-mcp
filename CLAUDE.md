@@ -41,6 +41,30 @@ When making changes, consider these areas:
 - **API Client**: Sentry API integration layer
 - **Server**: MCP protocol handler and error formatting
 
+#### AI-Powered Search Tools Architecture
+
+Two tools (`search_events` and `search_issues`) use embedded AI agents for natural language query translation:
+
+**search_events** (`packages/mcp-server/src/tools/search-events/`):
+- **Purpose**: Translates natural language to Sentry Discover queries for events/aggregations
+- **Agent**: Uses OpenAI GPT-4o with structured outputs to generate DiscoverQL syntax
+- **Tools**: Access to `datasetAttributes` (field discovery), `otelSemantics` (OpenTelemetry lookups), and `whoami` (user context)
+- **Output**: Event lists, counts, aggregations, and statistical data
+- **Example**: "how many errors today" → `level:error` with `count()` aggregation and `timeRange: "24h"`
+
+**search_issues** (`packages/mcp-server/src/tools/search-issues/`):
+- **Purpose**: Translates natural language to Sentry issue search queries for grouped problems
+- **Agent**: Uses OpenAI GPT-4o with structured outputs to generate issue search syntax
+- **Tools**: Access to `issueFields` (field discovery) and `whoami` (user context) 
+- **Output**: Lists of grouped issues with metadata (status, assignee, user count)
+- **Example**: "critical bugs assigned to me" → `level:error is:unresolved assignedOrSuggested:user@email.com`
+
+**Shared Agent Infrastructure** (`packages/mcp-server/src/agent-tools/`):
+- **Field Discovery**: Dynamic field discovery using Sentry's dataset APIs for project-specific attributes
+- **User Resolution**: Resolves 'me' references to actual user email addresses via `whoami`
+- **Error Handling**: Self-correction loops where validation errors are fed back to the agent for retry
+- **Requirements**: Requires `OPENAI_API_KEY` environment variable for AI-powered query translation
+
 ### Cloudflare Web App (`packages/mcp-cloudflare/`)
 - **Client**: React-based chat interface with UI components
 - **Server**: Worker API routes for search, auth, MCP communication

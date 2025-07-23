@@ -83,6 +83,15 @@ CRITICAL TOOL USAGE: You have access to three tools:
    - Query contains "me", "my", "myself" in context of user.id or user.email fields
    - Need to resolve user identity for search queries
 
+AMBIGUOUS QUERY HANDLING:
+When encountering unclear terms like "XYZ calls" or "calls using XYZ":
+1. Use datasetAttributes tool to discover available fields and understand project context
+2. Based on project's available attributes, infer the most likely meaning:
+   - If project has mcp.tool.name attributes → likely MCP tool calls  
+   - If project has gen_ai.request.model attributes → likely AI/agent calls
+   - If project has many span.op variations → likely operation-based calls
+3. Choose the single most appropriate field and use wildcards: mcp.tool.name:"*XYZ*" or span.op:"*XYZ*"
+
 SPECIFIC FIELD MAPPINGS:
 - "user agents", "browser", "client", "user agent strings" → call datasetAttributes to find user_agent fields
 
@@ -464,9 +473,11 @@ export async function translateQuery(
 CRITICAL: Sentry does NOT use SQL syntax. Do NOT generate SQL-like queries.
 
 DATASET SELECTION GUIDELINES:
-- spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics, user agent data
+- spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics, user agent data, "XYZ calls", ambiguous operations (richest attribute set)
 - errors: Exceptions, crashes, error messages, stack traces, unhandled errors, browser/client errors
 - logs: Log entries, log messages, severity levels, debugging information
+
+For ambiguous queries like "calls using XYZ", prefer spans dataset first as it contains the most comprehensive telemetry data.
 
 CRITICAL TOOL USAGE:
 1. Use datasetAttributes tool to discover what fields are available for your chosen dataset
