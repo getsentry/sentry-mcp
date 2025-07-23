@@ -30,12 +30,6 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     super(state, env);
   }
 
-  // Override fetch to capture user agent from initial request
-  async fetch(request: Request): Promise<Response> {
-    // User agent is available in request headers if needed for HTTP-specific operations
-    return super.fetch(request);
-  }
-
   async init() {
     // Load persisted state from Durable Object storage
     const persistedContext =
