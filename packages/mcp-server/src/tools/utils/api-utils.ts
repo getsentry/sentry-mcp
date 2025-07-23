@@ -55,38 +55,34 @@ export function apiServiceFromContext(
  * @param error - The error to handle
  * @param params - The parameters that were used in the API call
  * @returns Never - always throws an error
- * @throws {ApiError} For 4xx errors - preserves original error for agents to handle
+ * @throws {UserInputError} For 4xx errors that are likely user input issues
  * @throws {Error} For other errors
  */
 export function handleApiError(
   error: unknown,
   params?: Record<string, unknown>,
 ): never {
-  // For API errors, preserve the original error type and information
-  // This allows agents to see the exact status code and adjust their approach
   if (error instanceof ApiError) {
-    // For 404s, we can add helpful context about parameters
-    if (error.status === 404 && params) {
-      const paramsList: string[] = [];
-      for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== null && value !== "") {
-          paramsList.push(`${key}: '${value}'`);
+    // For 4xx errors, convert to UserInputError with status code in message
+    // This provides agents with the specific error type while using the appropriate error class
+    if (error.status >= 400 && error.status < 500) {
+      let message = `API error (${error.status}): ${error.message}`;
+
+      // For 404s, add helpful context about parameters if available
+      if (error.status === 404 && params) {
+        const paramsList: string[] = [];
+        for (const [key, value] of Object.entries(params)) {
+          if (value !== undefined && value !== null && value !== "") {
+            paramsList.push(`${key}: '${value}'`);
+          }
+        }
+
+        if (paramsList.length > 0) {
+          message = `Resource not found (404): ${error.message}\nPlease verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`;
         }
       }
 
-      if (paramsList.length > 0) {
-        // Create a new ApiError with enhanced message but preserve status code
-        throw new ApiError(
-          `${error.message}. Please verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`,
-          error.status,
-        );
-      }
-    }
-
-    // For all 4xx errors (including 404 without params), preserve the original error
-    // Agents can check error.status to determine how to handle it
-    if (error.status >= 400 && error.status < 500) {
-      throw error;
+      throw new UserInputError(message);
     }
   }
 
