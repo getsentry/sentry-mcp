@@ -139,17 +139,18 @@ export default defineTool({
         projectId = params.projectSlugOrId;
       } else {
         // It's a slug, convert to ID
-        try {
-          const project = await apiService.getProject({
+        const project = await withApiErrorHandling(
+          () =>
+            apiService.getProject({
+              organizationSlug: params.organizationSlug,
+              projectSlugOrId: params.projectSlugOrId!,
+            }),
+          {
             organizationSlug: params.organizationSlug,
             projectSlugOrId: params.projectSlugOrId,
-          });
-          projectId = String(project.id);
-        } catch (error) {
-          throw new Error(
-            `Project '${params.projectSlugOrId}' not found in organization '${params.organizationSlug}'`,
-          );
-        }
+          },
+        );
+        projectId = String(project.id);
       }
     }
 

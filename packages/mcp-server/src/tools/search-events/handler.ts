@@ -138,17 +138,18 @@ export default defineTool({
     // Convert project slug to ID if needed - we need this for attribute fetching
     let projectId: string | undefined;
     if (params.projectSlug) {
-      try {
-        const project = await apiService.getProject({
+      const project = await withApiErrorHandling(
+        () =>
+          apiService.getProject({
+            organizationSlug,
+            projectSlugOrId: params.projectSlug!,
+          }),
+        {
           organizationSlug,
           projectSlugOrId: params.projectSlug,
-        });
-        projectId = String(project.id);
-      } catch (error) {
-        throw new Error(
-          `Project '${params.projectSlug}' not found in organization '${organizationSlug}'`,
-        );
-      }
+        },
+      );
+      projectId = String(project.id);
     }
 
     // Translate the natural language query using Search Events Agent with error feedback
