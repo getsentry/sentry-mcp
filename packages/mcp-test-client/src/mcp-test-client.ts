@@ -52,6 +52,7 @@ export async function connectToMCPServer(
           });
 
           const client = await experimental_createMCPClient({
+            name: "mcp.sentry.dev (test-client)",
             transport,
           });
 

@@ -276,7 +276,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
 
       mcpClient = await experimental_createMCPClient({
-        name: "sentry",
+        name: "mcp.sentry.dev (web)",
         transport: {
           type: "sse" as const,
           url: sseUrl,
@@ -305,7 +305,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
 
             mcpClient = await experimental_createMCPClient({
-              name: "sentry",
+              name: "mcp.sentry.dev (web)",
               transport: {
                 type: "sse" as const,
                 url: sseUrl,
