@@ -56,7 +56,7 @@ export async function connectToRemoteMCPServer(
 
           // Create SSE client with authentication
           const client = await experimental_createMCPClient({
-            name: "sentry-mcp",
+            name: "mcp.sentry.dev (test-client)",
             transport: {
               type: "sse" as const,
               url: `${mcpHost}/sse`,
