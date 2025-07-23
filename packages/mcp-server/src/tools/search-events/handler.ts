@@ -127,7 +127,7 @@ export default defineTool({
 
     // Handle Search Events Agent errors first
     if (parsed.error) {
-      throw new Error(
+      throw new UserInputError(
         `Search Events Agent could not translate query "${params.naturalLanguageQuery}". Error: ${parsed.error}`,
       );
     }

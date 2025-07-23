@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events";
 import { generateText, tool, Output } from "ai";
+import { UserInputError } from "../errors";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => ({
@@ -243,7 +244,41 @@ describe("search_events", () => {
           organizationSlug: null,
         },
       ),
-    ).rejects.toThrow("Search Events Agent could not translate query");
+    ).rejects.toThrow(UserInputError);
+  });
+
+  it("should return UserInputError for time series queries", async () => {
+    // Mock AI response with time series error
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "errors",
+        "",
+        [],
+        "Time series aggregations are not currently supported.",
+      ),
+    );
+
+    const promise = searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "show me errors over time",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    // Check that it throws UserInputError
+    await expect(promise).rejects.toThrow(UserInputError);
+
+    // Check that the error message contains the expected text
+    await expect(promise).rejects.toThrow(
+      "Time series aggregations are not currently supported",
+    );
   });
 
   it("should handle API errors gracefully", async () => {
