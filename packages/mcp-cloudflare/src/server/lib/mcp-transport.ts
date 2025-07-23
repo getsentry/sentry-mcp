@@ -5,6 +5,7 @@ import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "../types";
 import type { ServerContext } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
+import { logError } from "@sentry/mcp-server/logging";
 import getSentryConfig from "../sentry.config";
 
 // Props contain the authenticated user context from the OAuth flow.
@@ -67,7 +68,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
           // Log the error but don't crash - the server can still function
           // without persisted state, it just won't survive hibernation
           console.error("Failed to persist MCP client info to storage:", error);
-          Sentry.captureException(error);
+          logError(error);
         }
       },
     });
