@@ -55,52 +55,42 @@ export function apiServiceFromContext(
  * @param error - The error to handle
  * @param params - The parameters that were used in the API call
  * @returns Never - always throws an error
- * @throws {UserInputError} For errors that are clearly user input issues
+ * @throws {ApiError} For 4xx errors - preserves original error for agents to handle
  * @throws {Error} For other errors
  */
 export function handleApiError(
   error: unknown,
   params?: Record<string, unknown>,
 ): never {
-  if (error instanceof ApiError && error.status === 404) {
-    // Build a list of all provided parameters
-    const paramsList: string[] = [];
-    if (params) {
+  // For API errors, preserve the original error type and information
+  // This allows agents to see the exact status code and adjust their approach
+  if (error instanceof ApiError) {
+    // For 404s, we can add helpful context about parameters
+    if (error.status === 404 && params) {
+      const paramsList: string[] = [];
       for (const [key, value] of Object.entries(params)) {
         if (value !== undefined && value !== null && value !== "") {
           paramsList.push(`${key}: '${value}'`);
         }
       }
+
+      if (paramsList.length > 0) {
+        // Create a new ApiError with enhanced message but preserve status code
+        throw new ApiError(
+          `${error.message}. Please verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`,
+          error.status,
+        );
+      }
     }
 
-    if (paramsList.length > 0) {
-      throw new UserInputError(
-        `Resource not found. Please verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`,
-      );
-    }
-
-    // Fallback to generic message if no params provided
-    throw new UserInputError(
-      `Resource not found (404). Please verify that all provided identifiers are correct and you have access to the requested resources.`,
-    );
-  }
-
-  // For other API errors, check if they're likely user input issues
-  if (error instanceof ApiError) {
-    // 400 Bad Request often indicates invalid parameters
-    if (error.status === 400) {
-      throw new UserInputError(`Invalid request: ${error.message}`);
-    }
-
-    // 403 Forbidden might be a permissions issue but could also be wrong org/project
-    if (error.status === 403) {
-      throw new UserInputError(
-        `Access denied: ${error.message}. Please verify you have access to this resource.`,
-      );
+    // For all 4xx errors (including 404 without params), preserve the original error
+    // Agents can check error.status to determine how to handle it
+    if (error.status >= 400 && error.status < 500) {
+      throw error;
     }
   }
 
-  // Re-throw any other errors as-is
+  // Re-throw any other errors as-is (including 5xx server errors)
   throw error;
 }
 
