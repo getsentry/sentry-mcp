@@ -72,8 +72,9 @@ export function createDatasetFieldsTool(
     parameters: z.object({
       includeExamples: z
         .boolean()
-        .default(false)
-        .describe("Include example values for each field"),
+        .describe(
+          "Include example values for each field (set to false if you don't need examples)",
+        ),
     }),
     execute: async ({ includeExamples }) => {
       return discoverDatasetFields(apiService, organizationSlug, dataset, {

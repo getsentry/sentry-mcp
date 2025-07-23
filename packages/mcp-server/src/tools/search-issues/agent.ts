@@ -12,12 +12,12 @@ const IssueQuerySchema = z.object({
   query: z.string().describe("The Sentry issue search query"),
   sort: z
     .enum(["date", "freq", "new", "user"])
-    .optional()
-    .describe("How to sort the results"),
+    .nullable()
+    .describe("How to sort the results (null if no specific sort is needed)"),
   explanation: z
     .string()
-    .optional()
-    .describe("Brief explanation of the translation"),
+    .nullable()
+    .describe("Brief explanation of the translation (null if not needed)"),
 });
 
 export type IssueQuery = z.infer<typeof IssueQuerySchema>;
@@ -105,6 +105,7 @@ export async function translateQuery(
 
     throw new Error(
       `Failed to translate query: ${error instanceof Error ? error.message : "Unknown error"}`,
+      { cause: error },
     );
   }
 }
