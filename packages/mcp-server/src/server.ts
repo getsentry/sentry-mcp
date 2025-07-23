@@ -169,8 +169,27 @@ function createResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.userAgent && {
-              "user_agent.original": context.userAgent,
+            ...(context.mcpClientName && context.mcpClientVersion
+              ? {
+                  "user_agent.original": `${context.mcpClientName}/${context.mcpClientVersion}`,
+                }
+              : context.userAgent && {
+                  "user_agent.original": context.userAgent,
+                }),
+            ...(context.mcpClientName && {
+              "mcp.client.name": context.mcpClientName,
+            }),
+            ...(context.mcpClientVersion && {
+              "mcp.client.version": context.mcpClientVersion,
+            }),
+            ...(context.mcpProtocolVersion && {
+              "mcp.protocol.version": context.mcpProtocolVersion,
+            }),
+            ...(context.mcpServerName && {
+              "mcp.server.name": context.mcpServerName,
+            }),
+            ...(context.mcpServerVersion && {
+              "mcp.server.version": context.mcpServerVersion,
             }),
           },
         },
@@ -211,8 +230,27 @@ function createTemplateResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.userAgent && {
-              "user_agent.original": context.userAgent,
+            ...(context.mcpClientName && context.mcpClientVersion
+              ? {
+                  "user_agent.original": `${context.mcpClientName}/${context.mcpClientVersion}`,
+                }
+              : context.userAgent && {
+                  "user_agent.original": context.userAgent,
+                }),
+            ...(context.mcpClientName && {
+              "mcp.client.name": context.mcpClientName,
+            }),
+            ...(context.mcpClientVersion && {
+              "mcp.client.version": context.mcpClientVersion,
+            }),
+            ...(context.mcpProtocolVersion && {
+              "mcp.protocol.version": context.mcpProtocolVersion,
+            }),
+            ...(context.mcpServerName && {
+              "mcp.server.name": context.mcpServerName,
+            }),
+            ...(context.mcpServerVersion && {
+              "mcp.server.version": context.mcpServerVersion,
             }),
             ...extractMcpParameters(variables),
           },
@@ -264,6 +302,29 @@ export async function configureServer({
     logError(error);
   };
 
+  // Hook into the initialized notification to capture client information
+  server.server.oninitialized = () => {
+    const serverInstance = server.server as any;
+    const clientInfo = serverInstance._clientVersion;
+    const protocolVersion = serverInstance._protocolVersion;
+
+    // Update the context object with client information
+    if (clientInfo) {
+      context.mcpClientName = clientInfo.name;
+      context.mcpClientVersion = clientInfo.version;
+    }
+
+    if (protocolVersion) {
+      context.mcpProtocolVersion = protocolVersion;
+    }
+
+    // Set server information
+    if (serverInstance._serverInfo) {
+      context.mcpServerName = serverInstance._serverInfo.name;
+      context.mcpServerVersion = serverInstance._serverInfo.version;
+    }
+  };
+
   for (const resource of RESOURCES) {
     if (isTemplateResource(resource)) {
       // Handle URI template resources
@@ -305,8 +366,27 @@ export async function configureServer({
                 name: `prompts/get ${prompt.name}`,
                 attributes: {
                   "mcp.prompt.name": prompt.name,
-                  ...(context.userAgent && {
-                    "user_agent.original": context.userAgent,
+                  ...(context.mcpClientName && context.mcpClientVersion
+                    ? {
+                        "user_agent.original": `${context.mcpClientName}/${context.mcpClientVersion}`,
+                      }
+                    : context.userAgent && {
+                        "user_agent.original": context.userAgent,
+                      }),
+                  ...(context.mcpClientName && {
+                    "mcp.client.name": context.mcpClientName,
+                  }),
+                  ...(context.mcpClientVersion && {
+                    "mcp.client.version": context.mcpClientVersion,
+                  }),
+                  ...(context.mcpProtocolVersion && {
+                    "mcp.protocol.version": context.mcpProtocolVersion,
+                  }),
+                  ...(context.mcpServerName && {
+                    "mcp.server.name": context.mcpServerName,
+                  }),
+                  ...(context.mcpServerVersion && {
+                    "mcp.server.version": context.mcpServerVersion,
                   }),
                   ...extractMcpParameters(args[0] || {}),
                 },
@@ -370,8 +450,27 @@ export async function configureServer({
                 name: `tools/call ${tool.name}`,
                 attributes: {
                   "mcp.tool.name": tool.name,
-                  ...(context.userAgent && {
-                    "user_agent.original": context.userAgent,
+                  ...(context.mcpClientName && context.mcpClientVersion
+                    ? {
+                        "user_agent.original": `${context.mcpClientName}/${context.mcpClientVersion}`,
+                      }
+                    : context.userAgent && {
+                        "user_agent.original": context.userAgent,
+                      }),
+                  ...(context.mcpClientName && {
+                    "mcp.client.name": context.mcpClientName,
+                  }),
+                  ...(context.mcpClientVersion && {
+                    "mcp.client.version": context.mcpClientVersion,
+                  }),
+                  ...(context.mcpProtocolVersion && {
+                    "mcp.protocol.version": context.mcpProtocolVersion,
+                  }),
+                  ...(context.mcpServerName && {
+                    "mcp.server.name": context.mcpServerName,
+                  }),
+                  ...(context.mcpServerVersion && {
+                    "mcp.server.version": context.mcpServerVersion,
                   }),
                   ...extractMcpParameters(params || {}),
                 },

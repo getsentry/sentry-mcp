@@ -46,4 +46,10 @@ export type ServerContext = {
   userId?: string | null;
   clientId?: string;
   userAgent?: string;
+  // MCP client information captured during initialization
+  mcpClientName?: string;
+  mcpClientVersion?: string;
+  mcpProtocolVersion?: string;
+  mcpServerName?: string;
+  mcpServerVersion?: string;
 };
