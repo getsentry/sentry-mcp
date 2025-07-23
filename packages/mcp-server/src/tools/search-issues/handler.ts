@@ -128,7 +128,7 @@ export default defineTool({
 
     setTag("organization.slug", params.organizationSlug);
     if (params.projectSlugOrId) {
-      setTag("project.slug", params.projectSlugOrId);
+      setTag("project.slug_or_id", params.projectSlugOrId);
     }
 
     // Convert project slug to ID if needed - required for the agent's field discovery
