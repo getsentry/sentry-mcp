@@ -145,7 +145,7 @@ export default defineTool({
         });
         projectId = String(project.id);
       } catch (error) {
-        throw new Error(
+        throw new UserInputError(
           `Project '${params.projectSlug}' not found in organization '${organizationSlug}'`,
         );
       }
@@ -165,7 +165,7 @@ export default defineTool({
 
     // Handle Search Events Agent errors first
     if (parsed.error) {
-      throw new Error(
+      throw new UserInputError(
         `Search Events Agent could not translate query "${params.naturalLanguageQuery}". Error: ${parsed.error}`,
       );
     }

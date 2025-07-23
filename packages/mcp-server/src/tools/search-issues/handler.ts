@@ -146,7 +146,7 @@ export default defineTool({
           });
           projectId = String(project.id);
         } catch (error) {
-          throw new Error(
+          throw new UserInputError(
             `Project '${params.projectSlugOrId}' not found in organization '${params.organizationSlug}'`,
           );
         }
