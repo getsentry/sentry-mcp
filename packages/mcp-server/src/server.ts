@@ -358,13 +358,6 @@ export async function configureServer({
                 name: `prompts/get ${prompt.name}`,
                 attributes: {
                   "mcp.prompt.name": prompt.name,
-                  ...(context.mcpClientName && context.mcpClientVersion
-                    ? {
-                        "user_agent.original": `${context.mcpClientName}/${context.mcpClientVersion}`,
-                      }
-                    : context.userAgent && {
-                        "user_agent.original": context.userAgent,
-                      }),
                   ...(context.mcpClientName && {
                     "mcp.client.name": context.mcpClientName,
                   }),
@@ -442,13 +435,6 @@ export async function configureServer({
                 name: `tools/call ${tool.name}`,
                 attributes: {
                   "mcp.tool.name": tool.name,
-                  ...(context.mcpClientName && context.mcpClientVersion
-                    ? {
-                        "user_agent.original": `${context.mcpClientName}/${context.mcpClientVersion}`,
-                      }
-                    : context.userAgent && {
-                        "user_agent.original": context.userAgent,
-                      }),
                   ...(context.mcpClientName && {
                     "mcp.client.name": context.mcpClientName,
                   }),
