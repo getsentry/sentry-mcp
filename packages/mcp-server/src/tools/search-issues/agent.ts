@@ -73,6 +73,10 @@ export async function translateQuery(
       experimental_output: Output.object({
         schema: IssueQuerySchema,
       }),
+      experimental_telemetry: {
+        isEnabled: true,
+        functionId: "search_issues_agent",
+      },
     });
 
     const query = result.experimental_output;
