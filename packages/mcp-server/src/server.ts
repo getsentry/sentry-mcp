@@ -169,13 +169,6 @@ function createResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.mcpClientName && context.mcpClientVersion
-              ? {
-                  "user_agent.original": `${context.mcpClientName}/${context.mcpClientVersion}`,
-                }
-              : context.userAgent && {
-                  "user_agent.original": context.userAgent,
-                }),
             ...(context.mcpClientName && {
               "mcp.client.name": context.mcpClientName,
             }),
@@ -230,13 +223,6 @@ function createTemplateResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.mcpClientName && context.mcpClientVersion
-              ? {
-                  "user_agent.original": `${context.mcpClientName}/${context.mcpClientVersion}`,
-                }
-              : context.userAgent && {
-                  "user_agent.original": context.userAgent,
-                }),
             ...(context.mcpClientName && {
               "mcp.client.name": context.mcpClientName,
             }),

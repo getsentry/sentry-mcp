@@ -12,7 +12,6 @@ import getSentryConfig from "../sentry.config";
 // NOTE: Only store persistent user data in props (e.g., userId, accessToken).
 // Request-specific data like user agent should be captured per request.
 class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
-  private cachedUserAgent?: string;
   private serverContext?: any; // Store the context for later updates
 
   server = new McpServer({
@@ -34,22 +33,13 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
 
   // Override fetch to capture user agent from initial request
   async fetch(request: Request): Promise<Response> {
-    // Capture user agent from the initial SSE/WebSocket connection request
-    if (!this.cachedUserAgent && request.headers.get("user-agent")) {
-      this.cachedUserAgent = request.headers.get("user-agent") || undefined;
-      // Persist the user agent to storage
-      await this.ctx.storage.put("cachedUserAgent", this.cachedUserAgent);
-    }
-
+    // User agent is available in request headers if needed for HTTP-specific operations
     return super.fetch(request);
   }
 
   async init() {
     // Load persisted state from Durable Object storage
-    const [persistedContext, persistedUserAgent] = await Promise.all([
-      this.ctx.storage.get<any>("serverContext"),
-      this.ctx.storage.get<string>("cachedUserAgent"),
-    ]);
+    const persistedContext = await this.ctx.storage.get<any>("serverContext");
 
     // Initialize or restore the context
     this.serverContext = persistedContext || {
@@ -57,14 +47,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       organizationSlug: this.props.organizationSlug,
       userId: this.props.id,
       mcpUrl: process.env.MCP_URL,
-      // User agent is captured from the initial SSE/WebSocket request
-      userAgent: persistedUserAgent || this.cachedUserAgent,
     };
-
-    // Restore cached user agent if it was persisted
-    if (persistedUserAgent) {
-      this.cachedUserAgent = persistedUserAgent;
-    }
 
     await configureServer({
       server: this.server,
