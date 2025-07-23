@@ -31,21 +31,21 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   }
 
   async init() {
-    // Load persisted state from Durable Object storage
-    const persistedContext =
-      await this.ctx.storage.get<ServerContext>("serverContext");
+    // Load only MCP client info from storage
+    const persistedMcpInfo = await this.ctx.storage.get<{
+      mcpClientName?: string;
+      mcpClientVersion?: string;
+      mcpProtocolVersion?: string;
+    }>("mcpClientInfo");
 
     // Initialize context with fresh auth data from props
-    // Only restore MCP client attributes from persisted context
     const serverContext: ServerContext = {
       accessToken: this.props.accessToken,
       organizationSlug: this.props.organizationSlug,
       userId: this.props.id,
       mcpUrl: process.env.MCP_URL,
-      // Restore only MCP client info from previous session
-      mcpClientName: persistedContext?.mcpClientName,
-      mcpClientVersion: persistedContext?.mcpClientVersion,
-      mcpProtocolVersion: persistedContext?.mcpProtocolVersion,
+      // Restore MCP client info if available
+      ...persistedMcpInfo,
     };
 
     await configureServer({
@@ -56,13 +56,17 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       },
       onInitialized: async () => {
         try {
-          // Persist the updated context to Durable Object storage
-          // The context has already been updated by configureServer's oninitialized handler
-          await this.ctx.storage.put("serverContext", serverContext);
+          // Only persist MCP client attributes that we'll restore later
+          const mcpClientInfo = {
+            mcpClientName: serverContext.mcpClientName,
+            mcpClientVersion: serverContext.mcpClientVersion,
+            mcpProtocolVersion: serverContext.mcpProtocolVersion,
+          };
+          await this.ctx.storage.put("mcpClientInfo", mcpClientInfo);
         } catch (error) {
           // Log the error but don't crash - the server can still function
           // without persisted state, it just won't survive hibernation
-          console.error("Failed to persist server context to storage:", error);
+          console.error("Failed to persist MCP client info to storage:", error);
           Sentry.captureException(error);
         }
       },
