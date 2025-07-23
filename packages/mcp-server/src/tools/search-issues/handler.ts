@@ -202,27 +202,16 @@ export default defineTool({
       }
       output += `\n\n`;
 
-      // Format results without the title (since we already have it)
-      const formattedResults = formatIssueResults(
+      // Format results without the header since we already added it
+      output += formatIssueResults(
         issues,
         params.organizationSlug,
         params.projectSlugOrId,
         translatedQuery.query,
         params.regionUrl,
         params.naturalLanguageQuery,
+        true, // skipHeader = true
       );
-
-      // Skip the title and display instructions from formatted results
-      const lines = formattedResults.split("\n");
-      let startIndex = 0;
-      // Find where the actual content starts (after title and display instructions)
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith("**📊 View these results")) {
-          startIndex = i;
-          break;
-        }
-      }
-      output += lines.slice(startIndex).join("\n");
     } else {
       // Format results with natural language query for title
       output = formatIssueResults(
@@ -232,6 +221,7 @@ export default defineTool({
         translatedQuery.query,
         params.regionUrl,
         params.naturalLanguageQuery,
+        false, // skipHeader = false (default)
       );
     }
 

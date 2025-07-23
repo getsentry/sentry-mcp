@@ -11,23 +11,28 @@ export function formatIssueResults(
   query: string,
   regionUrl?: string,
   naturalLanguageQuery?: string,
+  skipHeader = false,
 ): string {
   const host = regionUrl ? new URL(regionUrl).host : "sentry.io";
 
-  // Use natural language query in title if provided, otherwise fall back to org/project
   let output = "";
-  if (naturalLanguageQuery) {
-    output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
-  } else {
-    output = `# Issues in **${organizationSlug}`;
-    if (projectSlugOrId) {
-      output += `/${projectSlugOrId}`;
-    }
-    output += "**\n\n";
-  }
 
-  // Add display instructions for UI
-  output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
+  // Skip header section if requested (when called from handler with includeExplanation)
+  if (!skipHeader) {
+    // Use natural language query in title if provided, otherwise fall back to org/project
+    if (naturalLanguageQuery) {
+      output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+    } else {
+      output = `# Issues in **${organizationSlug}`;
+      if (projectSlugOrId) {
+        output += `/${projectSlugOrId}`;
+      }
+      output += "**\n\n";
+    }
+
+    // Add display instructions for UI
+    output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
+  }
 
   // Generate search URL first for consistent placement
   const searchUrl = getIssuesSearchUrl(
