@@ -49,6 +49,4 @@ export type ServerContext = {
   mcpClientName?: string;
   mcpClientVersion?: string;
   mcpProtocolVersion?: string;
-  mcpServerName?: string;
-  mcpServerVersion?: string;
 };

@@ -37,6 +37,7 @@ import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
 import { UserInputError, ConfigurationError } from "./errors";
+import { LIB_VERSION } from "./version";
 
 /**
  * Type guard to identify Sentry API errors.
@@ -178,12 +179,8 @@ function createResourceHandler(
             ...(context.mcpProtocolVersion && {
               "mcp.protocol.version": context.mcpProtocolVersion,
             }),
-            ...(context.mcpServerName && {
-              "mcp.server.name": context.mcpServerName,
-            }),
-            ...(context.mcpServerVersion && {
-              "mcp.server.version": context.mcpServerVersion,
-            }),
+            "mcp.server.name": "Sentry MCP",
+            "mcp.server.version": LIB_VERSION,
           },
         },
         async () => {
@@ -232,12 +229,8 @@ function createTemplateResourceHandler(
             ...(context.mcpProtocolVersion && {
               "mcp.protocol.version": context.mcpProtocolVersion,
             }),
-            ...(context.mcpServerName && {
-              "mcp.server.name": context.mcpServerName,
-            }),
-            ...(context.mcpServerVersion && {
-              "mcp.server.version": context.mcpServerVersion,
-            }),
+            "mcp.server.name": "Sentry MCP",
+            "mcp.server.version": LIB_VERSION,
             ...extractMcpParameters(variables),
           },
         },
@@ -308,12 +301,6 @@ export async function configureServer({
 
     if (protocolVersion) {
       context.mcpProtocolVersion = protocolVersion;
-    }
-
-    // Set server information
-    if (serverInstance._serverInfo) {
-      context.mcpServerName = serverInstance._serverInfo.name;
-      context.mcpServerVersion = serverInstance._serverInfo.version;
     }
 
     // Call the custom onInitialized handler if provided
