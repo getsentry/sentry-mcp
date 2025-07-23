@@ -1,5 +1,6 @@
 import type { Issue } from "../../api-client";
 import { getIssueUrl, getIssuesSearchUrl } from "../../utils/url-utils";
+import * as Sentry from "@sentry/node";
 
 /**
  * Format issue search results for display
@@ -35,6 +36,16 @@ export function formatIssueResults(
   }
 
   if (issues.length === 0) {
+    Sentry.logger.info(
+      Sentry.logger
+        .fmt`No issues found for query: ${naturalLanguageQuery || query}`,
+      {
+        query: query,
+        organizationSlug: organizationSlug,
+        projectSlug: projectSlugOrId,
+        naturalLanguageQuery: naturalLanguageQuery,
+      },
+    );
     output += "No issues found matching your search criteria.\n\n";
     output += "Try adjusting your search criteria or time range.";
     return output;

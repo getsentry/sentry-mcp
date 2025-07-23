@@ -5,6 +5,7 @@ import {
   getNumberValue,
   isAggregateQuery,
 } from "./utils";
+import * as Sentry from "@sentry/node";
 
 /**
  * Format error event results for display
@@ -37,6 +38,16 @@ export function formatErrorResults(
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
+    Sentry.logger.info(
+      Sentry.logger
+        .fmt`No error events found for query: ${params.naturalLanguageQuery}`,
+      {
+        query: sentryQuery,
+        fields: fields,
+        organizationSlug: organizationSlug,
+        dataset: "errors",
+      },
+    );
     output += `No results found.\n\n`;
     output += `Try being more specific or using different terms in your search.\n`;
     return output;
@@ -148,6 +159,16 @@ export function formatLogResults(
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
+    Sentry.logger.info(
+      Sentry.logger
+        .fmt`No log events found for query: ${params.naturalLanguageQuery}`,
+      {
+        query: sentryQuery,
+        fields: fields,
+        organizationSlug: organizationSlug,
+        dataset: "logs",
+      },
+    );
     output += `No results found.\n\n`;
     output += `Try being more specific or using different terms in your search.\n`;
     return output;
@@ -283,6 +304,16 @@ export function formatSpanResults(
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
+    Sentry.logger.info(
+      Sentry.logger
+        .fmt`No span events found for query: ${params.naturalLanguageQuery}`,
+      {
+        query: sentryQuery,
+        fields: fields,
+        organizationSlug: organizationSlug,
+        dataset: "spans",
+      },
+    );
     output += `No results found.\n\n`;
     output += `Try being more specific or using different terms in your search.\n`;
     return output;
