@@ -35,12 +35,17 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     const persistedContext =
       await this.ctx.storage.get<ServerContext>("serverContext");
 
-    // Initialize or restore the context
-    const serverContext: ServerContext = persistedContext || {
+    // Initialize context with fresh auth data from props
+    // Only restore MCP client attributes from persisted context
+    const serverContext: ServerContext = {
       accessToken: this.props.accessToken,
       organizationSlug: this.props.organizationSlug,
       userId: this.props.id,
       mcpUrl: process.env.MCP_URL,
+      // Restore only MCP client info from previous session
+      mcpClientName: persistedContext?.mcpClientName,
+      mcpClientVersion: persistedContext?.mcpClientVersion,
+      mcpProtocolVersion: persistedContext?.mcpProtocolVersion,
     };
 
     await configureServer({
