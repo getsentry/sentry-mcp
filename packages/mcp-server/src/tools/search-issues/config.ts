@@ -19,11 +19,18 @@ QUERY PATTERNS:
 - Impact: userCount:>100, eventCount:>1000
 - Assignment: assignedOrSuggested:email@example.com
 
-SORT OPTIONS:
-- date: Last seen (default)
-- freq: Event frequency
-- new: First seen
-- user: User count
+SORTING RULES:
+1. CRITICAL: Sort MUST go in the separate "sort" field, NEVER in the "query" field
+   - WRONG: query: "is:unresolved sort:user" ← Sort syntax in query field is FORBIDDEN
+   - CORRECT: query: "is:unresolved", sort: "user" ← Sort in separate field
+
+2. AVAILABLE SORT OPTIONS:
+   - date: Last seen (default)
+   - freq: Event frequency  
+   - new: First seen
+   - user: User count
+
+3. IMPORTANT: Query field is for filtering only (is:, level:, environment:, etc.)
 
 'ME' REFERENCES:
 - When the user says "assigned to me" or similar, you MUST use the whoami tool to get the current user's email
@@ -31,11 +38,11 @@ SORT OPTIONS:
 - Example: "assigned to me" → use whoami tool → assignedOrSuggested:user@example.com
 
 EXAMPLES:
-"critical bugs" → level:error is:unresolved
-"errors from last week" → is:unresolved lastSeen:-7d
-"affecting 100+ users" → userCount:>100
-"assigned to john@example.com" → assignedOrSuggested:john@example.com
-"production errors" → environment:production level:error
+"critical bugs" → query: "level:error is:unresolved", sort: "date"
+"worst issues affecting the most users" → query: "is:unresolved", sort: "user"
+"assigned to john@example.com" → query: "assignedOrSuggested:john@example.com", sort: "date"
+
+NEVER: query: "is:unresolved sort:user" ← Sort goes in separate field!
 
 Always use the issueFields tool to discover available fields when needed.
 Use the whoami tool when you need to resolve 'me' references.`;

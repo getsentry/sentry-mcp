@@ -147,17 +147,21 @@ When user asks for calculated metrics, ratios, or conversions:
 - IMPORTANT: Equations are ONLY supported in the spans dataset, NOT in errors or logs
 
 SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
-1. DEFAULT SORTING:
+1. CRITICAL: Sort MUST go in the separate "sort" field, NEVER in the "query" field
+   - WRONG: query: "level:error sort:-timestamp" ← Sort syntax in query field is FORBIDDEN
+   - CORRECT: query: "level:error", sort: "-timestamp" ← Sort in separate field
+
+2. DEFAULT SORTING:
    - errors dataset: Use "-timestamp" (newest first)
    - spans dataset: Use "-span.duration" (slowest first)  
    - logs dataset: Use "-timestamp" (newest first)
 
-2. SORTING SYNTAX:
+3. SORTING SYNTAX:
    - Use "-" prefix for descending order (e.g., "-timestamp" for newest first)
    - Use field name without prefix for ascending order
    - For aggregate queries: sort by aggregate function results (e.g., "-count()" for highest count first)
 
-3. IMPORTANT SORTING REQUIREMENTS:
+4. IMPORTANT SORTING REQUIREMENTS:
    - YOU MUST ALWAYS INCLUDE A SORT PARAMETER
    - CRITICAL: The field you sort by MUST be included in your fields array
    - If sorting by "-timestamp", include "timestamp" in fields
