@@ -10,18 +10,39 @@ export function formatIssueResults(
   projectSlugOrId: string | undefined,
   query: string,
   regionUrl?: string,
+  naturalLanguageQuery?: string,
 ): string {
   const host = regionUrl ? new URL(regionUrl).host : "sentry.io";
 
-  let output = `# Issues in **${organizationSlug}`;
-  if (projectSlugOrId) {
-    output += `/${projectSlugOrId}`;
+  // Use natural language query in title if provided, otherwise fall back to org/project
+  let output = "";
+  if (naturalLanguageQuery) {
+    output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+  } else {
+    output = `# Issues in **${organizationSlug}`;
+    if (projectSlugOrId) {
+      output += `/${projectSlugOrId}`;
+    }
+    output += "**\n\n";
   }
-  output += "**\n\n";
+
+  // Add display instructions for UI
+  output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
+
+  // Generate search URL first for consistent placement
+  const searchUrl = getIssuesSearchUrl(
+    host,
+    organizationSlug,
+    query,
+    projectSlugOrId,
+  );
+
+  // Add view link with emoji and guidance text (like search_events)
+  output += `**📊 View these results in Sentry**: ${searchUrl}\n`;
+  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (issues.length === 0) {
     output += "No issues found matching your search criteria.\n\n";
-    output += `**Query**: \`${query}\`\n\n`;
     output += "Try adjusting your search criteria or time range.";
     return output;
   }
@@ -65,16 +86,14 @@ export function formatIssueResults(
     output += "\n";
   });
 
-  // Add search link
-  const searchUrl = getIssuesSearchUrl(
-    host,
-    organizationSlug,
-    query,
-    projectSlugOrId,
-  );
-  output += `[View in Sentry Issues](${searchUrl})\n\n`;
-
-  output += "<!-- display as issue cards -->";
+  // Add next steps section (like search_events)
+  output += "## Next Steps\n\n";
+  output +=
+    "- Get more details about a specific issue: Use the Issue ID with get_issue_details\n";
+  output +=
+    "- Update issue status: Use update_issue to resolve or assign issues\n";
+  output +=
+    "- View event counts: Use search_events for aggregated statistics\n";
 
   return output;
 }

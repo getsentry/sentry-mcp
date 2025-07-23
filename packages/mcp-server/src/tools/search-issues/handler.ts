@@ -182,26 +182,57 @@ export default defineTool({
       },
     );
 
-    // Format the results
-    let output = formatIssueResults(
-      issues,
-      params.organizationSlug,
-      params.projectSlugOrId,
-      translatedQuery.query,
-      params.regionUrl,
-    );
+    // Build output with explanation first (if requested), then results
+    let output = "";
 
-    // Add explanation if requested
+    // Add explanation section before results (like search_events)
     if (params.includeExplanation) {
-      output += "\n\n## Query Translation\n\n";
-      output += `**Natural Language**: ${params.naturalLanguageQuery}\n\n`;
-      output += `**Sentry Query**: \`${translatedQuery.query}\``;
+      // Start with title including natural language query
+      output += `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+      output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
+
+      output += `## Query Translation\n`;
+      output += `Natural language: "${params.naturalLanguageQuery}"\n`;
+      output += `Sentry query: \`${translatedQuery.query}\``;
       if (translatedQuery.sort) {
-        output += `\n**Sort**: ${translatedQuery.sort}`;
+        output += `\nSort: ${translatedQuery.sort}`;
       }
       if (translatedQuery.explanation) {
         output += `\n\n${translatedQuery.explanation}`;
       }
+      output += `\n\n`;
+
+      // Format results without the title (since we already have it)
+      const formattedResults = formatIssueResults(
+        issues,
+        params.organizationSlug,
+        params.projectSlugOrId,
+        translatedQuery.query,
+        params.regionUrl,
+        params.naturalLanguageQuery,
+      );
+
+      // Skip the title and display instructions from formatted results
+      const lines = formattedResults.split("\n");
+      let startIndex = 0;
+      // Find where the actual content starts (after title and display instructions)
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith("**📊 View these results")) {
+          startIndex = i;
+          break;
+        }
+      }
+      output += lines.slice(startIndex).join("\n");
+    } else {
+      // Format results with natural language query for title
+      output = formatIssueResults(
+        issues,
+        params.organizationSlug,
+        params.projectSlugOrId,
+        translatedQuery.query,
+        params.regionUrl,
+        params.naturalLanguageQuery,
+      );
     }
 
     return output;
