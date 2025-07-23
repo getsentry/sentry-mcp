@@ -126,9 +126,9 @@ export default defineTool({
       regionUrl: params.regionUrl,
     });
 
-    setTag("search_issues.organizationSlug", params.organizationSlug);
+    setTag("organization.slug", params.organizationSlug);
     if (params.projectSlugOrId) {
-      setTag("search_issues.projectSlugOrId", params.projectSlugOrId);
+      setTag("project.slug", params.projectSlugOrId);
     }
 
     // Convert project slug to ID if needed - required for the agent's field discovery
