@@ -247,6 +247,56 @@ External documentation and data:
 - Streaming responses where applicable
 - Parallel API calls when possible
 
+## Two-Tier Agent Architecture
+
+Some tools (`search_events` and `search_issues`) implement a two-tier agent pattern:
+
+### Tier 1: Calling Agent (Claude/Cursor)
+- Decides when to use search tools
+- Provides natural language queries
+- Handles errors and retries
+- Interprets results for the user
+
+### Tier 2: Embedded Agent (GPT-4o)
+- Lives inside the MCP tool
+- Translates natural language to Sentry query syntax
+- Has its own tools for field discovery
+- Returns structured query objects
+
+### Data Flow Example
+
+```
+1. User: "Show me errors from yesterday"
+   ↓
+2. Claude: Calls search_events(naturalLanguageQuery="errors from yesterday")
+   ↓
+3. MCP Tool Handler: Receives request
+   ↓
+4. Embedded Agent (GPT-4o):
+   - Determines dataset: "errors"
+   - Calls datasetAttributes tool
+   - Translates to: {query: "", fields: [...], timeRange: {statsPeriod: "24h"}}
+   ↓
+5. MCP Tool: Executes Sentry API call
+   ↓
+6. Results formatted and returned to Claude
+   ↓
+7. Claude: Presents results to user
+```
+
+### Design Rationale
+
+This pattern is used when:
+- Query languages are complex (Sentry's search syntax)
+- Available fields vary by context (project-specific attributes)
+- Semantic understanding is required ("yesterday" → timeRange)
+
+### Error Handling
+
+- Embedded agent errors are returned as UserInputError
+- Calling agent sees the error and can retry
+- No internal retry loops - single responsibility
+
 ## Security Model
 
 - Access tokens never logged

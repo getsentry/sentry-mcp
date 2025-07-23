@@ -227,6 +227,93 @@ pnpm eval your-tool
 - [ ] 1-2 eval tests (if critical)
 - [ ] Run quality checks
 
+## Agent-in-Tool Pattern
+
+Some tools (`search_events` and `search_issues`) embed AI agents to handle complex natural language translation. This pattern is used when:
+
+### When to Use This Pattern
+
+1. **Complex query translation** - Converting natural language to domain-specific query languages
+2. **Dynamic field discovery** - When available fields vary by project/context
+3. **Semantic understanding** - When the tool needs to understand intent, not just parameters
+
+### When NOT to Use This Pattern
+
+1. **Simple API calls** - Direct parameter mapping to API endpoints
+2. **Deterministic operations** - Operations with clear, unambiguous inputs
+3. **Performance-critical paths** - Embedded agents add latency and cost
+
+### Architecture
+
+```typescript
+// Tool handler delegates to embedded agent
+async handler(params, context) {
+  // 1. Embedded agent translates natural language
+  const translated = await translateQuery(params.naturalLanguageQuery, ...);
+  
+  // 2. Tool executes the translated query
+  const results = await apiService.searchEvents(translated.query, ...);
+  
+  // 3. Format and return results
+  return formatResults(results);
+}
+```
+
+### Error Handling Philosophy
+
+**DO NOT retry internally**. When the embedded agent fails:
+1. Throw a clear `UserInputError` with specific guidance
+2. Let the calling agent (Claude/Cursor) see the error
+3. The calling agent can retry with corrections if needed
+
+**IMPORTANT**: Keep system prompts static to enable LLM provider caching. Never modify prompts based on errors.
+
+```typescript
+// BAD: Dynamic prompt modification prevents caching
+let systemPrompt = basePrompt;
+if (previousError) {
+  systemPrompt += `\nPrevious error: ${previousError}`;
+}
+
+// GOOD: Static prompt with clear error boundaries
+const systemPrompt = STATIC_SYSTEM_PROMPT;
+try {
+  return await translateQuery(...);
+} catch (error) {
+  throw new UserInputError(`Could not translate query: ${error.message}`);
+}
+```
+
+### Tool Boundaries
+
+1. **Embedded Agent Responsibilities**:
+   - Translate natural language to structured queries
+   - Discover available fields/attributes
+   - Validate query syntax
+
+2. **Tool Handler Responsibilities**:
+   - Execute the translated query
+   - Handle API errors
+   - Format results for the calling agent
+
+3. **Calling Agent Responsibilities**:
+   - Decide when to use the tool
+   - Handle errors and retry if needed
+   - Interpret results
+
+### Implementation Guidelines
+
+1. **Create a CLAUDE.md file** in the tool directory documenting:
+   - The embedded agent's prompt and behavior
+   - Common translation patterns
+   - Known limitations
+
+2. **Keep agent prompts focused** - Don't duplicate general MCP knowledge
+3. **Use structured outputs** - Define clear schemas for agent responses
+4. **Provide tool discovery** - Let agents explore available fields dynamically
+
+See `packages/mcp-server/src/tools/search-events/` and `packages/mcp-server/src/tools/search-issues/` for examples.
+
 ## Worker-Specific Tools
 
 Some tools may require access to Cloudflare Worker-specific bindings (like AutoRAG, D1, R2, etc.) that aren't available in the standard ServerContext. For these cases, create a separate endpoint in the Worker that the tool can call.

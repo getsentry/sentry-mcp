@@ -22,46 +22,6 @@ import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
 import { ApiError } from "../../api-client";
 
-/**
- * Translate query with error feedback for self-correction
- */
-async function translateQueryWithErrorFeedback(
-  params: {
-    naturalLanguageQuery: string;
-    organizationSlug: string;
-    projectId?: string;
-  },
-  apiService: SentryApiService,
-  maxRetries = 1,
-) {
-  let previousError: string | undefined;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await translateQuery(
-        params,
-        apiService,
-        params.organizationSlug,
-        params.projectId,
-        previousError,
-      );
-
-      return result;
-    } catch (error) {
-      if (error instanceof UserInputError && attempt < maxRetries) {
-        // Feed the validation error back to the agent for self-correction
-        previousError = error.message;
-        continue;
-      }
-      // Re-throw if it's not a UserInputError or we've exceeded retries
-      throw error;
-    }
-  }
-
-  // This should never be reached due to the throw above, but TypeScript needs it
-  throw new Error("Unexpected error in translateQueryWithErrorFeedback");
-}
-
 export default defineTool({
   name: "search_events",
   description: [
@@ -152,16 +112,17 @@ export default defineTool({
       projectId = String(project.id);
     }
 
-    // Translate the natural language query using Search Events Agent with error feedback
+    // Translate the natural language query using Search Events Agent
     // The agent will determine the dataset and fetch the appropriate attributes
-    const parsed = await translateQueryWithErrorFeedback(
+    const parsed = await translateQuery(
       {
         naturalLanguageQuery: params.naturalLanguageQuery,
         organizationSlug,
         projectId,
       },
       apiService,
-      1, // Max 1 retry with error feedback
+      organizationSlug,
+      projectId,
     );
 
     // Handle Search Events Agent errors first
