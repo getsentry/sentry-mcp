@@ -183,6 +183,12 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
    - If user asks for "slowest", use "-span.duration" or "-avg(span.duration)"
    - If user asks for "latest" or "recent", use "-timestamp"
    - If unsure, use the default sort for the dataset
+   
+   VALIDATION: Before returning your response, verify:
+   - If sort is "-timestamp", fields MUST contain "timestamp"
+   - If sort is "-count()", fields MUST contain "count()"
+   - If sort is any "-field", fields MUST contain "field"
+   - This is MANDATORY - Sentry will reject queries where sort field is not in the selected fields
 
 YOUR RESPONSE FORMAT:
 Return a JSON object with these fields:
@@ -206,6 +212,12 @@ CORRECT EXAMPLES (FOLLOW THESE PATTERNS):
     "fields": ["gen_ai.request.model", "sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)"],
     "sort": "-sum(gen_ai.usage.input_tokens)",
     "timeRange": {"statsPeriod": "24h"}
+  }
+- "gen_ai.operation.name values" (showing unique values):
+  {
+    "query": "has:gen_ai.operation.name",
+    "fields": ["gen_ai.operation.name", "count()"],
+    "sort": "-count()"
   }
 - "errors with null user IDs":
   {
@@ -233,6 +245,7 @@ IMPORTANT NOTES:
 - Add any fields mentioned in the user's query to the fields array
 - If the user asks about a specific field (e.g., "show me user emails"), include that field
 - CRITICAL: The field you're sorting by MUST be included in your fields array (e.g., if sort is "-timestamp", fields must include "timestamp")
+- VALIDATION REQUIREMENT: Sentry will REJECT queries where the sort field is not in the selected fields array. ALWAYS ensure your sort field is included in fields.
 - Do NOT include project: filters in your query (project filtering is handled separately)
 - For spans/errors: When user mentions time periods, include timestamp filters in query
 - For logs: When user mentions time periods, do NOT include timestamp filters - handled automatically
