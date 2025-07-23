@@ -82,7 +82,7 @@ export function handleApiError(
         }
       }
 
-      throw new UserInputError(message);
+      throw new UserInputError(message, { cause: error });
     }
   }
 
