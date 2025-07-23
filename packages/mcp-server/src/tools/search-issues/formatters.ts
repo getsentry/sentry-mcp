@@ -34,7 +34,13 @@ export function formatIssueResults(
     output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
   }
 
-  // Generate search URL first for consistent placement
+  if (issues.length === 0) {
+    output += "No issues found matching your search criteria.\n\n";
+    output += "Try adjusting your search criteria or time range.";
+    return output;
+  }
+
+  // Generate search URL for viewing results
   const searchUrl = getIssuesSearchUrl(
     host,
     organizationSlug,
@@ -45,12 +51,6 @@ export function formatIssueResults(
   // Add view link with emoji and guidance text (like search_events)
   output += `**📊 View these results in Sentry**: ${searchUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
-
-  if (issues.length === 0) {
-    output += "No issues found matching your search criteria.\n\n";
-    output += "Try adjusting your search criteria or time range.";
-    return output;
-  }
 
   output += `Found **${issues.length}** issue${issues.length === 1 ? "" : "s"}:\n\n`;
 

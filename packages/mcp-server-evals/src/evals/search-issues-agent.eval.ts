@@ -20,7 +20,7 @@ describe("search-issues agent", () => {
         { key: "environment", name: "Environment", totalValues: 3 },
         { key: "release", name: "Release", totalValues: 50 },
       ]),
-      whoami: vi.fn().mockResolvedValue({
+      getAuthenticatedUser: vi.fn().mockResolvedValue({
         id: "12345",
         email: "test@example.com",
         name: "Test User",
@@ -64,8 +64,8 @@ describe("search-issues agent", () => {
       mockApiService,
     );
 
-    // Should call whoami to resolve 'me'
-    expect(mockApiService.whoami).toHaveBeenCalled();
+    // Should call getAuthenticatedUser to resolve 'me'
+    expect(mockApiService.getAuthenticatedUser).toHaveBeenCalled();
     expect(result.query).toMatch(
       /assignedOrSuggested:(test@example\.com|12345)/,
     );
