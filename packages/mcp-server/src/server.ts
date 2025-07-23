@@ -37,6 +37,7 @@ import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
 import { UserInputError, ConfigurationError } from "./errors";
+import { LIB_VERSION } from "./version";
 
 /**
  * Type guard to identify Sentry API errors.
@@ -169,9 +170,17 @@ function createResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.userAgent && {
-              "user_agent.original": context.userAgent,
+            ...(context.mcpClientName && {
+              "mcp.client.name": context.mcpClientName,
             }),
+            ...(context.mcpClientVersion && {
+              "mcp.client.version": context.mcpClientVersion,
+            }),
+            ...(context.mcpProtocolVersion && {
+              "mcp.protocol.version": context.mcpProtocolVersion,
+            }),
+            "mcp.server.name": "Sentry MCP",
+            "mcp.server.version": LIB_VERSION,
           },
         },
         async () => {
@@ -211,9 +220,17 @@ function createTemplateResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.userAgent && {
-              "user_agent.original": context.userAgent,
+            ...(context.mcpClientName && {
+              "mcp.client.name": context.mcpClientName,
             }),
+            ...(context.mcpClientVersion && {
+              "mcp.client.version": context.mcpClientVersion,
+            }),
+            ...(context.mcpProtocolVersion && {
+              "mcp.protocol.version": context.mcpProtocolVersion,
+            }),
+            "mcp.server.name": "Sentry MCP",
+            "mcp.server.version": LIB_VERSION,
             ...extractMcpParameters(variables),
           },
         },
@@ -259,9 +276,45 @@ export async function configureServer({
   server,
   context,
   onToolComplete,
-}: { server: McpServer; context: ServerContext; onToolComplete?: () => void }) {
+  onInitialized,
+}: {
+  server: McpServer;
+  context: ServerContext;
+  onToolComplete?: () => void;
+  onInitialized?: () => void | Promise<void>;
+}) {
   server.server.onerror = (error) => {
     logError(error);
+  };
+
+  // Hook into the initialized notification to capture client information
+  server.server.oninitialized = () => {
+    const serverInstance = server.server as any;
+    const clientInfo = serverInstance._clientVersion;
+    const protocolVersion = serverInstance._protocolVersion;
+
+    // Update the context object with client information
+    if (clientInfo) {
+      context.mcpClientName = clientInfo.name;
+      context.mcpClientVersion = clientInfo.version;
+    }
+
+    if (protocolVersion) {
+      context.mcpProtocolVersion = protocolVersion;
+    }
+
+    // Call the custom onInitialized handler if provided
+    // Note: MCP SDK doesn't support async callbacks, so we handle promises
+    // without awaiting to avoid blocking the initialization flow
+    if (onInitialized) {
+      const result = onInitialized();
+      if (result instanceof Promise) {
+        result.catch((error) => {
+          console.error("Error in onInitialized callback:", error);
+          logError(error);
+        });
+      }
+    }
   };
 
   for (const resource of RESOURCES) {
@@ -305,8 +358,20 @@ export async function configureServer({
                 name: `prompts/get ${prompt.name}`,
                 attributes: {
                   "mcp.prompt.name": prompt.name,
-                  ...(context.userAgent && {
-                    "user_agent.original": context.userAgent,
+                  ...(context.mcpClientName && {
+                    "mcp.client.name": context.mcpClientName,
+                  }),
+                  ...(context.mcpClientVersion && {
+                    "mcp.client.version": context.mcpClientVersion,
+                  }),
+                  ...(context.mcpProtocolVersion && {
+                    "mcp.protocol.version": context.mcpProtocolVersion,
+                  }),
+                  ...(context.mcpServerName && {
+                    "mcp.server.name": context.mcpServerName,
+                  }),
+                  ...(context.mcpServerVersion && {
+                    "mcp.server.version": context.mcpServerVersion,
                   }),
                   ...extractMcpParameters(args[0] || {}),
                 },
@@ -370,8 +435,20 @@ export async function configureServer({
                 name: `tools/call ${tool.name}`,
                 attributes: {
                   "mcp.tool.name": tool.name,
-                  ...(context.userAgent && {
-                    "user_agent.original": context.userAgent,
+                  ...(context.mcpClientName && {
+                    "mcp.client.name": context.mcpClientName,
+                  }),
+                  ...(context.mcpClientVersion && {
+                    "mcp.client.version": context.mcpClientVersion,
+                  }),
+                  ...(context.mcpProtocolVersion && {
+                    "mcp.protocol.version": context.mcpProtocolVersion,
+                  }),
+                  ...(context.mcpServerName && {
+                    "mcp.server.name": context.mcpServerName,
+                  }),
+                  ...(context.mcpServerVersion && {
+                    "mcp.server.version": context.mcpServerVersion,
                   }),
                   ...extractMcpParameters(params || {}),
                 },

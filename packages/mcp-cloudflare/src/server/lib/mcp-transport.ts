@@ -3,7 +3,9 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "../types";
+import type { ServerContext } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
+import { logError } from "@sentry/mcp-server/logging";
 import getSentryConfig from "../sentry.config";
 
 // Props contain the authenticated user context from the OAuth flow.
@@ -12,8 +14,6 @@ import getSentryConfig from "../sentry.config";
 // NOTE: Only store persistent user data in props (e.g., userId, accessToken).
 // Request-specific data like user agent should be captured per request.
 class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
-  private cachedUserAgent?: string;
-
   server = new McpServer({
     name: "Sentry MCP",
     version: LIB_VERSION,
@@ -31,29 +31,44 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     super(state, env);
   }
 
-  // Override fetch to capture user agent from initial request
-  async fetch(request: Request): Promise<Response> {
-    // Capture user agent from the initial SSE/WebSocket connection request
-    if (!this.cachedUserAgent && request.headers.get("user-agent")) {
-      this.cachedUserAgent = request.headers.get("user-agent") || undefined;
-    }
-
-    return super.fetch(request);
-  }
-
   async init() {
+    // Load only MCP client info from storage
+    const persistedMcpInfo = await this.ctx.storage.get<{
+      mcpClientName?: string;
+      mcpClientVersion?: string;
+      mcpProtocolVersion?: string;
+    }>("mcpClientInfo");
+
+    // Initialize context with fresh auth data from props
+    const serverContext: ServerContext = {
+      accessToken: this.props.accessToken,
+      organizationSlug: this.props.organizationSlug,
+      userId: this.props.id,
+      mcpUrl: process.env.MCP_URL,
+      // Restore MCP client info if available
+      ...persistedMcpInfo,
+    };
+
     await configureServer({
       server: this.server,
-      context: {
-        accessToken: this.props.accessToken,
-        organizationSlug: this.props.organizationSlug,
-        userId: this.props.id,
-        mcpUrl: process.env.MCP_URL,
-        // User agent is captured from the initial SSE/WebSocket request
-        userAgent: this.cachedUserAgent,
-      },
+      context: serverContext,
       onToolComplete: () => {
         this.ctx.waitUntil(Sentry.flush(2000));
+      },
+      onInitialized: async () => {
+        try {
+          // Only persist MCP client attributes that we'll restore later
+          const mcpClientInfo = {
+            mcpClientName: serverContext.mcpClientName,
+            mcpClientVersion: serverContext.mcpClientVersion,
+            mcpProtocolVersion: serverContext.mcpProtocolVersion,
+          };
+          await this.ctx.storage.put("mcpClientInfo", mcpClientInfo);
+        } catch (error) {
+          // Log the error but don't crash - the server can still function
+          // without persisted state, it just won't survive hibernation
+          logError(error);
+        }
       },
     });
   }

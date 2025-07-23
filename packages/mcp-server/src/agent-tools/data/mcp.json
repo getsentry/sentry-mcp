@@ -29,6 +29,36 @@
       "description": "MCP response status",
       "type": "string",
       "examples": ["success", "error"]
+    },
+    "mcp.client.name": {
+      "description": "Name of the MCP client application",
+      "type": "string",
+      "examples": [
+        "Cursor",
+        "Claude Code",
+        "VSCode MCP Extension",
+        "sentry-mcp-stdio"
+      ]
+    },
+    "mcp.client.version": {
+      "description": "Version of the MCP client application",
+      "type": "string",
+      "examples": ["0.16.0", "1.0.0", "2.3.1"]
+    },
+    "mcp.server.name": {
+      "description": "Name of the MCP server application",
+      "type": "string",
+      "examples": ["Sentry MCP Server", "GitHub MCP Server", "Slack MCP Server"]
+    },
+    "mcp.server.version": {
+      "description": "Version of the MCP server application",
+      "type": "string",
+      "examples": ["0.1.0", "1.2.3", "2.0.0"]
+    },
+    "mcp.protocol.version": {
+      "description": "MCP protocol version being used",
+      "type": "string",
+      "examples": ["2024-11-05", "1.0", "2.0"]
     }
   },
   "custom": true
