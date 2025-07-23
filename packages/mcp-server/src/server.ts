@@ -304,8 +304,16 @@ export async function configureServer({
     }
 
     // Call the custom onInitialized handler if provided
+    // Note: MCP SDK doesn't support async callbacks, so we handle promises
+    // without awaiting to avoid blocking the initialization flow
     if (onInitialized) {
-      onInitialized();
+      const result = onInitialized();
+      if (result instanceof Promise) {
+        result.catch((error) => {
+          console.error("Error in onInitialized callback:", error);
+          logError(error);
+        });
+      }
     }
   };
 
