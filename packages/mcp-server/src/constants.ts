@@ -5,6 +5,11 @@
  */
 
 /**
+ * MCP Server identification
+ */
+export const MCP_SERVER_NAME = "Sentry MCP" as const;
+
+/**
  * Common Sentry platforms that have documentation available
  */
 export const SENTRY_PLATFORMS_BASE = [

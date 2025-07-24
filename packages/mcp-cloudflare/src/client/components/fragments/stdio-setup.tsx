@@ -16,6 +16,7 @@ export default function StdioSetup() {
     env: {
       SENTRY_ACCESS_TOKEN: "sentry-user-token",
       SENTRY_HOST: "sentry.io",
+      OPENAI_API_KEY: "your-openai-key", // Required for AI-powered search tools
     },
   };
 
@@ -88,7 +89,6 @@ export default function StdioSetup() {
                         ...coreConfig,
                         env: {
                           ...coreConfig.env,
-                          MCP_USER_AGENT: "Cursor (stdio)",
                         },
                       },
                     },
@@ -107,7 +107,7 @@ export default function StdioSetup() {
             <li>
               <CodeSnippet
                 noMargin
-                snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e SENTRY_HOST=sentry.io -e MCP_USER_AGENT="Claude Code (stdio)" -- ${mcpStdioSnippet}`}
+                snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e SENTRY_HOST=sentry.io -e OPENAI_API_KEY=your-openai-key -- ${mcpStdioSnippet}`}
               />
             </li>
             <li>
@@ -147,7 +147,6 @@ export default function StdioSetup() {
                         ...coreConfig,
                         env: {
                           ...coreConfig.env,
-                          MCP_USER_AGENT: "Windsurf (stdio)",
                         },
                       },
                     },
@@ -187,7 +186,6 @@ export default function StdioSetup() {
                       ...coreConfig,
                       env: {
                         ...coreConfig.env,
-                        MCP_USER_AGENT: "VSCode (stdio)",
                       },
                     },
                   },
@@ -222,7 +220,6 @@ export default function StdioSetup() {
                         ...coreConfig,
                         env: {
                           ...coreConfig.env,
-                          MCP_USER_AGENT: "Zed (stdio)",
                         },
                       },
                       settings: {},

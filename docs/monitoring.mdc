@@ -183,8 +183,6 @@ Following [OpenTelemetry semantic conventions for user agent](https://openteleme
 
 - `user_agent.original` - The original User-Agent header value from the client
 
-**Stdio Transport**: Set via `MCP_USER_AGENT` environment variable, defaults to `sentry-mcp-stdio/{version}`
-
 **Cloudflare Transport**: Captured from the initial SSE/WebSocket connection request headers and cached for the session
 
 ### Network Attributes

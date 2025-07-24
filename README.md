@@ -18,6 +18,8 @@ If you're looking to contribute, learn how it works, or to run this for self-hos
 
 While this repository is focused on acting as an MCP service, we also support a `stdio` transport. This is still a work in progress, but is the easiest way to adapt run the MCP against a self-hosted Sentry install.
 
+**Note:** The AI-powered search tools (`search_events` and `search_issues`) require an OpenAI API key. These tools use natural language processing to translate queries into Sentry's query syntax. Without the API key, these specific tools will be unavailable, but all other tools will function normally.
+
 To utilize the `stdio` transport, you'll need to create an User Auth Token in Sentry with the necessary scopes. As of writing this is:
 
 ```
@@ -40,6 +42,7 @@ Note: You can also use environment variables:
 ```shell
 SENTRY_ACCESS_TOKEN=
 SENTRY_HOST=
+OPENAI_API_KEY=  # Required for AI-powered search tools (search_events, search_issues)
 ```
 
 ### MCP Inspector
@@ -93,7 +96,7 @@ pnpm test
 Evals will require a `.env` file with some config:
 
 ```shell
-OPENAI_API_KEY=
+OPENAI_API_KEY=  # Also required for AI-powered search tools in production
 ```
 
 Once that's done you can run them using:
