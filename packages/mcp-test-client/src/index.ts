@@ -12,6 +12,7 @@ import { runAgent } from "./agent.js";
 import { DEFAULT_MODEL } from "./constants.js";
 import { logError, logInfo, logSuccess, logUser } from "./logger.js";
 import { LIB_VERSION } from "./version.js";
+import { sentryBeforeSend } from "./utils/sentry-scrubbing.js";
 import type { MCPConnection } from "./types.js";
 
 // Load environment variables from multiple possible locations
@@ -47,6 +48,7 @@ program
         dsn: sentryDsn,
         sendDefaultPii: true,
         tracesSampleRate: 1,
+        beforeSend: sentryBeforeSend,
         initialScope: {
           tags: {
             "gen_ai.agent.name": "sentry-mcp-agent",

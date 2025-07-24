@@ -22,6 +22,7 @@ import {
   validateSentryHost,
   validateAndParseSentryUrl,
 } from "./utils/url-utils";
+import { sentryBeforeSend } from "./internal/sentry-scrubbing";
 
 let accessToken: string | undefined = process.env.SENTRY_ACCESS_TOKEN;
 let sentryHost = "sentry.io"; // Default hostname
@@ -92,6 +93,7 @@ Sentry.init({
   dsn: sentryDsn,
   sendDefaultPii: true,
   tracesSampleRate: 1,
+  beforeSend: sentryBeforeSend,
   initialScope: {
     tags: {
       "mcp.server_version": LIB_VERSION,
