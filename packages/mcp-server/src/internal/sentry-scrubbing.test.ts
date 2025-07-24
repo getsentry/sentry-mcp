@@ -3,6 +3,7 @@ import {
   sentryBeforeSend,
   addScrubPattern,
   getScrubPatterns,
+  EventSerializationError,
 } from "./sentry-scrubbing";
 import type * as Sentry from "@sentry/node";
 
@@ -179,18 +180,22 @@ describe("sentry-scrubbing", () => {
   });
 
   describe("Error handling", () => {
-    it("should drop events with circular references", () => {
+    it("should throw EventSerializationError for circular references", () => {
       const circular: any = { message: "Error occurred" };
       circular.self = circular; // Create circular reference
 
       const event: Sentry.Event = circular;
 
-      // Should return null to drop the event
-      const result = sentryBeforeSend(event, {});
-      expect(result).toBeNull();
+      // Should throw EventSerializationError
+      expect(() => sentryBeforeSend(event, {})).toThrow(
+        EventSerializationError,
+      );
+      expect(() => sentryBeforeSend(event, {})).toThrow(
+        "[Sentry Scrubbing] Cannot serialize event for sensitive data check",
+      );
     });
 
-    it("should drop events with non-serializable values", () => {
+    it("should throw EventSerializationError for non-serializable values", () => {
       const event: any = {
         message: "Error with function",
         extra: {
@@ -199,9 +204,13 @@ describe("sentry-scrubbing", () => {
         },
       };
 
-      // Should return null to drop the event
-      const result = sentryBeforeSend(event, {});
-      expect(result).toBeNull();
+      // Should throw EventSerializationError
+      expect(() => sentryBeforeSend(event, {})).toThrow(
+        EventSerializationError,
+      );
+      expect(() => sentryBeforeSend(event, {})).toThrow(
+        "[Sentry Scrubbing] Cannot serialize event for sensitive data check",
+      );
     });
   });
 

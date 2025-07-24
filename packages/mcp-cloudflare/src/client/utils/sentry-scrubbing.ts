@@ -1,5 +1,18 @@
 import type * as Sentry from "@sentry/react";
 
+/**
+ * Error thrown when an event cannot be serialized for scrubbing
+ */
+export class EventSerializationError extends Error {
+  constructor(
+    message: string,
+    public readonly originalError: unknown,
+  ) {
+    super(message);
+    this.name = "EventSerializationError";
+  }
+}
+
 interface ScrubPattern {
   pattern: RegExp;
   replacement: string;
@@ -64,9 +77,10 @@ export function sentryBeforeSend(event: any, hint: any) {
   try {
     eventString = JSON.stringify(event);
   } catch (e) {
-    console.error("[Sentry Scrubbing] Failed to stringify event:", e);
-    // Drop the event if we can't check it for sensitive data
-    return null;
+    throw new EventSerializationError(
+      "[Sentry Scrubbing] Cannot serialize event for sensitive data check",
+      e,
+    );
   }
 
   for (const { pattern, description } of SCRUB_PATTERNS) {
