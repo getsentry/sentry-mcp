@@ -38,6 +38,7 @@ import { PROMPT_HANDLERS } from "./prompts";
 import { ApiError } from "./api-client";
 import { UserInputError, ConfigurationError } from "./errors";
 import { LIB_VERSION } from "./version";
+import { MCP_SERVER_NAME } from "./constants";
 
 /**
  * Type guard to identify Sentry API errors.
@@ -367,12 +368,8 @@ export async function configureServer({
                   ...(context.mcpProtocolVersion && {
                     "mcp.protocol.version": context.mcpProtocolVersion,
                   }),
-                  ...(context.mcpServerName && {
-                    "mcp.server.name": context.mcpServerName,
-                  }),
-                  ...(context.mcpServerVersion && {
-                    "mcp.server.version": context.mcpServerVersion,
-                  }),
+                  "mcp.server.name": MCP_SERVER_NAME,
+                  "mcp.server.version": LIB_VERSION,
                   ...extractMcpParameters(args[0] || {}),
                 },
               },
@@ -444,12 +441,8 @@ export async function configureServer({
                   ...(context.mcpProtocolVersion && {
                     "mcp.protocol.version": context.mcpProtocolVersion,
                   }),
-                  ...(context.mcpServerName && {
-                    "mcp.server.name": context.mcpServerName,
-                  }),
-                  ...(context.mcpServerVersion && {
-                    "mcp.server.version": context.mcpServerVersion,
-                  }),
+                  "mcp.server.name": MCP_SERVER_NAME,
+                  "mcp.server.version": LIB_VERSION,
                   ...extractMcpParameters(params || {}),
                 },
               },

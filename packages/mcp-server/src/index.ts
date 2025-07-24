@@ -76,6 +76,18 @@ if (!accessToken) {
   process.exit(1);
 }
 
+// Check for OpenAI API key and warn if missing
+if (!process.env.OPENAI_API_KEY) {
+  console.warn("Warning: OPENAI_API_KEY environment variable is not set.");
+  console.warn("The following AI-powered search tools will be unavailable:");
+  console.warn("  - search_events (natural language event search)");
+  console.warn("  - search_issues (natural language issue search)");
+  console.warn(
+    "All other tools will function normally. To enable AI-powered search, set OPENAI_API_KEY.",
+  );
+  console.warn("");
+}
+
 Sentry.init({
   dsn: sentryDsn,
   sendDefaultPii: true,
@@ -118,7 +130,6 @@ startStdio(instrumentedServer, {
   organizationSlug: null,
   sentryHost,
   mcpUrl,
-  userAgent: process.env.MCP_USER_AGENT || `sentry-mcp-stdio/${LIB_VERSION}`,
 }).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events
