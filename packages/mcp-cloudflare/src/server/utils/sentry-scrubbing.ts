@@ -9,17 +9,17 @@ interface ScrubPattern {
 // Patterns for sensitive data that should be scrubbed
 const SCRUB_PATTERNS: ScrubPattern[] = [
   {
-    pattern: /\bsk-[a-zA-Z0-9]{48}\b/g,
+    pattern: /\bsk-[a-zA-Z0-9]{48}\b/,
     replacement: "[REDACTED_OPENAI_KEY]",
     description: "OpenAI API key",
   },
   {
-    pattern: /\bBearer\s+[a-zA-Z0-9\-._~+/]+=*/g,
+    pattern: /\bBearer\s+[a-zA-Z0-9\-._~+/]+=*/,
     replacement: "Bearer [REDACTED_TOKEN]",
     description: "Bearer token",
   },
   {
-    pattern: /\bsntrys_[a-zA-Z0-9_]+\b/g,
+    pattern: /\bsntrys_[a-zA-Z0-9_]+\b/,
     replacement: "[REDACTED_SENTRY_TOKEN]",
     description: "Sentry access token",
   },
@@ -32,7 +32,8 @@ function scrubValue(value: unknown): unknown {
   if (typeof value === "string") {
     let scrubbed = value;
     for (const { pattern, replacement } of SCRUB_PATTERNS) {
-      scrubbed = scrubbed.replace(pattern, replacement);
+      // Use global flag for replace to replace all occurrences
+      scrubbed = scrubbed.replace(new RegExp(pattern.source, "g"), replacement);
     }
     return scrubbed;
   }

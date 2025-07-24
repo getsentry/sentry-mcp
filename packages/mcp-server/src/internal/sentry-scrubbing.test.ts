@@ -144,12 +144,46 @@ describe("sentry-scrubbing", () => {
     });
   });
 
+  describe("Regex state handling", () => {
+    it("should handle multiple calls without regex state corruption", () => {
+      // This tests the bug where global regex patterns maintain lastIndex between calls
+      const event1: Sentry.Event = {
+        message:
+          "First error with sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
+      };
+
+      const event2: Sentry.Event = {
+        message:
+          "Second error with sk-xyz123def456ghi789jkl012mno345pqr678stu901vwx234",
+      };
+
+      // Call sentryBeforeSend multiple times
+      const result1 = sentryBeforeSend(event1, {});
+      const result2 = sentryBeforeSend(event2, {});
+
+      // Both should be properly scrubbed
+      expect(result1?.message).toBe("First error with [REDACTED_OPENAI_KEY]");
+      expect(result2?.message).toBe("Second error with [REDACTED_OPENAI_KEY]");
+
+      // Test multiple replacements in the same string
+      const event3: Sentry.Event = {
+        message:
+          "Multiple keys: sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234 and sk-xyz123def456ghi789jkl012mno345pqr678stu901vwx234",
+      };
+
+      const result3 = sentryBeforeSend(event3, {});
+      expect(result3?.message).toBe(
+        "Multiple keys: [REDACTED_OPENAI_KEY] and [REDACTED_OPENAI_KEY]",
+      );
+    });
+  });
+
   describe("Custom patterns", () => {
     it("should support adding custom patterns", () => {
       const initialPatterns = getScrubPatterns().length;
 
       addScrubPattern(
-        /custom_secret_\w+/g,
+        /custom_secret_\w+/,
         "[REDACTED_CUSTOM]",
         "Custom secret",
       );
