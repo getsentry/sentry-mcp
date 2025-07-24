@@ -179,18 +179,18 @@ describe("sentry-scrubbing", () => {
   });
 
   describe("Error handling", () => {
-    it("should handle circular references in events", () => {
+    it("should drop events with circular references", () => {
       const circular: any = { message: "Error occurred" };
       circular.self = circular; // Create circular reference
 
       const event: Sentry.Event = circular;
 
-      // Should not throw and should return the event unmodified
+      // Should return null to drop the event
       const result = sentryBeforeSend(event, {});
-      expect(result).toBe(event);
+      expect(result).toBeNull();
     });
 
-    it("should handle non-serializable values", () => {
+    it("should drop events with non-serializable values", () => {
       const event: any = {
         message: "Error with function",
         extra: {
@@ -199,9 +199,9 @@ describe("sentry-scrubbing", () => {
         },
       };
 
-      // Should not throw and should return the event unmodified
+      // Should return null to drop the event
       const result = sentryBeforeSend(event, {});
-      expect(result).toBe(event);
+      expect(result).toBeNull();
     });
   });
 

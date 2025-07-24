@@ -65,7 +65,8 @@ export function sentryBeforeSend(event: any, hint: any) {
     eventString = JSON.stringify(event);
   } catch (e) {
     console.error("[Sentry Scrubbing] Failed to stringify event:", e);
-    eventString = "";
+    // Drop the event if we can't check it for sensitive data
+    return null;
   }
 
   for (const { pattern, description } of SCRUB_PATTERNS) {
