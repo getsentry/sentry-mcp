@@ -59,7 +59,14 @@ function scrubValue(value: unknown): unknown {
 export function sentryBeforeSend(event: any, hint: any) {
   // Check if the event contains any sensitive patterns
   let containsSensitive = false;
-  const eventString = JSON.stringify(event);
+  let eventString: string;
+  try {
+    eventString = JSON.stringify(event);
+  } catch (e) {
+    console.error("[Sentry Scrubbing] Failed to stringify event:", e);
+    // Return the event unmodified if we can't stringify it
+    return event;
+  }
 
   for (const { pattern, description } of SCRUB_PATTERNS) {
     if (pattern.test(eventString)) {
