@@ -1,190 +1,109 @@
 # CLAUDE.md
 
-<instructions>
-This file provides optimized guidance for Claude Code (Sonnet 4 and Opus 4) when working with the sentry-mcp repository.
-</instructions>
+## 🔴 CRITICAL Requirements
 
-## 🎯 Core Directives
+**MANDATORY before ANY code:**
+1. TypeScript: NEVER use `any`. Use `unknown` or proper types
+2. Security: NO API keys in logs. NO vulnerabilities
+3. Validation: `pnpm run tsc && pnpm run lint && pnpm run test`
+4. Tools limit: ≤20 (hard limit: 25)
 
-<behavior>
-- **TypeScript**: NEVER use 'any' type. Use proper type annotations, unknown, or validated type assertions
-- **Communication**: Direct, factual, concise. No fluff, niceties, or redundant explanations
-- **Critical Thinking**: Verify claims. Challenge incorrect assumptions. Validate before proceeding
-- **Code Quality**: Follow existing patterns. Check adjacent files for conventions. Never introduce security vulnerabilities
-</behavior>
+**MANDATORY reads:**
+- Tools → `docs/adding-tools.mdc`
+- Prompts → `docs/adding-prompts.mdc`
+- Resources → `docs/adding-resources.mdc`
+- Testing → `docs/testing.mdc`
+- PRs → `docs/pr-management.mdc`
 
-## 📋 Task Execution Protocol
+## 🟡 MANDATORY Workflow
 
-<workflow>
-1. **Understand**: Read relevant docs BEFORE coding (see mandatory reading sections)
-2. **Plan**: Use TodoWrite for multi-step tasks (3+ steps)
-3. **Implement**: Follow established patterns, check neighboring code
-4. **Validate**: Run `pnpm run tsc && pnpm run lint && pnpm run test`
-5. **Document**: Update relevant docs when changing functionality
-</workflow>
+```bash
+# BEFORE coding (parallel execution)
+cat docs/[component].mdc & ls -la neighboring-files & git status
 
-## Repository Structure
+# AFTER coding (sequential - fail fast)
+pnpm run tsc && pnpm run lint && pnpm run test  # ALL must pass
+```
+
+## Repository Map
 
 ```
 sentry-mcp/
 ├── packages/
-│   ├── mcp-server/           # Main MCP server (tools, prompts, resources)
+│   ├── mcp-server/          # Main MCP server
 │   │   ├── src/
-│   │   │   ├── tools/        # 19 individual tool modules + utils
-│   │   │   ├── prompts.ts    # MCP prompts
-│   │   │   ├── resources.ts  # MCP resources
-│   │   │   ├── server.ts     # MCP server configuration
-│   │   │   ├── api-client/   # Sentry API client
-│   │   │   └── internal/     # Shared utilities
-│   │   └── scripts/          # Build scripts (tool definitions generation)
-│   ├── mcp-cloudflare/       # Cloudflare Worker chat application
-│   │   ├── src/
-│   │   │   ├── client/       # React frontend
-│   │   │   └── server/       # Worker API routes
-│   │   └── components.json   # Shadcn/ui config
-│   ├── mcp-server-evals/     # AI evaluation tests
-│   ├── mcp-server-mocks/     # MSW mocks for testing
-│   ├── mcp-server-tsconfig/  # Shared TypeScript configs
-│   └── mcp-test-client/      # MCP client for testing
-└── docs/                     # All documentation
-    ├── cloudflare/           # Web app docs
-    └── llms/                 # LLM-specific docs
+│   │   │   ├── tools/       # 19 tool modules
+│   │   │   ├── prompts.ts   # MCP prompts
+│   │   │   ├── resources.ts # MCP resources
+│   │   │   ├── server.ts    # MCP protocol
+│   │   │   ├── api-client/  # Sentry API
+│   │   │   └── internal/    # Shared utils
+│   │   └── scripts/         # Build scripts
+│   ├── mcp-cloudflare/      # Web app
+│   ├── mcp-server-evals/    # AI tests
+│   ├── mcp-server-mocks/    # MSW mocks
+│   └── mcp-test-client/     # Test client
+└── docs/                    # All docs
 ```
 
-## Core Components Impact Analysis
-
-When making changes, consider these areas:
-
-### MCP Server (`packages/mcp-server/`)
-- **Tools** (19 modules): Query, create, update Sentry resources
-- **Prompts**: Help text and guidance for LLMs  
-- **Resources**: Static documentation and references
-- **API Client**: Sentry API integration layer
-- **Server**: MCP protocol handler and error formatting
-
-#### AI-Powered Search Tools Architecture
-
-Two tools (`search_events` and `search_issues`) use embedded AI agents for natural language query translation:
+## AI-Powered Search Tools
 
 **search_events** (`packages/mcp-server/src/tools/search-events/`):
-- **Purpose**: Translates natural language to Sentry Discover queries for events/aggregations
-- **Agent**: Uses OpenAI GPT-4o with structured outputs to generate DiscoverQL syntax
-- **Tools**: Access to `datasetAttributes` (field discovery), `otelSemantics` (OpenTelemetry lookups), and `whoami` (user context)
-- **Output**: Event lists, counts, aggregations, and statistical data
-- **Example**: "how many errors today" → `level:error` with `count()` aggregation and `timeRange: "24h"`
+- Natural language → DiscoverQL queries
+- GPT-4o agent with structured outputs
+- Tools: `datasetAttributes`, `otelSemantics`, `whoami`
+- Requires: `OPENAI_API_KEY`
 
 **search_issues** (`packages/mcp-server/src/tools/search-issues/`):
-- **Purpose**: Translates natural language to Sentry issue search queries for grouped problems
-- **Agent**: Uses OpenAI GPT-4o with structured outputs to generate issue search syntax
-- **Tools**: Access to `issueFields` (field discovery) and `whoami` (user context) 
-- **Output**: Lists of grouped issues with metadata (status, assignee, user count)
-- **Example**: "critical bugs assigned to me" → `level:error is:unresolved assignedOrSuggested:user@email.com`
+- Natural language → issue search syntax
+- GPT-4o agent with structured outputs
+- Tools: `issueFields`, `whoami`
+- Requires: `OPENAI_API_KEY`
 
-**Shared Agent Infrastructure** (`packages/mcp-server/src/agent-tools/`):
-- **Field Discovery**: Dynamic field discovery using Sentry's dataset APIs for project-specific attributes
-- **User Resolution**: Resolves 'me' references to actual user email addresses via `whoami`
-- **Error Handling**: Self-correction loops where validation errors are fed back to the agent for retry
-- **Requirements**: Requires `OPENAI_API_KEY` environment variable for AI-powered query translation
+## 🟢 Key Commands
 
-### Cloudflare Web App (`packages/mcp-cloudflare/`)
-- **Client**: React-based chat interface with UI components
-- **Server**: Worker API routes for search, auth, MCP communication
-- **Integration**: Uses MCP server for tool execution
-
-### Testing Infrastructure
-- **Unit Tests**: Co-located with each component
-- **Mocks**: Realistic API responses in `mcp-server-mocks/`
-- **Evaluations**: AI-driven integration tests in `mcp-server-evals/`
-- **Test Client**: Interactive MCP testing in `mcp-test-client/`
-
-### Build System
-- **Tool Definitions**: Auto-generated JSON schemas for client consumption
-- **TypeScript Config**: Shared configurations in `mcp-server-tsconfig/`
-- **Packaging**: Multiple package coordination
-- **OpenTelemetry Namespaces**: Run `pnpm run generate-otel-namespaces` to update namespace documentation from OpenTelemetry specs
-
-## 🚨 MANDATORY Pre-Development Reading
-
-<critical-requirements>
-BEFORE writing ANY code:
-
-### Component Development
-- Tools → READ: `docs/adding-tools.mdc`
-- Prompts → READ: `docs/adding-prompts.mdc`
-- Resources → READ: `docs/adding-resources.mdc`
-- Testing → READ: `docs/testing.mdc`
-
-### Code Patterns
-- Patterns → READ: `docs/common-patterns.mdc`
-- API Usage → READ: `docs/api-patterns.mdc`
-- Limits: Tools ≤20 (hard limit: 25), Prompts/Resources: reasonable count
-</critical-requirements>
-
-## ✅ Validation & Documentation
-
-<validation>
-AFTER code changes, ALWAYS:
 ```bash
-pnpm run tsc     # Type safety
-pnpm run lint    # Code style
-pnpm run test    # Component tests
+# Development
+pnpm run dev               # Start development
+pnpm run build             # Build all packages
+pnpm run generate-otel-namespaces  # Update OpenTelemetry docs
+
+# Quality checks (combine for speed)
+pnpm run tsc && pnpm run lint && pnpm run test
+
+# Common workflows
+pnpm run build && pnpm run test  # Before PR
+grep -r "TODO\|FIXME" src/     # Find tech debt
 ```
-See `docs/quality-checks.mdc` for full checklist
-</validation>
 
-<documentation>
-Docs are MANDATORY, not optional:
-- Update docs when changing functionality
-- Keep CLAUDE.md ↔ cursor.mdc synchronized
-- Update: tools, prompts, resources, API patterns, architecture docs
-</documentation>
+## Quick Reference
 
-## Pull Request Creation
-
-**MANDATORY when creating PRs:**
-- MUST read `docs/pr-management.mdc` for PR guidelines and template
-- Follow the PR description structure in the documentation
-- Use proper commit message format as specified
-- Include Claude Code attribution in PR descriptions
-
-## 🔢 Hard Limits
-
-<limits>
-- **Tools**: Target ~20, NEVER exceed 25 (AI agent constraint)
-- **Prompts**: Reasonable count, well-documented
-- **Resources**: Reasonable count, well-documented
-</limits>
-
-## Documentation Directory
-
-- `docs/adding-tools.mdc` - Tool development
-- `docs/adding-prompts.mdc` - Prompt development  
-- `docs/adding-resources.mdc` - Resource development
-- `docs/testing.mdc` - Testing requirements for all components
-- `docs/common-patterns.mdc` - Code patterns
-- `docs/api-patterns.mdc` - API usage
-- `docs/architecture.mdc` - System design
-- `docs/quality-checks.mdc` - Required quality checks
-- `docs/pr-management.mdc` - Pull request guidelines and templates
-
-## 🔧 Environment Context
-
-<context>
-**Claude Code**:
+**Defaults:**
+- Organization: `sentry`
+- Project: `mcp-server`
 - Transport: stdio
 - Auth: access tokens (NOT OAuth)
 
-**Sentry Defaults**:
-- Organization: 'sentry'
-- Project: 'mcp-server'
-</context>
+**Doc Index:**
+- `docs/adding-tools.mdc` - Tool development
+- `docs/adding-prompts.mdc` - Prompt development
+- `docs/adding-resources.mdc` - Resource development
+- `docs/testing.mdc` - Testing requirements
+- `docs/common-patterns.mdc` - Code patterns
+- `docs/api-patterns.mdc` - API usage
+- `docs/architecture.mdc` - System design
+- `docs/quality-checks.mdc` - Quality checks
+- `docs/pr-management.mdc` - PR guidelines
 
-## 🧠 Reasoning Guidelines
+## Rules
 
-<thinking>
-When tackling complex tasks:
-1. Break down the problem into steps
-2. Consider edge cases and error scenarios
-3. Validate assumptions against codebase
-4. Check existing patterns before implementing
-</thinking>
+1. **Code**: Follow existing patterns. Check adjacent files
+2. **Errors**: Try/catch all async. Log: `console.error('[ERROR]', error.message, error.stack)`
+   - Sentry API 429: Retry with exponential backoff
+   - Sentry API 401/403: Check token permissions
+3. **Docs**: Update when changing functionality
+4. **PR**: Read `docs/pr-management.mdc`. Include Claude Code attribution
+5. **Tasks**: Use TodoWrite for 3+ steps. Batch tool calls when possible
+
+---
+*Optimized for Claude Code (Sonnet 4/Opus 4)*
