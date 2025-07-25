@@ -1745,7 +1745,8 @@ export class SentryApiService {
 
     // Sort parameter transformation for API compatibility
     let apiSort = params.sort;
-    if (params.sort?.includes("(")) {
+    // Skip transformation for equation fields - they should be passed as-is
+    if (params.sort?.includes("(") && !params.sort?.includes("equation|")) {
       // Transform: count(field) -> count_field, count() -> count
       // Use safer string manipulation to avoid ReDoS
       const parenStart = params.sort.indexOf("(");
@@ -1824,7 +1825,8 @@ export class SentryApiService {
 
     // Sort parameter transformation for API compatibility
     let apiSort = params.sort;
-    if (params.sort?.includes("(")) {
+    // Skip transformation for equation fields - they should be passed as-is
+    if (params.sort?.includes("(") && !params.sort?.includes("equation|")) {
       // Transform: count(field) -> count_field, count() -> count
       // Use safer string manipulation to avoid ReDoS
       const parenStart = params.sort.indexOf("(");
