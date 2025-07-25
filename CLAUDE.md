@@ -18,14 +18,11 @@
 ## 🟡 MANDATORY Workflow
 
 ```bash
-# BEFORE coding
-cat docs/[component].mdc    # Read relevant docs
-ls -la neighboring-files    # Check patterns
+# BEFORE coding (parallel execution)
+cat docs/[component].mdc & ls -la neighboring-files & git status
 
-# AFTER coding
-pnpm run tsc               # 0 errors required
-pnpm run lint              # 0 errors required
-pnpm run test              # 100% pass required
+# AFTER coding (sequential - fail fast)
+pnpm run tsc && pnpm run lint && pnpm run test  # ALL must pass
 ```
 
 ## Repository Map
@@ -71,10 +68,12 @@ pnpm run dev               # Start development
 pnpm run build             # Build all packages
 pnpm run generate-otel-namespaces  # Update OpenTelemetry docs
 
-# Quality checks
-pnpm run tsc               # TypeScript check
-pnpm run lint              # ESLint check
-pnpm run test              # Run tests
+# Quality checks (combine for speed)
+pnpm run tsc && pnpm run lint && pnpm run test
+
+# Common workflows
+pnpm run build && pnpm run test  # Before PR
+grep -r "TODO\|FIXME" src/     # Find tech debt
 ```
 
 ## Quick Reference
@@ -100,9 +99,11 @@ pnpm run test              # Run tests
 
 1. **Code**: Follow existing patterns. Check adjacent files
 2. **Errors**: Try/catch all async. Log: `console.error('[ERROR]', error.message, error.stack)`
+   - Sentry API 429: Retry with exponential backoff
+   - Sentry API 401/403: Check token permissions
 3. **Docs**: Update when changing functionality
 4. **PR**: Read `docs/pr-management.mdc`. Include Claude Code attribution
-5. **Tasks**: Use TodoWrite for 3+ step tasks
+5. **Tasks**: Use TodoWrite for 3+ steps. Batch tool calls when possible
 
 ---
 *Optimized for Claude Code (Sonnet 4/Opus 4)*
