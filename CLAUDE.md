@@ -1,6 +1,27 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working with this repository.
+<instructions>
+This file provides optimized guidance for Claude Code (Sonnet 4 and Opus 4) when working with the sentry-mcp repository.
+</instructions>
+
+## 🎯 Core Directives
+
+<behavior>
+- **TypeScript**: NEVER use 'any' type. Use proper type annotations, unknown, or validated type assertions
+- **Communication**: Direct, factual, concise. No fluff, niceties, or redundant explanations
+- **Critical Thinking**: Verify claims. Challenge incorrect assumptions. Validate before proceeding
+- **Code Quality**: Follow existing patterns. Check adjacent files for conventions. Never introduce security vulnerabilities
+</behavior>
+
+## 📋 Task Execution Protocol
+
+<workflow>
+1. **Understand**: Read relevant docs BEFORE coding (see mandatory reading sections)
+2. **Plan**: Use TodoWrite for multi-step tasks (3+ steps)
+3. **Implement**: Follow established patterns, check neighboring code
+4. **Validate**: Run `pnpm run tsc && pnpm run lint && pnpm run test`
+5. **Document**: Update relevant docs when changing functionality
+</workflow>
 
 ## Repository Structure
 
@@ -82,35 +103,41 @@ Two tools (`search_events` and `search_issues`) use embedded AI agents for natur
 - **Packaging**: Multiple package coordination
 - **OpenTelemetry Namespaces**: Run `pnpm run generate-otel-namespaces` to update namespace documentation from OpenTelemetry specs
 
-## 🔴 CRITICAL: Pre-Development Requirements
+## 🚨 MANDATORY Pre-Development Reading
 
-**MANDATORY READING before ANY code changes:**
+<critical-requirements>
+BEFORE writing ANY code:
 
-### MCP Component Development
-- **Tools**: MUST read `docs/adding-tools.mdc` 
-- **Prompts**: MUST read `docs/adding-prompts.mdc`
-- **Resources**: MUST read `docs/adding-resources.mdc`
-- **Testing**: MUST read `docs/testing.mdc` for all components
+### Component Development
+- Tools → READ: `docs/adding-tools.mdc`
+- Prompts → READ: `docs/adding-prompts.mdc`
+- Resources → READ: `docs/adding-resources.mdc`
+- Testing → READ: `docs/testing.mdc`
 
-### Code Changes
-- MUST read `docs/common-patterns.mdc` for established patterns
-- MUST read `docs/api-patterns.mdc` for API usage
-- MUST verify component count limits (tools: ~20 max, prompts/resources: reasonable limits)
+### Code Patterns
+- Patterns → READ: `docs/common-patterns.mdc`
+- API Usage → READ: `docs/api-patterns.mdc`
+- Limits: Tools ≤20 (hard limit: 25), Prompts/Resources: reasonable count
+</critical-requirements>
 
-## Documentation Maintenance Requirements
+## ✅ Validation & Documentation
 
-**MANDATORY: Documentation MUST be updated when making code changes**
-- Documentation updates are not optional - they are part of completing any task
-- CLAUDE.md ↔ cursor.mdc must stay synchronized
-- Update relevant docs for tools, prompts, resources, API patterns, or architecture changes
+<validation>
+AFTER code changes, ALWAYS:
+```bash
+pnpm run tsc     # Type safety
+pnpm run lint    # Code style
+pnpm run test    # Component tests
+```
+See `docs/quality-checks.mdc` for full checklist
+</validation>
 
-## Code Validation Requirements
-
-**MANDATORY after ANY code changes:**
-- Run `pnpm run tsc` to verify type safety
-- Run `pnpm run lint` to check code style  
-- Run `pnpm run test` for affected components
-- See `docs/quality-checks.mdc` for complete checklist
+<documentation>
+Docs are MANDATORY, not optional:
+- Update docs when changing functionality
+- Keep CLAUDE.md ↔ cursor.mdc synchronized
+- Update: tools, prompts, resources, API patterns, architecture docs
+</documentation>
 
 ## Pull Request Creation
 
@@ -120,12 +147,13 @@ Two tools (`search_events` and `search_issues`) use embedded AI agents for natur
 - Use proper commit message format as specified
 - Include Claude Code attribution in PR descriptions
 
-## Component Limits
+## 🔢 Hard Limits
 
-**IMPORTANT**: 
-- **Tools**: Target ~20, never exceed 25 (AI agent hard limitations)
-- **Prompts**: Keep reasonable, well-documented
-- **Resources**: Keep reasonable, well-documented
+<limits>
+- **Tools**: Target ~20, NEVER exceed 25 (AI agent constraint)
+- **Prompts**: Reasonable count, well-documented
+- **Resources**: Reasonable count, well-documented
+</limits>
 
 ## Documentation Directory
 
@@ -139,12 +167,24 @@ Two tools (`search_events` and `search_issues`) use embedded AI agents for natur
 - `docs/quality-checks.mdc` - Required quality checks
 - `docs/pr-management.mdc` - Pull request guidelines and templates
 
-## Claude Code Notes
+## 🔧 Environment Context
 
-- Server runs via stdio transport
-- Authentication uses access tokens (not OAuth)
+<context>
+**Claude Code**:
+- Transport: stdio
+- Auth: access tokens (NOT OAuth)
 
-## Sentry Organization and Project Information
-
+**Sentry Defaults**:
 - Organization: 'sentry'
 - Project: 'mcp-server'
+</context>
+
+## 🧠 Reasoning Guidelines
+
+<thinking>
+When tackling complex tasks:
+1. Break down the problem into steps
+2. Consider edge cases and error scenarios
+3. Validate assumptions against codebase
+4. Check existing patterns before implementing
+</thinking>
