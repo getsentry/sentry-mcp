@@ -105,4 +105,4 @@ pnpm run test              # Run tests
 5. **Tasks**: Use TodoWrite for 3+ step tasks
 
 ---
-*Optimized for Claude Code (Sonnet 4/Opus 4) - 2025 Best Practices*
+*Optimized for Claude Code (Sonnet 4/Opus 4)*
