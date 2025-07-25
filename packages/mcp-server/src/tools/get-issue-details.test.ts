@@ -294,4 +294,37 @@ describe("get_issue_details", () => {
     expect(result).toContain("## Seer AI Analysis");
     expect(result).toContain("Consolidate bottle and price data fetching");
   });
+
+  it("returns json", async () => {
+    const result = await getIssueDetails.handler(
+      {
+        responseType: "json",
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+    expect(result).toMatchObject({
+      autofixState: expect.any(String),
+      event: {
+        id: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        occurredAt: "2025-04-08T21:15:04.000Z",
+      },
+      issue: {
+        count: "25",
+        culprit: "Object.fetch(index)",
+        firstSeen: "2025-04-03T22:51:19.403Z",
+        id: "6507376925",
+        lastSeen: "2025-04-12T11:34:11.000Z",
+        url: expect.any(String),
+      },
+    });
+  });
 });

@@ -27,4 +27,26 @@ describe("create_team", () => {
       "
     `);
   });
+  it("returns json", async () => {
+    const result = await createTeam.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        name: "the-goats",
+        responseType: "json",
+      },
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+    expect(result).toMatchObject({
+      organizationSlug: "sentry-mcp-evals",
+      team: {
+        id: "4509109078196224",
+        slug: "the-goats",
+        name: "the-goats",
+      },
+    });
+  });
 });

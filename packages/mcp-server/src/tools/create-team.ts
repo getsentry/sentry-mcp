@@ -3,7 +3,7 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "./utils/defineTool";
 import { apiServiceFromContext } from "./utils/api-utils";
 import type { ServerContext } from "../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import { ParamOrganizationSlug, ParamRegionUrl, ResponseType } from "../schema";
 
 export default defineTool({
   name: "create_team",
@@ -32,6 +32,7 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.optional(),
     name: z.string().trim().describe("The name of the team to create."),
+    responseType: ResponseType.optional(),
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
@@ -45,12 +46,20 @@ export default defineTool({
       organizationSlug,
       name: params.name,
     });
-    let output = `# New Team in **${organizationSlug}**\n\n`;
-    output += `**ID**: ${team.id}\n`;
-    output += `**Slug**: ${team.slug}\n`;
-    output += `**Name**: ${team.name}\n`;
-    output += "# Using this information\n\n";
-    output += `- You should always inform the user of the Team Slug value.\n`;
-    return output;
+    let mdOutput = `# New Team in **${organizationSlug}**\n\n`;
+    mdOutput += `**ID**: ${team.id}\n`;
+    mdOutput += `**Slug**: ${team.slug}\n`;
+    mdOutput += `**Name**: ${team.name}\n`;
+    mdOutput += "# Using this information\n\n";
+    mdOutput += `- You should always inform the user of the Team Slug value.\n`;
+
+    if (params.responseType === "json") {
+      return {
+        organizationSlug,
+        team,
+      };
+    }
+
+    return mdOutput;
   },
 });

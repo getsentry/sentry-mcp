@@ -683,44 +683,72 @@ export function formatIssueOutput({
   event,
   apiService,
   autofixState,
+  responseType = "md",
 }: {
   organizationSlug: string;
   issue: Issue;
   event: Event;
   apiService: SentryApiService;
   autofixState?: AutofixRunState;
+  responseType?: "md" | "json";
 }) {
-  let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
-  output += `**Description**: ${issue.title}\n`;
-  output += `**Culprit**: ${issue.culprit}\n`;
-  output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
-  output += `**Last Seen**: ${new Date(issue.lastSeen).toISOString()}\n`;
-  output += `**Occurrences**: ${issue.count}\n`;
-  output += `**Users Impacted**: ${issue.userCount}\n`;
-  output += `**Status**: ${issue.status}\n`;
-  output += `**Platform**: ${issue.platform}\n`;
-  output += `**Project**: ${issue.project.name}\n`;
-  output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue.shortId)}\n`;
-  output += "\n";
-  output += "## Event Details\n\n";
-  output += `**Event ID**: ${event.id}\n`;
+  let mdOutput = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
+  const issueUrl = apiService.getIssueUrl(organizationSlug, issue.shortId);
+  const firstSeen = new Date(issue.firstSeen).toISOString();
+  const lastSeen = new Date(issue.lastSeen).toISOString();
+  const jsonOutput: Record<string, unknown> = {
+    issue: {
+      ...issue,
+      firstSeen,
+      lastSeen,
+      url: issueUrl,
+    },
+    event: {
+      id: event.id,
+    },
+  };
+  mdOutput += `**Description**: ${issue.title}\n`;
+  mdOutput += `**Culprit**: ${issue.culprit}\n`;
+  mdOutput += `**First Seen**: ${firstSeen}\n`;
+  mdOutput += `**Last Seen**: ${lastSeen}\n`;
+  mdOutput += `**Occurrences**: ${issue.count}\n`;
+  mdOutput += `**Users Impacted**: ${issue.userCount}\n`;
+  mdOutput += `**Status**: ${issue.status}\n`;
+  mdOutput += `**Platform**: ${issue.platform}\n`;
+  mdOutput += `**Project**: ${issue.project.name}\n`;
+  mdOutput += `**URL**: ${issueUrl}\n`;
+  mdOutput += "\n";
+  mdOutput += "## Event Details\n\n";
+  mdOutput += `**Event ID**: ${event.id}\n`;
   if (event.type === "error") {
-    output += `**Occurred At**: ${new Date((event as z.infer<typeof ErrorEventSchema>).dateCreated).toISOString()}\n`;
+    const occurredAt = new Date(
+      (event as z.infer<typeof ErrorEventSchema>).dateCreated,
+    ).toISOString();
+    mdOutput += `**Occurred At**: ${occurredAt}\n`;
+    (jsonOutput.event as Record<string, unknown>).occurredAt = occurredAt;
   }
   if (event.message) {
-    output += `**Message**:\n${event.message}\n`;
+    mdOutput += `**Message**:\n${event.message}\n`;
+    (jsonOutput.event as Record<string, unknown>).message = event.message;
   }
-  output += "\n";
-  output += formatEventOutput(event);
+  mdOutput += "\n";
+  mdOutput += formatEventOutput(event);
 
   // Add Seer context if available
   if (autofixState) {
-    output += formatSeerContext(autofixState);
+    const formattedSeerContext = formatSeerContext(autofixState);
+    mdOutput += formattedSeerContext;
+    jsonOutput.autofixState = formattedSeerContext;
   }
 
-  output += "# Using this information\n\n";
-  output += `- You can reference the IssueID in commit messages (e.g. \`Fixes ${issue.shortId}\`) to automatically close the issue when the commit is merged.\n`;
-  output +=
+  mdOutput += "# Using this information\n\n";
+  mdOutput += `- You can reference the IssueID in commit messages (e.g. \`Fixes ${issue.shortId}\`) to automatically close the issue when the commit is merged.\n`;
+  mdOutput +=
     "- The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.\n";
-  return output;
+
+  if (responseType === "json") {
+    return jsonOutput;
+  }
+
+  return mdOutput;
 }
