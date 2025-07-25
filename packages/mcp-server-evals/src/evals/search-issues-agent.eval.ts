@@ -56,7 +56,6 @@ describeEval("search-issues-agent", {
   task: async (input) => {
     // Create a real API service that will use MSW mocks
     const apiService = new SentryApiService({
-      baseUrl: "https://us.sentry.io",
       accessToken: "test-token",
     });
 

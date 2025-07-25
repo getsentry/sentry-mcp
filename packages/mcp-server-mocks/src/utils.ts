@@ -16,9 +16,11 @@ export function setupMockServer(handlers: Array<any> = []): SetupServer {
 export function createMockApiService(
   baseUrl = "https://us.sentry.io",
 ): MockApiService {
-  const handlers = [
+  // Create handlers for multiple possible base URLs
+  const baseUrls = [baseUrl, "https://sentry.io"];
+  const handlers = baseUrls.flatMap((url) => [
     // Default handlers for common Sentry API endpoints
-    http.get(`${baseUrl}/api/0/organizations/:org/issues/`, () => {
+    http.get(`${url}/api/0/organizations/:org/issues/`, () => {
       return HttpResponse.json({
         data: [],
         links: {
@@ -28,7 +30,7 @@ export function createMockApiService(
       });
     }),
 
-    http.get(`${baseUrl}/api/0/organizations/:org/events/`, () => {
+    http.get(`${url}/api/0/organizations/:org/events/`, () => {
       return HttpResponse.json({
         data: [],
         meta: {
@@ -37,7 +39,7 @@ export function createMockApiService(
       });
     }),
 
-    http.get(`${baseUrl}/api/0/users/me/`, () => {
+    http.get(`${url}/api/0/users/me/`, () => {
       return HttpResponse.json({
         id: "123456",
         email: "test@example.com",
@@ -46,7 +48,7 @@ export function createMockApiService(
     }),
 
     // Dataset attributes for search_events agent
-    http.get(`${baseUrl}/api/0/organizations/:org/events/meta/`, () => {
+    http.get(`${url}/api/0/organizations/:org/events/meta/`, () => {
       return HttpResponse.json({
         fields: {
           project: { type: "string" },
@@ -64,7 +66,7 @@ export function createMockApiService(
     }),
 
     // Issue fields for search_issues agent
-    http.get(`${baseUrl}/api/0/organizations/:org/issues/fields/`, () => {
+    http.get(`${url}/api/0/organizations/:org/issues/fields/`, () => {
       return HttpResponse.json({
         fields: [
           { key: "status", name: "Status", type: "choice" },
@@ -81,7 +83,7 @@ export function createMockApiService(
 
     // Trace item attributes for spans/logs
     http.get(
-      `${baseUrl}/api/0/organizations/:org/trace-items/attributes/`,
+      `${url}/api/0/organizations/:org/trace-items/attributes/`,
       ({ request }) => {
         const itemType = new URL(request.url).searchParams.get("type");
 
@@ -106,16 +108,16 @@ export function createMockApiService(
     ),
 
     // Tags for error events
-    http.get(`${baseUrl}/api/0/organizations/:org/tags/`, () => {
+    http.get(`${url}/api/0/organizations/:org/tags/`, () => {
       return HttpResponse.json([
-        { key: "environment", name: "Environment" },
-        { key: "release", name: "Release" },
-        { key: "user", name: "User" },
-        { key: "browser", name: "Browser" },
-        { key: "os", name: "Operating System" },
+        { key: "environment", name: "Environment", totalValues: 10 },
+        { key: "release", name: "Release", totalValues: 5 },
+        { key: "user", name: "User", totalValues: 100 },
+        { key: "browser", name: "Browser", totalValues: 20 },
+        { key: "os", name: "Operating System", totalValues: 15 },
       ]);
     }),
-  ];
+  ]);
 
   const server = setupServer(...handlers);
 
