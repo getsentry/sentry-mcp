@@ -124,19 +124,21 @@ describeEval("search-events-agent-equations", {
   scorers: [
     async (input, output, expected) => {
       // Documentation scorer - always passes since this is for reference
+      // The expected object contains the full test case, not just the expected field
+      const exp = expected?.expected || {};
       return {
         pass: true,
         score: 1,
-        reason: `Documented expected output for: "${input}"
+        reason: `Documented expected output for: "${expected?.input || input}"
 
 Expected agent to generate:
-- Dataset: ${expected.dataset || "auto-detected"}
-- Query: ${expected.query || "(empty)"}
-- Fields: ${expected.fields ? expected.fields.join(", ") : "default"}
-- Sort: ${expected.sort || "default"}
-- TimeRange: ${expected.timeRange ? JSON.stringify(expected.timeRange) : "none"}
+- Dataset: ${exp.dataset || "auto-detected"}
+- Query: ${exp.query || "(empty)"}
+- Fields: ${exp.fields ? exp.fields.join(", ") : "default"}
+- Sort: ${exp.sort || "default"}
+- TimeRange: ${exp.timeRange ? JSON.stringify(exp.timeRange) : "none"}
 
-Key insight: ${expected.fields?.some((f) => f.startsWith("equation|")) ? "Uses equation fields for complex calculations" : "Standard aggregation or event query"}`,
+Key insight: ${exp.fields?.some((f: string) => f.startsWith("equation|")) ? "Uses equation fields for complex calculations" : "Standard aggregation or event query"}`,
       };
     },
   ],

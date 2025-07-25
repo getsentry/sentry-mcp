@@ -24,6 +24,8 @@
     "dotenv": "catalog:",
     "msw": "catalog:",
     "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-evals": "catalog:",
     "zod": "catalog:"
   }
 }
