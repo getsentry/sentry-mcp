@@ -410,6 +410,12 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.8.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
+      vitest-evals:
+        specifier: 'catalog:'
+        version: 0.4.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0))
       zod:
         specifier: 'catalog:'
         version: 3.25.72
@@ -8964,6 +8970,11 @@ snapshots:
     dependencies:
       tinyrainbow: 2.0.0
       vitest: 3.2.4(@types/debug@4.1.12)(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
+
+  vitest-evals@0.4.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)):
+    dependencies:
+      tinyrainbow: 2.0.0
+      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@24.0.10)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0)
 
   vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.16.0)(jiti@2.4.2)(lightningcss@1.30.1)(msw@2.10.2(@types/node@22.16.0)(typescript@5.8.3))(tsx@4.20.3)(yaml@2.8.0):
     dependencies:
