@@ -1,6 +1,15 @@
 import { describeEval } from "vitest-evals";
 import { ToolCallScorer } from "vitest-evals";
-import { testSearchIssuesAgent } from "./utils/testAgents";
+import { testableSearchIssuesAgent } from "@sentry/mcp-server/tools/search-issues/testable-agent";
+import { createMockApiService } from "@sentry/mcp-server-mocks";
+import { SentryApiService } from "@sentry/mcp-server/api-client";
+import "../setup-env";
+
+// Set up MSW mock server
+const mockApi = createMockApiService();
+
+// Start the mock server before tests
+mockApi.start();
 
 describeEval("search-issues-agent", {
   data: async () => {
@@ -45,11 +54,21 @@ describeEval("search-issues-agent", {
     ];
   },
   task: async (input) => {
-    const result = await testSearchIssuesAgent(input);
+    // Create a real API service that will use MSW mocks
+    const apiService = new SentryApiService({
+      baseUrl: "https://us.sentry.io",
+      accessToken: "test-token",
+    });
+
+    const result = await testableSearchIssuesAgent(
+      input,
+      "sentry-mcp-evals",
+      apiService,
+    );
 
     // Return in the format expected by ToolCallScorer
     return {
-      result: result.result,
+      result: JSON.stringify(result.result),
       toolCalls: result.toolCalls.map((call) => ({
         name: call.toolName,
         arguments: call.args,

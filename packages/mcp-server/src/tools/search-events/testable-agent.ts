@@ -1,55 +1,98 @@
+/**
+ * Testable version of the search events agent that exposes tool calls
+ * This is used for evaluation and testing purposes only
+ */
 import { z } from "zod";
+import type { SentryApiService } from "../../api-client";
+import type { CoreToolCall } from "ai";
 import { ConfigurationError } from "../../errors";
 import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
-import type { SentryApiService } from "../../api-client";
 import { createOtelLookupTool } from "../../agent-tools/lookup-otel-semantics";
 import { createWhoamiTool } from "../../agent-tools/whoami";
 import { createDatasetAttributesTool } from "./utils";
 
-// Type definitions
-export interface QueryTranslationResult {
-  query?: string;
-  fields?: string[];
-  sort?: string;
-  timeRange?:
-    | {
-        statsPeriod: string;
+// Re-export the output schema for consistency
+const SearchEventsOutputSchema = z
+  .object({
+    dataset: z
+      .enum(["spans", "errors", "logs"])
+      .optional()
+      .describe("Which dataset to use for the query"),
+    query: z
+      .string()
+      .optional()
+      .describe(
+        "The Sentry query string for filtering results (empty string returns all recent events)",
+      ),
+    fields: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Array of field names to return in results. REQUIRED for aggregate queries (include only aggregate functions and groupBy fields). Optional for individual event queries (will use recommended fields if not provided).",
+      ),
+    sort: z
+      .string()
+      .optional()
+      .describe(
+        "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
+      ),
+    timeRange: z
+      .union([
+        z.object({
+          statsPeriod: z
+            .string()
+            .describe("Relative time period like '1h', '24h', '7d'"),
+        }),
+        z.object({
+          start: z.string().describe("ISO 8601 start time"),
+          end: z.string().describe("ISO 8601 end time"),
+        }),
+      ])
+      .optional()
+      .describe(
+        "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
+      ),
+    error: z
+      .string()
+      .optional()
+      .describe("Error message if the query cannot be translated"),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.error) {
+      // If no error is present, dataset and sort must be defined
+      if (data.dataset === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Dataset is required when no error is returned.",
+          path: ["dataset"],
+        });
       }
-    | {
-        start: string;
-        end: string;
-      };
-  error?: string;
-}
+      if (data.sort === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Sort is required when no error is returned.",
+          path: ["sort"],
+        });
+      }
+    }
+  });
 
-export interface QueryTranslationParams {
-  naturalLanguageQuery: string;
-  dataset: "spans" | "errors" | "logs";
-  organizationSlug: string;
-  projectId?: string;
-  allFields: Record<string, string>;
-  datasetConfig: {
-    rules: string;
-    examples: string;
-  };
-  recommendedFields: {
-    basic: string[];
-    description: string;
-  };
+export type SearchEventsOutput = z.infer<typeof SearchEventsOutputSchema>;
+
+export interface TestableAgentResult {
+  result: SearchEventsOutput;
+  toolCalls: CoreToolCall<any, any>[];
 }
 
 /**
- * Translate natural language query to Sentry search syntax using AI
+ * Testable version of the search events agent
  */
-export async function translateQuery(
-  params: Omit<
-    QueryTranslationParams,
-    "dataset" | "allFields" | "datasetConfig" | "recommendedFields"
-  >,
-  apiService: SentryApiService,
+export async function testableSearchEventsAgent(
+  query: string,
   organizationSlug: string,
+  apiService: SentryApiService,
   projectId?: string,
-): Promise<QueryTranslationResult & { dataset?: "spans" | "errors" | "logs" }> {
+): Promise<TestableAgentResult> {
   // Check if OpenAI API key is available
   if (!process.env.OPENAI_API_KEY) {
     throw new ConfigurationError(
@@ -57,7 +100,7 @@ export async function translateQuery(
     );
   }
 
-  // Build a dataset-agnostic system prompt
+  // System prompt from the actual agent
   const systemPrompt = `You are a Sentry query translator. You need to:
 1. FIRST determine which dataset (spans, errors, or logs) is most appropriate for the query
 2. Query the available attributes for that dataset using the datasetAttributes tool
@@ -216,96 +259,17 @@ COMMON ERRORS TO AVOID:
   );
   const whoamiTool = createWhoamiTool(apiService);
 
-  // Define the output schema for the agent
-  const outputSchema = z
-    .object({
-      dataset: z
-        .enum(["spans", "errors", "logs"])
-        .optional()
-        .describe("Which dataset to use for the query"),
-      query: z
-        .string()
-        .optional()
-        .describe(
-          "The Sentry query string for filtering results (empty string returns all recent events)",
-        ),
-      fields: z
-        .array(z.string())
-        .optional()
-        .describe(
-          "Array of field names to return in results. REQUIRED for aggregate queries (include only aggregate functions and groupBy fields). Optional for individual event queries (will use recommended fields if not provided).",
-        ),
-      sort: z
-        .string()
-        .optional()
-        .describe(
-          "REQUIRED: Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
-        ),
-      timeRange: z
-        .union([
-          z.object({
-            statsPeriod: z
-              .string()
-              .describe("Relative time period like '1h', '24h', '7d'"),
-          }),
-          z.object({
-            start: z.string().describe("ISO 8601 start time"),
-            end: z.string().describe("ISO 8601 end time"),
-          }),
-        ])
-        .optional()
-        .describe(
-          "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
-        ),
-      error: z
-        .string()
-        .optional()
-        .describe("Error message if the query cannot be translated"),
-    })
-    .superRefine((data, ctx) => {
-      if (!data.error) {
-        // If no error is present, dataset and sort must be defined
-        if (data.dataset === undefined) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Dataset is required when no error is returned.",
-            path: ["dataset"],
-          });
-        }
-        if (data.sort === undefined) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Sort is required when no error is returned.",
-            path: ["sort"],
-          });
-        }
-      }
-    });
-
-  // Use callEmbeddedAgent to translate the query with tool call capture
+  // Use callEmbeddedAgent to get both result and tool calls
   const agentResult = await callEmbeddedAgent({
     system: systemPrompt,
-    prompt: params.naturalLanguageQuery,
+    prompt: query,
     tools: {
       datasetAttributes: datasetAttributesTool,
       otelSemantics: otelLookupTool,
       whoami: whoamiTool,
     },
-    schema: outputSchema,
+    schema: SearchEventsOutputSchema,
   });
 
-  // Extract the result from the agent
-  const parsed = agentResult.result;
-
-  // Note: agentResult.toolCalls contains the captured tool calls for debugging/evaluation
-  // In production, we could log these or use them for monitoring
-
-  return {
-    dataset: parsed.dataset,
-    query: parsed.query,
-    fields: parsed.fields,
-    sort: parsed.sort,
-    timeRange: parsed.timeRange,
-    error: parsed.error,
-  };
+  return agentResult;
 }

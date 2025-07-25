@@ -78,6 +78,43 @@ export function createMockApiService(
         ],
       });
     }),
+
+    // Trace item attributes for spans/logs
+    http.get(
+      `${baseUrl}/api/0/organizations/:org/trace-items/attributes/`,
+      ({ request }) => {
+        const itemType = new URL(request.url).searchParams.get("type");
+
+        if (itemType === "spans") {
+          return HttpResponse.json([
+            { key: "span.op", name: "Operation", type: "string" },
+            { key: "span.duration", name: "Duration", type: "number" },
+            { key: "span.description", name: "Description", type: "string" },
+            { key: "mcp.tool.name", name: "MCP Tool Name", type: "string" },
+            { key: "gen_ai.request.model", name: "AI Model", type: "string" },
+          ]);
+        }
+        if (itemType === "logs") {
+          return HttpResponse.json([
+            { key: "log.level", name: "Log Level", type: "string" },
+            { key: "log.message", name: "Log Message", type: "string" },
+          ]);
+        }
+
+        return HttpResponse.json([]);
+      },
+    ),
+
+    // Tags for error events
+    http.get(`${baseUrl}/api/0/organizations/:org/tags/`, () => {
+      return HttpResponse.json([
+        { key: "environment", name: "Environment" },
+        { key: "release", name: "Release" },
+        { key: "user", name: "User" },
+        { key: "browser", name: "Browser" },
+        { key: "os", name: "Operating System" },
+      ]);
+    }),
   ];
 
   const server = setupServer(...handlers);

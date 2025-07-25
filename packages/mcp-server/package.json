@@ -13,9 +13,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Server",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -26,9 +24,7 @@
   "bin": {
     "sentry-mcp": "./dist/index.js"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -77,6 +73,26 @@
     "./version": {
       "types": "./dist/version.ts",
       "default": "./dist/version.js"
+    },
+    "./tools/search-events/agent": {
+      "types": "./dist/tools/search-events/agent.ts",
+      "default": "./dist/tools/search-events/agent.js"
+    },
+    "./tools/search-issues/agent": {
+      "types": "./dist/tools/search-issues/agent.ts",
+      "default": "./dist/tools/search-issues/agent.js"
+    },
+    "./internal/agents/callEmbeddedAgent": {
+      "types": "./dist/internal/agents/callEmbeddedAgent.ts",
+      "default": "./dist/internal/agents/callEmbeddedAgent.js"
+    },
+    "./tools/search-events/testable-agent": {
+      "types": "./dist/tools/search-events/testable-agent.ts",
+      "default": "./dist/tools/search-events/testable-agent.js"
+    },
+    "./tools/search-issues/testable-agent": {
+      "types": "./dist/tools/search-issues/testable-agent.ts",
+      "default": "./dist/tools/search-issues/testable-agent.js"
     }
   },
   "scripts": {

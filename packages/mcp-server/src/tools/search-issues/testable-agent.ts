@@ -1,6 +1,11 @@
+/**
+ * Testable version of the search issues agent that exposes tool calls
+ * This is used for evaluation and testing purposes only
+ */
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
-import { ConfigurationError, UserInputError } from "../../errors";
+import type { CoreToolCall } from "ai";
+import { ConfigurationError } from "../../errors";
 import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
 import { createDatasetFieldsTool } from "../../agent-tools/discover-dataset-fields";
 import { createWhoamiTool } from "../../agent-tools/whoami";
@@ -21,18 +26,20 @@ const IssueQuerySchema = z.object({
 
 export type IssueQuery = z.infer<typeof IssueQuerySchema>;
 
+export interface TestableAgentResult {
+  result: IssueQuery;
+  toolCalls: CoreToolCall<any, any>[];
+}
+
 /**
- * Translate natural language query to Sentry issue search syntax
+ * Testable version of the search issues agent
  */
-export async function translateQuery(
-  params: {
-    naturalLanguageQuery: string;
-    organizationSlug: string;
-    projectSlugOrId?: string;
-    projectId?: string;
-  },
+export async function testableSearchIssuesAgent(
+  query: string,
+  organizationSlug: string,
   apiService: SentryApiService,
-): Promise<IssueQuery> {
+  projectId?: string,
+): Promise<TestableAgentResult> {
   // Check for OpenAI API key
   if (!process.env.OPENAI_API_KEY) {
     throw new ConfigurationError(
@@ -44,38 +51,20 @@ export async function translateQuery(
   const tools = {
     issueFields: createDatasetFieldsTool(
       apiService,
-      params.organizationSlug,
+      organizationSlug,
       "search_issues",
-      params.projectId,
+      projectId,
     ),
     whoami: createWhoamiTool(apiService),
   };
 
-  try {
-    const agentResult = await callEmbeddedAgent({
-      system: systemPrompt,
-      prompt: params.naturalLanguageQuery,
-      tools,
-      schema: IssueQuerySchema,
-    });
+  // Use callEmbeddedAgent to get both result and tool calls
+  const agentResult = await callEmbeddedAgent({
+    system: systemPrompt,
+    prompt: query,
+    tools,
+    schema: IssueQuerySchema,
+  });
 
-    // Extract the result from the agent
-    const query = agentResult.result;
-
-    // Note: agentResult.toolCalls contains the captured tool calls for debugging/evaluation
-
-    return query;
-  } catch (error) {
-    if (
-      error instanceof UserInputError ||
-      error instanceof ConfigurationError
-    ) {
-      throw error;
-    }
-
-    throw new Error(
-      `Failed to translate query: ${error instanceof Error ? error.message : "Unknown error"}`,
-      { cause: error },
-    );
-  }
+  return agentResult;
 }
