@@ -24,18 +24,32 @@
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 
-import autofixStateFixture from "./fixtures/autofix-state.json";
-import issueFixture from "./fixtures/issue.json";
-import eventsFixture from "./fixtures/event.json";
-import eventAttachmentsFixture from "./fixtures/event-attachments.json";
-import tagsFixture from "./fixtures/tags.json";
-import projectFixture from "./fixtures/project.json";
-import teamFixture from "./fixtures/team.json";
-import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json";
-import traceItemsAttributesSpansStringFixture from "./fixtures/trace-items-attributes-spans-string.json";
-import traceItemsAttributesSpansNumberFixture from "./fixtures/trace-items-attributes-spans-number.json";
-import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json";
-import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json";
+import autofixStateFixture from "./fixtures/autofix-state.json" with {
+  type: "json",
+};
+import issueFixture from "./fixtures/issue.json" with { type: "json" };
+import eventsFixture from "./fixtures/event.json" with { type: "json" };
+import eventAttachmentsFixture from "./fixtures/event-attachments.json" with {
+  type: "json",
+};
+import tagsFixture from "./fixtures/tags.json" with { type: "json" };
+import projectFixture from "./fixtures/project.json" with { type: "json" };
+import teamFixture from "./fixtures/team.json" with { type: "json" };
+import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json" with {
+  type: "json",
+};
+import traceItemsAttributesSpansStringFixture from "./fixtures/trace-items-attributes-spans-string.json" with {
+  type: "json",
+};
+import traceItemsAttributesSpansNumberFixture from "./fixtures/trace-items-attributes-spans-number.json" with {
+  type: "json",
+};
+import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json" with {
+  type: "json",
+};
+import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json" with {
+  type: "json",
+};
 
 /**
  * Standard organization payload for mock responses.
@@ -391,9 +405,26 @@ export const restHandlers = buildHandlers([
     controlOnly: true,
     fetch: () => {
       return HttpResponse.json({
-        id: "1",
-        name: "John Doe",
-        email: "john.doe@example.com",
+        id: "123456",
+        name: "Test User",
+        email: "test@example.com",
+        username: "testuser",
+        avatarUrl: "https://example.com/avatar.jpg",
+        dateJoined: "2024-01-01T00:00:00Z",
+        isActive: true,
+        isManaged: false,
+        isStaff: false,
+        isSuperuser: false,
+        lastLogin: "2024-12-01T00:00:00Z",
+        has2fa: false,
+        hasPasswordAuth: true,
+        emails: [
+          {
+            id: "1",
+            email: "test@example.com",
+            is_verified: true,
+          },
+        ],
       });
     },
   },
@@ -799,8 +830,9 @@ export const restHandlers = buildHandlers([
         );
       }
 
-      // Validate itemType values
-      if (!["span", "logs"].includes(itemType)) {
+      // Validate itemType values (API accepts both singular and plural forms)
+      const normalizedItemType = itemType === "spans" ? "span" : itemType;
+      if (!["span", "logs"].includes(normalizedItemType)) {
         return HttpResponse.json(
           {
             detail: `Invalid itemType '${itemType}'. Must be 'span' or 'logs'`,
@@ -820,13 +852,13 @@ export const restHandlers = buildHandlers([
       }
 
       // Return appropriate fixture based on parameters
-      if (itemType === "span") {
+      if (normalizedItemType === "span") {
         if (attributeType === "string") {
           return HttpResponse.json(traceItemsAttributesSpansStringFixture);
         }
         return HttpResponse.json(traceItemsAttributesSpansNumberFixture);
       }
-      if (itemType === "logs") {
+      if (normalizedItemType === "logs") {
         if (attributeType === "string") {
           return HttpResponse.json(traceItemsAttributesLogsStringFixture);
         }
@@ -1261,5 +1293,5 @@ export const mswServer = setupServer(
 // Export fixtures for use in tests
 export { autofixStateFixture };
 
-// Export utilities for creating mock API services
-export { setupMockServer, createMockApiService } from "./utils";
+// Export utilities for creating mock servers
+export { setupMockServer, startMockServer } from "./utils";

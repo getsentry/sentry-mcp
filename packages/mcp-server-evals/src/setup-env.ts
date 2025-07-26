@@ -18,3 +18,8 @@ config({ path: path.join(rootDir, ".env.local") });
 
 // Load local package .env (will override root if same keys exist)
 config({ path: path.resolve(__dirname, "../.env") });
+
+// Start the shared MSW server for all eval tests
+import { startMockServer } from "@sentry/mcp-server-mocks";
+
+startMockServer({ ignoreOpenAI: true });

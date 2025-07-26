@@ -1,16 +1,11 @@
 import { describeEval } from "vitest-evals";
 import { ToolCallScorer } from "vitest-evals";
 import { searchIssuesAgent } from "@sentry/mcp-server/tools/search-issues";
-import { createMockApiService } from "@sentry/mcp-server-mocks";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
-import { StructuredQueryScorer } from "./utils/StructuredQueryScorer";
+import { StructuredOutputScorer } from "./utils/StructuredOutputScorer";
 import "../setup-env";
 
-// Set up MSW mock server
-const mockApi = createMockApiService();
-
-// Start the mock server before tests
-mockApi.start();
+// The shared MSW server is already started in setup-env.ts
 
 describeEval("search-issues-agent", {
   data: async () => {
@@ -105,6 +100,6 @@ describeEval("search-issues-agent", {
   },
   scorers: [
     ToolCallScorer(), // Validates tool calls
-    StructuredQueryScorer(), // Validates the structured query output
+    StructuredOutputScorer({ match: "fuzzy" }), // Validates the structured query output with flexible matching
   ],
 });
