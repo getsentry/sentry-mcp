@@ -15,7 +15,49 @@ describeEval("search-events-agent", {
   data: async () => {
     return [
       {
+        // Simple query with common fields - should NOT require tool calls
         input: "Show me all errors from today",
+        expectedTools: [],
+      },
+      {
+        // Query with "me" reference - should only require whoami
+        input: "Show me my errors from last week",
+        expectedTools: [
+          {
+            name: "whoami",
+            arguments: {},
+          },
+        ],
+      },
+      {
+        // Common performance query - should NOT require tool calls
+        input: "Show me slow API calls taking more than 1 second",
+        expectedTools: [],
+      },
+      {
+        // Query with OpenTelemetry attributes that need discovery
+        input:
+          "Show me LLM calls where gen_ai.usage.prompt_tokens is over 1000",
+        expectedTools: [
+          {
+            name: "datasetAttributes",
+            arguments: {
+              dataset: "spans",
+            },
+          },
+          {
+            name: "otelSemantics",
+            arguments: {
+              namespace: "gen_ai",
+              searchTerm: "prompt_tokens",
+              dataset: "spans",
+            },
+          },
+        ],
+      },
+      {
+        // Query with custom field requiring discovery
+        input: "Find errors with custom.payment.processor field",
         expectedTools: [
           {
             name: "datasetAttributes",
@@ -26,7 +68,9 @@ describeEval("search-events-agent", {
         ],
       },
       {
-        input: "Show me my errors from last week",
+        // Complex query needing both user resolution and field discovery
+        input:
+          "Show me my database queries with custom.db.pool_size greater than 10",
         expectedTools: [
           {
             name: "whoami",
@@ -35,13 +79,14 @@ describeEval("search-events-agent", {
           {
             name: "datasetAttributes",
             arguments: {
-              dataset: "errors",
+              dataset: "spans",
             },
           },
         ],
       },
       {
-        input: "Show me slow API calls taking more than 1 second",
+        // Query requiring equation field calculation
+        input: "How many total tokens did we consume yesterday",
         expectedTools: [
           {
             name: "datasetAttributes",
@@ -49,6 +94,7 @@ describeEval("search-events-agent", {
               dataset: "spans",
             },
           },
+          // Agent may find gen_ai.usage.total_tokens in datasetAttributes and not need otelSemantics
         ],
       },
     ];
@@ -74,5 +120,5 @@ describeEval("search-events-agent", {
       })),
     };
   },
-  scorers: [ToolCallScorer()],
+  scorers: [ToolCallScorer()], // Default: strict parameter checking
 });

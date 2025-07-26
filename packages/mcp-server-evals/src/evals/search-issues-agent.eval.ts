@@ -15,38 +15,45 @@ describeEval("search-issues-agent", {
   data: async () => {
     return [
       {
+        // Simple query with common fields - should NOT require tool calls
         input: "Show me unresolved issues",
-        expectedTools: [
-          {
-            name: "issueFields",
-            arguments: {
-              includeExamples: false,
-            },
-          },
-        ],
+        expectedTools: [],
       },
       {
+        // Query with "me" reference - should only require whoami
         input: "Show me issues assigned to me",
         expectedTools: [
           {
             name: "whoami",
             arguments: {},
           },
+        ],
+      },
+      {
+        // Complex query but with common fields - should NOT require tool calls
+        input: "Show me critical unhandled errors from the last 24 hours",
+        expectedTools: [],
+      },
+      {
+        // Query with custom/uncommon field that would require discovery
+        input: "Show me issues with custom.payment.failed tag",
+        expectedTools: [
           {
             name: "issueFields",
             arguments: {
-              includeExamples: false,
+              includeExamples: false, // Agent typically uses false for performance
             },
           },
         ],
       },
       {
-        input: "Show me critical unhandled errors from the last 24 hours",
+        // Another query requiring field discovery
+        input: "Find issues where the kafka.consumer.group is orders-processor",
         expectedTools: [
           {
             name: "issueFields",
             arguments: {
-              includeExamples: false,
+              includeExamples: true, // Agent uses true when looking for specific fields
             },
           },
         ],
@@ -74,5 +81,5 @@ describeEval("search-issues-agent", {
       })),
     };
   },
-  scorers: [ToolCallScorer()],
+  scorers: [ToolCallScorer()], // Default: strict parameter checking
 });

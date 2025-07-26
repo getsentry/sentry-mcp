@@ -118,6 +118,7 @@ export function createMockApiService(
               { key: "gen_ai.request.model", name: "AI Model" },
               { key: "transaction", name: "Transaction" },
               { key: "environment", name: "Environment" },
+              { key: "custom.payment.processor", name: "Payment Processor" },
             ]);
           }
           if (itemType === "logs") {
@@ -125,6 +126,7 @@ export function createMockApiService(
               { key: "log.level", name: "Log Level" },
               { key: "log.message", name: "Log Message" },
               { key: "environment", name: "Environment" },
+              { key: "custom.payment.processor", name: "Payment Processor" },
             ]);
           }
         }
@@ -137,6 +139,8 @@ export function createMockApiService(
               { key: "gen_ai.usage.input_tokens", name: "Input Tokens" },
               { key: "gen_ai.usage.output_tokens", name: "Output Tokens" },
               { key: "gen_ai.usage.total_tokens", name: "Total Tokens" },
+              { key: "gen_ai.usage.prompt_tokens", name: "Prompt Tokens" },
+              { key: "custom.db.pool_size", name: "Database Pool Size" },
             ]);
           }
           return HttpResponse.json([]);
@@ -163,14 +167,50 @@ export function createMockApiService(
       },
     ),
 
-    // Tags for error events
-    http.get(`${url}/api/0/organizations/:org/tags/`, () => {
-      return HttpResponse.json([
+    // Tags for error events (including custom fields)
+    http.get(`${url}/api/0/organizations/:org/tags/`, ({ request }) => {
+      const url = new URL(request.url);
+      const dataset = url.searchParams.get("dataset");
+
+      // Base tags that are always present
+      const baseTags = [
         { key: "environment", name: "Environment", totalValues: 10 },
         { key: "release", name: "Release", totalValues: 5 },
         { key: "user", name: "User", totalValues: 100 },
         { key: "browser", name: "Browser", totalValues: 20 },
         { key: "os", name: "Operating System", totalValues: 15 },
+      ];
+
+      // Add dataset-specific and custom tags
+      if (dataset === "search_issues") {
+        return HttpResponse.json([
+          ...baseTags,
+          {
+            key: "custom.payment.failed",
+            name: "Payment Failed",
+            totalValues: 50,
+          },
+          {
+            key: "kafka.consumer.group",
+            name: "Kafka Consumer Group",
+            totalValues: 25,
+          },
+        ]);
+      }
+
+      // For events/errors dataset
+      return HttpResponse.json([
+        ...baseTags,
+        {
+          key: "custom.payment.processor",
+          name: "Payment Processor",
+          totalValues: 30,
+        },
+        {
+          key: "custom.db.pool_size",
+          name: "Database Pool Size",
+          totalValues: 15,
+        },
       ]);
     }),
   ]);
