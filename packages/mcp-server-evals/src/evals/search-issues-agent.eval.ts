@@ -20,7 +20,7 @@ describeEval("search-issues-agent", {
           {
             name: "issueFields",
             arguments: {
-              organizationSlug: "sentry-mcp-evals",
+              includeExamples: false,
             },
           },
         ],
@@ -35,7 +35,7 @@ describeEval("search-issues-agent", {
           {
             name: "issueFields",
             arguments: {
-              organizationSlug: "sentry-mcp-evals",
+              includeExamples: false,
             },
           },
         ],
@@ -46,7 +46,7 @@ describeEval("search-issues-agent", {
           {
             name: "issueFields",
             arguments: {
-              organizationSlug: "sentry-mcp-evals",
+              includeExamples: false,
             },
           },
         ],

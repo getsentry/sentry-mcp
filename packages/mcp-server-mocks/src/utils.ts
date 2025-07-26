@@ -39,11 +39,29 @@ export function createMockApiService(
       });
     }),
 
-    http.get(`${url}/api/0/users/me/`, () => {
+    // Auth endpoint (whoami)
+    http.get(`${url}/api/0/auth/`, () => {
       return HttpResponse.json({
         id: "123456",
         email: "test@example.com",
         name: "Test User",
+        username: "testuser",
+        avatarUrl: "https://example.com/avatar.jpg",
+        dateJoined: "2024-01-01T00:00:00Z",
+        isActive: true,
+        isManaged: false,
+        isStaff: false,
+        isSuperuser: false,
+        lastLogin: "2024-12-01T00:00:00Z",
+        has2fa: false,
+        hasPasswordAuth: true,
+        emails: [
+          {
+            id: "1",
+            email: "test@example.com",
+            is_verified: true,
+          },
+        ],
       });
     }),
 
@@ -81,12 +99,50 @@ export function createMockApiService(
       });
     }),
 
-    // Trace item attributes for spans/logs
+    // Trace item attributes for spans/logs - with string type
     http.get(
       `${url}/api/0/organizations/:org/trace-items/attributes/`,
       ({ request }) => {
-        const itemType = new URL(request.url).searchParams.get("type");
+        const params = new URL(request.url).searchParams;
+        const itemType = params.get("itemType") || params.get("type");
+        const attributeType =
+          params.get("attributeType") || params.get("data_type");
 
+        // Handle string type attributes
+        if (attributeType === "string") {
+          if (itemType === "spans") {
+            return HttpResponse.json([
+              { key: "span.op", name: "Operation" },
+              { key: "span.description", name: "Description" },
+              { key: "mcp.tool.name", name: "MCP Tool Name" },
+              { key: "gen_ai.request.model", name: "AI Model" },
+              { key: "transaction", name: "Transaction" },
+              { key: "environment", name: "Environment" },
+            ]);
+          }
+          if (itemType === "logs") {
+            return HttpResponse.json([
+              { key: "log.level", name: "Log Level" },
+              { key: "log.message", name: "Log Message" },
+              { key: "environment", name: "Environment" },
+            ]);
+          }
+        }
+
+        // Handle number type attributes
+        if (attributeType === "number") {
+          if (itemType === "spans") {
+            return HttpResponse.json([
+              { key: "span.duration", name: "Duration" },
+              { key: "gen_ai.usage.input_tokens", name: "Input Tokens" },
+              { key: "gen_ai.usage.output_tokens", name: "Output Tokens" },
+              { key: "gen_ai.usage.total_tokens", name: "Total Tokens" },
+            ]);
+          }
+          return HttpResponse.json([]);
+        }
+
+        // Default response with type included (when no dataType specified)
         if (itemType === "spans") {
           return HttpResponse.json([
             { key: "span.op", name: "Operation", type: "string" },

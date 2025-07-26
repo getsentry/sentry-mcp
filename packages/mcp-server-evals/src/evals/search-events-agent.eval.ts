@@ -20,7 +20,6 @@ describeEval("search-events-agent", {
           {
             name: "datasetAttributes",
             arguments: {
-              organizationSlug: "sentry-mcp-evals",
               dataset: "errors",
             },
           },
@@ -36,7 +35,6 @@ describeEval("search-events-agent", {
           {
             name: "datasetAttributes",
             arguments: {
-              organizationSlug: "sentry-mcp-evals",
               dataset: "errors",
             },
           },
@@ -48,7 +46,6 @@ describeEval("search-events-agent", {
           {
             name: "datasetAttributes",
             arguments: {
-              organizationSlug: "sentry-mcp-evals",
               dataset: "spans",
             },
           },
