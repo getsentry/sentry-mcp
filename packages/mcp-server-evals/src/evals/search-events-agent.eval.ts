@@ -62,14 +62,14 @@ describeEval("search-events-agent", {
             name: "otelSemantics",
             arguments: {
               namespace: "gen_ai",
-              searchTerm: "prompt_tokens",
               dataset: "spans",
             },
           },
         ],
         expected: {
           dataset: "spans",
-          query: "gen_ai.usage.prompt_tokens:>1000",
+          // Agent may use input_tokens or prompt_tokens
+          query: /gen_ai\.usage\.(prompt_tokens|input_tokens):>1000/,
           sort: "-span.duration",
         },
       },
@@ -123,13 +123,18 @@ describeEval("search-events-agent", {
               dataset: "spans",
             },
           },
-          // Agent may find gen_ai.usage.total_tokens in datasetAttributes and not need otelSemantics
+          // Agent may find gen_ai fields and use them for calculation
         ],
         expected: {
           dataset: "spans",
-          query: "has:gen_ai.usage.total_tokens", // Filter to spans that have token data
-          fields: ["sum(gen_ai.usage.total_tokens)"], // Aggregate function
-          sort: "-sum(gen_ai.usage.total_tokens)",
+          // For aggregations, query filter is optional - empty query gets all spans
+          query: /^$|has:gen_ai\.usage\.(input_tokens|output_tokens)/,
+          // Equation to sum both token types
+          fields: [
+            "equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)",
+          ],
+          // Sort by the equation result
+          sort: /^-?equation\|sum\(gen_ai\.usage\.input_tokens\)\s*\+\s*sum\(gen_ai\.usage\.output_tokens\)$/,
           timeRange: { statsPeriod: "24h" },
         },
       },
