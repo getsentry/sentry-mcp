@@ -3,6 +3,7 @@ import { ToolCallScorer } from "vitest-evals";
 import { searchEventsAgent } from "@sentry/mcp-server/tools/search-events";
 import { createMockApiService } from "@sentry/mcp-server-mocks";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
+import { StructuredQueryScorer } from "./utils/StructuredQueryScorer";
 import "../setup-env";
 
 // Set up MSW mock server
@@ -18,6 +19,12 @@ describeEval("search-events-agent", {
         // Simple query with common fields - should NOT require tool calls
         input: "Show me all errors from today",
         expectedTools: [],
+        expected: {
+          dataset: "errors",
+          query: "", // No filters, just time range
+          sort: "-timestamp",
+          timeRange: { statsPeriod: "24h" },
+        },
       },
       {
         // Query with "me" reference - should only require whoami
@@ -28,11 +35,22 @@ describeEval("search-events-agent", {
             arguments: {},
           },
         ],
+        expected: {
+          dataset: "errors",
+          query: /user\.email:test@example\.com|user\.id:123456/, // Can be either
+          sort: "-timestamp",
+          timeRange: { statsPeriod: "7d" },
+        },
       },
       {
         // Common performance query - should NOT require tool calls
         input: "Show me slow API calls taking more than 1 second",
         expectedTools: [],
+        expected: {
+          dataset: "spans",
+          query: /span\.duration:>1000|span\.duration:>1s/, // Can express as ms or seconds
+          sort: "-span.duration",
+        },
       },
       {
         // Query with OpenTelemetry attributes that need discovery
@@ -54,6 +72,11 @@ describeEval("search-events-agent", {
             },
           },
         ],
+        expected: {
+          dataset: "spans",
+          query: "gen_ai.usage.prompt_tokens:>1000",
+          sort: "-span.duration",
+        },
       },
       {
         // Query with custom field requiring discovery
@@ -66,6 +89,11 @@ describeEval("search-events-agent", {
             },
           },
         ],
+        expected: {
+          dataset: "errors",
+          query: "has:custom.payment.processor",
+          sort: "-timestamp",
+        },
       },
       {
         // Complex query needing both user resolution and field discovery
@@ -83,6 +111,12 @@ describeEval("search-events-agent", {
             },
           },
         ],
+        expected: {
+          dataset: "spans",
+          query:
+            /user\.(email:test@example\.com|id:123456).*custom\.db\.pool_size:>10/, // Accept various formats
+          sort: "-span.duration",
+        },
       },
       {
         // Query requiring equation field calculation
@@ -96,6 +130,13 @@ describeEval("search-events-agent", {
           },
           // Agent may find gen_ai.usage.total_tokens in datasetAttributes and not need otelSemantics
         ],
+        expected: {
+          dataset: "spans",
+          query: "has:gen_ai.usage.total_tokens", // Filter to spans that have token data
+          fields: ["sum(gen_ai.usage.total_tokens)"], // Aggregate function
+          sort: "-sum(gen_ai.usage.total_tokens)",
+          timeRange: { statsPeriod: "24h" },
+        },
       },
     ];
   },
@@ -120,5 +161,8 @@ describeEval("search-events-agent", {
       })),
     };
   },
-  scorers: [ToolCallScorer()], // Default: strict parameter checking
+  scorers: [
+    ToolCallScorer(), // Validates tool calls
+    StructuredQueryScorer(), // Validates the structured query output
+  ],
 });

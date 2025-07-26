@@ -3,6 +3,7 @@ import { ToolCallScorer } from "vitest-evals";
 import { searchIssuesAgent } from "@sentry/mcp-server/tools/search-issues";
 import { createMockApiService } from "@sentry/mcp-server-mocks";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
+import { StructuredQueryScorer } from "./utils/StructuredQueryScorer";
 import "../setup-env";
 
 // Set up MSW mock server
@@ -18,6 +19,10 @@ describeEval("search-issues-agent", {
         // Simple query with common fields - should NOT require tool calls
         input: "Show me unresolved issues",
         expectedTools: [],
+        expected: {
+          query: "is:unresolved",
+          sort: "date", // Agent uses "date" as default
+        },
       },
       {
         // Query with "me" reference - should only require whoami
@@ -28,11 +33,20 @@ describeEval("search-issues-agent", {
             arguments: {},
           },
         ],
+        expected: {
+          query:
+            /assignedOrSuggested:test@example\.com|assigned:test@example\.com|assigned:me/, // Various valid forms
+          sort: "date",
+        },
       },
       {
         // Complex query but with common fields - should NOT require tool calls
         input: "Show me critical unhandled errors from the last 24 hours",
         expectedTools: [],
+        expected: {
+          query: /level:error.*is:unresolved.*firstSeen:-24h/, // Agent uses firstSeen for "from the last 24 hours"
+          sort: "date",
+        },
       },
       {
         // Query with custom/uncommon field that would require discovery
@@ -45,6 +59,10 @@ describeEval("search-issues-agent", {
             },
           },
         ],
+        expected: {
+          query: "custom.payment.failed", // Tag search syntax
+          sort: "date", // Agent defaults to date sort
+        },
       },
       {
         // Another query requiring field discovery
@@ -57,6 +75,10 @@ describeEval("search-issues-agent", {
             },
           },
         ],
+        expected: {
+          query: "kafka.consumer.group:orders-processor",
+          sort: "date", // Agent defaults to date sort
+        },
       },
     ];
   },
@@ -81,5 +103,8 @@ describeEval("search-issues-agent", {
       })),
     };
   },
-  scorers: [ToolCallScorer()], // Default: strict parameter checking
+  scorers: [
+    ToolCallScorer(), // Validates tool calls
+    StructuredQueryScorer(), // Validates the structured query output
+  ],
 });
