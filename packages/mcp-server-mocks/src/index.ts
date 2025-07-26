@@ -1294,4 +1294,4 @@ export const mswServer = setupServer(
 export { autofixStateFixture };
 
 // Export utilities for creating mock servers
-export { setupMockServer, startMockServer } from "./utils";
+export { setupMockServer, startMockServer } from "./utils.js";

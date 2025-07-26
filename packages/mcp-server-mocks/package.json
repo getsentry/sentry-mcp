@@ -9,8 +9,12 @@
   "license": "FSL-1.1-ALv2",
   "exports": {
     ".": {
-      "types": "./dist/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "default": "./dist/utils.js"
     }
   },
   "scripts": {

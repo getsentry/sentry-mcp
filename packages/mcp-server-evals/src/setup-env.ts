@@ -20,6 +20,6 @@ config({ path: path.join(rootDir, ".env.local") });
 config({ path: path.resolve(__dirname, "../.env") });
 
 // Start the shared MSW server for all eval tests
-import { startMockServer } from "@sentry/mcp-server-mocks";
+import { startMockServer } from "@sentry/mcp-server-mocks/utils";
 
 startMockServer({ ignoreOpenAI: true });
