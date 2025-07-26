@@ -1260,3 +1260,6 @@ export const mswServer = setupServer(
 
 // Export fixtures for use in tests
 export { autofixStateFixture };
+
+// Export utilities for creating mock API services
+export { setupMockServer, createMockApiService } from "./utils";
