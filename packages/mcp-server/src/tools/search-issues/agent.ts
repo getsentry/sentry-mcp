@@ -22,17 +22,18 @@ const IssueQuerySchema = z.object({
 export type IssueQuery = z.infer<typeof IssueQuerySchema>;
 
 /**
- * Translate natural language query to Sentry issue search syntax
+ * Search issues agent - single entry point for translating natural language queries to Sentry issue search syntax
+ * This returns both the translated query result AND the tool calls made by the agent
  */
-export async function translateQuery(
-  params: {
-    naturalLanguageQuery: string;
-    organizationSlug: string;
-    projectSlugOrId?: string;
-    projectId?: string;
-  },
+export async function searchIssuesAgent(
+  query: string,
+  organizationSlug: string,
   apiService: SentryApiService,
-): Promise<IssueQuery> {
+  projectId?: string,
+): Promise<{
+  result: IssueQuery;
+  toolCalls: any[]; // CoreToolCall<any, any>[]
+}> {
   // Check for OpenAI API key
   if (!process.env.OPENAI_API_KEY) {
     throw new ConfigurationError(
@@ -44,9 +45,9 @@ export async function translateQuery(
   const tools = {
     issueFields: createDatasetFieldsTool(
       apiService,
-      params.organizationSlug,
+      organizationSlug,
       "search_issues",
-      params.projectId,
+      projectId,
     ),
     whoami: createWhoamiTool(apiService),
   };
@@ -54,17 +55,16 @@ export async function translateQuery(
   try {
     const agentResult = await callEmbeddedAgent({
       system: systemPrompt,
-      prompt: params.naturalLanguageQuery,
+      prompt: query,
       tools,
       schema: IssueQuerySchema,
     });
 
-    // Extract the result from the agent
-    const query = agentResult.result;
-
-    // Note: agentResult.toolCalls contains the captured tool calls for debugging/evaluation
-
-    return query;
+    // Return both the result and tool calls
+    return {
+      result: agentResult.result,
+      toolCalls: agentResult.toolCalls,
+    };
   } catch (error) {
     if (
       error instanceof UserInputError ||

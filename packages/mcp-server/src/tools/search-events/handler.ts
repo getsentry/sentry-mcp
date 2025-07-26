@@ -11,7 +11,7 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
-import { translateQuery } from "./agent";
+import { searchEventsAgent } from "./agent";
 import {
   formatErrorResults,
   formatLogResults,
@@ -114,16 +114,14 @@ export default defineTool({
 
     // Translate the natural language query using Search Events Agent
     // The agent will determine the dataset and fetch the appropriate attributes
-    const parsed = await translateQuery(
-      {
-        naturalLanguageQuery: params.naturalLanguageQuery,
-        organizationSlug,
-        projectId,
-      },
-      apiService,
+    const agentResult = await searchEventsAgent(
+      params.naturalLanguageQuery,
       organizationSlug,
+      apiService,
       projectId,
     );
+
+    const parsed = agentResult.result;
 
     // Handle Search Events Agent errors first
     if (parsed.error) {

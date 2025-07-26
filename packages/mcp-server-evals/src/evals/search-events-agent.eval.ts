@@ -1,6 +1,6 @@
 import { describeEval } from "vitest-evals";
 import { ToolCallScorer } from "vitest-evals";
-import { testableSearchEventsAgent } from "@sentry/mcp-server/tools/search-events/testable-agent";
+import { searchEventsAgent } from "@sentry/mcp-server/tools/search-events";
 import { createMockApiService } from "@sentry/mcp-server-mocks";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
 import "../setup-env";
@@ -62,7 +62,7 @@ describeEval("search-events-agent", {
       accessToken: "test-token",
     });
 
-    const result = await testableSearchEventsAgent(
+    const agentResult = await searchEventsAgent(
       input,
       "sentry-mcp-evals",
       apiService,
@@ -70,8 +70,8 @@ describeEval("search-events-agent", {
 
     // Return in the format expected by ToolCallScorer
     return {
-      result: JSON.stringify(result.result),
-      toolCalls: result.toolCalls.map((call) => ({
+      result: JSON.stringify(agentResult.result),
+      toolCalls: agentResult.toolCalls.map((call: any) => ({
         name: call.toolName,
         arguments: call.args,
       })),

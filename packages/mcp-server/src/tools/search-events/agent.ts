@@ -39,17 +39,18 @@ export interface QueryTranslationParams {
 }
 
 /**
- * Translate natural language query to Sentry search syntax using AI
+ * Search events agent - single entry point for translating natural language queries to Sentry search syntax
+ * This returns both the translated query result AND the tool calls made by the agent
  */
-export async function translateQuery(
-  params: Omit<
-    QueryTranslationParams,
-    "dataset" | "allFields" | "datasetConfig" | "recommendedFields"
-  >,
-  apiService: SentryApiService,
+export async function searchEventsAgent(
+  query: string,
   organizationSlug: string,
+  apiService: SentryApiService,
   projectId?: string,
-): Promise<QueryTranslationResult & { dataset?: "spans" | "errors" | "logs" }> {
+): Promise<{
+  result: QueryTranslationResult & { dataset?: "spans" | "errors" | "logs" };
+  toolCalls: any[]; // CoreToolCall<any, any>[]
+}> {
   // Check if OpenAI API key is available
   if (!process.env.OPENAI_API_KEY) {
     throw new ConfigurationError(
@@ -285,7 +286,7 @@ COMMON ERRORS TO AVOID:
   // Use callEmbeddedAgent to translate the query with tool call capture
   const agentResult = await callEmbeddedAgent({
     system: systemPrompt,
-    prompt: params.naturalLanguageQuery,
+    prompt: query,
     tools: {
       datasetAttributes: datasetAttributesTool,
       otelSemantics: otelLookupTool,
@@ -294,18 +295,16 @@ COMMON ERRORS TO AVOID:
     schema: outputSchema,
   });
 
-  // Extract the result from the agent
-  const parsed = agentResult.result;
-
-  // Note: agentResult.toolCalls contains the captured tool calls for debugging/evaluation
-  // In production, we could log these or use them for monitoring
-
+  // Return both the result and tool calls
   return {
-    dataset: parsed.dataset,
-    query: parsed.query,
-    fields: parsed.fields,
-    sort: parsed.sort,
-    timeRange: parsed.timeRange,
-    error: parsed.error,
+    result: {
+      dataset: agentResult.result.dataset,
+      query: agentResult.result.query,
+      fields: agentResult.result.fields,
+      sort: agentResult.result.sort,
+      timeRange: agentResult.result.timeRange,
+      error: agentResult.result.error,
+    },
+    toolCalls: agentResult.toolCalls,
   };
 }

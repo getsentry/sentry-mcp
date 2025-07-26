@@ -74,6 +74,14 @@
       "types": "./dist/version.ts",
       "default": "./dist/version.js"
     },
+    "./tools/search-events": {
+      "types": "./dist/tools/search-events/index.ts",
+      "default": "./dist/tools/search-events/index.js"
+    },
+    "./tools/search-issues": {
+      "types": "./dist/tools/search-issues/index.ts",
+      "default": "./dist/tools/search-issues/index.js"
+    },
     "./tools/search-events/agent": {
       "types": "./dist/tools/search-events/agent.ts",
       "default": "./dist/tools/search-events/agent.js"
@@ -85,14 +93,6 @@
     "./internal/agents/callEmbeddedAgent": {
       "types": "./dist/internal/agents/callEmbeddedAgent.ts",
       "default": "./dist/internal/agents/callEmbeddedAgent.js"
-    },
-    "./tools/search-events/testable-agent": {
-      "types": "./dist/tools/search-events/testable-agent.ts",
-      "default": "./dist/tools/search-events/testable-agent.js"
-    },
-    "./tools/search-issues/testable-agent": {
-      "types": "./dist/tools/search-issues/testable-agent.ts",
-      "default": "./dist/tools/search-issues/testable-agent.js"
     }
   },
   "scripts": {

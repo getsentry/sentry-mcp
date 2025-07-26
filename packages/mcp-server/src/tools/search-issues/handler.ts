@@ -11,7 +11,7 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
-import { translateQuery } from "./agent";
+import { searchIssuesAgent } from "./agent";
 import { formatIssueResults } from "./formatters";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
@@ -118,15 +118,14 @@ export default defineTool({
     }
 
     // Translate natural language to Sentry query
-    const translatedQuery = await translateQuery(
-      {
-        naturalLanguageQuery: params.naturalLanguageQuery,
-        organizationSlug: params.organizationSlug,
-        projectSlugOrId: params.projectSlugOrId,
-        projectId,
-      },
+    const agentResult = await searchIssuesAgent(
+      params.naturalLanguageQuery,
+      params.organizationSlug,
       apiService,
+      projectId,
     );
+
+    const translatedQuery = agentResult.result;
 
     // Execute the search - listIssues accepts projectSlug directly
     const issues = await withApiErrorHandling(
