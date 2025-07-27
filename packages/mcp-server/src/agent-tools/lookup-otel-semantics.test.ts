@@ -19,7 +19,6 @@ describe("otel-semantics-lookup", () => {
     it("should return namespace information for valid namespace", async () => {
       const result = await lookupOtelSemantics(
         "gen_ai",
-        undefined,
         "spans",
         mockApiService,
         "test-org",
@@ -36,14 +35,12 @@ describe("otel-semantics-lookup", () => {
     it("should handle namespace with underscore and dash interchangeably", async () => {
       const result1 = await lookupOtelSemantics(
         "gen_ai",
-        undefined,
         "spans",
         mockApiService,
         "test-org",
       );
       const result2 = await lookupOtelSemantics(
         "gen-ai",
-        undefined,
         "spans",
         mockApiService,
         "test-org",
@@ -52,23 +49,22 @@ describe("otel-semantics-lookup", () => {
       expect(result1).toBe(result2);
     });
 
-    it("should filter attributes by search term", async () => {
+    it("should return all attributes for a namespace", async () => {
       const result = await lookupOtelSemantics(
         "http",
-        "method",
         "spans",
         mockApiService,
         "test-org",
       );
 
-      expect(result).toContain("matching)");
+      expect(result).toContain("total)");
       expect(result).toContain("`http.request.method`");
+      expect(result).toContain("`http.response.status_code`");
     });
 
     it("should show custom namespace note for mcp", async () => {
       const result = await lookupOtelSemantics(
         "mcp",
-        undefined,
         "spans",
         mockApiService,
         "test-org",
@@ -80,7 +76,6 @@ describe("otel-semantics-lookup", () => {
     it("should handle invalid namespace", async () => {
       const result = await lookupOtelSemantics(
         "totally_invalid_namespace_that_does_not_exist",
-        undefined,
         "spans",
         mockApiService,
         "test-org",
@@ -94,7 +89,6 @@ describe("otel-semantics-lookup", () => {
     it("should suggest similar namespaces", async () => {
       const result = await lookupOtelSemantics(
         "gen",
-        undefined,
         "spans",
         mockApiService,
         "test-org",

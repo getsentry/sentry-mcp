@@ -284,16 +284,30 @@ COMMON ERRORS TO AVOID:
     });
 
   // Use callEmbeddedAgent to translate the query with tool call capture
-  const agentResult = await callEmbeddedAgent({
-    system: systemPrompt,
-    prompt: query,
-    tools: {
-      datasetAttributes: datasetAttributesTool,
-      otelSemantics: otelLookupTool,
-      whoami: whoamiTool,
-    },
-    schema: outputSchema,
-  });
+  let agentResult: Awaited<ReturnType<typeof callEmbeddedAgent>>;
+  try {
+    agentResult = await callEmbeddedAgent({
+      system: systemPrompt,
+      prompt: query,
+      tools: {
+        datasetAttributes: datasetAttributesTool,
+        otelSemantics: otelLookupTool,
+        whoami: whoamiTool,
+      },
+      schema: outputSchema,
+    });
+  } catch (error) {
+    // If the AI SDK failed to parse the output, return a safe error object
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Return a safe error response that matches our schema
+    return {
+      result: {
+        error: `AI failed to generate a valid query translation. This may happen when the query is too complex or ambiguous. Please try rephrasing your query. Details: ${errorMessage}`,
+      },
+      toolCalls: [],
+    };
+  }
 
   // Return both the result and tool calls
   return {

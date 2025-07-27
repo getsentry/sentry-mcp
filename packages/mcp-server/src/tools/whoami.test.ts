@@ -7,15 +7,15 @@ describe("whoami", () => {
       {},
       {
         accessToken: "access-token",
-        userId: "1",
+        userId: "123456",
         organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(
       `
-      "You are authenticated as John Doe (john.doe@example.com).
+      "You are authenticated as Test User (test@example.com).
 
-      Your Sentry User ID is 1."
+      Your Sentry User ID is 123456."
     `,
     );
   });

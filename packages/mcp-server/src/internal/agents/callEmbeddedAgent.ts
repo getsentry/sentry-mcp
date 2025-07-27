@@ -11,6 +11,10 @@ interface EmbeddedAgentResult<T> {
 /**
  * Call an embedded agent with tool call capture
  * This is the standard way to call embedded AI agents within MCP tools
+ *
+ * Error handling:
+ * - Errors are re-thrown for the calling agent to handle
+ * - Each agent can implement its own error handling strategy
  */
 export async function callEmbeddedAgent<T>({
   system,
