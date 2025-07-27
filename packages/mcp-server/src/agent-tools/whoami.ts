@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../api-client";
+import { wrapAgentToolExecute } from "./utils";
 
 export interface WhoamiResult {
   id: string | number;
@@ -29,9 +30,9 @@ export function createWhoamiTool(apiService: SentryApiService) {
   return tool({
     description: "Get the current authenticated user's information",
     parameters: z.object({}),
-    execute: async () => {
+    execute: wrapAgentToolExecute(async () => {
       const user = await getCurrentUser(apiService);
       return `Current user: ${user.name || "Unknown"} (${user.email}, ID: ${user.id})`;
-    },
+    }),
   });
 }

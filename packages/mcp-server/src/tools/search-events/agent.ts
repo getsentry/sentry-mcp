@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ConfigurationError } from "../../errors";
 import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
+import { formatErrorForUser } from "../../internal/error-handling";
 import type { SentryApiService } from "../../api-client";
 import { createOtelLookupTool } from "../../agent-tools/lookup-otel-semantics";
 import { createWhoamiTool } from "../../agent-tools/whoami";
@@ -284,7 +285,9 @@ COMMON ERRORS TO AVOID:
     });
 
   // Use callEmbeddedAgent to translate the query with tool call capture
-  let agentResult: Awaited<ReturnType<typeof callEmbeddedAgent>>;
+  let agentResult: Awaited<
+    ReturnType<typeof callEmbeddedAgent<z.infer<typeof outputSchema>>>
+  >;
   try {
     agentResult = await callEmbeddedAgent({
       system: systemPrompt,
@@ -298,12 +301,13 @@ COMMON ERRORS TO AVOID:
     });
   } catch (error) {
     // If the AI SDK failed to parse the output, return a safe error object
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // These are new errors that need to be logged
+    const errorMessage = await formatErrorForUser(error);
 
     // Return a safe error response that matches our schema
     return {
       result: {
-        error: `AI failed to generate a valid query translation. This may happen when the query is too complex or ambiguous. Please try rephrasing your query. Details: ${errorMessage}`,
+        error: errorMessage,
       },
       toolCalls: [],
     };

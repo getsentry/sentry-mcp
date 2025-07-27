@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../api-client";
 import { UserInputError } from "../errors";
+import { wrapAgentToolExecute } from "./utils";
 
 // Import all JSON files directly
 import android from "./data/android.json";
@@ -267,21 +268,14 @@ export function createOtelLookupTool(
           "REQUIRED: Dataset to check attribute availability in. The agent MUST specify this based on their chosen dataset.",
         ),
     }),
-    execute: async ({ namespace, dataset }) => {
-      try {
-        return await lookupOtelSemantics(
-          namespace,
-          dataset,
-          apiService,
-          organizationSlug,
-          projectId,
-        );
-      } catch (error) {
-        if (error instanceof UserInputError) {
-          return `Error: ${error.message}`;
-        }
-        throw error;
-      }
-    },
+    execute: wrapAgentToolExecute(async ({ namespace, dataset }) => {
+      return await lookupOtelSemantics(
+        namespace,
+        dataset,
+        apiService,
+        organizationSlug,
+        projectId,
+      );
+    }),
   });
 }
