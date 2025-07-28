@@ -269,37 +269,25 @@ export default defineTool({
     }
 
     // Format results based on dataset
+    const formatParams = {
+      eventData,
+      naturalLanguageQuery: params.naturalLanguageQuery,
+      includeExplanation: params.includeExplanation,
+      apiService,
+      organizationSlug,
+      explorerUrl,
+      sentryQuery,
+      fields,
+      explanation: parsed.explanation,
+    };
+
     switch (dataset) {
       case "errors":
-        return formatErrorResults(
-          eventData,
-          params,
-          apiService,
-          organizationSlug,
-          explorerUrl,
-          sentryQuery,
-          fields,
-        );
+        return formatErrorResults(formatParams);
       case "logs":
-        return formatLogResults(
-          eventData,
-          params,
-          apiService,
-          organizationSlug,
-          explorerUrl,
-          sentryQuery,
-          fields,
-        );
+        return formatLogResults(formatParams);
       case "spans":
-        return formatSpanResults(
-          eventData,
-          params,
-          apiService,
-          organizationSlug,
-          explorerUrl,
-          sentryQuery,
-          fields,
-        );
+        return formatSpanResults(formatParams);
     }
   },
 });

@@ -12,7 +12,7 @@ import {
   ParamProjectSlug,
 } from "../../schema";
 import { searchIssuesAgent } from "./agent";
-import { formatIssueResults } from "./formatters";
+import { formatIssueResults, formatExplanation } from "./formatters";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
 
@@ -166,32 +166,34 @@ export default defineTool({
       if (translatedQuery.sort) {
         output += `\nSort: ${translatedQuery.sort}`;
       }
-      if (translatedQuery.explanation) {
-        output += `\n\n${translatedQuery.explanation}`;
-      }
       output += `\n\n`;
 
+      if (translatedQuery.explanation) {
+        output += formatExplanation(translatedQuery.explanation);
+        output += `\n\n`;
+      }
+
       // Format results without the header since we already added it
-      output += formatIssueResults(
+      output += formatIssueResults({
         issues,
-        params.organizationSlug,
-        params.projectSlugOrId,
-        translatedQuery.query,
-        params.regionUrl,
-        params.naturalLanguageQuery,
-        true, // skipHeader = true
-      );
+        organizationSlug: params.organizationSlug,
+        projectSlugOrId: params.projectSlugOrId,
+        query: translatedQuery.query,
+        regionUrl: params.regionUrl,
+        naturalLanguageQuery: params.naturalLanguageQuery,
+        skipHeader: true,
+      });
     } else {
       // Format results with natural language query for title
-      output = formatIssueResults(
+      output = formatIssueResults({
         issues,
-        params.organizationSlug,
-        params.projectSlugOrId,
-        translatedQuery.query,
-        params.regionUrl,
-        params.naturalLanguageQuery,
-        false, // skipHeader = false (default)
-      );
+        organizationSlug: params.organizationSlug,
+        projectSlugOrId: params.projectSlugOrId,
+        query: translatedQuery.query,
+        regionUrl: params.regionUrl,
+        naturalLanguageQuery: params.naturalLanguageQuery,
+        skipHeader: false,
+      });
     }
 
     return output;

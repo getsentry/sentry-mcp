@@ -17,7 +17,9 @@ const outputSchema = z.object({
     .default("date")
     .nullish()
     .describe("How to sort the results"),
-  explanation: z.string().describe("Brief explanation of the translation"),
+  explanation: z
+    .string()
+    .describe("Brief explanation of how you translated this query."),
 });
 
 /**

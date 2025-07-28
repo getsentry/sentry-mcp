@@ -15,19 +15,11 @@ const outputSchema = z.object({
     .string()
     .default("")
     .nullish()
-    .describe(
-      "The Sentry query string for filtering results (empty string returns all recent events)",
-    ),
+    .describe("The Sentry query string for filtering results"),
   fields: z
     .array(z.string())
-    .describe(
-      "Array of field names to return in results. REQUIRED for aggregate queries (include only aggregate functions and groupBy fields). Optional for individual event queries (will use recommended fields if not provided).",
-    ),
-  sort: z
-    .string()
-    .describe(
-      "Sort parameter for results (e.g., '-timestamp' for newest first, '-count()' for highest count first)",
-    ),
+    .describe("Array of field names to return in results."),
+  sort: z.string().describe("Sort parameter for results."),
   timeRange: z
     .union([
       z.object({
@@ -44,6 +36,9 @@ const outputSchema = z.object({
     .describe(
       "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
     ),
+  explanation: z
+    .string()
+    .describe("Brief explanation of how you translated this query."),
 });
 
 /**

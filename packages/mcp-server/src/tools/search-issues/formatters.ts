@@ -3,17 +3,36 @@ import { getIssueUrl, getIssuesSearchUrl } from "../../utils/url-utils";
 import * as Sentry from "@sentry/node";
 
 /**
+ * Format an explanation for how a natural language query was translated
+ */
+export function formatExplanation(explanation: string): string {
+  return `## How I interpreted your query\n\n${explanation}`;
+}
+
+export interface FormatIssueResultsParams {
+  issues: Issue[];
+  organizationSlug: string;
+  projectSlugOrId?: string;
+  query?: string | null;
+  regionUrl?: string;
+  naturalLanguageQuery?: string;
+  skipHeader?: boolean;
+}
+
+/**
  * Format issue search results for display
  */
-export function formatIssueResults(
-  issues: Issue[],
-  organizationSlug: string,
-  projectSlugOrId: string | undefined,
-  query?: string | null,
-  regionUrl?: string,
-  naturalLanguageQuery?: string,
-  skipHeader = false,
-): string {
+export function formatIssueResults(params: FormatIssueResultsParams): string {
+  const {
+    issues,
+    organizationSlug,
+    projectSlugOrId,
+    query,
+    regionUrl,
+    naturalLanguageQuery,
+    skipHeader = false,
+  } = params;
+
   const host = regionUrl ? new URL(regionUrl).host : "sentry.io";
 
   let output = "";
@@ -40,10 +59,10 @@ export function formatIssueResults(
       Sentry.logger
         .fmt`No issues found for query: ${naturalLanguageQuery || query}`,
       {
-        query: query,
-        organizationSlug: organizationSlug,
+        query,
+        organizationSlug,
         projectSlug: projectSlugOrId,
-        naturalLanguageQuery: naturalLanguageQuery,
+        naturalLanguageQuery,
       },
     );
     output += "No issues found matching your search criteria.\n\n";
