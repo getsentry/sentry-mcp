@@ -131,8 +131,8 @@ describeEval("search-events-agent", {
           fields: [
             "equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)",
           ],
-          // Sort by the equation result
-          sort: "equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)",
+          // Sort by the equation result in descending order
+          sort: "-equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)",
           timeRange: { statsPeriod: "24h" },
         },
       },

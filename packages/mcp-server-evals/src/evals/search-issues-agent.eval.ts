@@ -56,7 +56,7 @@ describeEval("search-issues-agent", {
         ],
         expected: {
           query: /custom\.payment\.failed|tags\[custom\.payment\.failed\]/, // Both syntaxes are valid for tags
-          sort: null, // Agent returns null, handler defaults to date
+          sort: "date", // Agent should always return a sort value
         },
       },
       {
@@ -72,7 +72,7 @@ describeEval("search-issues-agent", {
         ],
         expected: {
           query: "kafka.consumer.group:orders-processor",
-          sort: null, // Agent returns null, handler defaults to date
+          sort: "date", // Agent should always return a sort value
         },
       },
     ];
