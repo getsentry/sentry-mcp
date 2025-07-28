@@ -36,7 +36,7 @@ export function getIssueUrl(
 export function getIssuesSearchUrl(
   host: string,
   organizationSlug: string,
-  query?: string,
+  query?: string | null,
   projectSlugOrId?: string,
 ): string {
   const isSaas = isSentryHost(host);

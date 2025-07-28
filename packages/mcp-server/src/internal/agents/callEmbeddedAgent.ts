@@ -1,11 +1,15 @@
 import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
-import type { CoreToolCall } from "ai";
 import type { z } from "zod";
+
+export type ToolCall = {
+  toolName: string;
+  args: any;
+};
 
 interface EmbeddedAgentResult<T> {
   result: T;
-  toolCalls: CoreToolCall<any, any>[];
+  toolCalls: ToolCall[];
 }
 
 /**
@@ -27,7 +31,7 @@ export async function callEmbeddedAgent<T>({
   tools: Record<string, any>;
   schema: z.ZodSchema<T>;
 }): Promise<EmbeddedAgentResult<T>> {
-  const capturedToolCalls: CoreToolCall<any, any>[] = [];
+  const capturedToolCalls: ToolCall[] = [];
 
   const result = await generateText({
     model: openai("gpt-4o"),
@@ -39,7 +43,10 @@ export async function callEmbeddedAgent<T>({
     onStepFinish: (event) => {
       if (event.toolCalls && event.toolCalls.length > 0) {
         for (const toolCall of event.toolCalls) {
-          capturedToolCalls.push(toolCall);
+          capturedToolCalls.push({
+            toolName: toolCall.toolName,
+            args: toolCall.args,
+          });
         }
       }
     },

@@ -9,7 +9,7 @@ export function formatIssueResults(
   issues: Issue[],
   organizationSlug: string,
   projectSlugOrId: string | undefined,
-  query: string,
+  query?: string | null,
   regionUrl?: string,
   naturalLanguageQuery?: string,
   skipHeader = false,

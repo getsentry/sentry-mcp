@@ -49,8 +49,7 @@ describeEval("search-events-agent", {
       },
       {
         // Query with OpenTelemetry attributes that need discovery
-        input:
-          "Show me LLM calls where gen_ai.usage.prompt_tokens is over 1000",
+        input: "Show me LLM calls where input tokens is over 1000",
         expectedTools: [
           {
             name: "datasetAttributes",
@@ -68,8 +67,7 @@ describeEval("search-events-agent", {
         ],
         expected: {
           dataset: "spans",
-          // Agent may use input_tokens or prompt_tokens
-          query: /gen_ai\.usage\.(prompt_tokens|input_tokens):>1000/,
+          query: "gen_ai.usage.input_tokens:>1000",
           sort: "-span.duration",
         },
       },
@@ -134,7 +132,7 @@ describeEval("search-events-agent", {
             "equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)",
           ],
           // Sort by the equation result
-          sort: /^-?equation\|sum\(gen_ai\.usage\.input_tokens\)\s*\+\s*sum\(gen_ai\.usage\.output_tokens\)$/,
+          sort: "equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)",
           timeRange: { statsPeriod: "24h" },
         },
       },
