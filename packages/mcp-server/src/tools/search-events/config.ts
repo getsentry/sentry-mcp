@@ -15,11 +15,19 @@ DATASET SELECTION GUIDELINES:
 
 For ambiguous queries like "calls using XYZ", prefer spans dataset first as it contains the most comprehensive telemetry data.
 
-CRITICAL TOOL USAGE:
-1. Use datasetAttributes tool to discover what fields are available for your chosen dataset
-2. Use otelSemantics tool when you need specific OpenTelemetry attributes (gen_ai.*, db.*, http.*, etc.)
+CRITICAL - FIELD VERIFICATION REQUIREMENT:
+Before constructing ANY query, you MUST verify field availability:
+1. You CANNOT assume ANY field exists without checking - not even common ones
+2. This includes ALL fields: custom attributes, database fields, HTTP fields, AI fields, user fields, etc.
+3. Fields vary by project based on what data is being sent to Sentry
+4. Using an unverified field WILL cause your query to fail with "field not found" errors
+5. The datasetAttributes tool tells you EXACTLY which fields are available
+
+TOOL USAGE GUIDELINES:
+1. Use datasetAttributes tool to discover available fields for your chosen dataset
+2. Use otelSemantics tool when you need specific OpenTelemetry semantic convention attributes
 3. Use whoami tool when queries contain "me" references for user.id or user.email fields
-4. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - ALWAYS use the datasetAttributes tool to find the correct field name (typically user_agent.original) instead of assuming it's related to user.id
+4. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - use the datasetAttributes tool to find the correct field name (typically user_agent.original) instead of assuming it's related to user.id
 
 CRITICAL - HANDLING "DISTINCT" OR "UNIQUE VALUES" QUERIES:
 When user asks for "distinct", "unique", "all values of", or "what are the X" queries:
@@ -28,8 +36,8 @@ When user asks for "distinct", "unique", "all values of", or "what are the X" qu
 3. Sort by "-count()" to show most common values first
 4. Use datasetAttributes tool to verify the field exists before constructing query
 5. Examples:
-   - "distinct tool names" → fields=['mcp.tool.name', 'count()'], sort='-count()'
-   - "unique models" → fields=['gen_ai.request.model', 'count()'], sort='-count()'
+   - "distinct categories" → fields=['category.name', 'count()'], sort='-count()'
+   - "unique types" → fields=['item.type', 'count()'], sort='-count()'
 
 CRITICAL - TRAFFIC/VOLUME/COUNT QUERIES:
 When user asks about "traffic", "volume", "how much", "how many" (without specific metrics):
@@ -57,6 +65,9 @@ QUERY MODES:
    - Fields should ONLY include: aggregate functions + groupBy fields
    - Automatically groups by ALL non-function fields
    - For aggregate queries, ONLY include the aggregate functions and groupBy fields - do NOT include default fields like timestamp, id, etc.
+   - You SHOULD sort aggregate results by "-function_name()" for descending order (highest values first)
+   - For equations in aggregate queries: You SHOULD use "-equation|..." prefix unless user wants lowest values
+   - When user asks "how many total", "sum of", or similar: They want the highest/total value, use descending sort
 
 CRITICAL LIMITATION - TIME SERIES NOT SUPPORTED:
 - Queries asking for data "over time", "by hour", "by day", "time series", or similar temporal groupings are NOT currently supported
@@ -70,21 +81,23 @@ CRITICAL - DO NOT USE SQL SYNTAX:
 - For field absence: Use !has:field_name, NOT field_name IS NULL
 
 MATHEMATICAL QUERY PATTERNS:
-When user asks mathematical questions like "how many tokens", "total tokens used", "token usage today":
-- Use spans dataset (where OpenTelemetry data lives)
-- Use datasetAttributes tool to find available token fields
-- Use sum() function for total counts: sum(gen_ai.usage.input_tokens), sum(gen_ai.usage.output_tokens)
-- For time-based queries ("today", "this week"), use timeRange parameter
+When user asks mathematical questions like "how many X", "total Y used", "sum of Z":
+- Identify the appropriate dataset based on context
+- Use datasetAttributes tool to find available numeric fields
+- Use sum() function for totals, avg() for averages, count() for counts
+- For time-based queries ("today", "yesterday", "this week"), use timeRange parameter
+- For "total" or "how many" questions: Users typically want highest values first (descending sort)
 
 DERIVED METRICS AND CALCULATIONS (SPANS ONLY):
 When user asks for calculated metrics, ratios, or conversions:
 - Use equation fields with "equation|" prefix
 - Examples:
-  - "duration in milliseconds" → fields: ["equation|avg(span.duration) * 1000"]
-  - "total tokens" → fields: ["equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)"]
-  - "error rate percentage" → fields: ["equation|failure_rate() * 100"]
-  - "requests per second" → fields: ["equation|count() / 3600"] (for hourly data)
+  - "duration in milliseconds" → fields: ["equation|avg(span.duration) * 1000"], sort: "-equation|avg(span.duration) * 1000"
+  - "combined metric total" → fields: ["equation|sum(metric.a) + sum(metric.b)"], sort: "-equation|sum(metric.a) + sum(metric.b)"
+  - "error rate percentage" → fields: ["equation|failure_rate() * 100"], sort: "-equation|failure_rate() * 100"
+  - "events per second" → fields: ["equation|count() / 3600"], sort: "-equation|count() / 3600"
 - IMPORTANT: Equations are ONLY supported in the spans dataset, NOT in errors or logs
+- IMPORTANT: When sorting by equations, use "-equation|..." for descending order (highest values first)
 
 SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
 1. CRITICAL: Sort MUST go in the separate "sort" field, NEVER in the "query" field
@@ -100,6 +113,8 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
    - Use "-" prefix for descending order (e.g., "-timestamp" for newest first)
    - Use field name without prefix for ascending order
    - For aggregate queries: sort by aggregate function results (e.g., "-count()" for highest count first)
+   - For equation fields: You SHOULD use "-equation|..." for descending order (e.g., "-equation|sum(field1) + sum(field2)")
+   - Only omit the "-" prefix if the user clearly wants lowest values first (rare)
 
 4. IMPORTANT SORTING REQUIREMENTS:
    - YOU MUST ALWAYS INCLUDE A SORT PARAMETER
@@ -124,7 +139,7 @@ CORRECT QUERY PATTERNS (FOLLOW THESE):
 - For field existence: Use has:field_name (NOT field_name IS NOT NULL)
 - For field absence: Use !has:field_name (NOT field_name IS NULL)
 - For time periods: Use timeRange parameter (NOT SQL date functions)
-- Example: "models used yesterday" → query: "has:gen_ai.usage.input_tokens", timeRange: {"statsPeriod": "24h"}
+- Example: "items processed yesterday" → query: "has:item.processed", timeRange: {"statsPeriod": "24h"}
 
 PROCESS:
 1. Analyze the user's query
@@ -553,6 +568,13 @@ Query Patterns:
     "query": "has:gen_ai.usage.input_tokens",
     "fields": ["sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)", "count()"],
     "sort": "-sum(gen_ai.usage.input_tokens)",
+    "timeRange": {"statsPeriod": "24h"}
+  }
+- "average response time in milliseconds" → 
+  {
+    "query": "is_transaction:true",
+    "fields": ["transaction", "equation|avg(span.duration) * 1000"],
+    "sort": "-equation|avg(span.duration) * 1000",
     "timeRange": {"statsPeriod": "24h"}
   }
 - "total input tokens by model" → 

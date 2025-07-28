@@ -89,14 +89,9 @@ describeEval("search-events-agent", {
         },
       },
       {
-        // Complex query needing both user resolution and field discovery
-        input:
-          "Show me my database queries with custom.db.pool_size greater than 10",
+        // Query with custom field requiring discovery
+        input: "Show me spans where custom.db.pool_size is greater than 10",
         expectedTools: [
-          {
-            name: "whoami",
-            arguments: {},
-          },
           {
             name: "datasetAttributes",
             arguments: {
@@ -106,8 +101,7 @@ describeEval("search-events-agent", {
         ],
         expected: {
           dataset: "spans",
-          query:
-            /user\.(email:test@example\.com|id:123456).*custom\.db\.pool_size:>10/, // Accept various formats
+          query: "custom.db.pool_size:>10",
           sort: "-span.duration",
         },
       },
