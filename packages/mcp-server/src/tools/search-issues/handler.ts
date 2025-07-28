@@ -118,11 +118,18 @@ export default defineTool({
     }
 
     // Translate natural language to Sentry query
-    const agentResult = await searchIssuesAgent(
-      params.naturalLanguageQuery,
-      params.organizationSlug,
-      apiService,
-      projectId,
+    const agentResult = await withApiErrorHandling(
+      () =>
+        searchIssuesAgent(
+          params.naturalLanguageQuery,
+          params.organizationSlug,
+          apiService,
+          projectId,
+        ),
+      {
+        organizationSlug: params.organizationSlug,
+        projectSlugOrId: params.projectSlugOrId,
+      },
     );
 
     const translatedQuery = agentResult.result;

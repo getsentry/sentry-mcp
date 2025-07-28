@@ -22,5 +22,9 @@
   {
     "key": "custom.latency_ms",
     "name": "Custom Latency (ms)"
+  },
+  {
+    "key": "custom.db.pool_size",
+    "name": "Custom DB Pool Size"
   }
 ]
