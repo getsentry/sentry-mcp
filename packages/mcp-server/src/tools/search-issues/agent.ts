@@ -2,8 +2,8 @@ import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { ConfigurationError, UserInputError } from "../../errors";
 import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
-import { createDatasetFieldsTool } from "../../agent-tools/discover-dataset-fields";
-import { createWhoamiTool } from "../../agent-tools/whoami";
+import { createDatasetFieldsTool } from "../../internal/agents/tools/dataset-fields";
+import { createWhoamiTool } from "../../internal/agents/tools/whoami";
 import { systemPrompt } from "./config";
 
 // Schema for agent output

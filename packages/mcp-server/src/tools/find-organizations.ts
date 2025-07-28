@@ -1,6 +1,9 @@
 import { z } from "zod";
-import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
+import { defineTool } from "../internal/tool-helpers/define";
+import {
+  apiServiceFromContext,
+  withApiErrorHandling,
+} from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
 
 export default defineTool({

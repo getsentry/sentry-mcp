@@ -3,8 +3,8 @@ import { ConfigurationError } from "../../errors";
 import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
 import { formatErrorForUser } from "../../internal/error-handling";
 import type { SentryApiService } from "../../api-client";
-import { createOtelLookupTool } from "../../agent-tools/lookup-otel-semantics";
-import { createWhoamiTool } from "../../agent-tools/whoami";
+import { createOtelLookupTool } from "../../internal/agents/tools/otel-semantics";
+import { createWhoamiTool } from "../../internal/agents/tools/whoami";
 import { createDatasetAttributesTool } from "./utils";
 
 // Type definitions

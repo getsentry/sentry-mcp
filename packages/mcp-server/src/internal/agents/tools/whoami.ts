@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { SentryApiService } from "../api-client";
+import type { SentryApiService } from "../../../api-client";
 import { wrapAgentToolExecute } from "./utils";
 
 export interface WhoamiResult {

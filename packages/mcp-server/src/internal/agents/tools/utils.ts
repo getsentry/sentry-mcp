@@ -1,4 +1,4 @@
-import { UserInputError } from "../errors";
+import { UserInputError } from "../../../errors";
 
 /**
  * Wraps an embedded agent tool's execute function with standardized error handling.

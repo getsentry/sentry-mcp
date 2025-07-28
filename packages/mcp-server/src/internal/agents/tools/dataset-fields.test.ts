@@ -5,8 +5,8 @@ import {
   discoverDatasetFields,
   getFieldExamples,
   getCommonPatterns,
-} from "./discover-dataset-fields";
-import { SentryApiService } from "../api-client";
+} from "./dataset-fields";
+import { SentryApiService } from "../../../api-client";
 
 // Test the core logic functions directly without AI SDK complexity
 

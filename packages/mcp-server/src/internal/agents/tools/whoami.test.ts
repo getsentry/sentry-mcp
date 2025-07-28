@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getCurrentUser } from "./whoami";
-import type { SentryApiService } from "../api-client";
+import type { SentryApiService } from "../../../api-client";
 
 describe("whoami agent tool", () => {
   let mockApiService: SentryApiService;

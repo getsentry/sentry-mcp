@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { logError } from "../../logging";
 import { UserInputError } from "../../errors";
-import { wrapAgentToolExecute } from "../../agent-tools/utils";
+import { wrapAgentToolExecute } from "../../internal/agents/tools/utils";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;

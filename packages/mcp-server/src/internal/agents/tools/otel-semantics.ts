@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { SentryApiService } from "../api-client";
-import { UserInputError } from "../errors";
+import type { SentryApiService } from "../../../api-client";
+import { UserInputError } from "../../../errors";
 import { wrapAgentToolExecute } from "./utils";
 
 // Import all JSON files directly

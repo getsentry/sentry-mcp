@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ApiError } from "../../api-client";
 import { UserInputError } from "../../errors";
-import { handleApiError, withApiErrorHandling } from "./api-utils";
+import { handleApiError, withApiErrorHandling } from "./api";
 
 describe("handleApiError", () => {
   it("converts 404 errors with params to list all parameters", () => {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "./utils/defineTool";
-import { fetchWithTimeout } from "./utils/fetch-utils";
+import { defineTool } from "../internal/tool-helpers/define";
+import { fetchWithTimeout } from "../internal/fetch-utils";
 import { UserInputError } from "../errors";
 import { ApiError } from "../api-client/index";
 import type { ServerContext } from "../types";

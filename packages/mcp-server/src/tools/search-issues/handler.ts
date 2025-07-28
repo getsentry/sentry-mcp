@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../utils/defineTool";
+import { defineTool } from "../../internal/tool-helpers/define";
 import {
   apiServiceFromContext,
   withApiErrorHandling,
-} from "../utils/api-utils";
+} from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,

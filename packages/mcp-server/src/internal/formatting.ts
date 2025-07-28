@@ -21,7 +21,7 @@ import {
   getOutputForAutofixStep,
   getStatusDisplayName,
   isTerminalStatus,
-} from "../tools/utils/seer-utils";
+} from "./tool-helpers/seer";
 
 // Language detection mappings
 const LANGUAGE_EXTENSIONS: Record<string, string> = {
