@@ -49,7 +49,7 @@ describeEval("search-events-agent", {
       },
       {
         // Query with OpenTelemetry attributes that need discovery
-        input: "Show me LLM calls where input tokens is over 1000",
+        input: "Show me LLM calls where temperature setting is above 0.7",
         expectedTools: [
           {
             name: "datasetAttributes",
@@ -67,7 +67,7 @@ describeEval("search-events-agent", {
         ],
         expected: {
           dataset: "spans",
-          query: "gen_ai.usage.input_tokens:>1000",
+          query: "gen_ai.request.temperature:>0.7",
           sort: "-span.duration",
         },
       },
