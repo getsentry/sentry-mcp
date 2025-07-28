@@ -2,7 +2,7 @@ import { describeEval } from "vitest-evals";
 import { ToolCallScorer } from "vitest-evals";
 import { searchIssuesAgent } from "@sentry/mcp-server/tools/search-issues";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
-import { StructuredOutputScorer } from "./utils/StructuredOutputScorer";
+import { StructuredOutputScorer } from "./utils/structuredOutputScorer";
 import "../setup-env";
 
 // The shared MSW server is already started in setup-env.ts
