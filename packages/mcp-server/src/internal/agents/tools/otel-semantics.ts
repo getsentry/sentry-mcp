@@ -1,7 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { SentryApiService } from "../api-client";
-import { UserInputError } from "../errors";
+import type { SentryApiService } from "../../../api-client";
+import { UserInputError } from "../../../errors";
+import { wrapAgentToolExecute } from "./utils";
 
 // Import all JSON files directly
 import android from "./data/android.json";
@@ -177,7 +178,6 @@ interface NamespaceData {
  */
 export async function lookupOtelSemantics(
   namespace: string,
-  searchTerm: string | undefined,
   dataset: "errors" | "logs" | "spans",
   apiService: SentryApiService,
   organizationSlug: string,
@@ -209,18 +209,10 @@ export async function lookupOtelSemantics(
       "**Note:** This is a custom namespace, not part of standard OpenTelemetry conventions.\n\n";
   }
 
-  // Filter attributes if searchTerm is provided
-  let attributes = Object.entries(data.attributes);
-  if (searchTerm) {
-    const lowerSearch = searchTerm.toLowerCase();
-    attributes = attributes.filter(
-      ([key, attr]) =>
-        key.toLowerCase().includes(lowerSearch) ||
-        attr.description.toLowerCase().includes(lowerSearch),
-    );
-  }
+  // Get all attributes
+  const attributes = Object.entries(data.attributes);
 
-  response += `## Attributes (${attributes.length} ${searchTerm ? "matching" : "total"})\n\n`;
+  response += `## Attributes (${attributes.length} total)\n\n`;
 
   // Sort attributes by key
   const sortedAttributes = attributes.sort(([a], [b]) => a.localeCompare(b));
@@ -270,32 +262,20 @@ export function createOtelLookupTool(
         .describe(
           "The OpenTelemetry namespace to look up (e.g., 'gen_ai', 'db', 'http', 'mcp')",
         ),
-      searchTerm: z
-        .string()
-        .optional()
-        .describe("Optional search term to filter attributes"),
       dataset: z
         .enum(["spans", "errors", "logs"])
         .describe(
           "REQUIRED: Dataset to check attribute availability in. The agent MUST specify this based on their chosen dataset.",
         ),
     }),
-    execute: async ({ namespace, searchTerm, dataset }) => {
-      try {
-        return await lookupOtelSemantics(
-          namespace,
-          searchTerm,
-          dataset,
-          apiService,
-          organizationSlug,
-          projectId,
-        );
-      } catch (error) {
-        if (error instanceof UserInputError) {
-          return `Error: ${error.message}`;
-        }
-        throw error;
-      }
-    },
+    execute: wrapAgentToolExecute(async ({ namespace, dataset }) => {
+      return await lookupOtelSemantics(
+        namespace,
+        dataset,
+        apiService,
+        organizationSlug,
+        projectId,
+      );
+    }),
   });
 }

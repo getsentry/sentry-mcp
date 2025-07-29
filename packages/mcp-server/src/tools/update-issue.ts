@@ -1,9 +1,12 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext, withApiErrorHandling } from "./utils/api-utils";
-import { parseIssueParams } from "./utils/issue-utils";
-import { formatAssignedTo } from "./utils/formatting-utils";
+import { defineTool } from "../internal/tool-helpers/define";
+import {
+  apiServiceFromContext,
+  withApiErrorHandling,
+} from "../internal/tool-helpers/api";
+import { parseIssueParams } from "../internal/tool-helpers/issue";
+import { formatAssignedTo } from "../internal/tool-helpers/formatting";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import {

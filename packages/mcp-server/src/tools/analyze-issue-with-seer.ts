@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "./utils/defineTool";
-import { apiServiceFromContext } from "./utils/api-utils";
-import { parseIssueParams } from "./utils/issue-utils";
+import { defineTool } from "../internal/tool-helpers/define";
+import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { parseIssueParams } from "../internal/tool-helpers/issue";
 import {
   getStatusDisplayName,
   isTerminalStatus,
@@ -13,7 +13,7 @@ import {
   SEER_TIMEOUT,
   SEER_MAX_RETRIES,
   SEER_INITIAL_RETRY_DELAY,
-} from "./utils/seer-utils";
+} from "../internal/tool-helpers/seer";
 import { retryWithBackoff } from "../internal/fetch-utils";
 import type { ServerContext } from "../types";
 import { ApiError } from "../api-client/index";

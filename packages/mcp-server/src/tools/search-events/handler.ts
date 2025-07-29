@@ -1,17 +1,17 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../utils/defineTool";
+import { defineTool } from "../../internal/tool-helpers/define";
 import {
   apiServiceFromContext,
   withApiErrorHandling,
-} from "../utils/api-utils";
+} from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
-import { translateQuery } from "./agent";
+import { searchEventsAgent } from "./agent";
 import {
   formatErrorResults,
   formatLogResults,
@@ -19,7 +19,6 @@ import {
 } from "./formatters";
 import { RECOMMENDED_FIELDS } from "./config";
 import { UserInputError } from "../../errors";
-import type { SentryApiService } from "../../api-client";
 import { ApiError } from "../../api-client";
 
 export default defineTool({
@@ -114,23 +113,21 @@ export default defineTool({
 
     // Translate the natural language query using Search Events Agent
     // The agent will determine the dataset and fetch the appropriate attributes
-    const parsed = await translateQuery(
+    const agentResult = await withApiErrorHandling(
+      () =>
+        searchEventsAgent(
+          params.naturalLanguageQuery,
+          organizationSlug,
+          apiService,
+          projectId,
+        ),
       {
-        naturalLanguageQuery: params.naturalLanguageQuery,
         organizationSlug,
-        projectId,
+        projectSlug: params.projectSlug,
       },
-      apiService,
-      organizationSlug,
-      projectId,
     );
 
-    // Handle Search Events Agent errors first
-    if (parsed.error) {
-      throw new UserInputError(
-        `Search Events Agent could not translate query "${params.naturalLanguageQuery}". Error: ${parsed.error}`,
-      );
-    }
+    const parsed = agentResult.result;
 
     // Get the dataset chosen by the agent (should be defined when no error)
     const dataset = parsed.dataset!;
@@ -208,38 +205,23 @@ export default defineTool({
       timeParams.statsPeriod = "14d";
     }
 
-    let eventsResponse: unknown;
-    try {
-      eventsResponse = await withApiErrorHandling(
-        () =>
-          apiService.searchEvents({
-            organizationSlug,
-            query: sentryQuery,
-            fields,
-            limit: params.limit,
-            projectSlug: projectId, // API requires numeric project ID, not slug
-            dataset: dataset === "logs" ? "ourlogs" : dataset,
-            sort: sortParam,
-            ...timeParams, // Spread the time parameters
-          }),
-        {
+    const eventsResponse = await withApiErrorHandling(
+      () =>
+        apiService.searchEvents({
           organizationSlug,
-          projectSlug: params.projectSlug,
-        },
-      );
-    } catch (error) {
-      // Convert API validation errors to UserInputError for agent self-correction
-      if (
-        error instanceof ApiError &&
-        (error.status === 400 || error.status === 422)
-      ) {
-        // 400 Bad Request and 422 Unprocessable Entity typically indicate input validation issues
-        throw new UserInputError(error.message);
-      }
-
-      // Re-throw other errors (5xx, network errors, etc.) as-is
-      throw error;
-    }
+          query: sentryQuery,
+          fields,
+          limit: params.limit,
+          projectSlug: projectId, // API requires numeric project ID, not slug
+          dataset: dataset === "logs" ? "ourlogs" : dataset,
+          sort: sortParam,
+          ...timeParams, // Spread the time parameters
+        }),
+      {
+        organizationSlug,
+        projectSlug: params.projectSlug,
+      },
+    );
 
     // Generate the Sentry explorer URL with structured aggregate information
     // Derive aggregate functions and groupBy fields from the fields array
@@ -287,37 +269,25 @@ export default defineTool({
     }
 
     // Format results based on dataset
+    const formatParams = {
+      eventData,
+      naturalLanguageQuery: params.naturalLanguageQuery,
+      includeExplanation: params.includeExplanation,
+      apiService,
+      organizationSlug,
+      explorerUrl,
+      sentryQuery,
+      fields,
+      explanation: parsed.explanation,
+    };
+
     switch (dataset) {
       case "errors":
-        return formatErrorResults(
-          eventData,
-          params,
-          apiService,
-          organizationSlug,
-          explorerUrl,
-          sentryQuery,
-          fields,
-        );
+        return formatErrorResults(formatParams);
       case "logs":
-        return formatLogResults(
-          eventData,
-          params,
-          apiService,
-          organizationSlug,
-          explorerUrl,
-          sentryQuery,
-          fields,
-        );
+        return formatLogResults(formatParams);
       case "spans":
-        return formatSpanResults(
-          eventData,
-          params,
-          apiService,
-          organizationSlug,
-          explorerUrl,
-          sentryQuery,
-          fields,
-        );
+        return formatSpanResults(formatParams);
     }
   },
 });

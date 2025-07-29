@@ -9,16 +9,21 @@
   "license": "FSL-1.1-ALv2",
   "exports": {
     ".": {
-      "types": "./dist/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "default": "./dist/utils.js"
     }
   },
   "scripts": {
-    "build": "tsc -b",
-    "dev": "tsc -w"
+    "build": "tsdown",
+    "dev": "tsdown -w"
   },
   "devDependencies": {
-    "@sentry/mcp-server-tsconfig": "workspace:*"
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "tsdown": "catalog:"
   },
   "dependencies": {
     "msw": "catalog:"

@@ -1,18 +1,18 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../utils/defineTool";
+import { defineTool } from "../../internal/tool-helpers/define";
 import {
   apiServiceFromContext,
   withApiErrorHandling,
-} from "../utils/api-utils";
+} from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
-import { translateQuery } from "./agent";
-import { formatIssueResults } from "./formatters";
+import { searchIssuesAgent } from "./agent";
+import { formatIssueResults, formatExplanation } from "./formatters";
 import { UserInputError } from "../../errors";
 import type { SentryApiService } from "../../api-client";
 
@@ -118,15 +118,21 @@ export default defineTool({
     }
 
     // Translate natural language to Sentry query
-    const translatedQuery = await translateQuery(
+    const agentResult = await withApiErrorHandling(
+      () =>
+        searchIssuesAgent(
+          params.naturalLanguageQuery,
+          params.organizationSlug,
+          apiService,
+          projectId,
+        ),
       {
-        naturalLanguageQuery: params.naturalLanguageQuery,
         organizationSlug: params.organizationSlug,
         projectSlugOrId: params.projectSlugOrId,
-        projectId,
       },
-      apiService,
     );
+
+    const translatedQuery = agentResult.result;
 
     // Execute the search - listIssues accepts projectSlug directly
     const issues = await withApiErrorHandling(
@@ -160,32 +166,34 @@ export default defineTool({
       if (translatedQuery.sort) {
         output += `\nSort: ${translatedQuery.sort}`;
       }
-      if (translatedQuery.explanation) {
-        output += `\n\n${translatedQuery.explanation}`;
-      }
       output += `\n\n`;
 
+      if (translatedQuery.explanation) {
+        output += formatExplanation(translatedQuery.explanation);
+        output += `\n\n`;
+      }
+
       // Format results without the header since we already added it
-      output += formatIssueResults(
+      output += formatIssueResults({
         issues,
-        params.organizationSlug,
-        params.projectSlugOrId,
-        translatedQuery.query,
-        params.regionUrl,
-        params.naturalLanguageQuery,
-        true, // skipHeader = true
-      );
+        organizationSlug: params.organizationSlug,
+        projectSlugOrId: params.projectSlugOrId,
+        query: translatedQuery.query,
+        regionUrl: params.regionUrl,
+        naturalLanguageQuery: params.naturalLanguageQuery,
+        skipHeader: true,
+      });
     } else {
       // Format results with natural language query for title
-      output = formatIssueResults(
+      output = formatIssueResults({
         issues,
-        params.organizationSlug,
-        params.projectSlugOrId,
-        translatedQuery.query,
-        params.regionUrl,
-        params.naturalLanguageQuery,
-        false, // skipHeader = false (default)
-      );
+        organizationSlug: params.organizationSlug,
+        projectSlugOrId: params.projectSlugOrId,
+        query: translatedQuery.query,
+        regionUrl: params.regionUrl,
+        naturalLanguageQuery: params.naturalLanguageQuery,
+        skipHeader: false,
+      });
     }
 
     return output;

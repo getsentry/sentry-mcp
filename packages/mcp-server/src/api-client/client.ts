@@ -1374,7 +1374,7 @@ export class SentryApiService {
     }: {
       organizationSlug: string;
       projectSlug?: string;
-      query?: string;
+      query?: string | null;
       sortBy?: "user" | "freq" | "date" | "new";
       limit?: number;
     },

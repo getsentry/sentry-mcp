@@ -8,18 +8,44 @@ import {
 import * as Sentry from "@sentry/node";
 
 /**
+ * Format an explanation for how a natural language query was translated
+ */
+export function formatExplanation(explanation: string): string {
+  return `## How I interpreted your query\n\n${explanation}`;
+}
+
+/**
+ * Common parameters for event formatters
+ */
+export interface FormatEventResultsParams {
+  eventData: FlexibleEventData[];
+  naturalLanguageQuery: string;
+  includeExplanation?: boolean;
+  apiService: SentryApiService;
+  organizationSlug: string;
+  explorerUrl: string;
+  sentryQuery: string;
+  fields: string[];
+  explanation?: string;
+}
+
+/**
  * Format error event results for display
  */
-export function formatErrorResults(
-  eventData: FlexibleEventData[],
-  params: { naturalLanguageQuery: string; includeExplanation?: boolean },
-  apiService: SentryApiService,
-  organizationSlug: string,
-  explorerUrl: string,
-  sentryQuery: string,
-  fields: string[],
-): string {
-  let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+export function formatErrorResults(params: FormatEventResultsParams): string {
+  const {
+    eventData,
+    naturalLanguageQuery,
+    includeExplanation,
+    apiService,
+    organizationSlug,
+    explorerUrl,
+    sentryQuery,
+    fields,
+    explanation,
+  } = params;
+
+  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
 
   // Check if this is an aggregate query and adjust display instructions
   if (isAggregateQuery(fields)) {
@@ -28,10 +54,9 @@ export function formatErrorResults(
     output += `⚠️ **IMPORTANT**: Display these errors as highlighted alert cards with color-coded severity levels and clickable Event IDs.\n\n`;
   }
 
-  if (params.includeExplanation) {
-    output += `## Query Translation\n`;
-    output += `Natural language: "${params.naturalLanguageQuery}"\n`;
-    output += `Sentry query: \`${sentryQuery}\`\n\n`;
+  if (includeExplanation && explanation) {
+    output += formatExplanation(explanation);
+    output += `\n\n`;
   }
 
   output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
@@ -40,7 +65,7 @@ export function formatErrorResults(
   if (eventData.length === 0) {
     Sentry.logger.info(
       Sentry.logger
-        .fmt`No error events found for query: ${params.naturalLanguageQuery}`,
+        .fmt`No error events found for query: ${naturalLanguageQuery}`,
       {
         query: sentryQuery,
         fields: fields,
@@ -131,16 +156,20 @@ export function formatErrorResults(
 /**
  * Format log event results for display
  */
-export function formatLogResults(
-  eventData: FlexibleEventData[],
-  params: { naturalLanguageQuery: string; includeExplanation?: boolean },
-  apiService: SentryApiService,
-  organizationSlug: string,
-  explorerUrl: string,
-  sentryQuery: string,
-  fields: string[],
-): string {
-  let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+export function formatLogResults(params: FormatEventResultsParams): string {
+  const {
+    eventData,
+    naturalLanguageQuery,
+    includeExplanation,
+    apiService,
+    organizationSlug,
+    explorerUrl,
+    sentryQuery,
+    fields,
+    explanation,
+  } = params;
+
+  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
 
   // Check if this is an aggregate query and adjust display instructions
   if (isAggregateQuery(fields)) {
@@ -149,10 +178,9 @@ export function formatLogResults(
     output += `⚠️ **IMPORTANT**: Display these logs in console format with monospace font, color-coded severity (🔴 ERROR, 🟡 WARN, 🔵 INFO), and preserve timestamps.\n\n`;
   }
 
-  if (params.includeExplanation) {
-    output += `## Query Translation\n`;
-    output += `Natural language: "${params.naturalLanguageQuery}"\n`;
-    output += `Sentry query: \`${sentryQuery}\`\n\n`;
+  if (includeExplanation && explanation) {
+    output += formatExplanation(explanation);
+    output += `\n\n`;
   }
 
   output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
@@ -160,8 +188,7 @@ export function formatLogResults(
 
   if (eventData.length === 0) {
     Sentry.logger.info(
-      Sentry.logger
-        .fmt`No log events found for query: ${params.naturalLanguageQuery}`,
+      Sentry.logger.fmt`No log events found for query: ${naturalLanguageQuery}`,
       {
         query: sentryQuery,
         fields: fields,
@@ -276,16 +303,20 @@ export function formatLogResults(
 /**
  * Format span/trace event results for display
  */
-export function formatSpanResults(
-  eventData: FlexibleEventData[],
-  params: { naturalLanguageQuery: string; includeExplanation?: boolean },
-  apiService: SentryApiService,
-  organizationSlug: string,
-  explorerUrl: string,
-  sentryQuery: string,
-  fields: string[],
-): string {
-  let output = `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+export function formatSpanResults(params: FormatEventResultsParams): string {
+  const {
+    eventData,
+    naturalLanguageQuery,
+    includeExplanation,
+    apiService,
+    organizationSlug,
+    explorerUrl,
+    sentryQuery,
+    fields,
+    explanation,
+  } = params;
+
+  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
 
   // Check if this is an aggregate query and adjust display instructions
   if (isAggregateQuery(fields)) {
@@ -294,10 +325,9 @@ export function formatSpanResults(
     output += `⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.\n\n`;
   }
 
-  if (params.includeExplanation) {
-    output += `## Query Translation\n`;
-    output += `Natural language: "${params.naturalLanguageQuery}"\n`;
-    output += `Sentry query: \`${sentryQuery}\`\n\n`;
+  if (includeExplanation && explanation) {
+    output += formatExplanation(explanation);
+    output += `\n\n`;
   }
 
   output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
@@ -306,7 +336,7 @@ export function formatSpanResults(
   if (eventData.length === 0) {
     Sentry.logger.info(
       Sentry.logger
-        .fmt`No span events found for query: ${params.naturalLanguageQuery}`,
+        .fmt`No span events found for query: ${naturalLanguageQuery}`,
       {
         query: sentryQuery,
         fields: fields,

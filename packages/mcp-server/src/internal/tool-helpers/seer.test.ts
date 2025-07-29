@@ -4,7 +4,7 @@ import {
   isHumanInterventionStatus,
   getStatusDisplayName,
   getHumanInterventionGuidance,
-} from "./seer-utils.js";
+} from "./seer";
 
 describe("seer-utils", () => {
   describe("isTerminalStatus", () => {
