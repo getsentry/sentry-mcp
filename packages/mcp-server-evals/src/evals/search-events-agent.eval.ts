@@ -144,7 +144,6 @@ describeEval("search-events-agent", {
       apiService,
     );
 
-    // Return in the format expected by ToolCallScorer
     return {
       result: JSON.stringify(agentResult.result),
       toolCalls: agentResult.toolCalls.map((call: any) => ({
