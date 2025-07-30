@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/getsentry/sentry-mcp/graph/badge.svg?token=khVKvJP5Ig)](https://codecov.io/gh/getsentry/sentry-mcp)
 
-This is a prototype of a remote MCP sever, acting as a middleware to the upstream Sentry API provider.
+This is a prototype of a remote MCP server, acting as a middleware to the upstream Sentry API provider.
 
 It is based on [Cloudflare's work towards remote MCPs](https://blog.cloudflare.com/remote-model-context-protocol-servers-mcp/).
 
