@@ -14,7 +14,6 @@ describe("get_trace_details", () => {
         organizationSlug: "sentry-mcp-evals",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
         regionUrl: undefined,
-        statsPeriod: undefined,
       },
       {
         accessToken: "access-token",
@@ -65,12 +64,11 @@ describe("get_trace_details", () => {
     `);
   });
 
-  it("serializes with custom stats period", async () => {
+  it("serializes with fixed stats period", async () => {
     const result = await getTraceDetails.handler(
       {
         organizationSlug: "sentry-mcp-evals",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        statsPeriod: "7d",
         regionUrl: undefined,
       },
       {
@@ -102,7 +100,6 @@ describe("get_trace_details", () => {
           organizationSlug: "sentry",
           traceId: "nonexistent",
           regionUrl: undefined,
-          statsPeriod: undefined,
         },
         {
           accessToken: "access-token",
@@ -120,7 +117,6 @@ describe("get_trace_details", () => {
           organizationSlug: "sentry-mcp-evals",
           traceId: "invalid-trace-id", // Too short, not hex
           regionUrl: undefined,
-          statsPeriod: undefined,
         },
         {
           accessToken: "access-token",
@@ -159,7 +155,6 @@ describe("get_trace_details", () => {
         organizationSlug: "sentry-mcp-evals",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
         regionUrl: undefined,
-        statsPeriod: undefined,
       },
       {
         accessToken: "access-token",
@@ -194,7 +189,6 @@ describe("get_trace_details", () => {
           organizationSlug: "sentry-mcp-evals",
           traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
           regionUrl: undefined,
-          statsPeriod: undefined,
         },
         {
           accessToken: "access-token",
@@ -226,7 +220,6 @@ describe("get_trace_details", () => {
         organizationSlug: "sentry-mcp-evals",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
         regionUrl: "https://us.sentry.io",
-        statsPeriod: undefined,
       },
       {
         accessToken: "access-token",

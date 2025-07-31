@@ -50,10 +50,6 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.optional(),
     traceId: ParamTraceId,
-    statsPeriod: z
-      .string()
-      .optional()
-      .describe("Stats period for trace analysis (e.g., '14d', '7d')"),
   },
   async handler(params, context: ServerContext) {
     // Validate trace ID format
@@ -76,7 +72,7 @@ export default defineTool({
         apiService.getTraceMeta({
           organizationSlug: params.organizationSlug,
           traceId: params.traceId,
-          statsPeriod: params.statsPeriod,
+          statsPeriod: "14d", // Fixed stats period
         }),
       {
         organizationSlug: params.organizationSlug,
@@ -91,7 +87,7 @@ export default defineTool({
           organizationSlug: params.organizationSlug,
           traceId: params.traceId,
           limit: 10, // Only get top-level spans for overview
-          statsPeriod: params.statsPeriod,
+          statsPeriod: "14d", // Fixed stats period
         }),
       {
         organizationSlug: params.organizationSlug,
