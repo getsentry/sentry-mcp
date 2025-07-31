@@ -188,6 +188,7 @@ export function formatEventOutput(event: Event) {
     );
   }
 
+  output += formatTags(event.tags);
   output += formatContexts(event.contexts);
   return output;
 }
@@ -592,6 +593,15 @@ function findFirstInAppFrame(
     }
   }
   return undefined;
+}
+
+function formatTags(tags: z.infer<typeof EventSchema>["tags"]) {
+  if (!tags || tags.length === 0) {
+    return "";
+  }
+  return `### Tags\n\n${tags
+    .map((tag) => `**${tag.key}**: ${tag.value}`)
+    .join("\n")}\n\n`;
 }
 
 function formatContexts(contexts: z.infer<typeof EventSchema>["contexts"]) {

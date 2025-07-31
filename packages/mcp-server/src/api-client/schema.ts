@@ -349,6 +349,14 @@ const BaseEventSchema = z.object({
         .passthrough(),
     )
     .optional(),
+  tags: z
+    .array(
+      z.object({
+        key: z.string(),
+        value: z.string(),
+      }),
+    )
+    .optional(),
 });
 
 export const ErrorEventSchema = BaseEventSchema.omit({
