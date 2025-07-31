@@ -9,6 +9,12 @@ import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl, ParamTraceId } from "../schema";
 
+// Constants for span filtering and tree rendering
+const MAX_DEPTH = 2;
+const MINIMUM_DURATION_THRESHOLD_MS = 10;
+const MIN_MEANINGFUL_CHILD_DURATION = 5;
+const MIN_AVG_DURATION_MS = 5;
+
 export default defineTool({
   name: "get_trace_details",
   description: [
@@ -79,12 +85,19 @@ export default defineTool({
     );
 
     // Get minimal trace data to show key transactions
-    const trace = await apiService.getTrace({
-      organizationSlug: params.organizationSlug,
-      traceId: params.traceId,
-      limit: 10, // Only get top-level spans for overview
-      statsPeriod: params.statsPeriod,
-    });
+    const trace = await withApiErrorHandling(
+      () =>
+        apiService.getTrace({
+          organizationSlug: params.organizationSlug,
+          traceId: params.traceId,
+          limit: 10, // Only get top-level spans for overview
+          statsPeriod: params.statsPeriod,
+        }),
+      {
+        organizationSlug: params.organizationSlug,
+        traceId: params.traceId,
+      },
+    );
 
     return formatTraceOutput({
       organizationSlug: params.organizationSlug,
@@ -144,7 +157,7 @@ function selectInterestingSpans(
   let spanCount = 0;
 
   function addSpan(span: any, level: number): boolean {
-    if (spanCount >= maxSpans || level > 2) return false;
+    if (spanCount >= maxSpans || level > MAX_DEPTH) return false;
 
     const duration = span.duration || 0;
     const isTransaction = span.is_transaction;
@@ -153,7 +166,10 @@ function selectInterestingSpans(
     // Always include transactions and spans with errors
     // For regular spans, include if they have reasonable duration or are at root level
     const shouldInclude =
-      isTransaction || hasErrors || level === 0 || duration >= 10; // Include spans >= 10ms
+      isTransaction ||
+      hasErrors ||
+      level === 0 ||
+      duration >= MINIMUM_DURATION_THRESHOLD_MS;
 
     if (!shouldInclude) return false;
 
@@ -170,11 +186,11 @@ function selectInterestingSpans(
 
     spanCount++;
 
-    // Add up to one interesting child per span, up to 2 levels deep
-    if (level < 2 && span.children?.length > 0) {
+    // Add up to one interesting child per span, up to MAX_DEPTH levels deep
+    if (level < MAX_DEPTH && span.children?.length > 0) {
       // Sort children by duration (descending) and take the most interesting ones
       const sortedChildren = span.children
-        .filter((child: any) => child.duration > 5) // Only children with meaningful duration
+        .filter((child: any) => child.duration > MIN_MEANINGFUL_CHILD_DURATION) // Only children with meaningful duration
         .sort((a: any, b: any) => (b.duration || 0) - (a.duration || 0));
 
       // Add up to 2 children for transactions, 1 for regular spans
@@ -402,7 +418,7 @@ function formatTraceOutput({
   if (trace.length > 0) {
     const operationStats = calculateOperationStats(trace);
     const sortedOps = Object.entries(operationStats)
-      .filter(([, stats]) => stats.avgDuration >= 5) // Only show ops with avg duration >= 5ms
+      .filter(([, stats]) => stats.avgDuration >= MIN_AVG_DURATION_MS) // Only show ops with avg duration >= 5ms
       .sort(([, a], [, b]) => b.count - a.count)
       .slice(0, 10); // Show top 10
 
