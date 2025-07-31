@@ -23,10 +23,12 @@ import {
   ClientKeyListSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
+  TraceMetaSchema,
+  TraceSchema,
   UserSchema,
   UserRegionsSchema,
 } from "./schema";
-import { UserInputError, ConfigurationError } from "../errors";
+import { ConfigurationError } from "../errors";
 import type {
   AutofixRun,
   AutofixRunState,
@@ -44,6 +46,8 @@ import type {
   TagList,
   Team,
   TeamList,
+  Trace,
+  TraceMeta,
   User,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
@@ -1387,7 +1391,6 @@ export class SentryApiService {
 
     const queryParams = new URLSearchParams();
     queryParams.set("per_page", String(limit));
-    queryParams.set("referrer", "sentry-mcp");
     if (sortBy) queryParams.set("sort", sortBy);
     queryParams.set("statsPeriod", "24h");
     queryParams.set("query", sentryQuery.join(" "));
@@ -1616,7 +1619,6 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("dataset", "errors");
     queryParams.set("per_page", "10");
-    queryParams.set("referrer", "sentry-mcp");
     queryParams.set(
       "sort",
       `-${sortBy === "last_seen" ? "last_seen" : "count"}`,
@@ -1668,7 +1670,6 @@ export class SentryApiService {
     const queryParams = new URLSearchParams();
     queryParams.set("dataset", "spans");
     queryParams.set("per_page", "10");
-    queryParams.set("referrer", "sentry-mcp");
     queryParams.set(
       "sort",
       `-${sortBy === "timestamp" ? "timestamp" : "span.duration"}`,
@@ -1717,7 +1718,6 @@ export class SentryApiService {
     // Basic parameters
     queryParams.set("per_page", params.limit.toString());
     queryParams.set("query", params.query);
-    queryParams.set("referrer", "sentry-mcp");
     queryParams.set("dataset", "errors");
 
     // Validate time parameters - can't use both relative and absolute
@@ -1792,7 +1792,6 @@ export class SentryApiService {
     // Basic parameters
     queryParams.set("per_page", params.limit.toString());
     queryParams.set("query", params.query);
-    queryParams.set("referrer", "sentry-mcp");
     queryParams.set("dataset", params.dataset);
 
     // Validate time parameters - can't use both relative and absolute
@@ -1964,5 +1963,104 @@ export class SentryApiService {
       opts,
     );
     return AutofixRunStateSchema.parse(body);
+  }
+
+  /**
+   * Retrieves high-level metadata about a trace.
+   *
+   * Returns statistics including span counts, error counts, transaction
+   * breakdown, and operation type distribution for the specified trace.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.traceId Trace identifier (32-character hex string)
+   * @param params.statsPeriod Optional stats period (e.g., "14d", "7d")
+   * @param opts Request options
+   * @returns Trace metadata with statistics
+   *
+   * @example
+   * ```typescript
+   * const traceMeta = await apiService.getTraceMeta({
+   *   organizationSlug: "my-org",
+   *   traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a"
+   * });
+   * console.log(`Trace has ${traceMeta.span_count} spans`);
+   * ```
+   */
+  async getTraceMeta(
+    {
+      organizationSlug,
+      traceId,
+      statsPeriod = "14d",
+    }: {
+      organizationSlug: string;
+      traceId: string;
+      statsPeriod?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TraceMeta> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("statsPeriod", statsPeriod);
+
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/trace-meta/${traceId}/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    return TraceMetaSchema.parse(body);
+  }
+
+  /**
+   * Retrieves the complete trace structure with all spans.
+   *
+   * Returns the hierarchical trace data including all spans, their timing
+   * information, operation details, and nested relationships.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.traceId Trace identifier (32-character hex string)
+   * @param params.limit Maximum number of spans to return (default: 1000)
+   * @param params.project Project filter (-1 for all projects)
+   * @param params.statsPeriod Optional stats period (e.g., "14d", "7d")
+   * @param opts Request options
+   * @returns Complete trace tree structure
+   *
+   * @example
+   * ```typescript
+   * const trace = await apiService.getTrace({
+   *   organizationSlug: "my-org",
+   *   traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+   *   limit: 1000
+   * });
+   * console.log(`Root spans: ${trace.length}`);
+   * ```
+   */
+  async getTrace(
+    {
+      organizationSlug,
+      traceId,
+      limit = 1000,
+      project = "-1",
+      statsPeriod = "14d",
+    }: {
+      organizationSlug: string;
+      traceId: string;
+      limit?: number;
+      project?: string;
+      statsPeriod?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Trace> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("limit", String(limit));
+    queryParams.set("project", project);
+    queryParams.set("statsPeriod", statsPeriod);
+
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/trace/${traceId}/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+    return TraceSchema.parse(body);
   }
 }

@@ -50,6 +50,11 @@ import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attrib
 import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json" with {
   type: "json",
 };
+import traceMetaFixture from "./fixtures/trace-meta.json" with { type: "json" };
+import traceFixture from "./fixtures/trace.json" with { type: "json" };
+import traceEventFixture from "./fixtures/trace-event.json" with {
+  type: "json",
+};
 
 /**
  * Standard organization payload for mock responses.
@@ -759,6 +764,18 @@ export const restHandlers = buildHandlers([
     fetch: () => HttpResponse.json(issueFixture2),
   },
 
+  // Trace endpoints
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/trace-meta/a4d1aae7216b47ff8117cf4e09ce9d0a/",
+    fetch: () => HttpResponse.json(traceMetaFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/trace/a4d1aae7216b47ff8117cf4e09ce9d0a/",
+    fetch: () => HttpResponse.json(traceFixture),
+  },
+
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
@@ -1291,7 +1308,12 @@ export const mswServer = setupServer(
 );
 
 // Export fixtures for use in tests
-export { autofixStateFixture };
+export {
+  autofixStateFixture,
+  traceMetaFixture,
+  traceFixture,
+  traceEventFixture,
+};
 
 // Export utilities for creating mock servers
 export { setupMockServer, startMockServer } from "./utils";

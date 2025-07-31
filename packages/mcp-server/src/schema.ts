@@ -54,6 +54,15 @@ export const ParamIssueUrl = z
     "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43",
   );
 
+export const ParamTraceId = z
+  .string()
+  .trim()
+  .regex(
+    /^[0-9a-fA-F]{32}$/,
+    "Trace ID must be a 32-character hexadecimal string",
+  )
+  .describe("The trace ID. e.g. `a4d1aae7216b47ff8117cf4e09ce9d0a`");
+
 export const ParamPlatform = z
   .string()
   .toLowerCase()
