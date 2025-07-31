@@ -645,7 +645,7 @@ describe("API query builders", () => {
       });
 
       expect(params.toString()).toMatchInlineSnapshot(
-        `"per_page=50&query=level%3Aerror&referrer=sentry-mcp&dataset=errors&statsPeriod=24h&project=backend&sort=-count&field=title&field=project&field=count%28%29"`,
+        `"per_page=50&query=level%3Aerror&dataset=errors&statsPeriod=24h&project=backend&sort=-count&field=title&field=project&field=count%28%29"`,
       );
     });
 
@@ -709,7 +709,7 @@ describe("API query builders", () => {
       });
 
       expect(params.toString()).toMatchInlineSnapshot(
-        `"per_page=20&query=span.op%3Adb&referrer=sentry-mcp&dataset=spans&statsPeriod=1h&project=frontend&sampling=NORMAL&sort=-span.duration&field=span.op&field=span.description&field=span.duration"`,
+        `"per_page=20&query=span.op%3Adb&dataset=spans&statsPeriod=1h&project=frontend&sampling=NORMAL&sort=-span.duration&field=span.op&field=span.description&field=span.duration"`,
       );
     });
 
@@ -726,7 +726,7 @@ describe("API query builders", () => {
       });
 
       expect(params.toString()).toMatchInlineSnapshot(
-        `"per_page=30&query=severity%3Aerror&referrer=sentry-mcp&dataset=ourlogs&sort=-timestamp&field=timestamp&field=message&field=severity"`,
+        `"per_page=30&query=severity%3Aerror&dataset=ourlogs&sort=-timestamp&field=timestamp&field=message&field=severity"`,
       );
 
       // Verify sampling is not added for logs

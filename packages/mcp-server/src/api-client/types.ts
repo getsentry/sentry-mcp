@@ -60,6 +60,9 @@ import type {
   TagSchema,
   TeamListSchema,
   TeamSchema,
+  TraceMetaSchema,
+  TraceSchema,
+  TraceSpanSchema,
   UserSchema,
 } from "./schema";
 
@@ -85,3 +88,8 @@ export type IssueList = z.infer<typeof IssueListSchema>;
 export type EventAttachmentList = z.infer<typeof EventAttachmentListSchema>;
 export type TagList = z.infer<typeof TagListSchema>;
 export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;
+
+// Trace types
+export type TraceMeta = z.infer<typeof TraceMetaSchema>;
+export type TraceSpan = z.infer<typeof TraceSpanSchema>;
+export type Trace = z.infer<typeof TraceSchema>;

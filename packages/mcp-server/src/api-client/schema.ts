@@ -554,3 +554,65 @@ export const EventAttachmentSchema = z.object({
 });
 
 export const EventAttachmentListSchema = z.array(EventAttachmentSchema);
+
+/**
+ * Schema for Sentry trace metadata response.
+ *
+ * Contains high-level statistics about a trace including span counts,
+ * transaction breakdown, and operation type distribution.
+ */
+export const TraceMetaSchema = z.object({
+  logs: z.number(),
+  errors: z.number(),
+  performance_issues: z.number(),
+  span_count: z.number(),
+  transaction_child_count_map: z.array(
+    z.object({
+      "transaction.event_id": z.string(),
+      "count()": z.number(),
+    }),
+  ),
+  span_count_map: z.record(z.string(), z.number()),
+});
+
+/**
+ * Schema for individual spans within a trace.
+ *
+ * Represents the hierarchical structure of spans with timing information,
+ * operation details, and nested children spans.
+ */
+export const TraceSpanSchema: z.ZodType<any> = z.lazy(() =>
+  z.object({
+    children: z.array(TraceSpanSchema),
+    errors: z.array(z.any()),
+    occurrences: z.array(z.any()),
+    event_id: z.string(),
+    transaction_id: z.string(),
+    project_id: z.union([z.string(), z.number()]),
+    project_slug: z.string(),
+    profile_id: z.string(),
+    profiler_id: z.string(),
+    parent_span_id: z.string().nullable(),
+    start_timestamp: z.number(),
+    end_timestamp: z.number(),
+    measurements: z.record(z.string(), z.number()).optional(),
+    duration: z.number(),
+    transaction: z.string(),
+    is_transaction: z.boolean(),
+    description: z.string(),
+    sdk_name: z.string(),
+    op: z.string(),
+    name: z.string(),
+    event_type: z.string(),
+    additional_attributes: z.record(z.string(), z.any()),
+  }),
+);
+
+/**
+ * Schema for Sentry trace response.
+ *
+ * Contains the complete trace tree starting from root spans.
+ * The response is an array of root-level spans, each potentially
+ * containing nested children spans.
+ */
+export const TraceSchema = z.array(TraceSpanSchema);

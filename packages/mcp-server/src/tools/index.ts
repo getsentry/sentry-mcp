@@ -4,6 +4,7 @@ import findTeams from "./find-teams";
 import findProjects from "./find-projects";
 import findReleases from "./find-releases";
 import getIssueDetails from "./get-issue-details";
+import getTraceDetails from "./get-trace-details";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
 import searchEvents from "./search-events";
@@ -25,6 +26,7 @@ export default {
   find_projects: findProjects,
   find_releases: findReleases,
   get_issue_details: getIssueDetails,
+  get_trace_details: getTraceDetails,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
   search_events: searchEvents,

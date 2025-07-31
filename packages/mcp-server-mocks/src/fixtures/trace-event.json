@@ -1,0 +1,236 @@
+{
+  "id": "db633982397f45fca67621093b1430ef",
+  "groupID": null,
+  "eventID": "db633982397f45fca67621093b1430ef",
+  "projectID": "4509062593708032",
+  "size": 4091,
+  "entries": [
+    { "data": [], "type": "spans" },
+    {
+      "data": {
+        "values": [
+          {
+            "type": "default",
+            "timestamp": "2025-07-30T18:37:34.265000Z",
+            "level": "error",
+            "message": "[Filtered]",
+            "category": "console",
+            "data": { "arguments": ["[Filtered]"], "logger": "console" },
+            "event_id": null
+          }
+        ]
+      },
+      "type": "breadcrumbs"
+    },
+    {
+      "data": {
+        "apiTarget": null,
+        "method": "POST",
+        "url": "https://mcp.sentry.dev/mcp",
+        "query": [],
+        "fragment": null,
+        "data": null,
+        "headers": [
+          ["Accept", "application/json, text/event-stream"],
+          ["Accept-Encoding", "gzip, br"],
+          ["Accept-Language", "*"],
+          ["Authorization", "[Filtered]"],
+          ["Cf-Connecting-Ip", "203.0.113.1"],
+          ["Cf-Ipcountry", "US"],
+          ["Cf-Ray", "abcd1234ef567890"],
+          ["Cf-Visitor", "{\"scheme\":\"https\"}"],
+          ["Connection", "Keep-Alive"],
+          ["Content-Length", "54"],
+          ["Content-Type", "application/json"],
+          ["Host", "mcp.sentry.dev"],
+          ["Mcp-Protocol-Version", "2025-06-18"],
+          [
+            "Mcp-Session-Id",
+            "abc123def456789012345678901234567890abcdef1234567890abcdef123456"
+          ],
+          ["Sec-Fetch-Mode", "cors"],
+          ["User-Agent", "claude-code/1.0.63"],
+          ["X-Forwarded-Proto", "https"],
+          ["X-Real-Ip", "203.0.113.1"]
+        ],
+        "cookies": [],
+        "env": null,
+        "inferredContentType": "application/json"
+      },
+      "type": "request"
+    }
+  ],
+  "dist": null,
+  "message": "",
+  "title": "POST /mcp",
+  "location": "POST /mcp",
+  "user": {
+    "id": null,
+    "email": null,
+    "username": null,
+    "ip_address": "2001:db8::1",
+    "name": null,
+    "geo": { "country_code": "US", "region": "United States" },
+    "data": null
+  },
+  "contexts": {
+    "cloud_resource": { "cloud.provider": "cloudflare", "type": "default" },
+    "culture": { "timezone": "America/New_York", "type": "default" },
+    "runtime": { "name": "cloudflare", "type": "runtime" },
+    "trace": {
+      "trace_id": "3691b2ad31b14d65941383ba6bc3e79c",
+      "span_id": "b3d79b8311435f52",
+      "op": "http.server",
+      "status": "internal_error",
+      "exclusive_time": 3026693.000078,
+      "client_sample_rate": 1.0,
+      "origin": "auto.http.cloudflare",
+      "data": {
+        "server.address": "mcp.sentry.dev",
+        "url.scheme": "https:",
+        "url.full": "https://mcp.sentry.dev/mcp",
+        "http.request.body.size": 54,
+        "http.request.method": "POST",
+        "network.protocol.name": "HTTP/1.1",
+        "sentry.op": "http.server",
+        "sentry.origin": "auto.http.cloudflare",
+        "sentry.sample_rate": 1,
+        "sentry.source": "url",
+        "url.path": "/mcp"
+      },
+      "hash": "7b635d2b22f8087a",
+      "type": "trace"
+    }
+  },
+  "sdk": { "name": "sentry.javascript.cloudflare", "version": "9.34.0" },
+  "context": {},
+  "packages": {},
+  "type": "transaction",
+  "metadata": { "location": "POST /mcp", "title": "POST /mcp" },
+  "tags": [
+    { "key": "environment", "value": "cloudflare" },
+    { "key": "level", "value": "info" },
+    { "key": "mcp.server_version", "value": "0.17.1" },
+    { "key": "release", "value": "eece3c53-694c-4362-b599-95fc591a6cc7" },
+    { "key": "runtime.name", "value": "cloudflare" },
+    { "key": "sentry.host", "value": "sentry.io" },
+    { "key": "transaction", "value": "POST /mcp" },
+    { "key": "url", "value": "https://mcp.sentry.dev/mcp" },
+    {
+      "key": "user",
+      "value": "ip:2001:db8::1",
+      "query": "user.ip:\"2001:db8::1\""
+    }
+  ],
+  "platform": "javascript",
+  "dateReceived": "2025-07-30T18:37:34.301253Z",
+  "errors": [],
+  "occurrence": null,
+  "_meta": {
+    "entries": {
+      "1": {
+        "data": {
+          "values": {
+            "0": {
+              "data": {
+                "arguments": {
+                  "0": {
+                    "": {
+                      "rem": [["@password:filter", "s", 0, 10]],
+                      "len": 63,
+                      "chunks": [
+                        {
+                          "type": "redaction",
+                          "text": "[Filtered]",
+                          "rule_id": "@password:filter",
+                          "remark": "s"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "message": {
+                "": {
+                  "rem": [["@password:filter", "s", 0, 10]],
+                  "len": 63,
+                  "chunks": [
+                    {
+                      "type": "redaction",
+                      "text": "[Filtered]",
+                      "rule_id": "@password:filter",
+                      "remark": "s"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "2": {
+        "data": {
+          "": null,
+          "apiTarget": null,
+          "method": null,
+          "url": null,
+          "query": null,
+          "data": null,
+          "headers": {
+            "3": {
+              "1": {
+                "": {
+                  "rem": [["@password:filter", "s", 0, 10]],
+                  "len": 64,
+                  "chunks": [
+                    {
+                      "type": "redaction",
+                      "text": "[Filtered]",
+                      "rule_id": "@password:filter",
+                      "remark": "s"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "cookies": null,
+          "env": null
+        }
+      }
+    },
+    "message": null,
+    "user": null,
+    "contexts": null,
+    "sdk": null,
+    "context": null,
+    "packages": null,
+    "tags": {}
+  },
+  "startTimestamp": 1753897627.572,
+  "endTimestamp": 1753900654.265,
+  "measurements": null,
+  "breakdowns": null,
+  "release": {
+    "id": 1489295029,
+    "commitCount": 0,
+    "data": {},
+    "dateCreated": "2025-07-29T01:05:26.573000Z",
+    "dateReleased": null,
+    "deployCount": 0,
+    "ref": null,
+    "lastCommit": null,
+    "lastDeploy": null,
+    "status": "open",
+    "url": null,
+    "userAgent": null,
+    "version": "eece3c53-694c-4362-b599-95fc591a6cc7",
+    "versionInfo": {
+      "package": null,
+      "version": { "raw": "eece3c53-694c-4362-b599-95fc591a6cc7" },
+      "description": "eece3c53-694c-4362-b599-95fc591a6cc7",
+      "buildHash": null
+    }
+  },
+  "projectSlug": "mcp-server"
+}

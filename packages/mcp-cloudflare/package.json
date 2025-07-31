@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -20,9 +18,9 @@
     "cf:versions:upload": "npx wrangler versions upload",
     "preview": "vite preview",
     "cf-typegen": "wrangler types",
-    "test": "vitest",
+    "test": "vitest run",
     "test:ci": "vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
-    "test:watch": "vitest watch",
+    "test:watch": "vitest",
     "tsc": "tsc --noEmit"
   },
   "devDependencies": {

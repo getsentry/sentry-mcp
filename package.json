@@ -34,6 +34,7 @@
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
     "test": "dotenv -e .env -e .env.local -- turbo test",
     "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
+    "test:watch": "dotenv -e .env -e .env.local -- turbo test:watch",
     "tsc": "turbo tsc"
   },
   "dependencies": {
