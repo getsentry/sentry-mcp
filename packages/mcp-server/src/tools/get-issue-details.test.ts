@@ -56,6 +56,15 @@ describe("get_issue_details", () => {
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
 
+      ### Tags
+
+      **environment**: development
+      **handled**: no
+      **level**: error
+      **mechanism**: cloudflare
+      **runtime.name**: cloudflare
+      **url**: https://mcp.sentry.dev/sse
+
       ### Additional Context
 
       These are additional context provided by the user when they're instrumenting their application.
@@ -137,6 +146,15 @@ describe("get_issue_details", () => {
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
 
+      ### Tags
+
+      **environment**: development
+      **handled**: no
+      **level**: error
+      **mechanism**: cloudflare
+      **runtime.name**: cloudflare
+      **url**: https://mcp.sentry.dev/sse
+
       ### Additional Context
 
       These are additional context provided by the user when they're instrumenting their application.
@@ -216,6 +234,15 @@ describe("get_issue_details", () => {
 
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
+
+      ### Tags
+
+      **environment**: development
+      **handled**: no
+      **level**: error
+      **mechanism**: cloudflare
+      **runtime.name**: cloudflare
+      **url**: https://mcp.sentry.dev/sse
 
       ### Additional Context
 
