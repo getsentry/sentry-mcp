@@ -463,6 +463,8 @@ export class SentryApiService {
     fields?: string[];
     sort?: string;
     statsPeriod?: string;
+    start?: string;
+    end?: string;
     aggregateFunctions?: string[];
     groupByFields?: string[];
   }): string {
@@ -472,7 +474,9 @@ export class SentryApiService {
       projectId,
       fields,
       sort,
-      statsPeriod = "24h",
+      statsPeriod,
+      start,
+      end,
       aggregateFunctions,
       groupByFields,
     } = params;
@@ -502,7 +506,14 @@ export class SentryApiService {
     }
 
     urlParams.set("sort", sort || "-timestamp");
-    urlParams.set("statsPeriod", statsPeriod);
+
+    // Add time parameters - either statsPeriod or start/end
+    if (start && end) {
+      urlParams.set("start", start);
+      urlParams.set("end", end);
+    } else {
+      urlParams.set("statsPeriod", statsPeriod || "24h");
+    }
 
     // Check if this is an aggregate query
     const isAggregate = (aggregateFunctions?.length ?? 0) > 0;
@@ -541,6 +552,8 @@ export class SentryApiService {
     fields?: string[];
     sort?: string;
     statsPeriod?: string;
+    start?: string;
+    end?: string;
     aggregateFunctions?: string[];
     groupByFields?: string[];
   }): string {
@@ -551,7 +564,9 @@ export class SentryApiService {
       projectId,
       fields,
       sort,
-      statsPeriod = "24h",
+      statsPeriod,
+      start,
+      end,
       aggregateFunctions,
       groupByFields,
     } = params;
@@ -633,7 +648,13 @@ export class SentryApiService {
       urlParams.set("sort", sort);
     }
 
-    urlParams.set("statsPeriod", statsPeriod);
+    // Add time parameters - either statsPeriod or start/end
+    if (start && end) {
+      urlParams.set("start", start);
+      urlParams.set("end", end);
+    } else {
+      urlParams.set("statsPeriod", statsPeriod || "24h");
+    }
 
     // Add table parameter for spans dataset (required for UI)
     if (dataset === "spans") {
@@ -663,6 +684,9 @@ export class SentryApiService {
    * @param sort Sort parameter (e.g., "-timestamp", "-count()")
    * @param aggregateFunctions Array of aggregate functions (only used for EAP datasets)
    * @param groupByFields Array of fields to group by (only used for EAP datasets)
+   * @param statsPeriod Relative time period (e.g., "24h", "7d")
+   * @param start Absolute start time (ISO 8601)
+   * @param end Absolute end time (ISO 8601)
    * @returns Full HTTPS URL to the events explorer in Sentry UI
    */
   getEventsExplorerUrl(
@@ -674,6 +698,9 @@ export class SentryApiService {
     sort?: string,
     aggregateFunctions?: string[],
     groupByFields?: string[],
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
   ): string {
     if (dataset === "errors") {
       // Route to legacy Discover API
@@ -683,6 +710,9 @@ export class SentryApiService {
         projectId,
         fields,
         sort,
+        statsPeriod,
+        start,
+        end,
         aggregateFunctions,
         groupByFields,
       });
@@ -696,6 +726,9 @@ export class SentryApiService {
       projectId,
       fields,
       sort,
+      statsPeriod,
+      start,
+      end,
       aggregateFunctions,
       groupByFields,
     });

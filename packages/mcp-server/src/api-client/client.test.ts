@@ -123,6 +123,135 @@ describe("getEventsExplorerUrl", () => {
       `"https://localhost:8000/organizations/sentry-mcp/explore/traces/?query=level%3Aerror&statsPeriod=24h&table=span"`,
     );
   });
+
+  describe("time parameters", () => {
+    it("should use statsPeriod when provided for spans dataset", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "level:error",
+        undefined, // projectId
+        "spans", // dataset
+        undefined, // fields
+        undefined, // sort
+        undefined, // aggregateFunctions
+        undefined, // groupByFields
+        "7d", // statsPeriod
+      );
+      expect(result).toContain("statsPeriod=7d");
+      expect(result).not.toContain("start=");
+      expect(result).not.toContain("end=");
+    });
+
+    it("should use start/end when provided for spans dataset", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "level:error",
+        undefined, // projectId
+        "spans", // dataset
+        undefined, // fields
+        undefined, // sort
+        undefined, // aggregateFunctions
+        undefined, // groupByFields
+        undefined, // statsPeriod
+        "2025-07-29T07:00:00", // start
+        "2025-07-31T06:59:59", // end
+      );
+      expect(result).toContain("start=2025-07-29T07%3A00%3A00");
+      expect(result).toContain("end=2025-07-31T06%3A59%3A59");
+      expect(result).not.toContain("statsPeriod=");
+    });
+
+    it("should prefer start/end over statsPeriod when both provided for spans dataset", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "level:error",
+        undefined, // projectId
+        "spans", // dataset
+        undefined, // fields
+        undefined, // sort
+        undefined, // aggregateFunctions
+        undefined, // groupByFields
+        "7d", // statsPeriod (should be ignored)
+        "2025-07-29T07:00:00", // start
+        "2025-07-31T06:59:59", // end
+      );
+      expect(result).toContain("start=2025-07-29T07%3A00%3A00");
+      expect(result).toContain("end=2025-07-31T06%3A59%3A59");
+      expect(result).not.toContain("statsPeriod=");
+    });
+
+    it("should use statsPeriod when provided for errors dataset", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "level:error",
+        undefined, // projectId
+        "errors", // dataset
+        undefined, // fields
+        undefined, // sort
+        undefined, // aggregateFunctions
+        undefined, // groupByFields
+        "14d", // statsPeriod
+      );
+      expect(result).toContain("statsPeriod=14d");
+      expect(result).not.toContain("start=");
+      expect(result).not.toContain("end=");
+    });
+
+    it("should use start/end when provided for errors dataset", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "level:error",
+        undefined, // projectId
+        "errors", // dataset
+        undefined, // fields
+        undefined, // sort
+        undefined, // aggregateFunctions
+        undefined, // groupByFields
+        undefined, // statsPeriod
+        "2025-07-29T07:00:00", // start
+        "2025-07-31T06:59:59", // end
+      );
+      expect(result).toContain("start=2025-07-29T07%3A00%3A00");
+      expect(result).toContain("end=2025-07-31T06%3A59%3A59");
+      expect(result).not.toContain("statsPeriod=");
+    });
+
+    it("should default to 24h when no time parameters provided", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "level:error",
+      );
+      expect(result).toContain("statsPeriod=24h");
+    });
+
+    it("should handle aggregate queries with time parameters for spans dataset", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+      const result = apiService.getEventsExplorerUrl(
+        "sentry-mcp",
+        "",
+        "4509062593708032", // projectId
+        "spans", // dataset
+        [
+          "equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)",
+        ], // fields
+        "-equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)", // sort
+        [
+          "equation|sum(gen_ai.usage.input_tokens) + sum(gen_ai.usage.output_tokens)",
+        ], // aggregateFunctions
+        [], // groupByFields
+        "7d", // statsPeriod
+      );
+      expect(result).toContain("statsPeriod=7d");
+      expect(result).toContain("project=4509062593708032");
+      expect(result).toContain("mode=aggregate");
+    });
+  });
 });
 
 describe("network error handling", () => {
