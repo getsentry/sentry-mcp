@@ -459,7 +459,7 @@ export class SentryApiService {
   private buildDiscoverUrl(params: {
     organizationSlug: string;
     query: string;
-    projectSlug?: string;
+    projectId?: string;
     fields?: string[];
     sort?: string;
     statsPeriod?: string;
@@ -469,7 +469,7 @@ export class SentryApiService {
     const {
       organizationSlug,
       query,
-      projectSlug,
+      projectId,
       fields,
       sort,
       statsPeriod = "24h",
@@ -484,8 +484,8 @@ export class SentryApiService {
     urlParams.set("queryDataset", "error-events");
     urlParams.set("query", query);
 
-    if (projectSlug) {
-      urlParams.set("project", projectSlug);
+    if (projectId) {
+      urlParams.set("project", projectId);
     }
 
     // Discover API includes aggregate functions directly in field list
@@ -537,7 +537,7 @@ export class SentryApiService {
     organizationSlug: string;
     query: string;
     dataset: "spans" | "logs";
-    projectSlug?: string;
+    projectId?: string;
     fields?: string[];
     sort?: string;
     statsPeriod?: string;
@@ -548,7 +548,7 @@ export class SentryApiService {
       organizationSlug,
       query,
       dataset,
-      projectSlug,
+      projectId,
       fields,
       sort,
       statsPeriod = "24h",
@@ -559,8 +559,8 @@ export class SentryApiService {
     const urlParams = new URLSearchParams();
     urlParams.set("query", query);
 
-    if (projectSlug) {
-      urlParams.set("project", projectSlug);
+    if (projectId) {
+      urlParams.set("project", projectId);
     }
 
     // Determine if this is an aggregate query
@@ -635,6 +635,11 @@ export class SentryApiService {
 
     urlParams.set("statsPeriod", statsPeriod);
 
+    // Add table parameter for spans dataset (required for UI)
+    if (dataset === "spans") {
+      urlParams.set("table", "span");
+    }
+
     const basePath = dataset === "logs" ? "logs" : "traces";
     const path = this.isSaas()
       ? `https://${organizationSlug}.sentry.io/explore/${basePath}/`
@@ -652,7 +657,7 @@ export class SentryApiService {
    *
    * @param organizationSlug Organization identifier
    * @param query Sentry search query
-   * @param projectSlug Optional project filter
+   * @param projectId Optional project filter
    * @param dataset Dataset type (spans, errors, or logs)
    * @param fields Array of fields to include in results
    * @param sort Sort parameter (e.g., "-timestamp", "-count()")
@@ -663,7 +668,7 @@ export class SentryApiService {
   getEventsExplorerUrl(
     organizationSlug: string,
     query: string,
-    projectSlug?: string,
+    projectId?: string,
     dataset: "spans" | "errors" | "logs" = "spans",
     fields?: string[],
     sort?: string,
@@ -675,7 +680,7 @@ export class SentryApiService {
       return this.buildDiscoverUrl({
         organizationSlug,
         query,
-        projectSlug,
+        projectId,
         fields,
         sort,
         aggregateFunctions,
@@ -688,7 +693,7 @@ export class SentryApiService {
       organizationSlug,
       query,
       dataset,
-      projectSlug,
+      projectId,
       fields,
       sort,
       aggregateFunctions,
@@ -1707,7 +1712,7 @@ export class SentryApiService {
     query: string;
     fields: string[];
     limit: number;
-    projectSlug?: string;
+    projectId?: string;
     statsPeriod?: string;
     start?: string;
     end?: string;
@@ -1739,8 +1744,8 @@ export class SentryApiService {
       queryParams.set("end", params.end);
     }
 
-    if (params.projectSlug) {
-      queryParams.set("project", params.projectSlug);
+    if (params.projectId) {
+      queryParams.set("project", params.projectId);
     }
 
     // Sort parameter transformation for API compatibility
@@ -1780,7 +1785,7 @@ export class SentryApiService {
     query: string;
     fields: string[];
     limit: number;
-    projectSlug?: string;
+    projectId?: string;
     dataset: "spans" | "ourlogs";
     statsPeriod?: string;
     start?: string;
@@ -1813,8 +1818,8 @@ export class SentryApiService {
       queryParams.set("end", params.end);
     }
 
-    if (params.projectSlug) {
-      queryParams.set("project", params.projectSlug);
+    if (params.projectId) {
+      queryParams.set("project", params.projectId);
     }
 
     // Dataset-specific parameters
@@ -1864,7 +1869,7 @@ export class SentryApiService {
       query,
       fields,
       limit = 10,
-      projectSlug,
+      projectId,
       dataset = "spans",
       statsPeriod,
       start,
@@ -1875,7 +1880,7 @@ export class SentryApiService {
       query: string;
       fields: string[];
       limit?: number;
-      projectSlug?: string;
+      projectId?: string;
       dataset?: "spans" | "errors" | "ourlogs";
       statsPeriod?: string;
       start?: string;
@@ -1892,7 +1897,7 @@ export class SentryApiService {
         query,
         fields,
         limit,
-        projectSlug,
+        projectId,
         statsPeriod,
         start,
         end,
@@ -1904,7 +1909,7 @@ export class SentryApiService {
         query,
         fields,
         limit,
-        projectSlug,
+        projectId,
         dataset,
         statsPeriod,
         start,

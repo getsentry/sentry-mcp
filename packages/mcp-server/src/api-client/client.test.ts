@@ -80,7 +80,7 @@ describe("getEventsExplorerUrl", () => {
       "level:error AND message:timeout",
     );
     expect(result).toMatchInlineSnapshot(
-      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror+AND+message%3Atimeout&statsPeriod=24h"`,
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror+AND+message%3Atimeout&statsPeriod=24h&table=span"`,
     );
   });
   it("should work with self-hosted", () => {
@@ -90,7 +90,7 @@ describe("getEventsExplorerUrl", () => {
       "level:error AND message:timeout",
     );
     expect(result).toMatchInlineSnapshot(
-      `"https://sentry.example.com/organizations/sentry-mcp/explore/traces/?query=level%3Aerror+AND+message%3Atimeout&statsPeriod=24h"`,
+      `"https://sentry.example.com/organizations/sentry-mcp/explore/traces/?query=level%3Aerror+AND+message%3Atimeout&statsPeriod=24h&table=span"`,
     );
   });
   it("should include project parameter when provided", () => {
@@ -101,7 +101,7 @@ describe("getEventsExplorerUrl", () => {
       "backend",
     );
     expect(result).toMatchInlineSnapshot(
-      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror&project=backend&statsPeriod=24h"`,
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=level%3Aerror&project=backend&statsPeriod=24h&table=span"`,
     );
   });
   it("should properly encode special characters in query", () => {
@@ -111,7 +111,7 @@ describe("getEventsExplorerUrl", () => {
       'message:"database timeout" AND level:error',
     );
     expect(result).toMatchInlineSnapshot(
-      `"https://sentry-mcp.sentry.io/explore/traces/?query=message%3A%22database+timeout%22+AND+level%3Aerror&statsPeriod=24h"`,
+      `"https://sentry-mcp.sentry.io/explore/traces/?query=message%3A%22database+timeout%22+AND+level%3Aerror&statsPeriod=24h&table=span"`,
     );
   });
   it("should always use HTTPS protocol", () => {
@@ -120,7 +120,7 @@ describe("getEventsExplorerUrl", () => {
     });
     const result = apiService.getEventsExplorerUrl("sentry-mcp", "level:error");
     expect(result).toMatchInlineSnapshot(
-      `"https://localhost:8000/organizations/sentry-mcp/explore/traces/?query=level%3Aerror&statsPeriod=24h"`,
+      `"https://localhost:8000/organizations/sentry-mcp/explore/traces/?query=level%3Aerror&statsPeriod=24h&table=span"`,
     );
   });
 });
@@ -639,7 +639,7 @@ describe("API query builders", () => {
         query: "level:error",
         fields: ["title", "project", "count()"],
         limit: 50,
-        projectSlug: "backend",
+        projectId: "backend",
         statsPeriod: "24h",
         sort: "-count()",
       });
@@ -702,7 +702,7 @@ describe("API query builders", () => {
         query: "span.op:db",
         fields: ["span.op", "span.description", "span.duration"],
         limit: 20,
-        projectSlug: "frontend",
+        projectId: "frontend",
         dataset: "spans",
         statsPeriod: "1h",
         sort: "-span.duration",
@@ -829,7 +829,7 @@ describe("API query builders", () => {
         const url = apiService.buildDiscoverUrl({
           organizationSlug: "my-org",
           query: "level:error",
-          projectSlug: "backend",
+          projectId: "backend",
           fields: ["title", "project", "timestamp"],
           sort: "-timestamp",
         });
@@ -883,7 +883,7 @@ describe("API query builders", () => {
           organizationSlug: "my-org",
           query: "is_transaction:True",
           dataset: "spans",
-          projectSlug: "123456",
+          projectId: "123456",
           fields: ["span.description", "count()"],
           sort: "-count()",
           aggregateFunctions: ["count()"],
@@ -996,7 +996,7 @@ describe("API query builders", () => {
         });
 
         expect(url).toMatchInlineSnapshot(
-          `"https://sentry.example.com/organizations/my-org/explore/traces/?query=&field=span.op&statsPeriod=24h"`,
+          `"https://sentry.example.com/organizations/my-org/explore/traces/?query=&field=span.op&statsPeriod=24h&table=span"`,
         );
       });
     });

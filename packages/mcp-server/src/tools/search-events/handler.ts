@@ -19,7 +19,6 @@ import {
 } from "./formatters";
 import { RECOMMENDED_FIELDS } from "./config";
 import { UserInputError } from "../../errors";
-import { ApiError } from "../../api-client";
 
 export default defineTool({
   name: "search_events",
@@ -198,7 +197,7 @@ export default defineTool({
           query: sentryQuery,
           fields,
           limit: params.limit,
-          projectSlug: projectId, // API requires numeric project ID, not slug
+          projectId, // API requires numeric project ID, not slug
           dataset: dataset === "logs" ? "ourlogs" : dataset,
           sort: sortParam,
           ...timeParams, // Spread the time parameters

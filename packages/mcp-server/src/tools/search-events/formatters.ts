@@ -59,7 +59,7 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
     output += `\n\n`;
   }
 
-  output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
+  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
@@ -183,7 +183,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
     output += `\n\n`;
   }
 
-  output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
+  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
@@ -330,7 +330,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
     output += `\n\n`;
   }
 
-  output += `**📊 View these results in Sentry**: ${explorerUrl}\n`;
+  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {

@@ -17,11 +17,7 @@ import type {
   ThreadsEntrySchema,
   SentryApiService,
 } from "../api-client";
-import {
-  getOutputForAutofixStep,
-  getStatusDisplayName,
-  isTerminalStatus,
-} from "./tool-helpers/seer";
+import { getOutputForAutofixStep, isTerminalStatus } from "./tool-helpers/seer";
 
 // Language detection mappings
 const LANGUAGE_EXTENSIONS: Record<string, string> = {
