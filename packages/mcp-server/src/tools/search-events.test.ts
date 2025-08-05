@@ -346,6 +346,59 @@ describe("search_events", () => {
     ).rejects.toThrow("missing required 'sort' parameter");
   });
 
+  it("should handle agent self-correction when sort field not in fields array", async () => {
+    // First call: Agent returns sort field not in fields (will fail validation)
+    // Second call: Agent self-corrects by adding sort field to fields array
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        dataset: "errors",
+        query: "test",
+        fields: ["title", "timestamp"], // Added timestamp after self-correction
+        sort: "-timestamp",
+      }),
+      experimental_output: {
+        dataset: "errors",
+        query: "test",
+        fields: ["title", "timestamp"],
+        sort: "-timestamp",
+        explanation: "Self-corrected to include sort field in fields array",
+      },
+    } as any);
+
+    // Mock the Sentry API response
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        return HttpResponse.json({
+          data: [
+            {
+              id: "error1",
+              title: "Test Error",
+              timestamp: "2024-01-15T10:30:00Z",
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "recent errors",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        accessToken: "test-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    // Verify the agent was called and result contains the data
+    expect(mockGenerateText).toHaveBeenCalled();
+    expect(result).toContain("Test Error");
+  });
+
   it("should correctly handle user agent queries", async () => {
     // Mock AI response for user agent query in spans dataset
     mockGenerateText.mockResolvedValueOnce(

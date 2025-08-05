@@ -130,6 +130,45 @@ describeEval("search-events-agent", {
           timeRange: { statsPeriod: "24h" },
         },
       },
+      {
+        // Query that tests sort field self-correction
+        // Agent should self-correct by adding count() to fields when sorting by it
+        input: "Show me the top 10 most frequent error types",
+        expectedTools: [],
+        expected: {
+          dataset: "errors",
+          query: "", // No specific filter, just aggregate all errors
+          // Agent should include count() in fields since we're sorting by it
+          fields: ["error.type", "count()"],
+          // Sort by count in descending order to get "most frequent"
+          sort: "-count()",
+          // timeRange can be null or have a default period
+        },
+      },
+      {
+        // Complex aggregate query that tests sort field self-correction
+        // Agent should self-correct by including avg(span.duration) in fields
+        input:
+          "Show me database operations grouped by type, sorted by average duration",
+        expectedTools: [
+          {
+            name: "datasetAttributes",
+            arguments: {
+              dataset: "spans",
+            },
+          },
+        ],
+        expected: {
+          dataset: "spans",
+          query: /has:db\.|span\.op:db/,
+          // Agent must include avg(span.duration) since we're sorting by it
+          // Accept either span.op or db.operation as the grouping field
+          fields: /\["(span\.op|db\.operation)", .*"avg\(span\.duration\)"\]/,
+          // Sort by average duration
+          sort: "-avg(span.duration)",
+          // timeRange is optional
+        },
+      },
     ];
   },
   task: async (input) => {
