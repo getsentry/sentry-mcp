@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"UserPromptSubmit\", \"additionalContext\": \"If something is unclear, please ask me. Reference our docs when they are available for a task, and make a note when they arent.\"}}'"
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"UserPromptSubmit\", \"additionalContext\": \"MANDATORY: If something is unclear, you MUST ask me. ALWAYS reference our docs when they are available for a task, and make a note when they arent.\"}}'"
           }
         ]
       }
