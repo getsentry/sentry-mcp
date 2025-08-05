@@ -160,10 +160,10 @@ describeEval("search-events-agent", {
         ],
         expected: {
           dataset: "spans",
-          query: /has:db\.|span\.op:db/,
+          query: "has:db.operation",
           // Agent must include avg(span.duration) since we're sorting by it
-          // Accept either span.op or db.operation as the grouping field
-          fields: /\["(span\.op|db\.operation)", .*"avg\(span\.duration\)"\]/,
+          // Use db.operation as the grouping field (span.op is deprecated)
+          fields: ["db.operation", "avg(span.duration)"],
           // Sort by average duration
           sort: "-avg(span.duration)",
           // timeRange is optional
