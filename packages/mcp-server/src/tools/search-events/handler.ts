@@ -226,6 +226,9 @@ export default defineTool({
       sortParam, // Pass sort parameter for URL generation
       aggregateFunctions,
       groupByFields,
+      timeParams.statsPeriod,
+      timeParams.start,
+      timeParams.end,
     );
 
     // Type-safe access to event data with proper validation
