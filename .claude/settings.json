@@ -22,6 +22,19 @@
     ],
     "deny": []
   },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"UserPromptSubmit\", \"additionalContext\": \"If something is unclear, please ask me. Reference our docs when they are available for a task, and make a note when they arent.\"}}'"
+          }
+        ]
+      }
+    ]
+  },
   "enableAllProjectMcpServers": true,
   "includeCoAuthoredBy": false,
   "enabledMcpjsonServers": ["sentry"]

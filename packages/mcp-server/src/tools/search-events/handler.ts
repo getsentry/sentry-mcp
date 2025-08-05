@@ -176,20 +176,6 @@ export default defineTool({
     // Use the AI-provided sort parameter
     const sortParam = parsed.sort;
 
-    // Validate that the sort field is included in the fields array
-    // Extract the field name from the sort parameter (e.g., "-timestamp" -> "timestamp", "-count()" -> "count()")
-    const sortField = sortParam.startsWith("-")
-      ? sortParam.substring(1)
-      : sortParam;
-
-    // Check if the sort field is included in the fields array
-    if (!fields.includes(sortField)) {
-      // Always throw an error to help the agent learn the correct pattern
-      throw new UserInputError(
-        `Sort field "${sortField}" (from sort parameter "${sortParam}") must be included in the fields array. Sentry requires that any field used for sorting must also be explicitly selected. Current fields: [${fields.join(", ")}]. Please add "${sortField}" to the fields array or choose a different sort field that's already in the fields array.`,
-      );
-    }
-
     // Extract time range parameters from parsed response
     const timeParams: { statsPeriod?: string; start?: string; end?: string } =
       {};
