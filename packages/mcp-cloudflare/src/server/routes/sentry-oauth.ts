@@ -56,7 +56,23 @@ export default new Hono<{
    */
   // TODO: this needs to deauthorize if props are not correct (e.g. wrong org slug)
   .get("/authorize", async (c) => {
-    const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+    let oauthReqInfo: AuthRequest;
+    try {
+      oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+    } catch (err) {
+      // Log invalid redirect URI errors without sending them to Sentry
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes("Invalid redirect URI")) {
+        logger.warn(`OAuth authorization failed: ${errorMessage}`, {
+          error: errorMessage,
+          // Don't include the full error object to prevent Sentry capture
+        });
+        return c.text("Invalid redirect URI", 400);
+      }
+      // Re-throw other errors to be captured by Sentry
+      throw err;
+    }
+
     const { clientId } = oauthReqInfo;
     if (!clientId) {
       return c.text("Invalid request", 400);
