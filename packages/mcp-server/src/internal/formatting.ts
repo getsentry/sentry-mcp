@@ -682,9 +682,9 @@ function selectN1QuerySpans(
         description:
           parent.description || evidence.parentSpan || "Parent Operation",
         duration:
-          parent.timestamp - parent.start_timestamp ||
-          parent.duration ||
-          DEFAULT_SPAN_DURATION,
+          parent.timestamp && parent.start_timestamp
+            ? parent.timestamp - parent.start_timestamp
+            : (parent.duration ?? DEFAULT_SPAN_DURATION),
         is_n1_query: false,
         children: [],
         level: 0,
@@ -722,9 +722,9 @@ function selectN1QuerySpans(
         op: span.op || "db.query",
         description: span.description || "Database Query",
         duration:
-          span.timestamp - span.start_timestamp ||
-          span.duration ||
-          DEFAULT_SPAN_DURATION,
+          span.timestamp && span.start_timestamp
+            ? span.timestamp - span.start_timestamp
+            : (span.duration ?? DEFAULT_SPAN_DURATION),
         is_n1_query: true,
         children: [],
         level: parentSpan ? 1 : 0,
