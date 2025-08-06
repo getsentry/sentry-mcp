@@ -32,7 +32,9 @@ export default function Home({ onChatClick }: HomeProps) {
           <Prose>
             <p>
               This service implements the Model Context Protocol (MCP) for
-              interacting with <a href="https://sentry.io/welcome/">Sentry</a>.
+              interacting with <a href="https://sentry.io/welcome/">Sentry</a>,
+              focused on human-in-the-loop coding agents and developer workflows
+              rather than general-purpose API access.
             </p>
           </Prose>
 
@@ -65,9 +67,10 @@ export default function Home({ onChatClick }: HomeProps) {
               <p>
                 Simply put, it's a way to plug Sentry's API into an LLM, letting
                 you ask questions about your data in context of the LLM itself.
-                This lets you take an agent that you already use, like Cursor,
-                and pull in additional information from Sentry to help with
-                tasks like debugging, code generation, and more.
+                This lets you take a coding agent that you already use, like
+                Cursor or Claude Code, and pull in additional information from
+                Sentry to help with tasks like debugging, fixing production
+                errors, and understanding your application's behavior.
               </p>
               <p>
                 This project is still in its infancy as development of the MCP
