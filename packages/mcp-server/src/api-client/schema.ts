@@ -193,6 +193,15 @@ export const IssueSchema = z.object({
   culprit: z.string(),
   type: z.union([z.literal("error"), z.literal("transaction"), z.unknown()]),
   assignedTo: AssignedToSchema.optional(),
+  issueType: z.string().optional(),
+  issueCategory: z.string().optional(),
+  metadata: z
+    .object({
+      title: z.string().optional(),
+      location: z.string().optional(),
+      value: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const IssueListSchema = z.array(IssueSchema);
@@ -371,10 +380,33 @@ export const TransactionEventSchema = BaseEventSchema.omit({
   type: true,
 }).extend({
   type: z.literal("transaction"),
-  occurrence: z.object({
-    issueTitle: z.string(),
-    culprit: z.string().nullable(),
-  }),
+  occurrence: z
+    .object({
+      id: z.string().optional(),
+      projectId: z.number().optional(),
+      eventId: z.string().optional(),
+      fingerprint: z.array(z.string()).optional(),
+      issueTitle: z.string(),
+      subtitle: z.string().optional(),
+      resourceId: z.string().nullable().optional(),
+      evidenceData: z.record(z.string(), z.any()).optional(),
+      evidenceDisplay: z
+        .array(
+          z.object({
+            name: z.string(),
+            value: z.string(),
+            important: z.boolean().optional(),
+          }),
+        )
+        .optional(),
+      type: z.number().optional(),
+      detectionTime: z.number().optional(),
+      level: z.string().optional(),
+      culprit: z.string().nullable(),
+      priority: z.number().optional(),
+      assignee: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 export const UnknownEventSchema = BaseEventSchema.omit({
