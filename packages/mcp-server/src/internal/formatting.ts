@@ -603,7 +603,6 @@ function findFirstInAppFrame(
  * Constants for performance issue formatting
  */
 const MAX_SPANS_IN_TREE = 10;
-const DEFAULT_SPAN_DURATION = 0;
 const MAX_QUERY_GROUPS = 10;
 
 /**
@@ -681,10 +680,7 @@ function selectN1QuerySpans(
         op: parent.op || "unknown",
         description:
           parent.description || evidence.parentSpan || "Parent Operation",
-        duration:
-          parent.timestamp && parent.start_timestamp
-            ? parent.timestamp - parent.start_timestamp
-            : (parent.duration ?? DEFAULT_SPAN_DURATION),
+        duration: parent.timestamp - parent.start_timestamp || parent.duration,
         is_n1_query: false,
         children: [],
         level: 0,
@@ -692,21 +688,6 @@ function selectN1QuerySpans(
       selected.push(parentSpan);
       spanCount++;
     }
-  }
-
-  // If we don't have a parent span but have evidence description, create a synthetic one
-  if (!parentSpan && evidence?.parentSpan) {
-    parentSpan = {
-      span_id: "parent",
-      op: evidence.op || "operation",
-      description: evidence.parentSpan,
-      duration: DEFAULT_SPAN_DURATION,
-      is_n1_query: false,
-      children: [],
-      level: 0,
-    };
-    selected.push(parentSpan);
-    spanCount++;
   }
 
   // Add N+1 query spans
@@ -721,41 +702,7 @@ function selectN1QuerySpans(
         span_id: span.span_id || span.id || "unknown",
         op: span.op || "db.query",
         description: span.description || "Database Query",
-        duration:
-          span.timestamp && span.start_timestamp
-            ? span.timestamp - span.start_timestamp
-            : (span.duration ?? DEFAULT_SPAN_DURATION),
-        is_n1_query: true,
-        children: [],
-        level: parentSpan ? 1 : 0,
-      };
-
-      if (parentSpan) {
-        parentSpan.children.push(perfSpan);
-      } else {
-        selected.push(perfSpan);
-      }
-      spanCount++;
-
-      if (spanCount >= maxSpans) break;
-    }
-  } else if (evidence?.repeatingSpansCompact || evidence?.repeatingSpans) {
-    // If we don't have individual span IDs but have the pattern, create synthetic spans
-    const queryPattern =
-      evidence.repeatingSpansCompact || evidence.repeatingSpans;
-    const queryCount = Math.min(
-      evidence.numberRepeatingSpans
-        ? safeParseInt(evidence.numberRepeatingSpans, 3)
-        : 3,
-      maxSpans - spanCount,
-    );
-
-    for (let i = 0; i < queryCount; i++) {
-      const perfSpan: PerformanceSpan = {
-        span_id: `n1-query-${i}`,
-        op: evidence.op || "db.query",
-        description: queryPattern,
-        duration: DEFAULT_SPAN_DURATION, // No duration info available
+        duration: span.timestamp - span.start_timestamp || span.duration,
         is_n1_query: true,
         children: [],
         level: parentSpan ? 1 : 0,
