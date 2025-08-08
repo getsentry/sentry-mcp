@@ -15,7 +15,11 @@ export interface ToolConfig<
   handler: (
     params: z.infer<z.ZodObject<TSchema>>,
     context: ServerContext,
-  ) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
+  ) => Promise<
+    | string
+    | Record<string, unknown>
+    | (TextContent | ImageContent | EmbeddedResource)[]
+  >;
 }
 
 /**
