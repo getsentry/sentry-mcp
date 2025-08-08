@@ -9,7 +9,7 @@ export function isSentryHost(host: string): boolean {
 
 /**
  * Generates a Sentry issue URL.
- * @param host The Sentry host
+ * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier
  * @param issueId Issue identifier (e.g., "PROJECT-123")
  * @returns The complete issue URL
@@ -20,14 +20,17 @@ export function getIssueUrl(
   issueId: string,
 ): string {
   const isSaas = isSentryHost(host);
+  // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+  // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+  const webHost = isSaas ? "sentry.io" : host;
   return isSaas
-    ? `https://${organizationSlug}.${host}/issues/${issueId}`
+    ? `https://${organizationSlug}.${webHost}/issues/${issueId}`
     : `https://${host}/organizations/${organizationSlug}/issues/${issueId}`;
 }
 
 /**
  * Generates a Sentry issues search URL.
- * @param host The Sentry host
+ * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier
  * @param query Optional search query
  * @param projectSlugOrId Optional project slug or ID
@@ -40,8 +43,11 @@ export function getIssuesSearchUrl(
   projectSlugOrId?: string,
 ): string {
   const isSaas = isSentryHost(host);
+  // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+  // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+  const webHost = isSaas ? "sentry.io" : host;
   let url = isSaas
-    ? `https://${organizationSlug}.${host}/issues/`
+    ? `https://${organizationSlug}.${webHost}/issues/`
     : `https://${host}/organizations/${organizationSlug}/issues/`;
 
   const params = new URLSearchParams();
@@ -62,7 +68,7 @@ export function getIssuesSearchUrl(
 
 /**
  * Generates a Sentry trace URL for performance investigation.
- * @param host The Sentry host
+ * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier
  * @param traceId Trace identifier
  * @returns The complete trace URL
@@ -73,14 +79,17 @@ export function getTraceUrl(
   traceId: string,
 ): string {
   const isSaas = isSentryHost(host);
+  // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+  // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+  const webHost = isSaas ? "sentry.io" : host;
   return isSaas
-    ? `https://${organizationSlug}.${host}/explore/traces/trace/${traceId}`
+    ? `https://${organizationSlug}.${webHost}/explore/traces/trace/${traceId}`
     : `https://${host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`;
 }
 
 /**
  * Generates a Sentry events explorer URL.
- * @param host The Sentry host
+ * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier
  * @param query Search query
  * @param dataset Dataset type
@@ -97,8 +106,11 @@ export function getEventsExplorerUrl(
   fields?: string[],
 ): string {
   const isSaas = isSentryHost(host);
+  // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+  // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+  const webHost = isSaas ? "sentry.io" : host;
   let url = isSaas
-    ? `https://${organizationSlug}.${host}/explore/`
+    ? `https://${organizationSlug}.${webHost}/explore/`
     : `https://${host}/organizations/${organizationSlug}/explore/`;
 
   const params = new URLSearchParams();

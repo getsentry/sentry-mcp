@@ -527,8 +527,11 @@ export class SentryApiService {
       urlParams.set("yAxis", "count()");
     }
 
+    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+    const webHost = this.isSaas() ? "sentry.io" : this.host;
     const path = this.isSaas()
-      ? `https://${organizationSlug}.sentry.io/explore/discover/homepage/`
+      ? `https://${organizationSlug}.${webHost}/explore/discover/homepage/`
       : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
 
     return `${path}?${urlParams.toString()}`;
@@ -662,8 +665,11 @@ export class SentryApiService {
     }
 
     const basePath = dataset === "logs" ? "logs" : "traces";
+    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+    const webHost = this.isSaas() ? "sentry.io" : this.host;
     const path = this.isSaas()
-      ? `https://${organizationSlug}.sentry.io/explore/${basePath}/`
+      ? `https://${organizationSlug}.${webHost}/explore/${basePath}/`
       : `https://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
 
     return `${path}?${urlParams.toString()}`;
