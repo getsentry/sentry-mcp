@@ -18,12 +18,37 @@ describe("resources", () => {
       const guideResource = RESOURCES.find(
         (r) => r.name === "sentry-docs-platform-guide",
       );
+      const aboutResource = RESOURCES.find(
+        (r) => r.name === "sentry-mcp-about",
+      );
 
       expect(templateResource).toBeDefined();
       expect(guideResource).toBeDefined();
+      expect(aboutResource).toBeDefined();
 
       expect(isTemplateResource(templateResource!)).toBe(true);
       expect(isTemplateResource(guideResource!)).toBe(true);
+      expect(isTemplateResource(aboutResource!)).toBe(false);
+    });
+  });
+
+  describe("aboutHandler", () => {
+    it("should return about content", async () => {
+      const aboutResource = RESOURCES.find(
+        (r) => r.name === "sentry-mcp-about",
+      );
+      expect(aboutResource).toBeDefined();
+
+      const result = await aboutResource!.handler(
+        new URL("sentry://about"),
+        {} as RequestHandlerExtra<any, any>,
+      );
+
+      expect(result.contents).toHaveLength(1);
+      expect(result.contents[0].uri).toBe("sentry://about");
+      expect(result.contents[0].mimeType).toBe("text/markdown");
+      expect(result.contents[0].text).toBeDefined();
+      expect(result.contents[0].text).toBeTruthy();
     });
   });
 

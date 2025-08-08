@@ -155,8 +155,36 @@ async function sentryDocsHandler(
 
 // Import platform constants from constants
 import { SENTRY_PLATFORMS_BASE, SENTRY_FRAMEWORKS } from "./constants";
+import { ABOUT_CONTENT } from "./resources/index";
+
+/**
+ * Handler for the about resource.
+ * Returns information about the Sentry MCP service and what users can do with it.
+ */
+async function aboutHandler(
+  url: URL,
+  _extra: RequestHandlerExtra<any, any>,
+): Promise<ReadResourceResult> {
+  return {
+    contents: [
+      {
+        uri: url.toString(),
+        mimeType: "text/markdown",
+        text: ABOUT_CONTENT,
+      },
+    ],
+  };
+}
 
 export const RESOURCES: ResourceConfig[] = [
+  // About guide for user discovery
+  {
+    name: "sentry-mcp-about",
+    uri: "sentry://about",
+    description: "Information about Sentry MCP service and its capabilities",
+    mimeType: "text/markdown",
+    handler: aboutHandler,
+  } as UriResourceConfig,
   // Platform documentation with dynamic segments
   {
     name: "sentry-docs-platform",
