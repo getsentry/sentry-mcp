@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   validateSentryHostThrows,
   validateAndParseSentryUrlThrows,
+  getIssueUrl,
+  getIssuesSearchUrl,
+  getTraceUrl,
+  getEventsExplorerUrl,
 } from "./url-utils";
 
 describe("url-utils", () => {
@@ -78,6 +82,126 @@ describe("url-utils", () => {
       expect(() =>
         validateAndParseSentryUrlThrows("https://[invalid-bracket"),
       ).toThrow("SENTRY_URL must be a valid HTTPS URL");
+    });
+  });
+
+  describe("getIssueUrl", () => {
+    it("should handle regional URLs correctly for SaaS", () => {
+      const result = getIssueUrl("us.sentry.io", "myorg", "PROJ-123");
+      expect(result).toBe("https://myorg.sentry.io/issues/PROJ-123");
+    });
+
+    it("should handle EU regional URLs correctly", () => {
+      const result = getIssueUrl("eu.sentry.io", "myorg", "PROJ-456");
+      expect(result).toBe("https://myorg.sentry.io/issues/PROJ-456");
+    });
+
+    it("should handle standard sentry.io correctly", () => {
+      const result = getIssueUrl("sentry.io", "myorg", "PROJ-789");
+      expect(result).toBe("https://myorg.sentry.io/issues/PROJ-789");
+    });
+
+    it("should handle self-hosted correctly", () => {
+      const result = getIssueUrl("sentry.example.com", "myorg", "PROJ-123");
+      expect(result).toBe(
+        "https://sentry.example.com/organizations/myorg/issues/PROJ-123",
+      );
+    });
+  });
+
+  describe("getIssuesSearchUrl", () => {
+    it("should handle regional URLs correctly for SaaS", () => {
+      const result = getIssuesSearchUrl(
+        "us.sentry.io",
+        "myorg",
+        "is:unresolved",
+        "proj1",
+      );
+      expect(result).toBe(
+        "https://myorg.sentry.io/issues/?project=proj1&query=is%3Aunresolved",
+      );
+    });
+
+    it("should handle EU regional URLs correctly", () => {
+      const result = getIssuesSearchUrl("eu.sentry.io", "myorg", "is:resolved");
+      expect(result).toBe(
+        "https://myorg.sentry.io/issues/?query=is%3Aresolved",
+      );
+    });
+
+    it("should handle self-hosted correctly", () => {
+      const result = getIssuesSearchUrl(
+        "sentry.example.com",
+        "myorg",
+        "is:unresolved",
+        "proj1",
+      );
+      expect(result).toBe(
+        "https://sentry.example.com/organizations/myorg/issues/?project=proj1&query=is%3Aunresolved",
+      );
+    });
+  });
+
+  describe("getTraceUrl", () => {
+    it("should handle regional URLs correctly for SaaS", () => {
+      const result = getTraceUrl("us.sentry.io", "myorg", "abc123def456");
+      expect(result).toBe(
+        "https://myorg.sentry.io/explore/traces/trace/abc123def456",
+      );
+    });
+
+    it("should handle EU regional URLs correctly", () => {
+      const result = getTraceUrl("eu.sentry.io", "myorg", "xyz789");
+      expect(result).toBe(
+        "https://myorg.sentry.io/explore/traces/trace/xyz789",
+      );
+    });
+
+    it("should handle self-hosted correctly", () => {
+      const result = getTraceUrl("sentry.example.com", "myorg", "abc123");
+      expect(result).toBe(
+        "https://sentry.example.com/organizations/myorg/explore/traces/trace/abc123",
+      );
+    });
+  });
+
+  describe("getEventsExplorerUrl", () => {
+    it("should handle regional URLs correctly for SaaS", () => {
+      const result = getEventsExplorerUrl(
+        "us.sentry.io",
+        "myorg",
+        "level:error",
+        "errors",
+        "proj1",
+      );
+      expect(result).toBe(
+        "https://myorg.sentry.io/explore/?query=level%3Aerror&dataset=errors&layout=table&project=proj1",
+      );
+    });
+
+    it("should handle EU regional URLs correctly", () => {
+      const result = getEventsExplorerUrl(
+        "eu.sentry.io",
+        "myorg",
+        "level:warning",
+        "spans",
+      );
+      expect(result).toBe(
+        "https://myorg.sentry.io/explore/?query=level%3Awarning&dataset=spans&layout=table",
+      );
+    });
+
+    it("should handle self-hosted correctly", () => {
+      const result = getEventsExplorerUrl(
+        "sentry.example.com",
+        "myorg",
+        "level:error",
+        "logs",
+        "proj1",
+      );
+      expect(result).toBe(
+        "https://sentry.example.com/organizations/myorg/explore/?query=level%3Aerror&dataset=logs&layout=table&project=proj1",
+      );
     });
   });
 });
