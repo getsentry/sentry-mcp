@@ -31,63 +31,6 @@ export function isNumericId(value: string): boolean {
 const VALID_SLUG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
 /**
- * Path traversal patterns that could be used in attacks.
- * Includes various encoded forms to catch bypass attempts.
- */
-const PATH_TRAVERSAL_PATTERNS = [
-  "..",
-  "./",
-  "/..",
-  "../",
-  "\\",
-  "%2e%2e",
-  "%252e%252e",
-  "..%2f",
-  "%2e%2e%2f",
-  "..%252f",
-  "%252e%252e%252f",
-  "..\\",
-  "..%5c",
-  "%2e%2e%5c",
-  "%252e%252e%5c",
-  "..%255c",
-  "%252e%252e%255c",
-];
-
-/**
- * Characters that are dangerous in URL contexts.
- */
-const DANGEROUS_CHARS = [
-  "/",
-  "\\",
-  "?",
-  "#",
-  "&",
-  "=",
-  ";",
-  ":",
-  "@",
-  "$",
-  ",",
-  "<",
-  ">",
-  '"',
-  "'",
-  "`",
-  "{",
-  "}",
-  "[",
-  "]",
-  "|",
-  "^",
-  "~",
-  "\0",
-  "\t",
-  "\n",
-  "\r",
-];
-
-/**
  * Validates a slug to prevent path traversal and injection attacks.
  * Designed to be used with Zod's superRefine() method.
  *
@@ -125,39 +68,7 @@ export function validateSlug(val: string, ctx: z.RefinementCtx): void {
     return;
   }
 
-  // Check for path traversal patterns (case-insensitive)
-  const lowerVal = val.toLowerCase();
-  for (const pattern of PATH_TRAVERSAL_PATTERNS) {
-    if (lowerVal.includes(pattern)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Slug contains path traversal sequence",
-      });
-      return;
-    }
-  }
-
-  // Check for URL encoding (could hide malicious patterns)
-  if (val.includes("%")) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Slug contains URL-encoded characters which are not allowed",
-    });
-    return;
-  }
-
-  // Check for dangerous characters
-  for (const char of DANGEROUS_CHARS) {
-    if (val.includes(char)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Slug contains invalid character '${char}'`,
-      });
-      return;
-    }
-  }
-
-  // Validate pattern
+  // Validate pattern - this implicitly blocks all dangerous characters and patterns
   if (!VALID_SLUG_PATTERN.test(val)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
