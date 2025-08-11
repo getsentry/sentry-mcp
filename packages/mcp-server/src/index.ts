@@ -102,14 +102,13 @@ Sentry.init({
       "mcp.mcp-url": mcpUrl,
     },
   },
-  enableLogs: true,
   release: process.env.SENTRY_RELEASE,
   integrations: [
     Sentry.consoleLoggingIntegration(),
     Sentry.zodErrorsIntegration(),
     Sentry.vercelAIIntegration({
-      recordInputs: false,
-      recordOutputs: false,
+      recordInputs: true,
+      recordOutputs: true,
     }),
   ],
   environment:

@@ -102,10 +102,7 @@ const result = streamText({
   model: openai("gpt-4o"),
   messages: processedMessages,
   tools: mcpTools,
-  system: "You are an AI assistant for testing Sentry MCP...",
-  experimental_telemetry: {
-    isEnabled: true,
-  },
+  system: "You are an AI assistant for testing Sentry MCP..."
 });
 ```
 
