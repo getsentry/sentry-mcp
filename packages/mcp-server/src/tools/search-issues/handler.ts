@@ -11,6 +11,7 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
+import { validateSlugOrId, isNumericId } from "../../utils/slug-validation";
 import { searchIssuesAgent } from "./agent";
 import { formatIssueResults, formatExplanation } from "./formatters";
 import { UserInputError } from "../../errors";
@@ -63,6 +64,9 @@ export default defineTool({
       .describe("Natural language description of issues to search for"),
     projectSlugOrId: z
       .string()
+      .toLowerCase()
+      .trim()
+      .superRefine(validateSlugOrId)
       .optional()
       .describe("The project's slug or numeric ID (optional)"),
     regionUrl: ParamRegionUrl.optional(),
@@ -87,7 +91,7 @@ export default defineTool({
     setTag("organization.slug", params.organizationSlug);
     if (params.projectSlugOrId) {
       // Check if it's a numeric ID or a slug and tag appropriately
-      if (/^\d+$/.test(params.projectSlugOrId)) {
+      if (isNumericId(params.projectSlugOrId)) {
         setTag("project.id", params.projectSlugOrId);
       } else {
         setTag("project.slug", params.projectSlugOrId);
@@ -98,7 +102,7 @@ export default defineTool({
     let projectId: string | undefined;
     if (params.projectSlugOrId) {
       // Check if it's already a numeric ID
-      if (/^\d+$/.test(params.projectSlugOrId)) {
+      if (isNumericId(params.projectSlugOrId)) {
         projectId = params.projectSlugOrId;
       } else {
         // It's a slug, convert to ID
