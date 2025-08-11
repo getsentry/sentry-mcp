@@ -32,7 +32,7 @@
     "severity": 0,
     "severity_reason": "ml",
     "initial_priority": 50,
-    "title": null
+    "title": "Error: Tool list_organizations is already registered"
   },
   "numComments": 0,
   "assignedTo": null,
