@@ -30,7 +30,6 @@
     "@sentry/mcp-server": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "@sentry/vite-plugin": "catalog:",
-    "@spotlightjs/spotlight": "^3.0.1",
     "@tailwindcss/typography": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/react": "catalog:",
