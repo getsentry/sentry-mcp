@@ -102,7 +102,9 @@ Sentry.init({
       "mcp.mcp-url": mcpUrl,
     },
   },
-  enableLogs: true,
+  _experiments: {
+    enableLogs: true,
+  },
   release: process.env.SENTRY_RELEASE,
   integrations: [
     Sentry.consoleLoggingIntegration(),
