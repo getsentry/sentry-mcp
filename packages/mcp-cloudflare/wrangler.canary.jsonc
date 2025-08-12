@@ -1,10 +1,10 @@
 /**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
+ * Canary configuration for sentry-mcp worker
+ * Uses separate resources for complete isolation from production
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "sentry-mcp",
+  "name": "sentry-mcp-canary",
   "main": "./src/server/index.ts",
   "compatibility_date": "2025-03-21",
   "compatibility_flags": [
@@ -12,9 +12,6 @@
     "nodejs_compat_populate_process_env",
     "global_fetch_strictly_public"
   ],
-  // we ask people to configure environment variables in prod
-  // Available environment variables:
-  // - AUTORAG_INDEX_NAME: Name of the AutoRAG index to use for documentation search (default: "sentry-docs")
   "keep_vars": true,
   "migrations": [
     {
@@ -44,7 +41,7 @@
       {
         "name": "CHAT_RATE_LIMITER",
         "type": "ratelimit",
-        "namespace_id": "1001",
+        "namespace_id": "2001",
         "simple": {
           "limit": 10,
           "period": 60
@@ -53,7 +50,7 @@
       {
         "name": "SEARCH_RATE_LIMITER",
         "type": "ratelimit",
-        "namespace_id": "1002",
+        "namespace_id": "2002",
         "simple": {
           "limit": 20,
           "period": 60
@@ -64,7 +61,7 @@
   "kv_namespaces": [
     {
       "binding": "OAUTH_KV",
-      "id": "8dd5e9bafe1945298e2d5ca3b408a553"
+      "id": "a3fe0d23b2d34416930e284362a88a3b"
     }
   ],
   "ai": {
@@ -74,11 +71,8 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
-  "tail_consumers": [
-    // super noisy - disable until it can be improve
-    // { "service": "sentry-mcp-tail" }
-  ],
+  "tail_consumers": [],
   "dev": {
-    "port": 8788
+    "port": 8789
   }
 }

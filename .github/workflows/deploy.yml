@@ -49,7 +49,7 @@ jobs:
         run: pnpm install
 
       # === BUILD AND DEPLOY CANARY WORKER ===
-      - name: Build for Canary
+      - name: Build
         working-directory: packages/mcp-cloudflare
         run: pnpm build
         env:
@@ -62,7 +62,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: deploy --name sentry-mcp-canary
+          command: deploy --config wrangler.canary.jsonc
           packageManager: pnpm
 
       - name: Wait for Canary to Propagate
@@ -99,7 +99,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: deploy --name sentry-mcp
+          command: deploy
           packageManager: pnpm
 
       - name: Wait for Production to Propagate
@@ -135,7 +135,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: rollback --name sentry-mcp
+          command: rollback
           packageManager: pnpm
         continue-on-error: true
 
