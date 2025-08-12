@@ -48,10 +48,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build
+      - name: Build for Canary
         run: pnpm build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          CLOUDFLARE_ENV: canary
 
       # === CANARY DEPLOYMENT ===
       - name: Create Canary Deployment
@@ -91,7 +92,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: deploy --env canary
+          command: deploy
           packageManager: pnpm
 
       - name: Update Canary Deployment Status
@@ -130,9 +131,24 @@ jobs:
           PREVIEW_URL: https://sentry-mcp-canary.getsentry.workers.dev
         run: |
           echo "Running smoke tests against canary environment..."
-          pnpm test
+          pnpm test:ci
+
+      - name: Publish Smoke Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: always() && steps.smoke_tests.outcome != 'skipped'
+        with:
+          report_paths: "**/tests.junit.xml"
+          check_name: "Canary Smoke Test Results"
+          fail_on_failure: false
 
       # === PRODUCTION DEPLOYMENT (only if smoke tests pass) ===
+      - name: Rebuild for Production
+        if: success()
+        run: pnpm build
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # No CLOUDFLARE_ENV means build for production
+
       - name: Create Production Deployment
         id: prod_deployment
         if: success()
