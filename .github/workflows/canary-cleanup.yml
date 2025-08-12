@@ -10,10 +10,19 @@ permissions:
 
 jobs:
   cleanup:
-    name: Mark Canary Deployment Inactive
+    name: Cleanup Canary Worker
     runs-on: ubuntu-latest
     
     steps:
+      - name: Delete Canary Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: delete --name sentry-mcp-pr-${{ github.event.pull_request.number }} --force
+          packageManager: pnpm
+        continue-on-error: true  # Don't fail if worker doesn't exist
+      
       - name: Mark Deployments as Inactive
         uses: actions/github-script@v7
         with:
@@ -37,7 +46,7 @@ jobs:
                   repo: context.repo.repo,
                   deployment_id: deployment.id,
                   state: 'inactive',
-                  description: 'PR closed - deployment marked inactive',
+                  description: 'PR closed - worker deleted',
                   auto_inactive: false
                 });
                 console.log(`Marked deployment ${deployment.id} as inactive`);
