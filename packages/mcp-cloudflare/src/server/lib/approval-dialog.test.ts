@@ -21,7 +21,7 @@ describe("approval-dialog", () => {
     // Mock crypto.getRandomValues to return predictable values for testing
     mockGetRandomValues.mockReturnValue(new Uint8Array(16).fill(1));
     // Mock Date.now to return a predictable timestamp
-    vi.spyOn(Date, 'now').mockReturnValue(1000000000000); // Fixed timestamp for testing
+    vi.spyOn(Date, "now").mockReturnValue(1000000000000); // Fixed timestamp for testing
   });
 
   describe("renderApprovalDialog", () => {
@@ -34,6 +34,8 @@ describe("approval-dialog", () => {
         client: {
           clientId: "test-client-id",
           clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+          tokenEndpointAuthMethod: "client_secret_basic",
         },
         server: {
           name: "Test Server",
@@ -66,6 +68,8 @@ describe("approval-dialog", () => {
         client: {
           clientId: "test-client-id",
           clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+          tokenEndpointAuthMethod: "client_secret_basic",
         },
         server: {
           name: "Test Server",
@@ -90,6 +94,8 @@ describe("approval-dialog", () => {
         client: {
           clientId: "test-client-id",
           clientName: "<script>alert('xss')</script>",
+          redirectUris: ["https://example.com/callback"],
+          tokenEndpointAuthMethod: "client_secret_basic",
         },
         server: {
           name: "Test Server",
@@ -109,7 +115,10 @@ describe("approval-dialog", () => {
   describe("parseRedirectApproval", () => {
     it("should reject requests without CSRF token", async () => {
       const formData = new FormData();
-      formData.append("state", btoa(JSON.stringify({ oauthReqInfo: { clientId: "test-client" } })));
+      formData.append(
+        "state",
+        btoa(JSON.stringify({ oauthReqInfo: { clientId: "test-client" } })),
+      );
       // Missing CSRF token
 
       const mockRequest = new Request("https://example.com/oauth/authorize", {
@@ -120,14 +129,17 @@ describe("approval-dialog", () => {
         },
       });
 
-      await expect(parseRedirectApproval(mockRequest, "test-secret")).rejects.toThrow(
-        "Missing or invalid CSRF token in form data."
-      );
+      await expect(
+        parseRedirectApproval(mockRequest, "test-secret"),
+      ).rejects.toThrow("Missing or invalid CSRF token in form data.");
     });
 
     it("should reject requests with invalid CSRF token", async () => {
       const formData = new FormData();
-      formData.append("state", btoa(JSON.stringify({ oauthReqInfo: { clientId: "test-client" } })));
+      formData.append(
+        "state",
+        btoa(JSON.stringify({ oauthReqInfo: { clientId: "test-client" } })),
+      );
       formData.append("csrf_token", "invalid-token");
 
       const mockRequest = new Request("https://example.com/oauth/authorize", {
@@ -138,9 +150,9 @@ describe("approval-dialog", () => {
         },
       });
 
-      await expect(parseRedirectApproval(mockRequest, "test-secret")).rejects.toThrow(
-        "Invalid CSRF token. Request may be forged."
-      );
+      await expect(
+        parseRedirectApproval(mockRequest, "test-secret"),
+      ).rejects.toThrow("Invalid CSRF token. Request may be forged.");
     });
 
     it("should reject non-POST requests", async () => {
@@ -148,9 +160,9 @@ describe("approval-dialog", () => {
         method: "GET",
       });
 
-      await expect(parseRedirectApproval(mockRequest, "test-secret")).rejects.toThrow(
-        "Invalid request method. Expected POST."
-      );
+      await expect(
+        parseRedirectApproval(mockRequest, "test-secret"),
+      ).rejects.toThrow("Invalid request method. Expected POST.");
     });
 
     it("should reject requests without state", async () => {
@@ -166,9 +178,9 @@ describe("approval-dialog", () => {
         },
       });
 
-      await expect(parseRedirectApproval(mockRequest, "test-secret")).rejects.toThrow(
-        "Missing or invalid 'state' in form data."
-      );
+      await expect(
+        parseRedirectApproval(mockRequest, "test-secret"),
+      ).rejects.toThrow("Missing or invalid 'state' in form data.");
     });
   });
 });

@@ -240,55 +240,6 @@ function decodeState<T = any>(encoded: string): T {
 }
 
 /**
- * Configuration for the approval dialog
- */
-export interface ApprovalDialogOptions {
-  /**
-   * Client information to display in the approval dialog
-   */
-  client: ClientInfo | null;
-  /**
-   * Server information to display in the approval dialog
-   */
-  server: {
-    name: string;
-    logo?: string;
-    description?: string;
-  };
-  /**
-   * Arbitrary state data to pass through the approval flow
-   * Will be encoded in the form and returned when approval is complete
-   */
-  state: Record<string, any>;
-  /**
-   * Name of the cookie to use for storing approvals
-   * @default "mcp_approved_clients"
-   */
-  cookieName?: string;
-  /**
-   * Secret used to sign cookies for verification
-   * Can be a string or Uint8Array
-   * @default Built-in Uint8Array key
-   */
-  cookieSecret?: string | Uint8Array;
-  /**
-   * Cookie domain
-   * @default current domain
-   */
-  cookieDomain?: string;
-  /**
-   * Cookie path
-   * @default "/"
-   */
-  cookiePath?: string;
-  /**
-   * Cookie max age in seconds
-   * @default 30 days
-   */
-  cookieMaxAge?: number;
-}
-
-/**
  * Renders an approval dialog for OAuth authorization
  * The dialog displays information about the client and server
  * and includes a form to submit approval
@@ -674,7 +625,7 @@ export async function parseRedirectApproval(
     }
 
     // Validate CSRF token
-    if (!await validateCSRFTokenFromRequest(request, csrfToken)) {
+    if (!(await validateCSRFTokenFromRequest(request, csrfToken))) {
       throw new Error("Invalid CSRF token. Request may be forged.");
     }
 
@@ -727,8 +678,12 @@ export async function parseRedirectApproval(
 function generateCSRFToken(): string {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
-  const timestamp = Math.floor(Date.now() / 1000).toString(16).padStart(8, '0');
-  const randomPart = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  const timestamp = Math.floor(Date.now() / 1000)
+    .toString(16)
+    .padStart(8, "0");
+  const randomPart = Array.from(array, (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
   return timestamp + randomPart.substring(0, 24); // 8 chars timestamp + 24 chars random
 }
 
@@ -737,12 +692,15 @@ function generateCSRFToken(): string {
  * @param request - The HTTP request to generate the token for
  * @returns An object containing the token and Set-Cookie header
  */
-function generateAndSetCSRFToken(request: Request): { token: string; cookieHeader: string } {
+function generateAndSetCSRFToken(request: Request): {
+  token: string;
+  cookieHeader: string;
+} {
   const token = generateCSRFToken();
   const domain = new URL(request.url).hostname;
-  
+
   const cookieHeader = `${CSRF_COOKIE_NAME}=${token}; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=${CSRF_TOKEN_EXPIRY}`;
-  
+
   return { token, cookieHeader };
 }
 
@@ -752,40 +710,45 @@ function generateAndSetCSRFToken(request: Request): { token: string; cookieHeade
  * @param submittedToken - The CSRF token submitted in the form
  * @returns true if the token is valid, false otherwise
  */
-async function validateCSRFTokenFromRequest(request: Request, submittedToken: string): Promise<boolean> {
+async function validateCSRFTokenFromRequest(
+  request: Request,
+  submittedToken: string,
+): Promise<boolean> {
   const cookieHeader = request.headers.get("Cookie");
   if (!cookieHeader) return false;
-  
+
   const cookies = cookieHeader.split(";").map((c) => c.trim());
   const csrfCookie = cookies.find((c) => c.startsWith(`${CSRF_COOKIE_NAME}=`));
-  
+
   if (!csrfCookie) return false;
-  
+
   const storedToken = csrfCookie.substring(CSRF_COOKIE_NAME.length + 1);
-  
+
   // Validate token format (should be 32 characters: 8 timestamp + 24 random)
   if (submittedToken.length !== 32 || storedToken.length !== 32) {
     return false;
   }
-  
+
   // Extract and validate timestamp (first 8 characters)
-  const submittedTimestamp = parseInt(submittedToken.substring(0, 8), 16);
-  const storedTimestamp = parseInt(storedToken.substring(0, 8), 16);
+  const submittedTimestamp = Number.parseInt(submittedToken.substring(0, 8), 16);
+  const storedTimestamp = Number.parseInt(storedToken.substring(0, 8), 16);
   const currentTime = Math.floor(Date.now() / 1000);
-  
+
   // Token should not be older than 1 hour
-  if (currentTime - submittedTimestamp > CSRF_TOKEN_EXPIRY || 
-      currentTime - storedTimestamp > CSRF_TOKEN_EXPIRY) {
+  if (
+    currentTime - submittedTimestamp > CSRF_TOKEN_EXPIRY ||
+    currentTime - storedTimestamp > CSRF_TOKEN_EXPIRY
+  ) {
     return false;
   }
-  
+
   // Compare the submitted token with the stored token
   // Use constant-time comparison to prevent timing attacks
   let result = 0;
   for (let i = 0; i < submittedToken.length; i++) {
     result |= submittedToken.charCodeAt(i) ^ storedToken.charCodeAt(i);
   }
-  
+
   return result === 0;
 }
 
