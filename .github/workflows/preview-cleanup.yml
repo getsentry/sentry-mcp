@@ -1,0 +1,49 @@
+name: Preview Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    name: Delete Preview Environment
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # pnpm/action-setup@v4
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Delete Preview Environment
+        working-directory: packages/mcp-cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # Get branch name and construct environment name (same as deploy)
+          BRANCH_NAME="${{ github.head_ref }}"
+          ENV_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
+          ENV_NAME="preview-${ENV_NAME}"
+          
+          echo "Deleting preview environment: $ENV_NAME"
+          
+          # Delete the Worker using the environment flag
+          # The --env flag tells wrangler which environment to delete
+          pnpx wrangler delete --env "$ENV_NAME" --force || echo "Environment may not exist or already deleted"
+          
+          echo "Cleanup completed for PR #${{ github.event.pull_request.number }}"

@@ -1,0 +1,14 @@
+{
+  "name": "@sentry/mcp-smoke-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

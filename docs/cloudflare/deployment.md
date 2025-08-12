@@ -126,6 +126,7 @@ Production deployments happen automatically when changes are pushed to the main 
 Required secrets in GitHub repository settings:
 - `CLOUDFLARE_API_TOKEN` - API token with Workers deployment permissions
 - `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
+- `SENTRY_AUTH_TOKEN` - For source map uploads during build
 
 See `github-actions.mdc` for detailed setup instructions.
 
@@ -142,19 +143,70 @@ pnpm deploy
 pnpm deploy --env production
 ```
 
-#### Version Uploads (Gradual Rollouts)
+#### Preview Environments
 
-For feature branches, GitHub Actions automatically uploads new versions without deploying:
+For pull requests, GitHub Actions automatically creates isolated preview environments:
 
-1. Push to any branch (except main)
+1. Open or update a pull request
 2. Tests run automatically
-3. If tests pass, version is uploaded to Cloudflare
-4. Use Cloudflare dashboard to gradually roll out the version
+3. If tests pass, deploys to a preview environment
+4. Preview environment is **completely isolated** from production
+5. Smoke tests run against the preview URL
+6. Results are posted as a PR comment
+7. Preview is accessible via: `https://sentry-mcp-preview-{branch}.getsentry.workers.dev`
 
-Manual version upload:
+Manual preview deployment:
 ```bash
-pnpm cf:versions:upload
+# Deploy to a preview environment
+npx wrangler deploy --env preview-feature-branch
+# Creates: sentry-mcp-preview-feature-branch.getsentry.workers.dev
 ```
+
+To deploy a specific version to production:
+```bash
+# After validation, deploy to production
+npx wrangler versions deploy VERSION_ID@100 --message "Production deployment"
+```
+
+Gradual rollout example:
+```bash
+# Start with 10% of traffic
+npx wrangler versions deploy abc123@10 --message "Testing rollout"
+
+# Increase to 50%
+npx wrangler versions deploy abc123@50 --message "Expanding rollout"
+
+# Full deployment
+npx wrangler versions deploy abc123@100 --message "Full deployment"
+```
+
+The preview environment approach ensures:
+- Complete isolation from production
+- Separate Worker instance for each branch
+- Safe testing of potentially breaking changes
+- Clean URLs based on branch names (e.g., `sentry-mcp-preview-feat-oauth.getsentry.workers.dev`)
+- Branch names are sanitized: lowercase, alphanumeric with hyphens, max 20 chars
+- Automatic cleanup when PR is closed (manual deletion of environment)
+
+### Smoke Tests
+
+Pull request deployments automatically run smoke tests to validate the deployment:
+
+```bash
+# Run smoke tests manually
+cd packages/smoke-tests
+PREVIEW_URL=https://sentry-mcp.workers.dev pnpm test
+```
+
+Tests validate (using Vitest):
+- Root endpoint availability (200 response)
+- MCP endpoint exists (returns auth error, not 404)
+- Metadata API endpoint (401 without auth)
+- Chat API endpoint (accepts POST requests)
+- OAuth endpoint accessibility
+- Static assets (robots.txt, llms.txt)
+- Response time performance (<2 seconds)
+- Security headers configuration
 
 ### Creating Resources
 
