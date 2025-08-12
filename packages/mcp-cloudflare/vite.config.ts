@@ -3,7 +3,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
-import spotlight from "@spotlightjs/spotlight/vite-plugin";
 import path from "node:path";
 
 export default defineConfig({
