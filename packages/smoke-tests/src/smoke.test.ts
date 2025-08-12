@@ -35,6 +35,14 @@ describe(`Smoke Tests for ${PREVIEW_URL}`, () => {
       signal: AbortSignal.timeout(TIMEOUT),
     });
 
+    // Check content type before parsing JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType?.includes("application/json")) {
+      throw new Error(
+        `Expected JSON response, got ${contentType}: ${await response.text()}`,
+      );
+    }
+
     const data = await response.json();
     // Should return auth error, not 404 - this proves the MCP endpoint exists
     expect(data).toHaveProperty("error");
@@ -52,6 +60,14 @@ describe(`Smoke Tests for ${PREVIEW_URL}`, () => {
     // SSE endpoint should exist and return 401 without auth
     expect(response.status).toBe(401);
 
+    // Check content type before parsing JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType?.includes("application/json")) {
+      throw new Error(
+        `Expected JSON response, got ${contentType}: ${await response.text()}`,
+      );
+    }
+
     const data = await response.json();
     expect(data).toHaveProperty("error");
     expect(data.error).toMatch(/invalid_token|unauthorized/i);
@@ -62,6 +78,14 @@ describe(`Smoke Tests for ${PREVIEW_URL}`, () => {
       signal: AbortSignal.timeout(TIMEOUT),
     });
     expect(response.status).toBe(401);
+
+    // Check content type before parsing JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType?.includes("application/json")) {
+      throw new Error(
+        `Expected JSON response, got ${contentType}: ${await response.text()}`,
+      );
+    }
 
     const data = await response.json();
     expect(data).toHaveProperty("error");
