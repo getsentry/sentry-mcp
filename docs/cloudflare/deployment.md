@@ -143,22 +143,22 @@ pnpm deploy
 pnpm deploy --env production
 ```
 
-#### Preview Environments
+#### Preview Deployments
 
-For pull requests, GitHub Actions automatically creates isolated preview environments:
+For pull requests, GitHub Actions automatically creates isolated preview deployments:
 
 1. Open or update a pull request
 2. Tests run automatically
-3. If tests pass, deploys to a preview environment
-4. Preview environment is **completely isolated** from production
+3. If tests pass, deploys to a separate worker instance
+4. Preview worker is **completely isolated** from production
 5. Smoke tests run against the preview URL
 6. Results are posted as a PR comment
 7. Preview is accessible via: `https://sentry-mcp-preview-{branch}.getsentry.workers.dev`
 
 Manual preview deployment:
 ```bash
-# Deploy to a preview environment
-npx wrangler deploy --env preview-feature-branch
+# Deploy to a preview worker
+npx wrangler deploy --name sentry-mcp-preview-feature-branch
 # Creates: sentry-mcp-preview-feature-branch.getsentry.workers.dev
 ```
 
@@ -180,12 +180,12 @@ npx wrangler versions deploy abc123@50 --message "Expanding rollout"
 npx wrangler versions deploy abc123@100 --message "Full deployment"
 ```
 
-The preview environment approach ensures:
+The preview deployment approach ensures:
 - Complete isolation from production
 - Separate Worker instance for each branch
 - Safe testing of potentially breaking changes
 - Clean URLs based on branch names (e.g., `sentry-mcp-preview-feat-oauth.getsentry.workers.dev`)
-- Branch names are sanitized: lowercase, alphanumeric with hyphens, max 10 chars
+- Branch names are sanitized: lowercase, alphanumeric with hyphens, max 20 chars
 - Automatic cleanup when PR is closed
 
 ### Smoke Tests

@@ -29,24 +29,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Generate Environment Name
-        id: env_name
+      - name: Generate Worker Name
+        id: worker_name
         run: |
-          # Get branch name and construct environment name (same as deploy)
+          # Get branch name and construct worker name (must match preview-deploy.yml)
           BRANCH_NAME="${{ github.head_ref }}"
           # Must match the naming in preview-deploy.yml
-          ENV_SUFFIX=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-10)
-          ENV_NAME="preview-${ENV_SUFFIX}"
+          ENV_SUFFIX=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
+          WORKER_NAME="sentry-mcp-preview-${ENV_SUFFIX}"
           
-          echo "env_name=$ENV_NAME" >> $GITHUB_OUTPUT
-          echo "Deleting preview environment: $ENV_NAME"
+          echo "worker_name=$WORKER_NAME" >> $GITHUB_OUTPUT
+          echo "Deleting preview worker: $WORKER_NAME"
 
-      - name: Delete Preview Environment
+      - name: Delete Preview Worker
         uses: cloudflare/wrangler-action@v3
-        continue-on-error: true  # Don't fail if environment doesn't exist
+        continue-on-error: true  # Don't fail if worker doesn't exist
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: delete --env ${{ steps.env_name.outputs.env_name }} --force
+          command: delete --name ${{ steps.worker_name.outputs.worker_name }} --force
           packageManager: pnpm

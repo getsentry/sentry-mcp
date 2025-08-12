@@ -53,16 +53,16 @@ jobs:
       - name: Generate Environment Name
         id: env_name
         run: |
-          # Get branch name and sanitize it for use as environment name
+          # Get branch name and sanitize it for use in worker name
           BRANCH_NAME="${{ github.head_ref }}"
-          # Wrangler env names: alphanumeric, hyphens, underscores only
-          # Truncate to 10 chars to leave room for "preview-" prefix
-          ENV_SUFFIX=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-10)
-          ENV_NAME="preview-${ENV_SUFFIX}"
+          # Worker names: alphanumeric, hyphens, underscores only
+          # Truncate to 20 chars to keep URLs reasonable
+          ENV_SUFFIX=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
+          WORKER_NAME="sentry-mcp-preview-${ENV_SUFFIX}"
           
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "env_name=$ENV_NAME" >> $GITHUB_OUTPUT
-          echo "Preview environment name: $ENV_NAME"
+          echo "worker_name=$WORKER_NAME" >> $GITHUB_OUTPUT
+          echo "Preview worker name: $WORKER_NAME"
 
       - name: Deploy Preview Environment
         id: deploy
@@ -71,18 +71,17 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: deploy --env ${{ steps.env_name.outputs.env_name }}
+          command: deploy --name ${{ steps.env_name.outputs.worker_name }}
           packageManager: pnpm
 
       - name: Generate Preview URL
         id: preview_url
         run: |
           # Construct preview URL
-          # Wrangler creates: <worker-name>-<env-name>.<subdomain>.workers.dev
-          WORKER_NAME="sentry-mcp"
+          # With --name flag, wrangler creates: <worker-name>.<subdomain>.workers.dev
+          WORKER_NAME="${{ steps.env_name.outputs.worker_name }}"
           SUBDOMAIN="getsentry"
-          ENV_NAME="${{ steps.env_name.outputs.env_name }}"
-          PREVIEW_URL="https://${WORKER_NAME}-${ENV_NAME}.${SUBDOMAIN}.workers.dev"
+          PREVIEW_URL="https://${WORKER_NAME}.${SUBDOMAIN}.workers.dev"
           
           echo "url=$PREVIEW_URL" >> $GITHUB_OUTPUT
           echo "Preview URL: $PREVIEW_URL"
@@ -109,7 +108,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const branchName = '${{ steps.env_name.outputs.branch_name }}';
-            const envName = '${{ steps.env_name.outputs.env_name }}';
+            const workerName = '${{ steps.env_name.outputs.worker_name }}';
             const previewUrl = '${{ steps.preview_url.outputs.url }}';
             const deploySuccess = '${{ steps.deploy.outcome }}' === 'success';
             const testsStatus = '${{ steps.smoke_tests.outcome }}' === 'success' ? '✅' : '❌';
@@ -122,27 +121,27 @@ jobs:
               comment = `## 🚨 Preview Deployment Failed
               
               **Branch:** \`${branchName}\`
-              **Environment:** \`${envName}\`
+              **Worker Name:** \`${workerName}\`
               
               The deployment failed. Please check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
               
               Common issues:
-              - Environment names must be alphanumeric with hyphens/underscores only
+              - Worker names must be alphanumeric with hyphens/underscores only
               - Check if the Cloudflare API token has proper permissions
               - Verify the wrangler configuration is valid`;
             } else {
               comment = `## 🚀 Preview Deployment
               
               **Branch:** \`${branchName}\`
-              **Environment:** \`${envName}\`
+              **Worker Name:** \`${workerName}\`
               **Preview URL:** ${previewUrl}
-              **Status:** Isolated preview environment (no production traffic)
+              **Status:** Isolated preview deployment (separate worker instance)
               
               ### Smoke Tests: ${testsStatus}
               ${testsMessage}
               
               ### Next Steps:
-              - This is a separate preview environment with its own URL
+              - This is a separate worker instance with its own URL
               - Test using the preview URL above to validate your changes
               - The preview is completely isolated from production
               - Once tests pass and PR is approved, it can be merged
