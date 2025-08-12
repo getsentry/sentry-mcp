@@ -82,7 +82,7 @@ jobs:
               deployment_id: deployment.data.id,
               state: 'in_progress',
               description: 'Deploying canary environment',
-              auto_inactive: false
+              auto_inactive: true  // Auto-mark previous deployments as inactive
             });
 
       - name: Deploy Canary Environment

@@ -80,7 +80,8 @@ jobs:
               repo: context.repo.repo,
               deployment_id: deployment.data.id,
               state: 'in_progress',
-              description: 'Deploying to production'
+              description: 'Deploying to production',
+              auto_inactive: true  // Auto-mark previous production deployment as inactive
             });
 
       - name: Deploy to Cloudflare
@@ -107,5 +108,6 @@ jobs:
               deployment_id: ${{ steps.deployment.outputs.id }},
               state: deploySuccess ? 'success' : 'failure',
               environment_url: deploySuccess ? 'https://mcp.sentry.dev' : undefined,
-              description: deploySuccess ? 'Deployed to production' : 'Deployment failed'
+              description: deploySuccess ? 'Deployed to production' : 'Deployment failed',
+              auto_inactive: true
             });
