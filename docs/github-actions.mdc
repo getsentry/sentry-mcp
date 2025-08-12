@@ -12,14 +12,25 @@ Runs on all pushes to main and on pull requests. Executes:
 - Code coverage reporting
 
 ### deploy.yml
-Runs only on pushes to the main branch (after tests pass). Executes:
-- Full test suite (via reusable workflow)
+Runs after tests pass on the main branch. Executes:
 - Production deployment to Cloudflare Workers
 
-### versions.yml
-Runs on all branches except main (after tests pass). Executes:
-- Full test suite (via reusable workflow)
-- Uploads a new version to Cloudflare for gradual rollout testing
+### preview-deploy.yml
+Runs on pull requests. Executes:
+- Builds the project
+- Deploys to an isolated preview worker
+- Runs smoke tests against the preview
+- Sets commit status with preview URL
+
+### preview-cleanup.yml
+Runs when pull requests are closed. Executes:
+- Deletes the preview worker created for the PR
+
+### merge-jobs.yml
+Runs on pushes to main and release branches. Executes:
+- Build and test
+- Package mcp-server
+- Archive artifacts for releases
 
 ### release.yml
 Manual workflow for creating releases and version tags.
@@ -70,13 +81,14 @@ The following secrets must be configured in your GitHub repository settings:
 3. If tests pass, `deploy.yml` workflow runs
 4. Cloudflare Worker is deployed to production
 
-### Version Upload (feature branches)
+### Preview Deployments (pull requests)
 
-1. Push to any branch (except main)
-2. `test.yml` workflow runs automatically  
-3. If tests pass, `versions.yml` workflow runs
-4. New version is uploaded to Cloudflare (not deployed)
-5. Version can be promoted via Cloudflare dashboard for gradual rollout
+1. Open or update a pull request
+2. `test.yml` workflow runs automatically
+3. `preview-deploy.yml` creates an isolated preview worker
+4. Smoke tests validate the deployment
+5. Preview URL is available via commit status check
+6. When PR is closed, `preview-cleanup.yml` removes the preview worker
 
 ### Manual Deployment
 
