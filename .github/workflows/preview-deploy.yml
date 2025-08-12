@@ -1,4 +1,4 @@
-name: Preview Deploy
+name: Preview Deploy & Test
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   preview:
-    name: Deploy Preview Version
+    name: Deploy Preview & Run Tests
     runs-on: ubuntu-latest
     environment: Actions
     
@@ -116,11 +116,44 @@ jobs:
               // Don't fail the workflow if status update fails
             }
             
-      - name: Output deployment info
+      - name: Wait for deployment to propagate
         if: success()
         run: |
-          echo "## Preview Deployment Successful"
-          echo "Worker Name: ${{ steps.env_name.outputs.worker_name }}"
-          echo "Preview URL: ${{ steps.preview_url.outputs.url }}"
-          echo ""
-          echo "The preview environment is ready for manual testing."
+          echo "Waiting for deployment to propagate..."
+          sleep 30
+
+      - name: Run Smoke Tests
+        id: smoke_tests
+        if: success()
+        working-directory: packages/smoke-tests
+        env:
+          PREVIEW_URL: ${{ steps.preview_url.outputs.url }}
+        run: |
+          echo "Running smoke tests against $PREVIEW_URL"
+          pnpm test
+
+      - name: Update Commit Status with Test Results
+        if: always() && steps.deploy.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const testsSuccess = '${{ steps.smoke_tests.outcome }}' === 'success';
+            const previewUrl = '${{ steps.preview_url.outputs.url }}';
+            
+            let state = testsSuccess ? 'success' : 'failure';
+            let description = testsSuccess ? 'All tests passed' : 'Some tests failed';
+            
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.payload.pull_request.head.sha,
+                state: state,
+                target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                description: description,
+                context: 'Smoke Tests'
+              });
+            } catch (error) {
+              console.error('Failed to create commit status:', error);
+            }
