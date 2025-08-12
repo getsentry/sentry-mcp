@@ -35,13 +35,8 @@ describe(`Smoke Tests for ${PREVIEW_URL}`, () => {
       signal: AbortSignal.timeout(TIMEOUT),
     });
 
-    // Check content type before parsing JSON
-    const contentType = response.headers.get("content-type");
-    if (!contentType?.includes("application/json")) {
-      throw new Error(
-        `Expected JSON response, got ${contentType}: ${await response.text()}`,
-      );
-    }
+    // Verify JSON content type
+    expect(response.headers.get("content-type")).toContain("application/json");
 
     const data = await response.json();
     // Should return auth error, not 404 - this proves the MCP endpoint exists
@@ -60,13 +55,8 @@ describe(`Smoke Tests for ${PREVIEW_URL}`, () => {
     // SSE endpoint should exist and return 401 without auth
     expect(response.status).toBe(401);
 
-    // Check content type before parsing JSON
-    const contentType = response.headers.get("content-type");
-    if (!contentType?.includes("application/json")) {
-      throw new Error(
-        `Expected JSON response, got ${contentType}: ${await response.text()}`,
-      );
-    }
+    // Verify JSON content type
+    expect(response.headers.get("content-type")).toContain("application/json");
 
     const data = await response.json();
     expect(data).toHaveProperty("error");
@@ -79,13 +69,8 @@ describe(`Smoke Tests for ${PREVIEW_URL}`, () => {
     });
     expect(response.status).toBe(401);
 
-    // Check content type before parsing JSON
-    const contentType = response.headers.get("content-type");
-    if (!contentType?.includes("application/json")) {
-      throw new Error(
-        `Expected JSON response, got ${contentType}: ${await response.text()}`,
-      );
-    }
+    // Verify JSON content type
+    expect(response.headers.get("content-type")).toContain("application/json");
 
     const data = await response.json();
     expect(data).toHaveProperty("error");
