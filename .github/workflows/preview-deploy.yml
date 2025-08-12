@@ -82,21 +82,6 @@ jobs:
           echo "url=$PREVIEW_URL" >> $GITHUB_OUTPUT
           echo "Preview URL: $PREVIEW_URL"
 
-      - name: Wait for Deployment
-        run: |
-          echo "Waiting for deployment to propagate..."
-          sleep 30
-
-      - name: Run Smoke Tests
-        id: smoke_tests
-        continue-on-error: true
-        working-directory: packages/smoke-tests
-        env:
-          PREVIEW_URL: ${{ steps.preview_url.outputs.url }}
-        run: |
-          echo "Running smoke tests against $PREVIEW_URL"
-          pnpm test
-
       - name: Set Commit Status
         if: always()
         uses: actions/github-script@v7
@@ -104,7 +89,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const deploySuccess = '${{ steps.deploy.outcome }}' === 'success';
-            const testsSuccess = '${{ steps.smoke_tests.outcome }}' === 'success';
             const previewUrl = '${{ steps.preview_url.outputs.url }}';
             const workerName = '${{ steps.env_name.outputs.worker_name }}';
             
@@ -112,9 +96,6 @@ jobs:
             if (!deploySuccess) {
               state = 'failure';
               description = 'Deployment failed';
-            } else if (!testsSuccess) {
-              state = 'failure';
-              description = `Preview: ${workerName} (tests failed)`;
             } else {
               state = 'success';
               description = `Preview: ${workerName}`;
@@ -134,3 +115,12 @@ jobs:
               console.error('Failed to create commit status:', error);
               // Don't fail the workflow if status update fails
             }
+            
+      - name: Output deployment info
+        if: success()
+        run: |
+          echo "## Preview Deployment Successful"
+          echo "Worker Name: ${{ steps.env_name.outputs.worker_name }}"
+          echo "Preview URL: ${{ steps.preview_url.outputs.url }}"
+          echo ""
+          echo "The preview environment is ready for manual testing."

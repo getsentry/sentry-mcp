@@ -19,8 +19,13 @@ Runs after tests pass on the main branch. Executes:
 Runs on pull requests. Executes:
 - Builds the project
 - Deploys to an isolated preview worker
-- Runs smoke tests against the preview
-- Sets commit status with preview URL
+- Sets commit status with preview URL for manual QA
+
+### smoke-tests.yml
+Runs after successful preview deployments. Executes:
+- Waits for deployment to propagate
+- Runs automated smoke tests against the preview URL
+- Sets separate commit status for test results
 
 ### preview-cleanup.yml
 Runs when pull requests are closed. Executes:
@@ -86,8 +91,8 @@ The following secrets must be configured in your GitHub repository settings:
 1. Open or update a pull request
 2. `test.yml` workflow runs automatically
 3. `preview-deploy.yml` creates an isolated preview worker
-4. Smoke tests validate the deployment
-5. Preview URL is available via commit status check
+4. Preview URL is available via "Preview Deploy" commit status for manual QA
+5. `smoke-tests.yml` runs automated tests (separate status check)
 6. When PR is closed, `preview-cleanup.yml` removes the preview worker
 
 ### Manual Deployment
