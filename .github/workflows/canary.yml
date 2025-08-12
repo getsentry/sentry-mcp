@@ -8,6 +8,7 @@ permissions:
   contents: read
   pull-requests: write
   statuses: write  # Required for creating commit statuses
+  deployments: write  # Required for creating deployment records
 
 jobs:
   preview:
