@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { csrf } from "hono/csrf";
+import { secureHeaders } from "hono/secure-headers";
 import type { Env } from "./types";
 import sentryOauth from "./routes/sentry-oauth";
 import chatOauth from "./routes/chat-oauth";
@@ -10,6 +12,25 @@ import { logError } from "@sentry/mcp-server/logging";
 const app = new Hono<{
   Bindings: Env;
 }>()
+  // Apply security middleware globally
+  .use(
+    "*",
+    secureHeaders({
+      xFrameOptions: "DENY",
+      xContentTypeOptions: "nosniff",
+      referrerPolicy: "strict-origin-when-cross-origin",
+      strictTransportSecurity: "max-age=31536000; includeSubDomains",
+    }),
+  )
+  .use(
+    "*",
+    csrf({
+      origin: (origin, c) => {
+        const requestUrl = new URL(c.req.url);
+        return origin === requestUrl.origin;
+      },
+    }),
+  )
   .get("/robots.txt", (c) => {
     return c.text(["User-agent: *", "Allow: /$", "Disallow: /"].join("\n"));
   })

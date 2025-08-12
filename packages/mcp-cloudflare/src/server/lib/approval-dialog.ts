@@ -6,9 +6,7 @@ import { logError } from "@sentry/mcp-server/logging";
 import { sanitizeHtml } from "./html-utils";
 
 const COOKIE_NAME = "mcp-approved-clients";
-const CSRF_COOKIE_NAME = "mcp-csrf-token";
 const ONE_YEAR_IN_SECONDS = 31536000;
-const CSRF_TOKEN_EXPIRY = 3600; // 1 hour
 /**
  * Imports a secret key string for HMAC-SHA256 signing.
  * @param secret - The raw secret key string.
@@ -179,32 +177,6 @@ export interface ApprovalDialogOptions {
    * Will be encoded in the form and returned when approval is complete
    */
   state: Record<string, any>;
-  /**
-   * Name of the cookie to use for storing approvals
-   * @default "mcp_approved_clients"
-   */
-  cookieName?: string;
-  /**
-   * Secret used to sign cookies for verification
-   * Can be a string or Uint8Array
-   * @default Built-in Uint8Array key
-   */
-  cookieSecret?: string | Uint8Array;
-  /**
-   * Cookie domain
-   * @default current domain
-   */
-  cookieDomain?: string;
-  /**
-   * Cookie path
-   * @default "/"
-   */
-  cookiePath?: string;
-  /**
-   * Cookie max age in seconds
-   * @default 30 days
-   */
-  cookieMaxAge?: number;
 }
 
 /**
@@ -253,9 +225,6 @@ export function renderApprovalDialog(
   options: ApprovalDialogOptions,
 ): Response {
   const { client, server, state } = options;
-
-  // Generate CSRF token and cookie header
-  const { token: csrfToken, cookieHeader } = generateAndSetCSRFToken(request);
 
   // Encode state for form submission
   const encodedState = btoa(JSON.stringify(state));
@@ -560,7 +529,6 @@ export function renderApprovalDialog(
             
             <form method="post" action="${new URL(request.url).pathname}">
               <input type="hidden" name="state" value="${encodedState}">
-              <input type="hidden" name="csrf_token" value="${csrfToken}">
               
               <div class="actions">
                 <button type="button" class="button button-secondary" onclick="window.history.back()">Cancel</button>
@@ -576,7 +544,6 @@ export function renderApprovalDialog(
   return new Response(htmlContent, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Set-Cookie": cookieHeader,
     },
   });
 }
@@ -614,19 +581,9 @@ export async function parseRedirectApproval(
   try {
     const formData = await request.formData();
     const encodedState = formData.get("state");
-    const csrfToken = formData.get("csrf_token");
 
     if (typeof encodedState !== "string" || !encodedState) {
       throw new Error("Missing or invalid 'state' in form data.");
-    }
-
-    if (typeof csrfToken !== "string" || !csrfToken) {
-      throw new Error("Missing or invalid CSRF token in form data.");
-    }
-
-    // Validate CSRF token
-    if (!(await validateCSRFTokenFromRequest(request, csrfToken))) {
-      throw new Error("Invalid CSRF token. Request may be forged.");
     }
 
     state = decodeState<{ oauthReqInfo?: AuthRequest }>(encodedState); // Decode the state
@@ -659,97 +616,12 @@ export async function parseRedirectApproval(
   const signature = await signData(key, payload);
   const newCookieValue = `${signature}.${btoa(payload)}`; // signature.base64(payload)
 
-  // Generate Set-Cookie headers
+  // Generate Set-Cookie header
   const headers: Record<string, string> = {
-    "Set-Cookie": [
-      `${COOKIE_NAME}=${newCookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`,
-      // Clear the CSRF token after successful validation to prevent reuse
-      `${CSRF_COOKIE_NAME}=; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-    ].join(", "),
+    "Set-Cookie": `${COOKIE_NAME}=${newCookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`,
   };
 
   return { state, headers };
-}
-
-/**
- * Generates a cryptographically secure random CSRF token with timestamp
- * @returns A random 32-character hex string with embedded timestamp
- */
-function generateCSRFToken(): string {
-  const array = new Uint8Array(16);
-  crypto.getRandomValues(array);
-  const timestamp = Math.floor(Date.now() / 1000)
-    .toString(16)
-    .padStart(8, "0");
-  const randomPart = Array.from(array, (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-  return timestamp + randomPart.substring(0, 24); // 8 chars timestamp + 24 chars random
-}
-
-/**
- * Generates a CSRF token and sets it as a secure cookie
- * @param request - The HTTP request to generate the token for
- * @returns An object containing the token and Set-Cookie header
- */
-function generateAndSetCSRFToken(request: Request): {
-  token: string;
-  cookieHeader: string;
-} {
-  const token = generateCSRFToken();
-  const domain = new URL(request.url).hostname;
-
-  const cookieHeader = `${CSRF_COOKIE_NAME}=${token}; HttpOnly; Secure; Path=/; SameSite=Strict; Max-Age=${CSRF_TOKEN_EXPIRY}`;
-
-  return { token, cookieHeader };
-}
-
-/**
- * Validates a CSRF token from the form submission against the stored cookie
- * @param request - The HTTP request containing the form data and cookies
- * @param submittedToken - The CSRF token submitted in the form
- * @returns true if the token is valid, false otherwise
- */
-async function validateCSRFTokenFromRequest(
-  request: Request,
-  submittedToken: string,
-): Promise<boolean> {
-  const cookieHeader = request.headers.get("Cookie");
-  if (!cookieHeader) return false;
-
-  const cookies = cookieHeader.split(";").map((c) => c.trim());
-  const csrfCookie = cookies.find((c) => c.startsWith(`${CSRF_COOKIE_NAME}=`));
-
-  if (!csrfCookie) return false;
-
-  const storedToken = csrfCookie.substring(CSRF_COOKIE_NAME.length + 1);
-
-  // Validate token format (should be 32 characters: 8 timestamp + 24 random)
-  if (submittedToken.length !== 32 || storedToken.length !== 32) {
-    return false;
-  }
-
-  // Extract and validate timestamp (first 8 characters)
-  const submittedTimestamp = Number.parseInt(submittedToken.substring(0, 8), 16);
-  const storedTimestamp = Number.parseInt(storedToken.substring(0, 8), 16);
-  const currentTime = Math.floor(Date.now() / 1000);
-
-  // Token should not be older than 1 hour
-  if (
-    currentTime - submittedTimestamp > CSRF_TOKEN_EXPIRY ||
-    currentTime - storedTimestamp > CSRF_TOKEN_EXPIRY
-  ) {
-    return false;
-  }
-
-  // Compare the submitted token with the stored token
-  // Use constant-time comparison to prevent timing attacks
-  let result = 0;
-  for (let i = 0; i < submittedToken.length; i++) {
-    result |= submittedToken.charCodeAt(i) ^ storedToken.charCodeAt(i);
-  }
-
-  return result === 0;
 }
 
 // sanitizeHtml function is now imported from "./html-utils"
