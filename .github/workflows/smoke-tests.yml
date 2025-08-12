@@ -17,9 +17,11 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     
     steps:
+      # Checkout from main branch for safety - we only need the test scripts,
+      # not the PR code (which is already deployed to preview)
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -51,9 +53,22 @@ jobs:
       - name: Generate Preview URL
         id: preview_url
         run: |
-          # Get the branch name from the workflow run
+          # Get the branch name from the workflow run event (safe - just metadata)
           BRANCH_NAME="${{ github.event.workflow_run.head_branch }}"
-          WORKER_NAME=$(./scripts/generate-worker-name.sh "$BRANCH_NAME")
+          # Generate worker name using the same logic as preview-deploy
+          # Sanitize branch name for worker name (must match preview-deploy.yml logic)
+          SANITIZED=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+          SANITIZED=$(echo "$SANITIZED" | sed 's/^-*//' | sed 's/-*$//')
+          SANITIZED=$(echo "$SANITIZED" | sed 's/--*/-/g')
+          if echo "$SANITIZED" | grep -q '^[0-9]'; then
+            SANITIZED="br-$SANITIZED"
+          fi
+          if [ -z "$SANITIZED" ]; then
+            SANITIZED="preview"
+          fi
+          SANITIZED=$(echo "$SANITIZED" | cut -c1-20)
+          SANITIZED=$(echo "$SANITIZED" | sed 's/-*$//')
+          WORKER_NAME="sentry-mcp-preview-${SANITIZED}"
           SUBDOMAIN="getsentry"
           PREVIEW_URL="https://${WORKER_NAME}.${SUBDOMAIN}.workers.dev"
           
