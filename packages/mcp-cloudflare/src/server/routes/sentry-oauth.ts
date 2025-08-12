@@ -42,17 +42,14 @@ async function redirectToUpstream(
   });
 }
 
+// Create OAuth router - security middleware is applied at the app level
 export default new Hono<{
   Bindings: Env;
 }>()
   /**
    * OAuth Authorization Endpoint
    *
-   * This route initiates the GitHub OAuth flow when a user wants to log in.
-   * It creates a random state parameter to prevent CSRF attacks and stores the
-   * original OAuth request information in KV storage for later retrieval.
-   * Then it redirects the user to GitHub's authorization page with the appropriate
-   * parameters so the user can authenticate and grant permissions.
+   * This route initiates the OAuth flow when a user wants to log in.
    */
   // TODO: this needs to deauthorize if props are not correct (e.g. wrong org slug)
   .get("/authorize", async (c) => {
@@ -193,5 +190,6 @@ export default new Hono<{
       } as WorkerProps,
     });
 
-    return Response.redirect(redirectTo);
+    // Use manual redirect instead of Response.redirect() to allow middleware to add headers
+    return c.redirect(redirectTo);
   });

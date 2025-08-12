@@ -177,32 +177,6 @@ export interface ApprovalDialogOptions {
    * Will be encoded in the form and returned when approval is complete
    */
   state: Record<string, any>;
-  /**
-   * Name of the cookie to use for storing approvals
-   * @default "mcp_approved_clients"
-   */
-  cookieName?: string;
-  /**
-   * Secret used to sign cookies for verification
-   * Can be a string or Uint8Array
-   * @default Built-in Uint8Array key
-   */
-  cookieSecret?: string | Uint8Array;
-  /**
-   * Cookie domain
-   * @default current domain
-   */
-  cookieDomain?: string;
-  /**
-   * Cookie path
-   * @default "/"
-   */
-  cookiePath?: string;
-  /**
-   * Cookie max age in seconds
-   * @default 30 days
-   */
-  cookieMaxAge?: number;
 }
 
 /**
@@ -235,55 +209,6 @@ function decodeState<T = any>(encoded: string): T {
     console.error("Error decoding state:", e);
     throw new Error("Could not decode state");
   }
-}
-
-/**
- * Configuration for the approval dialog
- */
-export interface ApprovalDialogOptions {
-  /**
-   * Client information to display in the approval dialog
-   */
-  client: ClientInfo | null;
-  /**
-   * Server information to display in the approval dialog
-   */
-  server: {
-    name: string;
-    logo?: string;
-    description?: string;
-  };
-  /**
-   * Arbitrary state data to pass through the approval flow
-   * Will be encoded in the form and returned when approval is complete
-   */
-  state: Record<string, any>;
-  /**
-   * Name of the cookie to use for storing approvals
-   * @default "mcp_approved_clients"
-   */
-  cookieName?: string;
-  /**
-   * Secret used to sign cookies for verification
-   * Can be a string or Uint8Array
-   * @default Built-in Uint8Array key
-   */
-  cookieSecret?: string | Uint8Array;
-  /**
-   * Cookie domain
-   * @default current domain
-   */
-  cookieDomain?: string;
-  /**
-   * Cookie path
-   * @default "/"
-   */
-  cookiePath?: string;
-  /**
-   * Cookie max age in seconds
-   * @default 30 days
-   */
-  cookieMaxAge?: number;
 }
 
 /**
