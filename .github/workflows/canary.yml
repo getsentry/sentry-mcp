@@ -85,21 +85,21 @@ jobs:
               auto_inactive: true  // Auto-mark previous deployments as inactive
             });
 
-      - name: Deploy Canary Worker
+      - name: Upload Canary Version
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: deploy --name sentry-mcp-pr-${{ github.event.pull_request.number }}
+          command: versions upload --preview-alias="pr-${{ github.event.pull_request.number }}" --message="PR #${{ github.event.pull_request.number }} - ${{ github.head_ref }}"
           packageManager: pnpm
 
-      - name: Get Canary URL
+      - name: Extract Version ID and Get Preview URL
         id: canary_url
         run: |
-          # Worker URL format: <worker-name>.<subdomain>.workers.dev
-          CANARY_URL="https://sentry-mcp-pr-${{ github.event.pull_request.number }}.getsentry.workers.dev"
+          # The preview alias URL should be: <alias>-<worker-name>.<subdomain>.workers.dev
+          CANARY_URL="https://pr-${{ github.event.pull_request.number }}-sentry-mcp.getsentry.workers.dev"
           
           echo "url=$CANARY_URL" >> $GITHUB_OUTPUT
           echo "Canary URL: $CANARY_URL"
