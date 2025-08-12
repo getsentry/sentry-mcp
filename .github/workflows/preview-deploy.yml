@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  statuses: write  # Required for creating commit statuses
 
 jobs:
   preview:
@@ -49,95 +50,106 @@ jobs:
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
-      - name: Deploy Preview Environment
-        id: deploy_preview
-        working-directory: packages/mcp-cloudflare
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Generate Environment Name
+        id: env_name
         run: |
           # Get branch name and sanitize it for use as environment name
-          # Replace non-alphanumeric characters with hyphens, lowercase, and truncate
           BRANCH_NAME="${{ github.head_ref }}"
           # Wrangler env names: alphanumeric, hyphens, underscores only
-          ENV_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
-          ENV_NAME="preview-${ENV_NAME}"
+          # Truncate to 10 chars to leave room for "preview-" prefix
+          ENV_SUFFIX=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-10)
+          ENV_NAME="preview-${ENV_SUFFIX}"
           
-          # Deploy to preview environment (creates separate Worker)
-          echo "Deploying to environment: $ENV_NAME"
-          OUTPUT=$(pnpx wrangler deploy --env "$ENV_NAME" 2>&1)
-          echo "$OUTPUT"
-          
-          echo "ENV_NAME=$ENV_NAME" >> $GITHUB_OUTPUT
-          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "Deploy completed for environment: $ENV_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "env_name=$ENV_NAME" >> $GITHUB_OUTPUT
+          echo "Preview environment name: $ENV_NAME"
 
-      - name: Get Worker Details
-        id: worker_details
-        working-directory: packages/mcp-cloudflare
+      - name: Deploy Preview Environment
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/mcp-cloudflare
+          command: deploy --env ${{ steps.env_name.outputs.env_name }}
+          packageManager: pnpm
+
+      - name: Generate Preview URL
+        id: preview_url
         run: |
-          # Get the base worker name
-          WORKER_NAME=$(grep '"name"' wrangler.jsonc | sed 's/.*"name":\s*"\([^"]*\)".*/\1/')
-          echo "WORKER_NAME=$WORKER_NAME" >> $GITHUB_OUTPUT
-          
-          # Workers.dev subdomain
-          SUBDOMAIN="getsentry"
-          echo "SUBDOMAIN=$SUBDOMAIN" >> $GITHUB_OUTPUT
-          
-          # Construct preview URL using environment name
+          # Construct preview URL
           # Wrangler creates: <worker-name>-<env-name>.<subdomain>.workers.dev
-          ENV_NAME="${{ steps.deploy_preview.outputs.ENV_NAME }}"
+          WORKER_NAME="sentry-mcp"
+          SUBDOMAIN="getsentry"
+          ENV_NAME="${{ steps.env_name.outputs.env_name }}"
           PREVIEW_URL="https://${WORKER_NAME}-${ENV_NAME}.${SUBDOMAIN}.workers.dev"
-          echo "PREVIEW_URL=$PREVIEW_URL" >> $GITHUB_OUTPUT
+          
+          echo "url=$PREVIEW_URL" >> $GITHUB_OUTPUT
           echo "Preview URL: $PREVIEW_URL"
+
+      - name: Wait for Deployment
+        run: |
+          echo "Waiting for deployment to propagate..."
+          sleep 30
 
       - name: Run Smoke Tests
         id: smoke_tests
         continue-on-error: true
         working-directory: packages/smoke-tests
         env:
-          PREVIEW_URL: ${{ steps.worker_details.outputs.PREVIEW_URL }}
+          PREVIEW_URL: ${{ steps.preview_url.outputs.url }}
         run: |
-          # Wait for deployment to propagate
-          echo "Waiting for deployment to propagate..."
-          sleep 30
-          
-          # Run smoke tests with Vitest
           echo "Running smoke tests against $PREVIEW_URL"
           pnpm test
 
       - name: Comment on PR
+        if: always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const branchName = '${{ steps.deploy_preview.outputs.BRANCH_NAME }}';
-            const envName = '${{ steps.deploy_preview.outputs.ENV_NAME }}';
-            const previewUrl = '${{ steps.worker_details.outputs.PREVIEW_URL }}';
+            const branchName = '${{ steps.env_name.outputs.branch_name }}';
+            const envName = '${{ steps.env_name.outputs.env_name }}';
+            const previewUrl = '${{ steps.preview_url.outputs.url }}';
+            const deploySuccess = '${{ steps.deploy.outcome }}' === 'success';
             const testsStatus = '${{ steps.smoke_tests.outcome }}' === 'success' ? '✅' : '❌';
             const testsMessage = '${{ steps.smoke_tests.outcome }}' === 'success' 
               ? 'All smoke tests passed!' 
               : 'Some smoke tests failed. Check the workflow logs for details.';
             
-            const comment = `## 🚀 Preview Deployment
+            let comment;
+            if (!deploySuccess) {
+              comment = `## 🚨 Preview Deployment Failed
+              
+              **Branch:** \`${branchName}\`
+              **Environment:** \`${envName}\`
+              
+              The deployment failed. Please check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
+              
+              Common issues:
+              - Environment names must be alphanumeric with hyphens/underscores only
+              - Check if the Cloudflare API token has proper permissions
+              - Verify the wrangler configuration is valid`;
+            } else {
+              comment = `## 🚀 Preview Deployment
+              
+              **Branch:** \`${branchName}\`
+              **Environment:** \`${envName}\`
+              **Preview URL:** ${previewUrl}
+              **Status:** Isolated preview environment (no production traffic)
+              
+              ### Smoke Tests: ${testsStatus}
+              ${testsMessage}
+              
+              ### Next Steps:
+              - This is a separate preview environment with its own URL
+              - Test using the preview URL above to validate your changes
+              - The preview is completely isolated from production
+              - Once tests pass and PR is approved, it can be merged
+              - After merge, the main deployment workflow will deploy to production`;
+            }
             
-            **Branch:** \`${branchName}\`
-            **Environment:** \`${envName}\`
-            **Preview URL:** ${previewUrl}
-            **Status:** Isolated preview environment (no production traffic)
-            
-            ### Smoke Tests: ${testsStatus}
-            ${testsMessage}
-            
-            ### Next Steps:
-            - This is a separate preview environment with its own URL
-            - Test using the preview URL above to validate your changes
-            - The preview is completely isolated from production
-            - Once tests pass and PR is approved, it can be merged
-            - After merge, the main deployment workflow will deploy to production
-            
-            ---
-            *Deployed via GitHub Actions at ${new Date().toISOString()}*`;
+            comment += `\n\n---\n*Deployed via GitHub Actions at ${new Date().toISOString()}*`;
             
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -169,24 +181,38 @@ jobs:
               });
             }
 
-
-      - name: Set Status Check
+      - name: Set Commit Status
         if: always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const state = '${{ steps.smoke_tests.outcome }}' === 'success' ? 'success' : 'failure';
-            const description = state === 'success' 
-              ? 'Preview deployed and tests passed' 
-              : 'Preview deployment failed tests';
+            const deploySuccess = '${{ steps.deploy.outcome }}' === 'success';
+            const testsSuccess = '${{ steps.smoke_tests.outcome }}' === 'success';
             
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.payload.pull_request.head.sha,
-              state: state,
-              target_url: '${{ steps.worker_details.outputs.PREVIEW_URL }}',
-              description: description,
-              context: 'cloudflare-preview'
-            });
+            let state, description;
+            if (!deploySuccess) {
+              state = 'failure';
+              description = 'Preview deployment failed';
+            } else if (!testsSuccess) {
+              state = 'failure';
+              description = 'Preview deployed but tests failed';
+            } else {
+              state = 'success';
+              description = 'Preview deployed and tests passed';
+            }
+            
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.payload.pull_request.head.sha,
+                state: state,
+                target_url: '${{ steps.preview_url.outputs.url }}',
+                description: description,
+                context: 'cloudflare-preview'
+              });
+            } catch (error) {
+              console.error('Failed to create commit status:', error);
+              // Don't fail the workflow if status update fails
+            }

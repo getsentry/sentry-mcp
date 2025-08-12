@@ -29,21 +29,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Delete Preview Environment
-        working-directory: packages/mcp-cloudflare
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Generate Environment Name
+        id: env_name
         run: |
           # Get branch name and construct environment name (same as deploy)
           BRANCH_NAME="${{ github.head_ref }}"
-          ENV_NAME=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
-          ENV_NAME="preview-${ENV_NAME}"
+          # Must match the naming in preview-deploy.yml
+          ENV_SUFFIX=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-10)
+          ENV_NAME="preview-${ENV_SUFFIX}"
           
+          echo "env_name=$ENV_NAME" >> $GITHUB_OUTPUT
           echo "Deleting preview environment: $ENV_NAME"
-          
-          # Delete the Worker using the environment flag
-          # The --env flag tells wrangler which environment to delete
-          pnpx wrangler delete --env "$ENV_NAME" --force || echo "Environment may not exist or already deleted"
-          
-          echo "Cleanup completed for PR #${{ github.event.pull_request.number }}"
+
+      - name: Delete Preview Environment
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true  # Don't fail if environment doesn't exist
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/mcp-cloudflare
+          command: delete --env ${{ steps.env_name.outputs.env_name }} --force
+          packageManager: pnpm

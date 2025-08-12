@@ -185,8 +185,8 @@ The preview environment approach ensures:
 - Separate Worker instance for each branch
 - Safe testing of potentially breaking changes
 - Clean URLs based on branch names (e.g., `sentry-mcp-preview-feat-oauth.getsentry.workers.dev`)
-- Branch names are sanitized: lowercase, alphanumeric with hyphens, max 20 chars
-- Automatic cleanup when PR is closed (manual deletion of environment)
+- Branch names are sanitized: lowercase, alphanumeric with hyphens, max 10 chars
+- Automatic cleanup when PR is closed
 
 ### Smoke Tests
 

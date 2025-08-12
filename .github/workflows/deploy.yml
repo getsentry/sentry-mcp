@@ -54,14 +54,10 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
       - name: Deploy to Cloudflare
-        working-directory: packages/mcp-cloudflare
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          # Deploy directly to production (100% traffic)
-          pnpx wrangler deploy
-          
-          # Get the deployed version for logging
-          VERSION_ID=$(pnpx wrangler versions list --json | jq -r '.[0].version_id')
-          echo "Deployed version: $VERSION_ID to production"
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/mcp-cloudflare
+          command: deploy
+          packageManager: pnpm
