@@ -48,150 +48,99 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build
+      # === BUILD AND DEPLOY CANARY WORKER ===
+      - name: Build for Canary
+        working-directory: packages/mcp-cloudflare
         run: pnpm build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
-      # === UPLOAD NEW VERSION (but don't deploy yet) ===
-      - name: Upload New Version
-        id: upload_version
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: packages/mcp-cloudflare
-          command: versions upload --message "Deploy from ${{ github.sha }}"
-          packageManager: pnpm
-
-      # === DEPLOY NEW VERSION AT 10% FOR CANARY ===
-      - name: Create Deployment Record
-        id: deployment
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const deployment = await github.rest.repos.createDeployment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: context.sha,
-              environment: 'production',
-              description: 'Canary deployment at 10% traffic',
-              transient_environment: false,
-              production_environment: true,
-              required_contexts: [],
-              auto_merge: false
-            });
-            
-            core.setOutput('id', deployment.data.id);
-            
-            // Set initial status
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: deployment.data.id,
-              state: 'in_progress',
-              description: 'Deploying at 10% traffic for canary testing',
-              auto_inactive: true
-            });
-
-      - name: Deploy at 10% Traffic (Canary)
+      - name: Deploy to Canary Worker
         id: deploy_canary
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: versions deploy --percentage 10
+          command: deploy --name sentry-mcp-canary
           packageManager: pnpm
 
-      - name: Wait for Deployment to Propagate
+      - name: Wait for Canary to Propagate
         if: success()
         run: |
-          echo "Waiting 30 seconds for deployment to propagate..."
+          echo "Waiting 30 seconds for canary deployment to propagate..."
           sleep 30
 
-      # === RUN SMOKE TESTS (will hit new version 10% of the time) ===
-      - name: Run Smoke Tests
-        id: smoke_tests
+      # === SMOKE TEST CANARY ===
+      - name: Run Smoke Tests on Canary
+        id: canary_smoke_tests
         if: success()
-        working-directory: packages/smoke-tests
+        env:
+          PREVIEW_URL: https://sentry-mcp-canary.getsentry.workers.dev
+        run: |
+          echo "Running smoke tests against canary worker..."
+          cd packages/smoke-tests
+          pnpm test:ci
+
+      - name: Publish Canary Smoke Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: always() && steps.canary_smoke_tests.outcome != 'skipped'
+        with:
+          report_paths: "packages/smoke-tests/tests.junit.xml"
+          check_name: "Canary Smoke Test Results"
+          fail_on_failure: false
+
+      # === DEPLOY PRODUCTION WORKER (only if canary tests pass) ===
+      - name: Deploy to Production Worker
+        id: deploy_production
+        if: steps.canary_smoke_tests.outcome == 'success'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/mcp-cloudflare
+          command: deploy --name sentry-mcp
+          packageManager: pnpm
+
+      - name: Wait for Production to Propagate
+        if: steps.deploy_production.outcome == 'success'
+        run: |
+          echo "Waiting 30 seconds for production deployment to propagate..."
+          sleep 30
+
+      # === SMOKE TEST PRODUCTION ===
+      - name: Run Smoke Tests on Production
+        id: production_smoke_tests
+        if: steps.deploy_production.outcome == 'success'
         env:
           PREVIEW_URL: https://mcp.sentry.dev
         run: |
-          echo "Running smoke tests (10% traffic on new version)..."
-          # Run tests multiple times to ensure we hit the new version
-          for i in {1..5}; do
-            echo "Test run $i of 5..."
-            pnpm test:ci || exit 1
-          done
+          echo "Running smoke tests on production..."
+          cd packages/smoke-tests
+          pnpm test:ci
 
-      - name: Publish Smoke Test Report
+      - name: Publish Production Smoke Test Report
         uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
-        if: always() && steps.smoke_tests.outcome != 'skipped'
+        if: always() && steps.production_smoke_tests.outcome != 'skipped'
         with:
-          report_paths: "**/tests.junit.xml"
-          check_name: "Smoke Test Results"
+          report_paths: "packages/smoke-tests/tests.junit.xml"
+          check_name: "Production Smoke Test Results"
           fail_on_failure: false
 
-      # === DEPLOY TO 100% IF TESTS PASS ===
-      - name: Deploy at 100% Traffic (Production)
-        id: deploy_prod
-        if: success()
+      # === ROLLBACK IF PRODUCTION SMOKE TESTS FAIL ===
+      - name: Rollback Production on Smoke Test Failure
+        if: steps.production_smoke_tests.outcome == 'failure'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: versions deploy --percentage 100
-          packageManager: pnpm
-
-      - name: Update Deployment Status
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const canarySuccess = '${{ steps.deploy_canary.outcome }}' === 'success';
-            const smokeTestsSuccess = '${{ steps.smoke_tests.outcome }}' === 'success';
-            const prodDeploySuccess = '${{ steps.deploy_prod.outcome }}' === 'success';
-            
-            let state = 'failure';
-            let description = 'Deployment failed';
-            
-            if (!canarySuccess) {
-              description = 'Canary deployment failed';
-            } else if (!smokeTestsSuccess) {
-              description = 'Smoke tests failed at 10% traffic - rolled back';
-            } else if (prodDeploySuccess) {
-              state = 'success';
-              description = 'Deployed to production at 100% traffic';
-            } else {
-              description = 'Production deployment failed';
-            }
-            
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: ${{ steps.deployment.outputs.id }},
-              state: state,
-              environment_url: state === 'success' ? 'https://mcp.sentry.dev' : undefined,
-              description: description,
-              auto_inactive: true
-            });
-            
-            if (state === 'failure') {
-              core.setFailed(description);
-            }
-
-      # === ROLLBACK IF NEEDED ===
-      - name: Rollback on Failure
-        if: failure() && steps.deploy_canary.outcome == 'success'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: packages/mcp-cloudflare
-          command: rollback
+          command: rollback --name sentry-mcp
           packageManager: pnpm
         continue-on-error: true
+
+      - name: Fail Job if Production Smoke Tests Failed
+        if: steps.production_smoke_tests.outcome == 'failure'
+        run: |
+          echo "Production smoke tests failed - job failed after rollback"
+          exit 1

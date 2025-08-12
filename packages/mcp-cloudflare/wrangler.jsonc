@@ -80,5 +80,58 @@
   ],
   "dev": {
     "port": 8788
+  },
+  // Environment configurations
+  "env": {
+    "canary": {
+      // Canary environment for full testing before production
+      // Deploys to sentry-mcp-canary.getsentry.workers.dev
+      // Uses same configuration as production but separate worker
+      "name": "sentry-mcp-canary",
+      "vars": {},
+      "durable_objects": {
+        "bindings": [
+          {
+            "class_name": "SentryMCP",
+            "name": "MCP_OBJECT"
+          }
+        ]
+      },
+      "kv_namespaces": [
+        {
+          "binding": "OAUTH_KV",
+          "id": "8dd5e9bafe1945298e2d5ca3b408a553"
+        }
+      ],
+      "unsafe": {
+        "bindings": [
+          {
+            "name": "CHAT_RATE_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "1001",
+            "simple": {
+              "limit": 10,
+              "period": 60
+            }
+          },
+          {
+            "name": "SEARCH_RATE_LIMITER",
+            "type": "ratelimit",
+            "namespace_id": "1002",
+            "simple": {
+              "limit": 20,
+              "period": 60
+            }
+          }
+        ]
+      },
+      "ai": {
+        "binding": "AI"
+      },
+      "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
+      },
+      "tail_consumers": []
+    }
   }
 }
