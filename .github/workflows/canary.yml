@@ -130,7 +130,15 @@ jobs:
           PREVIEW_URL: ${{ steps.preview_url.outputs.url }}
         run: |
           echo "Running smoke tests against $PREVIEW_URL"
-          pnpm test
+          pnpm test:ci
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: always() && steps.smoke_tests.outcome != 'skipped'
+        with:
+          report_paths: "**/tests.junit.xml"
+          check_name: "Smoke Test Results"
+          fail_on_failure: false
 
       - name: Update Commit Status with Test Results
         if: always() && steps.deploy.outcome == 'success'
