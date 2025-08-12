@@ -109,7 +109,7 @@ jobs:
                 state: state,
                 target_url: deploySuccess ? previewUrl : `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
                 description: description,
-                context: 'Canary'
+                context: 'Canary URL'
               });
             } catch (error) {
               console.error('Failed to create commit status:', error);
