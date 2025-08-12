@@ -50,15 +50,11 @@ jobs:
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
-      - name: Generate Environment Name
+      - name: Generate Worker Name
         id: env_name
         run: |
-          # Get branch name and sanitize it for use in worker name
           BRANCH_NAME="${{ github.head_ref }}"
-          # Worker names: alphanumeric, hyphens, underscores only
-          # Truncate to 20 chars to keep URLs reasonable
-          ENV_SUFFIX=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
-          WORKER_NAME="sentry-mcp-preview-${ENV_SUFFIX}"
+          WORKER_NAME=$(./scripts/generate-worker-name.sh "$BRANCH_NAME")
           
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           echo "worker_name=$WORKER_NAME" >> $GITHUB_OUTPUT

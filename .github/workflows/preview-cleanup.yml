@@ -32,11 +32,8 @@ jobs:
       - name: Generate Worker Name
         id: worker_name
         run: |
-          # Get branch name and construct worker name (must match preview-deploy.yml)
           BRANCH_NAME="${{ github.head_ref }}"
-          # Must match the naming in preview-deploy.yml
-          ENV_SUFFIX=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
-          WORKER_NAME="sentry-mcp-preview-${ENV_SUFFIX}"
+          WORKER_NAME=$(./scripts/generate-worker-name.sh "$BRANCH_NAME")
           
           echo "worker_name=$WORKER_NAME" >> $GITHUB_OUTPUT
           echo "Deleting preview worker: $WORKER_NAME"
