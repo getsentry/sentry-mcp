@@ -80,5 +80,13 @@
   ],
   "dev": {
     "port": 8788
+  },
+  // Environment configurations
+  "env": {
+    "canary": {
+      // Canary environment for testing before production deployment
+      // Inherits all settings from base config
+      // Deploys to sentry-mcp-canary.getsentry.workers.dev
+    }
   }
 }

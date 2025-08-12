@@ -48,13 +48,102 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build
+      - name: Build for Canary
         run: pnpm build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          CLOUDFLARE_ENV: canary
+
+      # === CANARY DEPLOYMENT ===
+      - name: Create Canary Deployment
+        id: canary_deployment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'canary',
+              description: 'Canary deployment for smoke testing',
+              transient_environment: true,
+              production_environment: false,
+              required_contexts: [],
+              auto_merge: false
+            });
+            
+            core.setOutput('id', deployment.data.id);
+            
+            // Set initial status
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'in_progress',
+              description: 'Deploying to canary environment',
+              auto_inactive: true
+            });
+
+      - name: Deploy to Canary
+        id: deploy_canary
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/mcp-cloudflare
+          command: deploy
+          packageManager: pnpm
+
+      - name: Update Canary Deployment Status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const deploySuccess = '${{ steps.deploy_canary.outcome }}' === 'success';
+            
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.canary_deployment.outputs.id }},
+              state: deploySuccess ? 'success' : 'failure',
+              environment_url: deploySuccess ? 'https://sentry-mcp-canary.getsentry.workers.dev' : undefined,
+              description: deploySuccess ? 'Canary deployed successfully' : 'Canary deployment failed',
+              auto_inactive: false
+            });
+            
+            if (!deploySuccess) {
+              core.setFailed('Canary deployment failed');
+            }
+
+      # === SMOKE TESTS ===
+      - name: Wait for Canary to Propagate
+        if: success()
+        run: |
+          echo "Waiting 30 seconds for canary deployment to propagate..."
+          sleep 30
+
+      - name: Run Smoke Tests on Canary
+        id: smoke_tests
+        if: success()
+        working-directory: packages/smoke-tests
+        env:
+          PREVIEW_URL: https://sentry-mcp-canary.getsentry.workers.dev
+        run: |
+          echo "Running smoke tests against canary environment..."
+          pnpm test
+
+      # === PRODUCTION DEPLOYMENT (only if smoke tests pass) ===
+      - name: Rebuild for Production
+        if: success()
+        run: pnpm build
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # No CLOUDFLARE_ENV means build for production
 
       - name: Create Production Deployment
-        id: deployment
+        id: prod_deployment
+        if: success()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -64,7 +153,7 @@ jobs:
               repo: context.repo.repo,
               ref: context.sha,
               environment: 'production',
-              description: 'Production deployment from main branch',
+              description: 'Production deployment after successful canary',
               transient_environment: false,
               production_environment: true,
               required_contexts: [],
@@ -80,11 +169,12 @@ jobs:
               deployment_id: deployment.data.id,
               state: 'in_progress',
               description: 'Deploying to production',
-              auto_inactive: true  // Auto-mark previous production deployment as inactive
+              auto_inactive: true
             });
 
-      - name: Deploy to Cloudflare
-        id: deploy
+      - name: Deploy to Production
+        id: deploy_prod
+        if: success()
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -93,20 +183,35 @@ jobs:
           command: deploy
           packageManager: pnpm
 
-      - name: Update Deployment Status
-        if: always()
+      - name: Update Production Deployment Status
+        if: always() && steps.prod_deployment.outcome == 'success'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const deploySuccess = '${{ steps.deploy.outcome }}' === 'success';
+            const deploySuccess = '${{ steps.deploy_prod.outcome }}' === 'success';
+            const smokeTestsSuccess = '${{ steps.smoke_tests.outcome }}' === 'success';
+            
+            let state = 'failure';
+            let description = 'Deployment failed';
+            
+            if (!smokeTestsSuccess) {
+              description = 'Smoke tests failed on canary';
+            } else if (deploySuccess) {
+              state = 'success';
+              description = 'Deployed to production';
+            }
             
             await github.rest.repos.createDeploymentStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              deployment_id: ${{ steps.deployment.outputs.id }},
-              state: deploySuccess ? 'success' : 'failure',
-              environment_url: deploySuccess ? 'https://mcp.sentry.dev' : undefined,
-              description: deploySuccess ? 'Deployed to production' : 'Deployment failed',
+              deployment_id: ${{ steps.prod_deployment.outputs.id }},
+              state: state,
+              environment_url: state === 'success' ? 'https://mcp.sentry.dev' : undefined,
+              description: description,
               auto_inactive: true
             });
+            
+            if (state === 'failure') {
+              core.setFailed(description);
+            }
