@@ -80,13 +80,5 @@
   ],
   "dev": {
     "port": 8788
-  },
-  // Environment configurations for canary deployments
-  "env": {
-    "canary": {
-      // Canary environment for PR preview deployments
-      // Inherits all settings from base config
-      // URL pattern: sentry-mcp-canary.getsentry.workers.dev
-    }
   }
 }

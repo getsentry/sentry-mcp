@@ -13,7 +13,6 @@ jobs:
   preview:
     name: Deploy and Test
     runs-on: ubuntu-latest
-    environment: Actions
     
     steps:
       - uses: actions/checkout@v4
@@ -85,21 +84,21 @@ jobs:
               auto_inactive: true  // Auto-mark previous deployments as inactive
             });
 
-      - name: Deploy Canary Environment
+      - name: Deploy Canary Version
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: deploy --env canary
+          command: versions upload --preview-alias="pr-${{ github.event.pull_request.number }}" --message="PR #${{ github.event.pull_request.number }} - ${{ github.head_ref }}"
           packageManager: pnpm
 
       - name: Get Canary URL
         id: canary_url
         run: |
-          # Canary environment URL format: <worker-name>-<env>.<subdomain>.workers.dev
-          CANARY_URL="https://sentry-mcp-canary.getsentry.workers.dev"
+          # Preview alias URL format: <alias>-<worker-name>.<subdomain>.workers.dev
+          CANARY_URL="https://pr-${{ github.event.pull_request.number }}-sentry-mcp.getsentry.workers.dev"
           
           echo "url=$CANARY_URL" >> $GITHUB_OUTPUT
           echo "Canary URL: $CANARY_URL"
@@ -170,7 +169,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const testsSuccess = '${{ steps.smoke_tests.outcome }}' === 'success';
-            const previewUrl = '${{ steps.preview_url.outputs.url }}';
             
             let state = testsSuccess ? 'success' : 'failure';
             let description = testsSuccess ? 'Passed' : 'Failed';
