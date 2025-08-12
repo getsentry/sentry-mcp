@@ -10,7 +10,6 @@ export default defineConfig({
     react(),
     cloudflare(),
     tailwindcss(),
-    spotlight(),
     sentryVitePlugin({
       org: "sentry",
       project: "mcp-server",
