@@ -6,8 +6,6 @@ Sentry.init({
   sendDefaultPii: true,
   tracesSampleRate: 1,
   beforeSend: sentryBeforeSend,
-  enableLogs: true,
-  integrations: [Sentry.consoleLoggingIntegration()],
   environment:
     import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.NODE_ENV,
 });
