@@ -1,4 +1,4 @@
-name: Preview Deploy & Test
+name: Canary
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   preview:
-    name: Deploy Preview & Run Tests
+    name: Deploy and Test
     runs-on: ubuntu-latest
     environment: Actions
     
@@ -98,7 +98,7 @@ jobs:
               description = 'Deployment failed';
             } else {
               state = 'success';
-              description = `Preview: ${workerName}`;
+              description = workerName;
             }
             
             try {
@@ -109,7 +109,7 @@ jobs:
                 state: state,
                 target_url: deploySuccess ? previewUrl : `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
                 description: description,
-                context: 'Preview Deploy'
+                context: 'Canary'
               });
             } catch (error) {
               console.error('Failed to create commit status:', error);
@@ -142,7 +142,7 @@ jobs:
             const previewUrl = '${{ steps.preview_url.outputs.url }}';
             
             let state = testsSuccess ? 'success' : 'failure';
-            let description = testsSuccess ? 'All tests passed' : 'Some tests failed';
+            let description = testsSuccess ? 'Passed' : 'Failed';
             
             try {
               await github.rest.repos.createCommitStatus({

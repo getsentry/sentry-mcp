@@ -1,4 +1,4 @@
-name: Preview Cleanup
+name: Canary Cleanup
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   cleanup:
-    name: Delete Preview Environment
+    name: Delete Canary Environment
     runs-on: ubuntu-latest
     environment: Actions
     
