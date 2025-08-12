@@ -48,11 +48,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build for Canary
+      - name: Build
         run: pnpm build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          CLOUDFLARE_ENV: canary
 
       # === CANARY DEPLOYMENT ===
       - name: Create Canary Deployment
@@ -92,7 +91,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: packages/mcp-cloudflare
-          command: deploy
+          command: deploy --name sentry-mcp-canary
           packageManager: pnpm
 
       - name: Update Canary Deployment Status
@@ -142,13 +141,6 @@ jobs:
           fail_on_failure: false
 
       # === PRODUCTION DEPLOYMENT (only if smoke tests pass) ===
-      - name: Rebuild for Production
-        if: success()
-        run: pnpm build
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          # No CLOUDFLARE_ENV means build for production
-
       - name: Create Production Deployment
         id: prod_deployment
         if: success()
