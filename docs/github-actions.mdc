@@ -1,111 +1,67 @@
 # GitHub Actions
 
-This document describes the GitHub Actions workflows used for CI/CD in the Sentry MCP project.
+CI/CD workflows for the Sentry MCP project.
 
 ## Workflows
 
 ### test.yml
-Runs on all pushes to main and on pull requests. Executes:
-- Build
-- Linting
-- Unit tests
+Runs on all pushes to main and pull requests:
+- Build, lint, unit tests
 - Code coverage reporting
 
 ### deploy.yml
-Runs only on pushes to the main branch (after tests pass). Executes:
-- Full test suite (via reusable workflow)
-- Production deployment to Cloudflare Workers
-
-### versions.yml
-Runs on all branches except main (after tests pass). Executes:
-- Full test suite (via reusable workflow)
-- Uploads a new version to Cloudflare for gradual rollout testing
-
-### release.yml
-Manual workflow for creating releases and version tags.
+Runs after tests pass on main branch:
+- **Canary deployment**: Deploy to `sentry-mcp-canary` worker with isolated resources
+- **Smoke tests**: Test canary deployment
+- **Production deployment**: Deploy to `sentry-mcp` worker (only if canary tests pass)
+- **Production smoke tests**: Test production deployment
+- **Automatic rollback**: Rollback production if smoke tests fail
 
 ### eval.yml
 Runs evaluation tests against the MCP server.
 
 ## Required Secrets
 
-The following secrets must be configured in your GitHub repository settings:
+Repository secrets (no environment needed):
 
-### Cloudflare Secrets
+- **`CLOUDFLARE_API_TOKEN`** - Cloudflare API token with Workers deployment permissions
+- **`CLOUDFLARE_ACCOUNT_ID`** - Your Cloudflare account ID  
+- **`SENTRY_AUTH_TOKEN`** - For Sentry release tracking
+- **`SENTRY_CLIENT_SECRET`** - Sentry OAuth client secret
+- **`COOKIE_SECRET`** - Session cookie encryption secret
+- **`OPENAI_API_KEY`** - For AI-powered search features
 
-- **`CLOUDFLARE_API_TOKEN`** - Cloudflare API token with permissions to deploy Workers
-  - Create at: https://dash.cloudflare.com/profile/api-tokens
-  - Required permissions:
-    - Account: Cloudflare Workers Scripts:Edit
-    - Zone: Workers Routes:Edit (if using custom domains)
+## Deployment Architecture
 
-- **`CLOUDFLARE_ACCOUNT_ID`** - Your Cloudflare account ID
-  - Find at: https://dash.cloudflare.com/ → Select your account → Copy ID from URL or sidebar
+### Workers
+- **`sentry-mcp`** - Production worker at `https://mcp.sentry.dev`
+- **`sentry-mcp-canary`** - Canary worker at `https://sentry-mcp-canary.getsentry.workers.dev`
 
-### Existing Secrets (already configured)
+### Resource Isolation
+Canary and production use separate resources for complete isolation:
 
-- **`CODECOV_TOKEN`** - For uploading test coverage reports
-- **`SENTRY_RELEASE_BOT_*`** - Used by release workflow
+| Resource | Production | Canary |
+|----------|------------|---------|
+| KV Namespace | `8dd5e9bafe1945298e2d5ca3b408a553` | `a3fe0d23b2d34416930e284362a88a3b` |
+| Rate Limiter IDs | `1001`, `1002` | `2001`, `2002` |
+| Wrangler Config | `wrangler.jsonc` | `wrangler.canary.jsonc` |
 
-## Setting Up Cloudflare API Token
+### Deployment Flow
+1. **Build once** - Single build for both deployments
+2. **Deploy canary** - `wrangler deploy --config wrangler.canary.jsonc`
+3. **Wait 30s** - Allow propagation
+4. **Test canary** - Run smoke tests against canary worker
+5. **Deploy production** - `wrangler deploy` (only if canary tests pass)
+6. **Wait 30s** - Allow propagation  
+7. **Test production** - Run smoke tests against production worker
+8. **Rollback** - `wrangler rollback` if production tests fail
 
-1. Go to https://dash.cloudflare.com/profile/api-tokens
-2. Click "Create Token"
-3. Use "Custom token" template
-4. Configure permissions:
-   - Account → Cloudflare Workers Scripts → Edit
-   - Account → Account Settings → Read (for account ID verification)
-   - If using custom domains: Zone → Workers Routes → Edit
-5. Set Account Resources to include your specific account
-6. Set TTL as appropriate (recommend no expiry for CI/CD)
-7. Create token and copy the value
-8. Add to GitHub: Settings → Secrets and variables → Actions → New repository secret
+## Manual Deployment
 
-## Deployment Process
-
-### Production Deployment (main branch)
-
-1. Push to main branch or merge PR
-2. `test.yml` workflow runs automatically
-3. If tests pass, `deploy.yml` workflow runs
-4. Cloudflare Worker is deployed to production
-
-### Version Upload (feature branches)
-
-1. Push to any branch (except main)
-2. `test.yml` workflow runs automatically  
-3. If tests pass, `versions.yml` workflow runs
-4. New version is uploaded to Cloudflare (not deployed)
-5. Version can be promoted via Cloudflare dashboard for gradual rollout
-
-### Manual Deployment
-
-You can trigger deployment manually:
-1. Go to Actions → Deploy to Cloudflare
-2. Click "Run workflow"
-3. Select branch and run
-
-## Monitoring Deployments
-
-- GitHub Actions: Check workflow runs in the Actions tab
-- Cloudflare Dashboard: Monitor Worker metrics and logs
-- Version Management: Use Cloudflare dashboard to manage gradual rollouts
+Trigger via GitHub Actions → Deploy to Cloudflare → "Run workflow"
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Authentication failed**
-   - Verify `CLOUDFLARE_API_TOKEN` has correct permissions
-   - Check token hasn't expired
-   - Ensure `CLOUDFLARE_ACCOUNT_ID` matches token's account
-
-2. **Build failures**
-   - Check Node.js version matches local development
-   - Verify all dependencies are properly listed
-   - Review build logs for TypeScript errors
-
-3. **Deployment fails but build succeeds**
-   - Check wrangler.jsonc configuration
-   - Verify all required bindings exist in Cloudflare
-   - Review Cloudflare API quotas and limits
+1. **Authentication failed** - Check `CLOUDFLARE_API_TOKEN` permissions
+2. **Build failures** - Review TypeScript/build logs
+3. **Smoke test failures** - Check worker logs in Cloudflare dashboard
