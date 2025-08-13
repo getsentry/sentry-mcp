@@ -4,6 +4,8 @@ import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { Command } from "commander";
 import { config } from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import * as Sentry from "@sentry/node";
 import { connectToMCPServer } from "./mcp-test-client.js";
@@ -15,9 +17,13 @@ import { LIB_VERSION } from "./version.js";
 import { sentryBeforeSend } from "./utils/sentry-scrubbing.js";
 import type { MCPConnection } from "./types.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, "../../../");
+
 // Load environment variables from multiple possible locations
-config(); // Try current directory first
-config({ path: "../../.env" }); // Also try root directory
+// IMPORTANT: Do NOT use override:true as it would overwrite shell/CI environment variables
+config(); // Try current directory first (.env in mcp-test-client)
+config({ path: path.join(rootDir, ".env") }); // Also try root directory (fallback for shared values)
 
 const program = new Command();
 
