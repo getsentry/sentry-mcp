@@ -16,6 +16,7 @@ import {
   ParamRegionUrl,
   ParamIssueShortId,
   ParamIssueUrl,
+  ResponseType,
 } from "../schema";
 
 export default defineTool({
@@ -61,6 +62,7 @@ export default defineTool({
     issueId: ParamIssueShortId.optional(),
     eventId: z.string().trim().describe("The ID of the event.").optional(),
     issueUrl: ParamIssueUrl.optional(),
+    responseType: ResponseType.optional(),
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
@@ -109,6 +111,7 @@ export default defineTool({
         event,
         apiService,
         autofixState,
+        responseType: params.responseType,
       });
     }
 
@@ -171,6 +174,7 @@ export default defineTool({
       event,
       apiService,
       autofixState,
+      responseType: params.responseType,
     });
   },
 });
