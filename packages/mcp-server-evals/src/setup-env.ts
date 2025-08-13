@@ -4,20 +4,15 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load .env files in priority order (later files override earlier ones)
-// 1. Root workspace .env
-// 2. Root workspace .env.local (for local overrides)
-// 3. Local package .env (higher priority)
-
-// Load root workspace .env first
+// Load environment variables from multiple possible locations
+// IMPORTANT: Do NOT use override:true as it would overwrite shell/CI environment variables
 const rootDir = path.resolve(__dirname, "../../../");
-config({ path: path.join(rootDir, ".env") });
 
-// Load root workspace .env.local (for local overrides)
-config({ path: path.join(rootDir, ".env.local") });
-
-// Load local package .env (will override root if same keys exist)
+// Load local package .env first (for package-specific overrides)
 config({ path: path.resolve(__dirname, "../.env") });
+
+// Load root .env second (for shared defaults - won't override local or shell vars)
+config({ path: path.join(rootDir, ".env") });
 
 // Start the shared MSW server for all eval tests
 import { startMockServer } from "@sentry/mcp-server-mocks/utils";

@@ -361,6 +361,9 @@ importers:
       ai:
         specifier: 'catalog:'
         version: 4.3.16(react@19.1.0)(zod@3.25.72)
+      dotenv:
+        specifier: 'catalog:'
+        version: 16.6.1
       zod:
         specifier: 'catalog:'
         version: 3.25.72

@@ -122,6 +122,7 @@
     "@sentry/core": "catalog:",
     "@sentry/node": "catalog:",
     "ai": "catalog:",
+    "dotenv": "catalog:",
     "zod": "catalog:"
   }
 }

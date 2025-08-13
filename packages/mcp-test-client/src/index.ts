@@ -16,8 +16,9 @@ import { sentryBeforeSend } from "./utils/sentry-scrubbing.js";
 import type { MCPConnection } from "./types.js";
 
 // Load environment variables from multiple possible locations
-config(); // Try current directory first
-config({ path: "../../.env" }); // Also try root directory
+// IMPORTANT: Do NOT use override:true as it would overwrite shell/CI environment variables
+config(); // Try current directory first (.env in mcp-test-client)
+config({ path: "../../.env" }); // Also try root directory (fallback for shared values)
 
 const program = new Command();
 
