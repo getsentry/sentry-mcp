@@ -185,6 +185,16 @@ export class EventBuilder {
     return this;
   }
 
+  withOccurrence(occurrence: any): this {
+    (this.event as any).occurrence = occurrence;
+    return this;
+  }
+
+  withEntry(entry: { type: string; data: any }): this {
+    this.event.entries.push(entry);
+    return this;
+  }
+
   build(): Event {
     return { ...this.event };
   }
