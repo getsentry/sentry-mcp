@@ -26,6 +26,12 @@ const app = new Hono<{
     "*",
     csrf({
       origin: (origin, c) => {
+        // If no Origin header is present, this cannot be a CSRF attack
+        // (CSRF requires a cross-origin request which always has an Origin header)
+        if (!origin) {
+          return true;
+        }
+        // If Origin is present, verify it matches the request URL's origin
         const requestUrl = new URL(c.req.url);
         return origin === requestUrl.origin;
       },
