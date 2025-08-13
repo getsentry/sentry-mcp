@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import {
   mswServer,
   traceMetaFixture,
+  traceMetaWithNullsFixture,
   traceFixture,
 } from "@sentry/mcp-server-mocks";
 import getTraceDetails from "./get-trace-details.js";
@@ -232,5 +233,45 @@ describe("get_trace_details", () => {
       "Trace `a4d1aae7216b47ff8117cf4e09ce9d0a` in **sentry-mcp-evals**",
     );
     expect(result).toContain("**Total Spans**: 112");
+  });
+
+  it("handles trace meta with null transaction.event_id values", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/a4d1aae7216b47ff8117cf4e09ce9d0a/",
+        () => {
+          return HttpResponse.json(traceMetaWithNullsFixture);
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/a4d1aae7216b47ff8117cf4e09ce9d0a/",
+        () => {
+          return HttpResponse.json(traceFixture);
+        },
+      ),
+    );
+
+    const result = await getTraceDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        regionUrl: undefined,
+      },
+      {
+        accessToken: "access-token",
+        userId: "1",
+        organizationSlug: null,
+      },
+    );
+
+    // The handler should successfully process the response with null values
+    expect(result).toContain(
+      "Trace `a4d1aae7216b47ff8117cf4e09ce9d0a` in **sentry-mcp-evals**",
+    );
+    expect(result).toContain("**Total Spans**: 85");
+    expect(result).toContain("**Errors**: 2");
+    // The null transaction.event_id entries should be handled gracefully
+    // and the trace should still be processed successfully
+    expect(result).not.toContain("null");
   });
 });

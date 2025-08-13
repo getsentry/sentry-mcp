@@ -568,7 +568,7 @@ export const TraceMetaSchema = z.object({
   span_count: z.number(),
   transaction_child_count_map: z.array(
     z.object({
-      "transaction.event_id": z.string(),
+      "transaction.event_id": z.string().nullable(),
       "count()": z.number(),
     }),
   ),
