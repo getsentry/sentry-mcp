@@ -3,6 +3,7 @@ name: Deploy to Cloudflare
 permissions:
   contents: read
   deployments: write
+  checks: write
 
 on:
   workflow_run:
