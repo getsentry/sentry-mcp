@@ -51,6 +51,9 @@ import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attrib
   type: "json",
 };
 import traceMetaFixture from "./fixtures/trace-meta.json" with { type: "json" };
+import traceMetaWithNullsFixture from "./fixtures/trace-meta-with-nulls.json" with {
+  type: "json",
+};
 import traceFixture from "./fixtures/trace.json" with { type: "json" };
 import traceEventFixture from "./fixtures/trace-event.json" with {
   type: "json",
@@ -1311,6 +1314,7 @@ export const mswServer = setupServer(
 export {
   autofixStateFixture,
   traceMetaFixture,
+  traceMetaWithNullsFixture,
   traceFixture,
   traceEventFixture,
 };
