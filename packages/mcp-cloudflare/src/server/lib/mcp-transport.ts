@@ -14,17 +14,7 @@ import getSentryConfig from "../sentry.config";
 // NOTE: Only store persistent user data in props (e.g., userId, accessToken).
 // Request-specific data like user agent should be captured per request.
 class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
-  server = new McpServer({
-    name: "Sentry MCP",
-    version: LIB_VERSION,
-  });
-  // Note: This does not work locally with miniflare so we are not using it
-  // server = wrapMcpServerWithSentry(
-  //   new McpServer({
-  //     name: "Sentry MCP",
-  //     version: LIB_VERSION,
-  //   }),
-  // );
+  server!: McpServer;
 
   // URL constraints are now stored in Durable Object storage for hibernation persistence
 
@@ -34,39 +24,73 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   }
 
   /**
-   * Override fetch to extract org/project from URL path
+   * Override fetch to extract org/project constraints from headers.
+   *
+   * These headers are set by our custom wrapper in index.ts because the
+   * agents library's serve() method rewrites the URL path to "/streamable-http",
+   * losing the original path parameters. Headers are preserved through this
+   * rewriting, making them a reliable way to pass constraint information.
    */
   async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
+    // Check if we have constraint headers (always present from our wrapper)
+    const orgSlugHeader = request.headers.get("X-Sentry-Org-Slug");
+    const projectSlugHeader = request.headers.get("X-Sentry-Project-Slug");
 
-    // Extract org/project from URL path using strict regex with bounded quantifiers
-    // Only allows alphanumeric, hyphens, underscores, and dots (common in slugs)
-    // Limited to 1-100 characters to prevent ReDoS attacks
-    const pathMatch = url.pathname.match(
-      /^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]{1,100}))?(?:\/([a-zA-Z0-9._-]{1,100}))?/,
-    );
+    // Load current constraints to see if they've changed
+    const currentConstraints =
+      await this.ctx.storage.get<UrlConstraints>("urlConstraints");
 
-    if (pathMatch?.[2]) {
-      const orgSlug = pathMatch[2];
-      const projectSlug = pathMatch[3]; // May be undefined
+    let constraintsChanged = false;
 
-      // Additional security validation
-      if (
-        this.isValidSlug(orgSlug) &&
-        (!projectSlug || this.isValidSlug(projectSlug))
-      ) {
-        try {
-          // Store in Durable Object storage to persist across hibernation cycles
-          const constraints: UrlConstraints = {
-            organizationSlug: orgSlug,
-            projectSlug: projectSlug,
-          };
-          await this.ctx.storage.put("urlConstraints", constraints);
-        } catch (error) {
-          // Log storage error but don't crash the request
-          console.error("[ERROR] Failed to store URL constraints:", error);
+    // If headers are present (even if empty), update constraints
+    if (orgSlugHeader !== null) {
+      if (orgSlugHeader === "") {
+        // Empty header means clear constraints
+        if (currentConstraints) {
+          await this.ctx.storage.delete("urlConstraints");
+          constraintsChanged = true;
+        }
+      } else {
+        // Validate slugs - throw if invalid since this shouldn't happen
+        if (!this.isValidSlug(orgSlugHeader)) {
+          throw new Error(`Invalid organization slug: ${orgSlugHeader}`);
+        }
+        if (
+          projectSlugHeader &&
+          projectSlugHeader !== "" &&
+          !this.isValidSlug(projectSlugHeader)
+        ) {
+          throw new Error(`Invalid project slug: ${projectSlugHeader}`);
+        }
+
+        // Store new constraints
+        const newConstraints: UrlConstraints = {
+          organizationSlug: orgSlugHeader,
+          projectSlug:
+            projectSlugHeader && projectSlugHeader !== ""
+              ? projectSlugHeader
+              : undefined,
+        };
+
+        // Check if constraints have changed
+        if (
+          !currentConstraints ||
+          currentConstraints.organizationSlug !==
+            newConstraints.organizationSlug ||
+          currentConstraints.projectSlug !== newConstraints.projectSlug
+        ) {
+          await this.ctx.storage.put("urlConstraints", newConstraints);
+          constraintsChanged = true;
         }
       }
+    }
+
+    // If constraints changed, we need to reinitialize the server with new constraints
+    if (constraintsChanged) {
+      // Force re-initialization by resetting the init flag
+      // Note: This assumes the parent class has an initRun flag or similar
+      // We may need to call init() directly here
+      await this.init();
     }
 
     return super.fetch(request);
@@ -110,6 +134,15 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   }
 
   async init() {
+    // Create a fresh server instance each time init() is called.
+    // This is crucial because configureServer() modifies the tool schemas based on constraints,
+    // and we need each Durable Object instance to have its own server with the correct
+    // constraints applied. Without this, different DO instances would share mutated schemas.
+    this.server = new McpServer({
+      name: "Sentry MCP",
+      version: LIB_VERSION,
+    });
+
     // Load only MCP client info from storage
     const persistedMcpInfo = await this.ctx.storage.get<{
       mcpClientName?: string;
