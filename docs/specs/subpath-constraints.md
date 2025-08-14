@@ -27,11 +27,11 @@ Same pattern for SSE endpoints:
 
 ### Key Discoveries
 
-1. **URLPattern Support**: The `McpAgent` class uses `URLPattern` API which supports dynamic segments with named groups (e.g., `/:org/:project`)
+1. **OAuth Provider Path Matching**: The OAuth provider uses `startsWith` for path matching, meaning a handler registered for `/mcp` will also match `/mcp/org/project`
 
-2. **OAuth Provider Path Matching**: The OAuth provider uses `startsWith` for path matching, meaning a handler registered for `/mcp` will also match `/mcp/org/project`
+2. **Header Communication**: Constraints can be passed from the handler to the Durable Object via custom headers
 
-3. **Header Communication**: Constraints can be passed from the handler to the Durable Object via custom headers
+3. **Session Persistence**: Constraints are stored in Durable Object storage and persist across requests
 
 ### Implementation Components
 
@@ -57,7 +57,7 @@ class SentryMCPBase extends McpAgent {
   
   async init() {
     // Include constraints in ServerContext
-    // constraints: this.constraints || this.props.constraints
+    // constraints: this.constraints
   }
 }
 ```
@@ -142,21 +142,23 @@ The implementation leverages the fact that the OAuth provider uses `startsWith` 
 4. Store constraints in Durable Object storage for session persistence
 5. Include constraints in the ServerContext for tool validation
 
-## Future Work
+## Future Improvements
 
-1. **Upstream Changes**: Work with the `agents` package maintainers to add support for dynamic routing
-2. **OAuth Provider Enhancement**: Extend the OAuth provider to support wildcard route patterns
-3. **Alternative Transport**: Consider implementing a custom transport that supports dynamic routing
-4. **Query Parameter Fallback**: Support constraints via query parameters as a fallback mechanism
+1. **Additional Tools**: Extend constraint validation to more tools beyond find-projects and update-project
+2. **Slug Validation**: Add format validation for organization and project slugs to reject invalid characters early
+3. **Error Logging**: Add structured logging for constraint violations for better debugging
 
 ## Testing
 
 ```bash
-# Unit tests
-pnpm test constraint-validation
+# Run constraint validation tests
+pnpm vitest run src/internal/constraint-validation.test.ts
 
-# Integration tests (when routing is resolved)
-pnpm test mcp-routes
+# Run constraint handler tests
+pnpm vitest run src/server/lib/mcp-constraint-handler.test.ts
+
+# Run router tests
+pnpm vitest run src/server/lib/mcp-router.test.ts
 ```
 
 ## Migration
