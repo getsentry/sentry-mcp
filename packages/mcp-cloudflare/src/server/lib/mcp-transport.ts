@@ -16,7 +16,10 @@ import getSentryConfig from "../sentry.config";
 class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   server!: McpServer;
 
-  // URL constraints are now stored in Durable Object storage for hibernation persistence
+  // Store constraints in memory for immediate access during init()
+  // This solves the race condition where init() might be called before
+  // storage operations complete in fetch()
+  private pendingConstraints: UrlConstraints | null = null;
 
   // biome-ignore lint/complexity/noUselessConstructor: Need the constructor to match the durable object types.
   constructor(state: DurableObjectState, env: Env) {
@@ -47,9 +50,15 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
         organizationSlug: orgSlugHeader,
         projectSlug: projectSlugHeader || undefined,
       };
+      // Store in BOTH memory and persistent storage:
+      // 1. Memory: For immediate use in init() (avoids race condition)
+      // 2. Storage: For hibernation recovery (persists across DO restarts)
+      this.pendingConstraints = newConstraints;
       await this.ctx.storage.put("urlConstraints", newConstraints);
     } else {
       // No org header means clear all constraints (user accessed base /mcp path)
+      // Clear from both memory and storage
+      this.pendingConstraints = null;
       await this.ctx.storage.delete("urlConstraints");
     }
 
@@ -73,9 +82,15 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       mcpProtocolVersion?: string;
     }>("mcpClientInfo");
 
-    // Load URL constraints from storage (survives hibernation)
-    const urlConstraints =
-      await this.ctx.storage.get<UrlConstraints>("urlConstraints");
+    // Use pending constraints if available (from current request),
+    // otherwise load from storage (for hibernation recovery)
+    let urlConstraints = this.pendingConstraints;
+
+    if (!urlConstraints) {
+      // No pending constraints, try loading from storage (hibernation recovery case)
+      urlConstraints =
+        (await this.ctx.storage.get<UrlConstraints>("urlConstraints")) || null;
+    }
 
     const serverContext: ServerContext = {
       accessToken: this.props.accessToken,
