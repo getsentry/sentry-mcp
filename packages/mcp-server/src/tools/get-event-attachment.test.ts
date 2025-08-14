@@ -12,9 +12,12 @@ describe("get_event_attachment", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+          projectSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -52,9 +55,12 @@ describe("get_event_attachment", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+          projectSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -105,9 +111,12 @@ describe("get_event_attachment", () => {
           regionUrl: "https",
         },
         {
+          constraints: {
+            organizationSlug: null,
+            projectSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow(

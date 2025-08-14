@@ -3,7 +3,7 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "../types";
-import type { ServerContext } from "@sentry/mcp-server/types";
+import type { ServerContext, UrlConstraints } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import { logError } from "@sentry/mcp-server/logging";
 import getSentryConfig from "../sentry.config";
@@ -39,10 +39,11 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Extract org/project from URL path using strict regex
+    // Extract org/project from URL path using strict regex with bounded quantifiers
     // Only allows alphanumeric, hyphens, underscores, and dots (common in slugs)
+    // Limited to 1-100 characters to prevent ReDoS attacks
     const pathMatch = url.pathname.match(
-      /^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]+))?(?:\/([a-zA-Z0-9._-]+))?$/,
+      /^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]{1,100}))?(?:\/([a-zA-Z0-9._-]{1,100}))?/,
     );
 
     if (pathMatch?.[2]) {
@@ -54,11 +55,17 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
         this.isValidSlug(orgSlug) &&
         (!projectSlug || this.isValidSlug(projectSlug))
       ) {
-        // Store in Durable Object storage to persist across hibernation cycles
-        await this.ctx.storage.put("urlConstraints", {
-          organizationSlug: orgSlug,
-          projectSlug: projectSlug,
-        });
+        try {
+          // Store in Durable Object storage to persist across hibernation cycles
+          const constraints: UrlConstraints = {
+            organizationSlug: orgSlug,
+            projectSlug: projectSlug,
+          };
+          await this.ctx.storage.put("urlConstraints", constraints);
+        } catch (error) {
+          // Log storage error but don't crash the request
+          console.error("[ERROR] Failed to store URL constraints:", error);
+        }
       }
     }
 
@@ -111,17 +118,15 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     }>("mcpClientInfo");
 
     // Load URL constraints from storage (survives hibernation)
-    const urlConstraints = await this.ctx.storage.get<{
-      organizationSlug?: string;
-      projectSlug?: string;
-    }>("urlConstraints");
+    const urlConstraints =
+      await this.ctx.storage.get<UrlConstraints>("urlConstraints");
 
     const serverContext: ServerContext = {
       accessToken: this.props.accessToken,
-      organizationSlug: urlConstraints?.organizationSlug || null,
-      projectSlug: urlConstraints?.projectSlug || null,
       userId: this.props.id,
       mcpUrl: process.env.MCP_URL,
+      // URL-based session constraints
+      constraints: urlConstraints || {},
       // Restore MCP client info if available
       ...persistedMcpInfo,
     };

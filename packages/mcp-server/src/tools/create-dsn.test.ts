@@ -11,9 +11,12 @@ describe("create_dsn", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+          projectSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`

@@ -38,14 +38,22 @@ export type PromptHandlers = {
   [K in PromptName]: PromptHandlerExtended<K>;
 };
 
+/**
+ * URL-based constraints that restrict the MCP session scope
+ */
+export type UrlConstraints = {
+  organizationSlug?: string | null;
+  projectSlug?: string | null;
+};
+
 export type ServerContext = {
   sentryHost?: string;
   mcpUrl?: string;
   accessToken: string;
-  organizationSlug: string | null;
-  projectSlug?: string | null;
   userId?: string | null;
   clientId?: string;
+  // URL-based session constraints
+  constraints: UrlConstraints;
   // MCP client information captured during initialization
   mcpClientName?: string;
   mcpClientVersion?: string;

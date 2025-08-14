@@ -6,9 +6,11 @@ describe("whoami", () => {
     const result = await whoami.handler(
       {},
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "123456",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(

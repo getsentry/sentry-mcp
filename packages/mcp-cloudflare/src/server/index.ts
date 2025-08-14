@@ -11,8 +11,14 @@ export { SentryMCP };
 
 const oAuthProvider = new OAuthProvider({
   apiHandlers: {
+    // Legacy route - still supported but not documented going forward
     "/sse": SentryMCP.serveSSE("/sse"),
+
+    // Primary MCP routes - these are the only routes we document going forward
     "/mcp": SentryMCP.serve("/mcp"),
+    // Subpath routes for organization/project constraints
+    "/mcp/:organizationSlug": SentryMCP.serve("/mcp"),
+    "/mcp/:organizationSlug/:projectSlug": SentryMCP.serve("/mcp"),
   },
   // @ts-ignore
   defaultHandler: app,

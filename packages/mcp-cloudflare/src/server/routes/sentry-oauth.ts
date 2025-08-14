@@ -164,8 +164,6 @@ export default new Hono<{
     });
     if (errResponse) return errResponse;
 
-    // We don't automatically select an organization - let URL constraints or tools handle this
-
     // Return back to the MCP client a new token
     const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
       request: oauthReqInfo,

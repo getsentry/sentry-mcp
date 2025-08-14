@@ -8,9 +8,11 @@ describe("get_doc", () => {
         path: "/product/rate-limiting.md",
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
         mcpUrl: "https://mcp.sentry.dev",
       },
     );
@@ -190,9 +192,11 @@ describe("get_doc", () => {
           path: "/product/rate-limiting", // Missing .md extension
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow(
@@ -213,9 +217,11 @@ describe("get_doc", () => {
           path: "/product/test.md",
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow();
@@ -229,9 +235,11 @@ describe("get_doc", () => {
           path: "https://malicious.com/test.md",
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow(
@@ -253,9 +261,11 @@ describe("get_doc", () => {
           path: "/product/test.md",
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow("Request timeout after 15000ms");
