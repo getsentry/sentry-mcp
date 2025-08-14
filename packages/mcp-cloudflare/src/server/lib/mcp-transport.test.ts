@@ -1,31 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 
-// Mock the mcp-router
-vi.mock("./mcp-router", () => ({
-  parseMcpPath: vi.fn((pathname: string) => {
-    if (pathname === "/mcp/acme-corp/frontend") {
-      return {
-        basePath: "/mcp",
-        constraints: {
-          organizationSlug: "acme-corp",
-          projectSlug: "frontend",
-        },
-      };
-    }
-    if (pathname === "/mcp/acme-corp") {
-      return {
-        basePath: "/mcp",
-        constraints: {
-          organizationSlug: "acme-corp",
-        },
-      };
-    }
-    if (pathname === "/mcp") {
-      return { basePath: "/mcp" };
-    }
-    return null;
-  }),
-}));
+// No need to mock mcp-router anymore - we use simple inline parsing
 
 // Mock dependencies
 vi.mock("@sentry/cloudflare", () => ({

@@ -7,7 +7,6 @@ import type { ServerContext } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import { logError } from "@sentry/mcp-server/logging";
 import getSentryConfig from "../sentry.config";
-import { parseMcpPath } from "./mcp-router";
 
 // Props contain the authenticated user context from the OAuth flow.
 // These are encrypted and stored in the OAuth token, then provided
@@ -41,11 +40,16 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
    */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    const parsedPath = parseMcpPath(url.pathname);
 
-    if (parsedPath?.constraints) {
-      this.urlOrganizationSlug = parsedPath.constraints.organizationSlug;
-      this.urlProjectSlug = parsedPath.constraints.projectSlug;
+    // Simple URL parsing: /mcp/org/project or /sse/org/project
+    const segments = url.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+
+    if (
+      (segments[0] === "mcp" || segments[0] === "sse") &&
+      segments.length > 1
+    ) {
+      this.urlOrganizationSlug = segments[1];
+      this.urlProjectSlug = segments[2]; // undefined if not provided
 
       // Store in Durable Object storage so they persist across requests
       await this.ctx.storage.put("urlConstraints", {
