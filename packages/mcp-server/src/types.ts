@@ -43,15 +43,11 @@ export type ServerContext = {
   mcpUrl?: string;
   accessToken: string;
   organizationSlug: string | null;
+  projectSlug?: string | null;
   userId?: string | null;
   clientId?: string;
   // MCP client information captured during initialization
   mcpClientName?: string;
   mcpClientVersion?: string;
   mcpProtocolVersion?: string;
-  // URL-derived constraints for organization/project scoping
-  constraints?: {
-    organizationSlug?: string;
-    projectSlug?: string;
-  };
 };

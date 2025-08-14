@@ -1,7 +1,6 @@
 import * as Sentry from "@sentry/cloudflare";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import SentryMCP from "./lib/mcp-transport";
-import { createConstraintAwareMcpHandler } from "./lib/mcp-constraint-handler";
 import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
@@ -12,11 +11,8 @@ export { SentryMCP };
 
 const oAuthProvider = new OAuthProvider({
   apiHandlers: {
-    // Use constraint-aware handlers that support dynamic URL segments
-    // These handlers will match /mcp, /mcp/org, /mcp/org/project etc.
-    // because the OAuth provider uses startsWith for path matching
-    "/sse": createConstraintAwareMcpHandler("/sse"),
-    "/mcp": createConstraintAwareMcpHandler("/mcp"),
+    "/sse": SentryMCP.serveSSE("/sse"),
+    "/mcp": SentryMCP.serve("/mcp"),
   },
   // @ts-ignore
   defaultHandler: app,

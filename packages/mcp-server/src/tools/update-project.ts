@@ -13,7 +13,6 @@ import {
   ParamPlatform,
   ParamTeamSlug,
 } from "../schema";
-import { validateConstraints } from "../internal/constraint-validation";
 
 export default defineTool({
   name: "update_project",
@@ -76,15 +75,6 @@ export default defineTool({
       regionUrl: params.regionUrl,
     });
     const organizationSlug = params.organizationSlug;
-
-    // Validate constraints
-    validateConstraints(
-      {
-        organizationSlug,
-        projectSlug: params.projectSlug,
-      },
-      context,
-    );
 
     setTag("organization.slug", organizationSlug);
     setTag("project.slug", params.projectSlug);

@@ -7,6 +7,7 @@ import type { ServerContext } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import { logError } from "@sentry/mcp-server/logging";
 import getSentryConfig from "../sentry.config";
+import { parseMcpPath } from "./mcp-router";
 
 // Props contain the authenticated user context from the OAuth flow.
 // These are encrypted and stored in the OAuth token, then provided
@@ -26,11 +27,9 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   //   }),
   // );
 
-  // Store constraints extracted from the request
-  private constraints?: {
-    organizationSlug?: string;
-    projectSlug?: string;
-  };
+  // Store org/project extracted from URL path
+  private urlOrganizationSlug?: string;
+  private urlProjectSlug?: string;
 
   // biome-ignore lint/complexity/noUselessConstructor: Need the constructor to match the durable object types.
   constructor(state: DurableObjectState, env: Env) {
@@ -38,31 +37,33 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   }
 
   /**
-   * Override fetch to extract constraints from request headers
+   * Override fetch to extract org/project from URL path
    */
   async fetch(request: Request): Promise<Response> {
-    // Extract constraints from headers if present
-    const orgConstraint = request.headers.get("X-MCP-Constraint-Org");
-    const projectConstraint = request.headers.get("X-MCP-Constraint-Project");
+    const url = new URL(request.url);
+    const parsedPath = parseMcpPath(url.pathname);
 
-    if (orgConstraint || projectConstraint) {
-      this.constraints = {
-        ...(orgConstraint && { organizationSlug: orgConstraint }),
-        ...(projectConstraint && { projectSlug: projectConstraint }),
-      };
+    if (parsedPath?.constraints) {
+      this.urlOrganizationSlug = parsedPath.constraints.organizationSlug;
+      this.urlProjectSlug = parsedPath.constraints.projectSlug;
 
-      // Store constraints in Durable Object storage so they persist
-      await this.ctx.storage.put("constraints", this.constraints);
+      // Store in Durable Object storage so they persist across requests
+      await this.ctx.storage.put("urlConstraints", {
+        organizationSlug: this.urlOrganizationSlug,
+        projectSlug: this.urlProjectSlug,
+      });
     } else {
-      // Try to load constraints from storage if not in headers
-      const storedConstraints =
-        await this.ctx.storage.get<typeof this.constraints>("constraints");
-      if (storedConstraints) {
-        this.constraints = storedConstraints;
+      // Try to load from storage if not in URL
+      const stored = await this.ctx.storage.get<{
+        organizationSlug?: string;
+        projectSlug?: string;
+      }>("urlConstraints");
+      if (stored) {
+        this.urlOrganizationSlug = stored.organizationSlug;
+        this.urlProjectSlug = stored.projectSlug;
       }
     }
 
-    // Call the parent fetch method
     return super.fetch(request);
   }
 
@@ -75,15 +76,15 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     }>("mcpClientInfo");
 
     // Initialize context with fresh auth data from props
+    // URL path constraints override OAuth org (if present)
     const serverContext: ServerContext = {
       accessToken: this.props.accessToken,
-      organizationSlug: this.props.organizationSlug,
+      organizationSlug: this.urlOrganizationSlug || this.props.organizationSlug,
+      projectSlug: this.urlProjectSlug,
       userId: this.props.id,
       mcpUrl: process.env.MCP_URL,
       // Restore MCP client info if available
       ...persistedMcpInfo,
-      // Include constraints from request headers or props
-      constraints: this.constraints || this.props.constraints,
     };
 
     await configureServer({

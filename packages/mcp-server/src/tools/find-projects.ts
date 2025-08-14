@@ -5,7 +5,6 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
-import { validateConstraints } from "../internal/constraint-validation";
 
 export default defineTool({
   name: "find_projects",
@@ -31,9 +30,6 @@ export default defineTool({
         "Organization slug is required. Please provide an organizationSlug parameter.",
       );
     }
-
-    // Validate organization constraints
-    validateConstraints({ organizationSlug }, context);
 
     setTag("organization.slug", organizationSlug);
 

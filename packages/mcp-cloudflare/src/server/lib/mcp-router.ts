@@ -6,11 +6,12 @@
  * - /mcp/{organizationSlug} -> Organization constraint
  * - /mcp/{organizationSlug}/{projectSlug} -> Organization + project constraints
  */
-import type { ServerContext } from "@sentry/mcp-server/types";
-
 export interface ParsedMcpPath {
   basePath: string;
-  constraints?: ServerContext["constraints"];
+  constraints?: {
+    organizationSlug?: string;
+    projectSlug?: string;
+  };
 }
 
 /**
