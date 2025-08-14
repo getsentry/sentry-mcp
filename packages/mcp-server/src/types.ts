@@ -49,4 +49,9 @@ export type ServerContext = {
   mcpClientName?: string;
   mcpClientVersion?: string;
   mcpProtocolVersion?: string;
+  // URL-derived constraints for organization/project scoping
+  constraints?: {
+    organizationSlug?: string;
+    projectSlug?: string;
+  };
 };

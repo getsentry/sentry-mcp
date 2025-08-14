@@ -26,9 +26,44 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   //   }),
   // );
 
+  // Store constraints extracted from the request
+  private constraints?: {
+    organizationSlug?: string;
+    projectSlug?: string;
+  };
+
   // biome-ignore lint/complexity/noUselessConstructor: Need the constructor to match the durable object types.
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
+  }
+
+  /**
+   * Override fetch to extract constraints from request headers
+   */
+  async fetch(request: Request): Promise<Response> {
+    // Extract constraints from headers if present
+    const orgConstraint = request.headers.get("X-MCP-Constraint-Org");
+    const projectConstraint = request.headers.get("X-MCP-Constraint-Project");
+
+    if (orgConstraint || projectConstraint) {
+      this.constraints = {
+        ...(orgConstraint && { organizationSlug: orgConstraint }),
+        ...(projectConstraint && { projectSlug: projectConstraint }),
+      };
+
+      // Store constraints in Durable Object storage so they persist
+      await this.ctx.storage.put("constraints", this.constraints);
+    } else {
+      // Try to load constraints from storage if not in headers
+      const storedConstraints =
+        await this.ctx.storage.get<typeof this.constraints>("constraints");
+      if (storedConstraints) {
+        this.constraints = storedConstraints;
+      }
+    }
+
+    // Call the parent fetch method
+    return super.fetch(request);
   }
 
   async init() {
@@ -47,6 +82,8 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       mcpUrl: process.env.MCP_URL,
       // Restore MCP client info if available
       ...persistedMcpInfo,
+      // Include constraints from request headers or props
+      constraints: this.constraints || this.props.constraints,
     };
 
     await configureServer({
