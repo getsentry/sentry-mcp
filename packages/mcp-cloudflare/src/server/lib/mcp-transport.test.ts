@@ -1,18 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
-// Mock dependencies
+// Only mock the Sentry wrapper to return the unwrapped class for testing
 vi.mock("@sentry/cloudflare", () => ({
   instrumentDurableObjectWithSentry: (config: any, cls: any) => cls,
-}));
-
-vi.mock("../sentry.config", () => ({
-  default: {
-    partial: () => ({}),
-  },
-}));
-
-vi.mock("@sentry/mcp-server/server", () => ({
-  configureServer: vi.fn(),
 }));
 
 vi.mock("agents/mcp", () => ({
