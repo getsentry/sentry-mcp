@@ -23,7 +23,7 @@ const createMcpHandler = (basePath: string, isSSE = false) => {
   const handler = isSSE ? SentryMCP.serveSSE("/*") : SentryMCP.serve("/*");
 
   return {
-    fetch: (request: Request, env: Env, ctx: ExecutionContext) => {
+    fetch: (request: Request, env: unknown, ctx: ExecutionContext) => {
       const url = new URL(request.url);
 
       // Always create new headers to prevent external manipulation
