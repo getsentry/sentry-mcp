@@ -44,6 +44,64 @@ describe(`Smoke Tests for ${PREVIEW_URL}`, () => {
     expect(data.error).toMatch(/invalid_token|unauthorized/i);
   });
 
+  it("should have MCP endpoint with org constraint (/mcp/sentry)", async () => {
+    const response = await fetch(`${PREVIEW_URL}/mcp/sentry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: {
+            name: "smoke-test",
+            version: "1.0.0",
+          },
+        },
+        id: 1,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT),
+    });
+
+    // Verify JSON content type
+    expect(response.headers.get("content-type")).toContain("application/json");
+
+    const data = await response.json();
+    // Should return auth error, not 404 - this proves the constrained MCP endpoint exists
+    expect(data).toHaveProperty("error");
+    expect(data.error).toMatch(/invalid_token|unauthorized/i);
+  });
+
+  it("should have MCP endpoint with org and project constraints (/mcp/sentry/mcp-server)", async () => {
+    const response = await fetch(`${PREVIEW_URL}/mcp/sentry/mcp-server`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: {
+            name: "smoke-test",
+            version: "1.0.0",
+          },
+        },
+        id: 1,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT),
+    });
+
+    // Verify JSON content type
+    expect(response.headers.get("content-type")).toContain("application/json");
+
+    const data = await response.json();
+    // Should return auth error, not 404 - this proves the fully constrained MCP endpoint exists
+    expect(data).toHaveProperty("error");
+    expect(data.error).toMatch(/invalid_token|unauthorized/i);
+  });
+
   it("should have SSE endpoint for MCP transport", async () => {
     const response = await fetch(`${PREVIEW_URL}/sse`, {
       headers: {
