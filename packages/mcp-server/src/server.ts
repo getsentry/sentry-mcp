@@ -84,6 +84,13 @@ function createResourceHandler(
             }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
+            ...(context.constraints.organizationSlug && {
+              "sentry-mcp.constraint-organization":
+                context.constraints.organizationSlug,
+            }),
+            ...(context.constraints.projectSlug && {
+              "sentry-mcp.constraint-project": context.constraints.projectSlug,
+            }),
           },
         },
         async () => {
@@ -134,6 +141,13 @@ function createTemplateResourceHandler(
             }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
+            ...(context.constraints.organizationSlug && {
+              "sentry-mcp.constraint-organization":
+                context.constraints.organizationSlug,
+            }),
+            ...(context.constraints.projectSlug && {
+              "sentry-mcp.constraint-project": context.constraints.projectSlug,
+            }),
             ...extractMcpParameters(variables),
           },
         },
@@ -272,6 +286,14 @@ export async function configureServer({
                   }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
+                  ...(context.constraints.organizationSlug && {
+                    "sentry-mcp.constraint-organization":
+                      context.constraints.organizationSlug,
+                  }),
+                  ...(context.constraints.projectSlug && {
+                    "sentry-mcp.constraint-project":
+                      context.constraints.projectSlug,
+                  }),
                   ...extractMcpParameters(args[0] || {}),
                 },
               },
@@ -357,6 +379,14 @@ export async function configureServer({
                   }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
+                  ...(context.constraints.organizationSlug && {
+                    "sentry-mcp.constraint-organization":
+                      context.constraints.organizationSlug,
+                  }),
+                  ...(context.constraints.projectSlug && {
+                    "sentry-mcp.constraint-project":
+                      context.constraints.projectSlug,
+                  }),
                   ...extractMcpParameters(params || {}),
                 },
               },
