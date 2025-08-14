@@ -41,21 +41,30 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Extract org/project from URL path using regex
+    // Extract org/project from URL path using strict regex
+    // Only allows alphanumeric, hyphens, underscores, and dots (common in slugs)
     const pathMatch = url.pathname.match(
-      /^\/(mcp|sse)(?:\/([^\/]+))?(?:\/([^\/]+))?$/,
+      /^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]+))?(?:\/([a-zA-Z0-9._-]+))?$/,
     );
 
     if (pathMatch?.[2]) {
-      // Has org parameter
-      this.urlOrganizationSlug = pathMatch[2];
-      this.urlProjectSlug = pathMatch[3]; // May be undefined
+      const orgSlug = pathMatch[2];
+      const projectSlug = pathMatch[3]; // May be undefined
 
-      // Store in Durable Object storage so they persist across requests
-      await this.ctx.storage.put("urlConstraints", {
-        organizationSlug: this.urlOrganizationSlug,
-        projectSlug: this.urlProjectSlug,
-      });
+      // Additional security validation
+      if (
+        this.isValidSlug(orgSlug) &&
+        (!projectSlug || this.isValidSlug(projectSlug))
+      ) {
+        this.urlOrganizationSlug = orgSlug;
+        this.urlProjectSlug = projectSlug;
+
+        // Store in Durable Object storage so they persist across requests
+        await this.ctx.storage.put("urlConstraints", {
+          organizationSlug: this.urlOrganizationSlug,
+          projectSlug: this.urlProjectSlug,
+        });
+      }
     } else {
       // Try to load from storage if not in URL
       const stored = await this.ctx.storage.get<{
@@ -69,6 +78,43 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     }
 
     return super.fetch(request);
+  }
+
+  /**
+   * Validates that a slug is safe and follows expected patterns
+   */
+  private isValidSlug(slug: string): boolean {
+    // Reject empty strings
+    if (!slug || slug.length === 0) {
+      return false;
+    }
+
+    // Reject excessively long slugs (prevent DOS)
+    if (slug.length > 100) {
+      return false;
+    }
+
+    // Reject path traversal attempts
+    if (slug.includes("..") || slug.includes("//")) {
+      return false;
+    }
+
+    // Reject URLs or suspicious patterns
+    if (slug.includes("://") || slug.includes("%")) {
+      return false;
+    }
+
+    // Must start and end with alphanumeric
+    if (!/^[a-zA-Z0-9].*[a-zA-Z0-9]$/.test(slug) && slug.length > 1) {
+      return false;
+    }
+
+    // Single character must be alphanumeric
+    if (slug.length === 1 && !/^[a-zA-Z0-9]$/.test(slug)) {
+      return false;
+    }
+
+    return true;
   }
 
   async init() {
