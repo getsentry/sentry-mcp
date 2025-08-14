@@ -36,12 +36,23 @@ const createMcpHandler = (basePath: string, isSSE = false) => {
       headers.delete("X-Sentry-Project-Slug");
 
       // Extract org/project from URL path
+      // NOTE: Extra path segments after project (e.g., /mcp/org/project/extra) are
+      // intentionally ignored - the MCP handler manages any additional routing
+      // IMPORTANT: /sse/message and /mcp/message are reserved SSE protocol endpoints
+      // and must not be interpreted as organization slugs
       const pathMatch = url.pathname.match(
         /^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]{1,100}))?(?:\/([a-zA-Z0-9._-]{1,100}))?/,
       );
 
-      // Validate and set headers based on URL path
-      if (pathMatch?.[2]) {
+      // Check if this is a reserved protocol endpoint
+      const isReservedEndpoint =
+        url.pathname === "/sse/message" ||
+        url.pathname.startsWith("/sse/message?") ||
+        url.pathname === "/mcp/message" ||
+        url.pathname.startsWith("/mcp/message?");
+
+      // Validate and set headers based on URL path (unless it's a reserved endpoint)
+      if (!isReservedEndpoint && pathMatch?.[2]) {
         // Organization slug is present - validate it
         if (!isValidSlug(pathMatch[2])) {
           return new Response(
