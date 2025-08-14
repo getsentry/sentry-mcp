@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
+import * as Sentry from "@sentry/cloudflare";
 import type { Env } from "./types";
 import sentryOauth from "./routes/sentry-oauth";
 import chatOauth from "./routes/chat-oauth";
@@ -12,6 +13,21 @@ import { logError } from "@sentry/mcp-server/logging";
 const app = new Hono<{
   Bindings: Env;
 }>()
+  // Set user IP address from X-Real-IP header for Sentry
+  .use("*", async (c, next) => {
+    // Extract client IP from headers in order of preference
+    const clientIP =
+      c.req.header("X-Real-IP") ||
+      c.req.header("CF-Connecting-IP") ||
+      c.req.header("X-Forwarded-For")?.split(",")[0]?.trim();
+
+    if (clientIP) {
+      // Set the user context with the correct IP address
+      Sentry.setUser({ ip_address: clientIP });
+    }
+
+    await next();
+  })
   // Apply security middleware globally
   .use(
     "*",
