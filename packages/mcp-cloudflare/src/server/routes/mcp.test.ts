@@ -185,7 +185,7 @@ describe("MCP endpoints - basic connectivity", () => {
     });
   });
 
-  describe("Future constraint patterns", () => {
+  describe("URL path constraints", () => {
     it("should accept /mcp/{org} pattern", async () => {
       const { default: worker } = await import("../index");
 
