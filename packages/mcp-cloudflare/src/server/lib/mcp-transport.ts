@@ -58,22 +58,6 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       ) {
         this.urlOrganizationSlug = orgSlug;
         this.urlProjectSlug = projectSlug;
-
-        // Store in Durable Object storage so they persist across requests
-        await this.ctx.storage.put("urlConstraints", {
-          organizationSlug: this.urlOrganizationSlug,
-          projectSlug: this.urlProjectSlug,
-        });
-      }
-    } else {
-      // Try to load from storage if not in URL
-      const stored = await this.ctx.storage.get<{
-        organizationSlug?: string;
-        projectSlug?: string;
-      }>("urlConstraints");
-      if (stored) {
-        this.urlOrganizationSlug = stored.organizationSlug;
-        this.urlProjectSlug = stored.projectSlug;
       }
     }
 

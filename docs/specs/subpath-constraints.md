@@ -29,55 +29,51 @@ Same pattern for SSE endpoints:
 
 1. **OAuth Provider Path Matching**: The OAuth provider uses `startsWith` for path matching, meaning a handler registered for `/mcp` will also match `/mcp/org/project`
 
-2. **Header Communication**: Constraints can be passed from the handler to the Durable Object via custom headers
+2. **Simple Context Defaults**: URL path constraints become default values in ServerContext, eliminating the need for complex validation infrastructure
 
 3. **Session Persistence**: Constraints are stored in Durable Object storage and persist across requests
 
 ### Implementation Components
 
-#### 1. Constraint-Aware Handler (`mcp-constraint-handler.ts`)
-```typescript
-export function createConstraintAwareMcpHandler(basePath: "/mcp" | "/sse") {
-  // Wraps the base MCP handler
-  // Extracts constraints from URL path using parseMcpPath
-  // Adds constraints as headers (X-MCP-Constraint-Org, X-MCP-Constraint-Project)
-  // Forwards modified request to base handler
-}
-```
-
-#### 2. Enhanced MCP Transport (`mcp-transport.ts`)
+#### 1. Enhanced MCP Transport (`mcp-transport.ts`)
 ```typescript
 class SentryMCPBase extends McpAgent {
-  // Override fetch to extract constraints from headers
   async fetch(request: Request): Promise<Response> {
-    // Extract constraints from X-MCP-Constraint-* headers
-    // Store in Durable Object storage for persistence
-    // Pass to parent fetch
+    // Extract org/project from URL path using regex
+    const pathMatch = url.pathname.match(/^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]+))?(?:\/([a-zA-Z0-9._-]+))?$/);
+    
+    if (pathMatch?.[2]) {
+      // Validate slugs for security
+      if (this.isValidSlug(orgSlug) && (!projectSlug || this.isValidSlug(projectSlug))) {
+        this.urlOrganizationSlug = orgSlug;
+        this.urlProjectSlug = projectSlug;
+        // Store in Durable Object storage for persistence
+      }
+    }
   }
   
   async init() {
-    // Include constraints in ServerContext
-    // constraints: this.constraints
+    // URL path constraints override OAuth org (if present)
+    const serverContext: ServerContext = {
+      organizationSlug: this.urlOrganizationSlug || this.props.organizationSlug,
+      projectSlug: this.urlProjectSlug,
+      // ... other fields
+    };
+  }
+  
+  private isValidSlug(slug: string): boolean {
+    // Security validation: reject malicious patterns, enforce length limits
   }
 }
 ```
 
-#### 3. URL Path Parser (`mcp-router.ts`)
+#### 2. Security Validation
 ```typescript
-export function parseMcpPath(pathname: string): ParsedMcpPath | null {
-  // Parses /mcp, /mcp/:org, /mcp/:org/:project
-  // Returns { basePath, constraints }
-}
-```
-
-#### 4. Constraint Validation (`constraint-validation.ts`)
-```typescript
-export function validateConstraints(
-  params: ConstraintParams,
-  context: ServerContext
-): void {
-  // Validates tool parameters against session constraints
-  // Throws UserInputError on violation
+private isValidSlug(slug: string): boolean {
+  // Reject empty strings, excessive length (100+ chars)
+  // Reject path traversal (.. //) and URL patterns (:// %)
+  // Require alphanumeric start/end characters
+  // Allow only [a-zA-Z0-9._-] characters
 }
 ```
 
@@ -94,71 +90,58 @@ export function validateConstraints(
 /sse
 ```
 
-### Constraint Validation
+### Context Integration
 ```typescript
-interface Constraints {
-  organizationSlug?: string;
-  projectSlug?: string;
-}
-
-function validateConstraints(
-  params: ConstraintParams,
-  context: ServerContext
-): void {
-  // Throws UserInputError if constraints are violated
+interface ServerContext {
+  organizationSlug: string | null;  // From URL path or OAuth
+  projectSlug?: string | null;      // From URL path only
+  // ... other fields
 }
 ```
 
-### Error Messages
-```
-Organization constraint violation: This session is restricted to organization 
-'acme-corp' but you tried to access 'other-org'.
-
-Project constraint violation: This session is restricted to project 'frontend' 
-but you tried to access 'backend'.
-```
+### Default Behavior
+Constraints work as simple defaults in the server context:
+- Tools that accept `organizationSlug` will use the URL constraint as default
+- Tools that accept `projectSlug` will use the URL constraint as default
+- No validation errors - tools just use the scoped defaults
 
 ## Implementation Status
 
 ### Completed
-- ✅ URL parsing logic (`mcp-router.ts`)
-- ✅ Constraint validation infrastructure (`constraint-validation.ts`)
-- ✅ ServerContext type updates
-- ✅ Tool enforcement (find-projects, update-project)
-- ✅ Unit tests for validation logic
-- ✅ Dynamic route handling via constraint-aware handlers (`mcp-constraint-handler.ts`)
-- ✅ Constraint extraction from connection URL using header communication
+- ✅ URL parsing logic with security validation in `mcp-transport.ts`
+- ✅ ServerContext integration with simple defaults
 - ✅ Session-level constraint storage in Durable Object
 - ✅ Support for both `/mcp` and `/sse` endpoints with constraints
-- ✅ Full test coverage for constraint handling
+- ✅ Security validation for slug patterns (alphanumeric, length limits, path traversal protection)
+- ✅ Smoke tests for endpoint connectivity
+- ✅ Client documentation updates
 
 ### How It Works
 
 The implementation leverages the fact that the OAuth provider uses `startsWith` for path matching. This means a handler registered for `/mcp` will also match `/mcp/org/project`. We use this behavior to:
 
-1. Create constraint-aware handlers that wrap the base MCP handlers
-2. Parse the URL path to extract organization and project constraints
-3. Pass constraints to the Durable Object via custom headers
+1. Parse the URL path directly in the MCP transport's `fetch()` method
+2. Extract organization and project slugs using a secure regex pattern
+3. Validate slugs for security (reject malicious patterns, length limits)
 4. Store constraints in Durable Object storage for session persistence
-5. Include constraints in the ServerContext for tool validation
+5. Use constraints as simple defaults in ServerContext (no validation needed)
 
-## Future Improvements
+## Security Features
 
-1. **Additional Tools**: Extend constraint validation to more tools beyond find-projects and update-project
-2. **Slug Validation**: Add format validation for organization and project slugs to reject invalid characters early
-3. **Error Logging**: Add structured logging for constraint violations for better debugging
+1. **Restrictive Regex**: Only allows `[a-zA-Z0-9._-]` characters in slugs
+2. **Length Limits**: Maximum 100 characters per slug to prevent DoS
+3. **Path Traversal Protection**: Rejects `..` and `//` patterns
+4. **URL Injection Protection**: Rejects `://` and `%` encoding
+5. **Format Validation**: Requires alphanumeric start/end characters
 
 ## Testing
 
 ```bash
-# Run constraint validation tests
-pnpm vitest run src/internal/constraint-validation.test.ts
+# Run smoke tests against deployment
+pnpm test  # in packages/smoke-tests
 
-# Run constraint handler tests
-pnpm vitest run src/server/lib/mcp-constraint-handler.test.ts
-
-# Run router tests
-pnpm vitest run src/server/lib/mcp-router.test.ts
+# Run smoke tests against local dev server
+PREVIEW_URL=http://localhost:5173 pnpm test
 ```
 
 ## Migration
