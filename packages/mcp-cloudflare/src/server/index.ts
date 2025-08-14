@@ -39,17 +39,14 @@ const createMcpHandler = (basePath: string, isSSE = false) => {
         /^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]{1,100}))?(?:\/([a-zA-Z0-9._-]{1,100}))?/,
       );
 
-      // Set headers based on URL path (or empty to clear constraints)
+      // Set headers based on URL path if org/project are present
       if (pathMatch?.[2]) {
         headers.set("X-Sentry-Org-Slug", pathMatch[2]);
         if (pathMatch[3]) {
           headers.set("X-Sentry-Project-Slug", pathMatch[3]);
         }
-      } else {
-        // Explicitly set empty headers to clear any stored constraints
-        headers.set("X-Sentry-Org-Slug", "");
-        headers.set("X-Sentry-Project-Slug", "");
       }
+      // If no path params, headers remain deleted (cleared above)
 
       // Create a new request with the sanitized headers
       const modifiedRequest = new Request(request, { headers });

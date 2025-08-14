@@ -30,67 +30,41 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
    * agents library's serve() method rewrites the URL path to "/streamable-http",
    * losing the original path parameters. Headers are preserved through this
    * rewriting, making them a reliable way to pass constraint information.
+   *
+   * Note: fetch() is called before init(), so we store constraints here to ensure
+   * they're available when init() creates and configures the server.
    */
   async fetch(request: Request): Promise<Response> {
-    // Check if we have constraint headers (always present from our wrapper)
+    // Check if we have constraint headers from our wrapper
     const orgSlugHeader = request.headers.get("X-Sentry-Org-Slug");
     const projectSlugHeader = request.headers.get("X-Sentry-Project-Slug");
 
-    // Load current constraints to see if they've changed
-    const currentConstraints =
-      await this.ctx.storage.get<UrlConstraints>("urlConstraints");
-
-    let constraintsChanged = false;
-
-    // If headers are present (even if empty), update constraints
-    if (orgSlugHeader !== null) {
-      if (orgSlugHeader === "") {
-        // Empty header means clear constraints
-        if (currentConstraints) {
-          await this.ctx.storage.delete("urlConstraints");
-          constraintsChanged = true;
-        }
-      } else {
-        // Validate slugs - throw if invalid since this shouldn't happen
-        if (!this.isValidSlug(orgSlugHeader)) {
-          throw new Error(`Invalid organization slug: ${orgSlugHeader}`);
-        }
-        if (
-          projectSlugHeader &&
-          projectSlugHeader !== "" &&
-          !this.isValidSlug(projectSlugHeader)
-        ) {
-          throw new Error(`Invalid project slug: ${projectSlugHeader}`);
-        }
-
-        // Store new constraints
-        const newConstraints: UrlConstraints = {
-          organizationSlug: orgSlugHeader,
-          projectSlug:
-            projectSlugHeader && projectSlugHeader !== ""
-              ? projectSlugHeader
-              : undefined,
-        };
-
-        // Check if constraints have changed
-        if (
-          !currentConstraints ||
-          currentConstraints.organizationSlug !==
-            newConstraints.organizationSlug ||
-          currentConstraints.projectSlug !== newConstraints.projectSlug
-        ) {
-          await this.ctx.storage.put("urlConstraints", newConstraints);
-          constraintsChanged = true;
-        }
+    // Update constraints based on headers (always update to ensure they're current)
+    if (orgSlugHeader) {
+      // Validate slugs - throw if invalid since this shouldn't happen
+      if (!this.isValidSlug(orgSlugHeader)) {
+        throw new Error(`Invalid organization slug: ${orgSlugHeader}`);
       }
-    }
+      if (
+        projectSlugHeader &&
+        projectSlugHeader !== "" &&
+        !this.isValidSlug(projectSlugHeader)
+      ) {
+        throw new Error(`Invalid project slug: ${projectSlugHeader}`);
+      }
 
-    // If constraints changed, we need to reinitialize the server with new constraints
-    if (constraintsChanged) {
-      // Force re-initialization by resetting the init flag
-      // Note: This assumes the parent class has an initRun flag or similar
-      // We may need to call init() directly here
-      await this.init();
+      // Store new constraints
+      const newConstraints: UrlConstraints = {
+        organizationSlug: orgSlugHeader,
+        projectSlug:
+          projectSlugHeader && projectSlugHeader !== ""
+            ? projectSlugHeader
+            : undefined,
+      };
+      await this.ctx.storage.put("urlConstraints", newConstraints);
+    } else {
+      // No org header means clear all constraints (user accessed base /mcp path)
+      await this.ctx.storage.delete("urlConstraints");
     }
 
     return super.fetch(request);
