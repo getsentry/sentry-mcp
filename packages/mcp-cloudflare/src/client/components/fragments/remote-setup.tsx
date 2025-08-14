@@ -55,12 +55,12 @@ export default function RemoteSetup() {
         </p>
         <ul>
           <li>
-            <code>{endpoint}/your-org</code> - Restricts session to a specific
-            organization
+            <code>{endpoint}/:organization</code> - Restricts session to a
+            specific organization
           </li>
           <li>
-            <code>{endpoint}/your-org/your-project</code> - Restricts session to
-            a specific organization and project
+            <code>{endpoint}/:organization/:project</code> - Restricts session
+            to a specific organization and project
           </li>
         </ul>
         <p>
@@ -70,11 +70,7 @@ export default function RemoteSetup() {
           the SSE-only implementation with the following URL:
         </p>
         <CodeSnippet snippet={sseEndpoint} />
-        <p>
-          The same constraint patterns work for SSE endpoints:{" "}
-          <code>{sseEndpoint}/your-org</code> or{" "}
-          <code>{sseEndpoint}/your-org/your-project</code>
-        </p>
+
         <h3>Integration Guides</h3>
       </Prose>
       <Accordion type="single" collapsible>
