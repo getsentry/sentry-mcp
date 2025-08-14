@@ -40,26 +40,12 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     const projectSlugHeader = request.headers.get("X-Sentry-Project-Slug");
 
     // Update constraints based on headers (always update to ensure they're current)
+    // Headers are pre-validated in index.ts, so we can trust them here
     if (orgSlugHeader) {
-      // Validate slugs - throw if invalid since this shouldn't happen
-      if (!this.isValidSlug(orgSlugHeader)) {
-        throw new Error(`Invalid organization slug: ${orgSlugHeader}`);
-      }
-      if (
-        projectSlugHeader &&
-        projectSlugHeader !== "" &&
-        !this.isValidSlug(projectSlugHeader)
-      ) {
-        throw new Error(`Invalid project slug: ${projectSlugHeader}`);
-      }
-
       // Store new constraints
       const newConstraints: UrlConstraints = {
         organizationSlug: orgSlugHeader,
-        projectSlug:
-          projectSlugHeader && projectSlugHeader !== ""
-            ? projectSlugHeader
-            : undefined,
+        projectSlug: projectSlugHeader || undefined,
       };
       await this.ctx.storage.put("urlConstraints", newConstraints);
     } else {
@@ -68,43 +54,6 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     }
 
     return super.fetch(request);
-  }
-
-  /**
-   * Validates that a slug is safe and follows expected patterns
-   */
-  private isValidSlug(slug: string): boolean {
-    // Reject empty strings
-    if (!slug || slug.length === 0) {
-      return false;
-    }
-
-    // Reject excessively long slugs (prevent DOS)
-    if (slug.length > 100) {
-      return false;
-    }
-
-    // Reject path traversal attempts
-    if (slug.includes("..") || slug.includes("//")) {
-      return false;
-    }
-
-    // Reject URLs or suspicious patterns
-    if (slug.includes("://") || slug.includes("%")) {
-      return false;
-    }
-
-    // Must start and end with alphanumeric
-    if (!/^[a-zA-Z0-9].*[a-zA-Z0-9]$/.test(slug) && slug.length > 1) {
-      return false;
-    }
-
-    // Single character must be alphanumeric
-    if (slug.length === 1 && !/^[a-zA-Z0-9]$/.test(slug)) {
-      return false;
-    }
-
-    return true;
   }
 
   async init() {

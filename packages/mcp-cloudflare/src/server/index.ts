@@ -5,6 +5,7 @@ import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
+import { isValidSlug } from "./lib/slug-validation";
 
 // required for Durable Objects
 export { SentryMCP };
@@ -39,10 +40,37 @@ const createMcpHandler = (basePath: string, isSSE = false) => {
         /^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]{1,100}))?(?:\/([a-zA-Z0-9._-]{1,100}))?/,
       );
 
-      // Set headers based on URL path if org/project are present
+      // Validate and set headers based on URL path
       if (pathMatch?.[2]) {
+        // Organization slug is present - validate it
+        if (!isValidSlug(pathMatch[2])) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_request",
+              error_description: "Invalid organization slug format",
+            }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
         headers.set("X-Sentry-Org-Slug", pathMatch[2]);
+
+        // Project slug is optional but must be valid if present
         if (pathMatch[3]) {
+          if (!isValidSlug(pathMatch[3])) {
+            return new Response(
+              JSON.stringify({
+                error: "invalid_request",
+                error_description: "Invalid project slug format",
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
           headers.set("X-Sentry-Project-Slug", pathMatch[3]);
         }
       }
