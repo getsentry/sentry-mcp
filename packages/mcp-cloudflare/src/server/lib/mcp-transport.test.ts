@@ -1,6 +1,48 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
 
-// No need to mock mcp-router anymore - we use simple inline parsing
+// Mock URLPattern for test environment
+beforeAll(() => {
+  if (!globalThis.URLPattern) {
+    globalThis.URLPattern = class URLPattern {
+      constructor(private pattern: { pathname: string }) {}
+
+      exec(url: URL) {
+        const pathname = url.pathname;
+
+        // Simple mock that matches our patterns
+        if (this.pattern.pathname === "/mcp/:org?/:project?") {
+          const match = pathname.match(/^\/mcp(?:\/([^\/]+))?(?:\/([^\/]+))?$/);
+          if (match) {
+            return {
+              pathname: {
+                groups: {
+                  org: match[1],
+                  project: match[2],
+                },
+              },
+            };
+          }
+        }
+
+        if (this.pattern.pathname === "/sse/:org?/:project?") {
+          const match = pathname.match(/^\/sse(?:\/([^\/]+))?(?:\/([^\/]+))?$/);
+          if (match) {
+            return {
+              pathname: {
+                groups: {
+                  org: match[1],
+                  project: match[2],
+                },
+              },
+            };
+          }
+        }
+
+        return null;
+      }
+    } as any;
+  }
+});
 
 // Mock dependencies
 vi.mock("@sentry/cloudflare", () => ({

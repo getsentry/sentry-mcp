@@ -26,8 +26,20 @@ vi.mock("../app", () => ({
 
 // Mock the agents/mcp module - just enough to verify endpoints are accessible
 vi.mock("agents/mcp", () => {
-  const McpAgent = {
-    serve(path: string) {
+  class McpAgent {
+    constructor(state: any, env: any) {
+      this.state = state;
+      this.env = env;
+    }
+
+    state: any;
+    env: any;
+
+    async fetch(request: Request): Promise<Response> {
+      return new Response("MCP endpoint active", { status: 200 });
+    }
+
+    static serve(path: string) {
       return {
         async fetch(request: Request, env: any, ctx: any): Promise<Response> {
           const url = new URL(request.url);
@@ -37,9 +49,9 @@ vi.mock("agents/mcp", () => {
           return new Response("Not found", { status: 404 });
         },
       };
-    },
+    }
 
-    serveSSE(path: string) {
+    static serveSSE(path: string) {
       return {
         async fetch(request: Request, env: any, ctx: any): Promise<Response> {
           const url = new URL(request.url);
@@ -66,8 +78,8 @@ vi.mock("agents/mcp", () => {
           return new Response("Not found", { status: 404 });
         },
       };
-    },
-  };
+    }
+  }
 
   return { McpAgent };
 });

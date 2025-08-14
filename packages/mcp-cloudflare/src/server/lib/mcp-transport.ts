@@ -41,15 +41,17 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Simple URL parsing: /mcp/org/project or /sse/org/project
-    const segments = url.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+    // Use URLPattern for clean named parameter extraction
+    const mcpPattern = new URLPattern({ pathname: "/mcp/:org?/:project?" });
+    const ssePattern = new URLPattern({ pathname: "/sse/:org?/:project?" });
 
-    if (
-      (segments[0] === "mcp" || segments[0] === "sse") &&
-      segments.length > 1
-    ) {
-      this.urlOrganizationSlug = segments[1];
-      this.urlProjectSlug = segments[2]; // undefined if not provided
+    const mcpMatch = mcpPattern.exec(url);
+    const sseMatch = ssePattern.exec(url);
+
+    if (mcpMatch?.pathname.groups.org || sseMatch?.pathname.groups.org) {
+      const groups = mcpMatch?.pathname.groups || sseMatch?.pathname.groups;
+      this.urlOrganizationSlug = groups.org;
+      this.urlProjectSlug = groups.project;
 
       // Store in Durable Object storage so they persist across requests
       await this.ctx.storage.put("urlConstraints", {
