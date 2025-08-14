@@ -121,10 +121,10 @@ Constraints work as simple defaults in the server context:
 The implementation leverages the fact that the OAuth provider uses `startsWith` for path matching. This means a handler registered for `/mcp` will also match `/mcp/org/project`. We use this behavior to:
 
 1. Parse the URL path directly in the MCP transport's `fetch()` method
-2. Extract organization and project slugs using a secure regex pattern
+2. Extract organization and project slugs using a secure regex pattern  
 3. Validate slugs for security (reject malicious patterns, length limits)
-4. Store constraints in Durable Object storage for session persistence
-5. Use constraints as simple defaults in ServerContext (no validation needed)
+4. Store constraints in Durable Object storage for hibernation persistence
+5. Load constraints from storage in `init()` and use as ServerContext defaults
 
 ## Security Features
 
