@@ -26,9 +26,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
   //   }),
   // );
 
-  // Store org/project extracted from URL path
-  private urlOrganizationSlug?: string;
-  private urlProjectSlug?: string;
+  // URL constraints are now stored in Durable Object storage for hibernation persistence
 
   // biome-ignore lint/complexity/noUselessConstructor: Need the constructor to match the durable object types.
   constructor(state: DurableObjectState, env: Env) {
@@ -56,8 +54,11 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
         this.isValidSlug(orgSlug) &&
         (!projectSlug || this.isValidSlug(projectSlug))
       ) {
-        this.urlOrganizationSlug = orgSlug;
-        this.urlProjectSlug = projectSlug;
+        // Store in Durable Object storage to persist across hibernation cycles
+        await this.ctx.storage.put("urlConstraints", {
+          organizationSlug: orgSlug,
+          projectSlug: projectSlug,
+        });
       }
     }
 
@@ -109,12 +110,16 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       mcpProtocolVersion?: string;
     }>("mcpClientInfo");
 
-    // Initialize context with fresh auth data from props
-    // URL path constraints override OAuth org (if present)
+    // Load URL constraints from storage (survives hibernation)
+    const urlConstraints = await this.ctx.storage.get<{
+      organizationSlug?: string;
+      projectSlug?: string;
+    }>("urlConstraints");
+
     const serverContext: ServerContext = {
       accessToken: this.props.accessToken,
-      organizationSlug: this.urlOrganizationSlug || this.props.organizationSlug,
-      projectSlug: this.urlProjectSlug,
+      organizationSlug: urlConstraints?.organizationSlug || null,
+      projectSlug: urlConstraints?.projectSlug || null,
       userId: this.props.id,
       mcpUrl: process.env.MCP_URL,
       // Restore MCP client info if available

@@ -164,12 +164,7 @@ export default new Hono<{
     });
     if (errResponse) return errResponse;
 
-    // Get organizations using the SentryApiService
-    const apiService = new SentryApiService({
-      host: c.env.SENTRY_HOST,
-      accessToken: payload.access_token,
-    });
-    const orgsList = await apiService.listOrganizations();
+    // We don't automatically select an organization - let URL constraints or tools handle this
 
     // Return back to the MCP client a new token
     const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
@@ -184,7 +179,6 @@ export default new Hono<{
         id: payload.user.id,
         name: payload.user.name,
         accessToken: payload.access_token,
-        organizationSlug: orgsList.length ? orgsList[0].slug : null,
         clientId: oauthReqInfo.clientId,
         scope: oauthReqInfo.scope.join(" "),
       } as WorkerProps,
