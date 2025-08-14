@@ -49,12 +49,28 @@ export default function RemoteSetup() {
         </p>
         <CodeSnippet snippet={endpoint} />
         <p>
+          <strong>Organization and Project Constraints:</strong> You can
+          optionally constrain your MCP session to specific organizations or
+          projects by including them in the URL path:
+        </p>
+        <ul>
+          <li>
+            <code>{endpoint}/:organization</code> - Restricts session to a
+            specific organization
+          </li>
+          <li>
+            <code>{endpoint}/:organization/:project</code> - Restricts session
+            to a specific organization and project
+          </li>
+        </ul>
+        <p>
           Sentry's MCP server supports both the SSE and HTTP Streaming
           protocols, and will negotiate based on your client's capabilities. If
           for some reason your client does not handle this well you can pin to
           the SSE-only implementation with the following URL:
         </p>
         <CodeSnippet snippet={sseEndpoint} />
+
         <h3>Integration Guides</h3>
       </Prose>
       <Accordion type="single" collapsible>

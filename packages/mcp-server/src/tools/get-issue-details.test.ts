@@ -14,9 +14,11 @@ describe("get_issue_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -103,9 +105,11 @@ describe("get_issue_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -193,9 +197,11 @@ describe("get_issue_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -283,9 +289,11 @@ describe("get_issue_details", () => {
           regionUrl: "https",
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow(
@@ -309,9 +317,11 @@ describe("get_issue_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -384,9 +394,11 @@ describe("get_issue_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -429,9 +441,11 @@ describe("get_issue_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -489,9 +503,11 @@ describe("get_issue_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 

@@ -3,7 +3,7 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "../types";
-import type { ServerContext } from "@sentry/mcp-server/types";
+import type { ServerContext, UrlConstraints } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import { logError } from "@sentry/mcp-server/logging";
 import getSentryConfig from "../sentry.config";
@@ -14,24 +14,58 @@ import getSentryConfig from "../sentry.config";
 // NOTE: Only store persistent user data in props (e.g., userId, accessToken).
 // Request-specific data like user agent should be captured per request.
 class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
-  server = new McpServer({
-    name: "Sentry MCP",
-    version: LIB_VERSION,
-  });
-  // Note: This does not work locally with miniflare so we are not using it
-  // server = wrapMcpServerWithSentry(
-  //   new McpServer({
-  //     name: "Sentry MCP",
-  //     version: LIB_VERSION,
-  //   }),
-  // );
+  server!: McpServer;
+
+  // URL constraints are now stored in Durable Object storage for hibernation persistence
 
   // biome-ignore lint/complexity/noUselessConstructor: Need the constructor to match the durable object types.
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
   }
 
+  /**
+   * Override fetch to extract org/project constraints from headers.
+   *
+   * These headers are set by our custom wrapper in index.ts because the
+   * agents library's serve() method rewrites the URL path to "/streamable-http",
+   * losing the original path parameters. Headers are preserved through this
+   * rewriting, making them a reliable way to pass constraint information.
+   *
+   * Note: fetch() is called before init(), so we store constraints here to ensure
+   * they're available when init() creates and configures the server.
+   */
+  async fetch(request: Request): Promise<Response> {
+    // Check if we have constraint headers from our wrapper
+    const orgSlugHeader = request.headers.get("X-Sentry-Org-Slug");
+    const projectSlugHeader = request.headers.get("X-Sentry-Project-Slug");
+
+    // Update constraints based on headers (always update to ensure they're current)
+    // Headers are pre-validated in index.ts, so we can trust them here
+    if (orgSlugHeader) {
+      // Store new constraints
+      const newConstraints: UrlConstraints = {
+        organizationSlug: orgSlugHeader,
+        projectSlug: projectSlugHeader || undefined,
+      };
+      await this.ctx.storage.put("urlConstraints", newConstraints);
+    } else {
+      // No org header means clear all constraints (user accessed base /mcp path)
+      await this.ctx.storage.delete("urlConstraints");
+    }
+
+    return super.fetch(request);
+  }
+
   async init() {
+    // Create a fresh server instance each time init() is called.
+    // This is crucial because configureServer() modifies the tool schemas based on constraints,
+    // and we need each Durable Object instance to have its own server with the correct
+    // constraints applied. Without this, different DO instances would share mutated schemas.
+    this.server = new McpServer({
+      name: "Sentry MCP",
+      version: LIB_VERSION,
+    });
+
     // Load only MCP client info from storage
     const persistedMcpInfo = await this.ctx.storage.get<{
       mcpClientName?: string;
@@ -39,12 +73,16 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       mcpProtocolVersion?: string;
     }>("mcpClientInfo");
 
-    // Initialize context with fresh auth data from props
+    // Load URL constraints from storage (survives hibernation)
+    const urlConstraints =
+      await this.ctx.storage.get<UrlConstraints>("urlConstraints");
+
     const serverContext: ServerContext = {
       accessToken: this.props.accessToken,
-      organizationSlug: this.props.organizationSlug,
       userId: this.props.id,
       mcpUrl: process.env.MCP_URL,
+      // URL-based session constraints
+      constraints: urlConstraints || {},
       // Restore MCP client info if available
       ...persistedMcpInfo,
     };

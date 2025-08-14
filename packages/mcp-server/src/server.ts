@@ -319,10 +319,22 @@ export async function configureServer({
   }
 
   for (const [toolKey, tool] of Object.entries(tools)) {
+    // Only consider constraints that exist in this tool's schema
+    const toolConstraintKeys = Object.entries(context.constraints)
+      .filter(([key, value]) => !!value && key in tool.inputSchema)
+      .map(([key, _]) => key);
+
+    // Create modified schema by removing constraint parameters that will be injected
+    const modifiedInputSchema = Object.fromEntries(
+      Object.entries(tool.inputSchema).filter(
+        ([key, _]) => !toolConstraintKeys.includes(key),
+      ),
+    );
+
     server.tool(
       tool.name,
       tool.description,
-      tool.inputSchema,
+      modifiedInputSchema,
       async (
         params: any,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
@@ -359,7 +371,22 @@ export async function configureServer({
                 }
 
                 try {
-                  const output = await tool.handler(params, context);
+                  // Apply URL constraints as normal parameters - only for params that exist in tool schema
+                  const applicableConstraints = Object.fromEntries(
+                    Object.entries(context.constraints).filter(
+                      ([key, value]) => !!value && key in tool.inputSchema,
+                    ),
+                  );
+
+                  const paramsWithConstraints = {
+                    ...params,
+                    ...applicableConstraints,
+                  };
+
+                  const output = await tool.handler(
+                    paramsWithConstraints,
+                    context,
+                  );
                   span.setStatus({
                     code: 1, // ok
                   });

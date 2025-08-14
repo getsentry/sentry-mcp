@@ -27,7 +27,10 @@ const server = new McpServer({
 // identically, but we don't really need userId and userName yet
 startStdio(server, {
   accessToken,
-  organizationSlug: null,
+  constraints: {
+    organizationSlug: null,
+    projectSlug: null,
+  },
 }).catch((err: unknown) => {
   console.error("Server error:", err);
   process.exit(1);

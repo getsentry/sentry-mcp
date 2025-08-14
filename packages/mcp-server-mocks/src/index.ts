@@ -895,6 +895,11 @@ export const restHandlers = buildHandlers([
     fetch: () => HttpResponse.json(autofixStateFixture),
   },
   {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
+  {
     method: "post",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/autofix/",
     fetch: () => HttpResponse.json({ run_id: 123 }),

@@ -111,9 +111,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -163,9 +165,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -213,9 +217,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -239,9 +245,11 @@ describe("search_events", () => {
           includeExplanation: false,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "test-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow(UserInputError);
@@ -266,9 +274,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -306,9 +316,11 @@ describe("search_events", () => {
           includeExplanation: false,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "test-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow();
@@ -338,9 +350,11 @@ describe("search_events", () => {
           includeExplanation: false,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "test-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow("missing required 'sort' parameter");
@@ -388,9 +402,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -456,9 +472,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 

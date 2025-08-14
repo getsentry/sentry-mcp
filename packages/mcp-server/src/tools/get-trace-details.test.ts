@@ -17,9 +17,11 @@ describe("get_trace_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -73,9 +75,11 @@ describe("get_trace_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toContain(
@@ -103,9 +107,11 @@ describe("get_trace_details", () => {
           regionUrl: undefined,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow();
@@ -120,9 +126,11 @@ describe("get_trace_details", () => {
           regionUrl: undefined,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow("Trace ID must be a 32-character hexadecimal string");
@@ -158,9 +166,11 @@ describe("get_trace_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -192,9 +202,11 @@ describe("get_trace_details", () => {
           regionUrl: undefined,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow();
@@ -223,9 +235,11 @@ describe("get_trace_details", () => {
         regionUrl: "https://us.sentry.io",
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -258,9 +272,11 @@ describe("get_trace_details", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 

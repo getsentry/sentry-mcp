@@ -14,9 +14,11 @@ describe("update_project", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -50,9 +52,11 @@ describe("update_project", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`

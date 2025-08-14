@@ -129,7 +129,9 @@ const SENTRY_TIMEOUT = 5000; // 5 seconds
 // identically, but we don't really need userId and userName yet
 startStdio(instrumentedServer, {
   accessToken,
-  organizationSlug: null,
+  constraints: {
+    organizationSlug: null,
+  },
   sentryHost,
   mcpUrl,
 }).catch((err) => {
