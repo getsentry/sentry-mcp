@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-// Only mock the Sentry wrapper to return the unwrapped class for testing
+// Mock Sentry wrapper to avoid Cloudflare runtime dependencies in tests
 vi.mock("@sentry/cloudflare", () => ({
   instrumentDurableObjectWithSentry: (config: any, cls: any) => cls,
 }));
@@ -34,7 +34,10 @@ describe("mcp-transport URL parsing", () => {
       },
     } as any;
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      CF_VERSION_METADATA: { id: "test-version" },
+      SENTRY_HOST: "sentry.io",
+    } as any;
     const instance = new (SentryMCP as any)(mockState, mockEnv);
 
     // Mock the ctx and props to simulate Durable Object context
@@ -65,7 +68,10 @@ describe("mcp-transport URL parsing", () => {
       },
     } as any;
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      CF_VERSION_METADATA: { id: "test-version" },
+      SENTRY_HOST: "sentry.io",
+    } as any;
     const instance = new (SentryMCP as any)(mockState, mockEnv);
 
     instance.ctx = mockState;
@@ -95,7 +101,10 @@ describe("mcp-transport URL parsing", () => {
       },
     } as any;
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      CF_VERSION_METADATA: { id: "test-version" },
+      SENTRY_HOST: "sentry.io",
+    } as any;
     const instance = new (SentryMCP as any)(mockState, mockEnv);
 
     instance.ctx = mockState;
@@ -124,7 +133,10 @@ describe("mcp-transport URL parsing", () => {
       },
     } as any;
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      CF_VERSION_METADATA: { id: "test-version" },
+      SENTRY_HOST: "sentry.io",
+    } as any;
     const instance = new (SentryMCP as any)(mockState, mockEnv);
 
     instance.ctx = mockState;
@@ -153,7 +165,10 @@ describe("mcp-transport URL parsing", () => {
       },
     } as any;
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      CF_VERSION_METADATA: { id: "test-version" },
+      SENTRY_HOST: "sentry.io",
+    } as any;
     const instance = new (SentryMCP as any)(mockState, mockEnv);
 
     instance.ctx = mockState;
@@ -193,7 +208,10 @@ describe("mcp-transport URL parsing", () => {
       },
     } as any;
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      CF_VERSION_METADATA: { id: "test-version" },
+      SENTRY_HOST: "sentry.io",
+    } as any;
     const instance = new (SentryMCP as any)(mockState, mockEnv);
 
     instance.ctx = mockState;
@@ -225,7 +243,10 @@ describe("mcp-transport URL parsing", () => {
       },
     } as any;
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      CF_VERSION_METADATA: { id: "test-version" },
+      SENTRY_HOST: "sentry.io",
+    } as any;
     const instance = new (SentryMCP as any)(mockState, mockEnv);
 
     instance.ctx = mockState;
@@ -270,7 +291,10 @@ describe("mcp-transport URL parsing", () => {
       },
     } as any;
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      CF_VERSION_METADATA: { id: "test-version" },
+      SENTRY_HOST: "sentry.io",
+    } as any;
     const instance = new (SentryMCP as any)(mockState, mockEnv);
 
     instance.ctx = mockState;
