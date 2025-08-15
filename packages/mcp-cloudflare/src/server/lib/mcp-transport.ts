@@ -33,14 +33,37 @@ import getSentryConfig from "../sentry.config";
  *    - init() is called again to restore state
  *    - fetch() is called for the request
  *
- * CONSTRAINT HANDLING:
- * - Constraints come from URL path (e.g., /mcp/org1/project1)
- * - Same user can connect with different constraints
- * - Ideally, each DO would be immutably coupled to its constraints (like in .mcp.json)
- * - However, since OAuth provider creates DOs per-user (not per-constraint-set), we must:
- *   1. Detect constraint changes in fetch()
- *   2. Reconfigure the MCP server when constraints change
- *   3. Store last constraints for hibernation recovery
+ * CONSTRAINT HANDLING - IMPORTANT ARCHITECTURAL TRADE-OFF:
+ *
+ * This implementation uses server reconfiguration when constraints change, which is
+ * NOT IDEAL but necessary given the current architecture limitations:
+ *
+ * IDEAL: Each unique set of constraints (org/project) would have its own DO instance,
+ * similar to how .mcp.json configurations work locally. This would provide:
+ * - Immutable configuration per context
+ * - Clear session boundaries
+ * - No reconfiguration needed
+ *
+ * REALITY: We must reconfigure because:
+ * 1. The OAuth provider creates DOs based on userId only (not constraints)
+ * 2. The agents library controls DO creation via sessionId
+ * 3. We cannot cleanly intercept DO creation without fragile hacks
+ *
+ * ATTEMPTED ALTERNATIVES (see git history):
+ * - Constraint-based sessionId manipulation: Too fragile, depends on internals
+ * - Multiple server instances per DO: Memory bloat
+ * - Custom DO routing: Requires reimplementing MCP protocol handling
+ *
+ * CURRENT APPROACH:
+ * - Detect constraint changes in fetch()
+ * - Reconfigure the MCP server when constraints change (~10-50ms overhead)
+ * - Store last constraints for hibernation recovery
+ *
+ * This is a pragmatic solution that:
+ * - Works reliably with existing libraries
+ * - Is maintainable and debuggable
+ * - Has acceptable performance (users rarely switch contexts rapidly)
+ * - Prevents state leakage between contexts (fresh server per reconfiguration)
  *
  * Props contain the authenticated user context from the OAuth flow.
  * These are encrypted and stored in the OAuth token, then provided
@@ -89,10 +112,16 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
 
   /**
    * Configure the MCP server with given constraints
+   *
+   * NOTE: This creates a NEW server instance on every reconfiguration.
+   * This is required because configureServer() modifies tool schemas based on
+   * constraints, and these modifications cannot be cleanly reversed.
+   *
+   * Performance impact: ~10-50ms to create and configure a new server.
+   * This is acceptable since users rarely switch contexts rapidly.
    */
   private async reconfigureServer(constraints: UrlConstraints | null) {
-    // Always create a fresh server instance
-    // (Required because configureServer modifies tool schemas based on constraints)
+    // Always create a fresh server instance to ensure clean state
     this.server = new McpServer({
       name: "Sentry MCP",
       version: LIB_VERSION,
@@ -137,26 +166,38 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
 
   /**
    * Handle incoming requests and manage constraint changes
+   *
+   * This is where we detect and handle constraint changes. When a user switches
+   * from /mcp/org1 to /mcp/org2, we must reconfigure the server with the new
+   * constraints to ensure tools operate on the correct organization/project.
    */
   async fetch(request: Request): Promise<Response> {
     const constraints = this.extractConstraints(request);
     const constraintKey = this.getConstraintKey(constraints);
 
-    // Check if constraints have changed
+    // Check if constraints have changed since last request
     // McpAgent guarantees init() is called before fetch(), so currentConstraintKey will be set
     const needsReconfiguration = constraintKey !== this.currentConstraintKey;
 
     if (needsReconfiguration) {
+      // Log constraint change for debugging
+      console.log(
+        `[MCP Transport] Constraint change detected: ${this.currentConstraintKey} → ${constraintKey}`,
+      );
+
       // Store constraints for hibernation recovery
+      // This ensures we restore the correct context when DO wakes up
       await this.ctx.storage.put("lastConstraints", {
         constraints,
         key: constraintKey,
       });
 
-      // Reconfigure the server with new constraints
-      // Note: Ideally constraints would be immutable per DO instance, but since
-      // the OAuth provider creates DOs based on userId only (not constraints),
-      // we must handle constraint changes when users switch contexts
+      // IMPORTANT: This is the reconfiguration that we'd prefer to avoid
+      // but cannot due to architectural constraints (see class documentation).
+      // The server is completely recreated to ensure clean state for new constraints.
+      //
+      // If this fails, we MUST fail the request. Operating with wrong constraints
+      // could lead to data being written to the wrong organization/project.
       await this.reconfigureServer(constraints);
     }
 
@@ -165,9 +206,13 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
 
   /**
    * Initialize on Durable Object creation or hibernation wake
+   *
+   * Restores the last known state from storage and configures the MCP server.
+   * Storage operations are batched for efficiency.
    */
   async init() {
     // Load persisted data in parallel for efficiency
+    // This reduces storage read latency from sequential to parallel
     const [clientInfo, lastConstraintData] = await Promise.all([
       this.ctx.storage.get<typeof this.mcpClientInfo>("mcpClientInfo"),
       this.ctx.storage.get<{ constraints: UrlConstraints | null; key: string }>(
@@ -175,7 +220,7 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
       ),
     ]);
 
-    // Cache client info
+    // Cache client info to avoid repeated storage reads
     this.mcpClientInfo = clientInfo || null;
 
     // Restore last constraints or start fresh
@@ -183,6 +228,9 @@ class SentryMCPBase extends McpAgent<Env, unknown, WorkerProps> {
     this.currentConstraintKey = lastConstraintData?.key || null;
 
     // Configure server with restored constraints
+    // This ensures the server is ready with the correct context after hibernation
+    // If this fails, let it bubble up - better to fail initialization than to
+    // operate with an incorrectly configured server
     await this.reconfigureServer(constraints);
   }
 }
