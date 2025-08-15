@@ -136,9 +136,8 @@ describeIfPreviewUrl(
 
     it("should have SSE endpoint for MCP transport", async () => {
       const response = await fetch(`${PREVIEW_URL}/sse`, {
-        headers: {
-          Accept: "text/event-stream",
-        },
+        // Remove Accept: "text/event-stream" header to avoid establishing streaming connection
+        // We just want to verify the endpoint exists and returns 401 without auth
         signal: AbortSignal.timeout(TIMEOUT),
       });
 
