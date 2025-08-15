@@ -1,0 +1,79 @@
+name: Smoke Tests (Local)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke-tests:
+    name: Run Smoke Tests Against Local Server
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # pnpm/action-setup@v4
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      
+      - name: Build
+        run: pnpm build
+
+      - name: Start local dev server
+        working-directory: packages/mcp-cloudflare
+        run: |
+          pnpm exec wrangler dev --port 8788 --local &
+          WRANGLER_PID=$!
+          echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
+          echo "Waiting for server to start..."
+          sleep 30
+          # Verify server is running
+          curl --retry 10 --retry-delay 3 --retry-connrefused http://localhost:8788/ || exit 1
+          echo "✅ Local server started successfully"
+
+      - name: Run smoke tests against local server
+        env:
+          PREVIEW_URL: http://localhost:8788
+        working-directory: packages/smoke-tests
+        run: |
+          echo "🧪 Running smoke tests against local server at $PREVIEW_URL"
+          pnpm test:ci
+
+      - name: Publish Smoke Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: always()
+        with:
+          report_paths: "packages/smoke-tests/tests.junit.xml"
+          check_name: "Local Smoke Test Results"
+          fail_on_failure: true
+
+      - name: Stop local server
+        if: always()
+        run: |
+          if [ ! -z "$WRANGLER_PID" ]; then
+            kill $WRANGLER_PID || true
+          fi

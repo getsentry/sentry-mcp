@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "test:ci": "vitest run --reporter=junit --outputFile=tests.junit.xml",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "vitest"
   },
   "devDependencies": {
