@@ -35,6 +35,21 @@ export default defineTool({
 
     const teams = await apiService.listTeams(organizationSlug);
     let output = `# Teams in **${organizationSlug}**\n\n`;
+
+    // Add note if session is constrained
+    if (
+      context.constraints.organizationSlug ||
+      context.constraints.projectSlug
+    ) {
+      output += `*Note: This MCP session is constrained to `;
+      if (context.constraints.projectSlug) {
+        output += `project **${context.constraints.projectSlug}**`;
+      } else {
+        output += `organization **${context.constraints.organizationSlug}**`;
+      }
+      output += `. Some parameters will be automatically provided to tools.*\n\n`;
+    }
+
     if (teams.length === 0) {
       output += "No teams found.\n";
       return output;

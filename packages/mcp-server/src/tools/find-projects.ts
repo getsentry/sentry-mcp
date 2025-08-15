@@ -5,6 +5,7 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import type { Project } from "../api-client/index";
 
 export default defineTool({
   name: "find_projects",
@@ -33,10 +34,42 @@ export default defineTool({
 
     setTag("organization.slug", organizationSlug);
 
-    const projects = await apiService.listProjects(organizationSlug);
+    let projects: Project[];
+
+    // When constrained to a specific project, fetch it directly instead of listing all
+    if (context.constraints.projectSlug) {
+      try {
+        const project = await apiService.getProject({
+          organizationSlug,
+          projectSlugOrId: context.constraints.projectSlug,
+        });
+        projects = [project];
+      } catch (error: any) {
+        // If we get a 404, the project doesn't exist or user lacks access
+        if (error.status === 404) {
+          projects = [];
+        } else {
+          throw error;
+        }
+      }
+    } else {
+      // No constraint, fetch all projects
+      projects = await apiService.listProjects(organizationSlug);
+    }
+
     let output = `# Projects in **${organizationSlug}**\n\n`;
+
+    // Add note if constrained
+    if (context.constraints.projectSlug) {
+      output += `*Note: This MCP session is constrained to project **${context.constraints.projectSlug}**. Project parameters will be automatically provided to tools.*\n\n`;
+    }
+
     if (projects.length === 0) {
-      output += "No projects found.\n";
+      if (context.constraints.projectSlug) {
+        output += `The constrained project **${context.constraints.projectSlug}** was not found in this organization or you don't have access to it.\n`;
+      } else {
+        output += "No projects found.\n";
+      }
       return output;
     }
     output += projects.map((project) => `- **${project.slug}**\n`).join("");

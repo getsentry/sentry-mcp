@@ -14,21 +14,48 @@ export default defineTool({
     "Use this tool when you need to:",
     "- View all organizations in Sentry",
     "- Find an organization's slug to aid other tool requests",
+    "- Get the regionUrl for an organization (required for many API calls)",
+    "",
+    "Note: Even when the session is constrained to a specific organization,",
+    "you should still call this tool if you need the regionUrl for API calls.",
   ].join("\n"),
   inputSchema: {},
   async handler(params, context: ServerContext) {
     // User data endpoints (like /users/me/regions/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
-    const organizations = await withApiErrorHandling(
+    let organizations = await withApiErrorHandling(
       () => apiService.listOrganizations(),
       {}, // No params for this endpoint
     );
 
+    // Filter organizations based on constraints
+    // TODO: This fetches ALL organizations then filters client-side, which is inefficient
+    // for users with many organizations. Unlike projects, there's no getOrganization
+    // endpoint to fetch a single org directly. This could be optimized by:
+    // 1. Adding a getOrganization endpoint to the API
+    // 2. Adding a filter parameter to the list endpoint
+    // 3. Caching organization data in the context when constraints are set
+    if (context.constraints.organizationSlug) {
+      organizations = organizations.filter(
+        (org) => org.slug === context.constraints.organizationSlug,
+      );
+    }
+
     let output = "# Organizations\n\n";
 
+    // Add note if constrained
+    if (context.constraints.organizationSlug) {
+      output += `*Note: This MCP session is constrained to organization **${context.constraints.organizationSlug}**. Organization parameters will be automatically provided to tools.*\n`;
+      output += `*However, you still need to use this tool to get the regionUrl for API calls.*\n\n`;
+    }
+
     if (organizations.length === 0) {
-      output += "You don't appear to be a member of any organizations.\n";
+      if (context.constraints.organizationSlug) {
+        output += `The constrained organization **${context.constraints.organizationSlug}** was not found or you don't have access to it.\n`;
+      } else {
+        output += "You don't appear to be a member of any organizations.\n";
+      }
       return output;
     }
 
