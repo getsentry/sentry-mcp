@@ -12,14 +12,23 @@ export { SentryMCP };
 
 // Custom wrapper to preserve path parameters via headers.
 //
-// Why this hack is necessary:
-// 1. OAuthProvider only supports prefix matching (e.g., "/mcp" matches "/mcp/*")
-// 2. The agents library's serve() method rewrites the URL path to "/streamable-http"
-//    before passing it to the Durable Object, losing the original path information
-// 3. We need to extract org/project from paths like "/mcp/sentry/javascript"
+// ARCHITECTURAL LIMITATION:
+// We must pass constraints via headers because the agents library rewrites URLs
+// from /mcp/org/project to /streamable-http, losing path information.
 //
-// Solution: Extract path parameters here and pass them as custom headers,
-// which are preserved through the serve() URL rewriting.
+// IDEAL SOLUTION (not possible with current libraries):
+// Each URL path (/mcp/org1/project1) would map to a separate DO instance,
+// providing immutable configuration per context.
+//
+// CURRENT SOLUTION:
+// 1. Extract org/project from URL path here
+// 2. Pass as headers (X-Sentry-Org-Slug, X-Sentry-Project-Slug)
+// 3. DO extracts headers and reconfigures when constraints change
+//
+// This wrapper ensures:
+// - Security: External clients cannot bypass URL-based constraints
+// - Validation: Slugs are validated before being passed to DO
+// - Compatibility: Works with both SSE and streamable-http transports
 const createMcpHandler = (basePath: string, isSSE = false) => {
   const handler = isSSE ? SentryMCP.serveSSE("/*") : SentryMCP.serve("/*");
 
