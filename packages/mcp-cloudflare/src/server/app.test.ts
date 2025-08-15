@@ -14,4 +14,16 @@ describe("app", () => {
       );
     });
   });
+
+  describe("GET /llms.txt", () => {
+    it("should return correct llms.txt content", async () => {
+      const res = await app.request("/llms.txt");
+
+      expect(res.status).toBe(200);
+
+      const text = await res.text();
+      expect(text).toContain("# sentry-mcp");
+      expect(text).toContain("Model Context Protocol");
+    });
+  });
 });

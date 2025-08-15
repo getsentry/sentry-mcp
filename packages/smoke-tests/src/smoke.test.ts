@@ -175,6 +175,60 @@ describe(`Smoke Tests for ${PREVIEW_URL}`, () => {
     expect(text).toContain("/mcp");
   });
 
+  it("should serve /.well-known/oauth-authorization-server with CORS headers", async () => {
+    const response = await fetch(
+      `${PREVIEW_URL}/.well-known/oauth-authorization-server`,
+      {
+        headers: {
+          Origin: "http://localhost:6274", // MCP inspector origin
+        },
+        signal: AbortSignal.timeout(TIMEOUT),
+      },
+    );
+    expect(response.status).toBe(200);
+
+    // Should have CORS headers for cross-origin access
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-methods")).toBe(
+      "GET, OPTIONS",
+    );
+    expect(response.headers.get("access-control-allow-headers")).toBe(
+      "Content-Type",
+    );
+
+    // Should return valid OAuth server metadata
+    const data = await response.json();
+    expect(data).toHaveProperty("issuer");
+    expect(data).toHaveProperty("authorization_endpoint");
+    expect(data).toHaveProperty("token_endpoint");
+  });
+
+  it("should handle CORS preflight for /.well-known/oauth-authorization-server", async () => {
+    const response = await fetch(
+      `${PREVIEW_URL}/.well-known/oauth-authorization-server`,
+      {
+        method: "OPTIONS",
+        headers: {
+          Origin: "http://localhost:6274",
+          "Access-Control-Request-Method": "GET",
+        },
+        signal: AbortSignal.timeout(TIMEOUT),
+      },
+    );
+
+    // Should return 204 No Content for preflight
+    expect(response.status).toBe(204);
+
+    // Should have CORS headers
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-methods")).toBe(
+      "GET, OPTIONS",
+    );
+    expect(response.headers.get("access-control-allow-headers")).toBe(
+      "Content-Type",
+    );
+  });
+
   it("should respond quickly (under 2 seconds)", async () => {
     const start = Date.now();
     const response = await fetch(PREVIEW_URL, {
