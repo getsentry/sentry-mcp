@@ -38,11 +38,12 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
     // Get tools by connecting to MCP server
     let tools: string[] = [];
+    let mcpClient;
     try {
       const requestUrl = new URL(c.req.url);
       const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
 
-      const mcpClient = await experimental_createMCPClient({
+      mcpClient = await experimental_createMCPClient({
         name: "sentry",
         transport: {
           type: "sse" as const,
@@ -58,6 +59,15 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     } catch (error) {
       // If we can't get tools, continue with just prompts
       console.warn("Failed to fetch tools from MCP server:", error);
+    } finally {
+      // Ensure the MCP client connection is properly closed to prevent hanging connections
+      if (mcpClient && typeof mcpClient.close === 'function') {
+        try {
+          await mcpClient.close();
+        } catch (closeError) {
+          console.warn("Failed to close MCP client connection:", closeError);
+        }
+      }
     }
 
     // Return the metadata
