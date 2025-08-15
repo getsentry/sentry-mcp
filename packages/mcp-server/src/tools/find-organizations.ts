@@ -40,11 +40,7 @@ export default defineTool({
         if (error.status === 404) {
           organizations = [];
         } else {
-          // Re-throw other errors through the error handler
-          throw await withApiErrorHandling(
-            () => Promise.reject(error),
-            {}, // No params for this endpoint
-          );
+          throw error;
         }
       }
     } else {
