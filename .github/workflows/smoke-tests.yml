@@ -54,9 +54,10 @@ jobs:
           WRANGLER_PID=$!
           echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
           echo "Waiting for server to start..."
-          sleep 30
+          # Wrangler takes time to build and start, especially with Durable Objects
+          sleep 45
           # Verify server is running
-          curl --retry 10 --retry-delay 3 --retry-connrefused http://localhost:8788/ || exit 1
+          curl --retry 15 --retry-delay 5 --retry-connrefused http://localhost:8788/ || exit 1
           echo "✅ Local server started successfully"
 
       - name: Run smoke tests against local server

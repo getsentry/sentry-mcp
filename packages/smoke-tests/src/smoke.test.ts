@@ -47,7 +47,7 @@ describeIfPreviewUrl(
         signal: AbortSignal.timeout(TIMEOUT),
       });
 
-      // Verify JSON content type
+      expect(response.status).toBe(401);
       expect(response.headers.get("content-type")).toContain(
         "application/json",
       );
@@ -78,7 +78,7 @@ describeIfPreviewUrl(
         signal: AbortSignal.timeout(TIMEOUT),
       });
 
-      // Verify JSON content type
+      expect(response.status).toBe(401);
       expect(response.headers.get("content-type")).toContain(
         "application/json",
       );
@@ -109,7 +109,7 @@ describeIfPreviewUrl(
         signal: AbortSignal.timeout(TIMEOUT),
       });
 
-      // Verify JSON content type
+      expect(response.status).toBe(401);
       expect(response.headers.get("content-type")).toContain(
         "application/json",
       );
