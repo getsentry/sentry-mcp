@@ -46,6 +46,22 @@ jobs:
 
       - name: Run tests
         run: pnpm test:ci
+      
+      - name: Start local dev server
+        run: |
+          cd packages/mcp-cloudflare
+          pnpm exec wrangler dev --port 8788 --local &
+          echo "Waiting for server to start..."
+          sleep 20
+          curl --retry 5 --retry-delay 5 --retry-connrefused http://localhost:8788/
+      
+      - name: Run smoke tests against local server
+        env:
+          PREVIEW_URL: http://localhost:8788
+        run: |
+          echo "Running smoke tests against local dev server at $PREVIEW_URL"
+          cd packages/smoke-tests
+          pnpm test:ci
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
