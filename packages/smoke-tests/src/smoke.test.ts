@@ -90,24 +90,38 @@ describeIfPreviewUrl(
     });
 
     it("should have MCP endpoint with org and project constraints (/mcp/sentry/mcp-server)", async () => {
-      const response = await fetch(`${PREVIEW_URL}/mcp/sentry/mcp-server`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "initialize",
-          params: {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            clientInfo: {
-              name: "smoke-test",
-              version: "1.0.0",
+      // Retry logic for Durable Object initialization in CI
+      let response: Response;
+      let retries = 3;
+
+      while (retries > 0) {
+        response = await fetch(`${PREVIEW_URL}/mcp/sentry/mcp-server`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "initialize",
+            params: {
+              protocolVersion: "2024-11-05",
+              capabilities: {},
+              clientInfo: {
+                name: "smoke-test",
+                version: "1.0.0",
+              },
             },
-          },
-          id: 1,
-        }),
-        signal: AbortSignal.timeout(TIMEOUT),
-      });
+            id: 1,
+          }),
+          signal: AbortSignal.timeout(TIMEOUT),
+        });
+
+        // If we get 503, it might be Durable Object initialization - retry
+        if (response.status === 503 && retries > 1) {
+          retries--;
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
+          continue;
+        }
+        break;
+      }
 
       expect(response.status).toBe(401);
       expect(response.headers.get("content-type")).toContain(
