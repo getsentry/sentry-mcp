@@ -5,6 +5,7 @@ import {
   withApiErrorHandling,
 } from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
+import type { Organization } from "../api-client/index";
 
 export default defineTool({
   name: "find_organizations",
@@ -24,21 +25,33 @@ export default defineTool({
     // User data endpoints (like /users/me/regions/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
-    let organizations = await withApiErrorHandling(
-      () => apiService.listOrganizations(),
-      {}, // No params for this endpoint
-    );
 
-    // Filter organizations based on constraints
-    // TODO: This fetches ALL organizations then filters client-side, which is inefficient
-    // for users with many organizations. Unlike projects, there's no getOrganization
-    // endpoint to fetch a single org directly. This could be optimized by:
-    // 1. Adding a getOrganization endpoint to the API
-    // 2. Adding a filter parameter to the list endpoint
-    // 3. Caching organization data in the context when constraints are set
+    let organizations: Organization[];
+
+    // When constrained to a specific organization, fetch it directly instead of listing all
     if (context.constraints.organizationSlug) {
-      organizations = organizations.filter(
-        (org) => org.slug === context.constraints.organizationSlug,
+      try {
+        const organization = await apiService.getOrganization(
+          context.constraints.organizationSlug!,
+        );
+        organizations = [organization];
+      } catch (error: any) {
+        // If we get a 404, the organization doesn't exist or user lacks access
+        if (error.status === 404) {
+          organizations = [];
+        } else {
+          // Re-throw other errors through the error handler
+          throw await withApiErrorHandling(
+            () => Promise.reject(error),
+            {}, // No params for this endpoint
+          );
+        }
+      }
+    } else {
+      // No constraint, fetch all organizations
+      organizations = await withApiErrorHandling(
+        () => apiService.listOrganizations(),
+        {}, // No params for this endpoint
       );
     }
 

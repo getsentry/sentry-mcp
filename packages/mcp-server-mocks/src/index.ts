@@ -463,6 +463,16 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/organizations/non-existent-org/",
+    fetch: () => {
+      return HttpResponse.json(
+        { detail: "The requested resource does not exist" },
+        { status: 404 },
+      );
+    },
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/teams/",
     fetch: () => {
       return HttpResponse.json([teamFixture]);
