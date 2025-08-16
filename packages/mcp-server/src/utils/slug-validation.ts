@@ -26,9 +26,10 @@ export function isNumericId(value: string): boolean {
 
 /**
  * Valid slug pattern: alphanumeric, hyphens, underscores, and dots.
- * Must start with alphanumeric character.
+ * Must start and end with alphanumeric character.
  */
-const VALID_SLUG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+const VALID_SLUG_PATTERN =
+  /^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$|^[a-zA-Z0-9]$/;
 
 /**
  * Validates a slug to prevent path traversal and injection attacks.
@@ -73,7 +74,7 @@ export function validateSlug(val: string, ctx: z.RefinementCtx): void {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message:
-        "Slug must contain only alphanumeric characters, hyphens, underscores, and dots, and must start with an alphanumeric character",
+        "Slug must contain only alphanumeric characters, hyphens, underscores, and dots, and must start and end with an alphanumeric character",
     });
   }
 }
