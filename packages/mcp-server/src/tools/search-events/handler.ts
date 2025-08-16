@@ -58,6 +58,7 @@ export default defineTool({
     "<hints>",
     "- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.",
     "- Parse org/project notation directly without calling find_organizations or find_projects.",
+    "- Note: When the MCP session is constrained to a specific organization or project, those parameters may be automatically provided and won't appear in the tool signature.",
     "</hints>",
   ].join("\n"),
   inputSchema: {

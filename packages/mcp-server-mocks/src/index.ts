@@ -463,6 +463,16 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/organizations/non-existent-org/",
+    fetch: () => {
+      return HttpResponse.json(
+        { detail: "The requested resource does not exist" },
+        { status: 404 },
+      );
+    },
+  },
+  {
+    method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/teams/",
     fetch: () => {
       return HttpResponse.json([teamFixture]);
@@ -478,6 +488,27 @@ export const restHandlers = buildHandlers([
           id: "4509106749636608", // Different ID for GET endpoint
         },
       ]);
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+    fetch: () => {
+      return HttpResponse.json({
+        ...projectFixture,
+        id: "4509106749636608",
+        slug: "cloudflare-mcp",
+      });
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/non-existent-project/",
+    fetch: () => {
+      return HttpResponse.json(
+        { detail: "The requested resource does not exist" },
+        { status: 404 },
+      );
     },
   },
   {

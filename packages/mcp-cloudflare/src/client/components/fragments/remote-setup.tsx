@@ -48,7 +48,6 @@ export default function RemoteSetup() {
           specification, including OAuth, you can connect directly.
         </p>
         <CodeSnippet snippet={endpoint} />
-        {/* Hidden for now - constraints not working correctly
         <p>
           <strong>Organization and Project Constraints:</strong> You can
           optionally constrain your MCP session to specific organizations or
@@ -64,7 +63,7 @@ export default function RemoteSetup() {
             to a specific organization and project
           </li>
         </ul>
-        */}
+
         <p>
           Sentry's MCP server supports both the SSE and HTTP Streaming
           protocols, and will negotiate based on your client's capabilities. If

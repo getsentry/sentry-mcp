@@ -50,7 +50,7 @@ const createMcpHandler = (basePath: string, isSSE = false) => {
       // IMPORTANT: /sse/message and /mcp/message are reserved SSE protocol endpoints
       // and must not be interpreted as organization slugs
       const pathMatch = url.pathname.match(
-        /^\/(mcp|sse)(?:\/([a-zA-Z0-9._-]{1,100}))?(?:\/([a-zA-Z0-9._-]{1,100}))?/,
+        /^\/(mcp|sse)(?:\/([a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?|[a-zA-Z0-9]))?(?:\/([a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?|[a-zA-Z0-9]))?/,
       );
 
       // Check if this is a reserved protocol endpoint

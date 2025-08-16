@@ -107,11 +107,14 @@ describe("slug-validation", () => {
       expect(() => schema.parse(longSlug)).toThrow(/exceeds maximum length/i);
     });
 
-    it("should reject slugs not matching valid pattern", () => {
+    it("should reject slugs not matching valid pattern (must start and end with alphanumeric)", () => {
       const invalidPatterns = [
         "-startwithdash",
         "_startwithunderscore",
         ".startwithdot",
+        "endwithdash-",
+        "endwithunderscore_",
+        "endwithdot.",
         "has spaces",
         "has\ttabs",
         "",

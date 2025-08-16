@@ -587,6 +587,44 @@ describe("listOrganizations", () => {
   });
 });
 
+describe("getOrganization", () => {
+  it("should fetch a single organization by slug", async () => {
+    const mockOrg = {
+      id: "1",
+      slug: "test-org",
+      name: "Test Organization",
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockOrg),
+    });
+
+    const apiService = new SentryApiService({ host: "sentry.io" });
+    const result = await apiService.getOrganization("test-org");
+
+    expect(result).toEqual(mockOrg);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://sentry.io/api/0/organizations/test-org/",
+      expect.any(Object),
+    );
+  });
+
+  it("should handle 404 error for non-existent organization", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      text: () =>
+        Promise.resolve(JSON.stringify({ detail: "Organization not found" })),
+    });
+
+    const apiService = new SentryApiService({ host: "sentry.io" });
+
+    await expect(apiService.getOrganization("non-existent")).rejects.toThrow();
+  });
+});
+
 describe("host configuration", () => {
   it("should handle hostname without protocol", () => {
     const apiService = new SentryApiService({ host: "sentry.io" });
