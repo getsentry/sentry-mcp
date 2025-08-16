@@ -4,6 +4,7 @@ import {
   apiServiceFromContext,
   withApiErrorHandling,
 } from "../internal/tool-helpers/api";
+import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import type { Organization } from "../api-client/index";
 
@@ -31,13 +32,15 @@ export default defineTool({
     // When constrained to a specific organization, fetch it directly instead of listing all
     if (context.constraints.organizationSlug) {
       try {
-        const organization = await apiService.getOrganization(
-          context.constraints.organizationSlug!,
+        const organization = await withApiErrorHandling(
+          () =>
+            apiService.getOrganization(context.constraints.organizationSlug!),
+          { organizationSlug: context.constraints.organizationSlug },
         );
         organizations = [organization];
       } catch (error: any) {
-        // If we get a 404, the organization doesn't exist or user lacks access
-        if (error.status === 404) {
+        // If we get a 404 UserInputError, the organization doesn't exist or user lacks access
+        if (error instanceof UserInputError && error.cause?.status === 404) {
           organizations = [];
         } else {
           throw error;

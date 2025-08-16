@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import {
+  apiServiceFromContext,
+  withApiErrorHandling,
+} from "../internal/tool-helpers/api";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
@@ -39,14 +42,21 @@ export default defineTool({
     // When constrained to a specific project, fetch it directly instead of listing all
     if (context.constraints.projectSlug) {
       try {
-        const project = await apiService.getProject({
-          organizationSlug,
-          projectSlugOrId: context.constraints.projectSlug,
-        });
+        const project = await withApiErrorHandling(
+          () =>
+            apiService.getProject({
+              organizationSlug,
+              projectSlugOrId: context.constraints.projectSlug,
+            }),
+          {
+            organizationSlug,
+            projectSlugOrId: context.constraints.projectSlug,
+          },
+        );
         projects = [project];
       } catch (error: any) {
-        // If we get a 404, the project doesn't exist or user lacks access
-        if (error.status === 404) {
+        // If we get a 404 UserInputError, the project doesn't exist or user lacks access
+        if (error instanceof UserInputError && error.cause?.status === 404) {
           projects = [];
         } else {
           throw error;
@@ -54,7 +64,10 @@ export default defineTool({
       }
     } else {
       // No constraint, fetch all projects
-      projects = await apiService.listProjects(organizationSlug);
+      projects = await withApiErrorHandling(
+        () => apiService.listProjects(organizationSlug),
+        { organizationSlug },
+      );
     }
 
     let output = `# Projects in **${organizationSlug}**\n\n`;
