@@ -99,7 +99,29 @@ jobs:
         working-directory: packages/smoke-tests
         run: |
           echo "🧪 Running smoke tests against local server at $PREVIEW_URL"
-          pnpm test:ci
+          
+          # Give server a bit more time to stabilize after startup
+          echo "⏳ Waiting 5 seconds for server to stabilize..."
+          sleep 5
+          
+          # Verify server is still responding before running tests
+          if ! curl -s -f -o /dev/null http://localhost:8788/; then
+            echo "❌ Server is not responding before tests!"
+            echo "📋 Wrangler log:"
+            cat ../mcp-cloudflare/wrangler.log
+            exit 1
+          fi
+          
+          echo "✅ Server is responding, running tests..."
+          pnpm test:ci || TEST_EXIT_CODE=$?
+          
+          # If tests failed, show server logs for debugging
+          if [ "${TEST_EXIT_CODE:-0}" -ne 0 ]; then
+            echo "❌ Tests failed with exit code ${TEST_EXIT_CODE}"
+            echo "📋 Wrangler log at time of failure:"
+            cat ../mcp-cloudflare/wrangler.log
+            exit ${TEST_EXIT_CODE}
+          fi
 
       - name: Publish Smoke Test Report
         uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
