@@ -47,23 +47,53 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Ensure cloudflare package is built
+        working-directory: packages/mcp-cloudflare
+        run: |
+          # Ensure dist directory exists with proper wrangler config
+          if [ ! -f "dist/sentry_mcp/wrangler.json" ]; then
+            echo "❌ Build failed: dist/sentry_mcp/wrangler.json not found"
+            echo "📁 Contents of packages/mcp-cloudflare:"
+            ls -la
+            echo "📁 Contents of packages/mcp-cloudflare/dist (if exists):"
+            ls -la dist/ 2>/dev/null || echo "No dist directory"
+            exit 1
+          fi
+          echo "✅ Build successful: dist/sentry_mcp/wrangler.json found"
+
       - name: Start local dev server
         working-directory: packages/mcp-cloudflare
         run: |
-          pnpm exec wrangler dev --port 8788 --local &
+          # Start wrangler in background and capture output
+          pnpm exec wrangler dev --port 8788 --local > wrangler.log 2>&1 &
           WRANGLER_PID=$!
           echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
-          echo "Waiting for server to start..."
+          echo "Waiting for server to start (PID: $WRANGLER_PID)..."
           
           # Wait for server to be ready (up to 2 minutes)
           MAX_ATTEMPTS=24
           ATTEMPT=0
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            # Check if wrangler process is still running
+            if ! kill -0 $WRANGLER_PID 2>/dev/null; then
+              echo "❌ Wrangler process died unexpectedly!"
+              echo "📋 Last 50 lines of wrangler.log:"
+              tail -50 wrangler.log
+              exit 1
+            fi
+            
             if curl -s -f -o /dev/null http://localhost:8788/; then
               echo "✅ Server is ready!"
+              echo "📋 Wrangler startup log:"
+              cat wrangler.log
               break
             else
               echo "⏳ Waiting for server to start (attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)..."
+              # Show partial log every 5 attempts
+              if [ $((ATTEMPT % 5)) -eq 0 ] && [ $ATTEMPT -gt 0 ]; then
+                echo "📋 Current wrangler.log output:"
+                tail -20 wrangler.log
+              fi
             fi
             
             ATTEMPT=$((ATTEMPT+1))
@@ -72,6 +102,8 @@ jobs:
           
           if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
             echo "❌ Server failed to start after $MAX_ATTEMPTS attempts"
+            echo "📋 Full wrangler.log:"
+            cat wrangler.log
             exit 1
           fi
 
