@@ -12,6 +12,8 @@ import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
 import type { ErrorResponse } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 
+type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
+
 function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
   return errorResponse;
 }
@@ -38,7 +40,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
     // Get tools by connecting to MCP server
     let tools: string[] = [];
-    let mcpClient;
+    let mcpClient: MCPClient | undefined;
     try {
       const requestUrl = new URL(c.req.url);
       const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
@@ -61,7 +63,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       console.warn("Failed to fetch tools from MCP server:", error);
     } finally {
       // Ensure the MCP client connection is properly closed to prevent hanging connections
-      if (mcpClient && typeof mcpClient.close === 'function') {
+      if (mcpClient && typeof mcpClient.close === "function") {
         try {
           await mcpClient.close();
         } catch (closeError) {
