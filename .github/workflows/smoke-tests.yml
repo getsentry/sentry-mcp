@@ -47,20 +47,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Ensure cloudflare package is built
-        working-directory: packages/mcp-cloudflare
-        run: |
-          # Ensure dist directory exists with proper wrangler config
-          if [ ! -f "dist/sentry_mcp/wrangler.json" ]; then
-            echo "❌ Build failed: dist/sentry_mcp/wrangler.json not found"
-            echo "📁 Contents of packages/mcp-cloudflare:"
-            ls -la
-            echo "📁 Contents of packages/mcp-cloudflare/dist (if exists):"
-            ls -la dist/ 2>/dev/null || echo "No dist directory"
-            exit 1
-          fi
-          echo "✅ Build successful: dist/sentry_mcp/wrangler.json found"
-
       - name: Start local dev server
         working-directory: packages/mcp-cloudflare
         run: |
