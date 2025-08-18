@@ -275,7 +275,8 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       const requestUrl = new URL(c.req.url);
       const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
 
-      mcpClient = await experimental_createMCPClient({
+      // Add timeout to prevent infinite hanging
+      const createClientPromise = experimental_createMCPClient({
         name: "mcp.sentry.dev (web)",
         transport: {
           type: "sse" as const,
@@ -285,6 +286,14 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           },
         },
       });
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("MCP client creation timeout"));
+        }, 10000);
+      });
+
+      mcpClient = await Promise.race([createClientPromise, timeoutPromise]);
 
       // Get available tools from MCP server
       Object.assign(tools, await mcpClient.tools());
