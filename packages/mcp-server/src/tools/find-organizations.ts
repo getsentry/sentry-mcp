@@ -4,7 +4,9 @@ import {
   apiServiceFromContext,
   withApiErrorHandling,
 } from "../internal/tool-helpers/api";
+import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
+import type { Organization } from "../api-client/index";
 
 export default defineTool({
   name: "find_organizations",
@@ -14,21 +16,58 @@ export default defineTool({
     "Use this tool when you need to:",
     "- View all organizations in Sentry",
     "- Find an organization's slug to aid other tool requests",
+    "- Get the regionUrl for an organization (required for many API calls)",
+    "",
+    "Note: Even when the session is constrained to a specific organization,",
+    "you should still call this tool if you need the regionUrl for API calls.",
   ].join("\n"),
   inputSchema: {},
   async handler(params, context: ServerContext) {
     // User data endpoints (like /users/me/regions/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
-    const organizations = await withApiErrorHandling(
-      () => apiService.listOrganizations(),
-      {}, // No params for this endpoint
-    );
+
+    let organizations: Organization[];
+
+    // When constrained to a specific organization, fetch it directly instead of listing all
+    if (context.constraints.organizationSlug) {
+      try {
+        const organization = await withApiErrorHandling(
+          () =>
+            apiService.getOrganization(context.constraints.organizationSlug!),
+          { organizationSlug: context.constraints.organizationSlug },
+        );
+        organizations = [organization];
+      } catch (error: any) {
+        // If we get a 404 UserInputError, the organization doesn't exist or user lacks access
+        if (error instanceof UserInputError && error.cause?.status === 404) {
+          organizations = [];
+        } else {
+          throw error;
+        }
+      }
+    } else {
+      // No constraint, fetch all organizations
+      organizations = await withApiErrorHandling(
+        () => apiService.listOrganizations(),
+        {}, // No params for this endpoint
+      );
+    }
 
     let output = "# Organizations\n\n";
 
+    // Add note if constrained
+    if (context.constraints.organizationSlug) {
+      output += `*Note: This MCP session is constrained to organization **${context.constraints.organizationSlug}**. Organization parameters will be automatically provided to tools.*\n`;
+      output += `*However, you still need to use this tool to get the regionUrl for API calls.*\n\n`;
+    }
+
     if (organizations.length === 0) {
-      output += "You don't appear to be a member of any organizations.\n";
+      if (context.constraints.organizationSlug) {
+        output += `The constrained organization **${context.constraints.organizationSlug}** was not found or you don't have access to it.\n`;
+      } else {
+        output += "You don't appear to be a member of any organizations.\n";
+      }
       return output;
     }
 

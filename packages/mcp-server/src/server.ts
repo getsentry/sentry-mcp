@@ -341,10 +341,30 @@ export async function configureServer({
   }
 
   for (const [toolKey, tool] of Object.entries(tools)) {
-    // Only consider constraints that exist in this tool's schema
-    const toolConstraintKeys = Object.entries(context.constraints)
-      .filter(([key, value]) => !!value && key in tool.inputSchema)
-      .map(([key, _]) => key);
+    // Map constraints to tool parameters, handling special cases like projectSlugOrId
+    const toolConstraintKeys: string[] = [];
+    const constraintMappings: Record<string, string> = {};
+
+    // Check which constraints can be applied to this tool
+    if (
+      context.constraints.organizationSlug &&
+      "organizationSlug" in tool.inputSchema
+    ) {
+      toolConstraintKeys.push("organizationSlug");
+      constraintMappings.organizationSlug = "organizationSlug";
+    }
+
+    // Handle projectSlug constraint - can map to either projectSlug or projectSlugOrId
+    if (context.constraints.projectSlug) {
+      if ("projectSlug" in tool.inputSchema) {
+        toolConstraintKeys.push("projectSlug");
+        constraintMappings.projectSlug = "projectSlug";
+      } else if ("projectSlugOrId" in tool.inputSchema) {
+        // Map projectSlug constraint to projectSlugOrId parameter
+        toolConstraintKeys.push("projectSlugOrId");
+        constraintMappings.projectSlugOrId = "projectSlug";
+      }
+    }
 
     // Create modified schema by removing constraint parameters that will be injected
     const modifiedInputSchema = Object.fromEntries(
@@ -401,12 +421,21 @@ export async function configureServer({
                 }
 
                 try {
-                  // Apply URL constraints as normal parameters - only for params that exist in tool schema
-                  const applicableConstraints = Object.fromEntries(
-                    Object.entries(context.constraints).filter(
-                      ([key, value]) => !!value && key in tool.inputSchema,
-                    ),
-                  );
+                  // Apply URL constraints as normal parameters using the constraint mappings
+                  const applicableConstraints: Record<string, any> = {};
+
+                  // Use constraintMappings to properly map constraints to tool parameters
+                  for (const [toolParam, constraintKey] of Object.entries(
+                    constraintMappings,
+                  )) {
+                    const constraintValue =
+                      context.constraints[
+                        constraintKey as keyof typeof context.constraints
+                      ];
+                    if (constraintValue) {
+                      applicableConstraints[toolParam] = constraintValue;
+                    }
+                  }
 
                   const paramsWithConstraints = {
                     ...params,
