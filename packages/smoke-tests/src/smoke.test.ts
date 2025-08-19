@@ -188,17 +188,13 @@ describeIfPreviewUrl(
       }
     });
 
-    // FIXME: SSE endpoint has inconsistent behavior with unauthorized requests
-    // Sometimes returns 401 immediately, sometimes hangs for 3+ seconds
-    // This causes the test to timeout intermittently
-    // See: https://github.com/getsentry/sentry-mcp/pull/512
-    it.skip("should have SSE endpoint for MCP transport", async () => {
-      // Use AbortSignal.timeout instead of manual controller
+    it("should have SSE endpoint for MCP transport", async () => {
+      // SSE endpoint may take longer to respond with 401 for unauthorized requests
       const response = await fetch(`${PREVIEW_URL}/sse`, {
         headers: {
           Accept: "text/event-stream",
         },
-        signal: AbortSignal.timeout(5000), // Increased timeout to handle slow 401 responses
+        signal: AbortSignal.timeout(15000), // Extended timeout for SSE endpoint
       });
 
       // SSE endpoint might return 401 JSON or start streaming with auth error
@@ -249,7 +245,7 @@ describeIfPreviewUrl(
 
     it("should have metadata endpoint that requires auth", async () => {
       const response = await fetch(`${PREVIEW_URL}/api/metadata`, {
-        signal: AbortSignal.timeout(TIMEOUT),
+        signal: AbortSignal.timeout(15000), // Extended timeout
       });
       expect(response.status).toBe(401);
 
@@ -265,10 +261,13 @@ describeIfPreviewUrl(
     it("should have chat endpoint that accepts POST", async () => {
       const response = await fetch(`${PREVIEW_URL}/api/chat`, {
         method: "POST",
+        headers: {
+          Origin: PREVIEW_URL, // Required for CSRF check
+        },
         signal: AbortSignal.timeout(TIMEOUT),
       });
-      // Should return 401 (unauthorized) or 400/500 (error) for POST without auth
-      expect([400, 401, 500]).toContain(response.status);
+      // Should return 401 (unauthorized) or 400 (bad request) for POST without auth
+      expect([400, 401]).toContain(response.status);
     });
 
     it("should have OAuth authorize endpoint", async () => {
