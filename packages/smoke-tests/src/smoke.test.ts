@@ -129,7 +129,7 @@ describeIfPreviewUrl(
         let retries = 3;
         while (retries > 0 && Date.now() - warmupStartTime < maxWarmupTime) {
           try {
-            const response = await fetch(endpoint, {
+            const { response } = await safeFetch(endpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -137,7 +137,8 @@ describeIfPreviewUrl(
                 method: "initialize",
                 id: 1,
               }),
-              signal: AbortSignal.timeout(1000), // 1 second timeout per request
+              maxLength: 100,
+              timeoutMs: 1000,
             });
 
             // If we get 503, retry after a short delay
@@ -159,8 +160,9 @@ describeIfPreviewUrl(
         1000,
         maxWarmupTime - (Date.now() - warmupStartTime),
       );
-      await fetch(`${PREVIEW_URL}/api/metadata`, {
-        signal: AbortSignal.timeout(remainingTime), // Use remaining warmup time
+      await safeFetch(`${PREVIEW_URL}/api/metadata`, {
+        maxLength: 100,
+        timeoutMs: remainingTime,
       }).catch(() => {}); // Ignore timeout
 
       // Brief stabilization if we have time left
@@ -244,7 +246,7 @@ describeIfPreviewUrl(
       } else {
         throw new Error(`Unexpected SSE status: ${response.status}`);
       }
-    });
+    }, 30000); // 30 second timeout for SSE test
 
     it("should have metadata endpoint that requires auth", async () => {
       // Run metadata test BEFORE constraint tests to avoid workerd bug
