@@ -136,15 +136,16 @@ describeIfPreviewUrl(
 
     it("should have SSE endpoint for MCP transport", async () => {
       const response = await fetch(`${PREVIEW_URL}/sse`, {
-        // Remove Accept: "text/event-stream" header to avoid establishing streaming connection
-        // We just want to verify the endpoint exists and returns 401 without auth
+        headers: {
+          Accept: "text/event-stream",
+        },
         signal: AbortSignal.timeout(TIMEOUT),
       });
 
-      // SSE endpoint should exist and return 401 without auth
+      // SSE endpoint should return 401 without auth
       expect(response.status).toBe(401);
 
-      // Verify JSON content type
+      // Should return JSON error even with SSE Accept header
       expect(response.headers.get("content-type")).toContain(
         "application/json",
       );
