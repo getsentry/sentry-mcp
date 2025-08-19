@@ -9,152 +9,36 @@ const IS_LOCAL_DEV =
 const describeIfPreviewUrl = PREVIEW_URL ? describe : describe.skip;
 
 /**
- * Safely read a response body, handling both JSON and streaming responses.
- * For streams, reads up to 1KB and then aborts to prevent hanging.
+ * Safely fetch from any endpoint and parse the response.
+ * Handles JSON, text, and streaming responses consistently.
+ * For streaming responses, reads up to maxLength bytes to prevent hanging.
  */
-async function safeReadBody(response: Response): Promise<any> {
+async function safeFetch(
+  url: string,
+  options: RequestInit & {
+    maxLength?: number;
+    timeoutMs?: number;
+  } = {},
+): Promise<{
+  response: Response;
+  data: any;
+}> {
+  const { maxLength = 1024, timeoutMs = 2000, ...fetchOptions } = options;
+  const response = await fetch(url, fetchOptions);
   const contentType = response.headers.get("content-type") || "";
 
-  // Check if it's a stream (SSE or other streaming response)
+  // Handle streaming responses (SSE, chunked, etc.)
   if (
     contentType.includes("text/event-stream") ||
     contentType.includes("stream") ||
     response.headers.get("transfer-encoding") === "chunked"
   ) {
-    // For streams, read limited data and abort
-    const controller = new AbortController();
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
-    let buffer = "";
-
-    try {
-      // Read up to 1KB
-      while (buffer.length < 1024) {
-        const readPromise = reader!.read();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Stream read timeout")), 1000),
-        );
-
-        const { done, value } = (await Promise.race([
-          readPromise,
-          timeoutPromise,
-        ]).catch(() => ({ done: true, value: undefined }))) as any;
-
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-      }
-    } finally {
-      controller.abort();
-      reader?.releaseLock();
-    }
-
-    return buffer;
-  }
-
-  // For non-streaming responses, read as text or JSON
-  if (contentType.includes("application/json")) {
-    return response.json();
-  }
-
-  return response.text();
-}
-
-/**
- * Fetch from an SSE endpoint and read a partial amount of data without hanging.
- * Safely handles SSE streams by reading only up to maxLength bytes with a timeout.
- * Ensures all connections are properly closed to prevent test hangs.
- */
-async function fetchPartialSSE(
-  url: string,
-  options: {
-    timeoutMs?: number;
-    maxLength?: number;
-    headers?: Record<string, string>;
-  } = {},
-): Promise<{
-  status: number;
-  isSSE: boolean;
-  received: boolean;
-  data?: string;
-  error?: string;
-}> {
-  const { timeoutMs = 2000, maxLength = 1024, headers = {} } = options;
-  const controller = new AbortController();
-  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: "text/event-stream",
-        ...headers,
-      },
-      signal: controller.signal,
-    });
-
-    const isSSE =
-      response.headers.get("content-type")?.includes("text/event-stream") ??
-      false;
-
-    // For non-200 responses, read the error response and abort immediately
-    if (response.status !== 200) {
-      const contentType = response.headers.get("content-type") || "";
-      let data: string;
-
-      try {
-        if (contentType.includes("application/json")) {
-          const json = await response.json();
-          data = typeof json === "object" ? JSON.stringify(json) : String(json);
-        } else {
-          data = await response.text();
-        }
-      } finally {
-        // Ensure the response body is fully consumed and closed
-        try {
-          if (response.body && !response.bodyUsed) {
-            await response.body.cancel();
-          }
-        } catch {
-          // Ignore cleanup errors
-        }
-        controller.abort();
-      }
-
-      return {
-        status: response.status,
-        isSSE,
-        received: true,
-        data,
-      };
-    }
-
-    // For 200 responses, verify it's actually SSE
-    if (!isSSE) {
-      // Cancel the response body immediately for non-SSE responses
-      try {
-        if (response.body) {
-          await response.body.cancel();
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
-
-      return {
-        status: response.status,
-        isSSE: false,
-        received: false,
-        error: `Expected text/event-stream but got: ${response.headers.get("content-type")}`,
-      };
-    }
-
-    // Read a partial chunk from the SSE stream with aggressive cleanup
-    reader = response.body?.getReader() || null;
-    const decoder = new TextDecoder();
-    let received = false;
     let data = "";
     let totalLength = 0;
 
     try {
-      // Read chunks until we hit maxLength or timeout
       while (totalLength < maxLength && reader) {
         const timeoutPromise = new Promise<{
           value: Uint8Array;
@@ -175,9 +59,7 @@ async function fetchPartialSSE(
           const chunk = decoder.decode(value, { stream: true });
           data += chunk;
           totalLength += chunk.length;
-          received = true;
 
-          // Stop if we have enough data
           if (totalLength >= maxLength) {
             data = data.substring(0, maxLength);
             break;
@@ -185,40 +67,34 @@ async function fetchPartialSSE(
         }
       }
     } catch (error) {
-      // Timeout is acceptable - it means the endpoint is streaming
       if (error instanceof Error && error.message === "Read timeout") {
-        received = true; // Timeout means it's working
+        // Timeout is acceptable for streams
         if (!data) {
           data = "(stream active but no immediate data)";
         }
       } else {
         throw error;
       }
-    }
-
-    return {
-      status: response.status,
-      isSSE: true,
-      received,
-      data,
-    };
-  } finally {
-    // CRITICAL: Aggressive cleanup to prevent hanging
-    try {
-      if (reader) {
-        reader.releaseLock();
-        reader = null;
+    } finally {
+      try {
+        reader?.releaseLock();
+      } catch {
+        // Ignore cleanup errors
       }
-    } catch {
-      // Ignore reader cleanup errors
     }
 
-    try {
-      controller.abort(); // Abort the fetch request
-    } catch {
-      // Ignore abort errors
-    }
+    return { response, data };
   }
+
+  // Handle non-streaming responses
+  let data: any;
+  if (contentType.includes("application/json")) {
+    data = await response.json();
+  } else {
+    data = await response.text();
+  }
+
+  return { response, data };
 }
 
 describeIfPreviewUrl(
@@ -298,14 +174,14 @@ describeIfPreviewUrl(
     });
 
     it("should respond on root endpoint", async () => {
-      const response = await fetch(PREVIEW_URL, {
+      const { response } = await safeFetch(PREVIEW_URL, {
         signal: AbortSignal.timeout(TIMEOUT),
       });
       expect(response.status).toBe(200);
     });
 
     it("should have MCP endpoint that returns server info (with auth error)", async () => {
-      const response = await fetch(`${PREVIEW_URL}/mcp`, {
+      const { response, data } = await safeFetch(`${PREVIEW_URL}/mcp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -326,7 +202,6 @@ describeIfPreviewUrl(
 
       expect(response.status).toBe(401);
 
-      const data = await safeReadBody(response);
       // Should return auth error, not 404 - this proves the MCP endpoint exists
       if (typeof data === "object") {
         expect(data).toHaveProperty("error");
@@ -337,46 +212,51 @@ describeIfPreviewUrl(
     });
 
     it("should have SSE endpoint for MCP transport", async () => {
-      // Test SSE endpoint without hanging on the stream
-      const result = await fetchPartialSSE(`${PREVIEW_URL}/sse`, {
-        timeoutMs: 500, // Very short timeout
-        maxLength: 256, // Small amount of data
+      // Test SSE endpoint using safeFetch with stream handling
+      const { response, data } = await safeFetch(`${PREVIEW_URL}/sse`, {
+        headers: {
+          Accept: "text/event-stream",
+        },
+        maxLength: 256, // Small amount of data for streams
+        timeoutMs: 500, // Short timeout for streams
       });
 
-      console.log(
-        `📡 SSE test result: status=${result.status}, isSSE=${result.isSSE}, received=${result.received}`,
-      );
-      if (result.data) {
-        console.log(`📡 SSE data: ${result.data.substring(0, 100)}...`);
+      console.log(`📡 SSE test result: status=${response.status}`);
+      if (data) {
+        console.log(`📡 SSE data: ${String(data).substring(0, 100)}...`);
       }
 
       // SSE endpoint should respond appropriately
-      if (result.status === 401) {
+      if (response.status === 401) {
         // Expected auth error
-        expect(result.received).toBe(true);
-        expect(result.data).toMatch(/invalid_token|unauthorized|error/i);
-      } else if (result.status === 200) {
+        if (typeof data === "object") {
+          expect(data).toHaveProperty("error");
+          expect(data.error).toMatch(/invalid_token|unauthorized/i);
+        } else {
+          expect(data).toMatch(/invalid_token|unauthorized|error/i);
+        }
+      } else if (response.status === 200) {
         // SSE stream started successfully
-        expect(result.isSSE).toBe(true);
-        expect(result.received).toBe(true);
-
-        // We should receive either data or have a working stream (timeout)
-        expect(result.data).toBeDefined();
-      } else {
-        throw new Error(
-          `Unexpected SSE status: ${result.status} - ${result.error || result.data}`,
+        expect(response.headers.get("content-type")).toContain(
+          "text/event-stream",
         );
+        expect(data).toBeDefined();
+      } else {
+        throw new Error(`Unexpected SSE status: ${response.status}`);
       }
-    }, 5000); // 5 second test timeout
+    });
 
     it("should have metadata endpoint that requires auth", async () => {
       // Run metadata test BEFORE constraint tests to avoid workerd bug
-      const response = await fetch(`${PREVIEW_URL}/api/metadata`, {
-        signal: AbortSignal.timeout(TIMEOUT),
-      });
+      const { response, data } = await safeFetch(
+        `${PREVIEW_URL}/api/metadata`,
+        {
+          signal: AbortSignal.timeout(TIMEOUT),
+        },
+      );
+
       expect(response.status).toBe(401);
 
-      const data = await safeReadBody(response);
       if (typeof data === "object") {
         expect(data).toHaveProperty("error");
         expect(data.name).toBe("MISSING_AUTH_TOKEN");
@@ -391,24 +271,29 @@ describeIfPreviewUrl(
       let retries = 5;
 
       while (retries > 0) {
-        response = await fetch(`${PREVIEW_URL}/mcp/sentry`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "initialize",
-            params: {
-              protocolVersion: "2024-11-05",
-              capabilities: {},
-              clientInfo: {
-                name: "smoke-test",
-                version: "1.0.0",
+        const { response: fetchResponse, data } = await safeFetch(
+          `${PREVIEW_URL}/mcp/sentry`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "initialize",
+              params: {
+                protocolVersion: "2024-11-05",
+                capabilities: {},
+                clientInfo: {
+                  name: "smoke-test",
+                  version: "1.0.0",
+                },
               },
-            },
-            id: 1,
-          }),
-          signal: AbortSignal.timeout(TIMEOUT),
-        });
+              id: 1,
+            }),
+            signal: AbortSignal.timeout(TIMEOUT),
+          },
+        );
+
+        response = fetchResponse;
 
         // If we get 503, retry after a delay
         if (response.status === 503 && retries > 1) {
@@ -416,13 +301,16 @@ describeIfPreviewUrl(
           await new Promise((resolve) => setTimeout(resolve, 2000));
           continue;
         }
+
+        // Store data for later use
+        (response as any).testData = data;
         break;
       }
 
       expect(response.status).toBe(401);
 
-      const data = await safeReadBody(response);
       // Should return auth error, not 404 - this proves the constrained MCP endpoint exists
+      const data = (response as any).testData;
       if (typeof data === "object") {
         expect(data).toHaveProperty("error");
         expect(data.error).toMatch(/invalid_token|unauthorized/i);
@@ -437,24 +325,29 @@ describeIfPreviewUrl(
       let retries = 5;
 
       while (retries > 0) {
-        response = await fetch(`${PREVIEW_URL}/mcp/sentry/mcp-server`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "initialize",
-            params: {
-              protocolVersion: "2024-11-05",
-              capabilities: {},
-              clientInfo: {
-                name: "smoke-test",
-                version: "1.0.0",
+        const { response: fetchResponse, data } = await safeFetch(
+          `${PREVIEW_URL}/mcp/sentry/mcp-server`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "initialize",
+              params: {
+                protocolVersion: "2024-11-05",
+                capabilities: {},
+                clientInfo: {
+                  name: "smoke-test",
+                  version: "1.0.0",
+                },
               },
-            },
-            id: 1,
-          }),
-          signal: AbortSignal.timeout(TIMEOUT),
-        });
+              id: 1,
+            }),
+            signal: AbortSignal.timeout(TIMEOUT),
+          },
+        );
+
+        response = fetchResponse;
 
         // If we get 503, it's Durable Object initialization - retry
         if (response.status === 503 && retries > 1) {
@@ -462,13 +355,16 @@ describeIfPreviewUrl(
           await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds for DO to stabilize
           continue;
         }
+
+        // Store data for later use
+        (response as any).testData = data;
         break;
       }
 
       expect(response.status).toBe(401);
 
-      const data = await safeReadBody(response);
       // Should return auth error, not 404 - this proves the fully constrained MCP endpoint exists
+      const data = (response as any).testData;
       if (typeof data === "object") {
         expect(data).toHaveProperty("error");
         expect(data.error).toMatch(/invalid_token|unauthorized/i);
@@ -483,13 +379,17 @@ describeIfPreviewUrl(
       let retries = 3;
 
       while (retries > 0) {
-        response = await fetch(`${PREVIEW_URL}/api/chat`, {
-          method: "POST",
-          headers: {
-            Origin: PREVIEW_URL, // Required for CSRF check
+        const { response: fetchResponse } = await safeFetch(
+          `${PREVIEW_URL}/api/chat`,
+          {
+            method: "POST",
+            headers: {
+              Origin: PREVIEW_URL, // Required for CSRF check
+            },
+            signal: AbortSignal.timeout(TIMEOUT),
           },
-          signal: AbortSignal.timeout(TIMEOUT),
-        });
+        );
+        response = fetchResponse;
 
         // If we get 503, retry after a short delay
         if (response.status === 503 && retries > 1) {
@@ -505,7 +405,7 @@ describeIfPreviewUrl(
     });
 
     it("should have OAuth authorize endpoint", async () => {
-      const response = await fetch(`${PREVIEW_URL}/oauth/authorize`, {
+      const { response } = await safeFetch(`${PREVIEW_URL}/oauth/authorize`, {
         signal: AbortSignal.timeout(TIMEOUT),
         redirect: "manual", // Don't follow redirects
       });
@@ -514,31 +414,29 @@ describeIfPreviewUrl(
     });
 
     it("should serve robots.txt", async () => {
-      const response = await fetch(`${PREVIEW_URL}/robots.txt`, {
+      const { response, data } = await safeFetch(`${PREVIEW_URL}/robots.txt`, {
         signal: AbortSignal.timeout(TIMEOUT),
       });
       expect(response.status).toBe(200);
 
-      const text = await response.text();
-      expect(text).toContain("User-agent");
+      expect(data).toContain("User-agent");
     });
 
     it("should serve llms.txt with MCP info", async () => {
-      const response = await fetch(`${PREVIEW_URL}/llms.txt`, {
+      const { response, data } = await safeFetch(`${PREVIEW_URL}/llms.txt`, {
         signal: AbortSignal.timeout(TIMEOUT),
       });
       expect(response.status).toBe(200);
 
-      const text = await response.text();
-      expect(text).toContain("sentry-mcp");
-      expect(text).toContain("Model Context Protocol");
-      expect(text).toContain("/mcp");
+      expect(data).toContain("sentry-mcp");
+      expect(data).toContain("Model Context Protocol");
+      expect(data).toContain("/mcp");
     });
 
     it.skipIf(IS_LOCAL_DEV)(
       "should serve /.well-known/oauth-authorization-server with CORS headers",
       async () => {
-        const response = await fetch(
+        const { response, data } = await safeFetch(
           `${PREVIEW_URL}/.well-known/oauth-authorization-server`,
           {
             headers: {
@@ -559,21 +457,16 @@ describeIfPreviewUrl(
         );
 
         // Should return valid OAuth server metadata
-        const data = await safeReadBody(response);
-        if (typeof data === "object") {
-          expect(data).toHaveProperty("issuer");
-          expect(data).toHaveProperty("authorization_endpoint");
-          expect(data).toHaveProperty("token_endpoint");
-        } else {
-          throw new Error(`Expected JSON metadata but got: ${data}`);
-        }
+        expect(data).toHaveProperty("issuer");
+        expect(data).toHaveProperty("authorization_endpoint");
+        expect(data).toHaveProperty("token_endpoint");
       },
     );
 
     it.skipIf(IS_LOCAL_DEV)(
       "should handle CORS preflight for /.well-known/oauth-authorization-server",
       async () => {
-        const response = await fetch(
+        const { response } = await safeFetch(
           `${PREVIEW_URL}/.well-known/oauth-authorization-server`,
           {
             method: "OPTIONS",
@@ -605,7 +498,7 @@ describeIfPreviewUrl(
 
     it("should respond quickly (under 2 seconds)", async () => {
       const start = Date.now();
-      const response = await fetch(PREVIEW_URL, {
+      const { response } = await safeFetch(PREVIEW_URL, {
         signal: AbortSignal.timeout(TIMEOUT),
       });
       const duration = Date.now() - start;
@@ -615,7 +508,7 @@ describeIfPreviewUrl(
     });
 
     it("should have proper security headers", async () => {
-      const response = await fetch(PREVIEW_URL, {
+      const { response } = await safeFetch(PREVIEW_URL, {
         signal: AbortSignal.timeout(TIMEOUT),
       });
 
