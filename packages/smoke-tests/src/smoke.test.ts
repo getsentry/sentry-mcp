@@ -181,7 +181,7 @@ describeIfPreviewUrl(
         headers: {
           Accept: "text/event-stream",
         },
-        signal: AbortSignal.timeout(6000), // SSE endpoint is slow to return 401
+        signal: AbortSignal.timeout(15000), // SSE endpoint can be slow due to workerd issues
       });
 
       // SSE endpoint might return 401 JSON or start streaming with auth error
