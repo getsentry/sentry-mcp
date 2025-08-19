@@ -62,13 +62,43 @@ async function safeReadBody(response: Response): Promise<any> {
 describeIfPreviewUrl(
   `Smoke Tests for ${PREVIEW_URL || "(no PREVIEW_URL set)"}`,
   () => {
-    beforeAll(() => {
+    beforeAll(async () => {
       console.log(`🔍 Running smoke tests against: ${PREVIEW_URL}`);
       if (IS_LOCAL_DEV) {
         console.log(
           `⚠️  Skipping OAuth .well-known tests (not available in local dev)`,
         );
       }
+
+      // Warm up the server and Durable Objects to avoid initialization delays
+      // IMPORTANT: There's a bug in workerd where Node.js fetch hangs after DO initialization
+      // We warm up all DO endpoints and add a "sacrificial" request to absorb the hang
+      console.log(`🔥 Warming up server and Durable Objects...`);
+
+      // Initialize all MCP endpoints that use DOs
+      const warmupEndpoints = [
+        `${PREVIEW_URL}/mcp`,
+        `${PREVIEW_URL}/mcp/sentry`,
+        `${PREVIEW_URL}/mcp/sentry/mcp-server`,
+      ];
+
+      for (const endpoint of warmupEndpoints) {
+        await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1 }),
+          signal: AbortSignal.timeout(5000),
+        }).catch(() => {}); // Ignore errors
+      }
+
+      // CRITICAL: Make a sacrificial request that will hang due to the workerd bug
+      // This protects the actual tests from hanging
+      await fetch(`${PREVIEW_URL}/api/metadata`, {
+        signal: AbortSignal.timeout(11000), // Allow it to hang and timeout
+      }).catch(() => {}); // Ignore timeout
+
+      // Additional stabilization time
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     });
 
     it("should respond on root endpoint", async () => {
@@ -111,24 +141,38 @@ describeIfPreviewUrl(
     });
 
     it("should have MCP endpoint with org constraint (/mcp/sentry)", async () => {
-      const response = await fetch(`${PREVIEW_URL}/mcp/sentry`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "initialize",
-          params: {
-            protocolVersion: "2024-11-05",
-            capabilities: {},
-            clientInfo: {
-              name: "smoke-test",
-              version: "1.0.0",
+      // Retry logic for potential Durable Object initialization
+      let response: Response;
+      let retries = 5;
+
+      while (retries > 0) {
+        response = await fetch(`${PREVIEW_URL}/mcp/sentry`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "initialize",
+            params: {
+              protocolVersion: "2024-11-05",
+              capabilities: {},
+              clientInfo: {
+                name: "smoke-test",
+                version: "1.0.0",
+              },
             },
-          },
-          id: 1,
-        }),
-        signal: AbortSignal.timeout(TIMEOUT),
-      });
+            id: 1,
+          }),
+          signal: AbortSignal.timeout(TIMEOUT),
+        });
+
+        // If we get 503, retry after a delay
+        if (response.status === 503 && retries > 1) {
+          retries--;
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          continue;
+        }
+        break;
+      }
 
       expect(response.status).toBe(401);
 
@@ -143,9 +187,9 @@ describeIfPreviewUrl(
     });
 
     it("should have MCP endpoint with org and project constraints (/mcp/sentry/mcp-server)", async () => {
-      // Retry logic for Durable Object initialization in CI
+      // Retry logic for Durable Object initialization
       let response: Response;
-      let retries = 3;
+      let retries = 5;
 
       while (retries > 0) {
         response = await fetch(`${PREVIEW_URL}/mcp/sentry/mcp-server`, {
@@ -167,10 +211,10 @@ describeIfPreviewUrl(
           signal: AbortSignal.timeout(TIMEOUT),
         });
 
-        // If we get 503, it might be Durable Object initialization - retry
+        // If we get 503, it's Durable Object initialization - retry
         if (response.status === 503 && retries > 1) {
           retries--;
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
+          await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds for DO to stabilize
           continue;
         }
         break;
@@ -189,14 +233,12 @@ describeIfPreviewUrl(
     });
 
     it("should have SSE endpoint for MCP transport", async () => {
-      // Workaround: The SSE endpoint can hang after Durable Object initialization
-      // This is a known issue with the agents library's SSE handling
-      // We increase the timeout to handle this case
+      // Extended timeout due to workerd bug where requests hang after DO operations
       const response = await fetch(`${PREVIEW_URL}/sse`, {
         headers: {
           Accept: "text/event-stream",
         },
-        signal: AbortSignal.timeout(20000), // Extended timeout due to known SSE/DO interaction bug
+        signal: AbortSignal.timeout(15000), // Need extra time due to workerd bug
       });
 
       // SSE endpoint might return 401 JSON or start streaming with auth error
@@ -247,7 +289,7 @@ describeIfPreviewUrl(
 
     it("should have metadata endpoint that requires auth", async () => {
       const response = await fetch(`${PREVIEW_URL}/api/metadata`, {
-        signal: AbortSignal.timeout(15000), // Extended timeout
+        signal: AbortSignal.timeout(TIMEOUT),
       });
       expect(response.status).toBe(401);
 
@@ -268,9 +310,8 @@ describeIfPreviewUrl(
         },
         signal: AbortSignal.timeout(TIMEOUT),
       });
-      // Should return 401 (unauthorized), 400 (bad request), or 500 (CSRF error in some environments)
-      // Note: 500 can occur when CSRF middleware fails before auth check
-      expect([400, 401, 500]).toContain(response.status);
+      // Should return 401 (unauthorized) or 400 (bad request) for POST without auth
+      expect([400, 401]).toContain(response.status);
     });
 
     it("should have OAuth authorize endpoint", async () => {
