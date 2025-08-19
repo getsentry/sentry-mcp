@@ -174,6 +174,78 @@ describeIfPreviewUrl(
       }
     });
 
+    it("should have SSE endpoint for MCP transport", async () => {
+      // Run SSE test BEFORE constraint tests to avoid workerd bug
+      // The workerd bug causes Node.js fetch to hang after DO operations
+      const response = await fetch(`${PREVIEW_URL}/sse`, {
+        headers: {
+          Accept: "text/event-stream",
+        },
+        signal: AbortSignal.timeout(6000), // SSE endpoint is slow to return 401
+      });
+
+      // SSE endpoint might return 401 JSON or start streaming with auth error
+      if (response.status === 401) {
+        // Got immediate 401 response
+        const data = await safeReadBody(response);
+        if (typeof data === "object") {
+          expect(data).toHaveProperty("error");
+          expect(data.error).toMatch(/invalid_token|unauthorized/i);
+        } else {
+          expect(data).toMatch(/invalid_token|unauthorized/i);
+        }
+      } else if (response.status === 200) {
+        // Got SSE stream - read first 1KB to find auth error
+        expect(response.headers.get("content-type")).toContain(
+          "text/event-stream",
+        );
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        try {
+          // Read up to 1KB to find error
+          while (buffer.length < 1024) {
+            const { done, value } = await reader!.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            // Stop if we found an error
+            if (
+              buffer.includes("invalid_token") ||
+              buffer.includes("unauthorized")
+            ) {
+              break;
+            }
+          }
+        } finally {
+          // Release the reader lock
+          reader?.releaseLock();
+        }
+
+        // Verify auth error was in stream
+        expect(buffer).toMatch(/invalid_token|unauthorized/i);
+      } else {
+        throw new Error(`Unexpected status: ${response.status}`);
+      }
+    });
+
+    it("should have metadata endpoint that requires auth", async () => {
+      // Run metadata test BEFORE constraint tests to avoid workerd bug
+      const response = await fetch(`${PREVIEW_URL}/api/metadata`, {
+        signal: AbortSignal.timeout(TIMEOUT),
+      });
+      expect(response.status).toBe(401);
+
+      const data = await safeReadBody(response);
+      if (typeof data === "object") {
+        expect(data).toHaveProperty("error");
+        expect(data.name).toBe("MISSING_AUTH_TOKEN");
+      } else {
+        expect(data).toMatch(/MISSING_AUTH_TOKEN|unauthorized/i);
+      }
+    });
+
     it("should have MCP endpoint with org constraint (/mcp/sentry)", async () => {
       // Retry logic for potential Durable Object initialization
       let response: Response;
@@ -266,85 +338,29 @@ describeIfPreviewUrl(
       }
     });
 
-    it("should have SSE endpoint for MCP transport", async () => {
-      // SSE endpoint has a bug where it takes 3+ seconds to return 401
-      // This is unrelated to DO initialization - it's a bug in the SSE handler itself
-      const response = await fetch(`${PREVIEW_URL}/sse`, {
-        headers: {
-          Accept: "text/event-stream",
-        },
-        signal: AbortSignal.timeout(6000), // SSE endpoint is slow to return 401
-      });
-
-      // SSE endpoint might return 401 JSON or start streaming with auth error
-      if (response.status === 401) {
-        // Got immediate 401 response
-        const data = await safeReadBody(response);
-        if (typeof data === "object") {
-          expect(data).toHaveProperty("error");
-          expect(data.error).toMatch(/invalid_token|unauthorized/i);
-        } else {
-          expect(data).toMatch(/invalid_token|unauthorized/i);
-        }
-      } else if (response.status === 200) {
-        // Got SSE stream - read first 1KB to find auth error
-        expect(response.headers.get("content-type")).toContain(
-          "text/event-stream",
-        );
-
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        try {
-          // Read up to 1KB to find error
-          while (buffer.length < 1024) {
-            const { done, value } = await reader!.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            // Stop if we found an error
-            if (
-              buffer.includes("invalid_token") ||
-              buffer.includes("unauthorized")
-            ) {
-              break;
-            }
-          }
-        } finally {
-          // Release the reader lock
-          reader?.releaseLock();
-        }
-
-        // Verify auth error was in stream
-        expect(buffer).toMatch(/invalid_token|unauthorized/i);
-      } else {
-        throw new Error(`Unexpected status: ${response.status}`);
-      }
-    });
-
-    it("should have metadata endpoint that requires auth", async () => {
-      const response = await fetch(`${PREVIEW_URL}/api/metadata`, {
-        signal: AbortSignal.timeout(TIMEOUT),
-      });
-      expect(response.status).toBe(401);
-
-      const data = await safeReadBody(response);
-      if (typeof data === "object") {
-        expect(data).toHaveProperty("error");
-        expect(data.name).toBe("MISSING_AUTH_TOKEN");
-      } else {
-        expect(data).toMatch(/MISSING_AUTH_TOKEN|unauthorized/i);
-      }
-    });
-
     it("should have chat endpoint that accepts POST", async () => {
-      const response = await fetch(`${PREVIEW_URL}/api/chat`, {
-        method: "POST",
-        headers: {
-          Origin: PREVIEW_URL, // Required for CSRF check
-        },
-        signal: AbortSignal.timeout(TIMEOUT),
-      });
+      // Chat endpoint might return 503 temporarily after DO operations
+      let response: Response;
+      let retries = 3;
+
+      while (retries > 0) {
+        response = await fetch(`${PREVIEW_URL}/api/chat`, {
+          method: "POST",
+          headers: {
+            Origin: PREVIEW_URL, // Required for CSRF check
+          },
+          signal: AbortSignal.timeout(TIMEOUT),
+        });
+
+        // If we get 503, retry after a short delay
+        if (response.status === 503 && retries > 1) {
+          retries--;
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+        break;
+      }
+
       // Should return 401 (unauthorized) or 400 (bad request) for POST without auth
       expect([400, 401]).toContain(response.status);
     });
