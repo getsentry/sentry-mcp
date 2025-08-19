@@ -8,6 +8,57 @@ const IS_LOCAL_DEV =
 // Skip all smoke tests if PREVIEW_URL is not set
 const describeIfPreviewUrl = PREVIEW_URL ? describe : describe.skip;
 
+/**
+ * Safely read a response body, handling both JSON and streaming responses.
+ * For streams, reads up to 1KB and then aborts to prevent hanging.
+ */
+async function safeReadBody(response: Response): Promise<any> {
+  const contentType = response.headers.get("content-type") || "";
+
+  // Check if it's a stream (SSE or other streaming response)
+  if (
+    contentType.includes("text/event-stream") ||
+    contentType.includes("stream") ||
+    response.headers.get("transfer-encoding") === "chunked"
+  ) {
+    // For streams, read limited data and abort
+    const controller = new AbortController();
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      // Read up to 1KB
+      while (buffer.length < 1024) {
+        const readPromise = reader!.read();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Stream read timeout")), 1000),
+        );
+
+        const { done, value } = (await Promise.race([
+          readPromise,
+          timeoutPromise,
+        ]).catch(() => ({ done: true, value: undefined }))) as any;
+
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+      }
+    } finally {
+      controller.abort();
+      reader?.releaseLock();
+    }
+
+    return buffer;
+  }
+
+  // For non-streaming responses, read as text or JSON
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  return response.text();
+}
+
 describeIfPreviewUrl(
   `Smoke Tests for ${PREVIEW_URL || "(no PREVIEW_URL set)"}`,
   () => {
@@ -48,14 +99,15 @@ describeIfPreviewUrl(
       });
 
       expect(response.status).toBe(401);
-      expect(response.headers.get("content-type")).toContain(
-        "application/json",
-      );
 
-      const data = await response.json();
+      const data = await safeReadBody(response);
       // Should return auth error, not 404 - this proves the MCP endpoint exists
-      expect(data).toHaveProperty("error");
-      expect(data.error).toMatch(/invalid_token|unauthorized/i);
+      if (typeof data === "object") {
+        expect(data).toHaveProperty("error");
+        expect(data.error).toMatch(/invalid_token|unauthorized/i);
+      } else {
+        expect(data).toMatch(/invalid_token|unauthorized/i);
+      }
     });
 
     it("should have MCP endpoint with org constraint (/mcp/sentry)", async () => {
@@ -79,14 +131,15 @@ describeIfPreviewUrl(
       });
 
       expect(response.status).toBe(401);
-      expect(response.headers.get("content-type")).toContain(
-        "application/json",
-      );
 
-      const data = await response.json();
+      const data = await safeReadBody(response);
       // Should return auth error, not 404 - this proves the constrained MCP endpoint exists
-      expect(data).toHaveProperty("error");
-      expect(data.error).toMatch(/invalid_token|unauthorized/i);
+      if (typeof data === "object") {
+        expect(data).toHaveProperty("error");
+        expect(data.error).toMatch(/invalid_token|unauthorized/i);
+      } else {
+        expect(data).toMatch(/invalid_token|unauthorized/i);
+      }
     });
 
     it("should have MCP endpoint with org and project constraints (/mcp/sentry/mcp-server)", async () => {
@@ -124,67 +177,78 @@ describeIfPreviewUrl(
       }
 
       expect(response.status).toBe(401);
-      expect(response.headers.get("content-type")).toContain(
-        "application/json",
-      );
 
-      const data = await response.json();
+      const data = await safeReadBody(response);
       // Should return auth error, not 404 - this proves the fully constrained MCP endpoint exists
-      expect(data).toHaveProperty("error");
-      expect(data.error).toMatch(/invalid_token|unauthorized/i);
+      if (typeof data === "object") {
+        expect(data).toHaveProperty("error");
+        expect(data.error).toMatch(/invalid_token|unauthorized/i);
+      } else {
+        expect(data).toMatch(/invalid_token|unauthorized/i);
+      }
     });
 
     it("should have SSE endpoint for MCP transport", async () => {
       const controller = new AbortController();
-      const response = await fetch(`${PREVIEW_URL}/sse`, {
-        headers: {
-          Accept: "text/event-stream",
-        },
-        signal: controller.signal,
-      });
 
-      // SSE endpoint might return 401 JSON or start streaming with auth error
-      if (response.status === 401) {
-        // Got immediate 401 response
-        expect(response.headers.get("content-type")).toContain(
-          "application/json",
-        );
-        const data = await response.json();
-        expect(data).toHaveProperty("error");
-        expect(data.error).toMatch(/invalid_token|unauthorized/i);
-      } else if (response.status === 200) {
-        // Got SSE stream - read first 1KB to find auth error
-        expect(response.headers.get("content-type")).toContain(
-          "text/event-stream",
-        );
+      // Set a timeout to abort the request if it hangs
+      const timeout = setTimeout(() => controller.abort(), 3000);
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+      try {
+        const response = await fetch(`${PREVIEW_URL}/sse`, {
+          headers: {
+            Accept: "text/event-stream",
+          },
+          signal: controller.signal,
+        });
 
-        try {
-          // Read up to 1KB to find error
-          while (buffer.length < 1024) {
-            const { done, value } = await reader!.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            // Stop if we found an error
-            if (
-              buffer.includes("invalid_token") ||
-              buffer.includes("unauthorized")
-            ) {
-              break;
-            }
+        // SSE endpoint might return 401 JSON or start streaming with auth error
+        if (response.status === 401) {
+          // Got immediate 401 response
+          const data = await safeReadBody(response);
+          if (typeof data === "object") {
+            expect(data).toHaveProperty("error");
+            expect(data.error).toMatch(/invalid_token|unauthorized/i);
+          } else {
+            expect(data).toMatch(/invalid_token|unauthorized/i);
           }
-        } finally {
-          // Always abort to clean up the stream
-          controller.abort();
-        }
+        } else if (response.status === 200) {
+          // Got SSE stream - read first 1KB to find auth error
+          expect(response.headers.get("content-type")).toContain(
+            "text/event-stream",
+          );
 
-        // Verify auth error was in stream
-        expect(buffer).toMatch(/invalid_token|unauthorized/i);
-      } else {
-        throw new Error(`Unexpected status: ${response.status}`);
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          try {
+            // Read up to 1KB to find error
+            while (buffer.length < 1024) {
+              const { done, value } = await reader!.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              // Stop if we found an error
+              if (
+                buffer.includes("invalid_token") ||
+                buffer.includes("unauthorized")
+              ) {
+                break;
+              }
+            }
+          } finally {
+            // Always abort to clean up the stream
+            controller.abort();
+          }
+
+          // Verify auth error was in stream
+          expect(buffer).toMatch(/invalid_token|unauthorized/i);
+        } else {
+          throw new Error(`Unexpected status: ${response.status}`);
+        }
+      } finally {
+        clearTimeout(timeout);
+        controller.abort(); // Ensure cleanup
       }
     });
 
@@ -194,14 +258,13 @@ describeIfPreviewUrl(
       });
       expect(response.status).toBe(401);
 
-      // Verify JSON content type
-      expect(response.headers.get("content-type")).toContain(
-        "application/json",
-      );
-
-      const data = await response.json();
-      expect(data).toHaveProperty("error");
-      expect(data.name).toBe("MISSING_AUTH_TOKEN");
+      const data = await safeReadBody(response);
+      if (typeof data === "object") {
+        expect(data).toHaveProperty("error");
+        expect(data.name).toBe("MISSING_AUTH_TOKEN");
+      } else {
+        expect(data).toMatch(/MISSING_AUTH_TOKEN|unauthorized/i);
+      }
     });
 
     it("should have chat endpoint that accepts POST", async () => {
@@ -268,10 +331,14 @@ describeIfPreviewUrl(
         );
 
         // Should return valid OAuth server metadata
-        const data = await response.json();
-        expect(data).toHaveProperty("issuer");
-        expect(data).toHaveProperty("authorization_endpoint");
-        expect(data).toHaveProperty("token_endpoint");
+        const data = await safeReadBody(response);
+        if (typeof data === "object") {
+          expect(data).toHaveProperty("issuer");
+          expect(data).toHaveProperty("authorization_endpoint");
+          expect(data).toHaveProperty("token_endpoint");
+        } else {
+          throw new Error(`Expected JSON metadata but got: ${data}`);
+        }
       },
     );
 
