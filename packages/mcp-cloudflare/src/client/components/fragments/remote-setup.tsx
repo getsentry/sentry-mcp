@@ -72,6 +72,11 @@ export default function RemoteSetup() {
           the SSE-only implementation with the following URL:
         </p>
         <CodeSnippet snippet={sseEndpoint} />
+        <p>
+          <strong>Note:</strong> SSE endpoints do not support organization and
+          project constraints. Use the main endpoint above if you need scoped
+          access.
+        </p>
 
         <h3>Integration Guides</h3>
       </Prose>
