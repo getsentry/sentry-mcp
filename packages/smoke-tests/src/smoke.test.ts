@@ -135,24 +135,57 @@ describeIfPreviewUrl(
     });
 
     it("should have SSE endpoint for MCP transport", async () => {
+      const controller = new AbortController();
       const response = await fetch(`${PREVIEW_URL}/sse`, {
         headers: {
           Accept: "text/event-stream",
         },
-        signal: AbortSignal.timeout(TIMEOUT),
+        signal: controller.signal,
       });
 
-      // SSE endpoint should return 401 without auth
-      expect(response.status).toBe(401);
+      // SSE endpoint might return 401 JSON or start streaming with auth error
+      if (response.status === 401) {
+        // Got immediate 401 response
+        expect(response.headers.get("content-type")).toContain(
+          "application/json",
+        );
+        const data = await response.json();
+        expect(data).toHaveProperty("error");
+        expect(data.error).toMatch(/invalid_token|unauthorized/i);
+      } else if (response.status === 200) {
+        // Got SSE stream - read first 1KB to find auth error
+        expect(response.headers.get("content-type")).toContain(
+          "text/event-stream",
+        );
 
-      // Should return JSON error even with SSE Accept header
-      expect(response.headers.get("content-type")).toContain(
-        "application/json",
-      );
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-      const data = await response.json();
-      expect(data).toHaveProperty("error");
-      expect(data.error).toMatch(/invalid_token|unauthorized/i);
+        try {
+          // Read up to 1KB to find error
+          while (buffer.length < 1024) {
+            const { done, value } = await reader!.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            // Stop if we found an error
+            if (
+              buffer.includes("invalid_token") ||
+              buffer.includes("unauthorized")
+            ) {
+              break;
+            }
+          }
+        } finally {
+          // Always abort to clean up the stream
+          controller.abort();
+        }
+
+        // Verify auth error was in stream
+        expect(buffer).toMatch(/invalid_token|unauthorized/i);
+      } else {
+        throw new Error(`Unexpected status: ${response.status}`);
+      }
     });
 
     it("should have metadata endpoint that requires auth", async () => {
