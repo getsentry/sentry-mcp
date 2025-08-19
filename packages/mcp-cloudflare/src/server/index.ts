@@ -107,8 +107,9 @@ const oAuthProvider = new OAuthProvider({
   apiHandlers: {
     // NOTE: OAuthProvider only does prefix matching, not parameterized routes.
     // So "/mcp" will match "/mcp", "/mcp/org", "/mcp/org/project" etc.
-    // We use a custom wrapper to extract path params and pass them as headers
-    "/sse": createMcpHandler("/sse", true),
+    // We use a custom wrapper to extract path params for /mcp endpoints only.
+    // SSE endpoints don't support subpath constraints due to protocol limitations.
+    "/sse": SentryMCP.serveSSE("/sse"),
     "/mcp": createMcpHandler("/mcp", false),
   },
   // @ts-ignore
