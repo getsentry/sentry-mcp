@@ -23,10 +23,11 @@ const describeIfPreviewUrl = PREVIEW_URL ? describe : describe.skip;
  *
  * STREAM HANDLING COMPLEXITY:
  * The stream reading logic is intentionally aggressive about cleanup because:
- * 1. Workerd has bugs where streams don't close properly
+ * 1. Workerd has bugs where streams don't close properly (see workerd error logs)
  * 2. Unfinished streams cause subsequent requests to hang
  * 3. Tests can hang for 30+ seconds without proper stream management
  * 4. AbortController and reader.releaseLock() are essential for cleanup
+ * 5. Response.body must be properly cancelled to avoid connection leaks
  */
 async function safeFetch(
   url: string,
@@ -39,86 +40,118 @@ async function safeFetch(
   data: any;
 }> {
   const { maxLength = 1024, timeoutMs = 2000, ...fetchOptions } = options;
-  const response = await fetch(url, fetchOptions);
-  const contentType = response.headers.get("content-type") || "";
 
-  // Handle streaming responses (SSE, chunked, etc.)
-  // WHY: These response types never "finish" naturally and will hang fetch() forever
-  if (
-    contentType.includes("text/event-stream") ||
-    contentType.includes("stream") ||
-    response.headers.get("transfer-encoding") === "chunked"
-  ) {
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let data = "";
-    let totalLength = 0;
+  // Create an AbortController to ensure we can cancel the request
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), timeoutMs + 1000);
 
-    try {
-      // Read stream chunks until we hit limits or timeout
-      // WHY: We can't read the entire stream (infinite) so we sample it
-      while (totalLength < maxLength && reader) {
-        // Race condition: either get data or timeout
-        // WHY: reader.read() can hang forever on slow/broken streams
-        const timeoutPromise = new Promise<{
-          value: Uint8Array;
-          done: boolean;
-        }>((_, reject) =>
-          setTimeout(() => reject(new Error("Read timeout")), timeoutMs),
-        );
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: fetchOptions.signal || abortController.signal,
+    });
 
-        const readPromise = reader.read();
-        const { value, done } = await Promise.race([
-          readPromise,
-          timeoutPromise,
-        ]);
+    const contentType = response.headers.get("content-type") || "";
 
-        if (done) break; // Stream ended naturally
+    // Handle streaming responses (SSE, chunked, etc.)
+    // WHY: These response types never "finish" naturally and will hang fetch() forever
+    if (
+      contentType.includes("text/event-stream") ||
+      contentType.includes("stream") ||
+      response.headers.get("transfer-encoding") === "chunked"
+    ) {
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let data = "";
+      let totalLength = 0;
 
-        if (value && value.length > 0) {
-          const chunk = decoder.decode(value, { stream: true });
-          data += chunk;
-          totalLength += chunk.length;
+      try {
+        // Read stream chunks until we hit limits or timeout
+        // WHY: We can't read the entire stream (infinite) so we sample it
+        while (totalLength < maxLength && reader) {
+          // Race condition: either get data or timeout
+          // WHY: reader.read() can hang forever on slow/broken streams
+          const timeoutPromise = new Promise<{
+            value: Uint8Array;
+            done: boolean;
+          }>((_, reject) =>
+            setTimeout(() => reject(new Error("Read timeout")), timeoutMs),
+          );
 
-          // Stop reading when we have enough data for testing
-          if (totalLength >= maxLength) {
-            data = data.substring(0, maxLength);
-            break;
+          const readPromise = reader.read();
+          const { value, done } = await Promise.race([
+            readPromise,
+            timeoutPromise,
+          ]);
+
+          if (done) break; // Stream ended naturally
+
+          if (value && value.length > 0) {
+            const chunk = decoder.decode(value, { stream: true });
+            data += chunk;
+            totalLength += chunk.length;
+
+            // Stop reading when we have enough data for testing
+            if (totalLength >= maxLength) {
+              data = data.substring(0, maxLength);
+              break;
+            }
           }
         }
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message === "Read timeout") {
-        // Timeout is EXPECTED for active streams - not an error!
-        // WHY: SSE streams never end, so timeout means "it's working"
-        if (!data) {
-          data = "(stream active but no immediate data)";
+      } catch (error) {
+        if (error instanceof Error && error.message === "Read timeout") {
+          // Timeout is EXPECTED for active streams - not an error!
+          // WHY: SSE streams never end, so timeout means "it's working"
+          if (!data) {
+            data = "(stream active but no immediate data)";
+          }
+        } else {
+          throw error;
         }
-      } else {
-        throw error;
+      } finally {
+        // CRITICAL: Proper cleanup to prevent workerd connection leaks
+        // This addresses the exact error: "can't read more data after a previous read didn't complete"
+        try {
+          // 1. Cancel the reader first
+          await reader?.cancel();
+        } catch {
+          // Ignore cleanup errors - better to continue than crash
+        }
+
+        try {
+          // 2. Release the reader lock
+          reader?.releaseLock();
+        } catch {
+          // Ignore cleanup errors - better to continue than crash
+        }
+
+        try {
+          // 3. Cancel the response body stream if it exists
+          // This ensures the underlying connection is properly closed
+          if (response.body && !response.body.locked) {
+            await response.body.cancel();
+          }
+        } catch {
+          // Ignore cleanup errors - better to continue than crash
+        }
       }
-    } finally {
-      // CRITICAL: Always release the reader lock
-      // WHY: Unreleased locks cause subsequent requests to hang permanently
-      try {
-        reader?.releaseLock();
-      } catch {
-        // Ignore cleanup errors - better to continue than crash
-      }
+
+      return { response, data };
+    }
+
+    // Handle non-streaming responses
+    let data: any;
+    if (contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      data = await response.text();
     }
 
     return { response, data };
+  } finally {
+    // Always clear the timeout
+    clearTimeout(timeoutId);
   }
-
-  // Handle non-streaming responses
-  let data: any;
-  if (contentType.includes("application/json")) {
-    data = await response.json();
-  } else {
-    data = await response.text();
-  }
-
-  return { response, data };
 }
 
 describeIfPreviewUrl(
@@ -132,108 +165,8 @@ describeIfPreviewUrl(
         );
       }
 
-      /*
-       * WARMUP LOGIC - WHY THIS DISGUSTING CODE EXISTS:
-       *
-       * 1. THE BUG: Cloudflare's workerd runtime (what powers Workers/Pages) has a race
-       *    condition where Node.js-style fetch() calls hang after Durable Object
-       *    initialization. This manifests as:
-       *    - First 2-3 HTTP requests work fine
-       *    - After DO initialization, fetch() hangs indefinitely
-       *    - Affects streaming endpoints (SSE) most severely
-       *    - Error: "kj/compat/http.c++:1993: can't read more data after previous read didn't complete"
-       *
-       * 2. ENVIRONMENT: Only happens in workerd local dev mode (wrangler dev)
-       *    Production Cloudflare Workers don't have this issue.
-       *
-       * 3. SYMPTOM: Without warmup, tests start passing, then hang:
-       *    ✓ Root endpoint (works)
-       *    ✓ MCP endpoint (works)
-       *    ⏸ SSE endpoint (hangs for 30+ seconds)
-       *
-       * 4. WORKAROUND: Initialize all DO endpoints first, then make a "sacrificial"
-       *    request that absorbs the hang. This keeps subsequent test requests working.
-       *
-       * 5. WHY NOT ALTERNATIVES:
-       *    - Mock endpoints: Defeats purpose of integration testing
-       *    - Skip SSE tests: Miss real deployment issues
-       *    - Use production: No local development workflow
-       *    - Raw timeouts: Don't fix the underlying hang
-       *
-       * This warmup is the only reliable solution found for workerd local testing.
-       */
-      console.log(`🔥 Warming up server and Durable Objects...`);
-
-      const warmupStartTime = Date.now();
-      const maxWarmupTime = 15000; // Maximum 15 seconds for entire warmup
-
-      // Initialize all MCP endpoints that use DOs, retrying on 503
-      const warmupEndpoints = [
-        `${PREVIEW_URL}/mcp`,
-        `${PREVIEW_URL}/mcp/sentry`,
-        `${PREVIEW_URL}/mcp/sentry/mcp-server`,
-      ];
-
-      for (const endpoint of warmupEndpoints) {
-        if (Date.now() - warmupStartTime > maxWarmupTime) break;
-
-        let retries = 3;
-        while (retries > 0 && Date.now() - warmupStartTime < maxWarmupTime) {
-          try {
-            const { response } = await safeFetch(endpoint, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                method: "initialize",
-                id: 1,
-              }),
-              maxLength: 100,
-              timeoutMs: 1000,
-            });
-
-            // If we get 503, retry after a short delay
-            if (response.status === 503 && retries > 1) {
-              retries--;
-              await new Promise((resolve) => setTimeout(resolve, 500));
-              continue;
-            }
-            break; // Success or non-503 error
-          } catch {
-            break; // Timeout or other error, move on
-          }
-        }
-      }
-
-      /*
-       * SACRIFICIAL REQUEST - The ugliest part:
-       *
-       * After DO initialization, workerd's fetch implementation is in a broken state.
-       * The NEXT HTTP request will hang indefinitely. We deliberately make a request
-       * that we know will trigger this hang, then timeout and clean up.
-       *
-       * This "absorbs" the hang bug, resetting workerd's HTTP state so subsequent
-       * requests work normally. Without this, our SSE test hangs for 30+ seconds.
-       *
-       * WHY /api/metadata: Simple endpoint, safe to call, returns quickly when working.
-       */
-      const remainingTime = Math.max(
-        1000,
-        maxWarmupTime - (Date.now() - warmupStartTime),
-      );
-      await safeFetch(`${PREVIEW_URL}/api/metadata`, {
-        maxLength: 100,
-        timeoutMs: remainingTime,
-      }).catch(() => {}); // Ignore timeout - this is expected
-
-      // Brief stabilization if we have time left
-      const stabilizationTime = Math.min(
-        500,
-        maxWarmupTime - (Date.now() - warmupStartTime),
-      );
-      if (stabilizationTime > 0) {
-        await new Promise((resolve) => setTimeout(resolve, stabilizationTime));
-      }
+      // TODO: Add back workerd warmup if needed for SSE tests
+      // Currently disabled to keep tests under 15s timeout
     });
 
     it("should respond on root endpoint", async () => {
@@ -282,32 +215,49 @@ describeIfPreviewUrl(
        *
        * For smoke tests (no auth), we expect 401 with error details.
        * This proves the endpoint exists and auth is working.
+       *
+       * We use a very short timeout and minimal data read to avoid workerd connection issues.
        */
-      const { response, data } = await safeFetch(`${PREVIEW_URL}/sse`, {
-        headers: {
-          Accept: "text/event-stream",
-        },
-        maxLength: 256,
-        timeoutMs: 500,
-      });
 
-      console.log(`📡 SSE test result: status=${response.status}`);
-      if (data) {
-        console.log(`📡 SSE data: ${String(data).substring(0, 100)}...`);
+      // Create AbortController for immediate cleanup
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 1000); // 1 second max
+
+      try {
+        const response = await fetch(`${PREVIEW_URL}/sse`, {
+          headers: {
+            Accept: "text/event-stream",
+          },
+          signal: abortController.signal,
+        });
+
+        console.log(`📡 SSE test result: status=${response.status}`);
+
+        // Should return 401 since we're not providing auth
+        expect(response.status).toBe(401);
+
+        // For 401 responses, read the error message
+        if (response.status === 401) {
+          try {
+            const data = await response.json();
+            console.log(
+              `📡 SSE data: ${JSON.stringify(data).substring(0, 100)}...`,
+            );
+            expect(data).toHaveProperty("error");
+            expect(data.error).toMatch(/invalid_token|unauthorized/i);
+          } catch {
+            // If not JSON, try as text
+            const text = await response.text();
+            console.log(`📡 SSE data: ${text.substring(0, 100)}...`);
+            expect(text).toMatch(/invalid_token|unauthorized|error/i);
+          }
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        // Abort any ongoing request to ensure cleanup
+        abortController.abort();
       }
-
-      // Should return 401 since we're not providing auth
-      expect(response.status).toBe(401);
-
-      // Should get a JSON error response
-      if (typeof data === "object") {
-        expect(data).toHaveProperty("error");
-        expect(data.error).toMatch(/invalid_token|unauthorized/i);
-      } else {
-        // If parsed as text, should still contain error info
-        expect(data).toMatch(/invalid_token|unauthorized|error/i);
-      }
-    }, 30000); // Longer timeout due to workerd stream handling quirks
+    }, 5000); // 5 second timeout - should be plenty for a 401 response
 
     it("should have metadata endpoint that requires auth", async () => {
       // Run metadata test BEFORE constraint tests to avoid workerd bug
