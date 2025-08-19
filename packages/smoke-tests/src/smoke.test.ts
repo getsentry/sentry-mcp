@@ -18,14 +18,13 @@ const describeIfPreviewUrl = PREVIEW_URL ? describe : describe.skip;
 async function safeFetch(
   url: string,
   options: RequestInit & {
-    maxLength?: number;
     timeoutMs?: number;
   } = {},
 ): Promise<{
   response: Response;
   data: any;
 }> {
-  const { maxLength = 1024, timeoutMs = 10000, ...fetchOptions } = options;
+  const { timeoutMs = 10000, ...fetchOptions } = options;
 
   // Use simple timeout without complex cleanup
   const response = await fetch(url, {
