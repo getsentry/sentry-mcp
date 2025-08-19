@@ -10,8 +10,23 @@ const describeIfPreviewUrl = PREVIEW_URL ? describe : describe.skip;
 
 /**
  * Safely fetch from any endpoint and parse the response.
- * Handles JSON, text, and streaming responses consistently.
- * For streaming responses, reads up to maxLength bytes to prevent hanging.
+ *
+ * WHY THIS EXISTS:
+ * - Regular fetch() hangs indefinitely on SSE/streaming endpoints in workerd
+ * - We need consistent timeout protection across all HTTP requests
+ * - Stream responses must be read partially and cleaned up aggressively
+ *
+ * WHAT IT HANDLES:
+ * - JSON responses: parsed automatically
+ * - Text responses: returned as string
+ * - Streaming responses (SSE, chunked): read up to maxLength with timeout protection
+ *
+ * STREAM HANDLING COMPLEXITY:
+ * The stream reading logic is intentionally aggressive about cleanup because:
+ * 1. Workerd has bugs where streams don't close properly
+ * 2. Unfinished streams cause subsequent requests to hang
+ * 3. Tests can hang for 30+ seconds without proper stream management
+ * 4. AbortController and reader.releaseLock() are essential for cleanup
  */
 async function safeFetch(
   url: string,
@@ -28,6 +43,7 @@ async function safeFetch(
   const contentType = response.headers.get("content-type") || "";
 
   // Handle streaming responses (SSE, chunked, etc.)
+  // WHY: These response types never "finish" naturally and will hang fetch() forever
   if (
     contentType.includes("text/event-stream") ||
     contentType.includes("stream") ||
@@ -39,7 +55,11 @@ async function safeFetch(
     let totalLength = 0;
 
     try {
+      // Read stream chunks until we hit limits or timeout
+      // WHY: We can't read the entire stream (infinite) so we sample it
       while (totalLength < maxLength && reader) {
+        // Race condition: either get data or timeout
+        // WHY: reader.read() can hang forever on slow/broken streams
         const timeoutPromise = new Promise<{
           value: Uint8Array;
           done: boolean;
@@ -53,13 +73,14 @@ async function safeFetch(
           timeoutPromise,
         ]);
 
-        if (done) break;
+        if (done) break; // Stream ended naturally
 
         if (value && value.length > 0) {
           const chunk = decoder.decode(value, { stream: true });
           data += chunk;
           totalLength += chunk.length;
 
+          // Stop reading when we have enough data for testing
           if (totalLength >= maxLength) {
             data = data.substring(0, maxLength);
             break;
@@ -68,7 +89,8 @@ async function safeFetch(
       }
     } catch (error) {
       if (error instanceof Error && error.message === "Read timeout") {
-        // Timeout is acceptable for streams
+        // Timeout is EXPECTED for active streams - not an error!
+        // WHY: SSE streams never end, so timeout means "it's working"
         if (!data) {
           data = "(stream active but no immediate data)";
         }
@@ -76,10 +98,12 @@ async function safeFetch(
         throw error;
       }
     } finally {
+      // CRITICAL: Always release the reader lock
+      // WHY: Unreleased locks cause subsequent requests to hang permanently
       try {
         reader?.releaseLock();
       } catch {
-        // Ignore cleanup errors
+        // Ignore cleanup errors - better to continue than crash
       }
     }
 
@@ -108,9 +132,36 @@ describeIfPreviewUrl(
         );
       }
 
-      // Warm up the server and Durable Objects to avoid initialization delays
-      // IMPORTANT: There's a bug in workerd where Node.js fetch hangs after DO initialization
-      // We warm up all DO endpoints and add a "sacrificial" request to absorb the hang
+      /*
+       * WARMUP LOGIC - WHY THIS DISGUSTING CODE EXISTS:
+       *
+       * 1. THE BUG: Cloudflare's workerd runtime (what powers Workers/Pages) has a race
+       *    condition where Node.js-style fetch() calls hang after Durable Object
+       *    initialization. This manifests as:
+       *    - First 2-3 HTTP requests work fine
+       *    - After DO initialization, fetch() hangs indefinitely
+       *    - Affects streaming endpoints (SSE) most severely
+       *    - Error: "kj/compat/http.c++:1993: can't read more data after previous read didn't complete"
+       *
+       * 2. ENVIRONMENT: Only happens in workerd local dev mode (wrangler dev)
+       *    Production Cloudflare Workers don't have this issue.
+       *
+       * 3. SYMPTOM: Without warmup, tests start passing, then hang:
+       *    ✓ Root endpoint (works)
+       *    ✓ MCP endpoint (works)
+       *    ⏸ SSE endpoint (hangs for 30+ seconds)
+       *
+       * 4. WORKAROUND: Initialize all DO endpoints first, then make a "sacrificial"
+       *    request that absorbs the hang. This keeps subsequent test requests working.
+       *
+       * 5. WHY NOT ALTERNATIVES:
+       *    - Mock endpoints: Defeats purpose of integration testing
+       *    - Skip SSE tests: Miss real deployment issues
+       *    - Use production: No local development workflow
+       *    - Raw timeouts: Don't fix the underlying hang
+       *
+       * This warmup is the only reliable solution found for workerd local testing.
+       */
       console.log(`🔥 Warming up server and Durable Objects...`);
 
       const warmupStartTime = Date.now();
@@ -154,8 +205,18 @@ describeIfPreviewUrl(
         }
       }
 
-      // CRITICAL: Make a sacrificial request that will hang due to the workerd bug
-      // This protects the actual tests from hanging
+      /*
+       * SACRIFICIAL REQUEST - The ugliest part:
+       *
+       * After DO initialization, workerd's fetch implementation is in a broken state.
+       * The NEXT HTTP request will hang indefinitely. We deliberately make a request
+       * that we know will trigger this hang, then timeout and clean up.
+       *
+       * This "absorbs" the hang bug, resetting workerd's HTTP state so subsequent
+       * requests work normally. Without this, our SSE test hangs for 30+ seconds.
+       *
+       * WHY /api/metadata: Simple endpoint, safe to call, returns quickly when working.
+       */
       const remainingTime = Math.max(
         1000,
         maxWarmupTime - (Date.now() - warmupStartTime),
@@ -163,7 +224,7 @@ describeIfPreviewUrl(
       await safeFetch(`${PREVIEW_URL}/api/metadata`, {
         maxLength: 100,
         timeoutMs: remainingTime,
-      }).catch(() => {}); // Ignore timeout
+      }).catch(() => {}); // Ignore timeout - this is expected
 
       // Brief stabilization if we have time left
       const stabilizationTime = Math.min(
@@ -214,13 +275,20 @@ describeIfPreviewUrl(
     });
 
     it("should have SSE endpoint for MCP transport", async () => {
-      // Test SSE endpoint using safeFetch with stream handling
+      /*
+       * SSE endpoints are simple:
+       * - No auth = 401 Unauthorized
+       * - Valid auth = 200 OK + stream starts
+       *
+       * For smoke tests (no auth), we expect 401 with error details.
+       * This proves the endpoint exists and auth is working.
+       */
       const { response, data } = await safeFetch(`${PREVIEW_URL}/sse`, {
         headers: {
           Accept: "text/event-stream",
         },
-        maxLength: 256, // Small amount of data for streams
-        timeoutMs: 500, // Short timeout for streams
+        maxLength: 256,
+        timeoutMs: 500,
       });
 
       console.log(`📡 SSE test result: status=${response.status}`);
@@ -228,25 +296,18 @@ describeIfPreviewUrl(
         console.log(`📡 SSE data: ${String(data).substring(0, 100)}...`);
       }
 
-      // SSE endpoint should respond appropriately
-      if (response.status === 401) {
-        // Expected auth error
-        if (typeof data === "object") {
-          expect(data).toHaveProperty("error");
-          expect(data.error).toMatch(/invalid_token|unauthorized/i);
-        } else {
-          expect(data).toMatch(/invalid_token|unauthorized|error/i);
-        }
-      } else if (response.status === 200) {
-        // SSE stream started successfully
-        expect(response.headers.get("content-type")).toContain(
-          "text/event-stream",
-        );
-        expect(data).toBeDefined();
+      // Should return 401 since we're not providing auth
+      expect(response.status).toBe(401);
+
+      // Should get a JSON error response
+      if (typeof data === "object") {
+        expect(data).toHaveProperty("error");
+        expect(data.error).toMatch(/invalid_token|unauthorized/i);
       } else {
-        throw new Error(`Unexpected SSE status: ${response.status}`);
+        // If parsed as text, should still contain error info
+        expect(data).toMatch(/invalid_token|unauthorized|error/i);
       }
-    }, 30000); // 30 second timeout for SSE test
+    }, 30000); // Longer timeout due to workerd stream handling quirks
 
     it("should have metadata endpoint that requires auth", async () => {
       // Run metadata test BEFORE constraint tests to avoid workerd bug
