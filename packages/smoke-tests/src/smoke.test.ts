@@ -75,7 +75,10 @@ describeIfPreviewUrl(
       // We warm up all DO endpoints and add a "sacrificial" request to absorb the hang
       console.log(`🔥 Warming up server and Durable Objects...`);
 
-      // Initialize all MCP endpoints that use DOs
+      const warmupStartTime = Date.now();
+      const maxWarmupTime = 15000; // Maximum 15 seconds for entire warmup
+
+      // Initialize all MCP endpoints that use DOs, retrying on 503
       const warmupEndpoints = [
         `${PREVIEW_URL}/mcp`,
         `${PREVIEW_URL}/mcp/sentry`,
@@ -83,22 +86,53 @@ describeIfPreviewUrl(
       ];
 
       for (const endpoint of warmupEndpoints) {
-        await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1 }),
-          signal: AbortSignal.timeout(5000),
-        }).catch(() => {}); // Ignore errors
+        if (Date.now() - warmupStartTime > maxWarmupTime) break;
+
+        let retries = 3;
+        while (retries > 0 && Date.now() - warmupStartTime < maxWarmupTime) {
+          try {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "initialize",
+                id: 1,
+              }),
+              signal: AbortSignal.timeout(1000), // 1 second timeout per request
+            });
+
+            // If we get 503, retry after a short delay
+            if (response.status === 503 && retries > 1) {
+              retries--;
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              continue;
+            }
+            break; // Success or non-503 error
+          } catch {
+            break; // Timeout or other error, move on
+          }
+        }
       }
 
       // CRITICAL: Make a sacrificial request that will hang due to the workerd bug
       // This protects the actual tests from hanging
+      const remainingTime = Math.max(
+        1000,
+        maxWarmupTime - (Date.now() - warmupStartTime),
+      );
       await fetch(`${PREVIEW_URL}/api/metadata`, {
-        signal: AbortSignal.timeout(11000), // Allow it to hang and timeout
+        signal: AbortSignal.timeout(remainingTime), // Use remaining warmup time
       }).catch(() => {}); // Ignore timeout
 
-      // Additional stabilization time
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Brief stabilization if we have time left
+      const stabilizationTime = Math.min(
+        500,
+        maxWarmupTime - (Date.now() - warmupStartTime),
+      );
+      if (stabilizationTime > 0) {
+        await new Promise((resolve) => setTimeout(resolve, stabilizationTime));
+      }
     });
 
     it("should respond on root endpoint", async () => {
@@ -233,12 +267,13 @@ describeIfPreviewUrl(
     });
 
     it("should have SSE endpoint for MCP transport", async () => {
-      // Extended timeout due to workerd bug where requests hang after DO operations
+      // SSE endpoint has a bug where it takes 3+ seconds to return 401
+      // This is unrelated to DO initialization - it's a bug in the SSE handler itself
       const response = await fetch(`${PREVIEW_URL}/sse`, {
         headers: {
           Accept: "text/event-stream",
         },
-        signal: AbortSignal.timeout(15000), // Need extra time due to workerd bug
+        signal: AbortSignal.timeout(6000), // SSE endpoint is slow to return 401
       });
 
       // SSE endpoint might return 401 JSON or start streaming with auth error
