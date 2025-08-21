@@ -1629,4 +1629,273 @@ describe("formatEventOutput", () => {
       `);
     });
   });
+
+  describe("Performance issue formatting", () => {
+    it("should format N+1 query issue with evidence data", () => {
+      const event = new EventBuilder("python")
+        .withType("transaction")
+        .withOccurrence({
+          issueTitle: "N+1 Query",
+          culprit: "SELECT * FROM users WHERE id = %s",
+          type: 1006, // Performance issue type code
+          issueType: "performance_n_plus_one_db_queries",
+          evidenceData: {
+            parentSpanIds: ["span_123"],
+            parentSpan: "GET /api/users",
+            repeatingSpansCompact: "SELECT * FROM users WHERE id = %s",
+            numberRepeatingSpans: "5",
+            offenderSpanIds: [
+              "span_456",
+              "span_457",
+              "span_458",
+              "span_459",
+              "span_460",
+            ],
+            transactionName: "/api/users",
+            op: "db",
+          },
+          evidenceDisplay: [
+            {
+              name: "Offending Spans",
+              value: "UserService.get_users",
+              important: true,
+            },
+          ],
+        })
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`
+        "**Parent Operation:**
+        GET /api/users
+
+        ### Repeated Database Queries
+
+        **Query executed 5 times:**
+        \`\`\`sql
+        SELECT * FROM users WHERE id = %s
+        \`\`\`
+
+        **Transaction:**
+        /api/users
+
+        **Offending Spans:**
+        UserService.get_users
+
+        "
+      `);
+    });
+
+    it("should format N+1 query issue with spans data fallback", () => {
+      const event = new EventBuilder("python")
+        .withType("transaction")
+        .withOccurrence({
+          issueTitle: "N+1 Query detected",
+          culprit: "database query",
+        })
+        .withEntry({
+          type: "spans",
+          data: [
+            {
+              op: "db.query",
+              description: "SELECT * FROM posts WHERE user_id = 1",
+              timestamp: 100.5,
+              start_timestamp: 100.0,
+            },
+            {
+              op: "db.query",
+              description: "SELECT * FROM posts WHERE user_id = 2",
+              timestamp: 101.0,
+              start_timestamp: 100.5,
+            },
+            {
+              op: "db.query",
+              description: "SELECT * FROM posts WHERE user_id = 3",
+              timestamp: 101.5,
+              start_timestamp: 101.0,
+            },
+            {
+              op: "http.client",
+              description: "GET /api/external",
+              timestamp: 102.0,
+              start_timestamp: 101.5,
+            },
+          ],
+        })
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`""`);
+    });
+
+    it("should format transaction event with non-repeated database queries", () => {
+      const event = new EventBuilder("python")
+        .withType("transaction")
+        .withOccurrence({
+          issueTitle: "Slow DB Query",
+          culprit: "database",
+        })
+        .withEntry({
+          type: "spans",
+          data: [
+            {
+              op: "db.query",
+              description: "SELECT COUNT(*) FROM users",
+              timestamp: 100.5,
+              start_timestamp: 100.0,
+            },
+            {
+              op: "db.query",
+              description: "SELECT * FROM settings WHERE key = 'theme'",
+              timestamp: 101.0,
+              start_timestamp: 100.5,
+            },
+          ],
+        })
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`""`);
+    });
+
+    it("should format evidence with operation and offenderSpanIds", () => {
+      const event = new EventBuilder("python")
+        .withType("transaction")
+        .withOccurrence({
+          issueTitle: "N+1 Query",
+          culprit: "database",
+          issueType: "performance_n_plus_one_db_queries",
+          evidenceData: {
+            op: "db",
+            offenderSpanIds: ["span_1", "span_2", "span_3", "span_4", "span_5"],
+            numberRepeatingSpans: "5",
+          },
+        })
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`""`);
+    });
+
+    it("should render span tree for N+1 queries with evidence and spans data", () => {
+      const event = new EventBuilder("python")
+        .withType("transaction")
+        .withOccurrence({
+          issueTitle: "N+1 Query",
+          culprit: "SELECT * FROM users WHERE id = %s",
+          issueType: "performance_n_plus_one_db_queries",
+          evidenceData: {
+            parentSpanIds: ["parent123"],
+            parentSpan: "GET /api/users",
+            offenderSpanIds: ["span1", "span2", "span3"],
+            repeatingSpansCompact: "SELECT * FROM users WHERE id = %s",
+            numberRepeatingSpans: "3",
+            op: "db",
+          },
+        })
+        .withEntry({
+          type: "spans",
+          data: [
+            {
+              span_id: "parent123",
+              op: "http.server",
+              description: "GET /users",
+              timestamp: 1000,
+              start_timestamp: 900,
+            },
+            {
+              span_id: "span1",
+              op: "db.query",
+              description: "SELECT * FROM users WHERE id = 1",
+              timestamp: 920,
+              start_timestamp: 910,
+            },
+            {
+              span_id: "span2",
+              op: "db.query",
+              description: "SELECT * FROM users WHERE id = 2",
+              timestamp: 940,
+              start_timestamp: 928,
+            },
+            {
+              span_id: "span3",
+              op: "db.query",
+              description: "SELECT * FROM users WHERE id = 3",
+              timestamp: 960,
+              start_timestamp: 949,
+            },
+          ],
+        })
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toContain("### Span Tree (Limited to 10 spans)");
+      expect(output).toContain("http.server: GET /users (100ms)");
+      expect(output).toContain(
+        "├─ db.query: SELECT * FROM users WHERE id = 1 (10ms) [N+1]",
+      );
+      expect(output).toContain(
+        "├─ db.query: SELECT * FROM users WHERE id = 2 (12ms) [N+1]",
+      );
+      expect(output).toContain(
+        "└─ db.query: SELECT * FROM users WHERE id = 3 (11ms) [N+1]",
+      );
+    });
+
+    it("should handle transaction event without performance data", () => {
+      const event = new EventBuilder("python")
+        .withType("transaction")
+        .withOccurrence({
+          issueTitle: "Generic Performance Issue",
+          culprit: "slow endpoint",
+        })
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`""`);
+    });
+
+    it("should handle evidence data without repeating_spans", () => {
+      const event = new EventBuilder("python")
+        .withType("transaction")
+        .withOccurrence({
+          issueTitle: "Performance Issue",
+          culprit: "database",
+          issueType: "performance_slow_db_query", // A different type that we don't fully handle yet
+          evidenceData: {
+            parentSpan: "GET /api/data",
+            transactionName: "/api/data",
+          },
+          evidenceDisplay: [
+            {
+              name: "Source Location",
+              value: "DataService.fetch",
+              important: true,
+            },
+          ],
+        })
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toMatchInlineSnapshot(`
+        "**Parent Operation:**
+        GET /api/data
+
+        **Transaction:**
+        /api/data
+
+        **Source Location:**
+        DataService.fetch
+
+        "
+      `);
+    });
+  });
 });
