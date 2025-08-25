@@ -46,39 +46,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
   }, []);
 
-  // Handle OAuth messages
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Security check
-      if (event.origin !== window.location.origin) return;
+  // Process OAuth result from localStorage
+  const processOAuthResult = useCallback((data: unknown) => {
+    if (isOAuthSuccessMessage(data)) {
+      setIsAuthenticated(true);
+      setIsAuthenticating(false);
+      setAuthError("");
 
-      if (isOAuthSuccessMessage(event.data)) {
-        // Auth succeeded - cookies were set server-side
-        setIsAuthenticated(true);
-        setIsAuthenticating(false);
-        setAuthError("");
-
-        // Cleanup
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-        popupRef.current = null;
-      } else if (isOAuthErrorMessage(event.data)) {
-        setAuthError(event.data.error || "Authentication failed");
-        setIsAuthenticating(false);
-
-        // Cleanup
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+      // Cleanup interval and popup reference
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (popupRef.current) {
         popupRef.current = null;
       }
-    };
+    } else if (isOAuthErrorMessage(data)) {
+      setAuthError(data.error || "Authentication failed");
+      setIsAuthenticating(false);
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+      // Cleanup interval and popup reference
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (popupRef.current) {
+        popupRef.current = null;
+      }
+    }
   }, []);
 
   // Cleanup on unmount
@@ -116,6 +111,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
           intervalRef.current = null;
         }
 
+        // Check localStorage for auth result before marking as cancelled
+        const storedResult = localStorage.getItem("sentry_oauth_result");
+        if (storedResult) {
+          try {
+            const result = JSON.parse(storedResult);
+            localStorage.removeItem("sentry_oauth_result");
+            processOAuthResult(result);
+            return;
+          } catch (e) {
+            // Invalid stored result, continue to cancellation
+          }
+        }
+
         // Only update state if still authenticating (no success/error received)
         setIsAuthenticating((current) => {
           if (current) {
@@ -128,7 +136,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         popupRef.current = null;
       }
     }, POPUP_CHECK_INTERVAL);
-  }, []);
+  }, [processOAuthResult]);
 
   const handleLogout = useCallback(async () => {
     try {
