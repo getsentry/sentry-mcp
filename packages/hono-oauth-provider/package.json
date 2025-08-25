@@ -1,0 +1,45 @@
+{
+  "name": "@sentry/hono-oauth-provider",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "author": "Original: Kenton Varda <kenton@cloudflare.com>, Ported: Sentry",
+  "description": "OAuth provider middleware for Hono (ported from Cloudflare Workers OAuth Provider)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE.txt"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "msw": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "hono": ">=4.0.0"
+  }
+}
