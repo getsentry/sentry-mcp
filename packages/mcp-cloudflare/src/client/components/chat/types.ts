@@ -54,9 +54,7 @@ export type AuthContextType = AuthState & AuthActions;
 // OAuth message types
 export interface OAuthSuccessMessage {
   type: "SENTRY_AUTH_SUCCESS";
-  data: {
-    accessToken: string;
-  };
+  data: Record<string, never>;
 }
 
 export interface OAuthErrorMessage {

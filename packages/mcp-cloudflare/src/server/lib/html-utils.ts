@@ -211,20 +211,17 @@ export function createSuccessPage(
   options: Partial<HtmlPageOptions> = {},
 ): string {
   const bodyScript = `
-    // Notify parent window of success
-    if (window.opener) {
-      window.opener.postMessage({
-        type: 'SENTRY_AUTH_SUCCESS',
-        data: {
-          // No token needed - auth handled via cookies
-        }
-      }, '*');
-    }
+    // Store success result for parent window to read
+    localStorage.setItem('sentry_oauth_result', JSON.stringify({
+      type: 'SENTRY_AUTH_SUCCESS',
+      timestamp: Date.now(),
+      data: {}
+    }));
     
-    // Close the popup after a short delay
+    // Close popup after short delay to allow parent to read result
     setTimeout(() => {
       window.close();
-    }, 1000);
+    }, 500);
   `;
 
   return createHtmlPage({
@@ -247,13 +244,17 @@ export function createErrorPage(
   options: Partial<HtmlPageOptions> = {},
 ): string {
   const bodyScript = `
-    if (window.opener) {
-      window.opener.postMessage({
-        type: 'SENTRY_AUTH_ERROR',
-        error: ${JSON.stringify(error)}
-      }, '*');
-    }
-    setTimeout(() => window.close(), 3000);
+    // Store error result for parent window to read
+    localStorage.setItem('sentry_oauth_result', JSON.stringify({
+      type: 'SENTRY_AUTH_ERROR',
+      timestamp: Date.now(),
+      error: ${JSON.stringify(error)}
+    }));
+    
+    // Close popup after delay to show error message
+    setTimeout(() => {
+      window.close();
+    }, 3000);
   `;
 
   return createHtmlPage({
