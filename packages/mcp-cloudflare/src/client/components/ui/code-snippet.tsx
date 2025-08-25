@@ -1,4 +1,5 @@
-import { Copy } from "lucide-react";
+import { Copy, Check } from "lucide-react";
+import { useState } from "react";
 import { Button } from "./button";
 
 export default function CodeSnippet({
@@ -8,6 +9,7 @@ export default function CodeSnippet({
   snippet: string;
   noMargin?: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
   return (
     <div className={`relative text-white ${noMargin ? "" : "mb-6"}`}>
       <div className="absolute top-2.5 right-2.5 flex items-center justify-end">
@@ -17,9 +19,15 @@ export default function CodeSnippet({
           className="h-8 w-8 text-slate-500 cursor-pointer"
           onClick={() => {
             navigator.clipboard.writeText(snippet);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
           }}
         >
-          <Copy className="h-4 w-4" />
+          {copied ? (
+            <Check className="h-4 w-4 text-green-500" />
+          ) : (
+            <Copy className="h-4 w-4 text-slate-500" />
+          )}
           <span className="sr-only">Copy Snippet</span>
         </Button>
       </div>
