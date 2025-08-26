@@ -4,50 +4,91 @@
 
 McpAgent is a base class from the Cloudflare agents library that provides the foundation for building MCP (Model Context Protocol) servers as Durable Objects. It handles the protocol transport, state management, and lifecycle of MCP server instances.
 
+Our Sentry MCP implementation extends this base class to provide authenticated, constraint-scoped access to Sentry's API through MCP tools and resources.
+
 ## Key Components
 
-### 1. McpAgent Base Class
+### 1. Sentry MCP Agent Implementation
 
 ```typescript
-class McpAgent<Env, State, Props> extends DurableObject {
-  // Props passed from OAuth provider
-  props: Props;
-  
-  // MCP server instance (must be provided by subclass)
-  abstract server: McpServer | Server;
+class SentryMCPBase extends McpAgent<
+  Env,
+  { constraints?: Constraints },
+  WorkerProps & {
+    organizationSlug?: string;
+    projectSlug?: string;
+  }
+> {
+  // MCP server created in constructor for performance
+  server = new McpServer({
+    name: "Sentry MCP",
+    version: LIB_VERSION,
+  });
   
   // Lifecycle methods
-  abstract init(): Promise<void>;
-  fetch(request: Request): Promise<Response>;
+  async init(): Promise<void>;
+  async fetch(request: Request): Promise<Response>;
   
-  // State management (from agents library)
-  state: State;
-  setState(state: State): void;
-  
-  // Static methods for creating handlers
-  static serve(path: string): Handler;
-  static serveSSE(path: string): Handler;
+  // State management (simplified)
+  state: { constraints?: Constraints };
+  setState(state): void;
 }
 ```
 
-### 2. Transport Methods
+### 2. Transport Methods and Constraint Handling
 
 McpAgent supports two transport protocols:
 
 - **`serve()`**: Streamable HTTP transport (recommended)
 - **`serveSSE()`**: Server-Sent Events transport (legacy)
 
-These are **static methods** that return request handlers:
+Our implementation adds **constraint verification** before routing to handlers:
 
 ```typescript
 // Usage in index.ts
-const oAuthProvider = new OAuthProvider({
-  apiHandlers: {
-    "/mcp": SentryMCP.serve("/*"),     // Returns a handler object
-    "/sse": SentryMCP.serveSSE("/*"),  // Returns a handler object
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(request.url);
+    
+    // SSE endpoint
+    if (url.pathname === "/sse" || url.pathname === "/sse/message") {
+      return SentryMCP.serveSSE("/sse").fetch(request, env, ctx);
+    }
+    
+    // Pattern match for constraint extraction
+    const pattern = new URLPattern({ pathname: "/mcp/:org?/:project?" });
+    const result = pattern.exec(url);
+    if (result) {
+      const { groups } = result.pathname;
+      
+      // Extract constraints from URL
+      const organizationSlug = groups?.org ?? "";
+      const projectSlug = groups?.project ?? "";
+      
+      // Verify access using OAuth token
+      const verification = await verifyConstraintsAccess(
+        { organizationSlug, projectSlug },
+        {
+          accessToken: ctx.props?.accessToken,
+          sentryHost: env.SENTRY_HOST || "sentry.io",
+        }
+      );
+      
+      if (!verification.ok) {
+        return new Response(verification.message, {
+          status: verification.status,
+        });
+      }
+      
+      // Mutate props with verified constraints
+      ctx.props.constraints = verification.constraints;
+      
+      return SentryMCP.serve(pattern.pathname).fetch(request, env, ctx);
+    }
+    
+    return new Response("Not found", { status: 404 });
   },
-  // ...
-});
+};
 ```
 
 ## Lifecycle
@@ -55,111 +96,151 @@ const oAuthProvider = new OAuthProvider({
 ### 1. Durable Object Creation
 
 ```
-Request arrives → OAuth Provider validates token → Extracts props from token → 
-Creates DO with ID based on props → DO instance created → init() called
+Request arrives → URL pattern matching → Constraint verification → 
+OAuth Provider validates token → Extracts props from token → 
+Mutates props with constraints → Creates DO with sessionId → 
+DO instance created → init() called
 ```
 
 **Key points:**
-- DO ID is generated from props (typically userId)
-- One DO instance per unique ID (one per user)
+- DO ID (sessionId) is generated from connection context by agents library
+- Different constraint contexts get separate DO instances
+- Props are mutated with verified constraints before DO creation
 - DO persists in memory between requests (~30 seconds idle timeout)
 
 ### 2. Request Flow
 
 ```
 First Request (DO Creation):
-1. OAuth provider validates token
-2. Extracts props (userId, accessToken, etc.)
-3. Creates DO instance with ID from props
-4. Calls init() on DO - ONCE
-5. Calls fetch() for the request (guaranteed after init() completes)
-6. Returns response
+1. URL pattern matching extracts org/project from path
+2. verifyConstraintsAccess() validates org/project exist and user has access
+3. OAuth provider validates token
+4. Props mutated with verified constraints
+5. DO instance created with unique sessionId for this constraint context
+6. init() called - configures MCP server with constraints
+7. fetch() called for the request (guaranteed after init() completes)
+8. Returns response
 
-Subsequent Requests (Same User):
-1. OAuth provider validates token
-2. Routes to existing DO instance
-3. Calls fetch() - init() is NOT called again
-4. Returns response
+Subsequent Requests (Same Constraint Context):
+1. Routes to existing DO instance (same sessionId)
+2. fetch() called - init() is NOT called again
+3. Returns response
 
 After Hibernation:
 1. DO wakes from hibernation
-2. Calls init() to restore state
-3. Calls fetch() for the request (guaranteed after init() completes)
+2. init() called to restore state and reconfigure MCP server
+3. fetch() called for the request (guaranteed after init() completes)
 4. Returns response
 ```
 
 **Important Lifecycle Guarantee**: McpAgent ensures `init()` always completes before `fetch()` is called. This is guaranteed both on DO creation and when waking from hibernation.
 
+**Constraint Immutability**: Once props are mutated with constraints and the DO is created, the constraint configuration remains immutable throughout the DO's lifetime.
+
 ### 3. Method Responsibilities
 
 **`init()`**:
 - Called when DO is created or wakes from hibernation
-- Should create/configure the MCP server
-- Should restore any persisted state
+- Configures the MCP server with user authentication and constraints
+- Restores constraint state from props
 - NOT called for every request
 
 **`fetch()`**:
 - Called for EVERY request
 - Handles the actual MCP protocol communication
-- Can access `this.props` set by OAuth provider
+- Can access `this.props` including mutated constraints
+- All MCP tools automatically scoped to the constraint context
 - Returns the MCP response
 
 ## Props System
 
-Props are the bridge between OAuth and the Durable Object:
+Props are the bridge between OAuth, constraint verification, and the Durable Object:
 
 ```typescript
-interface WorkerProps {
+// Base props from OAuth
+type WorkerProps = ServerContext & {
   id: string;           // User ID from OAuth token
-  accessToken: string;  // Sentry API token
   name: string;         // User name
   scope: string;        // OAuth scopes
-}
+  accessToken: string;  // Sentry API token
+};
+
+// Extended props with constraints
+type ExtendedProps = WorkerProps & {
+  organizationSlug?: string;  // Extracted from URL
+  projectSlug?: string;       // Extracted from URL
+  constraints?: Constraints;  // Verified constraints
+};
 ```
 
 **How props work:**
-1. OAuth provider decrypts the OAuth token
-2. Extracts encrypted props from token storage
-3. Passes props to DO via `ctx.props`
-4. DO can access via `this.props`
+1. URL pattern matching extracts org/project from request path
+2. `verifyConstraintsAccess()` validates constraints using OAuth token
+3. OAuth provider decrypts the OAuth token and extracts base props
+4. Props are mutated with verified constraints before DO creation
+5. DO can access complete props via `this.props`
 
-**Important:** Props are set once when DO is created and don't change during its lifetime.
+**Important:** Props are mutated once during request routing, then remain immutable throughout the DO's lifetime.
 
-## URL Rewriting Challenge
+## Constraint Verification System
 
-The agents library internally rewrites URLs:
+The constraint verification system validates org/project access before DO creation:
 
+```typescript
+export async function verifyConstraintsAccess(
+  { organizationSlug, projectSlug }: Constraints,
+  { accessToken, sentryHost }: { accessToken: string; sentryHost?: string }
+): Promise<
+  | { ok: true; constraints: Constraints }
+  | { ok: false; status: number; message: string; eventId?: string }
+> {
+  // Verify organization exists and user has access
+  const org = await api.getOrganization(organizationSlug);
+  const regionUrl = org.links?.regionUrl || null;
+  
+  // Verify project access if specified
+  if (projectSlug) {
+    await api.getProject(
+      { organizationSlug, projectSlugOrId: projectSlug },
+      regionUrl ? { host: new URL(regionUrl).host } : undefined
+    );
+  }
+  
+  return {
+    ok: true,
+    constraints: { organizationSlug, projectSlug, regionUrl },
+  };
+}
 ```
-Original: /mcp/sentry/javascript
-After rewrite: /streamable-http
-```
 
-This happens inside the transport layer before reaching our DO's fetch() method.
-
-**Implications:**
-- Original path information is lost
-- Can't use URL path for routing inside DO
-- Must use alternative methods (headers) to pass path information
+**Benefits:**
+- Early validation prevents unauthorized access
+- Regional URL detection for proper API routing
+- Consistent error handling with proper HTTP status codes
+- Integration with Sentry error tracking
 
 ## State Management
 
-McpAgent provides state management capabilities:
+Our implementation uses simplified state management focused on constraints:
 
 ```typescript
-// Initial state
-initialState: State;
+// State structure
+type State = {
+  constraints?: Constraints;
+};
 
-// Get current state
-this.state;
+// In init()
+if (!this.state) {
+  this.setState({
+    constraints: this.props.constraints,
+  });
+}
 
-// Update state
-this.setState(newState);
-
-// State change handler
-onStateUpdate(state: State, source: "server" | Connection): void;
+// Access state
+const constraints = this.state.constraints || {};
 ```
 
-State is persisted automatically and restored after hibernation.
+State is persisted automatically and restored after hibernation. The constraints from props are preserved in state for consistency.
 
 ## Storage
 
@@ -213,60 +294,23 @@ OAuth Provider                          McpAgent
 3. **URL rewriting**: Original paths lost during transport, must use headers
 4. **One DO per user**: DO ID based on userId, all user requests go to same instance
 5. **No request context in init()**: Can't access request data during initialization
-6. **Constraint mutability**: While ideally each DO would be coupled to specific constraints (like in .mcp.json configurations), the current architecture requires handling constraint changes since DOs are created per-user, not per-constraint-set
+6. **Constraint immutability**: Constraints are verified and set once at DO creation, remaining immutable throughout the DO's lifetime. Different constraint contexts create separate DO instances via unique sessionIds.
 
 ## Best Practices
 
-1. **Handle reconfiguration in fetch()**: Since init() isn't called for every request
+1. **Verify constraints early**: Use `verifyConstraintsAccess()` before DO creation
 2. **Use storage sparingly**: Storage operations are expensive
 3. **Cache in memory**: Use instance variables for frequently accessed data
-4. **Prepare for hibernation**: Always persist critical state
+4. **Prepare for hibernation**: Constraints are preserved in state automatically
 5. **Trust lifecycle guarantees**: McpAgent ensures init() completes before fetch()
+6. **Leverage immutable constraints**: Once set, constraints don't change - design accordingly
 
-## Example Implementation
+## Implementation Reference
 
-```typescript
-class SentryMCPBase extends McpAgent<Env, State, WorkerProps> {
-  server!: McpServer;
-  
-  async init() {
-    // Called once on DO creation or hibernation wake
-    // Restore state from storage
-    const savedData = await this.ctx.storage.get("data");
-    
-    // Create MCP server
-    this.server = new McpServer({...});
-    
-    // Configure server with props
-    await configureServer({
-      server: this.server,
-      context: {
-        accessToken: this.props.accessToken,  // From OAuth
-        userId: this.props.id,                // From OAuth
-        // ...
-      }
-    });
-  }
-  
-  async fetch(request: Request): Promise<Response> {
-    // Called for every request
-    // Handle any request-specific logic
-    
-    // Check if reconfiguration needed
-    if (needsReconfiguration(request)) {
-      await this.reconfigure(request);
-    }
-    
-    // Process request with MCP server
-    return super.fetch(request);
-  }
-}
-
-// Export with static handlers
-export default class SentryMCP extends SentryMCPBase {
-  // Static methods inherited from McpAgent
-}
-```
+The actual implementation can be found in:
+- **Main class**: `packages/mcp-cloudflare/src/server/lib/mcp-agent.ts`
+- **Constraint utilities**: `packages/mcp-cloudflare/src/server/lib/constraint-utils.ts`
+- **Type definitions**: `packages/mcp-cloudflare/src/server/types.ts`
 
 ## Related Documentation
 

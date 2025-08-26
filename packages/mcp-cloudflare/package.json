@@ -28,6 +28,7 @@
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@sentry/mcp-server": "workspace:*",
+    "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "@sentry/vite-plugin": "catalog:",
     "@tailwindcss/typography": "catalog:",
@@ -37,6 +38,7 @@
     "@types/react-scroll-to-bottom": "^4.2.5",
     "@vitejs/plugin-react": "catalog:",
     "tailwindcss": "catalog:",
+    "urlpattern-polyfill": "^10.1.0",
     "vite": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

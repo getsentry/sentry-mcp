@@ -18,6 +18,6 @@ export default defineConfig({
       reporter: ["text", "json", "html"],
       include: ["**/*.ts"],
     },
-    setupFiles: ["dotenv/config"],
+    setupFiles: ["dotenv/config", "src/test-setup.ts"],
   },
 });

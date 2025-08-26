@@ -17,6 +17,31 @@ export default defineTool({
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
     const user = await apiService.getAuthenticatedUser();
-    return `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
+
+    let output = `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
+
+    // Add constraints information
+    const constraints = context.constraints;
+    if (
+      constraints.organizationSlug ||
+      constraints.projectSlug ||
+      constraints.regionUrl
+    ) {
+      output += "\n\n## Session Constraints\n\n";
+
+      if (constraints.organizationSlug) {
+        output += `- **Organization**: ${constraints.organizationSlug}\n`;
+      }
+      if (constraints.projectSlug) {
+        output += `- **Project**: ${constraints.projectSlug}\n`;
+      }
+      if (constraints.regionUrl) {
+        output += `- **Region URL**: ${constraints.regionUrl}\n`;
+      }
+
+      output += "\nThese constraints limit the scope of this MCP session.";
+    }
+
+    return output;
   },
 });

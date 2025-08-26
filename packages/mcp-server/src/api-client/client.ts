@@ -6,6 +6,7 @@ import {
 } from "../utils/url-utils";
 import {
   OrganizationListSchema,
+  OrganizationSchema,
   ClientKeySchema,
   TeamListSchema,
   TeamSchema,
@@ -825,6 +826,22 @@ export class SentryApiService {
       // Re-throw other errors
       throw error;
     }
+  }
+
+  /**
+   * Gets a single organization by slug.
+   *
+   * @param organizationSlug Organization identifier
+   * @param opts Request options including host override
+   * @returns Organization data
+   */
+  async getOrganization(organizationSlug: string, opts?: RequestOptions) {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/`,
+      undefined,
+      opts,
+    );
+    return OrganizationSchema.parse(body);
   }
 
   /**
