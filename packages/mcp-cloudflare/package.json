@@ -37,7 +37,6 @@
     "@types/react-scroll-to-bottom": "^4.2.5",
     "@vitejs/plugin-react": "catalog:",
     "tailwindcss": "catalog:",
-    "urlpattern-polyfill": "^10.1.0",
     "vite": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"
