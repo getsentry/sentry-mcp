@@ -353,10 +353,13 @@ const BaseEventSchema = z.object({
     .array(
       z.object({
         key: z.string(),
-        value: z.string(),
+        value: z.string().nullable(),
       }),
     )
     .optional(),
+  // The _meta field contains metadata about fields in the response
+  // It's safer to type as unknown since its structure varies
+  _meta: z.unknown().optional(),
 });
 
 export const ErrorEventSchema = BaseEventSchema.omit({
@@ -371,10 +374,12 @@ export const TransactionEventSchema = BaseEventSchema.omit({
   type: true,
 }).extend({
   type: z.literal("transaction"),
-  occurrence: z.object({
-    issueTitle: z.string(),
-    culprit: z.string().nullable(),
-  }),
+  occurrence: z
+    .object({
+      issueTitle: z.string(),
+      culprit: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 export const UnknownEventSchema = BaseEventSchema.omit({
