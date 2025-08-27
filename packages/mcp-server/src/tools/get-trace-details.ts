@@ -152,6 +152,17 @@ function selectInterestingSpans(
   const selected: SelectedSpan[] = [];
   let spanCount = 0;
 
+  // Filter out non-span items (issues) from the trace data
+  // Spans must have children array, duration, and other span-specific fields
+  const actualSpans = spans.filter(
+    (item) =>
+      item &&
+      typeof item === "object" &&
+      "children" in item &&
+      Array.isArray(item.children) &&
+      "duration" in item,
+  );
+
   function addSpan(span: any, level: number): boolean {
     if (spanCount >= maxSpans || level > MAX_DEPTH) return false;
 
@@ -209,7 +220,7 @@ function selectInterestingSpans(
   }
 
   // Sort root spans by duration and select the most interesting ones
-  const sortedRoots = spans
+  const sortedRoots = actualSpans
     .sort((a, b) => (b.duration || 0) - (a.duration || 0))
     .slice(0, 5); // Start with top 5 root spans
 
@@ -370,6 +381,17 @@ function calculateOperationStats(spans: any[]): Record<
 function getAllSpansFlattened(spans: any[]): any[] {
   const result: any[] = [];
 
+  // Filter out non-span items (issues) from the trace data
+  // Spans must have children array and duration
+  const actualSpans = spans.filter(
+    (item) =>
+      item &&
+      typeof item === "object" &&
+      "children" in item &&
+      Array.isArray(item.children) &&
+      "duration" in item,
+  );
+
   function collectSpans(spanList: any[]) {
     for (const span of spanList) {
       result.push(span);
@@ -379,7 +401,7 @@ function getAllSpansFlattened(spans: any[]): any[] {
     }
   }
 
-  collectSpans(spans);
+  collectSpans(actualSpans);
   return result;
 }
 
