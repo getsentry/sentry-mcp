@@ -1,4 +1,37 @@
-.PHONY: setup-env
+.PHONY: setup-env clean
+
+# Clean all generated files, caches, and dependencies
+clean:
+	@echo "🧹 Cleaning build outputs, caches, and dependencies..."
+	@echo ""
+	
+	@# Remove all node_modules directories
+	@echo "Removing node_modules..."
+	@find . -name "node_modules" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+	
+	@# Remove all dist directories (build outputs)
+	@echo "Removing dist directories..."
+	@find . -name "dist" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+	
+	@# Remove all .turbo directories (turbo cache)
+	@echo "Removing .turbo cache directories..."
+	@find . -name ".turbo" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+	
+	@# Remove coverage directories
+	@echo "Removing coverage directories..."
+	@find . -name "coverage" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+	
+	@# Remove Cloudflare wrangler cache
+	@echo "Removing .wrangler cache directories..."
+	@find . -name ".wrangler" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+	
+	@# Remove pnpm store (optional - uncomment if you want to clean the global pnpm cache too)
+	@# pnpm store prune
+	
+	@echo ""
+	@echo "✅ Clean complete!"
+	@echo ""
+	@echo "To reinstall dependencies, run: pnpm install"
 
 # Set up environment files for local development
 setup-env:

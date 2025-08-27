@@ -39,11 +39,12 @@ export type PromptHandlers = {
 };
 
 /**
- * URL-based constraints that restrict the MCP session scope
+ * Constraints that restrict the MCP session scope
  */
-export type UrlConstraints = {
+export type Constraints = {
   organizationSlug?: string | null;
   projectSlug?: string | null;
+  regionUrl?: string | null;
 };
 
 export type ServerContext = {
@@ -53,7 +54,7 @@ export type ServerContext = {
   userId?: string | null;
   clientId?: string;
   // URL-based session constraints
-  constraints: UrlConstraints;
+  constraints: Constraints;
   // MCP client information captured during initialization
   mcpClientName?: string;
   mcpClientVersion?: string;

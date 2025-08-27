@@ -12,7 +12,6 @@ import {
   logStreamEnd,
   logStreamWrite,
 } from "./logger.js";
-import { randomUUID } from "node:crypto";
 import { LIB_VERSION } from "./version.js";
 
 export interface AgentConfig {

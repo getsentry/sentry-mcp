@@ -307,6 +307,9 @@ importers:
       '@sentry/mcp-server':
         specifier: workspace:*
         version: link:../mcp-server
+      '@sentry/mcp-server-mocks':
+        specifier: workspace:*
+        version: link:../mcp-server-mocks
       '@sentry/mcp-server-tsconfig':
         specifier: workspace:*
         version: link:../mcp-server-tsconfig
@@ -334,6 +337,9 @@ importers:
       tailwindcss:
         specifier: 'catalog:'
         version: 4.1.11
+      urlpattern-polyfill:
+        specifier: ^10.1.0
+        version: 10.1.0
       vite:
         specifier: 'catalog:'
         version: 6.3.5(@types/node@24.0.10)(jiti@2.4.2)(lightningcss@1.30.1)(tsx@4.20.3)(yaml@2.8.0)
@@ -4542,6 +4548,9 @@ packages:
 
   url-parse@1.5.10:
     resolution: {integrity: sha512-WypcfiRhfeUP9vvF0j6rw0J3hrWrw6iZv3+22h6iRMJ/8z1Tj6XfLP4DsUix5MhMPnXpiHDoKyoZ/bdCkwBCiQ==}
+
+  urlpattern-polyfill@10.1.0:
+    resolution: {integrity: sha512-IGjKp/o0NL3Bso1PymYURCJxMPNAf/ILOpendP9f5B6e1rTJgdgiOvgfoT8VxCAdY+Wisb9uhGaJJf3yZ2V9nw==}
 
   use-sync-external-store@1.5.0:
     resolution: {integrity: sha512-Rb46I4cGGVBmjamjphe8L/UnvJD+uPPtTkNvX5mZgqdbavhI4EbgIWJiIHXJ8bc/i9EQGPRh4DwEURJ552Do0A==}
@@ -9114,6 +9123,8 @@ snapshots:
     dependencies:
       querystringify: 2.2.0
       requires-port: 1.0.0
+
+  urlpattern-polyfill@10.1.0: {}
 
   use-sync-external-store@1.5.0(react@19.1.0):
     dependencies:
