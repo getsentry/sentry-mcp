@@ -614,10 +614,33 @@ export const TraceSpanSchema: z.ZodType<any> = z.lazy(() =>
 );
 
 /**
+ * Schema for issue objects that can appear in trace responses.
+ *
+ * When Sentry's trace API returns standalone errors, they are returned as
+ * SerializedIssue objects that lack the span-specific fields.
+ */
+export const TraceIssueSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]).optional(),
+    issue_id: z.union([z.string(), z.number()]).optional(),
+    project_id: z.union([z.string(), z.number()]).optional(),
+    project_slug: z.string().optional(),
+    title: z.string().optional(),
+    culprit: z.string().optional(),
+    type: z.string().optional(),
+    timestamp: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough();
+
+/**
  * Schema for Sentry trace response.
  *
  * Contains the complete trace tree starting from root spans.
- * The response is an array of root-level spans, each potentially
- * containing nested children spans.
+ * The response is an array that can contain both root-level spans
+ * and standalone issue objects. The Sentry API's query_trace_data
+ * function returns a mixed list of SerializedSpan and SerializedIssue
+ * objects when there are errors not directly associated with spans.
  */
-export const TraceSchema = z.array(TraceSpanSchema);
+export const TraceSchema = z.array(
+  z.union([TraceSpanSchema, TraceIssueSchema]),
+);

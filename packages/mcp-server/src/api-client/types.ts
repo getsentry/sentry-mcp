@@ -63,6 +63,7 @@ import type {
   TraceMetaSchema,
   TraceSchema,
   TraceSpanSchema,
+  TraceIssueSchema,
   UserSchema,
 } from "./schema";
 
@@ -92,4 +93,5 @@ export type ClientKeyList = z.infer<typeof ClientKeyListSchema>;
 // Trace types
 export type TraceMeta = z.infer<typeof TraceMetaSchema>;
 export type TraceSpan = z.infer<typeof TraceSpanSchema>;
+export type TraceIssue = z.infer<typeof TraceIssueSchema>;
 export type Trace = z.infer<typeof TraceSchema>;
