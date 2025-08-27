@@ -16,6 +16,7 @@ export default defineTool({
     // User data endpoints (like /auth/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
+    // API client will throw ApiClientError/ApiServerError which the MCP server wrapper handles
     const user = await apiService.getAuthenticatedUser();
 
     let output = `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;

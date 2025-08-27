@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
-import {
-  apiServiceFromContext,
-  withApiErrorHandling,
-} from "../../internal/tool-helpers/api";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
@@ -106,54 +103,32 @@ export default defineTool({
         projectId = params.projectSlugOrId;
       } else {
         // It's a slug, convert to ID
-        const project = await withApiErrorHandling(
-          () =>
-            apiService.getProject({
-              organizationSlug: params.organizationSlug,
-              projectSlugOrId: params.projectSlugOrId!,
-            }),
-          {
-            organizationSlug: params.organizationSlug,
-            projectSlugOrId: params.projectSlugOrId,
-          },
-        );
+        const project = await apiService.getProject({
+          organizationSlug: params.organizationSlug,
+          projectSlugOrId: params.projectSlugOrId!,
+        });
         projectId = String(project.id);
       }
     }
 
     // Translate natural language to Sentry query
-    const agentResult = await withApiErrorHandling(
-      () =>
-        searchIssuesAgent(
-          params.naturalLanguageQuery,
-          params.organizationSlug,
-          apiService,
-          projectId,
-        ),
-      {
-        organizationSlug: params.organizationSlug,
-        projectSlugOrId: params.projectSlugOrId,
-      },
+    const agentResult = await searchIssuesAgent(
+      params.naturalLanguageQuery,
+      params.organizationSlug,
+      apiService,
+      projectId,
     );
 
     const translatedQuery = agentResult.result;
 
     // Execute the search - listIssues accepts projectSlug directly
-    const issues = await withApiErrorHandling(
-      () =>
-        apiService.listIssues({
-          organizationSlug: params.organizationSlug,
-          projectSlug: params.projectSlugOrId,
-          query: translatedQuery.query,
-          sortBy: translatedQuery.sort || "date",
-          limit: params.limit,
-        }),
-      {
-        organizationSlug: params.organizationSlug,
-        projectSlug: params.projectSlugOrId,
-        query: translatedQuery.query,
-      },
-    );
+    const issues = await apiService.listIssues({
+      organizationSlug: params.organizationSlug,
+      projectSlug: params.projectSlugOrId,
+      query: translatedQuery.query,
+      sortBy: translatedQuery.sort || "date",
+      limit: params.limit,
+    });
 
     // Build output with explanation first (if requested), then results
     let output = "";

@@ -1,4 +1,8 @@
-import { SentryApiService, ApiError } from "../../api-client/index";
+import {
+  SentryApiService,
+  ApiClientError,
+  ApiNotFoundError,
+} from "../../api-client/index";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
 
@@ -62,31 +66,28 @@ export function handleApiError(
   error: unknown,
   params?: Record<string, unknown>,
 ): never {
-  if (error instanceof ApiError) {
-    // For 4xx errors, convert to UserInputError with status code in message
-    // This provides agents with the specific error type while using the appropriate error class
-    if (error.status >= 400 && error.status < 500) {
-      let message = `API error (${error.status}): ${error.message}`;
+  // Use the new error hierarchy - all 4xx errors extend ApiClientError
+  if (error instanceof ApiClientError) {
+    let message = `API error (${error.status}): ${error.message}`;
 
-      // For 404s, add helpful context about parameters if available
-      if (error.status === 404 && params) {
-        const paramsList: string[] = [];
-        for (const [key, value] of Object.entries(params)) {
-          if (value !== undefined && value !== null && value !== "") {
-            paramsList.push(`${key}: '${value}'`);
-          }
-        }
-
-        if (paramsList.length > 0) {
-          message = `Resource not found (404): ${error.message}\nPlease verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`;
+    // Special handling for 404s with parameter context
+    if (error instanceof ApiNotFoundError && params) {
+      const paramsList: string[] = [];
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null && value !== "") {
+          paramsList.push(`${key}: '${value}'`);
         }
       }
 
-      throw new UserInputError(message, { cause: error });
+      if (paramsList.length > 0) {
+        message = `Resource not found (404): ${error.message}\nPlease verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`;
+      }
     }
+
+    throw new UserInputError(message, { cause: error });
   }
 
-  // Re-throw any other errors as-is (including 5xx server errors)
+  // All other errors bubble up (including ApiServerError for 5xx)
   throw error;
 }
 

@@ -16,7 +16,7 @@ import {
 } from "../internal/tool-helpers/seer";
 import { retryWithBackoff } from "../internal/fetch-utils";
 import type { ServerContext } from "../types";
-import { ApiError } from "../api-client/index";
+import { ApiError, ApiServerError } from "../api-client/index";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -103,12 +103,10 @@ export default defineTool({
         maxRetries: SEER_MAX_RETRIES,
         initialDelay: SEER_INITIAL_RETRY_DELAY,
         shouldRetry: (error) => {
-          // Retry on network errors or 5xx errors
-          if (error instanceof ApiError) {
-            return error.status >= 500;
-          }
-          // Retry on network/connection errors
-          return true;
+          // Retry on server errors (5xx) or non-API errors (network issues)
+          return (
+            error instanceof ApiServerError || !(error instanceof ApiError)
+          );
         },
       },
     );
@@ -137,10 +135,10 @@ export default defineTool({
           maxRetries: SEER_MAX_RETRIES,
           initialDelay: SEER_INITIAL_RETRY_DELAY,
           shouldRetry: (error) => {
-            if (error instanceof ApiError) {
-              return error.status >= 500;
-            }
-            return true;
+            // Retry on server errors (5xx) or non-API errors (network issues)
+            return (
+              error instanceof ApiServerError || !(error instanceof ApiError)
+            );
           },
         },
       );
@@ -233,10 +231,10 @@ export default defineTool({
             maxRetries: SEER_MAX_RETRIES,
             initialDelay: SEER_INITIAL_RETRY_DELAY,
             shouldRetry: (error) => {
-              if (error instanceof ApiError) {
-                return error.status >= 500;
-              }
-              return true;
+              // Retry on server errors (5xx) or non-API errors (network issues)
+              return (
+                error instanceof ApiServerError || !(error instanceof ApiError)
+              );
             },
           },
         );

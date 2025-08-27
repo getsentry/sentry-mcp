@@ -1,14 +1,13 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
-import {
-  apiServiceFromContext,
-  withApiErrorHandling,
-} from "../internal/tool-helpers/api";
+import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import {
   parseIssueParams,
   formatIssueOutput,
 } from "../internal/tool-helpers/issue";
+import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
+import { ApiNotFoundError } from "../api-client";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import {
@@ -69,6 +68,7 @@ export default defineTool({
 
     if (params.eventId) {
       const orgSlug = params.organizationSlug;
+      const eventId = params.eventId; // Capture eventId for type safety
       if (!orgSlug) {
         throw new UserInputError(
           "`organizationSlug` is required when providing `eventId`",
@@ -76,18 +76,33 @@ export default defineTool({
       }
 
       setTag("organization.slug", orgSlug);
+      // API client will throw ApiClientError/ApiServerError which the MCP server wrapper handles
       const [issue] = await apiService.listIssues({
         organizationSlug: orgSlug,
-        query: params.eventId,
+        query: eventId,
       });
       if (!issue) {
-        return `# Event Not Found\n\nNo issue found for Event ID: ${params.eventId}`;
+        return `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`;
       }
-      const event = await apiService.getEventForIssue({
-        organizationSlug: orgSlug,
-        issueId: issue.shortId,
-        eventId: params.eventId,
-      });
+      // For this call, we might want to provide context if it fails
+      let event: Awaited<ReturnType<typeof apiService.getEventForIssue>>;
+      try {
+        event = await apiService.getEventForIssue({
+          organizationSlug: orgSlug,
+          issueId: issue.shortId,
+          eventId,
+        });
+      } catch (error) {
+        // Optionally enhance 404 errors with parameter context
+        if (error instanceof ApiNotFoundError) {
+          throw enhanceNotFoundError(error, {
+            organizationSlug: orgSlug,
+            issueId: issue.shortId,
+            eventId,
+          });
+        }
+        throw error;
+      }
 
       // Try to fetch Seer analysis context (non-blocking)
       let autofixState:
@@ -134,17 +149,22 @@ export default defineTool({
 
     setTag("organization.slug", orgSlug);
 
-    const issue = await withApiErrorHandling(
-      () =>
-        apiService.getIssue({
-          organizationSlug: orgSlug,
-          issueId: parsedIssueId!,
-        }),
-      {
+    // For the main issue lookup, provide parameter context on 404
+    let issue: Awaited<ReturnType<typeof apiService.getIssue>>;
+    try {
+      issue = await apiService.getIssue({
         organizationSlug: orgSlug,
-        issueId: parsedIssueId,
-      },
-    );
+        issueId: parsedIssueId!,
+      });
+    } catch (error) {
+      if (error instanceof ApiNotFoundError) {
+        throw enhanceNotFoundError(error, {
+          organizationSlug: orgSlug,
+          issueId: parsedIssueId,
+        });
+      }
+      throw error;
+    }
 
     const event = await apiService.getLatestEventForIssue({
       organizationSlug: orgSlug,
