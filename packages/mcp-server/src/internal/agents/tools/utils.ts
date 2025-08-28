@@ -91,8 +91,12 @@ export function agentTool<TParameters, TResult>(config: {
           };
         }
 
-        // Re-throw all other errors to be handled by the parent tool's error handling
-        throw error;
+        // Log unexpected errors to Sentry and return safe generic message
+        // SECURITY: Don't return untrusted error messages that could enable prompt injection
+        const eventId = logError(error);
+        return {
+          error: `System Error: An unexpected error occurred. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
+        };
       }
     },
   });
