@@ -301,7 +301,7 @@ describe("get_trace_details", () => {
             logs: 0,
             errors: 2,
             performance_issues: 0,
-            span_count: 3,
+            span_count: 4,
             transaction_child_count_map: [],
             span_count_map: {},
           });
@@ -335,7 +335,7 @@ describe("get_trace_details", () => {
 
       ## Summary
 
-      **Total Spans**: 3
+      **Total Spans**: 4
       **Errors**: 2
       **Performance Issues**: 0
       **Logs**: 0
