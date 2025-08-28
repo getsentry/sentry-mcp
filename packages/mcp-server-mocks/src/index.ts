@@ -55,6 +55,9 @@ import traceMetaWithNullsFixture from "./fixtures/trace-meta-with-nulls.json" wi
   type: "json",
 };
 import traceFixture from "./fixtures/trace.json" with { type: "json" };
+import traceMixedFixture from "./fixtures/trace-mixed.json" with {
+  type: "json",
+};
 import traceEventFixture from "./fixtures/trace-event.json" with {
   type: "json",
 };
@@ -1349,6 +1352,7 @@ export {
   traceMetaFixture,
   traceMetaWithNullsFixture,
   traceFixture,
+  traceMixedFixture,
   traceEventFixture,
 };
 
