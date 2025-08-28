@@ -102,12 +102,12 @@ export default defineTool({
 
     // Translate the natural language query using Search Events Agent
     // The agent will determine the dataset and fetch the appropriate attributes
-    const agentResult = await searchEventsAgent(
-      params.naturalLanguageQuery,
+    const agentResult = await searchEventsAgent({
+      query: params.naturalLanguageQuery,
       organizationSlug,
       apiService,
       projectId,
-    );
+    });
 
     const parsed = agentResult.result;
 

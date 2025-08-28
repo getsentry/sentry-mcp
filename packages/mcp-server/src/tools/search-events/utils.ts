@@ -87,12 +87,14 @@ export async function fetchCustomAttributes(
 
 /**
  * Create a tool for the agent to query available attributes by dataset
+ * The tool is pre-bound with the API service and organization configured for the appropriate region
  */
-export function createDatasetAttributesTool(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  projectId?: string,
-) {
+export function createDatasetAttributesTool(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectId?: string;
+}) {
+  const { apiService, organizationSlug, projectId } = options;
   return agentTool({
     description:
       "Query available attributes and fields for a specific Sentry dataset to understand what data is available",

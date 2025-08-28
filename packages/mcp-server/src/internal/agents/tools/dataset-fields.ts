@@ -60,13 +60,15 @@ export async function discoverDatasetFields(
 
 /**
  * Create a tool for discovering available fields in a dataset
+ * The tool is pre-bound with the API service and organization configured for the appropriate region
  */
-export function createDatasetFieldsTool(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  dataset: DatasetType,
-  projectId?: string,
-) {
+export function createDatasetFieldsTool(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  dataset: DatasetType;
+  projectId?: string;
+}) {
+  const { apiService, organizationSlug, dataset, projectId } = options;
   return agentTool({
     description: `Discover available fields for ${dataset} searches in Sentry`,
     parameters: z.object({

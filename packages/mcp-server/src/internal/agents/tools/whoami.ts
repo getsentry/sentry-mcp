@@ -25,8 +25,10 @@ export async function getCurrentUser(
 
 /**
  * Create a tool for getting current user information
+ * The tool is pre-bound with the API service configured for the appropriate region
  */
-export function createWhoamiTool(apiService: SentryApiService) {
+export function createWhoamiTool(options: { apiService: SentryApiService }) {
+  const { apiService } = options;
   return agentTool({
     description: "Get the current authenticated user's information",
     parameters: z.object({}),

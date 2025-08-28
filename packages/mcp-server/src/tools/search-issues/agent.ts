@@ -22,15 +22,19 @@ const outputSchema = z.object({
     .describe("Brief explanation of how you translated this query."),
 });
 
+export interface SearchIssuesAgentOptions {
+  query: string;
+  organizationSlug: string;
+  apiService: SentryApiService;
+  projectId?: string;
+}
+
 /**
  * Search issues agent - single entry point for translating natural language queries to Sentry issue search syntax
  * This returns both the translated query result AND the tool calls made by the agent
  */
 export async function searchIssuesAgent(
-  query: string,
-  organizationSlug: string,
-  apiService: SentryApiService,
-  projectId?: string,
+  options: SearchIssuesAgentOptions,
 ): Promise<{
   result: z.infer<typeof outputSchema>;
   toolCalls: any[];
@@ -41,17 +45,18 @@ export async function searchIssuesAgent(
     );
   }
 
+  // Create tools pre-bound with the provided API service and organization
   return await callEmbeddedAgent({
     system: systemPrompt,
-    prompt: query,
+    prompt: options.query,
     tools: {
-      issueFields: createDatasetFieldsTool(
-        apiService,
-        organizationSlug,
-        "search_issues",
-        projectId,
-      ),
-      whoami: createWhoamiTool(apiService),
+      issueFields: createDatasetFieldsTool({
+        apiService: options.apiService,
+        organizationSlug: options.organizationSlug,
+        dataset: "search_issues",
+        projectId: options.projectId,
+      }),
+      whoami: createWhoamiTool({ apiService: options.apiService }),
     },
     schema: outputSchema,
   });

@@ -62,15 +62,19 @@ const outputSchema = z
     },
   );
 
+export interface SearchEventsAgentOptions {
+  query: string;
+  organizationSlug: string;
+  apiService: SentryApiService;
+  projectId?: string;
+}
+
 /**
  * Search events agent - single entry point for translating natural language queries to Sentry search syntax
  * This returns both the translated query result AND the tool calls made by the agent
  */
 export async function searchEventsAgent(
-  query: string,
-  organizationSlug: string,
-  apiService: SentryApiService,
-  projectId?: string,
+  options: SearchEventsAgentOptions,
 ): Promise<{
   result: z.infer<typeof outputSchema>;
   toolCalls: any[];
@@ -81,22 +85,23 @@ export async function searchEventsAgent(
     );
   }
 
-  const datasetAttributesTool = createDatasetAttributesTool(
-    apiService,
-    organizationSlug,
-    projectId,
-  );
-  const otelLookupTool = createOtelLookupTool(
-    apiService,
-    organizationSlug,
-    projectId,
-  );
-  const whoamiTool = createWhoamiTool(apiService);
+  // Create tools pre-bound with the provided API service and organization
+  const datasetAttributesTool = createDatasetAttributesTool({
+    apiService: options.apiService,
+    organizationSlug: options.organizationSlug,
+    projectId: options.projectId,
+  });
+  const otelLookupTool = createOtelLookupTool({
+    apiService: options.apiService,
+    organizationSlug: options.organizationSlug,
+    projectId: options.projectId,
+  });
+  const whoamiTool = createWhoamiTool({ apiService: options.apiService });
 
   // Use callEmbeddedAgent to translate the query with tool call capture
   return await callEmbeddedAgent({
     system: systemPrompt,
-    prompt: query,
+    prompt: options.query,
     tools: {
       datasetAttributes: datasetAttributesTool,
       otelSemantics: otelLookupTool,
