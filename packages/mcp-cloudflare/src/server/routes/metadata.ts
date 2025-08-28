@@ -11,6 +11,13 @@ import { logError } from "@sentry/mcp-server/logging";
 import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
 import type { ErrorResponse } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
+import {
+  TOOL_PERMISSIONS,
+  PERMISSION_DESCRIPTIONS,
+  PermissionLevel,
+  getRequiredPermissionLevel,
+  type ToolCategory,
+} from "@sentry/mcp-server/permissions";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
@@ -40,6 +47,13 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
     // Get tools by connecting to MCP server
     let tools: string[] = [];
+    let toolsWithPermissions: Record<
+      string,
+      {
+        category: ToolCategory;
+        requiredPermission: PermissionLevel;
+      }
+    > = {};
     let mcpClient: MCPClient | undefined;
     try {
       const requestUrl = new URL(c.req.url);
@@ -58,6 +72,18 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
       const mcpTools = await mcpClient.tools();
       tools = Object.keys(mcpTools);
+
+      // Add permission information for each tool
+      toolsWithPermissions = Object.fromEntries(
+        tools.map((toolName) => [
+          toolName,
+          {
+            category: TOOL_PERMISSIONS[toolName] || ("read" as ToolCategory),
+            requiredPermission:
+              getRequiredPermissionLevel(toolName) || PermissionLevel.READ_ONLY,
+          },
+        ]),
+      );
     } catch (error) {
       // If we can't get tools, continue with just prompts
       console.warn("Failed to fetch tools from MCP server:", error);
@@ -77,6 +103,8 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       type: "mcp-metadata",
       prompts: serializedPrompts,
       tools,
+      toolPermissions: toolsWithPermissions,
+      permissionLevels: PERMISSION_DESCRIPTIONS,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

@@ -144,6 +144,9 @@ export interface ChatInputProps {
 export interface AuthFormProps {
   authError: string;
   isAuthenticating: boolean;
+  metadata?: McpMetadata;
+  selectedPermissionLevel?: PermissionLevel;
+  onPermissionLevelChange?: (level: PermissionLevel) => void;
   onOAuthLogin: () => void;
 }
 
@@ -182,6 +185,31 @@ export interface ToolInvocationProps {
   messageId: string;
   index: number;
 }
+
+// MCP Metadata types
+export interface McpMetadata {
+  type: "mcp-metadata";
+  prompts: any[];
+  tools: string[];
+  toolPermissions: Record<
+    string,
+    {
+      category: string;
+      requiredPermission: string;
+    }
+  >;
+  permissionLevels: Record<string, PermissionLevelDescription>;
+  timestamp: string;
+}
+
+export interface PermissionLevelDescription {
+  title: string;
+  description: string;
+  capabilities: string[];
+}
+
+// Re-export permission level from server
+export { PermissionLevel } from "@sentry/mcp-server/permissions";
 
 // Type guards
 export function isTextMessage(

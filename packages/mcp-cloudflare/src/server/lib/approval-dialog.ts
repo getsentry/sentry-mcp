@@ -402,6 +402,146 @@ export function renderApprovalDialog(
             border: 1px solid var(--border-color);
             color: var(--text-color);
           }
+          
+          /* Permission selection styles */
+          .permission-section {
+            margin: 2rem 0;
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+          }
+          
+          .permission-title {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: white;
+          }
+          
+          /* Default permissions section */
+          .default-permissions {
+            margin-bottom: 2rem;
+            background-color: oklab(0 0 0 / 0.15);
+            border: 1px solid var(--highlight-color);
+            padding: 1.5rem;
+            border-radius: 4px;
+          }
+          
+          .default-permissions-title {
+            margin: 0 0 1rem 0;
+            font-size: 1rem;
+            font-weight: 500;
+            color: white;
+          }
+          
+          .default-permission-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+          }
+          
+          .permission-check {
+            font-size: 1.2rem;
+            color: var(--highlight-color);
+            flex-shrink: 0;
+            margin-top: 0.1rem;
+          }
+          
+          .default-permission-content {
+            flex: 1;
+          }
+          
+          .default-permission-name {
+            font-weight: 600;
+            color: white;
+            font-size: 1rem;
+          }
+          
+          .default-permission-description {
+            color: var(--text-color);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+          }
+          
+          /* Optional permissions section */
+          .optional-permissions {
+            margin-bottom: 1.5rem;
+          }
+          
+          .optional-permissions-title {
+            margin: 0 0 1rem 0;
+            font-size: 1rem;
+            font-weight: 500;
+            color: white;
+          }
+          
+          .optional-permission-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+          
+          .optional-permission-item:hover {
+            border-color: var(--highlight-color);
+            background-color: oklab(0 0 0 / 0.1);
+          }
+          
+          .optional-permission-item input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+          }
+          
+          .permission-checkbox {
+            font-size: 1.2rem;
+            color: var(--text-color);
+            transition: color 0.2s ease;
+            flex-shrink: 0;
+            cursor: pointer;
+            margin-top: 0.1rem;
+          }
+          
+          /* CSS-only checkbox interactions using :checked pseudo-class */
+          .optional-permission-item input[type="checkbox"]:checked + .permission-checkbox {
+            color: var(--highlight-color);
+          }
+          
+          .optional-permission-item input[type="checkbox"]:checked + .permission-checkbox::before {
+            content: "☑";
+          }
+          
+          .optional-permission-item input[type="checkbox"]:not(:checked) + .permission-checkbox::before {
+            content: "☐";
+          }
+          
+          .optional-permission-item:has(input[type="checkbox"]:checked) {
+            background-color: oklab(0 0 0 / 0.1);
+          }
+          
+          .optional-permission-item input[type="checkbox"]:focus + .permission-checkbox {
+            outline: 2px solid var(--highlight-color);
+            outline-offset: 2px;
+          }
+          
+          .optional-permission-content {
+            flex: 1;
+          }
+          
+          .optional-permission-name {
+            font-weight: 600;
+            color: white;
+            font-size: 1rem;
+          }
+          
+          .optional-permission-description {
+            color: var(--text-color);
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+          }
 
           
           /* Responsive adjustments */
@@ -525,6 +665,45 @@ export function renderApprovalDialog(
               }
             </div>
             
+            <div class="permission-section">
+              <h3 class="permission-title">Permissions</h3>
+              
+              <!-- Default permissions section -->
+              <div class="default-permissions">
+                <h4 class="default-permissions-title">This MCP client will be able to:</h4>
+                <div class="default-permission-item">
+                  <span class="permission-check">✓</span>
+                  <div class="default-permission-content">
+                    <span class="default-permission-name">Access your Sentry data with Essential Tools (11 tools)</span>
+                    <div class="default-permission-description">Basic information retrieval and search capabilities</div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Optional permissions section -->
+              <div class="optional-permissions">
+                <h4 class="optional-permissions-title">Optional additional access:</h4>
+                
+                <label class="optional-permission-item">
+                  <input type="checkbox" name="permission_issue_triage" value="true">
+                  <span class="permission-checkbox"></span>
+                  <div class="optional-permission-content">
+                    <span class="optional-permission-name">Issue Triage (+1 tool)</span>
+                    <div class="optional-permission-description">Issue management capabilities for bug triage and resolution</div>
+                  </div>
+                </label>
+                
+                <label class="optional-permission-item">
+                  <input type="checkbox" name="permission_project_management" value="true">
+                  <span class="permission-checkbox"></span>
+                  <div class="optional-permission-content">
+                    <span class="optional-permission-name">Project Management (+4 tools)</span>
+                    <div class="optional-permission-description">Full project and team management capabilities</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+            
             <p>This MCP Client is requesting authorization to ${serverName}. If you approve, you will be redirected to complete authentication.</p>
             
             <form method="post" action="${new URL(request.url).pathname}">
@@ -556,6 +735,11 @@ export interface ParsedApprovalResult {
   state: any;
   /** Headers to set on the redirect response, including the Set-Cookie header. */
   headers: Record<string, string>;
+  /** Selected permission capabilities (checkboxes) */
+  permissions: {
+    issueTriageEnabled: boolean;
+    projectManagementEnabled: boolean;
+  };
 }
 
 /**
@@ -577,6 +761,10 @@ export async function parseRedirectApproval(
 
   let state: any;
   let clientId: string | undefined;
+  let permissions: {
+    issueTriageEnabled: boolean;
+    projectManagementEnabled: boolean;
+  };
 
   try {
     const formData = await request.formData();
@@ -592,6 +780,13 @@ export async function parseRedirectApproval(
     if (!clientId) {
       throw new Error("Could not extract clientId from state object.");
     }
+
+    // Extract permission selections from checkboxes
+    permissions = {
+      issueTriageEnabled: formData.get("permission_issue_triage") === "true",
+      projectManagementEnabled:
+        formData.get("permission_project_management") === "true",
+    };
   } catch (e) {
     console.error("Error processing form submission:", e);
     // Rethrow or handle as appropriate, maybe return a specific error response
@@ -621,7 +816,7 @@ export async function parseRedirectApproval(
     "Set-Cookie": `${COOKIE_NAME}=${newCookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`,
   };
 
-  return { state, headers };
+  return { state, headers, permissions };
 }
 
 // sanitizeHtml function is now imported from "./html-utils"
