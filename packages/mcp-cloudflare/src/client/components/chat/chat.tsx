@@ -29,12 +29,12 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
   const { initialMessages, saveMessages, clearPersistedMessages } =
     usePersistedChat(isAuthenticated);
 
-  // Fetch MCP metadata immediately when authenticated
+  // Fetch MCP metadata immediately when authenticated, and also for permission selection
   const {
     metadata: mcpMetadata,
     isLoading: isMetadataLoading,
     error: metadataError,
-  } = useMcpMetadata(isAuthenticated);
+  } = useMcpMetadata(isAuthenticated, !isAuthenticated);
 
   // Initialize streaming simulation first (without scroll callback)
   const {

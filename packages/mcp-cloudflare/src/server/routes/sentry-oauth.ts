@@ -8,6 +8,29 @@ import {
 import type { Env, WorkerProps } from "../types";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
 import { SCOPES } from "../../constants";
+import { PermissionLevel } from "@sentry/mcp-server/permissions";
+
+/**
+ * Convert permission checkboxes to a permission level
+ * Read-only is always included, checkboxes add additional capabilities
+ */
+function getPermissionLevelFromCheckboxes(permissions: {
+  issueTriageEnabled: boolean;
+  projectManagementEnabled: boolean;
+}): PermissionLevel {
+  // If project management is enabled, it includes all capabilities
+  if (permissions.projectManagementEnabled) {
+    return PermissionLevel.PROJECT_MANAGEMENT;
+  }
+
+  // If only issue triage is enabled, that's the level
+  if (permissions.issueTriageEnabled) {
+    return PermissionLevel.ISSUE_TRIAGE;
+  }
+
+  // Default to read-only (always included)
+  return PermissionLevel.READ_ONLY;
+}
 import {
   renderApprovalDialog,
   clientIdAlreadyApproved,
@@ -98,7 +121,7 @@ export default new Hono<{
 
   .post("/authorize", async (c) => {
     // Validates form submission, extracts state, and generates Set-Cookie headers to skip approval dialog next time
-    const { state, headers } = await parseRedirectApproval(
+    const { state, headers, permissions } = await parseRedirectApproval(
       c.req.raw,
       c.env.COOKIE_SECRET,
     );
@@ -106,7 +129,14 @@ export default new Hono<{
       return c.text("Invalid request", 400);
     }
 
-    return redirectToUpstream(c.env, c.req.raw, state.oauthReqInfo, headers);
+    // Add permissions to the state that will be passed through to the callback
+    const enhancedOauthReqInfo = {
+      ...state.oauthReqInfo,
+      // Store permissions in the state to be passed through the OAuth flow
+      permissions: permissions,
+    };
+
+    return redirectToUpstream(c.env, c.req.raw, enhancedOauthReqInfo, headers);
   })
 
   /**
@@ -164,6 +194,12 @@ export default new Hono<{
     });
     if (errResponse) return errResponse;
 
+    // Extract permission level from the OAuth request state
+    // This comes from the permissions selected in the approval form
+    const permissionLevel = oauthReqInfo.permissions
+      ? getPermissionLevelFromCheckboxes(oauthReqInfo.permissions)
+      : PermissionLevel.READ_ONLY;
+
     // Return back to the MCP client a new token
     const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
       request: oauthReqInfo,
@@ -179,6 +215,7 @@ export default new Hono<{
         accessToken: payload.access_token,
         clientId: oauthReqInfo.clientId,
         scope: oauthReqInfo.scope.join(" "),
+        permissionLevel,
       } as WorkerProps,
     });
 
