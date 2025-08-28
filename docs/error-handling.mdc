@@ -90,44 +90,36 @@ const result = await apiService.someMethod({ organizationSlug });
 
 ### 2. Embedded Agent Tools
 
-Tools used by AI agents within other tools use `wrapAgentToolExecute`:
+Tools used by AI agents within other tools use `agentTool()` which returns structured responses:
 
 ```typescript
-import { wrapAgentToolExecute } from "../../internal/agents/tools/utils";
+import { agentTool } from "../../internal/agents/tools/utils";
 
-return tool({
+return agentTool({
   description: "Tool description",
   parameters: z.object({ ... }),
-  execute: wrapAgentToolExecute(async (params) => {
-    // Just call the API directly - no withApiErrorHandling needed
+  execute: async (params) => {
+    // Just call the API directly - no error handling needed
     const data = await apiService.someMethod(params);
     return formatResult(data);
-  })
+  }
 });
 ```
 
 **What happens:**
 - API client throws `ApiClientError` or `ApiServerError`
-- `wrapAgentToolExecute` catches ALL API errors and throws formatted errors:
-  - `UserInputError` → Logged to console.warn, throws formatted Error:
-    ```
-    Error: Input Error: {message}. You may be able to resolve this by addressing the concern and trying again.
-    ```
-  - `ApiClientError` → Logged to console.warn, throws formatted Error:
-    ```
-    Error: Input Error: API error (404): Project not found. Please verify the parameters are correct. You may be able to resolve this by addressing the concern and trying again.
-    ```
-  - `ApiServerError` → Logged to Sentry with Event ID, throws formatted Error:
-    ```
-    Error: Server Error (502): Bad Gateway. Event ID: abc123def456. This is a system error that cannot be resolved by retrying.
-    ```
+- `agentTool` catches ALL API errors and returns structured responses:
+  - **Success:** `{ result: <data> }`
+  - **UserInputError:** `{ error: "Input Error: {message}. You may be able to resolve this by addressing the concern and trying again." }`
+  - **ApiClientError:** `{ error: "Input Error: API error (404): Project not found. Please verify the parameters are correct. You may be able to resolve this by addressing the concern and trying again." }`
+  - **ApiServerError:** `{ error: "Server Error (502): Bad Gateway. Event ID: abc123def456. This is a system error that cannot be resolved by retrying." }`
 - Other errors (unexpected) → Re-thrown to parent tool
 
-**Important:** When `wrapAgentToolExecute` throws these formatted errors, the AI SDK converts them to `tool-error` content parts. This allows the AI agent to:
-- See the error occurred and understand what went wrong
-- Potentially retry with corrected parameters for input errors
-- Handle system errors appropriately
-- Use the AI SDK's built-in error recovery mechanisms
+**Key Benefits:**
+- **Structured responses:** AI agents receive consistent `{error?, result?}` objects instead of thrown errors
+- **Better error handling:** Agents can check for `error` property and handle failures gracefully
+- **Retry logic:** Agents can analyze error messages and determine if retry is worthwhile
+- **Type safety:** Return types are preserved while error handling is abstracted
 
 ### 3. Error Flow Examples
 
@@ -137,18 +129,20 @@ return tool({
 1. User calls search_events tool
 2. search_events uses AI agent with datasetAttributesTool  
 3. datasetAttributesTool calls fetchCustomAttributes()
-4. fetchCustomAttributes calls apiService.listTraceItemAttributes() directly (no withApiErrorHandling)
+4. fetchCustomAttributes calls apiService.listTraceItemAttributes() directly
 5. API returns 403 "no multi-project access"
 6. API client creates ApiPermissionError via createApiError factory and throws
 7. fetchCustomAttributes lets it bubble up (no try/catch)
-8. wrapAgentToolExecute catches ApiClientError (specifically ApiPermissionError)
+8. agentTool catches ApiClientError (specifically ApiPermissionError)
 9. Logs to console.warn() for Sentry logging
-10. Throws formatted Error:
+10. Returns structured response:
     ```
-    Error: Input Error: API error (403): You do not have access to query across multiple projects. Please select a project for your query. You may be able to resolve this by addressing the concern and trying again.
+    { 
+      error: "Input Error: API error (403): You do not have access to query across multiple projects. Please select a project for your query. You may be able to resolve this by addressing the concern and trying again." 
+    }
     ```
-11. AI SDK converts to tool-error content part
-12. AI agent sees the error occurred and can retry with a specific project
+11. AI agent receives the structured response and can check the error property
+12. AI agent analyzes error message and retries with a specific project
 ```
 
 #### Example 2: Server Error
@@ -167,14 +161,16 @@ return tool({
 
 ### DO:
 - Call API methods directly and let errors bubble up naturally
-- Use `wrapAgentToolExecute` for embedded agent tools
+- Use `agentTool()` for embedded agent tools
 - Let typed errors (ApiClientError, ApiServerError) bubble up
 - Include helpful context in error messages
 - Rely on the error hierarchy for proper handling
+- Check for `error` property in agent tool responses
 
 ### DON'T:
 - Don't wrap API calls in try/catch unless adding value
 - Don't use `withApiErrorHandling` anymore (deprecated)
+- Don't use the old `wrapAgentToolExecute` function (use `agentTool` instead)
 - Don't use `logError()` for expected API errors (4xx)
 - Don't use `captureException()` for UserInputError or ApiClientError
 - Don't create Sentry issues for user-facing errors
@@ -191,15 +187,15 @@ createApiError Factory
     Thrown directly to tool (no withApiErrorHandling)
        ↓  
     In Embedded Agent Tool?
-    ├─ Yes → wrapAgentToolExecute
-    │        ├─ UserInputError → Throws formatted Error "Input Error: ..."
-    │        ├─ ApiClientError → Throws formatted Error "Input Error: ..." with toUserMessage()
-    │        ├─ ApiServerError → Throws formatted Error "Server Error (5xx): ..." + Event ID (logged to Sentry)
+    ├─ Yes → agentTool
+    │        ├─ UserInputError → Returns { error: "Input Error: ..." }
+    │        ├─ ApiClientError → Returns { error: "Input Error: ..." } with toUserMessage()
+    │        ├─ ApiServerError → Returns { error: "Server Error (5xx): ..." } + Event ID (logged to Sentry)
     │        └─ Other (unexpected) → Re-throw
     │              ↓
-    │        AI SDK converts to tool-error content part
+    │        AI agent receives structured {error?, result?} response
     │              ↓
-    │        AI agent can see error and potentially retry/correct
+    │        AI agent checks for error property and handles accordingly
     └─ No → MCP Server Wrapper → formatErrorForUser
             ├─ UserInputError → "**Input Error**" formatted
             ├─ ApiClientError → "**Input Error**" with toUserMessage()
@@ -234,33 +230,36 @@ When using Cloudflare Workers with Sentry integration:
 
 ### For Embedded Agent Tools:
 
-1. **Wrap the execute function with `wrapAgentToolExecute`:**
+1. **Use `agentTool()` instead of the regular `tool()` function:**
    ```typescript
-   return tool({
+   return agentTool({
      description: "Tool description",
      parameters: z.object({ ... }),
-     execute: wrapAgentToolExecute(async (params) => {
-       // Your tool implementation
-     })
+     execute: async (params) => {
+       // Your tool implementation - return the result directly
+       const data = await apiService.someMethod(params);
+       return formatResult(data);
+     }
    });
    ```
 
 2. **Inside the tool, call the API directly:**
    ```typescript
-   // No withApiErrorHandling needed
+   // No error handling needed - agentTool handles it automatically
    const data = await apiService.someMethod(params);
    ```
 
 3. **The wrapper will automatically:**
-   - Throw formatted errors that the AI SDK converts to tool-error parts
+   - Return `{ result: <data> }` on success
+   - Return `{ error: "formatted message" }` on failure
    - Log UserInputError/ApiClientError to console.warn for Sentry logging  
-   - Include Event IDs for ApiServerError while still throwing the error
+   - Include Event IDs for ApiServerError in error messages
 
 ### Error Message Formats:
 
-- **UserInputError to Agent:** Thrown as Error with "Input Error: {message}..." (becomes tool-error)
-- **ApiClientError to Agent:** Thrown as Error with "Input Error: {toUserMessage()}..." (becomes tool-error)
-- **ApiServerError to Agent:** Thrown as Error with "Server Error (5xx): ..." + Event ID (becomes tool-error)
+- **UserInputError to Agent:** `{ error: "Input Error: {message}. You may be able to resolve this by addressing the concern and trying again." }`
+- **ApiClientError to Agent:** `{ error: "Input Error: {toUserMessage()}. You may be able to resolve this by addressing the concern and trying again." }`
+- **ApiServerError to Agent:** `{ error: "Server Error (5xx): {message}. Event ID: {eventId}. This is a system error that cannot be resolved by retrying." }`
 - **ApiClientError to MCP User:** Formatted with "**Input Error**" header and toUserMessage()
 - **ApiServerError to MCP User:** Formatted with "**Error**" header + Event ID (logged to Sentry)
 

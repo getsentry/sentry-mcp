@@ -1,8 +1,7 @@
-import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { UserInputError } from "../../errors";
-import { wrapAgentToolExecute } from "../../internal/agents/tools/utils";
+import { agentTool } from "../../internal/agents/tools/utils";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
@@ -94,7 +93,7 @@ export function createDatasetAttributesTool(
   organizationSlug: string,
   projectId?: string,
 ) {
-  return tool({
+  return agentTool({
     description:
       "Query available attributes and fields for a specific Sentry dataset to understand what data is available",
     parameters: z.object({
@@ -102,7 +101,7 @@ export function createDatasetAttributesTool(
         .enum(["spans", "errors", "logs"])
         .describe("The dataset to query attributes for"),
     }),
-    execute: wrapAgentToolExecute(async ({ dataset }) => {
+    execute: async ({ dataset }) => {
       const {
         BASE_COMMON_FIELDS,
         DATASET_FIELDS,
@@ -160,6 +159,6 @@ ${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldType
 IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
 
 Use this information to construct appropriate queries for the ${dataset} dataset.`;
-    }),
+    },
   });
 }

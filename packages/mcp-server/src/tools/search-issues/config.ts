@@ -44,5 +44,11 @@ EXAMPLES:
 
 NEVER: query: "is:unresolved sort:user" ← Sort goes in separate field!
 
+CRITICAL - TOOL RESPONSE HANDLING:
+All tools return responses in this format: {error?: string, result?: data}
+- If 'error' is present: The tool failed - analyze the error message and potentially retry with corrections
+- If 'result' is present: The tool succeeded - use the result data for your query construction
+- Always check for errors before using results
+
 Always use the issueFields tool to discover available fields when needed.
 Use the whoami tool when you need to resolve 'me' references.`;

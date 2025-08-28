@@ -29,6 +29,12 @@ TOOL USAGE GUIDELINES:
 3. Use whoami tool when queries contain "me" references for user.id or user.email fields
 4. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - use the datasetAttributes tool to find the correct field name (typically user_agent.original) instead of assuming it's related to user.id
 
+CRITICAL - TOOL RESPONSE HANDLING:
+All tools return responses in this format: {error?: string, result?: data}
+- If 'error' is present: The tool failed - analyze the error message and potentially retry with corrections
+- If 'result' is present: The tool succeeded - use the result data for your query construction
+- Always check for errors before using results
+
 CRITICAL - HANDLING "DISTINCT" OR "UNIQUE VALUES" QUERIES:
 When user asks for "distinct", "unique", "all values of", or "what are the X" queries:
 1. This ALWAYS requires an AGGREGATE query with count() function
