@@ -30,6 +30,7 @@ import {
   UserRegionsSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
+import { createApiError, ApiError, ApiNotFoundError } from "./errors";
 import type {
   AutofixRun,
   AutofixRunState,
@@ -84,26 +85,6 @@ const NETWORK_ERROR_MESSAGES: Record<string, string> = {
  * }
  * ```
  */
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-  ) {
-    // HACK: improving this error message for the LLMs
-    let finalMessage = message;
-    if (
-      message.includes(
-        "You do not have the multi project stream feature enabled",
-      ) ||
-      message.includes("You cannot view events from multiple projects")
-    ) {
-      finalMessage =
-        "You do not have access to query across multiple projects. Please select a project for your query.";
-    }
-
-    super(finalMessage);
-  }
-}
 
 type RequestOptions = {
   host?: string;
@@ -315,7 +296,13 @@ export class SentryApiService {
         const { data, success, error } = ApiErrorSchema.safeParse(parsed);
 
         if (success) {
-          throw new ApiError(data.detail, response.status);
+          // Use the new error factory to create the appropriate error type
+          throw createApiError(
+            data.detail,
+            response.status,
+            data.detail,
+            parsed,
+          );
         }
 
         console.error(
@@ -817,7 +804,7 @@ export class SentryApiService {
     } catch (error) {
       // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
       // fall back to direct organizations endpoint
-      if (error instanceof ApiError && error.status === 404) {
+      if (error instanceof ApiNotFoundError) {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
         const body = await this.requestJSON("/organizations/", undefined, opts);
         return OrganizationListSchema.parse(body);

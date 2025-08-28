@@ -1,11 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { ApiError } from "../../api-client";
+import {
+  ApiError,
+  ApiNotFoundError,
+  ApiValidationError,
+  ApiPermissionError,
+  createApiError,
+} from "../../api-client";
 import { UserInputError } from "../../errors";
 import { handleApiError, withApiErrorHandling } from "./api";
 
 describe("handleApiError", () => {
   it("converts 404 errors with params to list all parameters", () => {
-    const error = new ApiError("Not Found", 404);
+    const error = new ApiNotFoundError("Not Found");
 
     expect(() =>
       handleApiError(error, {
@@ -25,7 +31,7 @@ describe("handleApiError", () => {
   });
 
   it("converts 404 errors with multiple params including nullish values", () => {
-    const error = new ApiError("Not Found", 404);
+    const error = new ApiNotFoundError("Not Found");
 
     expect(() =>
       handleApiError(error, {
@@ -42,7 +48,7 @@ describe("handleApiError", () => {
   });
 
   it("converts 404 errors with no params to generic message", () => {
-    const error = new ApiError("Not Found", 404);
+    const error = new ApiNotFoundError("Not Found");
 
     expect(() => handleApiError(error, {})).toThrow(
       "API error (404): Not Found",
@@ -50,7 +56,7 @@ describe("handleApiError", () => {
   });
 
   it("converts 400 errors to UserInputError", () => {
-    const error = new ApiError("Invalid parameters", 400);
+    const error = createApiError("Invalid parameters", 400);
 
     expect(() => handleApiError(error)).toThrow(UserInputError);
 
@@ -60,7 +66,7 @@ describe("handleApiError", () => {
   });
 
   it("converts 403 errors to UserInputError with access message", () => {
-    const error = new ApiError("Forbidden", 403);
+    const error = createApiError("Forbidden", 403);
 
     expect(() => handleApiError(error)).toThrow("API error (403): Forbidden");
   });
@@ -83,7 +89,7 @@ describe("withApiErrorHandling", () => {
   });
 
   it("handles errors through handleApiError", async () => {
-    const error = new ApiError("Not Found", 404);
+    const error = new ApiNotFoundError("Not Found");
 
     await expect(
       withApiErrorHandling(

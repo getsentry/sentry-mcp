@@ -1,5 +1,5 @@
 import { UserInputError, ConfigurationError } from "../errors";
-import { ApiError } from "../api-client";
+import { ApiError, ApiClientError, ApiServerError } from "../api-client";
 import { logError } from "../logging";
 
 /**
@@ -26,8 +26,25 @@ export function isApiError(error: unknown): error is ApiError {
 }
 
 /**
+ * Type guard to identify API client errors (4xx).
+ */
+export function isApiClientError(error: unknown): error is ApiClientError {
+  return error instanceof ApiClientError;
+}
+
+/**
+ * Type guard to identify API server errors (5xx).
+ */
+export function isApiServerError(error: unknown): error is ApiServerError {
+  return error instanceof ApiServerError;
+}
+
+/**
  * Format an error for user display with markdown formatting.
  * This is used by tool handlers to format errors for MCP responses.
+ *
+ * SECURITY: Only return trusted error messages to prevent prompt injection vulnerabilities.
+ * We trust: Sentry API errors, our own UserInputError/ConfigurationError messages, and system templates.
  */
 export async function formatErrorForUser(error: unknown): Promise<string> {
   if (isUserInputError(error)) {
@@ -48,19 +65,37 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
     ].join("\n\n");
   }
 
-  if (isApiError(error)) {
-    // Log 500+ errors to Sentry for debugging
-    const eventId = error.status >= 500 ? logError(error) : undefined;
+  // Handle ApiClientError (4xx) - user input errors, should NOT be logged to Sentry
+  if (isApiClientError(error)) {
+    return [
+      "**Input Error**",
+      `There was an HTTP ${error.status} error with your request to the Sentry API.`,
+      error.toUserMessage(),
+      `You may be able to resolve the issue by addressing the concern and trying again.`,
+    ].join("\n\n");
+  }
 
+  // Handle ApiServerError (5xx) - system errors, SHOULD be logged to Sentry
+  if (isApiServerError(error)) {
+    const eventId = logError(error);
+
+    return [
+      "**Error**",
+      `There was an HTTP ${error.status} server error with the Sentry API.`,
+      `${error.message}`,
+      `**Event ID**: ${eventId}`,
+      `Please contact support with this Event ID if the problem persists.`,
+    ].join("\n\n");
+  }
+
+  // Handle generic ApiError (shouldn't happen with new hierarchy, but just in case)
+  if (isApiError(error)) {
     return [
       "**Error**",
       `There was an HTTP ${error.status} error with your request to the Sentry API.`,
       `${error.message}`,
-      eventId ? `**Event ID**: ${eventId}` : "",
       `You may be able to resolve the issue by addressing the concern and trying again.`,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    ].join("\n\n");
   }
 
   const eventId = logError(error);

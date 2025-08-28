@@ -1,9 +1,7 @@
-import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
-import { logError } from "../../logging";
 import { UserInputError } from "../../errors";
-import { wrapAgentToolExecute } from "../../internal/agents/tools/utils";
+import { agentTool } from "../../internal/agents/tools/utils";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
@@ -46,57 +44,42 @@ export async function fetchCustomAttributes(
   const customAttributes: Record<string, string> = {};
   const fieldTypes: Record<string, "string" | "number"> = {};
 
-  try {
-    if (dataset === "errors") {
-      // TODO: For errors dataset, we currently need to use the old listTags API
-      // This will be updated in the future to use the new trace-items attributes API
-      const tagsResponse = await apiService.listTags({
-        organizationSlug,
-        dataset: "events",
-        project: projectId,
-        statsPeriod: "14d",
-        useCache: true,
-        useFlagsBackend: true,
-      });
+  if (dataset === "errors") {
+    // TODO: For errors dataset, we currently need to use the old listTags API
+    // This will be updated in the future to use the new trace-items attributes API
+    const tagsResponse = await apiService.listTags({
+      organizationSlug,
+      dataset: "events",
+      project: projectId,
+      statsPeriod: "14d",
+      useCache: true,
+      useFlagsBackend: true,
+    });
 
-      for (const tag of tagsResponse) {
-        if (tag.key && !tag.key.startsWith("sentry:")) {
-          customAttributes[tag.key] = tag.name || tag.key;
-        }
+    for (const tag of tagsResponse) {
+      if (tag.key && !tag.key.startsWith("sentry:")) {
+        customAttributes[tag.key] = tag.name || tag.key;
       }
-    } else {
-      // For logs and spans datasets, use the trace-items attributes endpoint
-      const itemType = dataset === "logs" ? "logs" : "spans";
-      const attributesResponse = await apiService.listTraceItemAttributes({
-        organizationSlug,
-        itemType,
-        project: projectId,
-        statsPeriod: "14d",
-      });
+    }
+  } else {
+    // For logs and spans datasets, use the trace-items attributes endpoint
+    const itemType = dataset === "logs" ? "logs" : "spans";
+    const attributesResponse = await apiService.listTraceItemAttributes({
+      organizationSlug,
+      itemType,
+      project: projectId,
+      statsPeriod: "14d",
+    });
 
-      for (const attr of attributesResponse) {
-        if (attr.key) {
-          customAttributes[attr.key] = attr.name || attr.key;
-          // Track field type from the attribute response with validation
-          if (attr.type && (attr.type === "string" || attr.type === "number")) {
-            fieldTypes[attr.key] = attr.type;
-          }
+    for (const attr of attributesResponse) {
+      if (attr.key && !attr.key.startsWith("sentry:")) {
+        customAttributes[attr.key] = attr.name || attr.key;
+        // Track field type from the attribute response with validation
+        if (attr.type && (attr.type === "string" || attr.type === "number")) {
+          fieldTypes[attr.key] = attr.type;
         }
       }
     }
-  } catch (error) {
-    // If we can't get custom attributes, continue with just common fields
-    logError(error, {
-      search_events: {
-        dataset,
-        organizationSlug,
-        operation:
-          dataset === "errors" ? "listTags" : "listTraceItemAttributes",
-        ...(dataset !== "errors" && {
-          itemType: dataset === "logs" ? "logs" : "spans",
-        }),
-      },
-    });
   }
 
   return { attributes: customAttributes, fieldTypes };
@@ -110,7 +93,7 @@ export function createDatasetAttributesTool(
   organizationSlug: string,
   projectId?: string,
 ) {
-  return tool({
+  return agentTool({
     description:
       "Query available attributes and fields for a specific Sentry dataset to understand what data is available",
     parameters: z.object({
@@ -118,7 +101,7 @@ export function createDatasetAttributesTool(
         .enum(["spans", "errors", "logs"])
         .describe("The dataset to query attributes for"),
     }),
-    execute: wrapAgentToolExecute(async ({ dataset }) => {
+    execute: async ({ dataset }) => {
       const {
         BASE_COMMON_FIELDS,
         DATASET_FIELDS,
@@ -127,6 +110,9 @@ export function createDatasetAttributesTool(
       } = await import("./config");
 
       // Get custom attributes for this dataset
+      // IMPORTANT: Let ALL errors bubble up to wrapAgentToolExecute
+      // UserInputError will be converted to error string for the AI agent
+      // Other errors will bubble up to be captured by Sentry
       const { attributes: customAttributes, fieldTypes } =
         await fetchCustomAttributes(
           apiService,
@@ -173,6 +159,6 @@ ${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldType
 IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
 
 Use this information to construct appropriate queries for the ${dataset} dataset.`;
-    }),
+    },
   });
 }

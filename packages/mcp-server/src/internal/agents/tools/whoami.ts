@@ -1,7 +1,6 @@
-import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
-import { wrapAgentToolExecute } from "./utils";
+import { agentTool } from "./utils";
 
 export interface WhoamiResult {
   id: string | number;
@@ -15,6 +14,7 @@ export interface WhoamiResult {
 export async function getCurrentUser(
   apiService: SentryApiService,
 ): Promise<WhoamiResult> {
+  // API client throws ApiClientError/ApiServerError which wrapAgentToolExecute handles
   const user = await apiService.getAuthenticatedUser();
   return {
     id: user.id,
@@ -27,12 +27,12 @@ export async function getCurrentUser(
  * Create a tool for getting current user information
  */
 export function createWhoamiTool(apiService: SentryApiService) {
-  return tool({
+  return agentTool({
     description: "Get the current authenticated user's information",
     parameters: z.object({}),
-    execute: wrapAgentToolExecute(async () => {
+    execute: async () => {
       const user = await getCurrentUser(apiService);
       return `Current user: ${user.name || "Unknown"} (${user.email}, ID: ${user.id})`;
-    }),
+    },
   });
 }

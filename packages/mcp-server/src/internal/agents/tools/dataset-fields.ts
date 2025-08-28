@@ -1,7 +1,6 @@
-import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
-import { wrapAgentToolExecute } from "./utils";
+import { agentTool } from "./utils";
 
 export type DatasetType = "events" | "errors" | "search_issues";
 
@@ -68,7 +67,7 @@ export function createDatasetFieldsTool(
   dataset: DatasetType,
   projectId?: string,
 ) {
-  return tool({
+  return agentTool({
     description: `Discover available fields for ${dataset} searches in Sentry`,
     parameters: z.object({
       includeExamples: z
@@ -77,12 +76,12 @@ export function createDatasetFieldsTool(
           "Include example values for each field (set to false if you don't need examples)",
         ),
     }),
-    execute: wrapAgentToolExecute(async ({ includeExamples }) => {
+    execute: async ({ includeExamples }) => {
       return discoverDatasetFields(apiService, organizationSlug, dataset, {
         projectId,
         includeExamples,
       });
-    }),
+    },
   });
 }
 

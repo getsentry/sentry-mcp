@@ -1,8 +1,7 @@
-import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
 import { UserInputError } from "../../../errors";
-import { wrapAgentToolExecute } from "./utils";
+import { agentTool } from "./utils";
 
 // Import all JSON files directly
 import android from "./data/android.json";
@@ -253,7 +252,7 @@ export function createOtelLookupTool(
   organizationSlug: string,
   projectId?: string,
 ) {
-  return tool({
+  return agentTool({
     description:
       "Look up OpenTelemetry semantic convention attributes for a specific namespace. OpenTelemetry attributes are universal standards that work across all datasets.",
     parameters: z.object({
@@ -268,7 +267,7 @@ export function createOtelLookupTool(
           "REQUIRED: Dataset to check attribute availability in. The agent MUST specify this based on their chosen dataset.",
         ),
     }),
-    execute: wrapAgentToolExecute(async ({ namespace, dataset }) => {
+    execute: async ({ namespace, dataset }) => {
       return await lookupOtelSemantics(
         namespace,
         dataset,
@@ -276,6 +275,6 @@ export function createOtelLookupTool(
         organizationSlug,
         projectId,
       );
-    }),
+    },
   });
 }

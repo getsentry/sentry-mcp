@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
-import {
-  apiServiceFromContext,
-  withApiErrorHandling,
-} from "../internal/tool-helpers/api";
+import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl, ParamTraceId } from "../schema";
@@ -67,33 +64,19 @@ export default defineTool({
     setTag("trace.id", params.traceId);
 
     // Get trace metadata for overview
-    const traceMeta = await withApiErrorHandling(
-      () =>
-        apiService.getTraceMeta({
-          organizationSlug: params.organizationSlug,
-          traceId: params.traceId,
-          statsPeriod: "14d", // Fixed stats period
-        }),
-      {
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-      },
-    );
+    const traceMeta = await apiService.getTraceMeta({
+      organizationSlug: params.organizationSlug,
+      traceId: params.traceId,
+      statsPeriod: "14d", // Fixed stats period
+    });
 
     // Get minimal trace data to show key transactions
-    const trace = await withApiErrorHandling(
-      () =>
-        apiService.getTrace({
-          organizationSlug: params.organizationSlug,
-          traceId: params.traceId,
-          limit: 10, // Only get top-level spans for overview
-          statsPeriod: "14d", // Fixed stats period
-        }),
-      {
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-      },
-    );
+    const trace = await apiService.getTrace({
+      organizationSlug: params.organizationSlug,
+      traceId: params.traceId,
+      limit: 10, // Only get top-level spans for overview
+      statsPeriod: "14d", // Fixed stats period
+    });
 
     return formatTraceOutput({
       organizationSlug: params.organizationSlug,
