@@ -42,6 +42,9 @@ export function isApiServerError(error: unknown): error is ApiServerError {
 /**
  * Format an error for user display with markdown formatting.
  * This is used by tool handlers to format errors for MCP responses.
+ *
+ * SECURITY: Only return trusted error messages to prevent prompt injection vulnerabilities.
+ * We trust: Sentry API errors, our own UserInputError/ConfigurationError messages, and system templates.
  */
 export async function formatErrorForUser(error: unknown): Promise<string> {
   if (isUserInputError(error)) {

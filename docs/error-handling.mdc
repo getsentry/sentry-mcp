@@ -46,13 +46,36 @@ ApiError (base class)
 ### 1. Let Errors Bubble Up Naturally
 **API errors should bubble up naturally to the appropriate handler.** The API client throws properly typed errors that are caught at the right level:
 - In MCP tools → Bubble up to MCP server wrapper → `formatErrorForUser`
-- In embedded agent tools → Caught by `wrapAgentToolExecute` → Formatted for AI
+- In embedded agent tools → Caught by `agentTool` → Formatted for AI
 
 ### 2. Typed Error Handling
 **The API client uses a factory pattern (`createApiError`) to create properly typed errors:**
 - 4xx → `ApiClientError` subclass (ApiPermissionError, ApiNotFoundError, etc.)
 - 5xx → `ApiServerError`
 - Each error type has specific behaviors and helper methods
+
+### 3. **SECURITY CRITICAL** - Trusted Error Messages Only
+**🚨 NEVER return untrusted error messages to AI agents - this creates prompt injection vulnerabilities.**
+
+In our system, we ONLY return trusted error messages from:
+- **Sentry API responses** (trusted - Sentry controls these messages)
+- **Our own validation errors** (`UserInputError` - we control the message content)
+- **Pre-formatted system messages** (hardcoded error templates we control)
+
+**Why this matters:**
+- AI agents receive error messages as part of their context
+- Malicious error messages could contain prompt injection attacks
+- Untrusted input could manipulate agent behavior or extract sensitive information
+
+**What we trust:**
+- Sentry's API error messages (via `ApiClientError.toUserMessage()`)
+- Our own `UserInputError` messages (application-controlled)
+- System-generated error templates with Event IDs
+
+**What we DON'T trust:**
+- User-provided input in error scenarios (never directly returned to agents)
+- Third-party API error messages (would need sanitization)
+- Database error messages (could contain sensitive schema information)
 
 ## Logging vs Capturing
 
@@ -166,6 +189,7 @@ return agentTool({
 - Include helpful context in error messages
 - Rely on the error hierarchy for proper handling
 - Check for `error` property in agent tool responses
+- **SECURITY: Only return trusted error messages to AI agents**
 
 ### DON'T:
 - Don't wrap API calls in try/catch unless adding value
@@ -174,6 +198,33 @@ return agentTool({
 - Don't use `logError()` for expected API errors (4xx)
 - Don't use `captureException()` for UserInputError or ApiClientError
 - Don't create Sentry issues for user-facing errors
+- **SECURITY: NEVER pass untrusted error messages to AI agents - risk of prompt injection**
+
+### Security Guidelines for Agent Error Messages:
+
+**✅ SAFE - These are trusted and can be returned to agents:**
+```typescript
+// Sentry API errors (controlled by Sentry)
+return { error: `Input Error: ${apiError.toUserMessage()}. You may be able to resolve this...` };
+
+// Our own validation errors (controlled by our code)
+throw new UserInputError("Invalid organization slug format");
+
+// System-generated templates (controlled by our code)
+return { error: `Server Error (${status}): ${message}. Event ID: ${eventId}...` };
+```
+
+**❌ UNSAFE - These could enable prompt injection:**
+```typescript
+// User input directly in error (NEVER do this)
+return { error: `Invalid input: ${userProvidedValue}` }; // 🚨 DANGEROUS
+
+// Third-party API errors without validation (NEVER do this)
+return { error: externalApiResponse.error }; // 🚨 DANGEROUS
+
+// Database errors (could leak schema info)
+return { error: sqlError.message }; // 🚨 DANGEROUS
+```
 
 ## Error Propagation Summary
 

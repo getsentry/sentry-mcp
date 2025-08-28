@@ -301,6 +301,50 @@ describe("get_issue_details", () => {
     );
   });
 
+  it("enhances 404 error with parameter context for non-existent issue", async () => {
+    // This test demonstrates the enhance-error functionality:
+    // When a 404 occurs, enhanceNotFoundError() adds parameter context to help users
+    // understand what went wrong (organizationSlug + issueId in this case)
+
+    // Mock a 404 response for a non-existent issue
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/issues/NONEXISTENT-ISSUE-123/",
+        () => {
+          return new HttpResponse(
+            JSON.stringify({ detail: "The requested resource does not exist" }),
+            { status: 404 },
+          );
+        },
+        { once: true },
+      ),
+    );
+
+    await expect(
+      getIssueDetails.handler(
+        {
+          organizationSlug: "test-org",
+          issueId: "NONEXISTENT-ISSUE-123",
+          eventId: undefined,
+          issueUrl: undefined,
+          regionUrl: undefined,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+          },
+          accessToken: "access-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrowErrorMatchingInlineSnapshot(`
+      [ApiNotFoundError: The requested resource does not exist
+      Please verify these parameters are correct:
+        - organizationSlug: 'test-org'
+        - issueId: 'NONEXISTENT-ISSUE-123']
+    `);
+  });
+
   // These tests verify that Seer analysis is properly formatted when available
   // Note: The autofix endpoint needs to be mocked for each test
 

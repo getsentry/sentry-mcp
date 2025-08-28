@@ -63,7 +63,9 @@ export function agentTool<TParameters, TResult>(config: {
         const result = await config.execute(params);
         return { result };
       } catch (error) {
-        // Handle both UserInputError and ApiClientError as user-facing errors
+        // SECURITY: Only return trusted error messages to AI agents to prevent prompt injection
+        // We trust: Sentry API errors, our own UserInputError messages, and system templates
+
         if (error instanceof UserInputError) {
           // Log UserInputError for Sentry logging (as log, not exception)
           console.warn(`[agent-tool] ${error.message}`);
