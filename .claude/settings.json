@@ -29,7 +29,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'MANDATORY: If something is unclear, you MUST ask me. ALWAYS reference our docs when they are available for a task, and make a note when they arent.'"
+            "command": "echo 'MANDATORY: If something is unclear, you MUST ask me. ALWAYS reference our docs when they are available for a task, and make a note when they arent. BEFORE starting this task, use the docs-reader subagent to identify and analyze relevant documentation from the docs/ directory.'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Now that the task is complete, use the docs-updater subagent to review and update any relevant documentation in the docs/ directory to ensure it stays current with any changes made.'"
           }
         ]
       }
