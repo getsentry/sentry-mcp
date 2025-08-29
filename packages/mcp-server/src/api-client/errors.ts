@@ -14,11 +14,12 @@
 /**
  * Base class for all API errors.
  * Contains common properties for all API error types.
+ * Status is optional since some errors (like client-side validation) don't have HTTP status codes.
  */
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly status: number,
+    public readonly status?: number,
     public readonly detail?: string,
     public readonly responseBody?: unknown,
   ) {
@@ -32,11 +33,12 @@ export class ApiError extends Error {
 /**
  * Client errors (4xx) - User input errors that should NOT be reported to Sentry.
  * These typically indicate issues with the request that the user can fix.
+ * Also includes client-side validation errors that don't have HTTP status codes.
  */
 export class ApiClientError extends ApiError {
   constructor(
     message: string,
-    status: number,
+    status?: number,
     detail?: string,
     responseBody?: unknown,
   ) {
@@ -47,11 +49,13 @@ export class ApiClientError extends ApiError {
 
   /**
    * Convert to a user-friendly formatted message.
-   * Returns the standard format: "API error (status): message"
+   * Returns the standard format: "API error (status): message" or just "API error: message" if no status.
    * For 404 errors, adds helpful context about checking parameters.
    */
   toUserMessage(): string {
-    const baseMessage = `API error (${this.status}): ${this.message}`;
+    const baseMessage = this.status
+      ? `API error (${this.status}): ${this.message}`
+      : `API error: ${this.message}`;
 
     // Add helpful context for 404 errors, especially generic ones
     if (this.status === 404) {
@@ -160,13 +164,13 @@ export class ApiNotFoundError extends ApiClientError {
 }
 
 /**
- * Validation error (400 or 422).
+ * Validation error (400 or 422 for API responses, or no status for client-side validation).
  * Indicates the request was malformed or contained invalid data.
  */
 export class ApiValidationError extends ApiClientError {
   constructor(
     message: string,
-    status: 400 | 422,
+    status?: 400 | 422,
     detail?: string,
     responseBody?: unknown,
     public readonly validationErrors?: Record<string, string[]>,
@@ -240,6 +244,7 @@ export class ApiServerError extends ApiError {
 /**
  * Factory function to create the appropriate error type based on HTTP status code.
  * This centralizes the logic for determining which error class to instantiate.
+ * This is only used for actual API responses, so status is required.
  */
 export function createApiError(
   message: string,

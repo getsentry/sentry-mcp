@@ -22,6 +22,47 @@ export type AgentToolResponse<T = unknown> = {
 };
 
 /**
+ * Handles errors from agent tool execution and returns appropriate error messages.
+ *
+ * SECURITY: Only returns trusted error messages to prevent prompt injection.
+ * We trust: Sentry API errors, our own UserInputError messages, and system templates.
+ */
+function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
+  if (error instanceof UserInputError) {
+    // Log UserInputError for Sentry logging (as log, not exception)
+    console.warn(`[agent-tool] ${error.message}`);
+    return {
+      error: `Input Error: ${error.message}. You may be able to resolve this by addressing the concern and trying again.`,
+    };
+  }
+
+  if (error instanceof ApiClientError) {
+    // Log ApiClientError for Sentry logging (as log, not exception)
+    const message = error.toUserMessage();
+    console.warn(`[agent-tool] ${message}`);
+    return {
+      error: `Input Error: ${message}. You may be able to resolve this by addressing the concern and trying again.`,
+    };
+  }
+
+  if (error instanceof ApiServerError) {
+    // Log server errors to Sentry and get Event ID
+    const eventId = logError(error);
+    const statusText = error.status ? ` (${error.status})` : "";
+    return {
+      error: `Server Error${statusText}: ${error.message}. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
+    };
+  }
+
+  // Log unexpected errors to Sentry and return safe generic message
+  // SECURITY: Don't return untrusted error messages that could enable prompt injection
+  const eventId = logError(error);
+  return {
+    error: `System Error: An unexpected error occurred. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
+  };
+}
+
+/**
  * Creates an embedded agent tool with automatic error handling and schema wrapping.
  *
  * This wrapper:
@@ -63,40 +104,7 @@ export function agentTool<TParameters, TResult>(config: {
         const result = await config.execute(params);
         return { result };
       } catch (error) {
-        // SECURITY: Only return trusted error messages to AI agents to prevent prompt injection
-        // We trust: Sentry API errors, our own UserInputError messages, and system templates
-
-        if (error instanceof UserInputError) {
-          // Log UserInputError for Sentry logging (as log, not exception)
-          console.warn(`[agent-tool] ${error.message}`);
-          return {
-            error: `Input Error: ${error.message}. You may be able to resolve this by addressing the concern and trying again.`,
-          };
-        }
-
-        if (error instanceof ApiClientError) {
-          // Log ApiClientError for Sentry logging (as log, not exception)
-          const message = error.toUserMessage();
-          console.warn(`[agent-tool] ${message}`);
-          return {
-            error: `Input Error: ${message}. You may be able to resolve this by addressing the concern and trying again.`,
-          };
-        }
-
-        if (error instanceof ApiServerError) {
-          // Log server errors to Sentry and get Event ID
-          const eventId = logError(error);
-          return {
-            error: `Server Error (${error.status}): ${error.message}. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
-          };
-        }
-
-        // Log unexpected errors to Sentry and return safe generic message
-        // SECURITY: Don't return untrusted error messages that could enable prompt injection
-        const eventId = logError(error);
-        return {
-          error: `System Error: An unexpected error occurred. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
-        };
+        return handleAgentToolError<InferredResult>(error);
       }
     },
   });

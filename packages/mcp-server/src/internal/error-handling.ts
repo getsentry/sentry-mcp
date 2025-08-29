@@ -67,9 +67,13 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
 
   // Handle ApiClientError (4xx) - user input errors, should NOT be logged to Sentry
   if (isApiClientError(error)) {
+    const statusText = error.status
+      ? `There was an HTTP ${error.status} error with your request to the Sentry API.`
+      : "There was an error with your request.";
+
     return [
       "**Input Error**",
-      `There was an HTTP ${error.status} error with your request to the Sentry API.`,
+      statusText,
       error.toUserMessage(),
       `You may be able to resolve the issue by addressing the concern and trying again.`,
     ].join("\n\n");
@@ -78,10 +82,13 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
   // Handle ApiServerError (5xx) - system errors, SHOULD be logged to Sentry
   if (isApiServerError(error)) {
     const eventId = logError(error);
+    const statusText = error.status
+      ? `There was an HTTP ${error.status} server error with the Sentry API.`
+      : "There was a server error.";
 
     return [
       "**Error**",
-      `There was an HTTP ${error.status} server error with the Sentry API.`,
+      statusText,
       `${error.message}`,
       `**Event ID**: ${eventId}`,
       `Please contact support with this Event ID if the problem persists.`,
@@ -90,9 +97,13 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
 
   // Handle generic ApiError (shouldn't happen with new hierarchy, but just in case)
   if (isApiError(error)) {
+    const statusText = error.status
+      ? `There was an HTTP ${error.status} error with your request to the Sentry API.`
+      : "There was an error with your request.";
+
     return [
       "**Error**",
-      `There was an HTTP ${error.status} error with your request to the Sentry API.`,
+      statusText,
       `${error.message}`,
       `You may be able to resolve the issue by addressing the concern and trying again.`,
     ].join("\n\n");

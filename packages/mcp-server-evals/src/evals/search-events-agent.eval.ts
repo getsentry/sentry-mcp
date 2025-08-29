@@ -177,11 +177,11 @@ describeEval("search-events-agent", {
       accessToken: "test-token",
     });
 
-    const agentResult = await searchEventsAgent(
-      input,
-      "sentry-mcp-evals",
+    const agentResult = await searchEventsAgent({
+      query: input,
+      organizationSlug: "sentry-mcp-evals",
       apiService,
-    );
+    });
 
     return {
       result: JSON.stringify(agentResult.result),

@@ -146,7 +146,7 @@ export default {
       );
       if (!verification.ok) {
         return new Response(verification.message, {
-          status: verification.status,
+          status: verification.status ?? 500,
         });
       }
 
