@@ -66,6 +66,43 @@ Context propagated through:
 
 ## Security Measures
 
+### SSRF Protection
+
+The MCP server validates `regionUrl` parameters to prevent Server-Side Request Forgery (SSRF) attacks:
+
+```typescript
+// Region URL validation rules:
+// 1. Must be a subdomain of the base host
+// 2. For sentry.io, only 'us' and 'de' regions allowed
+// 3. Prevents requests to arbitrary external domains
+
+validateRegionUrl("https://evil.com", "sentry.io"); // ❌ Throws error
+validateRegionUrl("https://us.sentry.io", "sentry.io"); // ✅ Allowed
+validateRegionUrl("https://subdomain.self-hosted.com", "self-hosted.com"); // ✅ Allowed
+```
+
+Implementation: `packages/mcp-server/src/internal/tool-helpers/validate-region-url.ts`
+
+### Prompt Injection Protection
+
+Tools that accept user input are vulnerable to prompt injection attacks. Key mitigations:
+
+1. **Parameter Validation**: All tool inputs validated with Zod schemas
+2. **URL Validation**: URLs parsed and validated before use
+3. **Region Constraints**: Region URLs restricted to known Sentry domains
+4. **No Direct Command Execution**: Tools don't execute user-provided commands
+
+Example protection in tools:
+```typescript
+// URLs must be valid and from expected domains
+if (!issueUrl.includes('sentry.io')) {
+  throw new UserInputError("Invalid Sentry URL");
+}
+
+// Region URLs validated against base host
+const validatedHost = validateRegionUrl(regionUrl, baseHost);
+```
+
 ### State Parameter Protection
 
 ```typescript

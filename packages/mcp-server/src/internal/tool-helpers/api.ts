@@ -5,6 +5,7 @@ import {
 } from "../../api-client/index";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
+import { validateRegionUrl } from "./validate-region-url";
 
 /**
  * Create a Sentry API service from server context with optional region override
@@ -20,32 +21,10 @@ export function apiServiceFromContext(
   let host = context.sentryHost;
 
   if (opts.regionUrl?.trim()) {
-    try {
-      const parsedUrl = new URL(opts.regionUrl);
-
-      // Validate that the URL has a proper protocol
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        throw new UserInputError(
-          `Invalid regionUrl provided: ${opts.regionUrl}. Must include protocol (http:// or https://).`,
-        );
-      }
-
-      // Validate that the host is not just the protocol name
-      if (parsedUrl.host === "https" || parsedUrl.host === "http") {
-        throw new UserInputError(
-          `Invalid regionUrl provided: ${opts.regionUrl}. The host cannot be just a protocol name.`,
-        );
-      }
-
-      host = parsedUrl.host;
-    } catch (error) {
-      if (error instanceof UserInputError) {
-        throw error;
-      }
-      throw new UserInputError(
-        `Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`,
-      );
-    }
+    // Validate the regionUrl against the base host to prevent SSRF
+    // Use default host if context.sentryHost is not set
+    const baseHost = context.sentryHost || "sentry.io";
+    host = validateRegionUrl(opts.regionUrl.trim(), baseHost);
   }
 
   return new SentryApiService({
