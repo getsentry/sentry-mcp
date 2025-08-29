@@ -66,6 +66,55 @@ Context propagated through:
 
 ## Security Measures
 
+### SSRF Protection
+
+The MCP server validates `regionUrl` parameters to prevent Server-Side Request Forgery (SSRF) attacks:
+
+```typescript
+// Region URL validation rules:
+// 1. By default, only the base host itself is allowed as regionUrl
+// 2. Additional domains must be in SENTRY_ALLOWED_REGION_DOMAINS allowlist
+// 3. Must use HTTPS protocol for security
+// 4. Empty/undefined regionUrl means use the base host
+
+// Base host always allowed
+validateRegionUrl("https://sentry.io", "sentry.io"); // ✅ Base host match
+validateRegionUrl("https://mycompany.com", "mycompany.com"); // ✅ Base host match
+
+// Allowlist domains (sentry.io, us.sentry.io, de.sentry.io)
+validateRegionUrl("https://us.sentry.io", "sentry.io"); // ✅ In allowlist
+validateRegionUrl("https://de.sentry.io", "mycompany.com"); // ✅ In allowlist
+validateRegionUrl("https://sentry.io", "mycompany.com"); // ✅ In allowlist
+
+// Rejected domains
+validateRegionUrl("https://evil.com", "sentry.io"); // ❌ Not in allowlist
+validateRegionUrl("http://us.sentry.io", "sentry.io"); // ❌ Must use HTTPS
+validateRegionUrl("https://eu.sentry.io", "sentry.io"); // ❌ Not in allowlist
+validateRegionUrl("https://sub.mycompany.com", "mycompany.com"); // ❌ Not base host or allowlist
+```
+
+Implementation: `packages/mcp-server/src/internal/tool-helpers/validate-region-url.ts`
+
+### Prompt Injection Protection
+
+Tools that accept user input are vulnerable to prompt injection attacks. Key mitigations:
+
+1. **Parameter Validation**: All tool inputs validated with Zod schemas
+2. **URL Validation**: URLs parsed and validated before use
+3. **Region Constraints**: Region URLs restricted to known Sentry domains
+4. **No Direct Command Execution**: Tools don't execute user-provided commands
+
+Example protection in tools:
+```typescript
+// URLs must be valid and from expected domains
+if (!issueUrl.includes('sentry.io')) {
+  throw new UserInputError("Invalid Sentry URL");
+}
+
+// Region URLs validated against base host
+const validatedHost = validateRegionUrl(regionUrl, baseHost);
+```
+
 ### State Parameter Protection
 
 ```typescript
