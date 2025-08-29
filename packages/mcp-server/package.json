@@ -13,7 +13,9 @@
   "author": "Sentry",
   "description": "Sentry MCP Server",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": ["sentry"],
+  "keywords": [
+    "sentry"
+  ],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -24,7 +26,9 @@
   "bin": {
     "sentry-mcp": "./dist/index.js"
   },
-  "files": ["./dist/*"],
+  "files": [
+    "./dist/*"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -117,7 +121,10 @@
     "zod-to-json-schema": "catalog:"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "catalog:",
+    "@ai-sdk/google": "catalog:",
     "@ai-sdk/openai": "catalog:",
+    "@ai-sdk/xai": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@sentry/core": "catalog:",
     "@sentry/node": "catalog:",
