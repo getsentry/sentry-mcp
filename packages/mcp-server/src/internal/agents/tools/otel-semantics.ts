@@ -247,11 +247,16 @@ export async function lookupOtelSemantics(
 /**
  * Create the otel-semantics-lookup tool for AI agents
  */
-export function createOtelLookupTool(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  projectId?: string,
-) {
+/**
+ * Create a tool for looking up OpenTelemetry semantic convention attributes
+ * The tool is pre-bound with the API service and organization configured for the appropriate region
+ */
+export function createOtelLookupTool(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  projectId?: string;
+}) {
+  const { apiService, organizationSlug, projectId } = options;
   return agentTool({
     description:
       "Look up OpenTelemetry semantic convention attributes for a specific namespace. OpenTelemetry attributes are universal standards that work across all datasets.",
