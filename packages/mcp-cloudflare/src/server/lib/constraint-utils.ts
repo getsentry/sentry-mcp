@@ -20,7 +20,7 @@ export async function verifyConstraintsAccess(
       ok: true;
       constraints: Constraints;
     }
-  | { ok: false; status: number; message: string; eventId?: string }
+  | { ok: false; status?: number; message: string; eventId?: string }
 > {
   if (!organizationSlug) {
     // No constraints specified, nothing to verify

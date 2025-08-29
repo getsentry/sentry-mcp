@@ -30,7 +30,13 @@ import {
   UserRegionsSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
-import { createApiError, ApiError, ApiNotFoundError } from "./errors";
+import {
+  createApiError,
+  ApiError,
+  ApiNotFoundError,
+  ApiServerError,
+  ApiValidationError,
+} from "./errors";
 import type {
   AutofixRun,
   AutofixRunState,
@@ -282,8 +288,12 @@ export class SentryApiService {
             `[sentryApi] Received HTML error page instead of JSON (status ${response.status})`,
             error,
           );
-          throw new Error(
+          // HTML response instead of JSON typically indicates a server configuration issue
+          throw createApiError(
             `Server error: Received HTML instead of JSON (${response.status} ${response.statusText}). This may indicate an invalid URL or server issue.`,
+            response.status,
+            errorText,
+            undefined,
           );
         }
         console.error(
@@ -311,8 +321,12 @@ export class SentryApiService {
         );
       }
 
-      throw new Error(
-        `API request failed: ${response.status} ${response.statusText}\n${errorText}`,
+      // Use the error factory to create the appropriate error type based on status
+      throw createApiError(
+        `API request failed: ${response.statusText}\n${errorText}`,
+        response.status,
+        errorText,
+        undefined,
       );
     }
 
@@ -344,6 +358,7 @@ export class SentryApiService {
         responseText.includes("<!DOCTYPE") ||
         responseText.includes("<html")
       ) {
+        // HTML when expecting JSON usually indicates authentication or routing issues
         throw new Error(
           `Expected JSON response but received HTML (${response.status} ${response.statusText}). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.`,
         );
@@ -359,6 +374,7 @@ export class SentryApiService {
     try {
       return await response.json();
     } catch (error) {
+      // JSON parsing failure after successful response
       throw new Error(
         `Failed to parse JSON response: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -1226,12 +1242,12 @@ export class SentryApiService {
     }
     // Validate time parameters - can't use both relative and absolute
     if (statsPeriod && (start || end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
       );
     }
     if ((start && !end) || (!start && end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Both start and end parameters must be provided together for absolute time ranges.",
       );
     }
@@ -1361,12 +1377,12 @@ export class SentryApiService {
     }
     // Validate time parameters - can't use both relative and absolute
     if (statsPeriod && (start || end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
       );
     }
     if ((start && !end) || (!start && end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Both start and end parameters must be provided together for absolute time ranges.",
       );
     }
@@ -1561,7 +1577,7 @@ export class SentryApiService {
     const attachment = attachments.find((att) => att.id === attachmentId);
 
     if (!attachment) {
-      throw new Error(
+      throw new ApiNotFoundError(
         `Attachment with ID ${attachmentId} not found for event ${eventId}`,
       );
     }
@@ -1770,12 +1786,12 @@ export class SentryApiService {
 
     // Validate time parameters - can't use both relative and absolute
     if (params.statsPeriod && (params.start || params.end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
       );
     }
     if ((params.start && !params.end) || (!params.start && params.end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Both start and end parameters must be provided together for absolute time ranges.",
       );
     }
@@ -1844,12 +1860,12 @@ export class SentryApiService {
 
     // Validate time parameters - can't use both relative and absolute
     if (params.statsPeriod && (params.start || params.end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
       );
     }
     if ((params.start && !params.end) || (!params.start && params.end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Both start and end parameters must be provided together for absolute time ranges.",
       );
     }

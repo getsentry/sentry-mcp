@@ -83,11 +83,11 @@ describeEval("search-issues-agent", {
       accessToken: "test-token",
     });
 
-    const agentResult = await searchIssuesAgent(
-      input,
-      "sentry-mcp-evals",
+    const agentResult = await searchIssuesAgent({
+      query: input,
+      organizationSlug: "sentry-mcp-evals",
       apiService,
-    );
+    });
 
     // Return in the format expected by ToolCallScorer
     return {
