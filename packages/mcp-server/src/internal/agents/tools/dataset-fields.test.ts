@@ -68,7 +68,7 @@ describe("dataset-fields agent tool", () => {
         apiService,
         "sentry-mcp-evals",
         "search_issues",
-        { projectId: "4509062593708032", includeExamples: false },
+        { projectId: "4509062593708032" },
       );
 
       expect(result.dataset).toBe("search_issues");
@@ -83,7 +83,7 @@ describe("dataset-fields agent tool", () => {
       });
     });
 
-    it("should discover fields for events dataset with examples", async () => {
+    it("should discover fields for events dataset (examples always included)", async () => {
       // Mock the tags API response for events
       mswServer.use(
         http.get(
@@ -112,7 +112,7 @@ describe("dataset-fields agent tool", () => {
         apiService,
         "sentry-mcp-evals",
         "events",
-        { projectId: "4509062593708032", includeExamples: true },
+        { projectId: "4509062593708032" },
       );
 
       expect(result.dataset).toBe("events");
@@ -150,9 +150,7 @@ describe("dataset-fields agent tool", () => {
       );
 
       await expect(
-        discoverDatasetFields(apiService, "sentry-mcp-evals", "errors", {
-          includeExamples: false,
-        }),
+        discoverDatasetFields(apiService, "sentry-mcp-evals", "errors"),
       ).rejects.toThrow();
     });
 
@@ -172,7 +170,6 @@ describe("dataset-fields agent tool", () => {
         apiService,
         "sentry-mcp-evals",
         "search_issues",
-        { includeExamples: true },
       );
 
       expect(issuesResult.fields[0].examples).toEqual([
@@ -203,7 +200,6 @@ describe("dataset-fields agent tool", () => {
         apiService,
         "sentry-mcp-evals",
         "events",
-        { includeExamples: true },
       );
 
       expect(eventsResult.fields[0].examples).toEqual([
@@ -233,7 +229,6 @@ describe("dataset-fields agent tool", () => {
         apiService,
         "sentry-mcp-evals",
         "search_issues",
-        { includeExamples: false },
       );
       expect(issuesResult.commonPatterns).toEqual(
         expect.arrayContaining([
@@ -249,7 +244,6 @@ describe("dataset-fields agent tool", () => {
         apiService,
         "sentry-mcp-evals",
         "events",
-        { includeExamples: false },
       );
       expect(eventsResult.commonPatterns).toEqual(
         expect.arrayContaining([

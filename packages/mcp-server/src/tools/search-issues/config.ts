@@ -16,6 +16,7 @@ QUERY PATTERNS:
 - Status: is:unresolved, is:resolved, is:ignored
 - Severity: level:error, level:warning, level:fatal
 - Time: firstSeen:-24h, lastSeen:-7d
+  IMPORTANT: lastSeen = issues active/seen in period, firstSeen = issues that originated in period
 - Impact: userCount:>100, eventCount:>1000
 - Assignment: assignedOrSuggested:email@example.com
 

@@ -26,10 +26,9 @@ export async function discoverDatasetFields(
   dataset: DatasetType,
   options: {
     projectId?: string;
-    includeExamples?: boolean;
   } = {},
 ): Promise<DatasetFieldsResult> {
-  const { projectId, includeExamples = false } = options;
+  const { projectId } = options;
 
   // Get available tags for the dataset
   const tags = await apiService.listTags({
@@ -46,9 +45,7 @@ export async function discoverDatasetFields(
       key: tag.key,
       name: tag.name,
       totalValues: tag.totalValues,
-      examples: includeExamples
-        ? getFieldExamples(tag.key, dataset)
-        : undefined,
+      examples: getFieldExamples(tag.key, dataset),
     }));
 
   return {
@@ -70,18 +67,11 @@ export function createDatasetFieldsTool(options: {
 }) {
   const { apiService, organizationSlug, dataset, projectId } = options;
   return agentTool({
-    description: `Discover available fields for ${dataset} searches in Sentry`,
-    parameters: z.object({
-      includeExamples: z
-        .boolean()
-        .describe(
-          "Include example values for each field (set to false if you don't need examples)",
-        ),
-    }),
-    execute: async ({ includeExamples }) => {
+    description: `Discover available fields for ${dataset} searches in Sentry (includes example values)`,
+    parameters: z.object({}),
+    execute: async () => {
       return discoverDatasetFields(apiService, organizationSlug, dataset, {
         projectId,
-        includeExamples,
       });
     },
   });

@@ -36,10 +36,11 @@ describeEval("search-issues-agent", {
       },
       {
         // Complex query but with common fields - should NOT require tool calls
+        // NOTE: AI often incorrectly uses firstSeen instead of lastSeen - known limitation
         input: "Show me critical unhandled errors from the last 24 hours",
         expectedTools: [],
         expected: {
-          query: /level:error.*is:unresolved.*firstSeen:-24h/, // Agent uses firstSeen for "from the last 24 hours"
+          query: /level:error.*is:unresolved.*lastSeen:-24h/,
           sort: "date",
         },
       },
@@ -49,9 +50,7 @@ describeEval("search-issues-agent", {
         expectedTools: [
           {
             name: "issueFields",
-            arguments: {
-              includeExamples: false, // Agent typically uses false for performance
-            },
+            arguments: {}, // No arguments needed anymore
           },
         ],
         expected: {
@@ -65,9 +64,7 @@ describeEval("search-issues-agent", {
         expectedTools: [
           {
             name: "issueFields",
-            arguments: {
-              includeExamples: true, // Agent uses true when looking for specific fields
-            },
+            arguments: {}, // No arguments needed anymore
           },
         ],
         expected: {
