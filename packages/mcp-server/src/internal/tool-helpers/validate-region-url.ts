@@ -1,24 +1,19 @@
 import { UserInputError } from "../../errors";
+import { SENTRY_ALLOWED_REGION_DOMAINS } from "../../constants";
 
 /**
- * Allowed region subdomains for sentry.io
- * Only these specific regions are permitted when using Sentry's cloud service
- */
-const SENTRY_IO_ALLOWED_REGIONS = new Set(["us", "de"]);
-
-/**
- * Validates that a regionUrl is a valid subset of the base host.
- * Prevents SSRF attacks by ensuring the regionUrl cannot point to arbitrary external domains.
+ * Validates that a regionUrl is valid.
+ * Prevents SSRF attacks by only allowing the base host itself or domains from an allowlist.
  *
  * Rules:
- * 1. regionUrl host must be the base host or a subdomain of it
- * 2. For sentry.io, only specific region subdomains are allowed (us, de)
- * 3. Protocol must be http:// or https://
+ * 1. By default, only the base host itself is allowed as regionUrl
+ * 2. For other domains, they must be in SENTRY_ALLOWED_REGION_DOMAINS
+ * 3. Protocol MUST be HTTPS for security
  *
  * @param regionUrl - The region URL to validate
  * @param baseHost - The base host to validate against
  * @returns The validated host if valid
- * @throws {UserInputError} If the regionUrl is invalid
+ * @throws {UserInputError} If the regionUrl is invalid or not allowed
  */
 export function validateRegionUrl(regionUrl: string, baseHost: string): string {
   let parsedUrl: URL;
@@ -30,10 +25,10 @@ export function validateRegionUrl(regionUrl: string, baseHost: string): string {
     );
   }
 
-  // Validate protocol
-  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+  // Validate protocol - MUST be HTTPS for security
+  if (parsedUrl.protocol !== "https:") {
     throw new UserInputError(
-      `Invalid regionUrl provided: ${regionUrl}. Must include protocol (http:// or https://).`,
+      `Invalid regionUrl provided: ${regionUrl}. Must use HTTPS protocol for security.`,
     );
   }
 
@@ -47,43 +42,17 @@ export function validateRegionUrl(regionUrl: string, baseHost: string): string {
   const regionHost = parsedUrl.host.toLowerCase();
   const baseLower = baseHost.toLowerCase();
 
-  // For sentry.io, enforce allowlist
-  if (baseLower === "sentry.io") {
-    // Allow exact match
-    if (regionHost === "sentry.io") {
-      return regionHost;
-    }
-
-    // Check if it's a subdomain
-    const match = regionHost.match(/^([^.]+)\.sentry\.io$/);
-    if (!match) {
-      throw new UserInputError(
-        `Invalid regionUrl: ${regionUrl}. For sentry.io, regionUrl must be sentry.io or [region].sentry.io`,
-      );
-    }
-
-    // Validate against allowlist
-    const region = match[1];
-    if (!SENTRY_IO_ALLOWED_REGIONS.has(region)) {
-      throw new UserInputError(
-        `Invalid regionUrl: ${regionUrl}. Allowed regions for sentry.io are: ${Array.from(SENTRY_IO_ALLOWED_REGIONS).join(", ")}`,
-      );
-    }
-
-    return regionHost;
-  }
-
-  // For other hosts (self-hosted), must be same domain or subdomain
+  // First, allow if it's the same as the base host
   if (regionHost === baseLower) {
     return regionHost;
   }
 
-  // Check if it's a subdomain of the base host
-  if (regionHost.endsWith(`.${baseLower}`)) {
-    return regionHost;
+  // Otherwise, check against the allowlist
+  if (!SENTRY_ALLOWED_REGION_DOMAINS.has(regionHost)) {
+    throw new UserInputError(
+      `Invalid regionUrl: ${regionUrl}. The domain '${regionHost}' is not allowed. Allowed domains are: ${Array.from(SENTRY_ALLOWED_REGION_DOMAINS).join(", ")}`,
+    );
   }
 
-  throw new UserInputError(
-    `Invalid regionUrl: ${regionUrl}. The regionUrl host must be ${baseHost} or a subdomain of ${baseHost}`,
-  );
+  return regionHost;
 }

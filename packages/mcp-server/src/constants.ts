@@ -10,6 +10,17 @@
 export const MCP_SERVER_NAME = "Sentry MCP" as const;
 
 /**
+ * Allowed region domains for sentry.io
+ * Only these specific domains are permitted when using Sentry's cloud service
+ * This is used to prevent SSRF attacks by restricting regionUrl to known domains
+ */
+export const SENTRY_ALLOWED_REGION_DOMAINS = new Set([
+  "sentry.io",
+  "us.sentry.io",
+  "de.sentry.io",
+]);
+
+/**
  * Common Sentry platforms that have documentation available
  */
 export const SENTRY_PLATFORMS_BASE = [

@@ -72,13 +72,25 @@ The MCP server validates `regionUrl` parameters to prevent Server-Side Request F
 
 ```typescript
 // Region URL validation rules:
-// 1. Must be a subdomain of the base host
-// 2. For sentry.io, only 'us' and 'de' regions allowed
-// 3. Prevents requests to arbitrary external domains
+// 1. By default, only the base host itself is allowed as regionUrl
+// 2. Additional domains must be in SENTRY_ALLOWED_REGION_DOMAINS allowlist
+// 3. Must use HTTPS protocol for security
+// 4. Empty/undefined regionUrl means use the base host
 
-validateRegionUrl("https://evil.com", "sentry.io"); // ❌ Throws error
-validateRegionUrl("https://us.sentry.io", "sentry.io"); // ✅ Allowed
-validateRegionUrl("https://subdomain.self-hosted.com", "self-hosted.com"); // ✅ Allowed
+// Base host always allowed
+validateRegionUrl("https://sentry.io", "sentry.io"); // ✅ Base host match
+validateRegionUrl("https://mycompany.com", "mycompany.com"); // ✅ Base host match
+
+// Allowlist domains (sentry.io, us.sentry.io, de.sentry.io)
+validateRegionUrl("https://us.sentry.io", "sentry.io"); // ✅ In allowlist
+validateRegionUrl("https://de.sentry.io", "mycompany.com"); // ✅ In allowlist
+validateRegionUrl("https://sentry.io", "mycompany.com"); // ✅ In allowlist
+
+// Rejected domains
+validateRegionUrl("https://evil.com", "sentry.io"); // ❌ Not in allowlist
+validateRegionUrl("http://us.sentry.io", "sentry.io"); // ❌ Must use HTTPS
+validateRegionUrl("https://eu.sentry.io", "sentry.io"); // ❌ Not in allowlist
+validateRegionUrl("https://sub.mycompany.com", "mycompany.com"); // ❌ Not base host or allowlist
 ```
 
 Implementation: `packages/mcp-server/src/internal/tool-helpers/validate-region-url.ts`
