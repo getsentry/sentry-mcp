@@ -176,6 +176,7 @@ export const DEFAULT_SCOPES = [
   "org:read",
   "project:read",
   "team:read",
+  "member:read",
   "event:read",
   "project:releases",
 ] as const;
