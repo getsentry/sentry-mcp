@@ -661,49 +661,49 @@ export function renderApprovalDialog(
               }
             </div>
             
-            <div class="permission-section">
-              <h3 class="permission-title">Permissions</h3>
-              
-              <!-- Default permissions section -->
-              <div class="default-permissions">
-                <h4 class="default-permissions-title">This MCP client will be able to:</h4>
-                <div class="default-permission-item">
-                  <span class="permission-check">✓</span>
-                  <div class="default-permission-content">
-                    <span class="default-permission-name">Read-only access to your Sentry data</span>
-                    <div class="default-permission-description">View organizations, projects, teams, issues, and releases</div>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Optional permissions section -->
-              <div class="optional-permissions">
-                <h4 class="optional-permissions-title">Optional additional access:</h4>
-                
-                <label class="optional-permission-item">
-                  <input type="checkbox" name="permission" value="issue_triage">
-                  <span class="permission-checkbox"></span>
-                  <div class="optional-permission-content">
-                    <span class="optional-permission-name">Issue Triage (event:write)</span>
-                    <div class="optional-permission-description">Update and manage issues - resolve, assign, and analyze problems</div>
-                  </div>
-                </label>
-                
-                <label class="optional-permission-item">
-                  <input type="checkbox" name="permission" value="project_management">
-                  <span class="permission-checkbox"></span>
-                  <div class="optional-permission-content">
-                    <span class="optional-permission-name">Project Management (project:write, team:write)</span>
-                    <div class="optional-permission-description">Create and modify projects, teams, and DSNs</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-            
-            <p>This MCP Client is requesting authorization to ${serverName}. If you approve, you will be redirected to complete authentication.</p>
-            
+            <p>This MCP Client is requesting authorization to ${serverName}. If you approve, you will be redirected to complete authentication.</p>            
+
             <form method="post" action="${new URL(request.url).pathname}">
               <input type="hidden" name="state" value="${encodedState}">
+              
+              <div class="permission-section">
+                <h3 class="permission-title">Permissions</h3>
+                
+                <!-- Default permissions section -->
+                <div class="default-permissions">
+                  <h4 class="default-permissions-title">This MCP client will be able to:</h4>
+                  <div class="default-permission-item">
+                    <span class="permission-check">✓</span>
+                    <div class="default-permission-content">
+                      <span class="default-permission-name">Read-only access to your Sentry data</span>
+                      <div class="default-permission-description">View organizations, projects, teams, issues, and releases</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Optional permissions section -->
+                <div class="optional-permissions">
+                  <h4 class="optional-permissions-title">Optional additional access:</h4>
+                  
+                  <label class="optional-permission-item">
+                    <input type="checkbox" name="permission" value="issue_triage">
+                    <span class="permission-checkbox"></span>
+                    <div class="optional-permission-content">
+                      <span class="optional-permission-name">Issue Triage (event:write)</span>
+                      <div class="optional-permission-description">Update and manage issues - resolve, assign, and analyze problems</div>
+                    </div>
+                  </label>
+                  
+                  <label class="optional-permission-item">
+                    <input type="checkbox" name="permission" value="project_management">
+                    <span class="permission-checkbox"></span>
+                    <div class="optional-permission-content">
+                      <span class="optional-permission-name">Project Management (project:write, team:write)</span>
+                      <div class="optional-permission-description">Create and modify projects, teams, and DSNs</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
               
               <div class="actions">
                 <button type="button" class="button button-secondary" onclick="window.history.back()">Cancel</button>
