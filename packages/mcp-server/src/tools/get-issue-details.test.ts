@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
-import { mswServer, autofixStateFixture } from "@sentry/mcp-server-mocks";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import getIssueDetails from "./get-issue-details.js";
 
 describe("get_issue_details", () => {

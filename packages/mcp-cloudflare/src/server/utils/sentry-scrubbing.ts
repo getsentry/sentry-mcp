@@ -1,5 +1,3 @@
-import type * as Sentry from "@sentry/cloudflare";
-
 /**
  * Error thrown when an event cannot be serialized for scrubbing
  */

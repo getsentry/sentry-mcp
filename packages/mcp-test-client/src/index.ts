@@ -11,9 +11,7 @@ import * as Sentry from "@sentry/node";
 import { connectToMCPServer } from "./mcp-test-client.js";
 import { connectToRemoteMCPServer } from "./mcp-test-client-remote.js";
 import { runAgent } from "./agent.js";
-import { DEFAULT_MODEL } from "./constants.js";
-import { logError, logInfo, logSuccess, logUser } from "./logger.js";
-import { LIB_VERSION } from "./version.js";
+import { logError, logInfo } from "./logger.js";
 import { sentryBeforeSend } from "./utils/sentry-scrubbing.js";
 import type { MCPConnection } from "./types.js";
 

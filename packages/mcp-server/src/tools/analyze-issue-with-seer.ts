@@ -6,7 +6,6 @@ import { parseIssueParams } from "../internal/tool-helpers/issue";
 import {
   getStatusDisplayName,
   isTerminalStatus,
-  isHumanInterventionStatus,
   getHumanInterventionGuidance,
   getOutputForAutofixStep,
   SEER_POLLING_INTERVAL,

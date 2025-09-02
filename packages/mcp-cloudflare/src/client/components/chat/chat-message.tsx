@@ -3,7 +3,6 @@ import { Markdown } from "../ui/markdown";
 import { InteractiveMarkdown } from "../ui/interactive-markdown";
 import { Typewriter } from "../ui/typewriter";
 import { ToolInvocation } from "./tool-invocation";
-import { PromptActions } from "../ui/prompt-actions";
 import { Terminal } from "lucide-react";
 import type {
   MessagePartProps,

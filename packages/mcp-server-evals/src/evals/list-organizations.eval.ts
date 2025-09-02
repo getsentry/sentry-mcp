@@ -1,5 +1,5 @@
 import { describeEval } from "vitest-evals";
-import { FIXTURES, NoOpTaskRunner, ToolPredictionScorer } from "./utils";
+import { NoOpTaskRunner, ToolPredictionScorer } from "./utils";
 
 describeEval("list-organizations", {
   data: async () => {

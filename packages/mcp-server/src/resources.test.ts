@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { RESOURCES, isTemplateResource } from "./resources";

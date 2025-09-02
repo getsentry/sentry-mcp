@@ -2,7 +2,6 @@ import type { SentryApiService } from "../../api-client";
 import {
   type FlexibleEventData,
   getStringValue,
-  getNumberValue,
   isAggregateQuery,
 } from "./utils";
 import * as Sentry from "@sentry/node";

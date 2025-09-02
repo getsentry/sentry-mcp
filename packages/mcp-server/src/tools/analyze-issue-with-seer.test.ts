@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer, autofixStateFixture } from "@sentry/mcp-server-mocks";
 import analyzeIssueWithSeer from "./analyze-issue-with-seer.js";
-import { ApiError } from "../api-client/index.js";
 
 describe("analyze_issue_with_seer", () => {
   beforeEach(() => {

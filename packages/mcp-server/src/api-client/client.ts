@@ -1,7 +1,6 @@
 import {
   getIssueUrl as getIssueUrlUtil,
   getTraceUrl as getTraceUrlUtil,
-  getEventsExplorerUrl as getEventsExplorerUrlUtil,
   isSentryHost,
 } from "../utils/url-utils";
 import {
@@ -30,13 +29,7 @@ import {
   UserRegionsSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
-import {
-  createApiError,
-  ApiError,
-  ApiNotFoundError,
-  ApiServerError,
-  ApiValidationError,
-} from "./errors";
+import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
 import type {
   AutofixRun,
   AutofixRunState,

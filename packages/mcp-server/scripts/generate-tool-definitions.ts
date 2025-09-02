@@ -16,7 +16,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { z } from "zod";
 
 // Get the directory of this script
 const __filename = fileURLToPath(import.meta.url);

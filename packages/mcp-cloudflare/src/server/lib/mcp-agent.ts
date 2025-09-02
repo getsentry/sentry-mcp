@@ -3,7 +3,7 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import type { Env, WorkerProps } from "../types";
-import type { ServerContext, Constraints } from "@sentry/mcp-server/types";
+import type { Constraints } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import getSentryConfig from "../sentry.config";
 import { verifyConstraintsAccess } from "./constraint-utils";
