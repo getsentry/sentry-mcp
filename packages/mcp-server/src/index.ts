@@ -23,7 +23,8 @@ import {
   validateAndParseSentryUrl,
 } from "./utils/url-utils";
 import { sentryBeforeSend } from "./internal/sentry-scrubbing";
-import { parseScopesFromString, type Scope } from "./permissions";
+import { parseScopesFromString, expandScopes, type Scope } from "./permissions";
+import { DEFAULT_SCOPES } from "./constants";
 
 let accessToken: string | undefined = process.env.SENTRY_ACCESS_TOKEN;
 let sentryHost = "sentry.io"; // Default hostname
@@ -33,6 +34,9 @@ let sentryDsn: string | undefined =
   process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
 let grantedScopes: Set<Scope> | undefined = process.env.MCP_SCOPES
   ? parseScopesFromString(process.env.MCP_SCOPES)
+  : undefined;
+let additionalScopes: Set<Scope> | undefined = process.env.MCP_ADD_SCOPES
+  ? parseScopesFromString(process.env.MCP_ADD_SCOPES)
   : undefined;
 
 // Set initial host from environment variables (SENTRY_URL takes precedence)
@@ -46,17 +50,32 @@ if (process.env.SENTRY_URL) {
 const packageName = "@sentry/mcp-server";
 
 function getUsage(): string {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>] [--scopes=<scope1,scope2>]
+  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>] [--scopes=<scope1,scope2>] [--add-scopes=<scope1,scope2>]
+
+Default scopes (read-only):
+  - org:read, project:read, team:read, member:read, event:read, project:releases
+
+Scope options:
+  --scopes      Override default scopes completely
+  --add-scopes  Add scopes to the default read-only set
 
 Available scopes (higher scopes include lower):
   - org:read, org:write, org:admin
   - project:read, project:write, project:admin
   - team:read, team:write, team:admin
+  - member:read, member:write, member:admin
   - event:read, event:write, event:admin
   - project:releases
 
-Example:
-  ${packageName} --access-token=TOKEN --scopes=org:read,event:read,project:read`;
+Examples:
+  # Default read-only access
+  ${packageName} --access-token=TOKEN
+  
+  # Override with specific scopes only
+  ${packageName} --access-token=TOKEN --scopes=org:read,event:read
+  
+  # Add write permissions to defaults
+  ${packageName} --access-token=TOKEN --add-scopes=event:write,project:write`;
 }
 
 for (const arg of process.argv.slice(2)) {
@@ -81,6 +100,16 @@ for (const arg of process.argv.slice(2)) {
     grantedScopes = parseScopesFromString(scopesString);
     if (grantedScopes.size === 0) {
       console.error("Error: Invalid scopes provided. No valid scopes found.");
+      console.error(getUsage());
+      process.exit(1);
+    }
+  } else if (arg.startsWith("--add-scopes=")) {
+    const scopesString = arg.split("=")[1];
+    additionalScopes = parseScopesFromString(scopesString);
+    if (additionalScopes.size === 0) {
+      console.error(
+        "Error: Invalid additional scopes provided. No valid scopes found.",
+      );
       console.error(getUsage());
       process.exit(1);
     }
@@ -147,11 +176,28 @@ const instrumentedServer = Sentry.wrapMcpServerWithSentry(server);
 
 const SENTRY_TIMEOUT = 5000; // 5 seconds
 
+// Process scope configuration
+let finalScopes: Set<Scope> | undefined;
+if (grantedScopes) {
+  // --scopes was used, override defaults completely
+  finalScopes = grantedScopes;
+} else if (additionalScopes) {
+  // --add-scopes was used, add to defaults
+  const defaultScopeSet = new Set<Scope>(DEFAULT_SCOPES);
+  for (const scope of additionalScopes) {
+    defaultScopeSet.add(scope);
+  }
+  finalScopes = expandScopes(defaultScopeSet);
+} else {
+  // No scope flags, use undefined to trigger defaults in server.ts
+  finalScopes = undefined;
+}
+
 // XXX: we could do what we're doing in routes/auth.ts and pass the context
 // identically, but we don't really need userId and userName yet
 startStdio(instrumentedServer, {
   accessToken,
-  grantedScopes,
+  grantedScopes: finalScopes,
   constraints: {
     organizationSlug: null,
   },

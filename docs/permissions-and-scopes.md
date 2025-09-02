@@ -2,28 +2,42 @@
 
 OAuth-style scope system for controlling access to Sentry MCP tools.
 
-## Quick Start
+## Default Permissions
 
-### Permission Levels
+**By default, all users receive read-only access.** This includes:
+- `org:read`, `project:read`, `team:read`, `member:read`, `event:read`, `project:releases`
 
-Users select one of three permission levels after Sentry authentication:
+Additional permissions must be explicitly granted through the OAuth flow or CLI arguments.
+
+## Permission Levels
+
+When authenticating via OAuth, users can select additional permissions:
 
 | Level | Scopes | Tools Enabled |
 |-------|--------|--------------|
-| **Read-Only** (default) | `org:read`, `project:read`, `team:read`, `event:read`, `project:releases` | Search, view issues/traces, documentation |
-| **Issue Triage** | Read-Only + `event:write` | All above + resolve/assign issues, AI analysis |
-| **Project Management** | `org:read`, `project:write`, `team:write`, `event:write`, `project:releases` | All above + create/modify projects/teams/DSNs |
+| **Read-Only** (default) | `org:read`, `project:read`, `team:read`, `member:read`, `event:read`, `project:releases` | Search, view issues/traces, documentation |
+| **+ Issue Triage** | Adds `event:write` | All above + resolve/assign issues, AI analysis |
+| **+ Project Management** | Adds `project:write`, `team:write` | All above + create/modify projects/teams/DSNs |
 
 ### CLI Usage
 
 ```bash
-# Specify scopes directly
-npx @sentry/mcp-server --access-token=TOKEN --scopes=org:read,event:write
+# Default: read-only access
+npx @sentry/mcp-server --access-token=TOKEN
 
-# Via environment variable
-export MCP_SCOPES=org:read,project:write,team:write
+# Override defaults with specific scopes only
+npx @sentry/mcp-server --access-token=TOKEN --scopes=org:read,event:read
+
+# Add write permissions to default read-only scopes
+npx @sentry/mcp-server --access-token=TOKEN --add-scopes=event:write,project:write
+
+# Via environment variables
+export MCP_SCOPES=org:read,project:write  # Overrides defaults
+export MCP_ADD_SCOPES=event:write         # Adds to defaults
 npx @sentry/mcp-server --access-token=TOKEN
 ```
+
+**Note:** `--scopes` completely replaces the default scopes, while `--add-scopes` adds to them.
 
 ## Scope Hierarchy
 
