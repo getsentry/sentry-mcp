@@ -6,7 +6,6 @@ import {
   getUpstreamAuthorizeUrl,
 } from "../lib/oauth";
 import type { Env, WorkerProps } from "../types";
-import { SentryApiService } from "@sentry/mcp-server/api-client";
 import { SCOPES } from "../../constants";
 import type { Scope } from "@sentry/mcp-server/permissions";
 import {

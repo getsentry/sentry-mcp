@@ -4,7 +4,6 @@ import type {
   WorkerVersionMetadata,
 } from "@cloudflare/workers-types";
 import type { ServerContext } from "@sentry/mcp-server/types";
-import type { Scope } from "@sentry/mcp-server/permissions";
 
 export type WorkerProps = ServerContext & {
   id: string;
