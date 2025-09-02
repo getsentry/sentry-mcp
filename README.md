@@ -62,16 +62,19 @@ Note: If you have issues with your OAuth flow when accessing the inspector on `1
 To contribute changes, you'll need to set up your local environment:
 
 1. **Set up environment files:**
+
    ```shell
    make setup-env  # Creates both .env files from examples
    ```
 
 2. **Create an OAuth App in Sentry** (Settings => API => [Applications](https://sentry.io/settings/account/api/applications/)):
+
    - Homepage URL: `http://localhost:5173`
-   - Authorized Redirect URIs: `http://localhost:5173/callback`
+   - Authorized Redirect URIs: `http://localhost:5173/oauth/callback`
    - Note your Client ID and generate a Client secret
 
 3. **Configure your credentials:**
+
    - Edit `.env` in the root directory and add your `OPENAI_API_KEY`
    - Edit `packages/mcp-cloudflare/.env` and add:
      - `SENTRY_CLIENT_ID=your_development_sentry_client_id`
@@ -125,8 +128,9 @@ pnpm eval
 This repository uses automated code review tools (like Cursor BugBot) to help identify potential issues in pull requests. These tools provide helpful feedback and suggestions, but **we do not recommend making these checks required** as the accuracy is still evolving and can produce false positives.
 
 The automated reviews should be treated as:
+
 - ✅ **Helpful suggestions** to consider during code review
-- ✅ **Starting points** for discussion and improvement  
+- ✅ **Starting points** for discussion and improvement
 - ❌ **Not blocking requirements** for merging PRs
 - ❌ **Not replacements** for human code review
 
