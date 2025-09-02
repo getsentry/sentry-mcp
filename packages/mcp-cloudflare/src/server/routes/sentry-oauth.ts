@@ -11,6 +11,7 @@ import type { Scope } from "@sentry/mcp-server/permissions";
 import {
   renderApprovalDialog,
   parseRedirectApproval,
+  clientIdAlreadyApproved,
 } from "../lib/approval-dialog";
 
 /**
@@ -197,6 +198,7 @@ export default new Hono<{
       });
       return c.text("Invalid state", 400);
     }
+
     if (!oauthReqInfo.clientId) {
       return c.text("Invalid state", 400);
     }
@@ -217,6 +219,18 @@ export default new Hono<{
         },
       );
       return c.text("Authorization failed: Invalid redirect URL", 400);
+    }
+
+    // because we share a clientId with the upstream provider, we need to ensure that the
+    // downstream client has been approved by the end-user (e.g. for a new client)
+    // https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/265
+    const isApproved = await clientIdAlreadyApproved(
+      c.req.raw,
+      oauthReqInfo.clientId,
+      c.env.COOKIE_SECRET,
+    );
+    if (!isApproved) {
+      return c.text("Authorization failed: Client not approved", 403);
     }
 
     // Exchange the code for an access token
