@@ -10,7 +10,6 @@ import { SCOPES } from "../../constants";
 import type { Scope } from "@sentry/mcp-server/permissions";
 import {
   renderApprovalDialog,
-  clientIdAlreadyApproved,
   parseRedirectApproval,
 } from "../lib/approval-dialog";
 
@@ -118,25 +117,30 @@ export default new Hono<{
       return c.text("Invalid request", 400);
     }
 
+    // XXX(dcramer): we want to confirm permissions on each time
+    // so you can always choose new ones
+    // This shouldn't be highly visible to users, as clients should use refresh tokens
+    // behind the scenes.
+    //
     // because we share a clientId with the upstream provider, we need to ensure that the
     // downstream client has been approved by the end-user (e.g. for a new client)
     // https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/265
-    const isApproved = await clientIdAlreadyApproved(
-      c.req.raw,
-      clientId,
-      c.env.COOKIE_SECRET,
-    );
-    if (!isApproved) {
-      return renderApprovalDialog(c.req.raw, {
-        client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
-        server: {
-          name: "Sentry MCP",
-        },
-        state: { oauthReqInfo }, // arbitrary data that flows through the form submission below
-      });
-    }
+    // const isApproved = await clientIdAlreadyApproved(
+    //   c.req.raw,
+    //   clientId,
+    //   c.env.COOKIE_SECRET,
+    // );
+    // if (isApproved) {
+    //   return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
+    // }
 
-    return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
+    return renderApprovalDialog(c.req.raw, {
+      client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
+      server: {
+        name: "Sentry MCP",
+      },
+      state: { oauthReqInfo }, // arbitrary data that flows through the form submission below
+    });
   })
 
   .post("/authorize", async (c) => {

@@ -37,7 +37,7 @@ import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
-import { MCP_SERVER_NAME } from "./constants";
+import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
 
 /**
@@ -202,18 +202,8 @@ export async function configureServer({
   onInitialized?: () => void | Promise<void>;
 }) {
   // Get granted scopes with default to all scopes for backward compatibility
-  const grantedScopes =
-    context.grantedScopes ||
-    new Set<Scope>([
-      "org:read",
-      "project:read",
-      "team:read",
-      "event:read",
-      "event:write",
-      "project:write",
-      "team:write",
-      "project:releases",
-    ]);
+  const grantedScopes = context.grantedScopes || new Set<Scope>(DEFAULT_SCOPES);
+
   server.server.onerror = (error) => {
     logError(error);
   };

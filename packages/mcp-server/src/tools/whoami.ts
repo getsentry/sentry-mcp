@@ -11,6 +11,7 @@ export default defineTool({
     "- Get the user's name and email address.",
   ].join("\n"),
   inputSchema: {},
+  requiredScopes: [], // No specific scopes required - uses authentication token
   async handler(params, context: ServerContext) {
     // User data endpoints (like /auth/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers

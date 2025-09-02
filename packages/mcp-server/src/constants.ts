@@ -171,3 +171,11 @@ export const SENTRY_GUIDES = [
     guides.map((guide) => `${platform}/${guide}`),
   ),
 ] as const;
+
+export const DEFAULT_SCOPES = [
+  "org:read",
+  "project:read",
+  "team:read",
+  "event:read",
+  "project:releases",
+] as const;

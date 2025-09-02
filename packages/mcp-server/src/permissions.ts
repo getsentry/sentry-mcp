@@ -81,56 +81,6 @@ export function expandScopes(grantedScopes: Set<Scope>): Set<Scope> {
 }
 
 /**
- * Permission levels that bundle scopes for the UI
- */
-export enum PermissionLevel {
-  READ_ONLY = "read_only",
-  ISSUE_TRIAGE = "issue_triage",
-  PROJECT_MANAGEMENT = "project_management",
-}
-
-/**
- * Map permission levels to their granted scopes
- * Note: These are the explicitly granted scopes, which will be expanded based on hierarchy
- */
-export const PERMISSION_SCOPES: Record<PermissionLevel, Set<Scope>> = {
-  [PermissionLevel.READ_ONLY]: new Set([
-    "org:read",
-    "project:read",
-    "team:read",
-    "event:read",
-    "project:releases",
-  ]),
-
-  [PermissionLevel.ISSUE_TRIAGE]: new Set([
-    "org:read",
-    "project:read",
-    "team:read",
-    "event:write", // Includes event:read through hierarchy
-    "project:releases",
-  ]),
-
-  [PermissionLevel.PROJECT_MANAGEMENT]: new Set([
-    "org:read",
-    "project:write", // Includes project:read through hierarchy
-    "team:write", // Includes team:read through hierarchy
-    "event:write", // Includes event:read through hierarchy
-    "project:releases",
-  ]),
-};
-
-/**
- * Human-readable descriptions of permission levels
- */
-export const PERMISSION_DESCRIPTIONS: Record<PermissionLevel, string> = {
-  [PermissionLevel.READ_ONLY]: "Read-only access to Sentry data",
-  [PermissionLevel.ISSUE_TRIAGE]:
-    "Read access plus issue management capabilities",
-  [PermissionLevel.PROJECT_MANAGEMENT]:
-    "Full access including project and team management",
-};
-
-/**
  * Human-readable descriptions of scopes
  */
 export const SCOPE_DESCRIPTIONS: Record<Scope, string> = {
@@ -180,52 +130,6 @@ export function isToolAllowed(
 }
 
 /**
- * Get scopes for a permission level (with hierarchy expansion)
- */
-export function getScopesForPermissionLevel(
-  permissionLevel: PermissionLevel,
-): Set<Scope> {
-  const baseScopes =
-    PERMISSION_SCOPES[permissionLevel] ||
-    PERMISSION_SCOPES[PermissionLevel.READ_ONLY];
-  return expandScopes(baseScopes);
-}
-
-/**
- * Parse permission level from string
- */
-export function parsePermissionLevel(
-  level: string | undefined,
-): PermissionLevel {
-  if (!level) {
-    // Default to PROJECT_MANAGEMENT for backward compatibility
-    return PermissionLevel.PROJECT_MANAGEMENT;
-  }
-
-  const normalizedLevel = level.toLowerCase().replace(/-/g, "_");
-
-  if (normalizedLevel === "read_only" || normalizedLevel === "readonly") {
-    return PermissionLevel.READ_ONLY;
-  }
-  if (normalizedLevel === "issue_triage" || normalizedLevel === "triage") {
-    return PermissionLevel.ISSUE_TRIAGE;
-  }
-  if (
-    normalizedLevel === "project_management" ||
-    normalizedLevel === "management" ||
-    normalizedLevel === "admin"
-  ) {
-    return PermissionLevel.PROJECT_MANAGEMENT;
-  }
-
-  // Default to PROJECT_MANAGEMENT for unknown values
-  console.warn(
-    `Unknown permission level: ${level}, defaulting to PROJECT_MANAGEMENT`,
-  );
-  return PermissionLevel.PROJECT_MANAGEMENT;
-}
-
-/**
  * Parse scopes from a comma-separated string
  */
 export function parseScopesFromString(
@@ -241,51 +145,4 @@ export function parseScopesFromString(
     .filter((s) => s.length > 0) as Scope[];
 
   return new Set(scopes);
-}
-
-/**
- * Get tool counts for each permission level
- * This would need to be calculated based on actual tool definitions
- */
-export function getToolCountsForPermissionLevel(
-  permissionLevel: PermissionLevel,
-  tools: Array<{ requiredScopes?: Scope[] }>,
-): number {
-  const grantedScopes = getScopesForPermissionLevel(permissionLevel);
-  return tools.filter((tool) =>
-    isToolAllowed(tool.requiredScopes, grantedScopes),
-  ).length;
-}
-
-/**
- * Legacy exports for backward compatibility
- */
-export type ToolCategory = "read" | "triage" | "management" | "documentation";
-
-// Dummy exports to maintain compatibility with metadata route
-// These will be removed once we update the metadata route
-export const TOOL_PERMISSIONS: Record<string, ToolCategory> = {};
-export const TOOL_CATEGORIES: Record<string, ToolCategory> = {};
-
-export function getRequiredPermissionLevel(toolName: string): PermissionLevel {
-  // This is now handled via scopes in tool definitions
-  return PermissionLevel.READ_ONLY;
-}
-
-export function validateToolPermissions(availableTools: string[]): {
-  valid: boolean;
-  unknownTools: string[];
-  unmappedTools: string[];
-} {
-  // This validation is now handled differently with scopes
-  return {
-    valid: true,
-    unknownTools: [],
-    unmappedTools: [],
-  };
-}
-
-export function getAvailableTools(permissionLevel: PermissionLevel): string[] {
-  // This would need to be calculated based on actual tool definitions
-  return [];
 }

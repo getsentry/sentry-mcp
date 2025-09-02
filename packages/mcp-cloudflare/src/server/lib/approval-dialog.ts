@@ -290,12 +290,11 @@ export function renderApprovalDialog(
           
           .container {
             max-width: 600px;
-            margin: 2rem auto;
+            margin: 1rem auto;
             padding: 1rem;
           }
           
           .precard {
-            padding: 2rem;
             text-align: center;
           }
           
@@ -671,7 +670,6 @@ export function renderApprovalDialog(
                 
                 <!-- Default permissions section -->
                 <div class="default-permissions">
-                  <h4 class="default-permissions-title">This MCP client will be able to:</h4>
                   <div class="default-permission-item">
                     <span class="permission-check">✓</span>
                     <div class="default-permission-content">
