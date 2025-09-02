@@ -83,10 +83,7 @@ describe("approval-dialog", () => {
         oauthReqInfo: { clientId: "test-client" },
       });
       expect(result.headers["Set-Cookie"]).toContain("mcp-approved-clients=");
-      expect(result.permissions).toEqual({
-        issueTriageEnabled: false,
-        projectManagementEnabled: false,
-      });
+      expect(result.permissions).toEqual([]);
     });
 
     it("should reject non-POST requests", async () => {
@@ -105,8 +102,8 @@ describe("approval-dialog", () => {
         "state",
         btoa(JSON.stringify({ oauthReqInfo: { clientId: "test-client" } })),
       );
-      formData.append("permission_issue_triage", "true");
-      formData.append("permission_project_management", "true");
+      formData.append("permission", "issue_triage");
+      formData.append("permission", "project_management");
 
       const mockRequest = new Request("https://example.com/oauth/authorize", {
         method: "POST",
@@ -115,10 +112,10 @@ describe("approval-dialog", () => {
 
       const result = await parseRedirectApproval(mockRequest, "test-secret");
 
-      expect(result.permissions).toEqual({
-        issueTriageEnabled: true,
-        projectManagementEnabled: true,
-      });
+      expect(result.permissions).toEqual([
+        "issue_triage",
+        "project_management",
+      ]);
     });
 
     it("should reject requests without state", async () => {

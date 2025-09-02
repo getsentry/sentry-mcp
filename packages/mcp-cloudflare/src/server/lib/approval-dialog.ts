@@ -685,7 +685,7 @@ export function renderApprovalDialog(
                 <h4 class="optional-permissions-title">Optional additional access:</h4>
                 
                 <label class="optional-permission-item">
-                  <input type="checkbox" name="permission_issue_triage" value="true">
+                  <input type="checkbox" name="permission" value="issue_triage">
                   <span class="permission-checkbox"></span>
                   <div class="optional-permission-content">
                     <span class="optional-permission-name">Issue Triage (event:write)</span>
@@ -694,7 +694,7 @@ export function renderApprovalDialog(
                 </label>
                 
                 <label class="optional-permission-item">
-                  <input type="checkbox" name="permission_project_management" value="true">
+                  <input type="checkbox" name="permission" value="project_management">
                   <span class="permission-checkbox"></span>
                   <div class="optional-permission-content">
                     <span class="optional-permission-name">Project Management (project:write, team:write)</span>
@@ -735,11 +735,8 @@ export interface ParsedApprovalResult {
   state: any;
   /** Headers to set on the redirect response, including the Set-Cookie header. */
   headers: Record<string, string>;
-  /** Selected permission capabilities (checkboxes) */
-  permissions: {
-    issueTriageEnabled: boolean;
-    projectManagementEnabled: boolean;
-  };
+  /** Selected permission levels */
+  permissions: string[];
 }
 
 /**
@@ -761,10 +758,7 @@ export async function parseRedirectApproval(
 
   let state: any;
   let clientId: string | undefined;
-  let permissions: {
-    issueTriageEnabled: boolean;
-    projectManagementEnabled: boolean;
-  };
+  let permissions: string[];
 
   try {
     const formData = await request.formData();
@@ -781,12 +775,10 @@ export async function parseRedirectApproval(
       throw new Error("Could not extract clientId from state object.");
     }
 
-    // Extract permission selections from checkboxes
-    permissions = {
-      issueTriageEnabled: formData.get("permission_issue_triage") === "true",
-      projectManagementEnabled:
-        formData.get("permission_project_management") === "true",
-    };
+    // Extract permission selections from checkboxes - collect all 'permission' field values
+    permissions = formData
+      .getAll("permission")
+      .filter((p): p is string => typeof p === "string");
   } catch (e) {
     console.error("Error processing form submission:", e);
     // Rethrow or handle as appropriate, maybe return a specific error response

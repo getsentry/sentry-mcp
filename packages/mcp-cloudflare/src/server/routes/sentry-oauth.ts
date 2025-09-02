@@ -8,11 +8,7 @@ import {
 import type { Env, WorkerProps } from "../types";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
 import { SCOPES } from "../../constants";
-import {
-  PermissionLevel,
-  getScopesForPermissionLevel,
-  type Scope,
-} from "@sentry/mcp-server/permissions";
+import type { Scope } from "@sentry/mcp-server/permissions";
 import {
   renderApprovalDialog,
   clientIdAlreadyApproved,
@@ -23,37 +19,43 @@ import {
  * Extended AuthRequest that includes permissions
  */
 interface AuthRequestWithPermissions extends AuthRequest {
-  permissions?: {
-    issueTriageEnabled: boolean;
-    projectManagementEnabled: boolean;
-  };
+  permissions?: string[];
 }
 
 /**
- * Convert permission checkboxes to a permission level
- * Read-only is always included, checkboxes add additional capabilities
+ * Convert selected permissions to granted scopes
+ * Permissions are additive:
+ * - Base (always included): org:read, project:read, team:read, member:read, event:read, project:releases
+ * - Issue Triage adds: event:write
+ * - Project Management adds: project:write, team:write
+ * @param permissions Array of permission strings
  */
-function getPermissionLevelFromCheckboxes(permissions?: {
-  issueTriageEnabled: boolean;
-  projectManagementEnabled: boolean;
-}): PermissionLevel {
-  if (!permissions) {
-    // Default to full permissions for backward compatibility
-    return PermissionLevel.PROJECT_MANAGEMENT;
+function getScopesFromPermissions(permissions?: string[]): Set<Scope> {
+  // Start with base read-only scopes (always granted)
+  const scopes = new Set<Scope>([
+    "org:read",
+    "project:read",
+    "team:read",
+    "member:read",
+    "event:read",
+    "project:releases",
+  ]);
+
+  if (!permissions || permissions.length === 0) {
+    return scopes;
   }
 
-  // If project management is enabled, it includes all capabilities
-  if (permissions.projectManagementEnabled) {
-    return PermissionLevel.PROJECT_MANAGEMENT;
+  // Add scopes based on selected permissions
+  if (permissions.includes("issue_triage")) {
+    scopes.add("event:write");
   }
 
-  // If only issue triage is enabled, that's the level
-  if (permissions.issueTriageEnabled) {
-    return PermissionLevel.ISSUE_TRIAGE;
+  if (permissions.includes("project_management")) {
+    scopes.add("project:write");
+    scopes.add("team:write");
   }
 
-  // Default to read-only (always included)
-  return PermissionLevel.READ_ONLY;
+  return scopes;
 }
 import { logger } from "@sentry/cloudflare";
 
@@ -140,10 +142,18 @@ export default new Hono<{
 
   .post("/authorize", async (c) => {
     // Validates form submission, extracts state, and generates Set-Cookie headers to skip approval dialog next time
-    const { state, headers, permissions } = await parseRedirectApproval(
-      c.req.raw,
-      c.env.COOKIE_SECRET,
-    );
+    let result: Awaited<ReturnType<typeof parseRedirectApproval>>;
+    try {
+      result = await parseRedirectApproval(c.req.raw, c.env.COOKIE_SECRET);
+    } catch (err) {
+      logger.warn(`Failed to parse approval form: ${err}`, {
+        error: String(err),
+      });
+      return c.text("Invalid request", 400);
+    }
+
+    const { state, headers, permissions } = result;
+
     if (!state.oauthReqInfo) {
       return c.text("Invalid request", 400);
     }
@@ -218,11 +228,8 @@ export default new Hono<{
     });
     if (errResponse) return errResponse;
 
-    // Use permissions from the approval dialog, or default to full permissions for backward compatibility
-    const permissionLevel = getPermissionLevelFromCheckboxes(
-      oauthReqInfo.permissions,
-    );
-    const grantedScopes = getScopesForPermissionLevel(permissionLevel);
+    // Get scopes based on selected permissions
+    const grantedScopes = getScopesFromPermissions(oauthReqInfo.permissions);
 
     // Return back to the MCP client a new token
     const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
