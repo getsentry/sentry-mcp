@@ -198,4 +198,104 @@ describe("sentry-oauth route", () => {
       expect(text).toBe("Invalid request");
     });
   });
+
+  describe("GET /oauth/callback", () => {
+    it("should reject callback without approved client cookie", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+      };
+
+      // Create callback request without the approval cookie
+      const request = new Request(
+        `http://localhost/oauth/callback?code=test-code&state=${btoa(JSON.stringify(oauthReqInfo))}`,
+        {
+          method: "GET",
+          headers: {
+            // No cookie header
+          },
+        },
+      );
+
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(403);
+      const text = await response.text();
+      expect(text).toBe("Authorization failed: Client not approved");
+    });
+
+    it("should reject callback with invalid client approval cookie", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+      };
+
+      // Create callback request with an invalid/tampered cookie
+      const request = new Request(
+        `http://localhost/oauth/callback?code=test-code&state=${btoa(JSON.stringify(oauthReqInfo))}`,
+        {
+          method: "GET",
+          headers: {
+            Cookie: "mcp-approved-clients=invalid-cookie-value",
+          },
+        },
+      );
+
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(403);
+      const text = await response.text();
+      expect(text).toBe("Authorization failed: Client not approved");
+    });
+
+    it("should reject callback with cookie for different client", async () => {
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+      };
+
+      // First, create a valid approval cookie for a different client
+      const approvalFormData = new FormData();
+      approvalFormData.append(
+        "state",
+        btoa(
+          JSON.stringify({
+            oauthReqInfo: {
+              clientId: "different-client",
+              redirectUri: "https://example.com/callback",
+              scope: ["read"],
+            },
+          }),
+        ),
+      );
+
+      const approvalRequest = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: approvalFormData,
+      });
+
+      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
+      const setCookie = approvalResponse.headers.get("Set-Cookie");
+
+      // Now try to use that cookie for a different client
+      const request = new Request(
+        `http://localhost/oauth/callback?code=test-code&state=${btoa(JSON.stringify(oauthReqInfo))}`,
+        {
+          method: "GET",
+          headers: {
+            Cookie: setCookie!.split(";")[0], // Extract just the cookie value
+          },
+        },
+      );
+
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(403);
+      const text = await response.text();
+      expect(text).toBe("Authorization failed: Client not approved");
+    });
+  });
 });

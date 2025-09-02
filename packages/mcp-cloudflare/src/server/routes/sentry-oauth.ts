@@ -144,6 +144,7 @@ export default new Hono<{
     });
   })
 
+  // This must be CSRF protected
   .post("/authorize", async (c) => {
     // Validates form submission, extracts state, and generates Set-Cookie headers to skip approval dialog next time
     let result: Awaited<ReturnType<typeof parseRedirectApproval>>;
