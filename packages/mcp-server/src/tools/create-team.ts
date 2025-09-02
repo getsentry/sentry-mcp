@@ -7,6 +7,7 @@ import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 
 export default defineTool({
   name: "create_team",
+  requiredScopes: ["team:write"],
   description: [
     "Create a new team in Sentry.",
     "",

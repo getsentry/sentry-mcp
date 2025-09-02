@@ -4,11 +4,13 @@ import type {
   WorkerVersionMetadata,
 } from "@cloudflare/workers-types";
 import type { ServerContext } from "@sentry/mcp-server/types";
+import type { Scope } from "@sentry/mcp-server/permissions";
 
 export type WorkerProps = ServerContext & {
   id: string;
   name: string;
   scope: string;
+  grantedScopes?: string[]; // Array of scope strings passed from OAuth
 };
 
 export interface Env {

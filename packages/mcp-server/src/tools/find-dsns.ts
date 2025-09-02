@@ -11,6 +11,7 @@ import {
 
 export default defineTool({
   name: "find_dsns",
+  requiredScopes: ["project:read"],
   description: [
     "List all Sentry DSNs for a specific project.",
     "",

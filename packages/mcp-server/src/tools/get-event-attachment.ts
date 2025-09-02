@@ -18,6 +18,7 @@ import { setTag } from "@sentry/core";
 
 export default defineTool({
   name: "get_event_attachment",
+  requiredScopes: ["event:read"],
   description: [
     "Download attachments from a Sentry event.",
     "",

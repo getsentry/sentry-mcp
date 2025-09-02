@@ -38,11 +38,7 @@ import { PROMPT_HANDLERS } from "./prompts";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { MCP_SERVER_NAME } from "./constants";
-import {
-  isToolAllowed,
-  validateToolPermissions,
-  PermissionLevel,
-} from "./permissions";
+import { isToolAllowed, type Scope } from "./permissions";
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -205,25 +201,19 @@ export async function configureServer({
   onToolComplete?: () => void;
   onInitialized?: () => void | Promise<void>;
 }) {
-  // Use default permission level for backward compatibility
-  const permissionLevel =
-    context.permissionLevel || PermissionLevel.PROJECT_MANAGEMENT;
-
-  // Validate tool permissions configuration at startup
-  const availableTools = Object.keys(tools);
-  const validation = validateToolPermissions(availableTools);
-  if (!validation.valid) {
-    if (validation.unknownTools.length > 0) {
-      console.warn(
-        `[MCP] Unknown tools in permission mapping: ${validation.unknownTools.join(", ")}`,
-      );
-    }
-    if (validation.unmappedTools.length > 0) {
-      console.warn(
-        `[MCP] Tools without permission mapping: ${validation.unmappedTools.join(", ")}`,
-      );
-    }
-  }
+  // Get granted scopes with default to all scopes for backward compatibility
+  const grantedScopes =
+    context.grantedScopes ||
+    new Set<Scope>([
+      "org:read",
+      "project:read",
+      "team:read",
+      "event:read",
+      "event:write",
+      "project:write",
+      "team:write",
+      "project:releases",
+    ]);
   server.server.onerror = (error) => {
     logError(error);
   };
@@ -365,10 +355,10 @@ export async function configureServer({
   }
 
   for (const [toolKey, tool] of Object.entries(tools)) {
-    // Check if this tool is allowed for the user's permission level
-    if (!isToolAllowed(toolKey, permissionLevel)) {
+    // Check if this tool is allowed based on granted scopes
+    if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
       console.debug(
-        `[MCP] Skipping tool '${toolKey}' - not allowed for permission level '${permissionLevel}'`,
+        `[MCP] Skipping tool '${tool.name}' - missing required scopes`,
       );
       continue;
     }
@@ -433,10 +423,10 @@ export async function configureServer({
                 }
 
                 try {
-                  // Double-check permission at runtime (defense in depth)
-                  if (!isToolAllowed(tool.name, permissionLevel)) {
+                  // Double-check scopes at runtime (defense in depth)
+                  if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
                     throw new Error(
-                      `Tool '${tool.name}' is not allowed for permission level '${permissionLevel}'`,
+                      `Tool '${tool.name}' is not allowed - missing required scopes`,
                     );
                   }
 

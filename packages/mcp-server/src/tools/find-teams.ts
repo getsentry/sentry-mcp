@@ -8,6 +8,7 @@ import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 
 export default defineTool({
   name: "find_teams",
+  requiredScopes: ["team:read"],
   description: [
     "Find teams in an organization in Sentry.",
     "",

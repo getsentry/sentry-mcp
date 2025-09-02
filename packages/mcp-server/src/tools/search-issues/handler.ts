@@ -16,6 +16,7 @@ import type { SentryApiService } from "../../api-client";
 
 export default defineTool({
   name: "search_issues",
+  requiredScopes: ["event:read"],
   description: [
     "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.",
     "",

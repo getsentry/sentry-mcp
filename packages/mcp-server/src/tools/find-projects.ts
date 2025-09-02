@@ -8,6 +8,7 @@ import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 
 export default defineTool({
   name: "find_projects",
+  requiredScopes: ["project:read"],
   description: [
     "Find projects in Sentry.",
     "",

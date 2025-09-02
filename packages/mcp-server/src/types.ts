@@ -8,7 +8,7 @@
 import type { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import type { z } from "zod";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
-import type { PermissionLevel } from "./permissions";
+import type { Scope } from "./permissions";
 
 type ZodifyRecord<T extends Record<string, any>> = {
   [K in keyof T]: z.infer<T[K]>;
@@ -54,8 +54,8 @@ export type ServerContext = {
   accessToken: string;
   userId?: string | null;
   clientId?: string;
-  // Permission level for tool access control (defaults to PROJECT_MANAGEMENT for backward compatibility)
-  permissionLevel?: PermissionLevel;
+  // Granted scopes for tool access control
+  grantedScopes?: Set<Scope>;
   // URL-based session constraints
   constraints: Constraints;
   // MCP client information captured during initialization

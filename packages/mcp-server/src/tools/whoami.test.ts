@@ -3,7 +3,7 @@ import whoami from "./whoami.js";
 import {
   createTestContext,
   createTestContextWithConstraints,
-} from "./__test-helpers__.js";
+} from "../test-utils/context.js";
 
 describe("whoami", () => {
   it("serializes without constraints", async () => {

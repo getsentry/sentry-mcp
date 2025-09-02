@@ -8,7 +8,21 @@ import {
 import type { Env, WorkerProps } from "../types";
 import { SentryApiService } from "@sentry/mcp-server/api-client";
 import { SCOPES } from "../../constants";
-import { PermissionLevel } from "@sentry/mcp-server/permissions";
+import {
+  PermissionLevel,
+  getScopesForPermissionLevel,
+  Scope,
+} from "@sentry/mcp-server/permissions";
+
+/**
+ * Extended AuthRequest that includes permissions
+ */
+interface AuthRequestWithPermissions extends AuthRequest {
+  permissions?: {
+    issueTriageEnabled: boolean;
+    projectManagementEnabled: boolean;
+  };
+}
 
 /**
  * Convert permission checkboxes to a permission level
@@ -33,7 +47,6 @@ function getPermissionLevelFromCheckboxes(permissions: {
 }
 import {
   renderApprovalDialog,
-  clientIdAlreadyApproved,
   parseRedirectApproval,
 } from "../lib/approval-dialog";
 import { logger } from "@sentry/cloudflare";
@@ -44,7 +57,7 @@ export const SENTRY_TOKEN_URL = "/oauth/token/";
 async function redirectToUpstream(
   env: Env,
   request: Request,
-  oauthReqInfo: AuthRequest,
+  oauthReqInfo: AuthRequestWithPermissions,
   headers: Record<string, string> = {},
 ) {
   return new Response(null, {
@@ -98,24 +111,8 @@ export default new Hono<{
       return c.text("Invalid request", 400);
     }
 
-    // because we share a clientId with the upstream provider, we need to ensure that the
-    // downstream client has been approved by the end-user (e.g. for a new client)
-    // https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/265
-    const isApproved = await clientIdAlreadyApproved(
-      c.req.raw,
-      clientId,
-      c.env.COOKIE_SECRET,
-    );
-    if (!isApproved) {
-      return renderApprovalDialog(c.req.raw, {
-        client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
-        server: {
-          name: "Sentry MCP",
-        },
-        state: { oauthReqInfo }, // arbitrary data that flows through the form submission below
-      });
-    }
-
+    // Always redirect to Sentry OAuth first for authentication
+    // The approval dialog will be shown after successful Sentry auth
     return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
   })
 
@@ -125,18 +122,43 @@ export default new Hono<{
       c.req.raw,
       c.env.COOKIE_SECRET,
     );
-    if (!state.oauthReqInfo) {
+    if (!state.oauthReqInfo || !state.sentryAuth) {
       return c.text("Invalid request", 400);
     }
 
-    // Add permissions to the state that will be passed through to the callback
-    const enhancedOauthReqInfo = {
-      ...state.oauthReqInfo,
-      // Store permissions in the state to be passed through the OAuth flow
-      permissions: permissions,
-    };
+    // Extract permission level from the form submission
+    const permissionLevel = getPermissionLevelFromCheckboxes(permissions);
 
-    return redirectToUpstream(c.env, c.req.raw, enhancedOauthReqInfo, headers);
+    // Convert permission level to scopes
+    const grantedScopes = getScopesForPermissionLevel(permissionLevel);
+
+    // Complete the authorization with the selected permissions
+    const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
+      request: state.oauthReqInfo,
+      userId: state.sentryAuth.userId,
+      metadata: {
+        label: state.sentryAuth.userName,
+      },
+      scope: state.oauthReqInfo.scope,
+      // This will be available on this.props inside MyMCP
+      props: {
+        id: state.sentryAuth.userId,
+        name: state.sentryAuth.userName,
+        accessToken: state.sentryAuth.accessToken,
+        clientId: state.oauthReqInfo.clientId,
+        scope: state.oauthReqInfo.scope.join(" "),
+        grantedScopes: Array.from(grantedScopes),
+      } as WorkerProps,
+    });
+
+    // Redirect with the approval cookie headers
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...headers,
+        location: redirectTo,
+      },
+    });
   })
 
   /**
@@ -149,11 +171,11 @@ export default new Hono<{
    */
   .get("/callback", async (c) => {
     // Get the oathReqInfo out of KV
-    let oauthReqInfo: AuthRequest;
+    let oauthReqInfo: AuthRequestWithPermissions;
     try {
       oauthReqInfo = JSON.parse(
         atob(c.req.query("state") as string),
-      ) as AuthRequest;
+      ) as AuthRequestWithPermissions;
     } catch (err) {
       logger.warn(`Invalid state: ${c.req.query("state") as string}`, {
         error: String(err),
@@ -194,31 +216,21 @@ export default new Hono<{
     });
     if (errResponse) return errResponse;
 
-    // Extract permission level from the OAuth request state
-    // This comes from the permissions selected in the approval form
-    const permissionLevel = oauthReqInfo.permissions
-      ? getPermissionLevelFromCheckboxes(oauthReqInfo.permissions)
-      : PermissionLevel.READ_ONLY;
-
-    // Return back to the MCP client a new token
-    const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
-      request: oauthReqInfo,
-      userId: payload.user.id,
-      metadata: {
-        label: payload.user.name,
+    // Always show the approval dialog with permission selection after Sentry auth
+    // TODO: In the future, we could store permissions with the approval cookie
+    // to skip this step for returning users with the same permissions
+    return renderApprovalDialog(c.req.raw, {
+      client: await c.env.OAUTH_PROVIDER.lookupClient(oauthReqInfo.clientId),
+      server: {
+        name: "Sentry MCP",
       },
-      scope: oauthReqInfo.scope,
-      // This will be available on this.props inside MyMCP
-      props: {
-        id: payload.user.id,
-        name: payload.user.name,
-        accessToken: payload.access_token,
-        clientId: oauthReqInfo.clientId,
-        scope: oauthReqInfo.scope.join(" "),
-        permissionLevel,
-      } as WorkerProps,
+      state: {
+        oauthReqInfo,
+        sentryAuth: {
+          userId: payload.user.id,
+          userName: payload.user.name,
+          accessToken: payload.access_token,
+        },
+      },
     });
-
-    // Use manual redirect instead of Response.redirect() to allow middleware to add headers
-    return c.redirect(redirectTo);
   });

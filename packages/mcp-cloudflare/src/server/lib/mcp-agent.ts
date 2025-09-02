@@ -98,7 +98,9 @@ class SentryMCPBase extends McpAgent<
         userId: this.props.id,
         mcpUrl: process.env.MCP_URL,
         accessToken: this.props.accessToken,
-        permissionLevel: this.props.permissionLevel,
+        grantedScopes: this.props.grantedScopes
+          ? new Set(this.props.grantedScopes as any)
+          : undefined,
         constraints: this.state.constraints || {},
       },
       onToolComplete: () => {

@@ -14,6 +14,7 @@ const MIN_AVG_DURATION_MS = 5;
 
 export default defineTool({
   name: "get_trace_details",
+  requiredScopes: ["event:read"],
   description: [
     "Get detailed information about a specific Sentry trace by ID.",
     "",

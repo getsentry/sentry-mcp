@@ -5,6 +5,7 @@ import type { ServerContext } from "../types";
 
 export default defineTool({
   name: "find_organizations",
+  requiredScopes: ["org:read"],
   description: [
     "Find organizations that the user has access to in Sentry.",
     "",

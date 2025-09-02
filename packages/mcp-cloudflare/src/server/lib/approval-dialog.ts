@@ -674,8 +674,8 @@ export function renderApprovalDialog(
                 <div class="default-permission-item">
                   <span class="permission-check">✓</span>
                   <div class="default-permission-content">
-                    <span class="default-permission-name">Access your Sentry data with Essential Tools (11 tools)</span>
-                    <div class="default-permission-description">Basic information retrieval and search capabilities</div>
+                    <span class="default-permission-name">Read-only access to your Sentry data</span>
+                    <div class="default-permission-description">View organizations, projects, teams, issues, and releases</div>
                   </div>
                 </div>
               </div>
@@ -688,8 +688,8 @@ export function renderApprovalDialog(
                   <input type="checkbox" name="permission_issue_triage" value="true">
                   <span class="permission-checkbox"></span>
                   <div class="optional-permission-content">
-                    <span class="optional-permission-name">Issue Triage (+1 tool)</span>
-                    <div class="optional-permission-description">Issue management capabilities for bug triage and resolution</div>
+                    <span class="optional-permission-name">Issue Triage (event:write)</span>
+                    <div class="optional-permission-description">Update and manage issues - resolve, assign, and analyze problems</div>
                   </div>
                 </label>
                 
@@ -697,8 +697,8 @@ export function renderApprovalDialog(
                   <input type="checkbox" name="permission_project_management" value="true">
                   <span class="permission-checkbox"></span>
                   <div class="optional-permission-content">
-                    <span class="optional-permission-name">Project Management (+4 tools)</span>
-                    <div class="optional-permission-description">Full project and team management capabilities</div>
+                    <span class="optional-permission-name">Project Management (project:write, team:write)</span>
+                    <div class="optional-permission-description">Create and modify projects, teams, and DSNs</div>
                   </div>
                 </label>
               </div>

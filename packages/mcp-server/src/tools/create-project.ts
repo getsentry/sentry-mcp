@@ -14,6 +14,7 @@ import {
 
 export default defineTool({
   name: "create_project",
+  requiredScopes: ["project:write", "team:read"],
   description: [
     "Create a new project in Sentry (includes DSN automatically).",
     "",

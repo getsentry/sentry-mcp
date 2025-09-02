@@ -23,6 +23,7 @@ import {
   validateAndParseSentryUrl,
 } from "./utils/url-utils";
 import { sentryBeforeSend } from "./internal/sentry-scrubbing";
+import { parseScopesFromString, type Scope } from "./permissions";
 
 let accessToken: string | undefined = process.env.SENTRY_ACCESS_TOKEN;
 let sentryHost = "sentry.io"; // Default hostname
@@ -30,6 +31,9 @@ let mcpUrl: string | undefined =
   process.env.MCP_URL || "https://mcp.sentry.dev";
 let sentryDsn: string | undefined =
   process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
+let grantedScopes: Set<Scope> | undefined = process.env.MCP_SCOPES
+  ? parseScopesFromString(process.env.MCP_SCOPES)
+  : undefined;
 
 // Set initial host from environment variables (SENTRY_URL takes precedence)
 if (process.env.SENTRY_URL) {
@@ -42,7 +46,17 @@ if (process.env.SENTRY_URL) {
 const packageName = "@sentry/mcp-server";
 
 function getUsage(): string {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>]`;
+  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>] [--scopes=<scope1,scope2>]
+
+Available scopes (higher scopes include lower):
+  - org:read, org:write, org:admin
+  - project:read, project:write, project:admin
+  - team:read, team:write, team:admin
+  - event:read, event:write, event:admin
+  - project:releases
+
+Example:
+  ${packageName} --access-token=TOKEN --scopes=org:read,event:read,project:read`;
 }
 
 for (const arg of process.argv.slice(2)) {
@@ -62,6 +76,14 @@ for (const arg of process.argv.slice(2)) {
     mcpUrl = arg.split("=")[1];
   } else if (arg.startsWith("--sentry-dsn=")) {
     sentryDsn = arg.split("=")[1];
+  } else if (arg.startsWith("--scopes=")) {
+    const scopesString = arg.split("=")[1];
+    grantedScopes = parseScopesFromString(scopesString);
+    if (grantedScopes.size === 0) {
+      console.error("Error: Invalid scopes provided. No valid scopes found.");
+      console.error(getUsage());
+      process.exit(1);
+    }
   } else {
     console.error("Error: Invalid argument:", arg);
     console.error(getUsage());
@@ -129,6 +151,7 @@ const SENTRY_TIMEOUT = 5000; // 5 seconds
 // identically, but we don't really need userId and userName yet
 startStdio(instrumentedServer, {
   accessToken,
+  grantedScopes,
   constraints: {
     organizationSlug: null,
   },

@@ -17,6 +17,7 @@ import {
 
 export default defineTool({
   name: "update_issue",
+  requiredScopes: ["event:write"],
   description: [
     "Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.",
     "",
