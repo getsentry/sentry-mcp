@@ -15,22 +15,21 @@ This directory serves a dual purpose:
 ## Contents
 
 ### Core Guidelines
-- `coding-guidelines.mdc` - Coding standards, patterns, and best practices
-- `coding-practices.mdc` - General coding practices and conventions
-- `package-management.mdc` - Package and dependency management
+- @docs/coding-guidelines.mdc - Coding standards, patterns, and best practices
+- @docs/common-patterns.mdc - Reusable patterns and conventions
+- @docs/quality-checks.mdc - Required checks before changes
 
 ### API and Tools
-- `adding-new-tools.mdc` - How to add new MCP tools
-- `adding-prompts.mdc` - Guidelines for adding new prompts
-- `adding-new-resources.mdc` - How to add new MCP resources
-- `api-client-patterns.mdc` - Working with the Sentry API client
-- `search-events-api-patterns.md` - Comprehensive guide to search_events API patterns
-- `using-api-mocks.mdc` - Testing with API mocks
+- @docs/adding-tools.mdc - How to add new MCP tools
+- @docs/adding-prompts.mdc - Guidelines for adding new prompts
+- @docs/adding-resources.mdc - How to add new MCP resources
+- @docs/api-patterns.mdc - Working with the Sentry API client
+- @docs/search-events-api-patterns.md - search_events API patterns
 
 ### Infrastructure and Operations
-- `deployment-and-infrastructure.mdc` - Deployment processes and infrastructure
-- `observability-and-monitoring.mdc` - Monitoring and telemetry practices
-- `security-and-authentication.mdc` - Security best practices
+- @docs/deployment.mdc - Deployment processes (Cloudflare)
+- @docs/monitoring.mdc - Monitoring and telemetry practices
+- @docs/security.mdc - Security and authentication patterns
 
 ## For LLMs
 
@@ -51,9 +50,9 @@ These `.mdc` files are designed to be easily consumed by various AI development 
 ## LLM-Specific Guidelines
 
 The `llms/` subdirectory contains meta-documentation for LLMs:
-- `documentation-style-guide.mdc` - How to write effective LLM documentation
-- `document-scopes.mdc` - Purpose and content for each doc
-- `documentation-todos.mdc` - Tasks for documentation improvement
+- @docs/llms/documentation-style-guide.mdc - How to write effective LLM documentation
+- @docs/llms/document-scopes.mdc - Purpose and content for each doc
+  
 
 ## Maintenance
 
@@ -65,4 +64,4 @@ These documents should be updated when:
 
 ## Note
 
-This documentation supplements but does not replace the root-level CLAUDE.md file, which remains the primary instruction set for Claude Code when working with this repository. The CLAUDE.md file will be refactored into multiple focused documents within this directory.
+This documentation supplements but does not replace the root-level @AGENTS.md file, which remains the primary instruction set for agents when working with this repository. The @AGENTS.md file is kept concise and points to focused documents within this directory.

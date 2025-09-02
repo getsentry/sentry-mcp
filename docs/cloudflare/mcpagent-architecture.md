@@ -308,12 +308,12 @@ OAuth Provider                          McpAgent
 ## Implementation Reference
 
 The actual implementation can be found in:
-- **Main class**: `packages/mcp-cloudflare/src/server/lib/mcp-agent.ts`
-- **Constraint utilities**: `packages/mcp-cloudflare/src/server/lib/constraint-utils.ts`
-- **Type definitions**: `packages/mcp-cloudflare/src/server/types.ts`
+- Main class: @packages/mcp-cloudflare/src/server/lib/mcp-agent.ts
+- Constraint utilities: @packages/mcp-cloudflare/src/server/lib/constraint-utils.ts
+- Type definitions: @packages/mcp-cloudflare/src/server/types.ts
 
 ## Related Documentation
 
-- [OAuth Architecture](./oauth-architecture.md) - How OAuth provider integrates
-- [MCP Transport Implementation](../lib/mcp-transport.ts) - Our implementation
-- [Constraint DO Analysis](./constraint-do-analysis.md) - Alternative architectures considered
+- OAuth Architecture: @docs/cloudflare/oauth-architecture.md — How OAuth provider integrates
+- MCP Transport (stdio) Implementation: @packages/mcp-server/src/transports/stdio.ts — Core server transport
+- Constraint DO Analysis: @docs/cloudflare/constraint-do-analysis.md — Alternative architectures considered

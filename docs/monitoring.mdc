@@ -161,7 +161,7 @@ process.on("uncaughtException", (error) => {
 Sentry follows OpenTelemetry semantic conventions for consistent observability.
 
 ### MCP Attributes (Model Context Protocol)
-Based on [OpenTelemetry MCP conventions](mdc:https:/github.com/open-telemetry/semantic-conventions/blob/3097fb0af5b9492b0e3f55dc5f6c21a3dc2be8df/docs/registry/attributes/mcp.md) (currently in **draft form**):
+Based on [OpenTelemetry MCP conventions](https://github.com/open-telemetry/semantic-conventions/blob/3097fb0af5b9492b0e3f55dc5f6c21a3dc2be8df/docs/registry/attributes/mcp.md) (currently in **draft form**):
 
 - `mcp.method.name` - The name of the request or notification method (e.g., "notifications/cancelled", "initialize", "notifications/initialized")
 - `mcp.prompt.name` - The name of the prompt or prompt template provided in the request or response (e.g., "analyze-code")
@@ -186,12 +186,12 @@ Following [OpenTelemetry semantic conventions for user agent](https://openteleme
 **Cloudflare Transport**: Captured from the initial SSE/WebSocket connection request headers and cached for the session
 
 ### Network Attributes
-Based on [OpenTelemetry network conventions](mdc:https:/github.com/open-telemetry/semantic-conventions/blob/main/docs/registry/attributes/network.md):
+Based on [OpenTelemetry network conventions](https://github.com/open-telemetry/semantic-conventions/blob/main/docs/registry/attributes/network.md):
 
 - `network.transport` - Transport protocol used ("pipe" for stdio, "tcp" for SSE)
 
 ### GenAI Attributes (Generative AI)
-Based on [OpenTelemetry GenAI conventions](mdc:https:/github.com/open-telemetry/semantic-conventions/blob/main/docs/registry/attributes/gen-ai.md):
+Based on [OpenTelemetry GenAI conventions](https://github.com/open-telemetry/semantic-conventions/blob/main/docs/registry/attributes/gen-ai.md):
 
 - `gen_ai.system` - The AI system being used (e.g., "anthropic")
 - `gen_ai.request.model` - Name of the GenAI model

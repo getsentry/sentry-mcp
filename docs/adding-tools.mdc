@@ -303,7 +303,7 @@ try {
 
 ### Implementation Guidelines
 
-1. **Create a CLAUDE.md file** in the tool directory documenting:
+1. **Create an AGENTS.md file** in the tool directory documenting:
    - The embedded agent's prompt and behavior
    - Common translation patterns
    - Known limitations

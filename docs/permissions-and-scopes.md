@@ -112,5 +112,5 @@ Examples:
 
 ## References
 
-- [Adding Tools](./adding-tools.md) - Add tools with scope requirements
-- [Testing](./testing.md) - Test with different scope configurations
+- Adding Tools: @docs/adding-tools.mdc — Add tools with scope requirements
+- Testing: @docs/testing.mdc — Test with different scope configurations

@@ -56,7 +56,7 @@ A separate web chat application that uses the MCP server.
 
 **Note**: This is NOT part of the MCP server itself - it's a demonstration of how to build a chat interface that consumes MCP.
 
-See [Cloudflare Web App Documentation](./cloudflare/overview.md) for details.
+See "Overview" in @docs/cloudflare/overview.md for details.
 
 ### packages/mcp-server-evals
 
