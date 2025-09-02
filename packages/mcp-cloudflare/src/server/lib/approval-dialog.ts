@@ -519,12 +519,8 @@ export function renderApprovalDialog(
           }
           
           .optional-permission-item:has(input[type="checkbox"]:checked) {
+          border-color: var(--highlight-color);
             background-color: oklab(0 0 0 / 0.1);
-          }
-          
-          .optional-permission-item input[type="checkbox"]:focus + .permission-checkbox {
-            outline: 2px solid var(--highlight-color);
-            outline-offset: 2px;
           }
           
           .optional-permission-content {
