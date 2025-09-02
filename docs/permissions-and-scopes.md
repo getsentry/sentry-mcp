@@ -5,7 +5,7 @@ OAuth-style scope system for controlling access to Sentry MCP tools.
 ## Default Permissions
 
 **By default, all users receive read-only access.** This includes:
-- `org:read`, `project:read`, `team:read`, `member:read`, `event:read`, `project:releases`
+- `org:read`, `project:read`, `team:read`, `event:read`
 
 Additional permissions must be explicitly granted through the OAuth flow or CLI arguments.
 
@@ -15,7 +15,7 @@ When authenticating via OAuth, users can select additional permissions:
 
 | Level | Scopes | Tools Enabled |
 |-------|--------|--------------|
-| **Read-Only** (default) | `org:read`, `project:read`, `team:read`, `member:read`, `event:read`, `project:releases` | Search, view issues/traces, documentation |
+| **Read-Only** (default) | `org:read`, `project:read`, `team:read`, `event:read` | Search, view issues/traces, documentation |
 | **+ Issue Triage** | Adds `event:write` | All above + resolve/assign issues, AI analysis |
 | **+ Project Management** | Adds `project:write`, `team:write` | All above + create/modify projects/teams/DSNs |
 
@@ -73,7 +73,7 @@ Examples:
 - `find_organizations` - `org:read`
 - `find_projects` - `project:read`
 - `find_teams` - `team:read`
-- `find_releases` - `project:releases`
+- `find_releases` - `project:read`
 - `find_dsns` - `project:read`
 - `get_issue_details` - `event:read`
 - `get_event_attachment` - `event:read`

@@ -53,7 +53,7 @@ function getUsage(): string {
   return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>] [--scopes=<scope1,scope2>] [--add-scopes=<scope1,scope2>]
 
 Default scopes (read-only):
-  - org:read, project:read, team:read, member:read, event:read, project:releases
+  - org:read, project:read, team:read, event:read
 
 Scope options:
   --scopes      Override default scopes completely

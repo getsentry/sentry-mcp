@@ -12,7 +12,7 @@ This package is primarily for running the `stdio` MCP server. If you do not know
 ## Permissions and Scopes
 
 By default, the MCP server runs with **read-only access** to your Sentry data:
-- `org:read`, `project:read`, `team:read`, `member:read`, `event:read`, `project:releases`
+- `org:read`, `project:read`, `team:read`, `event:read`
 
 ### Customizing Permissions
 

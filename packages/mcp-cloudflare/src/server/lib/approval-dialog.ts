@@ -227,7 +227,7 @@ export function renderApprovalDialog(
   const { client, server, state } = options;
 
   // Encode state for form submission
-  const encodedState = btoa(JSON.stringify(state));
+  const encodedState = encodeState(state);
 
   // Sanitize any untrusted content
   const serverName = sanitizeHtml(server.name);

@@ -24,7 +24,7 @@ interface AuthRequestWithPermissions extends AuthRequest {
 /**
  * Convert selected permissions to granted scopes
  * Permissions are additive:
- * - Base (always included): org:read, project:read, team:read, member:read, event:read, project:releases
+ * - Base (always included): org:read, project:read, team:read, event:read
  * - Issue Triage adds: event:write
  * - Project Management adds: project:write, team:write
  * @param permissions Array of permission strings
@@ -35,9 +35,7 @@ function getScopesFromPermissions(permissions?: string[]): Set<Scope> {
     "org:read",
     "project:read",
     "team:read",
-    "member:read",
     "event:read",
-    "project:releases",
   ]);
 
   if (!permissions || permissions.length === 0) {

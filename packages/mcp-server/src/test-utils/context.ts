@@ -15,7 +15,6 @@ export function createTestContext(
       "project:write",
       "team:write",
       "event:write",
-      "project:releases",
     ]),
     ...overrides,
   };
