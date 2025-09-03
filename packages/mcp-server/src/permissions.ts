@@ -153,14 +153,8 @@ export function isToolAllowed(
 export function parseScopesFromString(
   scopesString: string | undefined,
 ): Set<Scope> {
-  if (!scopesString) {
-    return new Set<Scope>();
-  }
-  const parts = scopesString
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  return parseScopesFromArray(parts);
+  if (!scopesString) return new Set<Scope>();
+  return parseScopes(scopesString).valid;
 }
 
 /**
@@ -169,32 +163,35 @@ export function parseScopesFromString(
  * - Logs a console.warn listing any invalid values
  */
 export function parseScopesFromArray(scopes: unknown): Set<Scope> {
-  if (!Array.isArray(scopes)) {
-    return new Set<Scope>();
+  if (!Array.isArray(scopes)) return new Set<Scope>();
+  return parseScopes(scopes).valid;
+}
+
+/**
+ * Generic scope parser: accepts a comma-separated string or an array.
+ * Returns both valid and invalid tokens. No logging.
+ */
+export function parseScopes(input: unknown): {
+  valid: Set<Scope>;
+  invalid: string[];
+} {
+  let tokens: string[] = [];
+  if (typeof input === "string") {
+    tokens = input.split(",");
+  } else if (Array.isArray(input)) {
+    tokens = input.map((v) => (typeof v === "string" ? v : ""));
   }
+
   const valid = new Set<Scope>();
   const invalid: string[] = [];
-
-  for (const raw of scopes) {
-    if (typeof raw !== "string") continue;
-    const value = raw.trim();
-    if (!value) continue;
-    if (ALL_SCOPES_SET.has(value as Scope)) {
-      valid.add(value as Scope);
+  for (const raw of tokens.map((s) => s.trim()).filter(Boolean)) {
+    if (ALL_SCOPES_SET.has(raw as Scope)) {
+      valid.add(raw as Scope);
     } else {
-      invalid.push(value);
+      invalid.push(raw);
     }
   }
-
-  if (invalid.length > 0) {
-    console.warn(
-      `[MCP] Ignoring invalid scope values: ${invalid.join(", ")} (allowed: ${[
-        ...ALL_SCOPES_SET,
-      ].join(", ")})`,
-    );
-  }
-
-  return valid;
+  return { valid, invalid };
 }
 
 /**
@@ -205,19 +202,7 @@ export function validateScopes(scopesString: string): {
   valid: Set<Scope>;
   invalid: string[];
 } {
-  const valid = new Set<Scope>();
-  const invalid: string[] = [];
-  for (const raw of scopesString
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)) {
-    if (ALL_SCOPES_SET.has(raw as Scope)) {
-      valid.add(raw as Scope);
-    } else {
-      invalid.push(raw);
-    }
-  }
-  return { valid, invalid };
+  return parseScopes(scopesString);
 }
 
 /**
