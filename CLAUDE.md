@@ -102,8 +102,8 @@ grep -r "TODO\|FIXME" src/     # Find tech debt
    - Sentry API 429: Retry with exponential backoff
    - Sentry API 401/403: Check token permissions
 3. **Docs**: Update when changing functionality
-4. **PR**: Read `docs/pr-management.mdc`. Include Claude Code attribution
+4. **PR**: Follow `docs/pr-management.mdc` for commit/PR guidelines (includes AI attribution)
 5. **Tasks**: Use TodoWrite for 3+ steps. Batch tool calls when possible
 
 ---
-*Optimized for Claude Code (Sonnet 4/Opus 4)*
+*Optimized for Codex CLI (OpenAI) and Claude Code*
