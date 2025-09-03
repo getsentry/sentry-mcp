@@ -188,8 +188,8 @@ const SENTRY_TIMEOUT = 5000; // 5 seconds
 // Process scope configuration
 let finalScopes: Set<Scope> | undefined;
 if (grantedScopes) {
-  // --scopes was used, override defaults completely
-  finalScopes = grantedScopes;
+  // --scopes was used, override defaults completely, but include implied lower-level scopes
+  finalScopes = expandScopes(grantedScopes);
 } else if (additionalScopes) {
   // --add-scopes was used, add to defaults
   const defaultScopeSet = new Set<Scope>(DEFAULT_SCOPES);
