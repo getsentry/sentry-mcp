@@ -1,22 +1,15 @@
 import { describe, expect, it } from "vitest";
-import {
-  validateScopesStrictFromString,
-  expandScopes,
-  type Scope,
-} from "./permissions";
+import { validateScopes, expandScopes, type Scope } from "./permissions";
 
-describe("validateScopesStrictFromString", () => {
+describe("validateScopes", () => {
   it("returns invalid tokens for unknown scopes", () => {
-    const { valid, invalid } =
-      validateScopesStrictFromString("foo,bar,org:admin");
+    const { valid, invalid } = validateScopes("foo,bar,org:admin");
     expect(invalid).toEqual(["foo", "bar"]);
     expect([...valid]).toContain("org:admin");
   });
 
   it("returns only valid set when all are valid", () => {
-    const { valid, invalid } = validateScopesStrictFromString(
-      "event:admin,org:read",
-    );
+    const { valid, invalid } = validateScopes("event:admin,org:read");
     expect(invalid).toEqual([]);
     const out = new Set<Scope>(valid);
     expect(out.has("event:admin")).toBe(true);

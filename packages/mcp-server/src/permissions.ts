@@ -201,19 +201,20 @@ export function parseScopesFromArray(scopes: unknown): Set<Scope> {
  * Strict validation helper for scope strings supplied via flags/env.
  * Returns both valid and invalid entries without side effects.
  */
-export function validateScopesStrictFromString(scopesString: string): {
+export function validateScopes(scopesString: string): {
   valid: Set<Scope>;
   invalid: string[];
 } {
   const valid = new Set<Scope>();
   const invalid: string[] = [];
-  for (const raw of scopesString.split(",")) {
-    const value = raw.trim();
-    if (!value) continue;
-    if (ALL_SCOPES_SET.has(value as Scope)) {
-      valid.add(value as Scope);
+  for (const raw of scopesString
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)) {
+    if (ALL_SCOPES_SET.has(raw as Scope)) {
+      valid.add(raw as Scope);
     } else {
-      invalid.push(value);
+      invalid.push(raw);
     }
   }
   return { valid, invalid };
