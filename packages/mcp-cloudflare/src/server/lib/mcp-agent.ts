@@ -5,7 +5,6 @@ import { configureServer } from "@sentry/mcp-server/server";
 import {
   expandScopes,
   parseScopesFromArray,
-  type Scope,
 } from "@sentry/mcp-server/permissions";
 import type { Env, WorkerProps } from "../types";
 import type { Constraints } from "@sentry/mcp-server/types";
@@ -104,9 +103,7 @@ class SentryMCPBase extends McpAgent<
         mcpUrl: process.env.MCP_URL,
         accessToken: this.props.accessToken,
         grantedScopes: this.props.grantedScopes
-          ? (expandScopes(
-              parseScopesFromArray(this.props.grantedScopes),
-            ) as Set<Scope>)
+          ? expandScopes(parseScopesFromArray(this.props.grantedScopes))
           : undefined,
         constraints: this.state.constraints || {},
       },
