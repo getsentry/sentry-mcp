@@ -1,37 +1,61 @@
+import { parseArgs } from "node:util";
 import type { CliArgs, EnvArgs, MergedArgs } from "./types";
 
 export function parseArgv(argv: string[]): CliArgs {
-  const out: CliArgs = { unknownArgs: [] };
-  for (const arg of argv) {
-    if (arg === "--help" || arg === "-h") {
-      out.help = true;
-      continue;
-    }
-    if (arg === "--version" || arg === "-v") {
-      out.version = true;
-      continue;
-    }
-    if (arg.startsWith("--access-token=")) {
-      out.accessToken = arg.split("=")[1];
-    } else if (arg.startsWith("--host=")) {
-      out.host = arg.split("=")[1];
-    } else if (arg.startsWith("--url=")) {
-      out.url = arg.split("=")[1];
-    } else if (arg.startsWith("--mcp-url=")) {
-      out.mcpUrl = arg.split("=")[1];
-    } else if (arg.startsWith("--sentry-dsn=")) {
-      out.sentryDsn = arg.split("=")[1];
-    } else if (arg.startsWith("--scopes=")) {
-      out.scopes = arg.split("=")[1];
-    } else if (arg.startsWith("--add-scopes=")) {
-      out.addScopes = arg.split("=")[1];
-    } else if (arg === "--all-scopes") {
-      out.allScopes = true;
-    } else {
-      out.unknownArgs.push(arg);
+  const options = {
+    "access-token": { type: "string" as const },
+    host: { type: "string" as const },
+    url: { type: "string" as const },
+    "mcp-url": { type: "string" as const },
+    "sentry-dsn": { type: "string" as const },
+    scopes: { type: "string" as const },
+    "add-scopes": { type: "string" as const },
+    "all-scopes": { type: "boolean" as const },
+    help: { type: "boolean" as const, short: "h" as const },
+    version: { type: "boolean" as const, short: "v" as const },
+  };
+
+  const { values, positionals, tokens } = parseArgs({
+    args: argv,
+    options,
+    allowPositionals: false,
+    strict: false,
+    tokens: true,
+  });
+
+  const knownLong = new Set(Object.keys(options));
+  const knownShort = new Set([
+    ...(Object.values(options)
+      .map((o) => ("short" in o ? (o.short as string | undefined) : undefined))
+      .filter(Boolean) as string[]),
+  ]);
+
+  const unknownArgs: string[] = [];
+  for (const t of (tokens as any[]) || []) {
+    if (t.kind === "option") {
+      const name = t.name as string | undefined;
+      if (name && !(knownLong.has(name) || knownShort.has(name))) {
+        unknownArgs.push((t.raw as string) ?? `--${name}`);
+      }
+    } else if (t.kind === "positional") {
+      unknownArgs.push((t.raw as string) ?? String(t.value ?? ""));
     }
   }
-  return out;
+
+  return {
+    accessToken: values["access-token"] as string | undefined,
+    host: values.host as string | undefined,
+    url: values.url as string | undefined,
+    mcpUrl: values["mcp-url"] as string | undefined,
+    sentryDsn: values["sentry-dsn"] as string | undefined,
+    scopes: values.scopes as string | undefined,
+    addScopes: values["add-scopes"] as string | undefined,
+    allScopes: (values["all-scopes"] as boolean | undefined) === true,
+    help: (values.help as boolean | undefined) === true,
+    version: (values.version as boolean | undefined) === true,
+    unknownArgs:
+      unknownArgs.length > 0 ? unknownArgs : (positionals as string[]) || [],
+  };
 }
 
 export function parseEnv(env: NodeJS.ProcessEnv): EnvArgs {
