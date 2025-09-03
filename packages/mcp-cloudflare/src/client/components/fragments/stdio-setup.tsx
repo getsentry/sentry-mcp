@@ -1,5 +1,5 @@
 import { Accordion } from "../ui/accordion";
-import { Link } from "../ui/base";
+import { Heading, Link } from "../ui/base";
 import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
@@ -22,7 +22,7 @@ export default function StdioSetup() {
 
   return (
     <>
-      <Prose>
+      <Prose className="mb-6">
         <p>
           The stdio client is made available on npm at{" "}
           <Link href={`https://www.npmjs.com/package/${NPM_PACKAGE_NAME}`}>
@@ -64,8 +64,47 @@ export default function StdioSetup() {
           sentry.io). If you wish to disable it, pass <code>--sentry-dsn=</code>{" "}
           with an empty value.
         </p>
-        <h3>Integration Guides</h3>
+
+        <p>
+          <strong>Constraints (stdio only):</strong> Restrict all tool calls to
+          a specific organization, and optionally to a project within that
+          organization using CLI flags.
+        </p>
+        <CodeSnippet
+          snippet={[
+            `${mcpStdioSnippet}`,
+            "--access-token=sentry-user-token",
+            "--host=sentry.io",
+            "--organization-slug=sentry",
+            "--project-slug=mcp-server",
+          ].join(" \\\n  ")}
+        />
+        <p>
+          You can provide just <code>--organization-slug</code> to scope to an
+          org, or include <code>--project-slug</code> to scope to a single
+          project within that org.
+        </p>
+
+        <p>
+          <strong>Scopes:</strong> The default configuration grants read-only
+          access (listed above). To grant full access to all available tools use
+          <code>--all-scopes</code>.
+        </p>
+        <CodeSnippet
+          snippet={[
+            `${mcpStdioSnippet}`,
+            "--access-token=sentry-user-token",
+            "--host=sentry.io",
+            "--all-scopes",
+          ].join(" \\\n  ")}
+        />
+        <p>
+          For more options and details, run{" "}
+          <code>npx @sentry/mcp-server@latest --help</code> — there are many
+          flags available.
+        </p>
       </Prose>
+      <Heading as="h3">Integration Guides</Heading>
       <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
           <ol>
