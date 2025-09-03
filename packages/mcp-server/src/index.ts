@@ -26,7 +26,7 @@ import { sentryBeforeSend } from "./internal/sentry-scrubbing";
 import {
   type Scope,
   ALL_SCOPES,
-  validateScopes,
+  parseScopes,
   resolveScopes,
 } from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
@@ -108,7 +108,7 @@ for (const arg of process.argv.slice(2)) {
     sentryDsn = arg.split("=")[1];
   } else if (arg.startsWith("--scopes=")) {
     const scopesString = arg.split("=")[1];
-    const { valid, invalid } = validateScopes(scopesString);
+    const { valid, invalid } = parseScopes(scopesString);
     if (invalid.length > 0) {
       console.error(fmtInvalid(invalid));
       console.error(getUsage());
@@ -122,7 +122,7 @@ for (const arg of process.argv.slice(2)) {
     }
   } else if (arg.startsWith("--add-scopes=")) {
     const scopesString = arg.split("=")[1];
-    const { valid, invalid } = validateScopes(scopesString);
+    const { valid, invalid } = parseScopes(scopesString);
     if (invalid.length > 0) {
       console.error(fmtInvalid(invalid));
       console.error(getUsage());
@@ -149,7 +149,7 @@ for (const arg of process.argv.slice(2)) {
 // Environment precedence: Only apply env vars if neither CLI override nor additive flags were provided
 if (!grantedScopes && !additionalScopes) {
   if (process.env.MCP_SCOPES) {
-    const { valid, invalid } = validateScopes(process.env.MCP_SCOPES);
+    const { valid, invalid } = parseScopes(process.env.MCP_SCOPES);
     if (invalid.length > 0) {
       console.error(fmtInvalid(invalid, "MCP_SCOPES"));
       console.error(getUsage());
@@ -164,7 +164,7 @@ if (!grantedScopes && !additionalScopes) {
     }
     grantedScopes = valid;
   } else if (process.env.MCP_ADD_SCOPES) {
-    const { valid, invalid } = validateScopes(process.env.MCP_ADD_SCOPES);
+    const { valid, invalid } = parseScopes(process.env.MCP_ADD_SCOPES);
     if (invalid.length > 0) {
       console.error(fmtInvalid(invalid, "MCP_ADD_SCOPES"));
       console.error(getUsage());

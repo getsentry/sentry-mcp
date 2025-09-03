@@ -192,12 +192,8 @@ export function parseScopes(input: unknown): {
  * Strict validation helper for scope strings supplied via flags/env.
  * Returns both valid and invalid entries without side effects.
  */
-export function validateScopes(scopesString: string): {
-  valid: Set<Scope>;
-  invalid: string[];
-} {
-  return parseScopes(scopesString);
-}
+// Deprecated: use parseScopes(scopesString)
+// export function validateScopes(scopesString: string): { valid: Set<Scope>; invalid: string[] } { ... }
 
 /**
  * Resolve final scopes from optional override/additive sets and provided defaults.
