@@ -37,6 +37,10 @@ export MCP_ADD_SCOPES=event:write         # Adds to defaults
 npx @sentry/mcp-server --access-token=TOKEN
 ```
 
+Precedence and validation:
+- Flags override environment variables. If `--scopes` is provided, `MCP_SCOPES` is ignored. If `--add-scopes` is provided, `MCP_ADD_SCOPES` is ignored.
+- Flags and env vars are strict: any invalid scope token causes an error listing allowed scopes.
+
 **Note:** `--scopes` completely replaces the default scopes, while `--add-scopes` adds to them.
 
 ## Scope Hierarchy

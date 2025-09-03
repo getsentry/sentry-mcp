@@ -80,48 +80,11 @@ Examples:
   ${packageName} --access-token=TOKEN --add-scopes=event:write,project:write`;
 }
 
-// Parse environment-provided scopes strictly as well
-if (process.env.MCP_SCOPES) {
-  const { valid, invalid } = validateScopesStrictFromString(
-    process.env.MCP_SCOPES,
-  );
-  if (invalid.length > 0) {
-    console.error(
-      `Error: Invalid MCP_SCOPES provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
-    );
-    console.error(getUsage());
-    process.exit(1);
-  }
-  if (valid.size === 0) {
-    console.error("Error: Invalid MCP_SCOPES provided. No valid scopes found.");
-    console.error(getUsage());
-    process.exit(1);
-  }
-  grantedScopes = valid;
-}
-
-if (process.env.MCP_ADD_SCOPES) {
-  const { valid, invalid } = validateScopesStrictFromString(
-    process.env.MCP_ADD_SCOPES,
-  );
-  if (invalid.length > 0) {
-    console.error(
-      `Error: Invalid MCP_ADD_SCOPES provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
-    );
-    console.error(getUsage());
-    process.exit(1);
-  }
-  if (valid.size === 0) {
-    console.error(
-      "Error: Invalid MCP_ADD_SCOPES provided. No valid scopes found.",
-    );
-    console.error(getUsage());
-    process.exit(1);
-  }
-  additionalScopes = valid;
-}
-
 for (const arg of process.argv.slice(2)) {
+  if (arg === "--help" || arg === "-h") {
+    console.log(getUsage());
+    process.exit(0);
+  }
   if (arg === "--version" || arg === "-v") {
     console.log(`${packageName} ${LIB_VERSION}`);
     process.exit(0);
@@ -179,6 +142,49 @@ for (const arg of process.argv.slice(2)) {
     console.error("Error: Invalid argument:", arg);
     console.error(getUsage());
     process.exit(1);
+  }
+}
+
+// Environment precedence: Only apply env vars if neither CLI override nor additive flags were provided
+if (!grantedScopes && !additionalScopes) {
+  if (process.env.MCP_SCOPES) {
+    const { valid, invalid } = validateScopesStrictFromString(
+      process.env.MCP_SCOPES,
+    );
+    if (invalid.length > 0) {
+      console.error(
+        `Error: Invalid MCP_SCOPES provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
+      );
+      console.error(getUsage());
+      process.exit(1);
+    }
+    if (valid.size === 0) {
+      console.error(
+        "Error: Invalid MCP_SCOPES provided. No valid scopes found.",
+      );
+      console.error(getUsage());
+      process.exit(1);
+    }
+    grantedScopes = valid;
+  } else if (process.env.MCP_ADD_SCOPES) {
+    const { valid, invalid } = validateScopesStrictFromString(
+      process.env.MCP_ADD_SCOPES,
+    );
+    if (invalid.length > 0) {
+      console.error(
+        `Error: Invalid MCP_ADD_SCOPES provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
+      );
+      console.error(getUsage());
+      process.exit(1);
+    }
+    if (valid.size === 0) {
+      console.error(
+        "Error: Invalid MCP_ADD_SCOPES provided. No valid scopes found.",
+      );
+      console.error(getUsage());
+      process.exit(1);
+    }
+    additionalScopes = valid;
   }
 }
 
