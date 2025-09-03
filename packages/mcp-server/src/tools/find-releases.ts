@@ -11,6 +11,7 @@ import {
 
 export default defineTool({
   name: "find_releases",
+  requiredScopes: ["project:read"],
   description: [
     "Find releases in Sentry.",
     "",

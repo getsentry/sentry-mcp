@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events";
-import { generateText, tool, Output } from "ai";
+import { generateText } from "ai";
 import { UserInputError } from "../errors";
 
 // Mock the AI SDK

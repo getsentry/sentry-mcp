@@ -21,7 +21,6 @@
 import {
   ResourceTemplate,
   type ReadResourceCallback,
-  type ReadResourceTemplateCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";

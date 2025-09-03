@@ -3,6 +3,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "@sentry/mcp-server/transports/stdio";
 import { mswServer } from "@sentry/mcp-server-mocks";
+import type { Scope } from "@sentry/mcp-server/permissions";
+import { ALL_SCOPES } from "@sentry/mcp-server/permissions";
 
 mswServer.listen({
   onUnhandledRequest: (req, print) => {
@@ -18,15 +20,17 @@ mswServer.listen({
 
 const accessToken = "mocked-access-token";
 
+// Grant all available scopes for evals to ensure MSW mocks apply broadly
+
 const server = new McpServer({
   name: "Sentry MCP",
   version: "0.1.0",
 });
 
-// XXX: we could do what we're doing in routes/auth.ts and pass the context
-// identically, but we don't really need userId and userName yet
+// Run in-process MCP with all scopes so MSW mocks apply
 startStdio(server, {
   accessToken,
+  grantedScopes: new Set<Scope>(ALL_SCOPES),
   constraints: {
     organizationSlug: null,
     projectSlug: null,

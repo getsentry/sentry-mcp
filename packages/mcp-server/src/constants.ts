@@ -171,3 +171,13 @@ export const SENTRY_GUIDES = [
     guides.map((guide) => `${platform}/${guide}`),
   ),
 ] as const;
+
+export const DEFAULT_SCOPES = [
+  "org:read",
+  "project:read",
+  "team:read",
+  "event:read",
+] as const;
+
+// Note: All scopes are now exported from permissions.ts to avoid pulling this
+// heavy constants module into scope-only consumers.

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
-import { UserInputError } from "../../errors";
 import { agentTool } from "../../internal/agents/tools/utils";
 
 // Type for flexible event data that can contain any fields

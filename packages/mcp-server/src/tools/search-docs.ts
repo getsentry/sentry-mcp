@@ -8,6 +8,7 @@ import { ParamSentryGuide } from "../schema";
 
 export default defineTool({
   name: "search_docs",
+  requiredScopes: [], // Documentation search doesn't require specific scopes
   description: [
     "Search Sentry documentation for SDK setup, instrumentation, and configuration guidance.",
     "",

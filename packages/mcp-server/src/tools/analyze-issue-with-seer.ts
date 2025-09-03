@@ -6,7 +6,6 @@ import { parseIssueParams } from "../internal/tool-helpers/issue";
 import {
   getStatusDisplayName,
   isTerminalStatus,
-  isHumanInterventionStatus,
   getHumanInterventionGuidance,
   getOutputForAutofixStep,
   SEER_POLLING_INTERVAL,
@@ -26,6 +25,7 @@ import {
 
 export default defineTool({
   name: "analyze_issue_with_seer",
+  requiredScopes: ["event:read"],
   description: [
     "Use Seer AI to analyze production errors and get detailed root cause analysis with specific code fixes.",
     "",

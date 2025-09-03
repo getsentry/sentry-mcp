@@ -3,7 +3,6 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { MessagePart } from ".";
 import { PromptActions } from "../ui/prompt-actions";
-import { SlashCommandActions } from "../ui/slash-command-actions";
 import type { Message, ProcessedMessagePart, ChatMessagesProps } from "./types";
 import { isAuthError, getErrorMessage } from "../../utils/chat-error-handler";
 import { useAuth } from "../../contexts/auth-context";

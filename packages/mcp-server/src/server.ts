@@ -37,7 +37,8 @@ import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
-import { MCP_SERVER_NAME } from "./constants";
+import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
+import { isToolAllowed, type Scope } from "./permissions";
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -200,6 +201,12 @@ export async function configureServer({
   onToolComplete?: () => void;
   onInitialized?: () => void | Promise<void>;
 }) {
+  // Get granted scopes with default to read-only scopes
+  // Normalize to a mutable Set regardless of input being Set or ReadonlySet
+  const grantedScopes: Set<Scope> = context.grantedScopes
+    ? new Set<Scope>(context.grantedScopes)
+    : new Set<Scope>(DEFAULT_SCOPES);
+
   server.server.onerror = (error) => {
     logError(error);
   };
@@ -341,6 +348,14 @@ export async function configureServer({
   }
 
   for (const [toolKey, tool] of Object.entries(tools)) {
+    // Check if this tool is allowed based on granted scopes
+    if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
+      console.debug(
+        `[MCP] Skipping tool '${tool.name}' - missing required scopes`,
+      );
+      continue;
+    }
+
     // Only consider constraints that exist in this tool's schema
     const toolConstraintKeys = Object.entries(context.constraints)
       .filter(([key, value]) => !!value && key in tool.inputSchema)
@@ -401,6 +416,13 @@ export async function configureServer({
                 }
 
                 try {
+                  // Double-check scopes at runtime (defense in depth)
+                  if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
+                    throw new Error(
+                      `Tool '${tool.name}' is not allowed - missing required scopes`,
+                    );
+                  }
+
                   // Apply URL constraints as normal parameters - only for params that exist in tool schema
                   const applicableConstraints = Object.fromEntries(
                     Object.entries(context.constraints).filter(

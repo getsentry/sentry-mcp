@@ -82,6 +82,7 @@ To contribute changes, you'll need to set up your local environment:
      - `COOKIE_SECRET=my-super-secret-cookie`
 
 4. **Start the development server:**
+
    ```shell
    pnpm dev
    ```
@@ -135,3 +136,7 @@ The automated reviews should be treated as:
 - ❌ **Not replacements** for human code review
 
 When addressing automated feedback, focus on the underlying concerns rather than strictly following every suggestion.
+
+### Contributor Documentation
+
+Looking to contribute or explore the full documentation map? See `CLAUDE.md` (also available as `AGENTS.md`) for contributor workflows and the complete docs index. The `docs/` folder contains the per-topic guides and tool-integrated `.mdc` files.

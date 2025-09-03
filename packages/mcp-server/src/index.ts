@@ -18,64 +18,44 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "./version";
-import {
-  validateSentryHost,
-  validateAndParseSentryUrl,
-} from "./utils/url-utils";
+import { buildUsage } from "./cli/usage";
+import { parseArgv, parseEnv, merge } from "./cli/parse";
+import { finalize } from "./cli/resolve";
 import { sentryBeforeSend } from "./internal/sentry-scrubbing";
-
-let accessToken: string | undefined = process.env.SENTRY_ACCESS_TOKEN;
-let sentryHost = "sentry.io"; // Default hostname
-let mcpUrl: string | undefined =
-  process.env.MCP_URL || "https://mcp.sentry.dev";
-let sentryDsn: string | undefined =
-  process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
-
-// Set initial host from environment variables (SENTRY_URL takes precedence)
-if (process.env.SENTRY_URL) {
-  sentryHost = validateAndParseSentryUrl(process.env.SENTRY_URL);
-} else if (process.env.SENTRY_HOST) {
-  validateSentryHost(process.env.SENTRY_HOST);
-  sentryHost = process.env.SENTRY_HOST;
-}
+import { ALL_SCOPES } from "./permissions";
+import { DEFAULT_SCOPES } from "./constants";
 
 const packageName = "@sentry/mcp-server";
+const usageText = buildUsage(packageName, DEFAULT_SCOPES, ALL_SCOPES);
 
-function getUsage(): string {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>]`;
-}
-
-for (const arg of process.argv.slice(2)) {
-  if (arg === "--version" || arg === "-v") {
-    console.log(`${packageName} ${LIB_VERSION}`);
-    process.exit(0);
-  }
-  if (arg.startsWith("--access-token=")) {
-    accessToken = arg.split("=")[1];
-  } else if (arg.startsWith("--host=")) {
-    sentryHost = arg.split("=")[1];
-    validateSentryHost(sentryHost);
-  } else if (arg.startsWith("--url=")) {
-    const url = arg.split("=")[1];
-    sentryHost = validateAndParseSentryUrl(url);
-  } else if (arg.startsWith("--mcp-url=")) {
-    mcpUrl = arg.split("=")[1];
-  } else if (arg.startsWith("--sentry-dsn=")) {
-    sentryDsn = arg.split("=")[1];
-  } else {
-    console.error("Error: Invalid argument:", arg);
-    console.error(getUsage());
-    process.exit(1);
-  }
-}
-
-if (!accessToken) {
-  console.error(
-    "Error: No access token was provided. Pass one with `--access-token` or via `SENTRY_ACCESS_TOKEN`.",
-  );
-  console.error(getUsage());
+function die(message: string): never {
+  console.error(message);
+  console.error(usageText);
   process.exit(1);
 }
+const cli = parseArgv(process.argv.slice(2));
+if (cli.help) {
+  console.log(usageText);
+  process.exit(0);
+}
+if (cli.version) {
+  console.log(`${packageName} ${LIB_VERSION}`);
+  process.exit(0);
+}
+if (cli.unknownArgs.length > 0) {
+  console.error("Error: Invalid argument(s):", cli.unknownArgs.join(", "));
+  console.error(usageText);
+  process.exit(1);
+}
+
+const env = parseEnv(process.env);
+const cfg = (() => {
+  try {
+    return finalize(merge(cli, env));
+  } catch (err) {
+    die(err instanceof Error ? err.message : String(err));
+  }
+})();
 
 // Check for OpenAI API key and warn if missing
 if (!process.env.OPENAI_API_KEY) {
@@ -90,7 +70,7 @@ if (!process.env.OPENAI_API_KEY) {
 }
 
 Sentry.init({
-  dsn: sentryDsn,
+  dsn: cfg.sentryDsn,
   sendDefaultPii: true,
   tracesSampleRate: 1,
   beforeSend: sentryBeforeSend,
@@ -98,8 +78,8 @@ Sentry.init({
     tags: {
       "mcp.server_version": LIB_VERSION,
       "mcp.transport": "stdio",
-      "sentry.host": sentryHost,
-      "mcp.mcp-url": mcpUrl,
+      "sentry.host": cfg.sentryHost,
+      "mcp.mcp-url": cfg.mcpUrl,
     },
   },
   release: process.env.SENTRY_RELEASE,
@@ -125,15 +105,18 @@ const instrumentedServer = Sentry.wrapMcpServerWithSentry(server);
 
 const SENTRY_TIMEOUT = 5000; // 5 seconds
 
+// Process scope configuration using shared resolver
 // XXX: we could do what we're doing in routes/auth.ts and pass the context
 // identically, but we don't really need userId and userName yet
 startStdio(instrumentedServer, {
-  accessToken,
+  accessToken: cfg.accessToken,
+  grantedScopes: cfg.finalScopes,
   constraints: {
-    organizationSlug: null,
+    organizationSlug: cfg.organizationSlug ?? null,
+    projectSlug: cfg.projectSlug ?? null,
   },
-  sentryHost,
-  mcpUrl,
+  sentryHost: cfg.sentryHost,
+  mcpUrl: cfg.mcpUrl,
 }).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events

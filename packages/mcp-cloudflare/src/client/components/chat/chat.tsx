@@ -4,7 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
-import { X, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { ChatProps } from "./types";
 import { usePersistedChat } from "../../hooks/use-persisted-chat";
 import { useMcpMetadata } from "../../hooks/use-mcp-metadata";

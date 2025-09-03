@@ -4,7 +4,11 @@
     "enabled": true
   },
   "files": {
-    "ignore": ["worker-configuration.d.ts", "tsconfig*.json"]
+    "ignore": [
+      "worker-configuration.d.ts",
+      "tsconfig*.json",
+      "packages/mcp-server-mocks/src/fixtures/**"
+    ]
   },
   "vcs": {
     "enabled": true,
@@ -15,6 +19,9 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "correctness": {
+        "noUnusedImports": "warn"
+      },
       "suspicious": {
         "noExplicitAny": "off",
         "noDebugger": "off",

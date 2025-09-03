@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
@@ -17,6 +16,7 @@ import {
 
 export default defineTool({
   name: "update_issue",
+  requiredScopes: ["event:write"],
   description: [
     "Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.",
     "",

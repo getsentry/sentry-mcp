@@ -1,15 +1,19 @@
 import { describe, it, expect } from "vitest";
 import whoami from "./whoami.js";
+import {
+  createTestContext,
+  createTestContextWithConstraints,
+} from "../test-utils/context.js";
 
 describe("whoami", () => {
   it("serializes without constraints", async () => {
     const result = await whoami.handler(
       {},
-      {
+      createTestContext({
         constraints: {},
         accessToken: "access-token",
         userId: "123456",
-      },
+      }),
     );
     expect(result).toMatchInlineSnapshot(
       `
@@ -23,15 +27,17 @@ describe("whoami", () => {
   it("serializes with constraints", async () => {
     const result = await whoami.handler(
       {},
-      {
-        constraints: {
+      createTestContextWithConstraints(
+        {
           organizationSlug: "sentry",
           projectSlug: "mcp-server",
           regionUrl: "https://us.sentry.io",
         },
-        accessToken: "access-token",
-        userId: "123456",
-      },
+        {
+          accessToken: "access-token",
+          userId: "123456",
+        },
+      ),
     );
     expect(result).toMatchInlineSnapshot(
       `
@@ -53,13 +59,15 @@ describe("whoami", () => {
   it("serializes with partial constraints", async () => {
     const result = await whoami.handler(
       {},
-      {
-        constraints: {
+      createTestContextWithConstraints(
+        {
           organizationSlug: "sentry",
         },
-        accessToken: "access-token",
-        userId: "123456",
-      },
+        {
+          accessToken: "access-token",
+          userId: "123456",
+        },
+      ),
     );
     expect(result).toMatchInlineSnapshot(
       `

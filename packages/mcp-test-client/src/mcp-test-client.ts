@@ -25,7 +25,10 @@ export async function connectToMCPServer(
       },
       async (span) => {
         try {
-          const args = [`--access-token=${config.accessToken}`];
+          const args = [
+            `--access-token=${config.accessToken}`,
+            "--all-scopes", // Ensure all tools are available in local stdio runs
+          ];
           if (config.host) {
             args.push(`--host=${config.host}`);
           }

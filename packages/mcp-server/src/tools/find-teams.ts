@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
@@ -8,6 +7,7 @@ import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 
 export default defineTool({
   name: "find_teams",
+  requiredScopes: ["team:read"],
   description: [
     "Find teams in an organization in Sentry.",
     "",

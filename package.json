@@ -20,6 +20,7 @@
     "url": "git@github.com:getsentry/sentry-mcp.git"
   },
   "scripts": {
+    "docs:check": "node scripts/check-doc-links.mjs",
     "dev": "dotenv -e .env -e .env.local -- turbo dev",
     "build": "turbo build after-build",
     "deploy": "turbo deploy",

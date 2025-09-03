@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { ServerContext } from "../types";
+import type { Scope } from "../permissions";
 import type {
   TextContent,
   ImageContent,
@@ -12,6 +13,7 @@ export interface ToolConfig<
   name: string;
   description: string;
   inputSchema: TSchema;
+  requiredScopes?: Scope[];
   handler: (
     params: z.infer<z.ZodObject<TSchema>>,
     context: ServerContext,

@@ -2,8 +2,9 @@ import * as Sentry from "@sentry/cloudflare";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
+import { expandScopes, parseScopes } from "@sentry/mcp-server/permissions";
 import type { Env, WorkerProps } from "../types";
-import type { ServerContext, Constraints } from "@sentry/mcp-server/types";
+import type { Constraints } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import getSentryConfig from "../sentry.config";
 import { verifyConstraintsAccess } from "./constraint-utils";
@@ -98,6 +99,17 @@ class SentryMCPBase extends McpAgent<
         userId: this.props.id,
         mcpUrl: process.env.MCP_URL,
         accessToken: this.props.accessToken,
+        grantedScopes: this.props.grantedScopes
+          ? (() => {
+              const { valid, invalid } = parseScopes(this.props.grantedScopes);
+              if (invalid.length > 0) {
+                console.warn(
+                  `[MCP] Ignoring invalid scopes from OAuth provider: ${invalid.join(", ")}`,
+                );
+              }
+              return expandScopes(valid);
+            })()
+          : undefined,
         constraints: this.state.constraints || {},
       },
       onToolComplete: () => {

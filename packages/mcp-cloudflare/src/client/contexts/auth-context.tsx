@@ -1,4 +1,4 @@
-import React, {
+import {
   createContext,
   useContext,
   useState,
@@ -89,10 +89,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsAuthenticating(true);
     setAuthError("");
 
+    const desiredWidth = Math.max(Math.min(window.screen.availWidth, 900), 600);
+    const desiredHeight = Math.min(window.screen.availHeight, 900);
+    const windowFeatures = `width=${desiredWidth},height=${desiredHeight},resizable=yes,scrollbars=yes`;
+
     const popup = window.open(
       "/api/auth/authorize",
       "sentry-oauth",
-      "width=600,height=700,scrollbars=yes,resizable=yes",
+      windowFeatures,
     );
 
     if (!popup) {

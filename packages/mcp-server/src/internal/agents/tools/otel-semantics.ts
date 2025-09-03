@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
-import { UserInputError } from "../../../errors";
 import { agentTool } from "./utils";
 
 // Import all JSON files directly

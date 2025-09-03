@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  ApiError,
-  ApiNotFoundError,
-  ApiValidationError,
-  ApiPermissionError,
-  createApiError,
-} from "../../api-client";
+import { ApiNotFoundError, createApiError } from "../../api-client";
 import { UserInputError } from "../../errors";
 import { handleApiError, withApiErrorHandling } from "./api";
 

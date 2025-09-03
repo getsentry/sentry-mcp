@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
@@ -18,6 +17,7 @@ import { setTag } from "@sentry/core";
 
 export default defineTool({
   name: "get_event_attachment",
+  requiredScopes: ["event:read"],
   description: [
     "Download attachments from a Sentry event.",
     "",

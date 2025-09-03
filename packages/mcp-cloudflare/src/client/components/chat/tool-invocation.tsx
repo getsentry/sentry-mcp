@@ -1,11 +1,6 @@
 import { useState } from "react";
 import { Bolt, ChevronDown, ChevronRight } from "lucide-react";
-import { Prose } from "../ui/prose";
-import type {
-  ChatToolInvocation,
-  ToolMessage,
-  ToolInvocationProps,
-} from "./types";
+import type { ToolMessage, ToolInvocationProps } from "./types";
 import { isTextMessage } from "./types";
 
 function getTokenCount(content: ToolMessage[]): number {

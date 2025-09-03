@@ -19,6 +19,7 @@ import {
 
 export default defineTool({
   name: "get_issue_details",
+  requiredScopes: ["event:read"],
   description: [
     "Get detailed information about a specific Sentry issue by ID.",
     "",

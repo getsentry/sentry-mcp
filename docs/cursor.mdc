@@ -36,16 +36,16 @@ Sentry MCP is a Model Context Protocol server that provides access to Sentry's f
 - **Changing architecture**: Update `docs/architecture.mdc`
 
 ### Critical Sync Requirements
-- **CLAUDE.md ↔ cursor.mdc**: These files MUST stay synchronized
-- **When updating CLAUDE.md**: Also update `cursor.mdc` with equivalent guidance
-- **When updating cursor.mdc**: Also update `CLAUDE.md` with equivalent guidance
+- **AGENTS.md ↔ cursor.mdc**: These files MUST stay synchronized
+- **When updating AGENTS.md**: Also update `cursor.mdc` with equivalent guidance
+- **When updating cursor.mdc**: Also update `AGENTS.md` with equivalent guidance
 - Both files serve the same purpose for different tools (Claude Code vs Cursor IDE)
 
 ### Documentation Update Process
 1. **Identify affected docs** while implementing changes
 2. **Update documentation in the same session** as code changes
 3. **Verify cross-references** remain accurate
-4. **Ensure CLAUDE.md ↔ cursor.mdc sync** is maintained
+4. **Ensure AGENTS.md ↔ cursor.mdc sync** is maintained
 5. **Add examples** for new patterns introduced
 
 **Documentation updates are not optional - they are part of completing any task.**
@@ -75,7 +75,7 @@ You should ALWAYS update docs when they are inaccurate or you have learned new r
 
 ## Documentation Maintenance
 
-- **Keep CLAUDE.md and cursor.mdc concise**: These files are navigation aids, not comprehensive docs
+- **Keep AGENTS.md and cursor.mdc concise**: These files are navigation aids, not comprehensive docs
 - **Reference, don't duplicate**: Point to `docs/` files instead of repeating content
 - **Update referenced docs first**: When making changes, update the actual documentation before updating references
 - **Avoid redundancy**: Check existing docs before creating new ones (see `docs/llms/documentation-style-guide.mdc`)

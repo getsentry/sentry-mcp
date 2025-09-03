@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import type { Message } from "ai";
 
 const CHAT_STORAGE_KEY = "sentry_chat_messages";

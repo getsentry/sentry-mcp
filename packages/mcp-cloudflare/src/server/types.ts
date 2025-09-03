@@ -9,6 +9,7 @@ export type WorkerProps = ServerContext & {
   id: string;
   name: string;
   scope: string;
+  grantedScopes?: string[]; // Array of scope strings passed from OAuth
 };
 
 export interface Env {

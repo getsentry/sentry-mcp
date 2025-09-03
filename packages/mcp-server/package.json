@@ -42,6 +42,10 @@
       "types": "./dist/logging.ts",
       "default": "./dist/logging.js"
     },
+    "./permissions": {
+      "types": "./dist/permissions.ts",
+      "default": "./dist/permissions.js"
+    },
     "./transports/stdio": {
       "types": "./dist/transports/stdio.ts",
       "default": "./dist/transports/stdio.js"

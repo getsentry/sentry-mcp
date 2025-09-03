@@ -3,19 +3,14 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
-import {
-  ParamOrganizationSlug,
-  ParamRegionUrl,
-  ParamProjectSlug,
-} from "../../schema";
+import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import { validateSlugOrId, isNumericId } from "../../utils/slug-validation";
 import { searchIssuesAgent } from "./agent";
 import { formatIssueResults, formatExplanation } from "./formatters";
-import { UserInputError } from "../../errors";
-import type { SentryApiService } from "../../api-client";
 
 export default defineTool({
   name: "search_issues",
+  requiredScopes: ["event:read"],
   description: [
     "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.",
     "",
