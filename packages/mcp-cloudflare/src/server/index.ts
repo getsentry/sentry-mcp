@@ -5,24 +5,13 @@ import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
+import { tokenExchangeCallback } from "./sentry-oauth";
 
 // required for Durable Objects
 export { SentryMCP };
 
 // SentryMCP handles URLPattern-based constraint extraction from request URLs
 // and passes context to Durable Objects via headers for org/project scoping.
-
-const oAuthProvider = new OAuthProvider({
-  apiRoute: ["/sse", "/mcp"],
-  apiHandler: sentryMcpHandler,
-  // @ts-ignore
-  defaultHandler: app,
-  // must match the routes registered in `app.ts`
-  authorizeEndpoint: "/oauth/authorize",
-  tokenEndpoint: "/oauth/token",
-  clientRegistrationEndpoint: "/oauth/register",
-  scopesSupported: Object.keys(SCOPES),
-});
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
@@ -57,6 +46,20 @@ const corsWrappedOAuthProvider = {
         return addCorsHeaders(new Response(null, { status: 204 }));
       }
     }
+
+    const oAuthProvider = new OAuthProvider({
+      apiRoute: ["/sse", "/mcp"],
+      apiHandler: sentryMcpHandler,
+      // @ts-ignore
+      defaultHandler: app,
+      // must match the routes registered in `app.ts`
+      authorizeEndpoint: "/oauth/authorize",
+      tokenEndpoint: "/oauth/token",
+      clientRegistrationEndpoint: "/oauth/register",
+      // @ts-ignore - Environment will be passed as second parameter
+      tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
+      scopesSupported: Object.keys(SCOPES),
+    });
 
     const response = await oAuthProvider.fetch(request, env, ctx);
 

@@ -10,6 +10,8 @@ export type WorkerProps = ServerContext & {
   name: string;
   scope: string;
   grantedScopes?: string[]; // Array of scope strings passed from OAuth
+  refreshToken?: string; // Refresh token for OAuth token renewal
+  accessTokenTTL?: number; // Access token time-to-live in seconds
 };
 
 export interface Env {
