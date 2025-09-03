@@ -218,6 +218,16 @@ export function createSuccessPage(
       data: {}
     }));
     
+    // Notify opener directly (more reliable than polling)
+    try {
+      if (window.opener && typeof window.opener.postMessage === 'function') {
+        const message = { type: 'SENTRY_AUTH_SUCCESS', timestamp: Date.now(), data: {} };
+        window.opener.postMessage(message, window.location.origin);
+      }
+    } catch (e) {
+      // Ignore cross-origin or other postMessage errors
+    }
+    
     // Close popup after short delay to allow parent to read result
     setTimeout(() => {
       window.close();
@@ -250,6 +260,16 @@ export function createErrorPage(
       timestamp: Date.now(),
       error: ${JSON.stringify(error)}
     }));
+    
+    // Notify opener directly (more reliable than polling)
+    try {
+      if (window.opener && typeof window.opener.postMessage === 'function') {
+        const message = { type: 'SENTRY_AUTH_ERROR', timestamp: Date.now(), error: ${JSON.stringify(error)} };
+        window.opener.postMessage(message, window.location.origin);
+      }
+    } catch (e) {
+      // Ignore cross-origin or other postMessage errors
+    }
     
     // Close popup after delay to show error message
     setTimeout(() => {

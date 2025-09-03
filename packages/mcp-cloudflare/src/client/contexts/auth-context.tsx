@@ -13,7 +13,7 @@ import {
   isOAuthErrorMessage,
 } from "../components/chat/types";
 
-const POPUP_CHECK_INTERVAL = 1000;
+// No interval-based polling required; popup communicates via postMessage/storage
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -27,9 +27,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState("");
 
-  // Keep refs for cleanup
+  // Popup reference
   const popupRef = useRef<Window | null>(null);
-  const intervalRef = useRef<number | null>(null);
 
   // Check if authenticated by making a request to the server
   useEffect(() => {
@@ -49,49 +48,103 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Process OAuth result from localStorage
   const processOAuthResult = useCallback((data: unknown) => {
     if (isOAuthSuccessMessage(data)) {
-      setIsAuthenticated(true);
-      setIsAuthenticating(false);
-      setAuthError("");
-
-      // Cleanup interval and popup reference
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      if (popupRef.current) {
-        popupRef.current = null;
-      }
+      // Verify session on server before marking authenticated
+      fetch("/api/auth/status", { credentials: "include" })
+        .then(async (res) => {
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}) as unknown);
+            throw new Error(
+              typeof body === "object" &&
+                body &&
+                "error" in (body as Record<string, unknown>)
+                ? String((body as Record<string, unknown>).error)
+                : "Authentication not yet completed",
+            );
+          }
+          // Fully reload the app to pick up new auth context/cookies
+          // This avoids intermediate/loading states and ensures a clean session
+          window.location.reload();
+        })
+        .catch(() => {
+          setIsAuthenticated(false);
+          setAuthError("Authentication not completed. Please finish sign-in.");
+        })
+        .finally(() => {
+          setIsAuthenticating(false);
+          // Cleanup popup reference
+          if (popupRef.current) {
+            popupRef.current = null;
+          }
+        });
     } else if (isOAuthErrorMessage(data)) {
       setAuthError(data.error || "Authentication failed");
       setIsAuthenticating(false);
 
-      // Cleanup interval and popup reference
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      // Cleanup popup reference
       if (popupRef.current) {
         popupRef.current = null;
       }
     }
   }, []);
 
-  // Cleanup on unmount
+  // Listen for storage events from the popup to process results immediately
   useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== "sentry_oauth_result") return;
+      try {
+        const raw = e.newValue;
+        if (!raw) return;
+        const parsed: unknown = JSON.parse(raw);
+        // Clear after reading
+        localStorage.removeItem("sentry_oauth_result");
+        processOAuthResult(parsed);
+      } catch {
+        // ignore parse errors
       }
     };
-  }, []);
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [processOAuthResult]);
+
+  // Listen for postMessage from the popup for immediate result delivery
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      // Only accept messages from same origin for safety
+      if (e.origin !== window.location.origin) return;
+      const data = e.data as unknown;
+      if (isOAuthSuccessMessage(data) || isOAuthErrorMessage(data)) {
+        processOAuthResult(data);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [processOAuthResult]);
+
+  // No interval cleanup needed
 
   const handleOAuthLogin = useCallback(() => {
-    setIsAuthenticating(true);
     setAuthError("");
 
     const desiredWidth = Math.max(Math.min(window.screen.availWidth, 900), 600);
     const desiredHeight = Math.min(window.screen.availHeight, 900);
     const windowFeatures = `width=${desiredWidth},height=${desiredHeight},resizable=yes,scrollbars=yes`;
+
+    // Clear any stale results from previous attempts before starting
+    try {
+      localStorage.removeItem("sentry_oauth_result");
+    } catch {
+      // ignore storage errors
+    }
+
+    // If a popup is already open, focus it instead of opening another
+    if (popupRef.current && !popupRef.current.closed) {
+      try {
+        popupRef.current.focus();
+      } catch {
+        // ignore focus errors
+      }
+      return;
+    }
 
     const popup = window.open(
       "/api/auth/authorize",
@@ -101,50 +154,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (!popup) {
       setAuthError("Popup blocked. Please allow popups and try again.");
-      setIsAuthenticating(false);
       return;
     }
 
     popupRef.current = popup;
+  }, []);
 
-    // Check if popup is closed by user
-    intervalRef.current = window.setInterval(() => {
-      if (popup.closed) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-
-        // Check localStorage for auth result before marking as cancelled
-        const storedResult = localStorage.getItem("sentry_oauth_result");
-        if (storedResult) {
-          try {
-            const result = JSON.parse(storedResult);
-            localStorage.removeItem("sentry_oauth_result");
-            processOAuthResult(result);
-            return;
-          } catch (e) {
-            // Invalid stored result, continue to cancellation
-          }
-        }
-
-        // Only update state if still authenticating (no success/error received)
-        setIsAuthenticating((current) => {
-          if (current) {
-            setAuthError("Authentication was cancelled.");
-            return false;
-          }
-          return current;
-        });
-
-        popupRef.current = null;
-      }
-    }, POPUP_CHECK_INTERVAL);
-  }, [processOAuthResult]);
+  // No explicit check/cancel actions required in current UX
 
   const handleLogout = useCallback(async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch {
       // Ignore errors, proceed with local logout
     }

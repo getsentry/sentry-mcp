@@ -340,7 +340,17 @@ export default new Hono<{
     }
 
     try {
-      AuthDataSchema.parse(JSON.parse(authDataCookie));
+      const authData = AuthDataSchema.parse(JSON.parse(authDataCookie));
+      // Validate token expiration
+      const expiresAt = new Date(authData.expires_at).getTime();
+      const now = Date.now();
+      // Consider token expired if past expiration or within a small grace window (e.g., 10s)
+      const GRACE_MS = 10_000;
+      if (!Number.isFinite(expiresAt) || expiresAt - now <= GRACE_MS) {
+        // Expired or invalid expiration; clear cookie and report unauthenticated
+        deleteCookie(c, "sentry_auth_data", getSecureCookieOptions(c.req.url));
+        return c.json({ authenticated: false }, 401);
+      }
       return c.json({ authenticated: true });
     } catch {
       return c.json({ authenticated: false }, 401);

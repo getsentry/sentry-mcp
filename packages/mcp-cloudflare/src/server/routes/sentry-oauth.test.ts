@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import sentryOauthRoute from "./sentry-oauth";
+import sentryOauthRoute from "../sentry-oauth";
 import type { Env } from "../types";
 
 // Mock the OAuth provider
