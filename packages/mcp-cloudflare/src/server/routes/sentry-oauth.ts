@@ -18,7 +18,7 @@ import {
  * Extended AuthRequest that includes permissions
  */
 interface AuthRequestWithPermissions extends AuthRequest {
-  permissions?: string[];
+  permissions?: unknown;
 }
 
 /**
@@ -29,7 +29,7 @@ interface AuthRequestWithPermissions extends AuthRequest {
  * - Project Management adds: project:write, team:write
  * @param permissions Array of permission strings
  */
-function getScopesFromPermissions(permissions?: string[]): Set<Scope> {
+function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
   // Start with base read-only scopes (always granted)
   const scopes = new Set<Scope>([
     "org:read",
@@ -38,16 +38,20 @@ function getScopesFromPermissions(permissions?: string[]): Set<Scope> {
     "event:read",
   ]);
 
-  if (!permissions || permissions.length === 0) {
+  // Validate permissions is an array of strings
+  if (!Array.isArray(permissions) || permissions.length === 0) {
     return scopes;
   }
+  const perms = (permissions as unknown[]).filter(
+    (p): p is string => typeof p === "string",
+  );
 
   // Add scopes based on selected permissions
-  if (permissions.includes("issue_triage")) {
+  if (perms.includes("issue_triage")) {
     scopes.add("event:write");
   }
 
-  if (permissions.includes("project_management")) {
+  if (perms.includes("project_management")) {
     scopes.add("project:write");
     scopes.add("team:write");
   }
