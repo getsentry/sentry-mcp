@@ -202,7 +202,10 @@ export async function configureServer({
   onInitialized?: () => void | Promise<void>;
 }) {
   // Get granted scopes with default to read-only scopes
-  const grantedScopes = context.grantedScopes || new Set<Scope>(DEFAULT_SCOPES);
+  // Normalize to a mutable Set regardless of input being Set or ReadonlySet
+  const grantedScopes: Set<Scope> = context.grantedScopes
+    ? new Set<Scope>(context.grantedScopes)
+    : new Set<Scope>(DEFAULT_SCOPES);
 
   server.server.onerror = (error) => {
     logError(error);
