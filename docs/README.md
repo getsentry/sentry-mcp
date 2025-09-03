@@ -1,67 +1,26 @@
-# Documentation for Contributors
+# Contributor Docs
 
-This directory contains documentation to help LLMs (Language Learning Models) and human contributors work more effectively with the Sentry MCP codebase.
+This directory contains contributor documentation used by humans and LLMs. To avoid duplication, the canonical documentation map and contributor workflow live in `CLAUDE.md` (also available as `AGENTS.md`).
 
 ## Purpose
 
-These documents provide structured guidance to ensure consistent, high-quality contributions that align with the project's standards and patterns. All documentation files use the `.mdc` format for better AI tool compatibility.
+- Central home for all contributor-focused docs (.mdc files)
+- Consumed by tools (e.g., Cursor) via direct file references
 
-## Directory Structure
+## Start Here
 
-This directory serves a dual purpose:
-1. Central documentation repository for all contributors
-2. Source for `.cursor/rules/` via symlink (for Cursor IDE integration)
+- Doc map and workflow: see `CLAUDE.md` / `AGENTS.md`
+- Per-topic guides live in this folder (e.g., `adding-tools.mdc`)
 
-## Contents
+## Integration with Tools
 
-### Core Guidelines
-- @docs/coding-guidelines.mdc - Coding standards, patterns, and best practices
-- @docs/common-patterns.mdc - Reusable patterns and conventions
-- @docs/quality-checks.mdc - Required checks before changes
+- Cursor IDE: this folder is referenced directly as contextual rules
+- Other AI tools: reference specific `.mdc` files as needed
 
-### API and Tools
-- @docs/adding-tools.mdc - How to add new MCP tools
-- @docs/adding-prompts.mdc - Guidelines for adding new prompts
-- @docs/adding-resources.mdc - How to add new MCP resources
-- @docs/api-patterns.mdc - Working with the Sentry API client
-- @docs/search-events-api-patterns.md - search_events API patterns
+## LLM-Specific
 
-### Infrastructure and Operations
-- @docs/deployment.mdc - Deployment processes (Cloudflare)
-- @docs/monitoring.mdc - Monitoring and telemetry practices
-- @docs/security.mdc - Security and authentication patterns
-
-## For LLMs
-
-When working with this codebase:
-1. Always read relevant `.mdc` files before making changes
-2. Follow the patterns and conventions outlined in these guides
-3. Run all quality checks as specified in the guidelines
-4. Maintain consistency with existing code
-
-## Integration with Development Tools
-
-### Cursor IDE
-The `.cursor/rules/` directory is symlinked to this `docs/` folder, ensuring that Cursor IDE automatically picks up all documentation as contextual rules.
-
-### Other AI Tools
-These `.mdc` files are designed to be easily consumed by various AI development assistants and can be referenced directly when needed.
-
-## LLM-Specific Guidelines
-
-The `llms/` subdirectory contains meta-documentation for LLMs:
-- @docs/llms/documentation-style-guide.mdc - How to write effective LLM documentation
-- @docs/llms/document-scopes.mdc - Purpose and content for each doc
-  
+- Meta-docs live under `llms/` (e.g., `llms/document-scopes.mdc`)
 
 ## Maintenance
 
-These documents should be updated when:
-- New patterns or conventions are adopted
-- Common issues arise that need documentation
-- The architecture or tooling changes significantly
-- New tools, resources, or features are added
-
-## Note
-
-This documentation supplements but does not replace the root-level @AGENTS.md file, which remains the primary instruction set for agents when working with this repository. The @AGENTS.md file is kept concise and points to focused documents within this directory.
+Update docs when patterns change, new tools are added, or common issues arise. Keep the index in `CLAUDE.md` authoritative; avoid mirroring it here.
