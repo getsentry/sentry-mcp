@@ -8,6 +8,7 @@ import {
 import type { Env, WorkerProps } from "../types";
 import { SCOPES } from "../../constants";
 import type { Scope } from "@sentry/mcp-server/permissions";
+import { DEFAULT_SCOPES } from "@sentry/mcp-server/constants";
 import {
   renderApprovalDialog,
   parseRedirectApproval,
@@ -31,12 +32,7 @@ interface AuthRequestWithPermissions extends AuthRequest {
  */
 function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
   // Start with base read-only scopes (always granted)
-  const scopes = new Set<Scope>([
-    "org:read",
-    "project:read",
-    "team:read",
-    "event:read",
-  ]);
+  const scopes = new Set<Scope>(DEFAULT_SCOPES);
 
   // Validate permissions is an array of strings
   if (!Array.isArray(permissions) || permissions.length === 0) {
