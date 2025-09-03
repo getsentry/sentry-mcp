@@ -178,3 +178,6 @@ export const DEFAULT_SCOPES = [
   "team:read",
   "event:read",
 ] as const;
+
+// Note: All scopes are now exported from permissions.ts to avoid pulling this
+// heavy constants module into scope-only consumers.

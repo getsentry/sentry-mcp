@@ -61,6 +61,20 @@ const SCOPE_HIERARCHY: Record<string, Set<Scope>> = {
 };
 
 /**
+ * All available scopes as a readonly list
+ */
+export function getAvailableScopes(): ReadonlyArray<Scope> {
+  return Object.keys(SCOPE_HIERARCHY) as ReadonlyArray<Scope>;
+}
+
+/**
+ * All scopes available in the server, generated from the permission hierarchy.
+ * Exported here to keep scope consumers lightweight and avoid importing other
+ * unrelated constants.
+ */
+export const ALL_SCOPES: ReadonlyArray<Scope> = getAvailableScopes();
+
+/**
  * Expand a set of granted scopes to include all implied scopes
  */
 export function expandScopes(grantedScopes: Set<Scope>): Set<Scope> {

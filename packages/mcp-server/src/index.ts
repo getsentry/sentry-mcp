@@ -23,7 +23,12 @@ import {
   validateAndParseSentryUrl,
 } from "./utils/url-utils";
 import { sentryBeforeSend } from "./internal/sentry-scrubbing";
-import { parseScopesFromString, expandScopes, type Scope } from "./permissions";
+import {
+  parseScopesFromString,
+  expandScopes,
+  type Scope,
+  ALL_SCOPES,
+} from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
 
 let accessToken: string | undefined = process.env.SENTRY_ACCESS_TOKEN;
@@ -50,7 +55,7 @@ if (process.env.SENTRY_URL) {
 const packageName = "@sentry/mcp-server";
 
 function getUsage(): string {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>] [--scopes=<scope1,scope2>] [--add-scopes=<scope1,scope2>]
+  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>] [--scopes=<scope1,scope2>] [--add-scopes=<scope1,scope2>] [--all-scopes]
 
 Default scopes (read-only):
   - org:read, project:read, team:read, event:read
@@ -58,6 +63,7 @@ Default scopes (read-only):
 Scope options:
   --scopes      Override default scopes completely
   --add-scopes  Add scopes to the default read-only set
+  --all-scopes  Grant all available scopes (admin-level and implied)
 
 Available scopes (higher scopes include lower):
   - org:read, org:write, org:admin
@@ -113,6 +119,9 @@ for (const arg of process.argv.slice(2)) {
       console.error(getUsage());
       process.exit(1);
     }
+  } else if (arg === "--all-scopes") {
+    // Explicitly grant all available scopes
+    grantedScopes = new Set<Scope>(ALL_SCOPES as ReadonlyArray<Scope>);
   } else {
     console.error("Error: Invalid argument:", arg);
     console.error(getUsage());

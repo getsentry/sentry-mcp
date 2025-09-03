@@ -31,8 +31,6 @@ gh pr create --title "feat: add new search functionality" --body "$(cat <<'EOF'
 - Added search_events tool with AI integration
 - Implemented dataset-specific formatting
 - Added comprehensive test coverage
-
-🤖 Generated with [Claude Code](https://claude.ai/code)
 EOF
 )"
 
@@ -136,8 +134,6 @@ git commit -m "fix: address review feedback about error handling
 Per @reviewer suggestion, add proper error boundaries around 
 JSON.parse operations in search-events.ts.
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
 # 4. Push and notify
@@ -185,8 +181,6 @@ Implement AI-powered query translation using OpenAI GPT-4 to convert
 natural language queries into Sentry search syntax. Supports multiple
 datasets: errors, logs, and spans.
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
 # Bug fix
@@ -196,8 +190,6 @@ Replace missing TaskRunner and Factuality imports with NoOpTaskRunner
 and ToolPredictionScorer to resolve CI build failures after factuality 
 checker removal.
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
 # Refactoring
@@ -206,10 +198,15 @@ git commit -m "refactor: move tool test to appropriate directory
 Move toolDefinitions.test.ts to tools/ directory and rename to tools.test.ts
 to fix circular dependency and improve organization.
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
+
+### AI Attribution
+
+- When assisted by AI, include the following footer in commits:
+  - `Co-Authored-By: Claude <noreply@anthropic.com>`
+  
+This maintains transparent attribution without additional generator footers.
 
 ## PR Description Structure
 
@@ -337,8 +334,6 @@ git commit -m "fix: address review feedback about validation
 Add input validation for natural language queries per @reviewer
 suggestion. Ensures minimum length and sanitizes special characters.
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
-
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
 # Respond to comments
@@ -364,8 +359,6 @@ feat: add natural language search for Sentry events
 Complete implementation of AI-powered search tool that translates
 natural language queries into Sentry search syntax. Supports errors,
 logs, and spans datasets with comprehensive field selection.
-
-🤖 Generated with [Claude Code](https://claude.ai/code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
