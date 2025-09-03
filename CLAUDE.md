@@ -9,11 +9,12 @@
 4. Tools limit: ≤20 (hard limit: 25)
 
 **MANDATORY reads:**
-- Tools → `docs/adding-tools.mdc`
-- Prompts → `docs/adding-prompts.mdc`
-- Resources → `docs/adding-resources.mdc`
-- Testing → `docs/testing.mdc`
-- PRs → `docs/pr-management.mdc`
+- Start here: @docs/README.md — Contributor doc map
+- Tools → @docs/adding-tools.mdc
+- Prompts → @docs/adding-prompts.mdc
+- Resources → @docs/adding-resources.mdc
+- Testing → @docs/testing.mdc
+- PRs → @docs/pr-management.mdc
 
 ## 🟡 MANDATORY Workflow
 
@@ -85,15 +86,30 @@ grep -r "TODO\|FIXME" src/     # Find tech debt
 - Auth: access tokens (NOT OAuth)
 
 **Doc Index:**
-- `docs/adding-tools.mdc` - Tool development
-- `docs/adding-prompts.mdc` - Prompt development
-- `docs/adding-resources.mdc` - Resource development
-- `docs/testing.mdc` - Testing requirements
-- `docs/common-patterns.mdc` - Code patterns
-- `docs/api-patterns.mdc` - API usage
-- `docs/architecture.mdc` - System design
-- `docs/quality-checks.mdc` - Quality checks
-- `docs/pr-management.mdc` - PR guidelines
+
+- Core Guidelines
+  - @docs/coding-guidelines.mdc — Code standards and patterns
+  - @docs/common-patterns.mdc — Reusable patterns and conventions
+  - @docs/quality-checks.mdc — Required checks before changes
+  - @docs/error-handling.mdc — Error handling patterns
+
+- API and Tools
+  - @docs/adding-tools.mdc — Add new MCP tools
+  - @docs/adding-prompts.mdc — Add prompts
+  - @docs/adding-resources.mdc — Add resources
+  - @docs/api-patterns.mdc — Sentry API usage
+  - @docs/search-events-api-patterns.md — search_events specifics
+
+- Infrastructure and Operations
+  - @docs/architecture.mdc — System design
+  - @docs/deployment.mdc — Deploy (Cloudflare)
+  - @docs/monitoring.mdc — Monitoring/telemetry
+  - @docs/security.mdc — Security and authentication
+  - @docs/cursor.mdc — Cursor IDE integration
+
+- LLM-Specific
+  - @docs/llms/documentation-style-guide.mdc — How to write LLM docs
+  - @docs/llms/document-scopes.mdc — Doc scopes and purposes
 
 ## Rules
 
