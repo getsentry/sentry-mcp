@@ -24,10 +24,10 @@ import {
 } from "./utils/url-utils";
 import { sentryBeforeSend } from "./internal/sentry-scrubbing";
 import {
-  expandScopes,
   type Scope,
   ALL_SCOPES,
   validateScopesStrictFromString,
+  resolveScopes,
 } from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
 
@@ -244,22 +244,12 @@ const instrumentedServer = Sentry.wrapMcpServerWithSentry(server);
 
 const SENTRY_TIMEOUT = 5000; // 5 seconds
 
-// Process scope configuration
-let finalScopes: Set<Scope> | undefined;
-if (grantedScopes) {
-  // --scopes was used, override defaults completely, but include implied lower-level scopes
-  finalScopes = expandScopes(grantedScopes);
-} else if (additionalScopes) {
-  // --add-scopes was used, add to defaults
-  const defaultScopeSet = new Set<Scope>(DEFAULT_SCOPES);
-  for (const scope of additionalScopes) {
-    defaultScopeSet.add(scope);
-  }
-  finalScopes = expandScopes(defaultScopeSet);
-} else {
-  // No scope flags, use undefined to trigger defaults in server.ts
-  finalScopes = undefined;
-}
+// Process scope configuration using shared resolver
+const finalScopes = resolveScopes({
+  override: grantedScopes,
+  add: additionalScopes,
+  defaults: DEFAULT_SCOPES,
+});
 
 // XXX: we could do what we're doing in routes/auth.ts and pass the context
 // identically, but we don't really need userId and userName yet

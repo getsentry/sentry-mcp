@@ -30,7 +30,7 @@ export type Scope =
 /**
  * Scope hierarchy - higher scopes include lower ones
  */
-const SCOPE_HIERARCHY: Record<string, Set<Scope>> = {
+const SCOPE_HIERARCHY: Record<Scope, Set<Scope>> = {
   // Organization scopes
   "org:read": new Set(["org:read"]),
   "org:write": new Set(["org:read", "org:write"]),
@@ -220,4 +220,27 @@ export function validateScopesStrictFromString(scopesString: string): {
     }
   }
   return { valid, invalid };
+}
+
+/**
+ * Resolve final scopes from optional override/additive sets and provided defaults.
+ * - If override is provided, it replaces defaults and is expanded
+ * - Else if add is provided, it unions with defaults and is expanded
+ * - Else returns undefined to indicate default handling upstream
+ */
+export function resolveScopes(options: {
+  override?: Set<Scope>;
+  add?: Set<Scope>;
+  defaults: ReadonlyArray<Scope>;
+}): Set<Scope> | undefined {
+  const { override, add, defaults } = options;
+  if (override) {
+    return expandScopes(override);
+  }
+  if (add) {
+    const base = new Set<Scope>(defaults as ReadonlyArray<Scope>);
+    for (const s of add) base.add(s);
+    return expandScopes(base);
+  }
+  return undefined;
 }
