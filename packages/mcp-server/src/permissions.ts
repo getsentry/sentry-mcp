@@ -150,16 +150,12 @@ export function isToolAllowed(
  * - Filters out invalid entries
  * - Logs a console.warn listing any invalid values
  */
-// Deprecated: use parseScopes(scopesString).valid
-// export function parseScopesFromString(scopesString: string | undefined): Set<Scope> { ... }
 
 /**
  * Parse scopes from an array of strings.
  * - Filters out invalid entries
  * - Logs a console.warn listing any invalid values
  */
-// Deprecated: use parseScopes(array).valid
-// export function parseScopesFromArray(scopes: unknown): Set<Scope> { ... }
 
 /**
  * Generic scope parser: accepts a comma-separated string or an array.
