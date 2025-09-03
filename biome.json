@@ -7,7 +7,7 @@
     "ignore": [
       "worker-configuration.d.ts",
       "tsconfig*.json",
-      "packages/mcp-server-mocks/src/fixtures/trace.json"
+      "packages/mcp-server-mocks/src/fixtures/**"
     ]
   },
   "vcs": {
