@@ -150,22 +150,16 @@ export function isToolAllowed(
  * - Filters out invalid entries
  * - Logs a console.warn listing any invalid values
  */
-export function parseScopesFromString(
-  scopesString: string | undefined,
-): Set<Scope> {
-  if (!scopesString) return new Set<Scope>();
-  return parseScopes(scopesString).valid;
-}
+// Deprecated: use parseScopes(scopesString).valid
+// export function parseScopesFromString(scopesString: string | undefined): Set<Scope> { ... }
 
 /**
  * Parse scopes from an array of strings.
  * - Filters out invalid entries
  * - Logs a console.warn listing any invalid values
  */
-export function parseScopesFromArray(scopes: unknown): Set<Scope> {
-  if (!Array.isArray(scopes)) return new Set<Scope>();
-  return parseScopes(scopes).valid;
-}
+// Deprecated: use parseScopes(array).valid
+// export function parseScopesFromArray(scopes: unknown): Set<Scope> { ... }
 
 /**
  * Generic scope parser: accepts a comma-separated string or an array.
