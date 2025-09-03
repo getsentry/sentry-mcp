@@ -15,6 +15,10 @@ Scope options:
   --add-scopes  Add scopes to the default read-only set
   --all-scopes  Grant all available scopes (admin-level and implied)
 
+Constraints (stdio only):
+  --organization-slug <slug>  Constrain all tool calls to this org
+  --project-slug <slug>       Constrain to a project (optional)
+
 Available scopes (higher scopes include lower):
   - org:read, org:write, org:admin
   - project:read, project:write, project:admin

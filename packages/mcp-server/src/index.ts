@@ -22,11 +22,17 @@ import { buildUsage } from "./cli/usage";
 import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
 import { sentryBeforeSend } from "./internal/sentry-scrubbing";
-import { type Scope, ALL_SCOPES } from "./permissions";
+import { ALL_SCOPES } from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
 
 const packageName = "@sentry/mcp-server";
 const usageText = buildUsage(packageName, DEFAULT_SCOPES, ALL_SCOPES);
+
+function die(message: string): never {
+  console.error(message);
+  console.error(usageText);
+  process.exit(1);
+}
 const cli = parseArgv(process.argv.slice(2));
 if (cli.help) {
   console.log(usageText);
@@ -43,25 +49,13 @@ if (cli.unknownArgs.length > 0) {
 }
 
 const env = parseEnv(process.env);
-let accessToken: string;
-let sentryHost: string;
-let mcpUrl: string | undefined;
-let sentryDsn: string | undefined;
-let finalScopes: Set<Scope> | undefined;
-try {
-  const merged = merge(cli, env);
-  const cfg = finalize(merged);
-  accessToken = cfg.accessToken;
-  sentryHost = cfg.sentryHost;
-  mcpUrl = cfg.mcpUrl;
-  sentryDsn = cfg.sentryDsn;
-  finalScopes = cfg.finalScopes;
-} catch (err) {
-  const msg = err instanceof Error ? err.message : String(err);
-  console.error(msg);
-  console.error(usageText);
-  process.exit(1);
-}
+const cfg = (() => {
+  try {
+    return finalize(merge(cli, env));
+  } catch (err) {
+    die(err instanceof Error ? err.message : String(err));
+  }
+})();
 
 // Check for OpenAI API key and warn if missing
 if (!process.env.OPENAI_API_KEY) {
@@ -76,7 +70,7 @@ if (!process.env.OPENAI_API_KEY) {
 }
 
 Sentry.init({
-  dsn: sentryDsn,
+  dsn: cfg.sentryDsn,
   sendDefaultPii: true,
   tracesSampleRate: 1,
   beforeSend: sentryBeforeSend,
@@ -84,8 +78,8 @@ Sentry.init({
     tags: {
       "mcp.server_version": LIB_VERSION,
       "mcp.transport": "stdio",
-      "sentry.host": sentryHost,
-      "mcp.mcp-url": mcpUrl,
+      "sentry.host": cfg.sentryHost,
+      "mcp.mcp-url": cfg.mcpUrl,
     },
   },
   release: process.env.SENTRY_RELEASE,
@@ -115,13 +109,14 @@ const SENTRY_TIMEOUT = 5000; // 5 seconds
 // XXX: we could do what we're doing in routes/auth.ts and pass the context
 // identically, but we don't really need userId and userName yet
 startStdio(instrumentedServer, {
-  accessToken,
-  grantedScopes: finalScopes,
+  accessToken: cfg.accessToken,
+  grantedScopes: cfg.finalScopes,
   constraints: {
-    organizationSlug: null,
+    organizationSlug: cfg.organizationSlug ?? null,
+    projectSlug: cfg.projectSlug ?? null,
   },
-  sentryHost,
-  mcpUrl,
+  sentryHost: cfg.sentryHost,
+  mcpUrl: cfg.mcpUrl,
 }).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events

@@ -9,6 +9,8 @@ export type CliArgs = {
   scopes?: string;
   addScopes?: string;
   allScopes?: boolean;
+  organizationSlug?: string;
+  projectSlug?: string;
   help?: boolean;
   version?: boolean;
   unknownArgs: string[];
@@ -33,6 +35,8 @@ export type MergedArgs = {
   scopes?: string;
   addScopes?: string;
   allScopes?: boolean;
+  organizationSlug?: string;
+  projectSlug?: string;
   help?: boolean;
   version?: boolean;
   unknownArgs: string[];
@@ -44,4 +48,6 @@ export type ResolvedConfig = {
   mcpUrl?: string;
   sentryDsn?: string;
   finalScopes?: Set<Scope>;
+  organizationSlug?: string;
+  projectSlug?: string;
 };

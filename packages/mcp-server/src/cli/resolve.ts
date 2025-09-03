@@ -6,8 +6,8 @@ import {
 } from "../permissions";
 import { DEFAULT_SCOPES } from "../constants";
 import {
-  validateAndParseSentryUrl,
-  validateSentryHost,
+  validateAndParseSentryUrlThrows,
+  validateSentryHostThrows,
 } from "../utils/url-utils";
 import type { MergedArgs, ResolvedConfig } from "./types";
 
@@ -27,9 +27,9 @@ export function finalize(input: MergedArgs): ResolvedConfig {
   // Determine host from url/host with validation
   let sentryHost = "sentry.io";
   if (input.url) {
-    sentryHost = validateAndParseSentryUrl(input.url);
+    sentryHost = validateAndParseSentryUrlThrows(input.url);
   } else if (input.host) {
-    validateSentryHost(input.host);
+    validateSentryHostThrows(input.host);
     sentryHost = input.host;
   }
 
@@ -73,5 +73,7 @@ export function finalize(input: MergedArgs): ResolvedConfig {
     mcpUrl: input.mcpUrl,
     sentryDsn: input.sentryDsn,
     finalScopes,
+    organizationSlug: input.organizationSlug,
+    projectSlug: input.projectSlug,
   };
 }
