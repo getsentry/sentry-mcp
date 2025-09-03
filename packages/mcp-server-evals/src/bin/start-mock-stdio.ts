@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "@sentry/mcp-server/transports/stdio";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import type { Scope } from "@sentry/mcp-server/permissions";
+import { ALL_SCOPES } from "@sentry/mcp-server/permissions";
 
 mswServer.listen({
   onUnhandledRequest: (req, print) => {
@@ -19,17 +20,7 @@ mswServer.listen({
 
 const accessToken = "mocked-access-token";
 
-// Grant only high-level scopes that imply all lower-level permissions via hierarchy
-// See packages/mcp-server/src/permissions.ts for the scope hierarchy
-const HIGH_LEVEL_SCOPES_LOCAL: ReadonlyArray<Scope> = [
-  "org:admin",
-  "project:admin",
-  "team:admin",
-  "member:admin",
-  "event:admin",
-  // Special (non-hierarchical) scope
-  "project:releases",
-];
+// Grant all available scopes for evals to ensure MSW mocks apply broadly
 
 const server = new McpServer({
   name: "Sentry MCP",
@@ -39,7 +30,7 @@ const server = new McpServer({
 // Run in-process MCP with all scopes so MSW mocks apply
 startStdio(server, {
   accessToken,
-  grantedScopes: new Set<Scope>(HIGH_LEVEL_SCOPES_LOCAL),
+  grantedScopes: new Set<Scope>(ALL_SCOPES as ReadonlyArray<Scope>),
   constraints: {
     organizationSlug: null,
     projectSlug: null,
