@@ -30,7 +30,7 @@ const server = new McpServer({
 // Run in-process MCP with all scopes so MSW mocks apply
 startStdio(server, {
   accessToken,
-  grantedScopes: new Set<Scope>(ALL_SCOPES as ReadonlyArray<Scope>),
+  grantedScopes: new Set<Scope>(ALL_SCOPES),
   constraints: {
     organizationSlug: null,
     projectSlug: null,

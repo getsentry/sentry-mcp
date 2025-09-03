@@ -55,7 +55,7 @@ export type ServerContext = {
   userId?: string | null;
   clientId?: string;
   // Granted scopes for tool access control
-  grantedScopes?: Set<Scope>;
+  grantedScopes?: Set<Scope> | ReadonlySet<Scope>;
   // URL-based session constraints
   constraints: Constraints;
   // MCP client information captured during initialization
