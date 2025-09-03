@@ -74,6 +74,9 @@ export function getAvailableScopes(): ReadonlyArray<Scope> {
  */
 export const ALL_SCOPES: ReadonlyArray<Scope> = getAvailableScopes();
 
+// Fast lookup set for validations
+export const ALL_SCOPES_SET = new Set<Scope>(ALL_SCOPES);
+
 /**
  * Expand a set of granted scopes to include all implied scopes
  */
@@ -82,12 +85,8 @@ export function expandScopes(grantedScopes: Set<Scope>): Set<Scope> {
 
   for (const scope of grantedScopes) {
     const implied = SCOPE_HIERARCHY[scope];
-    if (implied) {
-      for (const s of implied) {
-        expandedScopes.add(s);
-      }
-    } else {
-      expandedScopes.add(scope);
+    for (const s of implied) {
+      expandedScopes.add(s);
     }
   }
 
@@ -173,7 +172,6 @@ export function parseScopesFromArray(scopes: unknown): Set<Scope> {
   if (!Array.isArray(scopes)) {
     return new Set<Scope>();
   }
-  const available = new Set<Scope>(getAvailableScopes());
   const valid = new Set<Scope>();
   const invalid: string[] = [];
 
@@ -181,7 +179,7 @@ export function parseScopesFromArray(scopes: unknown): Set<Scope> {
     if (typeof raw !== "string") continue;
     const value = raw.trim();
     if (!value) continue;
-    if (available.has(value as Scope)) {
+    if (ALL_SCOPES_SET.has(value as Scope)) {
       valid.add(value as Scope);
     } else {
       invalid.push(value);
@@ -191,7 +189,7 @@ export function parseScopesFromArray(scopes: unknown): Set<Scope> {
   if (invalid.length > 0) {
     console.warn(
       `[MCP] Ignoring invalid scope values: ${invalid.join(", ")} (allowed: ${[
-        ...available,
+        ...ALL_SCOPES_SET,
       ].join(", ")})`,
     );
   }
@@ -207,13 +205,12 @@ export function validateScopesStrictFromString(scopesString: string): {
   valid: Set<Scope>;
   invalid: string[];
 } {
-  const available = new Set<Scope>(getAvailableScopes());
   const valid = new Set<Scope>();
   const invalid: string[] = [];
   for (const raw of scopesString.split(",")) {
     const value = raw.trim();
     if (!value) continue;
-    if (available.has(value as Scope)) {
+    if (ALL_SCOPES_SET.has(value as Scope)) {
       valid.add(value as Scope);
     } else {
       invalid.push(value);

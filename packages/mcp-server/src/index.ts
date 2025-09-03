@@ -80,6 +80,11 @@ Examples:
   ${packageName} --access-token=TOKEN --add-scopes=event:write,project:write`;
 }
 
+function fmtInvalid(invalid: string[], envName?: string): string {
+  const where = envName ? `${envName} provided` : "Invalid scopes provided";
+  return `Error: ${where}: ${invalid.join(", ")}\nAvailable scopes: ${ALL_SCOPES.join(", ")}`;
+}
+
 for (const arg of process.argv.slice(2)) {
   if (arg === "--help" || arg === "-h") {
     console.log(getUsage());
@@ -105,9 +110,7 @@ for (const arg of process.argv.slice(2)) {
     const scopesString = arg.split("=")[1];
     const { valid, invalid } = validateScopesStrictFromString(scopesString);
     if (invalid.length > 0) {
-      console.error(
-        `Error: Invalid scopes provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
-      );
+      console.error(fmtInvalid(invalid));
       console.error(getUsage());
       process.exit(1);
     }
@@ -121,9 +124,7 @@ for (const arg of process.argv.slice(2)) {
     const scopesString = arg.split("=")[1];
     const { valid, invalid } = validateScopesStrictFromString(scopesString);
     if (invalid.length > 0) {
-      console.error(
-        `Error: Invalid additional scopes provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
-      );
+      console.error(fmtInvalid(invalid));
       console.error(getUsage());
       process.exit(1);
     }
@@ -152,9 +153,7 @@ if (!grantedScopes && !additionalScopes) {
       process.env.MCP_SCOPES,
     );
     if (invalid.length > 0) {
-      console.error(
-        `Error: Invalid MCP_SCOPES provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
-      );
+      console.error(fmtInvalid(invalid, "MCP_SCOPES"));
       console.error(getUsage());
       process.exit(1);
     }
@@ -171,9 +170,7 @@ if (!grantedScopes && !additionalScopes) {
       process.env.MCP_ADD_SCOPES,
     );
     if (invalid.length > 0) {
-      console.error(
-        `Error: Invalid MCP_ADD_SCOPES provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
-      );
+      console.error(fmtInvalid(invalid, "MCP_ADD_SCOPES"));
       console.error(getUsage());
       process.exit(1);
     }
