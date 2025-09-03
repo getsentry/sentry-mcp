@@ -146,17 +146,78 @@ export function isToolAllowed(
 /**
  * Parse scopes from a comma-separated string
  */
+/**
+ * Parse scopes from a comma-separated string.
+ * - Filters out invalid entries
+ * - Logs a console.warn listing any invalid values
+ */
 export function parseScopesFromString(
   scopesString: string | undefined,
 ): Set<Scope> {
   if (!scopesString) {
-    return new Set();
+    return new Set<Scope>();
   }
-
-  const scopes = scopesString
+  const parts = scopesString
     .split(",")
     .map((s) => s.trim())
-    .filter((s) => s.length > 0) as Scope[];
+    .filter((s) => s.length > 0);
+  return parseScopesFromArray(parts);
+}
 
-  return new Set(scopes);
+/**
+ * Parse scopes from an array of strings.
+ * - Filters out invalid entries
+ * - Logs a console.warn listing any invalid values
+ */
+export function parseScopesFromArray(scopes: unknown): Set<Scope> {
+  if (!Array.isArray(scopes)) {
+    return new Set<Scope>();
+  }
+  const available = new Set<Scope>(getAvailableScopes());
+  const valid = new Set<Scope>();
+  const invalid: string[] = [];
+
+  for (const raw of scopes) {
+    if (typeof raw !== "string") continue;
+    const value = raw.trim();
+    if (!value) continue;
+    if (available.has(value as Scope)) {
+      valid.add(value as Scope);
+    } else {
+      invalid.push(value);
+    }
+  }
+
+  if (invalid.length > 0) {
+    console.warn(
+      `[MCP] Ignoring invalid scope values: ${invalid.join(", ")} (allowed: ${[
+        ...available,
+      ].join(", ")})`,
+    );
+  }
+
+  return valid;
+}
+
+/**
+ * Strict validation helper for scope strings supplied via flags/env.
+ * Returns both valid and invalid entries without side effects.
+ */
+export function validateScopesStrictFromString(scopesString: string): {
+  valid: Set<Scope>;
+  invalid: string[];
+} {
+  const available = new Set<Scope>(getAvailableScopes());
+  const valid = new Set<Scope>();
+  const invalid: string[] = [];
+  for (const raw of scopesString.split(",")) {
+    const value = raw.trim();
+    if (!value) continue;
+    if (available.has(value as Scope)) {
+      valid.add(value as Scope);
+    } else {
+      invalid.push(value);
+    }
+  }
+  return { valid, invalid };
 }

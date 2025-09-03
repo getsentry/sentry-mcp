@@ -98,7 +98,7 @@ Examples:
 
 ## Notes
 
-- Default behavior grants full access if no scopes specified (backward compatibility)
+- Default behavior grants read-only access if no scopes specified
 - Embedded agent tools don't require scope binding
 - Documentation tools always available regardless of scopes
 

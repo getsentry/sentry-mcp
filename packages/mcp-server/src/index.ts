@@ -24,10 +24,10 @@ import {
 } from "./utils/url-utils";
 import { sentryBeforeSend } from "./internal/sentry-scrubbing";
 import {
-  parseScopesFromString,
   expandScopes,
   type Scope,
   ALL_SCOPES,
+  validateScopesStrictFromString,
 } from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
 
@@ -37,12 +37,8 @@ let mcpUrl: string | undefined =
   process.env.MCP_URL || "https://mcp.sentry.dev";
 let sentryDsn: string | undefined =
   process.env.SENTRY_DSN || process.env.DEFAULT_SENTRY_DSN;
-let grantedScopes: Set<Scope> | undefined = process.env.MCP_SCOPES
-  ? parseScopesFromString(process.env.MCP_SCOPES)
-  : undefined;
-let additionalScopes: Set<Scope> | undefined = process.env.MCP_ADD_SCOPES
-  ? parseScopesFromString(process.env.MCP_ADD_SCOPES)
-  : undefined;
+let grantedScopes: Set<Scope> | undefined = undefined;
+let additionalScopes: Set<Scope> | undefined = undefined;
 
 // Set initial host from environment variables (SENTRY_URL takes precedence)
 if (process.env.SENTRY_URL) {
@@ -84,6 +80,47 @@ Examples:
   ${packageName} --access-token=TOKEN --add-scopes=event:write,project:write`;
 }
 
+// Parse environment-provided scopes strictly as well
+if (process.env.MCP_SCOPES) {
+  const { valid, invalid } = validateScopesStrictFromString(
+    process.env.MCP_SCOPES,
+  );
+  if (invalid.length > 0) {
+    console.error(
+      `Error: Invalid MCP_SCOPES provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
+    );
+    console.error(getUsage());
+    process.exit(1);
+  }
+  if (valid.size === 0) {
+    console.error("Error: Invalid MCP_SCOPES provided. No valid scopes found.");
+    console.error(getUsage());
+    process.exit(1);
+  }
+  grantedScopes = valid;
+}
+
+if (process.env.MCP_ADD_SCOPES) {
+  const { valid, invalid } = validateScopesStrictFromString(
+    process.env.MCP_ADD_SCOPES,
+  );
+  if (invalid.length > 0) {
+    console.error(
+      `Error: Invalid MCP_ADD_SCOPES provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
+    );
+    console.error(getUsage());
+    process.exit(1);
+  }
+  if (valid.size === 0) {
+    console.error(
+      "Error: Invalid MCP_ADD_SCOPES provided. No valid scopes found.",
+    );
+    console.error(getUsage());
+    process.exit(1);
+  }
+  additionalScopes = valid;
+}
+
 for (const arg of process.argv.slice(2)) {
   if (arg === "--version" || arg === "-v") {
     console.log(`${packageName} ${LIB_VERSION}`);
@@ -103,7 +140,15 @@ for (const arg of process.argv.slice(2)) {
     sentryDsn = arg.split("=")[1];
   } else if (arg.startsWith("--scopes=")) {
     const scopesString = arg.split("=")[1];
-    grantedScopes = parseScopesFromString(scopesString);
+    const { valid, invalid } = validateScopesStrictFromString(scopesString);
+    if (invalid.length > 0) {
+      console.error(
+        `Error: Invalid scopes provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
+      );
+      console.error(getUsage());
+      process.exit(1);
+    }
+    grantedScopes = valid;
     if (grantedScopes.size === 0) {
       console.error("Error: Invalid scopes provided. No valid scopes found.");
       console.error(getUsage());
@@ -111,7 +156,15 @@ for (const arg of process.argv.slice(2)) {
     }
   } else if (arg.startsWith("--add-scopes=")) {
     const scopesString = arg.split("=")[1];
-    additionalScopes = parseScopesFromString(scopesString);
+    const { valid, invalid } = validateScopesStrictFromString(scopesString);
+    if (invalid.length > 0) {
+      console.error(
+        `Error: Invalid additional scopes provided: ${invalid.join(", ")}.\nAvailable scopes: ${ALL_SCOPES.join(", ")}`,
+      );
+      console.error(getUsage());
+      process.exit(1);
+    }
+    additionalScopes = valid;
     if (additionalScopes.size === 0) {
       console.error(
         "Error: Invalid additional scopes provided. No valid scopes found.",

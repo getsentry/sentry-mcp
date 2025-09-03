@@ -2,6 +2,11 @@ import * as Sentry from "@sentry/cloudflare";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
+import {
+  expandScopes,
+  parseScopesFromArray,
+  type Scope,
+} from "@sentry/mcp-server/permissions";
 import type { Env, WorkerProps } from "../types";
 import type { Constraints } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
@@ -99,7 +104,9 @@ class SentryMCPBase extends McpAgent<
         mcpUrl: process.env.MCP_URL,
         accessToken: this.props.accessToken,
         grantedScopes: this.props.grantedScopes
-          ? new Set(this.props.grantedScopes as any)
+          ? (expandScopes(
+              parseScopesFromArray(this.props.grantedScopes),
+            ) as Set<Scope>)
           : undefined,
         constraints: this.state.constraints || {},
       },

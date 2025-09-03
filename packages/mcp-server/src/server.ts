@@ -201,7 +201,7 @@ export async function configureServer({
   onToolComplete?: () => void;
   onInitialized?: () => void | Promise<void>;
 }) {
-  // Get granted scopes with default to all scopes for backward compatibility
+  // Get granted scopes with default to read-only scopes
   const grantedScopes = context.grantedScopes || new Set<Scope>(DEFAULT_SCOPES);
 
   server.server.onerror = (error) => {
