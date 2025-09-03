@@ -36,6 +36,35 @@ describe("sentry-oauth route", () => {
     app = createTestApp(testEnv);
   });
 
+  describe("GET /oauth/authorize", () => {
+    it("renders approval dialog HTML with state field", async () => {
+      // Mock the OAuth request parsed from the provider
+      mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+        state: "orig",
+      });
+      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "GET",
+      });
+
+      const response = await app.fetch(request, testEnv as Env);
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      // Basic structure checks come from the renderer
+      expect(html).toContain("<form");
+      expect(html).toContain('name="state"');
+    });
+  });
+
   describe("POST /oauth/authorize", () => {
     it("should encode permissions in the redirect state", async () => {
       // Setup the OAuth request info that would come from the approval dialog
@@ -180,6 +209,7 @@ describe("sentry-oauth route", () => {
       expect(setCookie).toContain("mcp-approved-clients=");
       expect(setCookie).toContain("HttpOnly");
       expect(setCookie).toContain("Secure");
+      expect(setCookie).toContain("SameSite=Lax");
     });
 
     it("should reject request without state", async () => {
@@ -200,6 +230,19 @@ describe("sentry-oauth route", () => {
   });
 
   describe("GET /oauth/callback", () => {
+    it("should reject callback with invalid state param", async () => {
+      // Provide a non-base64/invalid state to simulate tampering/CSRF
+      const request = new Request(
+        `http://localhost/oauth/callback?code=test-code&state=%%%INVALID%%%`,
+        { method: "GET" },
+      );
+
+      const response = await app.fetch(request, testEnv as Env);
+      expect(response.status).toBe(400);
+      const text = await response.text();
+      expect(text).toBe("Invalid state");
+    });
+
     it("should reject callback without approved client cookie", async () => {
       const oauthReqInfo = {
         clientId: "test-client",
@@ -296,6 +339,24 @@ describe("sentry-oauth route", () => {
       expect(response.status).toBe(403);
       const text = await response.text();
       expect(text).toBe("Authorization failed: Client not approved");
+    });
+  });
+
+  describe("POST /oauth/authorize (CSRF/validation)", () => {
+    it("should reject invalid encoded state (bad base64/json)", async () => {
+      const formData = new FormData();
+      // Intentionally malformed state
+      formData.append("state", "%%%INVALID-BASE64%%%");
+
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+
+      const response = await app.fetch(request, testEnv as Env);
+      expect(response.status).toBe(400);
+      const text = await response.text();
+      expect(text).toBe("Invalid request");
     });
   });
 });

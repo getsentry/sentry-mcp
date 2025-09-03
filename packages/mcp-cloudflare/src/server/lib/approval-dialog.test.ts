@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { renderApprovalDialog, parseRedirectApproval } from "./approval-dialog";
+import { renderApprovalDialog } from "./approval-dialog";
 
 describe("approval-dialog", () => {
   beforeEach(() => {
@@ -64,72 +64,8 @@ describe("approval-dialog", () => {
     });
   });
 
-  describe("parseRedirectApproval", () => {
-    it("should parse state and generate approval cookie", async () => {
-      const formData = new FormData();
-      formData.append(
-        "state",
-        btoa(JSON.stringify({ oauthReqInfo: { clientId: "test-client" } })),
-      );
-
-      const mockRequest = new Request("https://example.com/oauth/authorize", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await parseRedirectApproval(mockRequest, "test-secret");
-
-      expect(result.state).toEqual({
-        oauthReqInfo: { clientId: "test-client" },
-      });
-      expect(result.headers["Set-Cookie"]).toContain("mcp-approved-clients=");
-      expect(result.permissions).toEqual([]);
-    });
-
-    it("should reject non-POST requests", async () => {
-      const mockRequest = new Request("https://example.com/oauth/authorize", {
-        method: "GET",
-      });
-
-      await expect(
-        parseRedirectApproval(mockRequest, "test-secret"),
-      ).rejects.toThrow("Invalid request method. Expected POST.");
-    });
-
-    it("should parse permission checkboxes", async () => {
-      const formData = new FormData();
-      formData.append(
-        "state",
-        btoa(JSON.stringify({ oauthReqInfo: { clientId: "test-client" } })),
-      );
-      formData.append("permission", "issue_triage");
-      formData.append("permission", "project_management");
-
-      const mockRequest = new Request("https://example.com/oauth/authorize", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await parseRedirectApproval(mockRequest, "test-secret");
-
-      expect(result.permissions).toEqual([
-        "issue_triage",
-        "project_management",
-      ]);
-    });
-
-    it("should reject requests without state", async () => {
-      const formData = new FormData();
-      // Missing state
-
-      const mockRequest = new Request("https://example.com/oauth/authorize", {
-        method: "POST",
-        body: formData,
-      });
-
-      await expect(
-        parseRedirectApproval(mockRequest, "test-secret"),
-      ).rejects.toThrow("Missing or invalid 'state' in form data.");
-    });
-  });
+  // parseRedirectApproval behavior (form parsing, cookies, permissions) is
+  // validated at the route level in sentry-oauth.test.ts to keep concerns
+  // consolidated around HTTP behavior. This test file focuses on pure
+  // rendering concerns of the dialog itself.
 });
