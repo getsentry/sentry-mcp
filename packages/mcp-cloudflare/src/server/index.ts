@@ -5,7 +5,7 @@ import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
-import { tokenExchangeCallback } from "./sentry-oauth";
+import { tokenExchangeCallback } from "./oauth";
 
 // required for Durable Objects
 export { SentryMCP };

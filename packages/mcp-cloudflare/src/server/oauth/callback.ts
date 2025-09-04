@@ -134,7 +134,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       name: payload.user.name,
       accessToken: payload.access_token,
       refreshToken: payload.refresh_token,
-      accessTokenTTL: payload.expires_in,
+      // Cache upstream expiry so future refresh grants can avoid
+      // unnecessary upstream refresh calls when still valid
+      accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
       grantedScopes: Array.from(grantedScopes),

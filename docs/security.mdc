@@ -30,7 +30,7 @@ MCP Client → MCP Server → Sentry OAuth → Sentry API
 
 ### OAuth Flow Handler
 
-See implementation: `packages/mcp-cloudflare/src/server/routes/sentry-oauth.ts`
+See implementation: `packages/mcp-cloudflare/src/server/oauth/authorize.ts` and `packages/mcp-cloudflare/src/server/oauth/callback.ts`
 
 Key endpoints:
 
@@ -216,7 +216,7 @@ const ALLOWED_ORIGINS = [
 
 ## References
 
-- OAuth implementation: `packages/mcp-cloudflare/src/server/routes/sentry-oauth.ts`
+- OAuth implementation: `packages/mcp-cloudflare/src/server/oauth/*`
 - Cookie utilities: `packages/mcp-cloudflare/src/server/utils/cookies.ts`
 - OAuth Provider: `packages/mcp-cloudflare/src/server/bindings.ts`
 - Sentry OAuth docs: <https://docs.sentry.io/api/guides/oauth/>

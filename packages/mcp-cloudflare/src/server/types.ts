@@ -11,7 +11,7 @@ export type WorkerProps = ServerContext & {
   scope: string;
   grantedScopes?: string[]; // Array of scope strings passed from OAuth
   refreshToken?: string; // Refresh token for OAuth token renewal
-  accessTokenTTL?: number; // Access token time-to-live in seconds
+  accessTokenExpiresAt?: number; // Timestamp when the upstream access token expires
 };
 
 export interface Env {

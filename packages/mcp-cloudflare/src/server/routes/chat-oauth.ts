@@ -262,7 +262,18 @@ export default new Hono<{
         createErrorPage(
           "Authentication Failed",
           "Invalid state parameter. Please try again.",
-          "Invalid state parameter",
+          {
+            bodyScript: `
+              // Notify opener of error
+              try {
+                if (window.opener && typeof window.opener.postMessage === 'function') {
+                  const message = { type: 'SENTRY_AUTH_ERROR', timestamp: Date.now(), error: 'Invalid state parameter' };
+                  window.opener.postMessage(message, window.location.origin);
+                }
+              } catch (e) {}
+              setTimeout(() => { window.close(); }, 3000);
+            `,
+          },
         ),
         400,
       );
@@ -277,7 +288,18 @@ export default new Hono<{
         createErrorPage(
           "Authentication Failed",
           "No authorization code received. Please try again.",
-          "No authorization code received",
+          {
+            bodyScript: `
+              // Notify opener of error
+              try {
+                if (window.opener && typeof window.opener.postMessage === 'function') {
+                  const message = { type: 'SENTRY_AUTH_ERROR', timestamp: Date.now(), error: 'No authorization code received' };
+                  window.opener.postMessage(message, window.location.origin);
+                }
+              } catch (e) {}
+              setTimeout(() => { window.close(); }, 3000);
+            `,
+          },
         ),
         400,
       );
@@ -315,14 +337,40 @@ export default new Hono<{
       );
 
       // Return a success page - auth is now handled via cookies
-      return c.html(createSuccessPage());
+      // This is the chat's redirect_uri, so we notify the opener window
+      return c.html(
+        createSuccessPage({
+          description: "You can now close this window and return to the chat.",
+          bodyScript: `
+            // Notify opener of success
+            try {
+              if (window.opener && typeof window.opener.postMessage === 'function') {
+                const message = { type: 'SENTRY_AUTH_SUCCESS', timestamp: Date.now() };
+                window.opener.postMessage(message, window.location.origin);
+              }
+            } catch (e) {}
+            setTimeout(() => { window.close(); }, 500);
+          `,
+        }),
+      );
     } catch (error) {
       logError(error);
       return c.html(
         createErrorPage(
           "Authentication Error",
           "Failed to complete authentication. Please try again.",
-          "Authentication failed",
+          {
+            bodyScript: `
+              // Notify opener of error
+              try {
+                if (window.opener && typeof window.opener.postMessage === 'function') {
+                  const message = { type: 'SENTRY_AUTH_ERROR', timestamp: Date.now(), error: 'Authentication failed' };
+                  window.opener.postMessage(message, window.location.origin);
+                }
+              } catch (e) {}
+              setTimeout(() => { window.close(); }, 3000);
+            `,
+          },
         ),
         500,
       );

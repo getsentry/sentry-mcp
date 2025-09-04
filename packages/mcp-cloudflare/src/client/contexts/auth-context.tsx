@@ -90,13 +90,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Listen for storage events from the popup to process results immediately
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== "sentry_oauth_result") return;
+      if (e.key !== "oauth_result") return;
       try {
         const raw = e.newValue;
         if (!raw) return;
         const parsed: unknown = JSON.parse(raw);
         // Clear after reading
-        localStorage.removeItem("sentry_oauth_result");
+        localStorage.removeItem("oauth_result");
         processOAuthResult(parsed);
       } catch {
         // ignore parse errors
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Clear any stale results from previous attempts before starting
     try {
-      localStorage.removeItem("sentry_oauth_result");
+      localStorage.removeItem("oauth_result");
     } catch {
       // ignore storage errors
     }
@@ -146,11 +146,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return;
     }
 
-    const popup = window.open(
-      "/api/auth/authorize",
-      "sentry-oauth",
-      windowFeatures,
-    );
+    const popup = window.open("/api/auth/authorize", "oauth", windowFeatures);
 
     if (!popup) {
       setAuthError("Popup blocked. Please allow popups and try again.");

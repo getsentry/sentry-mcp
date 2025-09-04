@@ -5,6 +5,7 @@ import type {
 import type { z } from "zod";
 import { logError } from "@sentry/mcp-server/logging";
 import { TokenResponseSchema, SENTRY_TOKEN_URL } from "./constants";
+import type { WorkerProps } from "../types";
 
 /**
  * Constructs an authorization URL for Sentry.
@@ -226,6 +227,23 @@ export async function tokenExchangeCallback(
   }
 
   try {
+    // If we have a cached upstream expiry, and there's ample time left,
+    // avoid calling upstream to reduce unnecessary refreshes.
+    // Mint a new provider token with the remaining TTL.
+    const props = options.props as WorkerProps;
+    const maybeExpiresAt = props.accessTokenExpiresAt;
+    if (maybeExpiresAt && Number.isFinite(maybeExpiresAt)) {
+      const remainingMs = maybeExpiresAt - Date.now();
+      const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes safety window
+      if (remainingMs > SAFE_WINDOW_MS) {
+        const remainingSec = Math.floor(remainingMs / 1000);
+        return {
+          newProps: { ...options.props },
+          accessTokenTTL: remainingSec,
+        };
+      }
+    }
+
     // Construct the upstream token URL for Sentry
     const upstreamTokenUrl = new URL(
       SENTRY_TOKEN_URL,
@@ -255,7 +273,7 @@ export async function tokenExchangeCallback(
         ...options.props,
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token,
-        accessTokenTTL: tokenResponse.expires_in,
+        accessTokenExpiresAt: Date.now() + tokenResponse.expires_in * 1000,
       },
       accessTokenTTL: tokenResponse.expires_in,
     };
