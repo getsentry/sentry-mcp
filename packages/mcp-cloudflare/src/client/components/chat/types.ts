@@ -143,7 +143,6 @@ export interface ChatInputProps {
 
 export interface AuthFormProps {
   authError: string;
-  isAuthenticating: boolean;
   onOAuthLogin: () => void;
 }
 

@@ -1,17 +1,9 @@
 import { Button } from "../ui/button";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
-interface AuthFormProps {
-  authError: string;
-  isAuthenticating: boolean;
-  onOAuthLogin: () => void;
-}
+import type { AuthFormProps } from "./types";
 
-export function AuthForm({
-  authError,
-  isAuthenticating,
-  onOAuthLogin,
-}: AuthFormProps) {
+export function AuthForm({ authError, onOAuthLogin }: AuthFormProps) {
   return (
     <div className="sm:p-8 p-4 flex flex-col items-center">
       <div className="max-w-md w-full space-y-6">
@@ -44,18 +36,10 @@ export function AuthForm({
 
           <Button
             onClick={onOAuthLogin}
-            disabled={isAuthenticating}
             variant="default"
             className="w-full cursor-pointer"
           >
-            {isAuthenticating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Connecting...
-              </>
-            ) : (
-              "Connect with Sentry"
-            )}
+            Connect with Sentry
           </Button>
         </div>
       </div>

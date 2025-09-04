@@ -17,13 +17,7 @@ import { isAuthError } from "../../utils/chat-error-handler";
 // The MCP server handles all Sentry authentication internally
 
 export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
-  const {
-    isLoading,
-    isAuthenticated,
-    isAuthenticating,
-    authError,
-    handleOAuthLogin,
-  } = useAuth();
+  const { isLoading, isAuthenticated, authError, handleOAuthLogin } = useAuth();
 
   // Use persisted chat to save/load messages from localStorage
   const { initialMessages, saveMessages, clearPersistedMessages } =
@@ -393,11 +387,7 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
           transform: !isAuthenticated ? "scale(1)" : "scale(0.95)",
         }}
       >
-        <AuthForm
-          authError={authError}
-          isAuthenticating={isAuthenticating}
-          onOAuthLogin={handleOAuthLogin}
-        />
+        <AuthForm authError={authError} onOAuthLogin={handleOAuthLogin} />
       </div>
 
       {/* Chat UI with fade transition */}
