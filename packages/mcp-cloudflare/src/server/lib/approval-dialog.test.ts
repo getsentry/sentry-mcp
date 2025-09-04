@@ -65,7 +65,7 @@ describe("approval-dialog", () => {
   });
 
   // parseRedirectApproval behavior (form parsing, cookies, permissions) is
-  // validated at the route level in oauth/authorize.test.ts to keep concerns
+  // validated at the route level in sentry-oauth.test.ts to keep concerns
   // consolidated around HTTP behavior. This test file focuses on pure
   // rendering concerns of the dialog itself.
 });

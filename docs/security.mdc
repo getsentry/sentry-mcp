@@ -25,15 +25,15 @@ MCP Client → MCP Server → Sentry OAuth → Sentry API
 3. **Token Management**
    - Access tokens encrypted in KV storage
    - Tokens scoped to organizations
+   - No refresh token support (Sentry limitation)
 
 ## Implementation Patterns
 
 ### OAuth Flow Handler
 
-See implementation: `packages/mcp-cloudflare/src/server/oauth/authorize.ts` and `packages/mcp-cloudflare/src/server/oauth/callback.ts`
+See implementation: `packages/mcp-cloudflare/src/server/routes/sentry-oauth.ts`
 
 Key endpoints:
-
 - `/authorize` - Client approval and redirect to Sentry
 - `/callback` - Handle Sentry callback, store tokens
 - `/approve` - Process user approval
@@ -60,7 +60,6 @@ interface ServerContext {
 ```
 
 Context propagated through:
-
 - Tool handlers
 - API client initialization
 - Error messages (sanitized)
@@ -106,7 +105,6 @@ Tools that accept user input are vulnerable to prompt injection attacks. Key mit
 4. **No Direct Command Execution**: Tools don't execute user-provided commands
 
 Example protection in tools:
-
 ```typescript
 // URLs must be valid and from expected domains
 if (!issueUrl.includes('sentry.io')) {
@@ -139,7 +137,6 @@ if (Date.now() - decoded.ts > 600000) { // 10 min expiry
 ### Input Validation
 
 All user inputs sanitized:
-
 - HTML content escaped
 - URLs validated
 - OAuth parameters verified
@@ -160,7 +157,6 @@ const cookie = await signCookie(
 ## Error Handling
 
 Security-aware error responses:
-
 - No token/secret exposure in errors
 - Generic messages for auth failures
 - Detailed logging server-side only
@@ -197,7 +193,6 @@ if (!orgs.find(org => org.slug === requestedOrg)) {
 ## Environment Variables
 
 Required for OAuth:
-
 ```bash
 SENTRY_CLIENT_ID=your_oauth_app_id
 SENTRY_CLIENT_SECRET=your_oauth_app_secret  
@@ -216,7 +211,7 @@ const ALLOWED_ORIGINS = [
 
 ## References
 
-- OAuth implementation: `packages/mcp-cloudflare/src/server/oauth/*`
+- OAuth implementation: `packages/mcp-cloudflare/src/server/routes/sentry-oauth.ts`
 - Cookie utilities: `packages/mcp-cloudflare/src/server/utils/cookies.ts`
 - OAuth Provider: `packages/mcp-cloudflare/src/server/bindings.ts`
-- Sentry OAuth docs: <https://docs.sentry.io/api/guides/oauth/>
+- Sentry OAuth docs: https://docs.sentry.io/api/guides/oauth/

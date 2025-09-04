@@ -3,7 +3,7 @@ import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import * as Sentry from "@sentry/cloudflare";
 import type { Env } from "./types";
-import sentryOauth from "./oauth";
+import sentryOauth from "./routes/sentry-oauth";
 import chatOauth from "./routes/chat-oauth";
 import chat from "./routes/chat";
 import search from "./routes/search";
