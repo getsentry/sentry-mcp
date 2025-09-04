@@ -260,7 +260,9 @@ export async function tokenExchangeCallback(
       accessTokenTTL: tokenResponse.expires_in,
     };
   } catch (error) {
-    console.error("Failed to refresh upstream token in OAuth provider:", error);
-    throw new Error("Failed to refresh upstream token in OAuth provider");
+    logError(error);
+    throw new Error("Failed to refresh upstream token in OAuth provider", {
+      cause: error,
+    });
   }
 }
