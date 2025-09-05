@@ -264,21 +264,13 @@ export default new Hono<{
           "Invalid state parameter. Please try again.",
           {
             bodyScript: `
-              // Layer 1: Write to localStorage first
+              // Write error to localStorage
               try {
                 localStorage.setItem('oauth_result', JSON.stringify({
                   type: 'SENTRY_AUTH_ERROR',
                   timestamp: Date.now(),
                   error: 'Invalid state parameter'
                 }));
-              } catch (e) {}
-              
-              // Layer 2: Try postMessage
-              try {
-                if (window.opener && typeof window.opener.postMessage === 'function') {
-                  const message = { type: 'SENTRY_AUTH_ERROR', timestamp: Date.now(), error: 'Invalid state parameter' };
-                  window.opener.postMessage(message, window.location.origin);
-                }
               } catch (e) {}
               
               setTimeout(() => { window.close(); }, 3000);
@@ -300,21 +292,13 @@ export default new Hono<{
           "No authorization code received. Please try again.",
           {
             bodyScript: `
-              // Layer 1: Write to localStorage first
+              // Write error to localStorage
               try {
                 localStorage.setItem('oauth_result', JSON.stringify({
                   type: 'SENTRY_AUTH_ERROR',
                   timestamp: Date.now(),
                   error: 'No authorization code received'
                 }));
-              } catch (e) {}
-              
-              // Layer 2: Try postMessage
-              try {
-                if (window.opener && typeof window.opener.postMessage === 'function') {
-                  const message = { type: 'SENTRY_AUTH_ERROR', timestamp: Date.now(), error: 'No authorization code received' };
-                  window.opener.postMessage(message, window.location.origin);
-                }
               } catch (e) {}
               
               setTimeout(() => { window.close(); }, 3000);
@@ -362,24 +346,14 @@ export default new Hono<{
         createSuccessPage({
           description: "You can now close this window and return to the chat.",
           bodyScript: `
-            // Layer 1: Write to localStorage first (most reliable)
+            // Write to localStorage for parent window to pick up
             try {
               localStorage.setItem('oauth_result', JSON.stringify({
                 type: 'SENTRY_AUTH_SUCCESS',
                 timestamp: Date.now()
               }));
             } catch (e) {
-              console.warn('Failed to write to localStorage:', e);
-            }
-            
-            // Layer 2: Try postMessage (fastest when it works)
-            try {
-              if (window.opener && typeof window.opener.postMessage === 'function') {
-                const message = { type: 'SENTRY_AUTH_SUCCESS', timestamp: Date.now() };
-                window.opener.postMessage(message, window.location.origin);
-              }
-            } catch (e) {
-              console.warn('Failed to postMessage:', e);
+              console.error('Failed to write to localStorage:', e);
             }
             
             // Auto-close after brief delay
@@ -397,21 +371,13 @@ export default new Hono<{
           "Failed to complete authentication. Please try again.",
           {
             bodyScript: `
-              // Layer 1: Write to localStorage first
+              // Write error to localStorage
               try {
                 localStorage.setItem('oauth_result', JSON.stringify({
                   type: 'SENTRY_AUTH_ERROR',
                   timestamp: Date.now(),
                   error: 'Authentication failed'
                 }));
-              } catch (e) {}
-              
-              // Layer 2: Try postMessage
-              try {
-                if (window.opener && typeof window.opener.postMessage === 'function') {
-                  const message = { type: 'SENTRY_AUTH_ERROR', timestamp: Date.now(), error: 'Authentication failed' };
-                  window.opener.postMessage(message, window.location.origin);
-                }
               } catch (e) {}
               
               setTimeout(() => { window.close(); }, 3000);

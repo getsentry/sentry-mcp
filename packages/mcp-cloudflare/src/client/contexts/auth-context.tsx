@@ -94,26 +94,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  // Listen for storage events from the popup
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "oauth_result" && e.newValue) {
-        try {
-          const result = JSON.parse(e.newValue);
-          localStorage.removeItem("oauth_result");
-          processOAuthResult(result);
-        } catch {
-          // Ignore parse errors
-        }
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, [processOAuthResult]);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
