@@ -13,7 +13,7 @@ import {
   isOAuthErrorMessage,
 } from "../components/chat/types";
 
-// No interval-based polling required; popup communicates via postMessage/storage
+const POPUP_CHECK_INTERVAL = 1000;
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -27,8 +27,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState("");
 
-  // Popup reference
+  // Keep refs for cleanup
   const popupRef = useRef<Window | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   // Check if authenticated by making a request to the server
   useEffect(() => {
@@ -50,113 +51,134 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (isOAuthSuccessMessage(data)) {
       // Verify session on server before marking authenticated
       fetch("/api/auth/status", { credentials: "include" })
-        .then(async (res) => {
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}) as unknown);
-            throw new Error(
-              typeof body === "object" &&
-                body &&
-                "error" in (body as Record<string, unknown>)
-                ? String((body as Record<string, unknown>).error)
-                : "Authentication not yet completed",
+        .then((res) => res.ok)
+        .then((authenticated) => {
+          if (authenticated) {
+            // Fully reload the app to pick up new auth context/cookies
+            // This avoids intermediate/loading states and ensures a clean session
+            window.location.reload();
+          } else {
+            setIsAuthenticated(false);
+            setAuthError(
+              "Authentication not completed. Please finish sign-in.",
             );
+            setIsAuthenticating(false);
           }
-          // Fully reload the app to pick up new auth context/cookies
-          // This avoids intermediate/loading states and ensures a clean session
-          window.location.reload();
         })
         .catch(() => {
           setIsAuthenticated(false);
-          setAuthError("Authentication not completed. Please finish sign-in.");
-        })
-        .finally(() => {
+          setAuthError("Failed to verify authentication.");
           setIsAuthenticating(false);
-          // Cleanup popup reference
-          if (popupRef.current) {
-            popupRef.current = null;
-          }
         });
+
+      // Cleanup interval and popup reference
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (popupRef.current) {
+        popupRef.current = null;
+      }
     } else if (isOAuthErrorMessage(data)) {
       setAuthError(data.error || "Authentication failed");
       setIsAuthenticating(false);
 
-      // Cleanup popup reference
+      // Cleanup interval and popup reference
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
       if (popupRef.current) {
         popupRef.current = null;
       }
     }
   }, []);
 
-  // Listen for storage events from the popup to process results immediately
+  // Cleanup on unmount
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== "oauth_result") return;
-      try {
-        const raw = e.newValue;
-        if (!raw) return;
-        const parsed: unknown = JSON.parse(raw);
-        // Clear after reading
-        localStorage.removeItem("oauth_result");
-        processOAuthResult(parsed);
-      } catch {
-        // ignore parse errors
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [processOAuthResult]);
-
-  // Listen for postMessage from the popup for immediate result delivery
-  useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      // Only accept messages from same origin for safety
-      if (e.origin !== window.location.origin) return;
-      const data = e.data as unknown;
-      if (isOAuthSuccessMessage(data) || isOAuthErrorMessage(data)) {
-        processOAuthResult(data);
-      }
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [processOAuthResult]);
-
-  // No interval cleanup needed
+  }, []);
 
   const handleOAuthLogin = useCallback(() => {
+    setIsAuthenticating(true);
     setAuthError("");
 
     const desiredWidth = Math.max(Math.min(window.screen.availWidth, 900), 600);
     const desiredHeight = Math.min(window.screen.availHeight, 900);
     const windowFeatures = `width=${desiredWidth},height=${desiredHeight},resizable=yes,scrollbars=yes`;
 
-    // Clear any stale results from previous attempts before starting
+    // Clear any stale results before opening popup
     try {
       localStorage.removeItem("oauth_result");
     } catch {
       // ignore storage errors
     }
 
-    // If a popup is already open, focus it instead of opening another
-    if (popupRef.current && !popupRef.current.closed) {
-      try {
-        popupRef.current.focus();
-      } catch {
-        // ignore focus errors
-      }
-      return;
-    }
-
-    const popup = window.open("/api/auth/authorize", "oauth", windowFeatures);
+    const popup = window.open(
+      "/api/auth/authorize",
+      "sentry-oauth",
+      windowFeatures,
+    );
 
     if (!popup) {
       setAuthError("Popup blocked. Please allow popups and try again.");
+      setIsAuthenticating(false);
       return;
     }
 
     popupRef.current = popup;
-  }, []);
 
-  // No explicit check/cancel actions required in current UX
+    // Poll for OAuth result in localStorage
+    // We don't check popup.closed as it's unreliable with cross-origin windows
+    intervalRef.current = window.setInterval(() => {
+      // Check localStorage for auth result
+      const storedResult = localStorage.getItem("oauth_result");
+      if (storedResult) {
+        try {
+          const result = JSON.parse(storedResult);
+          localStorage.removeItem("oauth_result");
+          processOAuthResult(result);
+
+          // Clear interval since we got a result
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          popupRef.current = null;
+        } catch (e) {
+          // Invalid stored result, continue polling
+        }
+      }
+    }, POPUP_CHECK_INTERVAL);
+
+    // Stop polling after 5 minutes (safety timeout)
+    setTimeout(() => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+
+        // Final check if we're authenticated
+        fetch("/api/auth/status", { credentials: "include" })
+          .then((res) => res.ok)
+          .then((authenticated) => {
+            if (authenticated) {
+              window.location.reload();
+            } else {
+              setIsAuthenticating(false);
+              setAuthError("Authentication timed out. Please try again.");
+            }
+          })
+          .catch(() => {
+            setIsAuthenticating(false);
+            setAuthError("Authentication timed out. Please try again.");
+          });
+      }
+    }, 300000); // 5 minutes
+  }, [processOAuthResult]);
 
   const handleLogout = useCallback(async () => {
     try {
