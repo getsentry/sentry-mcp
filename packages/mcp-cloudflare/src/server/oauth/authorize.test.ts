@@ -97,13 +97,15 @@ describe("oauth authorize routes", () => {
         stateParam!,
         testEnv.COOKIE_SECRET as string,
       );
-      expect(decodedState.permissions).toEqual([
+      expect((decodedState.req as any).permissions).toEqual([
         "issue_triage",
         "project_management",
       ]);
-      expect(decodedState.clientId).toBe("test-client");
-      expect(decodedState.redirectUri).toBe("https://example.com/callback");
-      expect(decodedState.scope).toEqual(["read", "write"]);
+      expect((decodedState.req as any).clientId).toBe("test-client");
+      expect((decodedState.req as any).redirectUri).toBe(
+        "https://example.com/callback",
+      );
+      expect((decodedState.req as any).scope).toEqual(["read", "write"]);
     });
 
     it("should handle no permissions selected (read-only default)", async () => {
@@ -129,7 +131,7 @@ describe("oauth authorize routes", () => {
         stateParam!,
         testEnv.COOKIE_SECRET as string,
       );
-      expect(decodedState.permissions).toEqual([]);
+      expect((decodedState.req as any).permissions).toEqual([]);
     });
 
     it("should handle only issue triage permission", async () => {
@@ -155,7 +157,7 @@ describe("oauth authorize routes", () => {
         stateParam!,
         testEnv.COOKIE_SECRET as string,
       );
-      expect(decodedState.permissions).toEqual(["issue_triage"]);
+      expect((decodedState.req as any).permissions).toEqual(["issue_triage"]);
     });
 
     it("should include Set-Cookie header for approval", async () => {
