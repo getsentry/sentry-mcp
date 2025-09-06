@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
-import { logger } from "@sentry/cloudflare";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import type { Env, WorkerProps } from "../../types";
 import type { Scope } from "@sentry/mcp-server/permissions";
@@ -65,7 +64,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     const rawState = c.req.query("state") ?? "";
     parsedState = await verifyAndParseState(rawState, c.env.COOKIE_SECRET);
   } catch (err) {
-    logger.warn("Invalid state received on OAuth callback", {
+    console.warn("Invalid state received on OAuth callback", {
       error: String(err),
     });
     return c.text("Invalid state", 400);
@@ -80,19 +79,20 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   } as AuthRequestWithPermissions;
 
   if (!oauthReqInfo.clientId) {
+    console.warn("Missing clientId in OAuth state");
     return c.text("Invalid state", 400);
   }
 
   // Validate redirectUri is a valid URL
   if (!oauthReqInfo.redirectUri) {
-    logger.warn("Missing redirectUri in OAuth state");
+    console.warn("Missing redirectUri in OAuth state");
     return c.text("Authorization failed: No redirect URL provided", 400);
   }
 
   try {
     new URL(oauthReqInfo.redirectUri);
   } catch (err) {
-    logger.warn(
+    console.warn(
       `Invalid redirectUri in OAuth state: ${oauthReqInfo.redirectUri}`,
       {
         error: String(err),
@@ -122,14 +122,14 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       Array.isArray(client?.redirectUris) &&
       client.redirectUris.includes(oauthReqInfo.redirectUri);
     if (!uriIsAllowed) {
-      logger.warn("Redirect URI not registered for client on callback", {
+      console.warn("Redirect URI not registered for client on callback", {
         clientId: oauthReqInfo.clientId,
         redirectUri: oauthReqInfo.redirectUri,
       });
       return c.text("Authorization failed: Invalid redirect URL", 400);
     }
   } catch (lookupErr) {
-    logger.warn("Failed to validate client redirect URI on callback", {
+    console.warn("Failed to validate client redirect URI on callback", {
       error: String(lookupErr),
     });
     return c.text("Authorization failed: Invalid redirect URL", 400);
