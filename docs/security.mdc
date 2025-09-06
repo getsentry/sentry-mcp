@@ -119,22 +119,26 @@ const validatedHost = validateRegionUrl(regionUrl, baseHost);
 
 ### State Parameter Protection
 
-```typescript
-// Generate secure state
-const state = encodeURIComponent(
-  jwt.sign({
-    oauthRequest: JSON.stringify(oauthReqInfo),
-    redirect_uri,
-    ts: Date.now()
-  }, COOKIE_SECRET)
-);
+The OAuth `state` is a compact HMAC-signed payload with a 10‑minute expiry:
 
-// Verify on callback
-const decoded = jwt.verify(state, COOKIE_SECRET);
-if (Date.now() - decoded.ts > 600000) { // 10 min expiry
-  throw new Error("State expired");
-}
+```typescript
+// Payload contains only what's needed on callback
+type OAuthState = {
+  clientId: string;
+  redirectUri: string; // must be a valid URL
+  scope: string[];     // from OAuth provider parseAuthRequest
+  permissions?: string[]; // user selections from approval
+  iat: number;         // issued at (ms)
+  exp: number;         // expires at (ms)
+};
+
+// Sign: `${hex(hmacSHA256(json))}.${btoa(json)}` using COOKIE_SECRET
+const signed = `${signatureHex}.${btoa(JSON.stringify(state))}`;
+
+// On callback: split, verify signature, parse, check exp > Date.now()
 ```
+
+Implementation: `packages/mcp-cloudflare/src/server/oauth/state.ts`
 
 ### Input Validation
 

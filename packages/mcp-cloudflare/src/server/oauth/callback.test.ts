@@ -129,5 +129,62 @@ describe("oauth callback routes", () => {
       const text = await response.text();
       expect(text).toBe("Authorization failed: Client not approved");
     });
+
+    it("should reject callback when state signature is tampered", async () => {
+      // Ensure client redirectUri is registered
+      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+
+      // Prepare approval POST to generate a signed state
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+      };
+      const approvalFormData = new FormData();
+      approvalFormData.append(
+        "state",
+        btoa(
+          JSON.stringify({
+            oauthReqInfo,
+          }),
+        ),
+      );
+      const approvalRequest = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: approvalFormData,
+      });
+      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
+      expect(approvalResponse.status).toBe(302);
+      const setCookie = approvalResponse.headers.get("Set-Cookie");
+      const location = approvalResponse.headers.get("location");
+      expect(location).toBeTruthy();
+      const redirectUrl = new URL(location!);
+      const signedState = redirectUrl.searchParams.get("state")!;
+
+      // Tamper with the signature portion (hex) without breaking payload parsing
+      const [sig, b64] = signedState.split(".");
+      const badSig = (sig[0] === "a" ? "b" : "a") + sig.slice(1);
+      const tamperedState = `${badSig}.${b64}`;
+
+      // Call callback with tampered state and valid approval cookie
+      const callbackRequest = new Request(
+        `http://localhost/oauth/callback?code=test-code&state=${tamperedState}`,
+        {
+          method: "GET",
+          headers: {
+            Cookie: setCookie!.split(";")[0],
+          },
+        },
+      );
+      const response = await app.fetch(callbackRequest, testEnv as Env);
+      expect(response.status).toBe(400);
+      const text = await response.text();
+      expect(text).toBe("Invalid state");
+    });
   });
 });

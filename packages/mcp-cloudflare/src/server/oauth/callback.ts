@@ -7,6 +7,7 @@ import type { Scope } from "@sentry/mcp-server/permissions";
 import { DEFAULT_SCOPES } from "@sentry/mcp-server/constants";
 import { SENTRY_TOKEN_URL } from "./constants";
 import { exchangeCodeForAccessToken } from "./helpers";
+import { verifyAndParseState, type OAuthState } from "./state";
 
 /**
  * Extended AuthRequest that includes permissions
@@ -58,18 +59,26 @@ function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
  */
 // Export Hono app for /callback endpoint
 export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
-  // Get the oauthReqInfo out of state
-  let oauthReqInfo: AuthRequestWithPermissions;
+  // Verify and parse the signed state
+  let parsedState: OAuthState;
   try {
-    oauthReqInfo = JSON.parse(
-      atob(c.req.query("state") as string),
-    ) as AuthRequestWithPermissions;
+    const rawState = c.req.query("state") ?? "";
+    parsedState = await verifyAndParseState(rawState, c.env.COOKIE_SECRET);
   } catch (err) {
-    logger.warn(`Invalid state: ${c.req.query("state") as string}`, {
+    logger.warn("Invalid state received on OAuth callback", {
       error: String(err),
     });
     return c.text("Invalid state", 400);
   }
+
+  // Reconstruct minimal oauth request info from signed state
+  const oauthReqInfo: AuthRequestWithPermissions = {
+    clientId: parsedState.clientId,
+    redirectUri: parsedState.redirectUri,
+    scope: parsedState.scope,
+    permissions: parsedState.permissions,
+    state: undefined,
+  } as AuthRequestWithPermissions;
 
   if (!oauthReqInfo.clientId) {
     return c.text("Invalid state", 400);
@@ -105,6 +114,28 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     return c.text("Authorization failed: Client not approved", 403);
   }
 
+  // Validate redirectUri is registered for this client
+  try {
+    const client = await c.env.OAUTH_PROVIDER.lookupClient(
+      oauthReqInfo.clientId,
+    );
+    const uriIsAllowed =
+      Array.isArray(client?.redirectUris) &&
+      client.redirectUris.includes(oauthReqInfo.redirectUri);
+    if (!uriIsAllowed) {
+      logger.warn("Redirect URI not registered for client on callback", {
+        clientId: oauthReqInfo.clientId,
+        redirectUri: oauthReqInfo.redirectUri,
+      });
+      return c.text("Authorization failed: Invalid redirect URL", 400);
+    }
+  } catch (lookupErr) {
+    logger.warn("Failed to validate client redirect URI on callback", {
+      error: String(lookupErr),
+    });
+    return c.text("Authorization failed: Invalid redirect URL", 400);
+  }
+
   // Exchange the code for an access token
   const [payload, errResponse] = await exchangeCodeForAccessToken({
     upstream_url: new URL(
@@ -114,6 +145,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     client_id: c.env.SENTRY_CLIENT_ID,
     client_secret: c.env.SENTRY_CLIENT_SECRET,
     code: c.req.query("code"),
+    redirect_uri: oauthReqInfo.redirectUri,
   });
   if (errResponse) return errResponse;
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import oauthRoute from "./index";
 import type { Env } from "../types";
+import { verifyAndParseState } from "./state";
 
 // Mock the OAuth provider
 const mockOAuthProvider = {
@@ -60,6 +61,14 @@ describe("oauth authorize routes", () => {
   });
 
   describe("POST /oauth/authorize", () => {
+    beforeEach(() => {
+      mockOAuthProvider.lookupClient.mockResolvedValue({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+    });
     it("should encode permissions in the redirect state", async () => {
       const oauthReqInfo = {
         clientId: "test-client",
@@ -84,7 +93,10 @@ describe("oauth authorize routes", () => {
       expect(redirectUrl.pathname).toBe("/oauth/authorize/");
       const stateParam = redirectUrl.searchParams.get("state");
       expect(stateParam).toBeTruthy();
-      const decodedState = JSON.parse(atob(stateParam!));
+      const decodedState = await verifyAndParseState(
+        stateParam!,
+        testEnv.COOKIE_SECRET as string,
+      );
       expect(decodedState.permissions).toEqual([
         "issue_triage",
         "project_management",
@@ -113,7 +125,10 @@ describe("oauth authorize routes", () => {
       expect(location).toBeTruthy();
       const redirectUrl = new URL(location!);
       const stateParam = redirectUrl.searchParams.get("state");
-      const decodedState = JSON.parse(atob(stateParam!));
+      const decodedState = await verifyAndParseState(
+        stateParam!,
+        testEnv.COOKIE_SECRET as string,
+      );
       expect(decodedState.permissions).toEqual([]);
     });
 
@@ -136,7 +151,10 @@ describe("oauth authorize routes", () => {
       const location = response.headers.get("location");
       const redirectUrl = new URL(location!);
       const stateParam = redirectUrl.searchParams.get("state");
-      const decodedState = JSON.parse(atob(stateParam!));
+      const decodedState = await verifyAndParseState(
+        stateParam!,
+        testEnv.COOKIE_SECRET as string,
+      );
       expect(decodedState.permissions).toEqual(["issue_triage"]);
     });
 

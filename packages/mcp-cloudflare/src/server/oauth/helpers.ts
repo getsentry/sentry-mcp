@@ -40,11 +40,13 @@ export async function exchangeCodeForAccessToken({
   client_secret,
   code,
   upstream_url,
+  redirect_uri,
 }: {
   code: string | undefined;
   upstream_url: string;
   client_secret: string;
   client_id: string;
+  redirect_uri?: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!code) {
     const eventId = logError("[oauth] Missing code in token exchange", {
@@ -72,6 +74,7 @@ export async function exchangeCodeForAccessToken({
       client_id,
       client_secret,
       code,
+      ...(redirect_uri ? { redirect_uri } : {}),
     }).toString(),
   });
   if (!resp.ok) {

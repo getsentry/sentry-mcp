@@ -9,6 +9,7 @@ import type { Env } from "../types";
 import { SENTRY_AUTH_URL } from "./constants";
 import { getUpstreamAuthorizeUrl } from "./helpers";
 import { SCOPES } from "../../constants";
+import { signState, type OAuthState } from "./state";
 
 /**
  * Extended AuthRequest that includes permissions
@@ -22,6 +23,7 @@ async function redirectToUpstream(
   request: Request,
   oauthReqInfo: AuthRequest | AuthRequestWithPermissions,
   headers: Record<string, string> = {},
+  stateOverride?: string,
 ) {
   return new Response(null, {
     status: 302,
@@ -35,7 +37,7 @@ async function redirectToUpstream(
         scope: Object.keys(SCOPES).join(" "),
         client_id: env.SENTRY_CLIENT_ID,
         redirect_uri: new URL("/oauth/callback", request.url).href,
-        state: btoa(JSON.stringify(oauthReqInfo)),
+        state: stateOverride ?? btoa(JSON.stringify(oauthReqInfo)),
       }),
     },
   });
@@ -127,10 +129,45 @@ export default new Hono<{ Bindings: Env }>()
       permissions,
     };
 
+    // Validate redirectUri is registered for this client before proceeding
+    try {
+      const client = await c.env.OAUTH_PROVIDER.lookupClient(
+        oauthReqWithPermissions.clientId,
+      );
+      const uriIsAllowed =
+        Array.isArray(client?.redirectUris) &&
+        client.redirectUris.includes(oauthReqWithPermissions.redirectUri);
+      if (!uriIsAllowed) {
+        logger.warn("Redirect URI not registered for client", {
+          clientId: oauthReqWithPermissions.clientId,
+          redirectUri: oauthReqWithPermissions.redirectUri,
+        });
+        return c.text("Invalid redirect URI", 400);
+      }
+    } catch (lookupErr) {
+      logger.warn("Failed to validate client redirect URI", {
+        error: String(lookupErr),
+      });
+      return c.text("Invalid request", 400);
+    }
+
+    // Build signed state for redirect to Sentry (10 minute validity)
+    const now = Date.now();
+    const payload: OAuthState = {
+      clientId: oauthReqWithPermissions.clientId,
+      redirectUri: oauthReqWithPermissions.redirectUri,
+      scope: oauthReqWithPermissions.scope,
+      permissions,
+      iat: now,
+      exp: now + 10 * 60 * 1000,
+    };
+    const signedState = await signState(payload, c.env.COOKIE_SECRET);
+
     return redirectToUpstream(
       c.env,
       c.req.raw,
       oauthReqWithPermissions,
       headers,
+      signedState,
     );
   });
