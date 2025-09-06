@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import oauthRoute from "./index";
+import { signState, type OAuthState } from "./state";
 import type { Env } from "../types";
 
 // Mock the OAuth provider
@@ -45,15 +46,19 @@ describe("oauth callback routes", () => {
     });
 
     it("should reject callback without approved client cookie", async () => {
-      const oauthReqInfo = {
+      // Build signed state matching what /oauth/authorize issues
+      const now = Date.now();
+      const payload: OAuthState = {
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
         scope: ["read"],
+        iat: now,
+        exp: now + 10 * 60 * 1000,
       };
+      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
+
       const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${btoa(
-          JSON.stringify(oauthReqInfo),
-        )}`,
+        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
         {
           method: "GET",
           headers: {},
@@ -66,15 +71,18 @@ describe("oauth callback routes", () => {
     });
 
     it("should reject callback with invalid client approval cookie", async () => {
-      const oauthReqInfo = {
+      const now = Date.now();
+      const payload: OAuthState = {
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
         scope: ["read"],
+        iat: now,
+        exp: now + 10 * 60 * 1000,
       };
+      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
+
       const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${btoa(
-          JSON.stringify(oauthReqInfo),
-        )}`,
+        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
         {
           method: "GET",
           headers: {
@@ -89,11 +97,14 @@ describe("oauth callback routes", () => {
     });
 
     it("should reject callback with cookie for different client", async () => {
-      const oauthReqInfo = {
-        clientId: "test-client",
-        redirectUri: "https://example.com/callback",
-        scope: ["read"],
-      };
+      // Ensure authorize POST accepts the redirectUri
+      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+        clientId: "different-client",
+        clientName: "Other Client",
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+
       const approvalFormData = new FormData();
       approvalFormData.append(
         "state",
@@ -112,11 +123,23 @@ describe("oauth callback routes", () => {
         body: approvalFormData,
       });
       const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
+      expect(approvalResponse.status).toBe(302);
       const setCookie = approvalResponse.headers.get("Set-Cookie");
+      expect(setCookie).toBeTruthy();
+
+      // Build a signed state for a different client than the approved one
+      const now = Date.now();
+      const payload: OAuthState = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+        iat: now,
+        exp: now + 10 * 60 * 1000,
+      };
+      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
+
       const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${btoa(
-          JSON.stringify(oauthReqInfo),
-        )}`,
+        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
         {
           method: "GET",
           headers: {

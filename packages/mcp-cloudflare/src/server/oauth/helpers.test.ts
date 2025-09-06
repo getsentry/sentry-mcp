@@ -26,6 +26,9 @@ describe("tokenExchangeCallback", () => {
   it("should skip non-refresh_token grant types", async () => {
     const options: TokenExchangeCallbackOptions = {
       grantType: "authorization_code",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
       props: {} as WorkerProps,
     };
 
@@ -37,6 +40,9 @@ describe("tokenExchangeCallback", () => {
   it("should throw error when no refresh token in props", async () => {
     const options: TokenExchangeCallbackOptions = {
       grantType: "refresh_token",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
         name: "Test User",
@@ -55,6 +61,9 @@ describe("tokenExchangeCallback", () => {
     const futureExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes from now
     const options: TokenExchangeCallbackOptions = {
       grantType: "refresh_token",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
         name: "Test User",
@@ -80,6 +89,9 @@ describe("tokenExchangeCallback", () => {
     const nearExpiry = Date.now() + 1 * 60 * 1000; // 1 minute from now (less than 2 min safety window)
     const options: TokenExchangeCallbackOptions = {
       grantType: "refresh_token",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
         name: "Test User",
@@ -134,6 +146,9 @@ describe("tokenExchangeCallback", () => {
   it("should refresh token when no cached expiry exists", async () => {
     const options: TokenExchangeCallbackOptions = {
       grantType: "refresh_token",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
         name: "Test User",
@@ -177,6 +192,9 @@ describe("tokenExchangeCallback", () => {
   it("should throw error when upstream refresh fails", async () => {
     const options: TokenExchangeCallbackOptions = {
       grantType: "refresh_token",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
         name: "Test User",
