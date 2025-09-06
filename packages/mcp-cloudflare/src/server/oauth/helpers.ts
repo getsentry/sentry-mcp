@@ -74,7 +74,8 @@ export async function exchangeCodeForAccessToken({
       client_id,
       client_secret,
       code,
-      ...(redirect_uri ? { redirect_uri } : {}),
+      // binding the redirect_uri creates an unsupported_grant_type error
+      // ...(redirect_uri ? { redirect_uri } : {}),
     }).toString(),
   });
   if (!resp.ok) {
