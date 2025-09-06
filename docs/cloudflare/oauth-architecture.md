@@ -1,63 +1,157 @@
-# OAuth Architecture
+# OAuth Architecture: MCP OAuth vs Sentry OAuth
 
-## Overview
+## Two Separate OAuth Systems
 
-The Sentry MCP Cloudflare implementation uses the `@cloudflare/workers-oauth-provider` library to act as an **OAuth 2.0 Authorization Server**. This is NOT an OAuth proxy or client - it's a full OAuth server that:
+The Sentry MCP implementation involves **two completely separate OAuth providers**:
 
-1. Issues its own access tokens
-2. Manages client registrations dynamically
-3. Handles authorization flows with consent
-4. Stores encrypted user data in tokens
+### 1. MCP OAuth Provider (Our Server)
+- **What it is**: Our own OAuth 2.0 server built with `@cloudflare/workers-oauth-provider`
+- **Purpose**: Authenticates MCP clients (like Cursor, VS Code, etc.)
+- **Tokens issued**: MCP access tokens and MCP refresh tokens
+- **Storage**: Uses Cloudflare KV to store encrypted tokens
+- **Endpoints**: `/oauth/register`, `/oauth/authorize`, `/oauth/token`
+
+### 2. Sentry OAuth Provider (Sentry's Server)
+- **What it is**: Sentry's official OAuth 2.0 server at `sentry.io`
+- **Purpose**: Authenticates users and grants API access to Sentry
+- **Tokens issued**: Sentry access tokens and Sentry refresh tokens
+- **Storage**: Tokens are stored encrypted within MCP's token props
+- **Endpoints**: `https://sentry.io/oauth/authorize/`, `https://sentry.io/oauth/token/`
+
+## High-Level Flow
+
+The system uses a dual-token approach:
+1. **MCP clients** authenticate with **MCP OAuth** to get MCP tokens
+2. **MCP OAuth** authenticates with **Sentry OAuth** to get Sentry tokens
+3. **MCP tokens** contain encrypted **Sentry tokens** in their payload
+4. When serving MCP requests, the server uses Sentry tokens to call Sentry's API
+
+### Complete Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client (Cursor)
+    participant MCPOAuth as MCP OAuth Provider<br/>(Our Server)
+    participant MCP as MCP Server<br/>(Durable Object)
+    participant SentryOAuth as Sentry OAuth Provider<br/>(sentry.io)
+    participant SentryAPI as Sentry API
+    participant User as User
+
+    Note over Client,SentryAPI: Initial Client Registration
+    Client->>MCPOAuth: Register as OAuth client
+    MCPOAuth-->>Client: MCP Client ID & Secret
+
+    Note over Client,SentryAPI: User Authorization Flow
+    Client->>MCPOAuth: Request authorization
+    MCPOAuth->>User: Show MCP consent screen
+    User->>MCPOAuth: Approve MCP permissions
+    MCPOAuth->>SentryOAuth: Redirect to Sentry OAuth
+    SentryOAuth->>User: Sentry login page
+    User->>SentryOAuth: Authenticate with Sentry
+    SentryOAuth-->>MCPOAuth: Sentry auth code
+    MCPOAuth->>SentryOAuth: Exchange code for tokens
+    SentryOAuth-->>MCPOAuth: Sentry access + refresh tokens
+    MCPOAuth-->>Client: MCP access token<br/>(contains encrypted Sentry tokens)
+
+    Note over Client,SentryAPI: Using MCP Protocol
+    Client->>MCP: MCP request with MCP Bearer token
+    MCP->>MCPOAuth: Validate MCP token
+    MCPOAuth-->>MCP: Decrypted props<br/>(includes Sentry tokens)
+    MCP->>SentryAPI: API call with Sentry Bearer token
+    SentryAPI-->>MCP: API response
+    MCP-->>Client: MCP response
+
+    Note over Client,SentryAPI: Token Refresh
+    Client->>MCPOAuth: POST /oauth/token<br/>(MCP refresh_token)
+    MCPOAuth->>MCPOAuth: Check Sentry token expiry
+    alt Sentry token still valid
+        MCPOAuth-->>Client: New MCP token<br/>(reusing cached Sentry token)
+    else Sentry token expired
+        MCPOAuth->>SentryOAuth: Refresh Sentry token
+        SentryOAuth-->>MCPOAuth: New Sentry tokens
+        MCPOAuth-->>Client: New MCP token<br/>(with new Sentry tokens)
+    end
+```
 
 ## Key Concepts
 
-### OAuth Provider as a Server
+### Token Types
 
-The Cloudflare OAuth Provider is a complete OAuth 2.0 server implementation that:
+| Token Type | Issued By | Used By | Contains | Purpose |
+|------------|-----------|---------|----------|----------|
+| **MCP Access Token** | MCP OAuth Provider | MCP Clients | Encrypted Sentry tokens | Authenticate to MCP Server |
+| **MCP Refresh Token** | MCP OAuth Provider | MCP Clients | Grant reference | Refresh MCP access tokens |
+| **Sentry Access Token** | Sentry OAuth | MCP Server | User credentials | Call Sentry API |
+| **Sentry Refresh Token** | Sentry OAuth | MCP OAuth Provider | Refresh credentials | Refresh Sentry tokens |
 
-- **Issues tokens**: Creates and manages its own access tokens (not proxying Sentry's)
-- **Dynamic client registration**: Allows AI agents to register as OAuth clients on-the-fly
-- **Token storage**: Uses Cloudflare KV to store encrypted tokens and grants
-- **PKCE support**: Implements Proof Key for Code Exchange for security
-- **Consent flow**: Manages user consent for agent permissions
+### Not a Simple Proxy
 
-### How It Works
+**Important**: MCP is NOT an HTTP proxy that forwards requests. Instead:
+- MCP implements the **Model Context Protocol** (tools, prompts, resources)
+- Clients send MCP protocol messages, not HTTP requests
+- MCP Server executes these commands using Sentry's API
+- Responses are MCP protocol messages, not raw HTTP responses
+
+## Technical Implementation
+
+### MCP OAuth Provider Details
+
+The MCP OAuth Provider is built with `@cloudflare/workers-oauth-provider` and provides:
+
+1. **Dynamic client registration** - MCP clients can register on-demand
+2. **PKCE support** - Secure authorization code flow
+3. **Token management** - Issues and validates MCP tokens
+4. **Consent UI** - Custom approval screen for permissions
+5. **Token encryption** - Stores Sentry tokens encrypted in MCP token props
+
+### Sentry OAuth Integration
+
+The integration with Sentry OAuth happens through:
+
+1. **Authorization redirect** - After MCP consent, redirect to Sentry OAuth
+2. **Code exchange** - Exchange Sentry auth code for tokens
+3. **Token storage** - Store Sentry tokens in MCP token props
+4. **Token refresh** - Use Sentry refresh tokens to get new access tokens
+
+## Key Concepts
+
+### How the MCP OAuth Provider Works
 
 ```mermaid
 sequenceDiagram
     participant Agent as AI Agent
-    participant OAuth as OAuth Provider
+    participant MCPOAuth as MCP OAuth Provider
     participant KV as Cloudflare KV
     participant User as User
     participant MCP as MCP Server
 
-    Agent->>OAuth: Register as client
-    OAuth->>KV: Store client registration
-    OAuth-->>Agent: Client ID & Secret
+    Agent->>MCPOAuth: Register as client
+    MCPOAuth->>KV: Store client registration
+    MCPOAuth-->>Agent: MCP Client ID & Secret
 
-    Agent->>OAuth: Request authorization
-    OAuth->>User: Show consent screen
-    User->>OAuth: Approve
-    OAuth->>KV: Store grant
-    OAuth-->>Agent: Authorization code
+    Agent->>MCPOAuth: Request authorization
+    MCPOAuth->>User: Show MCP consent screen
+    User->>MCPOAuth: Approve
+    MCPOAuth->>KV: Store grant
+    MCPOAuth-->>Agent: Authorization code
 
-    Agent->>OAuth: Exchange code for token
-    OAuth->>KV: Validate grant
-    OAuth->>KV: Store encrypted token
-    OAuth-->>Agent: Access token
+    Agent->>MCPOAuth: Exchange code for MCP token
+    MCPOAuth->>KV: Validate grant
+    MCPOAuth->>KV: Store encrypted MCP token
+    MCPOAuth-->>Agent: MCP access token
 
-    Agent->>MCP: Request with Bearer token
-    MCP->>OAuth: Validate token
-    OAuth->>KV: Lookup token
-    OAuth-->>MCP: Decrypted props (user data)
-    MCP-->>Agent: Response
+    Agent->>MCP: MCP protocol request with MCP token
+    MCP->>MCPOAuth: Validate MCP token
+    MCPOAuth->>KV: Lookup MCP token
+    MCPOAuth-->>MCP: Decrypted props (includes Sentry tokens)
+    MCP-->>Agent: MCP protocol response
 ```
 
 ## Implementation Details
 
-### 1. Configuration
+### 1. MCP OAuth Provider Configuration
 
-The OAuth Provider is configured in `src/server/index.ts`:
+The MCP OAuth Provider is configured in `src/server/index.ts`:
 
 ```typescript
 const oAuthProvider = new OAuthProvider({
@@ -87,14 +181,17 @@ These handlers receive:
 
 ### 3. Token Structure
 
-Tokens contain encrypted user properties:
+MCP tokens contain encrypted properties including Sentry tokens:
 
 ```typescript
 interface WorkerProps {
-  id: string;           // User ID
-  accessToken: string;  // Sentry API token
-  name: string;         // User name
-  scope: string;        // Granted permissions
+  id: string;                    // Sentry user ID
+  name: string;                   // User name
+  accessToken: string;            // Sentry access token
+  refreshToken?: string;          // Sentry refresh token
+  accessTokenExpiresAt?: number;  // Sentry token expiry timestamp
+  scope: string;                  // MCP permissions granted
+  grantedScopes?: string[];       // Sentry API scopes
 }
 ```
 
@@ -143,35 +240,148 @@ const createMcpHandler = (basePath: string, isSSE = false) => {
 
 ## Storage (KV Namespace)
 
-The OAuth Provider uses `OAUTH_KV` namespace to store:
+The MCP OAuth Provider uses `OAUTH_KV` namespace to store:
 
-1. **Client registrations**: `client:{clientId}` - OAuth client details
-2. **Authorization grants**: `grant:{userId}:{grantId}` - User consent records
-3. **Access tokens**: `token:{userId}:{grantId}:{tokenId}` - Encrypted tokens
-4. **Refresh tokens**: `refresh:{userId}:{grantId}:{refreshId}` - For token renewal
+1. **MCP Client registrations**: `client:{clientId}` - MCP OAuth client details
+2. **MCP Authorization grants**: `grant:{userId}:{grantId}` - User consent records for MCP
+3. **MCP Access tokens**: `token:{userId}:{grantId}:{tokenId}` - Encrypted MCP tokens (contains Sentry tokens)
+4. **MCP Refresh tokens**: `refresh:{userId}:{grantId}:{refreshId}` - For MCP token renewal
+
+### Token Storage Structure
+
+When a user completes the full OAuth flow, the MCP OAuth Provider stores Sentry tokens inside MCP token props:
+
+```typescript
+// In /oauth/callback after exchanging code with Sentry
+const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
+  // ... other params
+  props: {
+    id: payload.user.id,                    // From Sentry
+    name: payload.user.name,                 // From Sentry
+    accessToken: payload.access_token,       // Sentry's access token
+    refreshToken: payload.refresh_token,     // Sentry's refresh token
+    accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
+    scope: oauthReqInfo.scope.join(" "),     // MCP scopes
+    grantedScopes: Array.from(grantedScopes), // Sentry API scopes
+    // ... other fields
+  }
+});
+```
+
+## Token Refresh Implementation
+
+### Dual Refresh Token System
+
+The system maintains two separate refresh flows:
+
+1. **MCP Token Refresh**: When MCP clients need new MCP access tokens
+2. **Sentry Token Refresh**: When Sentry access tokens expire (handled internally)
+
+### MCP Token Refresh Flow
+
+When an MCP client's token expires:
+
+1. Client sends refresh request to MCP OAuth: `POST /oauth/token` with MCP refresh token
+2. MCP OAuth invokes `tokenExchangeCallback` function
+3. Callback checks if cached Sentry token is still valid (with 2-minute safety window)
+4. If Sentry token is valid, returns new MCP token with cached Sentry token
+5. If Sentry token expired, refreshes with Sentry OAuth and updates storage
+
+### Token Exchange Callback Implementation
+
+```typescript
+// tokenExchangeCallback in src/server/oauth/helpers.ts
+export async function tokenExchangeCallback(options, env) {
+  // Only handle MCP refresh_token requests
+  if (options.grantType !== "refresh_token") {
+    return undefined;
+  }
+
+  // Extract Sentry refresh token from MCP token props
+  const sentryRefreshToken = options.props.refreshToken;
+  if (!sentryRefreshToken) {
+    throw new Error("No Sentry refresh token available in stored props");
+  }
+
+  // Smart caching: Check if Sentry token is still valid
+  const sentryTokenExpiresAt = props.accessTokenExpiresAt;
+  if (sentryTokenExpiresAt && Number.isFinite(sentryTokenExpiresAt)) {
+    const remainingMs = sentryTokenExpiresAt - Date.now();
+    const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes safety
+    
+    if (remainingMs > SAFE_WINDOW_MS) {
+      // Sentry token still valid - return new MCP token with cached Sentry token
+      return {
+        newProps: { ...options.props },
+        accessTokenTTL: Math.floor(remainingMs / 1000),
+      };
+    }
+  }
+
+  // Sentry token expired - refresh with Sentry OAuth
+  const [sentryTokens, errorResponse] = await refreshAccessToken({
+    client_id: env.SENTRY_CLIENT_ID,
+    client_secret: env.SENTRY_CLIENT_SECRET,
+    refresh_token: sentryRefreshToken,
+    upstream_url: "https://sentry.io/oauth/token/",
+  });
+
+  // Update MCP token props with new Sentry tokens
+  return {
+    newProps: {
+      ...options.props,
+      accessToken: sentryTokens.access_token,      // New Sentry access token
+      refreshToken: sentryTokens.refresh_token,    // New Sentry refresh token
+      accessTokenExpiresAt: Date.now() + sentryTokens.expires_in * 1000,
+    },
+    accessTokenTTL: sentryTokens.expires_in,
+  };
+}
+```
+
+### Error Scenarios
+
+1. **Missing Sentry Refresh Token**: 
+   - Error: "No Sentry refresh token available in stored props"
+   - Resolution: Client must re-authenticate through full OAuth flow
+
+2. **Sentry Refresh Token Invalid**: 
+   - Error: Sentry OAuth returns 401/400
+   - Resolution: Client must re-authenticate with both MCP and Sentry
+
+3. **Network Failures**: 
+   - Error: Cannot reach Sentry OAuth endpoint
+   - Resolution: Retry with exponential backoff or re-authenticate
+
+The 2-minute safety window prevents edge cases with clock skew and processing delays between MCP and Sentry.
 
 ## Security Features
 
-1. **PKCE**: Prevents authorization code interception
-2. **Token encryption**: User data encrypted in tokens using WebCrypto
-3. **Consent management**: Users explicitly approve agent permissions
-4. **Scope enforcement**: Limits what agents can access
-5. **Token expiration**: Automatic token expiry and refresh
+1. **PKCE**: MCP OAuth uses PKCE to prevent authorization code interception
+2. **Token encryption**: Sentry tokens encrypted within MCP tokens using WebCrypto
+3. **Dual consent**: Users approve both MCP permissions and Sentry access
+4. **Scope enforcement**: Both MCP and Sentry scopes limit access
+5. **Token expiration**: Both MCP and Sentry tokens have expiry times
+6. **Refresh token rotation**: Sentry issues new refresh tokens on each refresh
 
 ## Discovery Endpoints
 
-The OAuth Provider automatically provides:
+The MCP OAuth Provider automatically provides:
 
-- `/.well-known/oauth-authorization-server` - OAuth server metadata
-- `/.well-known/oauth-protected-resource` - Resource server info
+- `/.well-known/oauth-authorization-server` - MCP OAuth server metadata
+- `/.well-known/oauth-protected-resource` - MCP resource server info
 
-## Integration with MCP
+Note: These describe the MCP OAuth server, not Sentry's OAuth endpoints.
 
-The MCP Durable Object (`SentryMCP`) receives:
+## Integration Between MCP OAuth and MCP Server
 
-1. **Props via constructor**: User data from OAuth token (via `ctx.props`)
-2. **Constraints via headers**: Organization/project limits
+The MCP Server (Durable Object `SentryMCP`) receives:
+
+1. **Props via constructor**: Decrypted data from MCP token (includes Sentry tokens)
+2. **Constraints via headers**: Organization/project limits from URL path
 3. **Both stored**: In Durable Object storage for session persistence
+
+The MCP Server then uses the Sentry access token from props to make Sentry API calls.
 
 ## Limitations
 
@@ -179,21 +389,36 @@ The MCP Durable Object (`SentryMCP`) receives:
 2. **URL rewriting**: Requires header-based constraint passing
 3. **Props architecture mismatch**: OAuth passes props per-request, agents library expects them in constructor
 
-## Why Not Replace It?
+## Why Use Two OAuth Systems?
 
-Reimplementing the OAuth Provider would require:
+### Benefits of the Dual OAuth Approach
 
-1. OAuth 2.0 authorization flow implementation
-2. Dynamic client registration (RFC 7591)
-3. Token issuance and validation
-4. PKCE implementation (RFC 7636)
-5. Consent management UI
-6. Token encryption/decryption
-7. KV storage management
-8. Discovery endpoint implementation
-9. Security vulnerability management
+1. **Security isolation**: MCP clients never see Sentry tokens directly
+2. **Token management**: MCP can refresh Sentry tokens transparently
+3. **Permission layering**: MCP permissions separate from Sentry API scopes
+4. **Client flexibility**: MCP clients don't need to understand Sentry OAuth
 
-The Cloudflare OAuth Provider handles all of this correctly and securely. The header-passing pattern for constraints is a reasonable adapter between two different architectural patterns.
+### Why Not Direct Sentry OAuth?
+
+If MCP clients used Sentry OAuth directly:
+- Clients would need to manage Sentry token refresh
+- No way to add MCP-specific permissions
+- Clients would have raw Sentry API access (security risk)
+- No centralized token management
+
+### Implementation Complexity
+
+The MCP OAuth Provider (via `@cloudflare/workers-oauth-provider`) provides:
+- OAuth 2.0 authorization flows
+- Dynamic client registration
+- Token issuance and validation
+- PKCE support
+- Consent UI
+- Token encryption
+- KV storage
+- Discovery endpoints
+
+Reimplementing this would be complex and error-prone.
 
 ## Related Documentation
 
