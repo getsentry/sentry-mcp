@@ -4,12 +4,12 @@ import { logger } from "@sentry/cloudflare";
 import {
   renderApprovalDialog,
   parseRedirectApproval,
-} from "../lib/approval-dialog";
-import type { Env } from "../types";
-import { SENTRY_AUTH_URL } from "./constants";
-import { getUpstreamAuthorizeUrl } from "./helpers";
-import { SCOPES } from "../../constants";
-import { signState, type OAuthState } from "./state";
+} from "../../lib/approval-dialog";
+import type { Env } from "../../types";
+import { SENTRY_AUTH_URL } from "../constants";
+import { getUpstreamAuthorizeUrl } from "../helpers";
+import { SCOPES } from "../../../constants";
+import { signState, type OAuthState } from "../state";
 
 /**
  * Extended AuthRequest that includes permissions

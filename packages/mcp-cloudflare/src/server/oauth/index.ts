@@ -1,7 +1,5 @@
-import { Hono } from "hono";
-import type { Env } from "../types";
-import authorizeApp from "./authorize";
-import callbackApp from "./callback";
+// Re-export the main OAuth Hono app
+export { default } from "./routes/index";
 
 // Re-export helper functions and constants for external use
 export { tokenExchangeCallback } from "./helpers";
@@ -15,8 +13,3 @@ export {
   exchangeCodeForAccessToken,
   refreshAccessToken,
 } from "./helpers";
-
-// Compose and export the main OAuth Hono app
-export default new Hono<{ Bindings: Env }>()
-  .route("/authorize", authorizeApp)
-  .route("/callback", callbackApp);

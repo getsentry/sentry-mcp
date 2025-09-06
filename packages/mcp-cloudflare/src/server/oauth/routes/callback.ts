@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { logger } from "@sentry/cloudflare";
-import { clientIdAlreadyApproved } from "../lib/approval-dialog";
-import type { Env, WorkerProps } from "../types";
+import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
+import type { Env, WorkerProps } from "../../types";
 import type { Scope } from "@sentry/mcp-server/permissions";
 import { DEFAULT_SCOPES } from "@sentry/mcp-server/constants";
-import { SENTRY_TOKEN_URL } from "./constants";
-import { exchangeCodeForAccessToken } from "./helpers";
-import { verifyAndParseState, type OAuthState } from "./state";
+import { SENTRY_TOKEN_URL } from "../constants";
+import { exchangeCodeForAccessToken } from "../helpers";
+import { verifyAndParseState, type OAuthState } from "../state";
 
 /**
  * Extended AuthRequest that includes permissions
