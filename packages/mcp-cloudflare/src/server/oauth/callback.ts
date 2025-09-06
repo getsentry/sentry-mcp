@@ -77,7 +77,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     redirectUri: parsedState.redirectUri,
     scope: parsedState.scope,
     permissions: parsedState.permissions,
-    state: undefined,
   } as AuthRequestWithPermissions;
 
   if (!oauthReqInfo.clientId) {
