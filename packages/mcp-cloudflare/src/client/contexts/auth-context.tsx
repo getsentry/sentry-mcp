@@ -49,9 +49,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Process OAuth result from localStorage
   const processOAuthResult = useCallback((data: unknown) => {
     if (isOAuthSuccessMessage(data)) {
-      setIsAuthenticated(true);
-      setIsAuthenticating(false);
-      setAuthError("");
+      // Verify session on server before marking authenticated
+      fetch("/api/auth/status", { credentials: "include" })
+        .then((res) => res.ok)
+        .then((authenticated) => {
+          if (authenticated) {
+            // Fully reload the app to pick up new auth context/cookies
+            // This avoids intermediate/loading states and ensures a clean session
+            window.location.reload();
+          } else {
+            setIsAuthenticated(false);
+            setAuthError(
+              "Authentication not completed. Please finish sign-in.",
+            );
+            setIsAuthenticating(false);
+          }
+        })
+        .catch(() => {
+          setIsAuthenticated(false);
+          setAuthError("Failed to verify authentication.");
+          setIsAuthenticating(false);
+        });
 
       // Cleanup interval and popup reference
       if (intervalRef.current) {
@@ -93,6 +111,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const desiredHeight = Math.min(window.screen.availHeight, 900);
     const windowFeatures = `width=${desiredWidth},height=${desiredHeight},resizable=yes,scrollbars=yes`;
 
+    // Clear any stale results before opening popup
+    try {
+      localStorage.removeItem("oauth_result");
+    } catch {
+      // ignore storage errors
+    }
+
     const popup = window.open(
       "/api/auth/authorize",
       "sentry-oauth",
@@ -107,44 +132,60 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     popupRef.current = popup;
 
-    // Check if popup is closed by user
+    // Poll for OAuth result in localStorage
+    // We don't check popup.closed as it's unreliable with cross-origin windows
     intervalRef.current = window.setInterval(() => {
-      if (popup.closed) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+      // Check localStorage for auth result
+      const storedResult = localStorage.getItem("oauth_result");
+      if (storedResult) {
+        try {
+          const result = JSON.parse(storedResult);
+          localStorage.removeItem("oauth_result");
+          processOAuthResult(result);
 
-        // Check localStorage for auth result before marking as cancelled
-        const storedResult = localStorage.getItem("sentry_oauth_result");
-        if (storedResult) {
-          try {
-            const result = JSON.parse(storedResult);
-            localStorage.removeItem("sentry_oauth_result");
-            processOAuthResult(result);
-            return;
-          } catch (e) {
-            // Invalid stored result, continue to cancellation
+          // Clear interval since we got a result
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
           }
+          popupRef.current = null;
+        } catch (e) {
+          // Invalid stored result, continue polling
         }
-
-        // Only update state if still authenticating (no success/error received)
-        setIsAuthenticating((current) => {
-          if (current) {
-            setAuthError("Authentication was cancelled.");
-            return false;
-          }
-          return current;
-        });
-
-        popupRef.current = null;
       }
     }, POPUP_CHECK_INTERVAL);
+
+    // Stop polling after 5 minutes (safety timeout)
+    setTimeout(() => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+
+        // Final check if we're authenticated
+        fetch("/api/auth/status", { credentials: "include" })
+          .then((res) => res.ok)
+          .then((authenticated) => {
+            if (authenticated) {
+              window.location.reload();
+            } else {
+              setIsAuthenticating(false);
+              setAuthError("Authentication timed out. Please try again.");
+            }
+          })
+          .catch(() => {
+            setIsAuthenticating(false);
+            setAuthError("Authentication timed out. Please try again.");
+          });
+      }
+    }, 300000); // 5 minutes
   }, [processOAuthResult]);
 
   const handleLogout = useCallback(async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch {
       // Ignore errors, proceed with local logout
     }

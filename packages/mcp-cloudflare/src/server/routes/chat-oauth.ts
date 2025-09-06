@@ -262,7 +262,20 @@ export default new Hono<{
         createErrorPage(
           "Authentication Failed",
           "Invalid state parameter. Please try again.",
-          "Invalid state parameter",
+          {
+            bodyScript: `
+              // Write error to localStorage
+              try {
+                localStorage.setItem('oauth_result', JSON.stringify({
+                  type: 'SENTRY_AUTH_ERROR',
+                  timestamp: Date.now(),
+                  error: 'Invalid state parameter'
+                }));
+              } catch (e) {}
+              
+              setTimeout(() => { window.close(); }, 3000);
+            `,
+          },
         ),
         400,
       );
@@ -277,7 +290,20 @@ export default new Hono<{
         createErrorPage(
           "Authentication Failed",
           "No authorization code received. Please try again.",
-          "No authorization code received",
+          {
+            bodyScript: `
+              // Write error to localStorage
+              try {
+                localStorage.setItem('oauth_result', JSON.stringify({
+                  type: 'SENTRY_AUTH_ERROR',
+                  timestamp: Date.now(),
+                  error: 'No authorization code received'
+                }));
+              } catch (e) {}
+              
+              setTimeout(() => { window.close(); }, 3000);
+            `,
+          },
         ),
         400,
       );
@@ -315,14 +341,48 @@ export default new Hono<{
       );
 
       // Return a success page - auth is now handled via cookies
-      return c.html(createSuccessPage());
+      // This is the chat's redirect_uri, so we notify the opener window
+      return c.html(
+        createSuccessPage({
+          description: "You can now close this window and return to the chat.",
+          bodyScript: `
+            // Write to localStorage for parent window to pick up
+            try {
+              localStorage.setItem('oauth_result', JSON.stringify({
+                type: 'SENTRY_AUTH_SUCCESS',
+                timestamp: Date.now()
+              }));
+            } catch (e) {
+              console.error('Failed to write to localStorage:', e);
+            }
+            
+            // Auto-close after brief delay
+            setTimeout(() => { 
+              try { window.close(); } catch(e) {} 
+            }, 500);
+          `,
+        }),
+      );
     } catch (error) {
       logError(error);
       return c.html(
         createErrorPage(
           "Authentication Error",
           "Failed to complete authentication. Please try again.",
-          "Authentication failed",
+          {
+            bodyScript: `
+              // Write error to localStorage
+              try {
+                localStorage.setItem('oauth_result', JSON.stringify({
+                  type: 'SENTRY_AUTH_ERROR',
+                  timestamp: Date.now(),
+                  error: 'Authentication failed'
+                }));
+              } catch (e) {}
+              
+              setTimeout(() => { window.close(); }, 3000);
+            `,
+          },
         ),
         500,
       );
@@ -340,7 +400,17 @@ export default new Hono<{
     }
 
     try {
-      AuthDataSchema.parse(JSON.parse(authDataCookie));
+      const authData = AuthDataSchema.parse(JSON.parse(authDataCookie));
+      // Validate token expiration
+      const expiresAt = new Date(authData.expires_at).getTime();
+      const now = Date.now();
+      // Consider token expired if past expiration or within a small grace window (e.g., 10s)
+      const GRACE_MS = 10_000;
+      if (!Number.isFinite(expiresAt) || expiresAt - now <= GRACE_MS) {
+        // Expired or invalid expiration; clear cookie and report unauthenticated
+        deleteCookie(c, "sentry_auth_data", getSecureCookieOptions(c.req.url));
+        return c.json({ authenticated: false }, 401);
+      }
       return c.json({ authenticated: true });
     } catch {
       return c.json({ authenticated: false }, 401);
