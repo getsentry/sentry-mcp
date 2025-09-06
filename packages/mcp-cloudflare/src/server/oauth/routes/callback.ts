@@ -70,13 +70,8 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     return c.text("Invalid state", 400);
   }
 
-  // Reconstruct minimal oauth request info from signed state
-  const oauthReqInfo: AuthRequestWithPermissions = {
-    clientId: parsedState.clientId,
-    redirectUri: parsedState.redirectUri,
-    scope: parsedState.scope,
-    permissions: parsedState.permissions,
-  } as AuthRequestWithPermissions;
+  // Reconstruct oauth request info exactly as provided by downstream client
+  const oauthReqInfo = parsedState.req as unknown as AuthRequestWithPermissions;
 
   if (!oauthReqInfo.clientId) {
     console.warn("Missing clientId in OAuth state");

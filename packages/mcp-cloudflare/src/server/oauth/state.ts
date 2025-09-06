@@ -3,16 +3,17 @@ import { z } from "zod";
 // Minimal, stateless HMAC-signed OAuth state utilities
 // Format: `${signatureHex}.${base64(payloadJson)}`
 
+// Safe envelope: keep the full downstream AuthRequest (+permissions) under `req`
+// and include only iat/exp metadata at top-level to avoid collisions.
 export const OAuthStateSchema = z.object({
-  clientId: z.string().min(1),
-  redirectUri: z.string().url(),
-  scope: z.array(z.string()).min(1),
-  permissions: z.array(z.string()).optional(),
+  req: z.record(z.unknown()),
   iat: z.number().int(),
   exp: z.number().int(),
 });
 
-export type OAuthState = z.infer<typeof OAuthStateSchema>;
+export type OAuthState = z.infer<typeof OAuthStateSchema> & {
+  req: Record<string, unknown>;
+};
 
 async function importKey(secret: string): Promise<CryptoKey> {
   if (!secret) {
