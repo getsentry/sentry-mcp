@@ -9,8 +9,10 @@ import { experimental_createMCPClient } from "ai";
 import type { Env } from "../types";
 import { logError } from "@sentry/mcp-server/logging";
 import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
+import { RESOURCES } from "@sentry/mcp-server/resources";
 import type { ErrorResponse } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
+import { z } from "zod";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
@@ -19,9 +21,31 @@ function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
 }
 
 export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
-  // Get the authorization header for MCP authentication
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  // Support cookie-based auth (preferred) with fallback to Authorization header
+  let accessToken: string | null = null;
+
+  // Try to read from signed cookie set during OAuth
+  try {
+    const { getCookie } = await import("hono/cookie");
+    const authDataCookie = getCookie(c, "sentry_auth_data");
+    if (authDataCookie) {
+      const AuthDataSchema = z.object({ access_token: z.string() });
+      const authData = AuthDataSchema.parse(JSON.parse(authDataCookie));
+      accessToken = authData.access_token;
+    }
+  } catch {
+    // Ignore cookie parse errors; we'll check header below
+  }
+
+  // Fallback to Authorization header if cookie is not present
+  if (!accessToken) {
+    const authHeader = c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      accessToken = authHeader.substring(7);
+    }
+  }
+
+  if (!accessToken) {
     return c.json(
       createErrorResponse({
         error: "Authorization required",
@@ -30,8 +54,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       401,
     );
   }
-
-  const accessToken = authHeader.substring(7); // Remove "Bearer " prefix
 
   try {
     // Get prompts directly from MCP server definitions
@@ -77,6 +99,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       type: "mcp-metadata",
       prompts: serializedPrompts,
       tools,
+      resources: RESOURCES.map((r) => ({
+        name: r.name,
+        description: r.description,
+      })),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

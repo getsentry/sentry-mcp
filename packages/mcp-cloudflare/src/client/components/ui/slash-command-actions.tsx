@@ -10,6 +10,8 @@ interface SlashCommandActionsProps {
 
 const SLASH_COMMANDS = [
   { command: "help", description: "Show help message" },
+  { command: "tools", description: "List available MCP tools" },
+  { command: "resources", description: "List available MCP resources" },
   { command: "prompts", description: "List available MCP prompts" },
   { command: "clear", description: "Clear all chat messages" },
   { command: "logout", description: "Log out of the current session" },

@@ -10,7 +10,7 @@ MCP prompts provide multi-step workflows and guided interactions for complex Sen
 
 ### 1. Dedicated Metadata Endpoint
 
-We've created a separate `/api/metadata` endpoint that provides immediate access to MCP prompts and tools:
+We've created a separate `/api/metadata` endpoint that provides immediate access to MCP prompts, tools, and resources:
 
 ```typescript
 // packages/mcp-cloudflare/src/server/routes/metadata.ts
@@ -28,6 +28,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     type: "mcp-metadata",
     prompts: serializedPrompts,
     tools,
+    resources: RESOURCES.map(r => ({ name: r.name, description: r.description })),
     timestamp: new Date().toISOString(),
   });
 });
@@ -121,7 +122,12 @@ The prompts are serialized into a client-friendly format:
       }
     }
   ],
-  tools: ['find_organizations', 'find_projects', ...]
+  tools: ['find_organizations', 'find_projects', ...],
+  resources: [
+    { name: 'sentry-mcp-about', description: 'Information about Sentry MCP service and its capabilities' },
+    { name: 'sentry-docs-platform', description: 'Sentry SDK documentation for {platform}' },
+    // ...
+  ]
 }
 ```
 
@@ -155,6 +161,7 @@ const { metadata, isLoading, error } = useMcpMetadata(authToken, isAuthenticated
 if (metadata) {
   console.log('Available prompts:', metadata.prompts);
   console.log('Available tools:', metadata.tools);
+  console.log('Available resources:', metadata.resources);
 }
 
 // Handle loading and error states
@@ -167,6 +174,8 @@ if (error) console.log('Error loading prompts:', error);
 The chat UI supports several slash commands:
 
 - `/help` - Show comprehensive help message with usage instructions
+- `/tools` - List all available MCP tools
+- `/resources` - List all available MCP resources
 - `/prompts` - List all available MCP prompts with detailed information
 - `/clear` - Clear all chat messages  
 - `/logout` - Log out of the current session

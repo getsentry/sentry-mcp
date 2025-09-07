@@ -7,6 +7,7 @@ import { useAuth } from "../../contexts/auth-context";
 import { Loader2 } from "lucide-react";
 import type { ChatProps } from "./types";
 import { usePersistedChat } from "../../hooks/use-persisted-chat";
+import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
 import { useMcpMetadata } from "../../hooks/use-mcp-metadata";
 import { useStreamingSimulation } from "../../hooks/use-streaming-simulation";
 import { SlidingPanel } from "../ui/sliding-panel";
@@ -113,12 +114,102 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     };
   }, [getMcpMetadata, isMetadataLoading, metadataError]);
 
+  // Generate tools-based messages for custom commands
+  const createToolsMessage = useCallback(() => {
+    const metadata = getMcpMetadata();
+
+    let content: string;
+    let messageMetadata: Record<string, unknown>;
+
+    if (isMetadataLoading) {
+      content = "🔄 Loading tools from MCP server...";
+      messageMetadata = { type: "tools-loading" };
+    } else if (metadataError) {
+      content = `❌ Failed to load tools: ${metadataError}\n\nPlease check your connection and try again.`;
+      messageMetadata = { type: "tools-error", error: metadataError };
+    } else if (!metadata || !metadata.tools || !Array.isArray(metadata.tools)) {
+      content =
+        "No tools are currently available. The MCP server may not have loaded tools yet.\n\nPlease check your connection and try again.";
+      messageMetadata = { type: "tools-empty" };
+    } else {
+      // Build detailed tool list for UI component rendering
+      const definitionsByName = new Map(
+        TOOL_DEFINITIONS.map((t) => [t.name, t]),
+      );
+      const detailed = metadata.tools
+        .slice()
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => {
+          const def = definitionsByName.get(name);
+          return {
+            name,
+            description: def ? def.description.split("\n")[0] : "",
+          } as { name: string; description: string };
+        });
+
+      content =
+        "These tools are available right now. Click a name to learn more above, or ask the assistant to use one.\n\nNote: This list reflects the permissions you approved during sign‑in. Granting additional scopes will enable more tools.";
+      messageMetadata = {
+        type: "tools-list",
+        tools: metadata.tools,
+        toolsDetailed: detailed,
+      };
+    }
+
+    return {
+      content,
+      data: messageMetadata,
+    };
+  }, [getMcpMetadata, isMetadataLoading, metadataError]);
+
+  // Generate resources-based messages for custom commands
+  const createResourcesMessage = useCallback(() => {
+    const metadata = getMcpMetadata();
+
+    let content: string;
+    let messageMetadata: Record<string, unknown>;
+
+    if (isMetadataLoading) {
+      content = "🔄 Loading resources from MCP server...";
+      messageMetadata = { type: "resources-loading" };
+    } else if (metadataError) {
+      content = `❌ Failed to load resources: ${metadataError}\n\nPlease check your connection and try again.`;
+      messageMetadata = { type: "resources-error", error: metadataError };
+    } else if (
+      !metadata ||
+      !metadata.resources ||
+      !Array.isArray(metadata.resources)
+    ) {
+      content =
+        "No resources are currently available. The MCP server may not have loaded resources yet.\n\nPlease check your connection and try again.";
+      messageMetadata = { type: "resources-empty" };
+    } else {
+      const resourcesList = metadata.resources
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((r) => `- ${r.name}: ${r.description}`)
+        .join("\n");
+      content = `Available MCP Resources:\n\n${resourcesList}`;
+      messageMetadata = {
+        type: "resources-list",
+        resources: metadata.resources,
+      };
+    }
+
+    return {
+      content,
+      data: messageMetadata,
+    };
+  }, [getMcpMetadata, isMetadataLoading, metadataError]);
+
   const createHelpMessage = useCallback(() => {
     const content = `Welcome to the Sentry Model Context Protocol chat interface! This AI assistant helps you test and explore Sentry functionality.
 
 ## Available Slash Commands
 
 - **\`/help\`** - Show this help message
+- **\`/tools\`** - List all available MCP tools
+- **\`/resources\`** - List all available MCP resources
 - **\`/prompts\`** - List all available MCP prompts with detailed information
 - **\`/clear\`** - Clear all chat messages
 - **\`/logout\`** - Log out of the current session
@@ -312,12 +403,48 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
           // Start streaming simulation
           startStreaming(promptsMessage.id, 800);
         }, 100);
+      } else if (command === "tools") {
+        // Add user message first
+        setMessages((prev: any[]) => [...prev, userMessage]);
+
+        // Create tools message
+        setTimeout(() => {
+          const toolsMessageData = createToolsMessage();
+          const toolsMessage = {
+            id: (Date.now() + 1).toString(),
+            role: "system" as const,
+            content: toolsMessageData.content,
+            createdAt: new Date(),
+            data: { ...toolsMessageData.data, simulateStreaming: true },
+          };
+          setMessages((prev) => [...prev, toolsMessage]);
+
+          startStreaming(toolsMessage.id, 600);
+        }, 100);
+      } else if (command === "resources") {
+        // Add user message first
+        setMessages((prev: any[]) => [...prev, userMessage]);
+
+        // Create resources message
+        setTimeout(() => {
+          const resourcesMessageData = createResourcesMessage();
+          const resourcesMessage = {
+            id: (Date.now() + 1).toString(),
+            role: "system" as const,
+            content: resourcesMessageData.content,
+            createdAt: new Date(),
+            data: { ...resourcesMessageData.data, simulateStreaming: true },
+          };
+          setMessages((prev) => [...prev, resourcesMessage]);
+
+          startStreaming(resourcesMessage.id, 600);
+        }, 100);
       } else {
         // Handle unknown slash commands - add user message and error
         const errorMessage = {
           id: (Date.now() + 1).toString(),
           role: "system" as const,
-          content: `Unknown command: /${command}. Available commands: /help, /prompts, /clear, /logout`,
+          content: `Unknown command: /${command}. Available commands: /help, /tools, /resources, /prompts, /clear, /logout`,
           createdAt: new Date(),
         };
         setMessages((prev) => [...prev, userMessage, errorMessage]);
@@ -330,6 +457,8 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
       setMessages,
       createHelpMessage,
       createPromptsMessage,
+      createToolsMessage,
+      createResourcesMessage,
       startStreaming,
     ],
   );

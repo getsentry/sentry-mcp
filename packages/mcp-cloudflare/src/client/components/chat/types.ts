@@ -13,6 +13,7 @@ export interface ExtendedMessage extends Message {
   data?: {
     type?: string;
     prompts?: any[];
+    toolsDetailed?: Array<{ name: string; description: string }>;
     hasSlashCommands?: boolean;
     error?: string;
     // Prompt execution data
