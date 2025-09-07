@@ -70,6 +70,7 @@ function generateToolDefinitions() {
       name: string;
       description: string;
       inputSchema: Record<string, any>;
+      requiredScopes?: string[];
     };
 
     if (!toolObj.name || !toolObj.description) {
@@ -85,6 +86,9 @@ function generateToolDefinitions() {
       name: toolObj.name,
       description: toolObj.description,
       inputSchema,
+      requiredScopes: Array.isArray(toolObj.requiredScopes)
+        ? toolObj.requiredScopes
+        : [],
     };
   });
 }

@@ -13,7 +13,7 @@ export interface ToolConfig<
   name: string;
   description: string;
   inputSchema: TSchema;
-  requiredScopes?: Scope[];
+  requiredScopes: Scope[];
   handler: (
     params: z.infer<z.ZodObject<TSchema>>,
     context: ServerContext,

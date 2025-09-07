@@ -14,16 +14,3 @@ test(`all tool descriptions under maximum length`, () => {
     );
   }
 });
-
-test(`all tools have requiredScopes defined`, () => {
-  for (const [toolName, tool] of Object.entries(tools.default)) {
-    assert(
-      tool.requiredScopes !== undefined,
-      `Tool "${toolName}" must have requiredScopes defined (even if it's an empty array)`,
-    );
-    assert(
-      Array.isArray(tool.requiredScopes),
-      `Tool "${toolName}" requiredScopes must be an array`,
-    );
-  }
-});
