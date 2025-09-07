@@ -148,7 +148,7 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
         });
 
       content =
-        "These tools are available right now. Click a name to learn more above, or ask the assistant to use one.\n\nNote: This list reflects the permissions you approved during sign‑in. Granting additional scopes will enable more tools.";
+        "These tools are available right now. Ask the assistant to use one.\n\nNote: This list reflects the permissions you approved during sign‑in. Granting additional scopes will enable more tools.";
       messageMetadata = {
         type: "tools-list",
         tools: metadata.tools,
