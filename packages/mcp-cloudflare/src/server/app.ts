@@ -9,6 +9,7 @@ import chat from "./routes/chat";
 import search from "./routes/search";
 import metadata from "./routes/metadata";
 import { logError } from "@sentry/mcp-server/logging";
+import mcpRoutes from "./routes/mcp";
 
 const app = new Hono<{
   Bindings: Env;
@@ -72,7 +73,8 @@ const app = new Hono<{
   .route("/api/auth", chatOauth)
   .route("/api/chat", chat)
   .route("/api/search", search)
-  .route("/api/metadata", metadata);
+  .route("/api/metadata", metadata)
+  .route("/.mcp", mcpRoutes);
 
 // TODO: propagate the error as sentry isnt injecting into hono
 app.onError((err, c) => {

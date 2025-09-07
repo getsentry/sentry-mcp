@@ -1,26 +1,16 @@
 import toolDefinitionsData from "./toolDefinitions.json";
+import type { Scope } from "./permissions";
 
-// Simplified tool parameter with just description for UI display
-export interface ToolParameter {
-  description: string;
-}
-
-// Tool definition for UI consumption
+// Tool definition for UI/external consumption
 export interface ToolDefinition {
   name: string;
   description: string;
-  inputSchema: Record<string, ToolParameter>;
-  requiredScopes: string[];
+  // Full JSON Schema object for parameters
+  inputSchema: unknown;
+  // Sentry API scopes required to use the tool
+  requiredScopes: Scope[];
 }
 
-// Normalize data to ensure requiredScopes exists for all tools
-const toolDefinitions = (
-  toolDefinitionsData as unknown as Array<
-    ToolDefinition & { requiredScopes?: string[] }
-  >
-).map((def) => ({
-  ...def,
-  requiredScopes: Array.isArray(def.requiredScopes) ? def.requiredScopes : [],
-}));
+const toolDefinitions = toolDefinitionsData as ToolDefinition[];
 
 export default toolDefinitions;

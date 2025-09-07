@@ -45,6 +45,8 @@ export type TemplateResourceConfig = {
   description: string;
   mimeType: string;
   template: ResourceTemplate;
+  // Added explicit template string for external metadata export
+  templateString: string;
   handler: ReadResourceCallback; // Changed back to ReadResourceCallback
 };
 
@@ -200,6 +202,7 @@ export const RESOURCES: ResourceConfig[] = [
         }),
       },
     ),
+    templateString: "https://docs.sentry.io/platforms/{platform}/",
     mimeType: "text/markdown",
     description: "Sentry SDK documentation for {platform}",
     handler: sentryDocsHandler,
@@ -222,6 +225,8 @@ export const RESOURCES: ResourceConfig[] = [
         }),
       },
     ),
+    templateString:
+      "https://docs.sentry.io/platforms/{platform}/guides/{framework}/",
     mimeType: "text/markdown",
     description: "Sentry integration guide for {framework} on {platform}",
     handler: sentryDocsHandler,
