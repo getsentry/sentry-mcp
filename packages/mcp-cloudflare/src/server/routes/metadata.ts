@@ -9,7 +9,7 @@ import { experimental_createMCPClient } from "ai";
 import type { Env } from "../types";
 import { logError } from "@sentry/mcp-server/logging";
 import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
-import { RESOURCES } from "@sentry/mcp-server/resources";
+import RESOURCE_DEFINITIONS from "@sentry/mcp-server/resourceDefinitions";
 import type { ErrorResponse } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 import { z } from "zod";
@@ -99,7 +99,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       type: "mcp-metadata",
       prompts: serializedPrompts,
       tools,
-      resources: RESOURCES.map((r) => ({
+      resources: RESOURCE_DEFINITIONS.map((r) => ({
         name: r.name,
         description: r.description,
       })),

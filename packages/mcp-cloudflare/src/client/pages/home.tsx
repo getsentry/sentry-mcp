@@ -1,6 +1,6 @@
 import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
-import { RESOURCES } from "@sentry/mcp-server/resources";
-import { PROMPT_DEFINITIONS } from "@sentry/mcp-server/promptDefinitions";
+import RESOURCE_DEFINITIONS from "@sentry/mcp-server/resourceDefinitions";
+import PROMPT_DEFINITIONS from "@sentry/mcp-server/promptDefinitions";
 import { Link } from "../components/ui/base";
 import {
   Accordion,
@@ -16,6 +16,8 @@ import { useState } from "react";
 import StdioSetup from "../components/fragments/stdio-setup";
 import Section from "../components/ui/section";
 import { Prose } from "../components/ui/prose";
+import JsonSchemaParams from "../components/ui/json-schema-params";
+import TemplateVars from "../components/ui/template-vars";
 
 interface HomeProps {
   onChatClick: () => void;
@@ -187,30 +189,7 @@ export default function Home({ onChatClick }: HomeProps) {
                           )}
                         </div>
                       </section>
-
-                      {/* Parameters */}
-                      {tool.inputSchema &&
-                      Object.keys(tool.inputSchema).length > 0 ? (
-                        <section className="rounded-md border border-slate-700/60 bg-black/30 p-3">
-                          <div className="text-xs uppercase tracking-wide text-slate-300/80 mb-1">
-                            Parameters
-                          </div>
-                          <dl className="space-y-0">
-                            {Object.entries(tool.inputSchema).map(
-                              ([key, property]) => (
-                                <div key={key} className="p-2 bg-black/20">
-                                  <dt className="text-sm font-medium text-violet-300">
-                                    {key}
-                                  </dt>
-                                  <dd className="text-sm text-slate-300 mt-0.5">
-                                    {property.description}
-                                  </dd>
-                                </div>
-                              ),
-                            )}
-                          </dl>
-                        </section>
-                      ) : null}
+                      <JsonSchemaParams schema={tool.inputSchema as unknown} />
                     </div>
                   </AccordionContent>
                 </AccordionItem>
@@ -238,6 +217,10 @@ export default function Home({ onChatClick }: HomeProps) {
                   <Prose>
                     <p className="mb-0">{prompt.description.split("\n")[0]}</p>
                   </Prose>
+                  {/* Parameters (JSON Schema) */}
+                  <div className="mt-4">
+                    <JsonSchemaParams schema={prompt.inputSchema as unknown} />
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -256,22 +239,37 @@ export default function Home({ onChatClick }: HomeProps) {
             </p>
           </Prose>
           <Accordion type="single" collapsible className="w-full space-y-1">
-            {RESOURCES.sort((a, b) => a.name.localeCompare(b.name)).map(
-              (resource) => (
-                <AccordionItem value={resource.name} key={resource.name}>
-                  <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
-                    {resource.name}
-                  </AccordionTrigger>
-                  <AccordionContent className="max-w-none py-4">
-                    <Prose>
-                      <p className="mb-0">
-                        {resource.description.split("\n")[0]}
-                      </p>
-                    </Prose>
-                  </AccordionContent>
-                </AccordionItem>
-              ),
-            )}
+            {RESOURCE_DEFINITIONS.sort((a, b) =>
+              a.name.localeCompare(b.name),
+            ).map((resource) => (
+              <AccordionItem value={resource.name} key={resource.name}>
+                <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
+                  {resource.name}
+                </AccordionTrigger>
+                <AccordionContent className="max-w-none py-4">
+                  <Prose>
+                    <p className="mb-0">
+                      {resource.description.split("\n")[0]}
+                    </p>
+                  </Prose>
+                  {/* Template variables (if applicable) */}
+                  {resource.kind === "template" ? (
+                    <div className="mt-4">
+                      <TemplateVars
+                        variables={
+                          (
+                            resource as unknown as {
+                              variables?: readonly string[];
+                            }
+                          ).variables
+                        }
+                        title="Parameters"
+                      />
+                    </div>
+                  ) : null}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
           </Accordion>
         </Section>
 
