@@ -165,25 +165,53 @@ export default function Home({ onChatClick }: HomeProps) {
                     <Prose>
                       <p className="mb-0">{tool.description.split("\n")[0]}</p>
                     </Prose>
-                    {tool.inputSchema &&
-                    Object.keys(tool.inputSchema).length > 0 ? (
-                      <dl className="space-y-3 mt-6">
-                        {Object.entries(tool.inputSchema).map(
-                          ([key, property]) => {
-                            return (
-                              <div className="p-3 bg-black/30" key={key}>
-                                <dt className="text-sm font-medium text-violet-300">
-                                  {key}
-                                </dt>
-                                <dd className="text-sm text-slate-300 mt-1">
-                                  {property.description}
-                                </dd>
-                              </div>
-                            );
-                          },
-                        )}
-                      </dl>
-                    ) : null}
+                    <div className="mt-4 space-y-4">
+                      {/* Authorization / Scopes */}
+                      <section className="rounded-md border border-slate-700/60 bg-black/30 p-3">
+                        <div className="text-xs uppercase tracking-wide text-slate-300/80 mb-2">
+                          Authorization
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {tool.requiredScopes &&
+                          tool.requiredScopes.length > 0 ? (
+                            tool.requiredScopes.map((s) => (
+                              <span
+                                key={s}
+                                className="inline-flex items-center rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-xs font-mono text-violet-200"
+                              >
+                                {s}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-sm text-slate-400">None</span>
+                          )}
+                        </div>
+                      </section>
+
+                      {/* Parameters */}
+                      {tool.inputSchema &&
+                      Object.keys(tool.inputSchema).length > 0 ? (
+                        <section className="rounded-md border border-slate-700/60 bg-black/30 p-3">
+                          <div className="text-xs uppercase tracking-wide text-slate-300/80 mb-1">
+                            Parameters
+                          </div>
+                          <dl className="space-y-0">
+                            {Object.entries(tool.inputSchema).map(
+                              ([key, property]) => (
+                                <div key={key} className="p-2 bg-black/20">
+                                  <dt className="text-sm font-medium text-violet-300">
+                                    {key}
+                                  </dt>
+                                  <dd className="text-sm text-slate-300 mt-0.5">
+                                    {property.description}
+                                  </dd>
+                                </div>
+                              ),
+                            )}
+                          </dl>
+                        </section>
+                      ) : null}
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               ),

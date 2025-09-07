@@ -10,9 +10,17 @@ export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: Record<string, ToolParameter>;
+  requiredScopes: string[];
 }
 
-// Type assertion - we trust the build process generates valid data
-const toolDefinitions = toolDefinitionsData as ToolDefinition[];
+// Normalize data to ensure requiredScopes exists for all tools
+const toolDefinitions = (
+  toolDefinitionsData as unknown as Array<
+    ToolDefinition & { requiredScopes?: string[] }
+  >
+).map((def) => ({
+  ...def,
+  requiredScopes: Array.isArray(def.requiredScopes) ? def.requiredScopes : [],
+}));
 
 export default toolDefinitions;
