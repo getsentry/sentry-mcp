@@ -49,14 +49,38 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # === BUILD AND DEPLOY CANARY WORKER ===
-      - name: Build
+      # === DEPLOY DOCS (CANARY) FIRST ===
+      - name: Deploy Docs Canary Worker
+        id: deploy_docs_canary
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/docs
+          command: deploy --config wrangler.canary.jsonc
+          packageManager: pnpm
+
+      - name: Smoke Test Docs Canary
+        id: smoke_docs_canary
+        if: success()
+        run: |
+          set -euo pipefail
+          URL="https://sentry-mcp-docs-canary.getsentry.workers.dev/docs"
+          echo "Testing $URL"
+          STATUS=$(curl -s -o /tmp/docs_canary.html -w "%{http_code}" "$URL")
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Unexpected status: $STATUS"; cat /tmp/docs_canary.html; exit 1; fi
+          if ! grep -q "<title>Documentation" /tmp/docs_canary.html; then
+            echo "Title check failed"; cat /tmp/docs_canary.html; exit 1; fi
+
+      # === BUILD AND DEPLOY APP (CANARY) ===
+      - name: Build App (Canary)
         working-directory: packages/mcp-cloudflare
         run: pnpm build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
-      - name: Deploy to Canary Worker
+      - name: Deploy App Canary Worker
         id: deploy_canary
         uses: cloudflare/wrangler-action@v3
         with:
@@ -91,10 +115,22 @@ jobs:
           check_name: "Canary Smoke Test Results"
           fail_on_failure: false
 
-      # === DEPLOY PRODUCTION WORKER (only if canary tests pass) ===
-      - name: Deploy to Production Worker
-        id: deploy_production
+      # === DEPLOY DOCS PRODUCTION (only if canary tests pass) ===
+      - name: Deploy Docs Production Worker
+        id: deploy_docs_production
         if: steps.canary_smoke_tests.outcome == 'success'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/docs
+          command: deploy
+          packageManager: pnpm
+
+      # === DEPLOY APP PRODUCTION (only if canary tests pass) ===
+      - name: Deploy App Production Worker
+        id: deploy_production
+        if: steps.canary_smoke_tests.outcome == 'success' && steps.smoke_docs_canary.outcome == 'success'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -128,9 +164,22 @@ jobs:
           check_name: "Production Smoke Test Results"
           fail_on_failure: false
 
+      - name: Smoke Test Docs Production
+        id: smoke_docs_production
+        if: steps.deploy_docs_production.outcome == 'success'
+        run: |
+          set -euo pipefail
+          URL="https://sentry-mcp-docs.getsentry.workers.dev/docs"
+          echo "Testing $URL"
+          STATUS=$(curl -s -o /tmp/docs_prod.html -w "%{http_code}" "$URL")
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Unexpected status: $STATUS"; cat /tmp/docs_prod.html; exit 1; fi
+          if ! grep -q "<title>Documentation" /tmp/docs_prod.html; then
+            echo "Title check failed"; cat /tmp/docs_prod.html; exit 1; fi
+
       # === ROLLBACK IF PRODUCTION SMOKE TESTS FAIL ===
-      - name: Rollback Production on Smoke Test Failure
-        if: steps.production_smoke_tests.outcome == 'failure'
+      - name: Rollback App Production on Smoke Test Failure
+        if: steps.production_smoke_tests.outcome == 'failure' || steps.smoke_docs_production.outcome == 'failure'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -140,8 +189,19 @@ jobs:
           packageManager: pnpm
         continue-on-error: true
 
+      - name: Rollback Docs Production on Smoke Test Failure
+        if: steps.production_smoke_tests.outcome == 'failure' || steps.smoke_docs_production.outcome == 'failure'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/docs
+          command: rollback
+          packageManager: pnpm
+        continue-on-error: true
+
       - name: Fail Job if Production Smoke Tests Failed
-        if: steps.production_smoke_tests.outcome == 'failure'
+        if: steps.production_smoke_tests.outcome == 'failure' || steps.smoke_docs_production.outcome == 'failure'
         run: |
           echo "Production smoke tests failed - job failed after rollback"
           exit 1

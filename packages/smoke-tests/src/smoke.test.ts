@@ -103,6 +103,13 @@ describeIfPreviewUrl(
       expect(response.status).toBe(200);
     });
 
+    it("should serve documentation at /docs", async () => {
+      const { response, data } = await safeFetch(`${PREVIEW_URL}/docs`);
+      expect(response.status).toBe(200);
+      const body = typeof data === "string" ? data : String(data);
+      expect(body).toContain("<title>Documentation");
+    });
+
     it("should have MCP endpoint that returns server info (with auth error)", async () => {
       const { response, data } = await safeFetch(`${PREVIEW_URL}/mcp`, {
         method: "POST",

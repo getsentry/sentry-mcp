@@ -1,0 +1,10 @@
+{
+  "extends": "../mcp-server-tsconfig/tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts"]
+}
+

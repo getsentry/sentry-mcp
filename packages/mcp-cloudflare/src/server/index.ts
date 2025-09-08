@@ -73,7 +73,27 @@ const corsWrappedOAuthProvider = {
   },
 };
 
-export default Sentry.withSentry(
+const baseHandler = Sentry.withSentry(
   getSentryConfig,
   corsWrappedOAuthProvider,
-) satisfies ExportedHandler<Env>;
+) as ExportedHandler<Env>;
+
+const handler: ExportedHandler<Env> = {
+  async fetch(request, env, ctx) {
+    try {
+      const url = new URL(request.url);
+      if (url.pathname.startsWith("/docs")) {
+        return env.DOCS.fetch(request);
+      }
+    } catch (error: unknown) {
+      // Maintain minimal logging and avoid leaking secrets
+      const err = error as Error;
+      // eslint-disable-next-line no-console
+      console.error("[ERROR]", err.message, err.stack);
+    }
+
+    return baseHandler.fetch!(request, env, ctx);
+  },
+};
+
+export default handler;
