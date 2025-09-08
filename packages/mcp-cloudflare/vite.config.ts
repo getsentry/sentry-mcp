@@ -8,7 +8,7 @@ import path from "node:path";
 export default defineConfig({
   plugins: [
     react(),
-    cloudflare(),
+    cloudflare({ configPath: "./wrangler.jsonc" }),
     tailwindcss(),
     sentryVitePlugin({
       org: "sentry",
@@ -22,5 +22,8 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
+  },
+  server: {
+    port: 5173,
   },
 });
