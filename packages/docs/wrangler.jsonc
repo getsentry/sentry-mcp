@@ -13,6 +13,11 @@
     "global_fetch_strictly_public"
   ],
   "keep_vars": true,
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
   "vars": {},
   "dev": {
     "port": 8790
