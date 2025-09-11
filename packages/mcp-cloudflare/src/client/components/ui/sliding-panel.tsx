@@ -20,7 +20,7 @@ export function SlidingPanel({
   className = "",
 }: SlidingPanelProps) {
   // Lock body scroll when panel is open on mobile
-  useScrollLock(isOpen);
+  useScrollLock(isOpen && window.innerWidth < 768);
 
   return (
     <>
@@ -56,11 +56,11 @@ export function SlidingPanel({
         </div>
       </div>
 
-      {/* Desktop: Fixed right half */}
+      {/* Desktop: placed inside the hero animation container */}
       <div
         className={`${
-          isOpen ? "hidden md:flex" : "hidden"
-        } fixed top-0 right-0 h-screen w-1/2 bg-slate-950 flex-col border-l border-slate-800 transition-opacity duration-300 ${className}`}
+          isOpen ? "md:flex flex-col" : "hidden"
+        } absolute top-0 right-0 z-50 max-md:hidden h-[calc(100%-1rem)] w-[calc(50%-1rem)] m-2 border border-white/20 backdrop-blur-3xl bg-slate-950/10 rounded-2xl transition-opacity duration-300 ${className}`}
       >
         {children}
       </div>
