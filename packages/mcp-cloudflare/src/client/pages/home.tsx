@@ -24,8 +24,8 @@ export default function Home({ onChatClick }: HomeProps) {
   const [stdio, setStdio] = useState(false);
 
   return (
-    <main className="flex gap-4 max-w-3xl">
-      <article>
+    <main className="flex gap-4">
+      <article className="max-w-full overflow-x-clip">
         <div id="top" />
         <Section className="space-y-4 mb-10">
           <Prose>

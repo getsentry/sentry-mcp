@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 @plugin "@tailwindcss/typography";
@@ -37,13 +38,66 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --background: #160f24;
+  --background: #000;
+  --foreground: #ededed;
+  --gray100: #e7e1ec;
+  --gray200: #c6becf;
+  --gray300: #9386a0;
+  --gray400: #776589;
+  --gray500: #2b1d38;
+  --gray600: #1d1127;
+  --yellow100: #fde8b4;
+  --yellow200: #ffd577;
+  --yellow300: #ffc227;
+  --yellow400: #ffa800;
+  --yellow500: #ff8c00;
+  --yellow600: #ff7000;
+  --purple100: #d4d1ec;
+  --purple200: #a396da;
+  --purple300: #6c5fc7;
+  --blue100: #d2dff7;
+  --blue200: #92a8ea;
+  --blue300: #3d74db;
+  --red100: #fcc6c8;
+  --red200: #fd918f;
+  --red300: #f55459;
+  --green100: #b6ecdf;
+  --green200: #7dd6be;
+  --green300: #33bf9e;
+  --pink100: #fdc9d7;
+  --pink200: #fa93ab;
+  --pink300: #f05781;
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-100: var(--gray100);
+  --color-200: var(--gray200);
+  --color-300: var(--gray300);
+  /* --color-400: var(--gray400); */
+  /* --color-500: var(--gray500); */
+  /* --color-600: var(--gray600); */
+  --color-green100: var(--green100);
+  --color-green200: var(--green200);
+  --color-green300: var(--green300);
+  --color-pink100: var(--pink100);
+  --color-pink200: var(--pink200);
+  --color-pink300: var(--pink300);
+  --color-purple100: var(--purple100);
+  --color-purple200: var(--purple200);
+  --color-purple300: var(--purple300);
+  --color-yellow100: var(--yellow100);
+  --color-yellow200: var(--yellow200);
+  --color-yellow300: var(--yellow300);
+  --color-yellow400: var(--yellow400);
+  --color-yellow500: var(--yellow500);
+  --color-yellow600: var(--yellow600);
+  /* --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 4px); */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -75,6 +129,9 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: "Rubik", sans-serif;
+  --font-serif: "Instrument Serif", serif;
 }
 
 @layer base {
@@ -83,11 +140,142 @@
   }
 
   body {
-    @apply bg-background text-foreground bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950;
+    @apply bg-black text-foreground;
     min-height: 100vh;
   }
 
   pre {
     white-space: pre-wrap;
   }
+}
+
+::selection {
+  background-color: #e1567c;
+  color: white;
+}
+
+/* globals.css */
+@keyframes keycapPulse {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+
+  11% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  /* fade-in (~120ms of 540ms) */
+  78% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  /* hold 300ms */
+  100% {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.985);
+  }
+
+  /* fade-out (~120ms) */
+}
+
+.keycap.animate-keycap {
+  animation: keycapPulse var(--dur, 750ms) ease-out both;
+  animation-delay: var(--delay, 0s);
+}
+
+/* globals.css */
+@keyframes urlHoverClick {
+  /* base */
+  0% {
+    background-color: var(--gray600);
+  }
+
+  /* hover (≈200ms) */
+  50% {
+    background-color: #fff2;
+  }
+
+  /* active press (≈75ms) */
+  68% {
+    background-color: var(--color-violet-300);
+    color: var(--background);
+  }
+
+  /* release back to hover quickly, then fade out */
+  85% {
+    background-color: #fff2;
+  }
+
+  100% {
+    background-color: var(--color-violet-300);
+    color: var(--background);
+  }
+}
+
+#url.animate-url {
+  /* total ≈ 400ms (200 hover + 75 active + ~125 release) */
+  animation: urlHoverClick 400ms ease-out forwards;
+  animation-delay: var(--delay, 0s);
+}
+
+/* SpeedDisplay animation */
+@keyframes popSpeed {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  30% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+
+  60% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+}
+
+.speed-animate {
+  animation: popSpeed var(--speed-pop-dur, 500ms) ease-out;
+}
+
+.bg-grid {
+  background-size: 40px 40px;
+  background-position: -20px -20px;
+  background-image: linear-gradient(to right, #fff2 1px, transparent 1px),
+    linear-gradient(to bottom, #fff2 1px, transparent 1px);
+}
+
+.animate-cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* remove background from terminal container */
+.ap-player .ap-terminal {
+  background: transparent !important;
+}
+
+/* optional: also remove outer container bg */
+.ap-wrapper {
+  background: transparent !important;
 }
