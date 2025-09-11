@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Chat } from "./components/chat";
 import { useAuth } from "./contexts/auth-context";
 import Home from "./pages/home";
+import TerminalAnimation from "./components/animation/TerminalAnimation";
 
 export default function App() {
   const { isAuthenticated, handleLogout } = useAuth();
@@ -16,14 +17,8 @@ export default function App() {
       return urlParams.get("chat") !== "0";
     }
 
-    // Default based on screen size to avoid flash on mobile
-    // Note: This is safe for SSR since we handle the correction in useEffect
-    if (typeof window !== "undefined") {
-      return window.innerWidth >= 768; // Desktop: open, Mobile: closed
-    }
-
-    // SSR fallback - default to true for desktop-first approach
-    return true;
+    // default to false for mobile and to avoid scroll lock on desktop
+    return false;
   });
 
   // Adjust initial state for mobile after component mounts
@@ -71,56 +66,66 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Handle window resize to adjust chat state appropriately
-  useEffect(() => {
-    const handleResize = () => {
-      // If no explicit URL state, adjust based on screen size
-      const urlParams = new URLSearchParams(window.location.search);
-      if (!urlParams.has("chat")) {
-        const isDesktop = window.innerWidth >= 768;
-        setIsChatOpen(isDesktop); // Open on desktop, closed on mobile
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   return (
     <div className="min-h-screen text-white">
+      <div className="bg-[radial-gradient(ellipse_110%_100%_at_top_right,transparent_80%,var(--color-violet-950)_95%,transparent)] absolute inset-0 -z-10 h-full w-full opacity-20" />
+      <div className="bg-[radial-gradient(ellipse_110%_100%_at_top_right,transparent_40%,var(--color-orange-500)_50%,transparent_60%)] absolute inset-0 -z-10 h-full w-full opacity-10" />
       {/* Mobile layout: Single column with overlay chat */}
-      <div className="md:hidden h-screen flex flex-col">
-        <div className="flex-1 overflow-y-auto sm:p-8 p-4">
-          <div className="max-w-3xl mx-auto">
+      <div className="md:hidden flex flex-col">
+        <div className="flex-1 sm:p-8 p-4">
+          <div className=" mx-auto">
             <Header isAuthenticated={isAuthenticated} onLogout={handleLogout} />
-            <Home onChatClick={() => toggleChat(true)} />
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop layout: Main content adjusts width based on chat state */}
-      <div className="hidden md:flex h-screen">
-        <div
-          className={`flex flex-col ${isChatOpen ? "w-1/2" : "flex-1"} md:transition-all md:duration-300`}
-        >
-          <div className="flex-1 overflow-y-auto sm:p-8 p-4">
-            <div className="max-w-3xl mx-auto">
-              <Header
-                isAuthenticated={isAuthenticated}
-                onLogout={handleLogout}
-              />
+            <div
+              className="overflow-wrap relative grid h-[calc(100svh-12rem)] max-h-[69rem] w-full gap-8 overflow-hidden rounded-2xl md:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 md:grid-rows-1"
+              id="demo"
+            >
+              <TerminalAnimation onChatClick={() => toggleChat(true)} />
+            </div>
+            <div className="pt-12">
               <Home onChatClick={() => toggleChat(true)} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Single Chat component - handles both mobile and desktop layouts */}
-      <Chat
-        isOpen={isChatOpen}
-        onClose={() => toggleChat(false)}
-        onLogout={handleLogout}
-      />
+      {/* Desktop layout: Main content adjusts width based on chat state */}
+      <div className="hidden md:flex">
+        <div className="flex flex-col container mx-auto">
+          <div className="flex-1 sm:p-8 p-4">
+            <div className="max-w-3xl mx-auto">
+              <Header
+                isAuthenticated={isAuthenticated}
+                onLogout={handleLogout}
+              />
+            </div>
+            <div
+              className="overflow-wrap relative grid h-[calc(100vh-12rem)] max-h-[69rem] w-full gap-8 rounded-2xl p-2 md:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 md:grid-rows-1"
+              id="demo"
+            >
+              <div className="contents z-50">
+                <Chat
+                  isOpen={isChatOpen}
+                  onClose={() => toggleChat(false)}
+                  onLogout={handleLogout}
+                />
+              </div>
+              <TerminalAnimation onChatClick={() => toggleChat(true)} />
+            </div>
+            <div className="max-w-3xl mx-auto pt-12">
+              <Home onChatClick={() => toggleChat(true)} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="md:hidden">
+        <Chat
+          isMobile
+          isOpen={isChatOpen}
+          onClose={() => toggleChat(false)}
+          onLogout={handleLogout}
+        />
+      </div>
     </div>
   );
 }
