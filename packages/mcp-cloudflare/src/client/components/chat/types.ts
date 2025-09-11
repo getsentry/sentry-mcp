@@ -101,6 +101,7 @@ export interface ProcessedMessagePart {
 // Component prop types
 export interface ChatProps {
   isOpen: boolean;
+  isMobile?: boolean;
   onClose: () => void;
   onLogout: () => void;
 }
