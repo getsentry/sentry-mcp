@@ -48,19 +48,19 @@ export default function CodeSnippet({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-slate-500 cursor-pointer"
+          className="h-8 w-8 text-neutral-500 cursor-pointer"
           onClick={handleCopy}
         >
           {copied ? (
             <Check className="h-4 w-4 text-green-500" />
           ) : (
-            <Copy className="h-4 w-4 text-slate-500" />
+            <Copy className="h-4 w-4 text-violet-300/50" />
           )}
           <span className="sr-only">Copy Snippet</span>
         </Button>
       </div>
       <pre
-        className="p-4 overflow-x-auto text-slate-200 text-sm bg-slate-950"
+        className="p-4 rounded-2xl border-2 pr-12 overflow-x-auto text-slate-200 text-sm bg-neutral-900"
         style={{ margin: 0 }}
       >
         {snippet}
