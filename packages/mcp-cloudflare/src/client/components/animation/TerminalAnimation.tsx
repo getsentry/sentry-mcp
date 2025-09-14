@@ -7,7 +7,7 @@ import BrowserAnimation from "./BrowserAnimation";
 import Paste from "./terminal-ui/Paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
 import StepsList from "./terminal-ui/StepsList";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight, RotateCcw, Sparkles } from "lucide-react";
 import CodeSnippet from "../ui/code-snippet";
 import DataWire from "./DataWire";
 
@@ -50,7 +50,7 @@ export default function TerminalAnimation({
       autoPlay: false,
     },
     {
-      // type: "toolcall",
+      type: "[toolcall]",
       label: "get_issue_details()",
       description: "MCP performs a toolcall to fetch issue details",
       startTime: 40,
@@ -59,7 +59,7 @@ export default function TerminalAnimation({
       autoPlay: false,
     },
     {
-      // type: "toolcall",
+      type: "[toolcall]",
       label: "analyze_issue_with_seer()",
       description:
         "A toolcall to Seer to analyze the stack trace and pinpoint the root cause",
@@ -69,16 +69,16 @@ export default function TerminalAnimation({
       autoPlay: false,
     },
     {
-      // type: "LLM",
+      type: "[LLM]",
       label: "Finding solution",
       description: "LLM analyzes the context and comes up with a solution",
       startTime: 48.5,
-      startSpeed: 24,
+      startSpeed: 30,
       autoContinueMs: 1000,
       autoPlay: false,
     },
     {
-      // type: "LLM",
+      type: "[LLM]",
       label: "Applying Edits",
       description: "LLM adds the suggested solution to the codebase",
       startTime: 146,
@@ -90,7 +90,7 @@ export default function TerminalAnimation({
       label: "Validation",
       description: "Automaticall running tests to verify the solution works",
       startTime: 242,
-      startSpeed: 5,
+      startSpeed: 20,
       autoContinueMs: 1000,
       autoPlay: false,
     },
@@ -265,29 +265,47 @@ export default function TerminalAnimation({
       <div
         className={`${
           currentIndex > 4 ? "opacity-0 scale-y-50" : "opacity-100 scale-y-100"
-        } duration-300 max-md:hidden absolute inset-y-0 left-1/2 -translate-x-1/2 w-8 py-12`}
+        } duration-300 max-md:hidden absolute h-[calc(100%-24rem)] inset-y-0 left-1/2 -translate-x-1/2 w-8 py-12 flex justify-around flex-col`}
       >
-        <DataWire
-          active={
-            currentIndex === 1 || currentIndex === 2 || currentIndex === 4
-          }
-          direction={currentIndex === 4 ? "ltr" : "rtl"}
-          pulseColorClass={
-            currentIndex === 4
-              ? "text-lime-400"
-              : currentIndex === 2
-                ? "text-orange-400"
-                : "text-pink-400"
-          }
-          heightClass="h-0.5"
-          periodSec={0.3}
-          pulseWidthPct={200}
-        />
+        {Array.from({ length: 12 }).map((_, i) => (
+          <DataWire
+            // biome-ignore lint/suspicious/noArrayIndexKey: fake array in-place
+            key={i}
+            active={
+              currentIndex === 1 || currentIndex === 2 || currentIndex === 4
+            }
+            direction={currentIndex === 4 ? "ltr" : "rtl"}
+            pulseColorClass={
+              currentIndex === 4
+                ? "text-lime-400"
+                : currentIndex === 2
+                  ? "text-orange-400"
+                  : "text-pink-400"
+            }
+            heightClass="h-0.5"
+            periodSec={0.3}
+            pulseWidthPct={200}
+            delaySec={Math.random() * 0.3} // stagger: each later wire starts 0.05s later
+          />
+        ))}
       </div>
 
       {/* Browser Window side */}
       <div className="relative max-md:row-span-0 hidden col-span-2 md:flex flex-col w-full">
         <BrowserAnimation globalIndex={currentIndex} />
+        <div className="relative">
+          <button
+            type="button"
+            className={`border group/replay border-white/20 bg-white/5 hover:bg-white/20 active:bg-white/30 active:duration-75 duration-300 absolute -top-12 rounded-full px-3 py-1 left-1/2 -translate-x-1/2 z-50 cursor-pointer hover:duration-300 hover:delay-0 ${
+              currentIndex === 5
+                ? "opacity-100 -translate-y-full delay-1000 duration-500 blur-none pointer-events-auto"
+                : "opacity-0 -translate-y-1/2 pointer-events-none blur-xl"
+            }`}
+          >
+            Missed a step? Replay
+            <RotateCcw className="inline-block size-4 ml-2 group-hover/replay:-rotate-360 group-hover/replay:ease-out group-hover/replay:duration-1000" />
+          </button>
+        </div>
         <div className="md:mt-0 group/griditem overflow-clip">
           <StepsList
             onSelectAction={(i) =>
