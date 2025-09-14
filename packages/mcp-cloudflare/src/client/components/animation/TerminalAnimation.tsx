@@ -7,6 +7,9 @@ import BrowserAnimation from "./BrowserAnimation";
 import Paste from "./terminal-ui/Paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
 import StepsList from "./terminal-ui/StepsList";
+import { ChevronRight, Sparkles } from "lucide-react";
+import CodeSnippet from "../ui/code-snippet";
+import DataWire from "./DataWire";
 
 export type Step = {
   type?: string;
@@ -17,6 +20,8 @@ export type Step = {
   autoContinueMs: number | null;
   autoPlay: boolean;
 };
+
+type ActivationSource = "marker" | "manual";
 
 export default function TerminalAnimation({
   onChatClick,
@@ -92,7 +97,12 @@ export default function TerminalAnimation({
   ];
 
   const mountPlayer = useCallback(
-    async (resumeAtSec: number, newSpeed: number, marker?: number) => {
+    async (
+      resumeAtSec: number,
+      newSpeed: number,
+      marker?: number,
+      manual?: boolean,
+    ) => {
       const AsciinemaPlayerLibrary = await import("asciinema-player" as any);
       if (!cliDemoRef.current) return;
 
@@ -110,7 +120,7 @@ export default function TerminalAnimation({
               : undefined,
           fit: window.innerWidth > 1024 ? "none" : "none",
           theme: "dracula",
-          controls: true,
+          controls: false,
           autoPlay: true,
           loop: false,
           idleTimeLimit: 0.1,
@@ -149,7 +159,7 @@ export default function TerminalAnimation({
       const onMarker = () => {
         // eliminates race condition that happpens before 1st step (steps 0 and 1 firing at the same time with idelTimeLimit timeline adjustments)
         if (player !== playerRef.current) return; // ignore stale instance
-        activateStep(currentStepRef.current + 1);
+        activateStep(currentStepRef.current + 1, manual ? "manual" : "marker");
       };
       player.addEventListener("marker", onMarker);
       (player as any).__onMarker = onMarker;
@@ -157,7 +167,10 @@ export default function TerminalAnimation({
     [],
   );
 
-  function activateStep(stepIndex: number) {
+  function activateStep(
+    stepIndex: number,
+    source: ActivationSource = "manual",
+  ) {
     currentStepRef.current = stepIndex;
     setCurrentIndex(stepIndex);
     const step = steps[currentStepRef.current];
@@ -185,7 +198,10 @@ export default function TerminalAnimation({
       step.startSpeed,
       steps[stepIndex + 1]?.startTime,
     );
-    if (!step.autoPlay) playerRef.current.pause();
+    if (!step.autoPlay) playerRef.current.pause?.();
+
+    // Step 0 special-case: if auto-activated by marker, do NOT auto-continue.
+    // const shouldAutoContinue = !(stepIndex === 0 && source === "marker");
     if (step.autoContinueMs) {
       autoContinueTimerRef.current = setTimeout(async () => {
         playerRef.current?.play?.();
@@ -194,7 +210,6 @@ export default function TerminalAnimation({
     }
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     // initial
     mountPlayer(31, 0.5, steps[0].startTime);
@@ -203,7 +218,7 @@ export default function TerminalAnimation({
         playerRef.current?.dispose?.();
       } catch {}
     };
-  }, []);
+  }, [mountPlayer]);
 
   const endpoint = new URL("/mcp", window.location.href).href;
 
@@ -220,8 +235,8 @@ export default function TerminalAnimation({
           speed={speed}
         /> */}
         <SpeedDisplay speed={speed} />
-        <Paste />
-        {/* <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-12 text-shadow-md bg-neutral-950 h-full flex flex-col justify-end [mask-image:linear-gradient(190deg,transparent_50%,red_69%)] pointer-events-none">
+        <Paste step={currentIndex} />
+        <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-12 text-shadow-md bg-neutral-950 h-full flex flex-col justify-end [mask-image:linear-gradient(190deg,transparent_50%,red_69%)] pointer-events-none">
           <h1 className="text-4xl font-bold font-serif my-5 flex items-center pointer-events-auto">
             <ChevronRight className="-ml-2 size-8" /> fix the url
             <span className="animate-cursor-blink">_</span>
@@ -245,19 +260,42 @@ export default function TerminalAnimation({
               Live Demo
             </button>
           </div>
-        </div> */}
+        </div>
+      </div>
+      <div
+        className={`${
+          currentIndex > 4 ? "opacity-0 scale-y-50" : "opacity-100 scale-y-100"
+        } duration-300 max-md:hidden absolute inset-y-0 left-1/2 -translate-x-1/2 w-8 py-12`}
+      >
+        <DataWire
+          active={
+            currentIndex === 1 || currentIndex === 2 || currentIndex === 4
+          }
+          direction={currentIndex === 4 ? "ltr" : "rtl"}
+          pulseColorClass={
+            currentIndex === 4
+              ? "text-lime-400"
+              : currentIndex === 2
+                ? "text-orange-400"
+                : "text-pink-400"
+          }
+          heightClass="h-0.5"
+          periodSec={0.3}
+          pulseWidthPct={200}
+        />
       </div>
 
       {/* Browser Window side */}
       <div className="relative max-md:row-span-0 hidden col-span-2 md:flex flex-col w-full">
         <BrowserAnimation globalIndex={currentIndex} />
-        <div className="md:mt-8 group/griditem overflow-clip">
+        <div className="md:mt-0 group/griditem overflow-clip">
           <StepsList
             onSelectAction={(i) =>
               i === 0
                 ? (() => {
                     currentStepRef.current = -1;
                     setCurrentIndex(-1);
+                    setSpeed(0.5);
                     autoContinueTimerRef.current = null;
                     playerRef.current.pause?.();
                     // remove previous marker listener if present
@@ -270,7 +308,7 @@ export default function TerminalAnimation({
                       } catch {}
                     }
                     playerRef.current.dispose?.();
-                    mountPlayer(31, 0.5, steps[0].startTime);
+                    mountPlayer(31, 0.5, steps[0].startTime, true);
                   })()
                 : activateStep(i)
             }
