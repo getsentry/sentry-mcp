@@ -7,9 +7,9 @@ export default function Seer({ step }: { step: number }) {
     <div
       className={`${
         step === 2
-          ? "translate-x-0 scale-100 opacity-100"
-          : "translate-x-[20%] scale-90 opacity-0 pointer-events-none"
-      } absolute top-0 right-0 z-10 h-full w-full bg-600 p-4 duration-300 ease-out`}
+          ? "scale-100 opacity-100 duration-300"
+          : "scale-90 opacity-0 pointer-events-none"
+      } absolute top-0 right-0 z-10 h-full w-full bg-600 flex flex-col justify-center p-4 pr-16 ease-out`}
     >
       <div className="-z-10 absolute inset-0 bg-grid [mask-image:linear-gradient(to_bottom,transparent,red,transparent),linear-gradient(to_right,transparent,red,transparent)] [mask-composite:intersect]" />
       {/* <h1 className="font-bold text-2xl">👀 Seer</h1> */}
@@ -50,7 +50,7 @@ export default function Seer({ step }: { step: number }) {
           step === 2
             ? "border-orange-300/40 bg-orange-500/20 delay-1000 duration-300"
             : "border-orange-300/20 bg-orange-500/10"
-        } group relative m-auto size-32 rounded-xl border`}
+        } group relative mx-auto size-32 rounded-xl border`}
       >
         {/*<div className="relative">*/}
         <Plus

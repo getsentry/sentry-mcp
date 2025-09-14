@@ -17,13 +17,13 @@ export default function BrowserWindow({ step }: { step: number }) {
       <WindowHeader />
       <div className="flex h-full w-full overflow-hidden">
         <div className="flex flex-col gap-3 px-4 pt-2 overflow-clip max-h-full">
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/35" />
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/10" />
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/10" />
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/10" />
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/15" />
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/13" />
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/11" />
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/9" />
           {/* <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/10" />
           <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/10" /> */}
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/5" />
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/6" />
         </div>
         {/* WINDOW CONTENTS */}
         <div

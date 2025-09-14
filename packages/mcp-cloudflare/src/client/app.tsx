@@ -4,6 +4,7 @@ import { Chat } from "./components/chat";
 import { useAuth } from "./contexts/auth-context";
 import Home from "./pages/home";
 import TerminalAnimation from "./components/animation/TerminalAnimation";
+import BackgroundDecorations from "./components/animation/BackgroundDecorations";
 
 export default function App() {
   const { isAuthenticated, handleLogout } = useAuth();
@@ -68,8 +69,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen text-white">
-      <div className="bg-[radial-gradient(ellipse_110%_100%_at_top_right,transparent_80%,var(--color-violet-950)_95%,transparent)] absolute inset-0 -z-10 h-full w-full opacity-20" />
-      <div className="bg-[radial-gradient(ellipse_110%_100%_at_top_right,transparent_40%,var(--color-orange-500)_50%,transparent_60%)] absolute inset-0 -z-10 h-full w-full opacity-10" />
+      <BackgroundDecorations />
       {/* Mobile layout: Single column with overlay chat */}
       <div className="md:hidden flex flex-col">
         <div className="flex-1 sm:p-8 p-4">
@@ -109,7 +109,7 @@ export default function App() {
                   onLogout={handleLogout}
                 />
               </div>
-              <TerminalAnimation onChatClick={() => toggleChat(true)} />
+              <TerminalAnimation onChatClick={() => toggleChat(!isChatOpen)} />
             </div>
             <div className="max-w-3xl mx-auto pt-12">
               <Home onChatClick={() => toggleChat(true)} />
