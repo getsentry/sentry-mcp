@@ -17,16 +17,20 @@ export default function IDEWindow({ step }: { step: number }) {
           {/*packages/mcp-server/src/api-client/*/}
           <div
             className={`${
-              step === 4 && "bg-500"
-            } flex items-center justify-between gap-2 truncate border-white/10 border-r px-2 py-2`}
+              step === 4
+                ? "bg-black/20 opacity-100 translate-y-0"
+                : "opacity-0 translate-y-2"
+            } flex items-center justify-between gap-2 truncate duration-300 border-white/10 border-r px-2 py-2`}
           >
             schema.ts
             <X className="size-4 flex-shrink-0" />
           </div>
           <div
             className={`${
-              step === 4 && "bg-500 delay-2000"
-            } flex items-center justify-between gap-2 truncate border-white/10 border-r px-4 py-2`}
+              step === 4
+                ? "bg-black/20 opacity-100 delay-2000 translate-y-0"
+                : "opacity-0 translate-y-2"
+            } flex items-center justify-between gap-2 truncate duration-300 border-white/10 border-r px-4 py-2`}
           >
             types.ts
             <X className="size-4 flex-shrink-0" />
@@ -34,8 +38,10 @@ export default function IDEWindow({ step }: { step: number }) {
           {/*packages/mcp-server/src/tools/*/}
           <div
             className={`${
-              step === 4 && "bg-500 delay-3000"
-            } flex items-center justify-between gap-2 truncate border-white/10 border-r px-4 py-2`}
+              step === 4
+                ? "bg-black/20 opacity-100 delay-3000 translate-y-0"
+                : "opacity-0 translate-y-2"
+            } flex items-center justify-between gap-2 truncate duration-300 border-white/10 border-r px-4 py-2`}
           >
             get-trace-details.ts
             <X className="size-4 flex-shrink-0" />
@@ -51,8 +57,8 @@ export default function IDEWindow({ step }: { step: number }) {
         {/* <DiffBlock code={diff1} step={step} /> */}
         <pre
           className={`${
-            step === 4 ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"
-          } absolute inset-0 top-10 z-50 h-full bg-500 text-sm duration-300`}
+            step === 4 ? "opacity-100" : "opacity-0"
+          } absolute inset-0 top-10 z-50 h-full bg-neutral-900 text-sm duration-300`}
           style={{
             transitionDelay: step === 4 ? `${3}s` : "0s",
           }}
@@ -66,9 +72,9 @@ export default function IDEWindow({ step }: { step: number }) {
                     : "-translate-x-8 opacity-0 blur-xl"
                 } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
                   line.includes("+")
-                    ? "bg-lime-800 text-lime-400"
+                    ? "bg-lime-300/30 text-lime-400"
                     : line.includes("-")
-                      ? "bg-red-800 text-red-400"
+                      ? "bg-red-300/30 text-red-400"
                       : "text-white/70"
                 }}`}
                 key={line}
@@ -82,8 +88,8 @@ export default function IDEWindow({ step }: { step: number }) {
         </pre>
         <pre
           className={`${
-            step >= 4 ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"
-          } absolute inset-0 top-10 z-40 h-full bg-500 text-sm delay-2000 duration-300`}
+            step >= 4 ? "opacity-100" : "opacity-0"
+          } absolute inset-0 top-10 z-40 h-full bg-neutral-900 text-sm delay-2000 duration-300`}
         >
           {diff2.map((line, idx) => (
             <div
@@ -93,9 +99,9 @@ export default function IDEWindow({ step }: { step: number }) {
                   : "-translate-x-8 opacity-0 blur-xl"
               } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
                 line.includes("+")
-                  ? "bg-lime-800 text-lime-400"
+                  ? "bg-lime-300/30 text-lime-400"
                   : line.includes("-")
-                    ? "bg-red-800 text-red-400"
+                    ? "bg-red-300/30 text-red-400"
                     : "text-white/70"
               }}`}
               key={line}
@@ -109,8 +115,8 @@ export default function IDEWindow({ step }: { step: number }) {
         </pre>
         <pre
           className={`${
-            step >= 4 ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"
-          } absolute inset-0 top-10 z-30 h-full bg-500 text-sm delay-100 duration-300`}
+            step >= 4 ? "opacity-100" : "opacity-0"
+          } absolute inset-0 top-10 z-30 h-full bg-neutral-900 text-sm delay-100 duration-300`}
         >
           {diff3.map((line, idx) => (
             <div
@@ -120,10 +126,10 @@ export default function IDEWindow({ step }: { step: number }) {
                   : "-translate-x-8 opacity-0 blur-xl"
               } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
                 line.includes("+")
-                  ? "bg-lime-800 text-lime-400"
+                  ? "bg-lime-300/30 text-lime-400"
                   : line.includes("-")
-                    ? "bg-red-800 text-red-400"
-                    : "text-white/70"
+                    ? "bg-red-300/30 text-red-400"
+                    : "ext-white/70"
               }}`}
               key={line}
               style={{
@@ -159,7 +165,7 @@ const diff1 = [
   "        219      }",
   "        220",
   "        221      // Sort root spans by duration and select the most interesting ones",
-  "        222 -    const sortedRoots = spans",
+  "        222 -    const sortedRotots = spans",
   "        222 +    const sortedRoots = actualSpans",
   "        223        .sort((a, b) => (b.duration || 0) - (a.duration || 0))",
   "        224        .slice(0, 5); // Start with top 5 root spans",

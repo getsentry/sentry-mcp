@@ -7,16 +7,14 @@ import BrowserAnimation from "./BrowserAnimation";
 import Paste from "./terminal-ui/Paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
 import StepsList from "./terminal-ui/StepsList";
-import CodeSnippet from "../ui/code-snippet";
-import { ChevronRight, Sparkles } from "lucide-react";
 
 export type Step = {
-  type: string;
-  time: number;
+  type?: string;
   label: string;
   description: string;
+  startTime: number;
+  startSpeed: number;
   autoContinueMs: number | null;
-  restartSpeed: number;
   autoPlay: boolean;
 };
 
@@ -30,81 +28,77 @@ export default function TerminalAnimation({
   const autoContinueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const postSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const currentStepRef = useRef<number>(-1);
   const [speed, setSpeed] = useState<number>(0.5);
-  const [activeStep, setActiveStep] = useState<Step | null>(null);
+  const EPS = 0.01;
 
   const steps: Step[] = [
     {
-      type: "copy url",
-      time: 31.75,
-      label: "You Copy the Issue URL",
+      label: "You Copy Paste the Issue URL",
       description: "Copy the Sentry issue url directly from your browser",
+      startTime: 31.6,
+      startSpeed: 2,
       autoContinueMs: 1950,
-      restartSpeed: 3,
       autoPlay: false,
     },
     {
-      type: "toolcall",
-      time: 40,
+      // type: "toolcall",
       label: "get_issue_details()",
       description: "MCP performs a toolcall to fetch issue details",
+      startTime: 40,
+      startSpeed: 3,
       autoContinueMs: 1000,
-      restartSpeed: 3,
       autoPlay: false,
     },
     {
-      type: "toolcall",
-      time: 46,
+      // type: "toolcall",
       label: "analyze_issue_with_seer()",
       description:
         "A toolcall to Seer to analyze the stack trace and pinpoint the root cause",
-      autoContinueMs: 3000,
-      restartSpeed: 1.5,
+      startTime: 46,
+      startSpeed: 5,
+      autoContinueMs: 2000,
       autoPlay: false,
     },
     {
-      type: "LLM",
-      time: 48.5,
+      // type: "LLM",
       label: "Finding solution",
       description: "LLM analyzes the context and comes up with a solution",
-      autoContinueMs: 1500,
-      restartSpeed: 24,
+      startTime: 48.5,
+      startSpeed: 24,
+      autoContinueMs: 1000,
       autoPlay: false,
     },
     {
-      type: "LLM",
-      time: 146,
+      // type: "LLM",
       label: "Applying Edits",
       description: "LLM adds the suggested solution to the codebase",
-      autoContinueMs: 1500,
-      restartSpeed: 24,
+      startTime: 146,
+      startSpeed: 20,
+      autoContinueMs: 1000,
       autoPlay: false,
     },
     {
-      type: "test",
-      time: 242,
       label: "Validation",
       description: "Automaticall running tests to verify the solution works",
-      autoContinueMs: 100,
-      restartSpeed: 25,
+      startTime: 242,
+      startSpeed: 5,
+      autoContinueMs: 1000,
       autoPlay: false,
     },
   ];
 
-  // factor your create logic so we can recreate on speed changes
   const mountPlayer = useCallback(
-    async (resumeAtSec: number | null = null, newSpeed = speed) => {
+    async (resumeAtSec: number, newSpeed: number, marker?: number) => {
       const AsciinemaPlayerLibrary = await import("asciinema-player" as any);
       if (!cliDemoRef.current) return;
 
-      // dispose previous instance (if any)
-      try {
-        playerRef.current?.dispose?.();
-      } catch {}
+      const target = resumeAtSec;
 
-      const instance = AsciinemaPlayerLibrary.create(
+      const player = AsciinemaPlayerLibrary.create(
         "demo.cast",
         cliDemoRef.current,
         {
@@ -116,88 +110,100 @@ export default function TerminalAnimation({
               : undefined,
           fit: window.innerWidth > 1024 ? "none" : "none",
           theme: "dracula",
-          controls: false,
+          controls: true,
           autoPlay: true,
           loop: false,
-          speed: newSpeed,
           idleTimeLimit: 0.1,
-          markers: steps
-            .filter((_, i) => i > currentStepRef.current) // strictly future steps
-            .map((s) => [s.time, s.label] as const),
-          pauseOnMarkers: true,
-          ...(resumeAtSec != null ? { startAt: resumeAtSec } : { startAt: 31 }),
+          speed: newSpeed,
+          // fixes first step
+          startAt: Math.max(target - EPS, 0),
+          ...(marker
+            ? { pauseOnMarkers: true, markers: [marker] }
+            : { pauseOnMarkers: false }),
         },
       );
+      playerRef.current = player;
 
-      instance.addEventListener(
-        "marker",
-        (ev: { index: number; time: number; label: string }) =>
-          activateStep(currentStepRef.current + 1 + ev.index),
-      );
-      playerRef.current = instance;
+      if (postSeekTimerRef.current) {
+        clearTimeout(postSeekTimerRef.current);
+        postSeekTimerRef.current = null;
+      }
+
+      // setTimeout 0 microtask and seek fixes last step, pause is for every step
+      postSeekTimerRef.current = setTimeout(() => {
+        // eliminates race condition that happpens before 1st step (steps 0 and 1 firing at the same time with idelTimeLimit timeline adjustments)
+        if (player !== playerRef.current) return;
+        try {
+          player.seek?.(target + EPS);
+          if (
+            !(
+              currentStepRef.current === -1 ||
+              steps[currentStepRef.current].autoPlay
+            )
+          ) {
+            player.pause?.();
+          }
+        } catch {}
+      }, 0);
+
+      const onMarker = () => {
+        // eliminates race condition that happpens before 1st step (steps 0 and 1 firing at the same time with idelTimeLimit timeline adjustments)
+        if (player !== playerRef.current) return; // ignore stale instance
+        activateStep(currentStepRef.current + 1);
+      };
+      player.addEventListener("marker", onMarker);
+      (player as any).__onMarker = onMarker;
     },
-    [speed],
+    [],
   );
 
-  async function activateStep(stepIndex: number) {
+  function activateStep(stepIndex: number) {
+    currentStepRef.current = stepIndex;
+    setCurrentIndex(stepIndex);
+    const step = steps[currentStepRef.current];
+    if (!step) return;
+    playerRef.current.pause?.();
+    // remove previous marker listener if present
+    if (playerRef.current.__onMarker) {
+      try {
+        playerRef.current.removeEventListener?.(
+          "marker",
+          playerRef.current.__onMarker,
+        );
+      } catch {}
+    }
+    playerRef.current.dispose?.();
+
     if (autoContinueTimerRef.current) {
       clearTimeout(autoContinueTimerRef.current);
       autoContinueTimerRef.current = null;
     }
-    const globalIndex = stepIndex;
-    // console.log(globalIndex);
-    const step = steps[globalIndex];
-    if (!step) return;
 
-    setActiveStep(step);
-    currentStepRef.current = globalIndex;
-
-    playerRef.current?.pause?.();
-    if (
-      step.autoContinueMs != null &&
-      step.autoContinueMs > 0 &&
-      speed !== step.restartSpeed
-    ) {
-      // autoContinueTimerRef.current =
-      setTimeout(async () => {
-        playerRef.current?.dispose?.(); // dispose of the current instance
-        setSpeed(step.restartSpeed);
-        await mountPlayer(step.time + 1, step.restartSpeed); // recreate at current time with new speed
-        // if (!step.autoPlay) playerRef.current?.pause?.();
+    setSpeed(step.startSpeed);
+    mountPlayer(
+      step.startTime,
+      step.startSpeed,
+      steps[stepIndex + 1]?.startTime,
+    );
+    if (!step.autoPlay) playerRef.current.pause();
+    if (step.autoContinueMs) {
+      autoContinueTimerRef.current = setTimeout(async () => {
+        playerRef.current?.play?.();
         autoContinueTimerRef.current = null; // finished
       }, step.autoContinueMs);
-    } else if (
-      // reset if new speed
-      speed !== step.restartSpeed
-    ) {
-      playerRef.current?.dispose?.(); // dispose of the current instance
-      setSpeed(step.restartSpeed);
-      await mountPlayer(step.time, step.restartSpeed);
-      if (!step.autoPlay) playerRef.current?.pause?.();
-    } else {
-      // simply seek if old speed
-      playerRef.current?.seek(step.time);
-      playerRef.current?.play?.();
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
-    mountPlayer(31, 0.5, true);
+    // initial
+    mountPlayer(31, 0.5, steps[0].startTime);
     return () => {
       try {
         playerRef.current?.dispose?.();
       } catch {}
     };
-  }, [mountPlayer]);
-
-  const onChangeSpeed = async (s: number) => {
-    const p = playerRef.current;
-    const at = p?.getCurrentTime?.() ?? 0;
-    setSpeed(s);
-    await mountPlayer(at, s); // recreate at current time with new speed
-    // auto-continue playback
-    playerRef.current?.play?.();
-  };
+  }, []);
 
   const endpoint = new URL("/mcp", window.location.href).href;
 
@@ -215,24 +221,19 @@ export default function TerminalAnimation({
         /> */}
         <SpeedDisplay speed={speed} />
         <Paste />
-        <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-12 text-shadow-md bg-neutral-950 h-full flex flex-col justify-end [mask-image:linear-gradient(190deg,transparent_50%,red_69%)]">
-          {/* <div className="max-w-96">
-            You could try to explain your issue to the LLM, copy paste context,
-            and run tests yourself
-          </div>
-          <br /> or you can just use <b>Sentry MCP</b> and... <br />{" "} */}
-          <h1 className="text-4xl font-bold font-serif my-5 flex items-center">
+        {/* <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-12 text-shadow-md bg-neutral-950 h-full flex flex-col justify-end [mask-image:linear-gradient(190deg,transparent_50%,red_69%)] pointer-events-none">
+          <h1 className="text-4xl font-bold font-serif my-5 flex items-center pointer-events-auto">
             <ChevronRight className="-ml-2 size-8" /> fix the url
             <span className="animate-cursor-blink">_</span>
           </h1>
-          <span className="opacity-60 ml-0.5">
-            That's all it should take to fix your bugs
+          <span className="opacity-60 ml-0.5 pointer-events-auto">
+            That's all it could take to fix your bugs
           </span>
-          <div className="mt-6 flex flex-wrap gap-4 w-full">
+          <div className="mt-6 flex flex-wrap gap-4 w-full pointer-events-auto">
             <div className="hidden sm:block">
               <CodeSnippet noMargin snippet={endpoint} />
             </div>
-            <div className="px-6 py-2 flex items-center bg-violet-600 hover:bg-violet-700 text-white transition rounded-2xl font-bold border-2 border-white/20">
+            <div className="px-6 py-2 flex items-center bg-gradient-to-br from-violet-300 via-violet-600 to-violet-700 hover:bg-violet-700 text-white transition rounded-2xl font-bold border-2 border-white/20">
               Docs
             </div>
             <button
@@ -244,21 +245,37 @@ export default function TerminalAnimation({
               Live Demo
             </button>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Browser Window side */}
       <div className="relative max-md:row-span-0 hidden col-span-2 md:flex flex-col w-full">
-        <BrowserAnimation
-          activeStep={activeStep || null}
-          globalIndex={currentStepRef.current}
-        />
-        <div className="md:bg-white/5 md:rounded-2xl md:p-4 md:mt-8 group/griditem overflow-clip">
+        <BrowserAnimation globalIndex={currentIndex} />
+        <div className="md:mt-8 group/griditem overflow-clip">
           <StepsList
-            activeStepLabel={activeStep?.label || null}
-            onSelectAction={(i) => activateStep(i)}
-            globalIndex={currentStepRef.current}
-            steps={steps} // renamed prop
+            onSelectAction={(i) =>
+              i === 0
+                ? (() => {
+                    currentStepRef.current = -1;
+                    setCurrentIndex(-1);
+                    autoContinueTimerRef.current = null;
+                    playerRef.current.pause?.();
+                    // remove previous marker listener if present
+                    if (playerRef.current.__onMarker) {
+                      try {
+                        playerRef.current.removeEventListener?.(
+                          "marker",
+                          playerRef.current.__onMarker,
+                        );
+                      } catch {}
+                    }
+                    playerRef.current.dispose?.();
+                    mountPlayer(31, 0.5, steps[0].startTime);
+                  })()
+                : activateStep(i)
+            }
+            globalIndex={Math.max(currentIndex, 0)}
+            steps={steps}
           />
         </div>
       </div>
