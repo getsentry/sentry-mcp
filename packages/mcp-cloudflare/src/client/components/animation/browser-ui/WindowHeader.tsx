@@ -37,8 +37,7 @@ export default function WindowHeader({ ide = false }: { ide?: boolean }) {
       <div
         className={`mx-auto flex items-center ${
           ide && "justify-center"
-        } h-8 w-full max-w-1/2 cursor-pointer gap-2 rounded-xl border border-white/20 bg-600 p-3 duration-200 hover:bg-white/10 active:bg-white/50 active:duration-75`}
-        id={ide ? "" : "url"}
+        } h-8 w-full max-w-1/2 cursor-pointer gap-2 rounded-xl border border-white/20 bg-white/5 p-3 duration-200 hover:bg-white/10 active:bg-white/50 active:duration-75`}
         style={{ ["--delay" as any]: "0.45s" }}
       >
         {!ide && <Lock className="size-4 flex-shrink-0" />}

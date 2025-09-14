@@ -1,5 +1,4 @@
 import { CheckCheck } from "lucide-react";
-import { useEffect } from "react";
 import BrowserWindow from "./browser-ui/BrowserWindow";
 import IDEWindow from "./browser-ui/IDEWindow";
 
@@ -8,36 +7,6 @@ export default function BrowserAnimation({
 }: {
   globalIndex: number;
 }) {
-  useEffect(() => {
-    runAnimationFor(globalIndex);
-  }, [globalIndex]);
-
-  function runAnimationFor(index: number) {
-    if (index === 0) {
-      // 1) URL: simulate hover+click and text selection immediately
-      const urlEl = document.getElementById("url");
-      if (urlEl) {
-        // retriggerable: remove -> reflow -> add
-        urlEl.classList.remove("animate-url");
-        // void (urlEl as HTMLElement).offsetWidth;
-        urlEl.classList.add("animate-url");
-        const sel = window.getSelection();
-        // TODO: simulated SELECT HIGHLIGHT
-      }
-
-      // 2) KEYCAPS: trigger your existing keycap animation class on all .keycap
-      const keycaps =
-        document.querySelectorAll<HTMLDivElement>("#demo .keycap");
-
-      // re-triggerable: remove -> reflow -> add
-      for (const el of keycaps) {
-        el.classList.remove("animate-keycap");
-        // void el.offsetWidth; // force reflow so animation restarts cleanly
-        el.classList.add("animate-keycap");
-      }
-    }
-  }
-
   return (
     <div
       className={`relative h-full w-full ${
