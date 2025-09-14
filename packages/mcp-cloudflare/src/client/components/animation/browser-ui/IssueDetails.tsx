@@ -18,15 +18,42 @@ export default function IssueDetails({ step }: { step: number }) {
           Stack Trace
           <ChevronDown className="h-5 w-5 text-white/50 -scale-y-100" />
         </div>
-        <div className="relative w-[calc(100%-1rem)] m-2">
+        <div className="relative w-[calc(100%-1rem)] m-2 border border-white/10 bg-white/5 rounded-xl">
           <div
             className={`${
-              step >= 1
-                ? "-translate-x-[150%] translate-y-1/2 origin-bottom scale-50 opacity-0 delay-675 duration-1000"
-                : ""
-            } pb-4 rounded-xl border border-white/20 bg-pink-900 text-pink100`}
+              step === 1 ? "animate-issue-context opacity-30" : "opacity-0"
+            } pb-4 rounded-xl absolute inset-0 border border-white/20 bg-pink-900 text-pink100`}
+            style={{ ["--delay" as any]: "0.8s" }}
           >
-            <div className="h-full w-full rounded-xl border border-white/20 bg-white/10">
+            <div className="h-full w-full rounded-xl border border-white/20 bg-white/10 pb-4" />
+          </div>
+          <div
+            className={`${
+              step === 1 ? "animate-issue-context opacity-30" : "opacity-0"
+            } pb-4 rounded-xl absolute inset-0 border border-white/20 bg-pink-900 text-pink100`}
+            style={{ ["--delay" as any]: "1s" }}
+          >
+            <div className="h-full w-full rounded-xl border border-white/20 bg-white/10 pb-4" />
+          </div>
+          <div
+            className={`${
+              step === 1 ? "animate-issue-context opacity-30" : "opacity-0"
+            } pb-4 rounded-xl absolute inset-0 border border-white/20 bg-pink-900 text-pink100`}
+            style={{ ["--delay" as any]: "1.2s" }}
+          >
+            <div className="h-full w-full rounded-xl border border-white/20 bg-white/10 pb-4" />
+          </div>
+          <div
+            className={`${
+              step === 1
+                ? "animate-issue-context"
+                : step > 1
+                  ? "opacity-0"
+                  : "opacity-100"
+            } pb-4 rounded-xl border border-white/20 bg-pink-900 text-pink100`}
+            style={{ ["--delay" as any]: "0.675s" }}
+          >
+            <div className="h-full w-full rounded-xl border border-white/20 bg-white/10 pb-4">
               <pre>
                 {`
   Error: Something went wrong
@@ -35,7 +62,7 @@ export default function IssueDetails({ step }: { step: number }) {
               </pre>
             </div>
           </div>
-          <div
+          {/* <div
             className={`${
               step >= 1
                 ? "-translate-x-[150%] translate-y-1/2 origin-bottom scale-0 opacity-0 delay-675 duration-1000"
@@ -55,7 +82,7 @@ export default function IssueDetails({ step }: { step: number }) {
                 ? "-translate-x-[150%] -translate-y-1/2 origin-bottom scale-33 opacity-0 delay-750 duration-1000"
                 : ""
             } absolute top-0 h-full w-full rounded-xl border border-white/20 bg-white/5`}
-          />
+          /> */}
         </div>
       </div>
     </>
