@@ -2,24 +2,18 @@ import { CheckCheck } from "lucide-react";
 import { useEffect } from "react";
 import BrowserWindow from "./browser-ui/BrowserWindow";
 import IDEWindow from "./browser-ui/IDEWindow";
-import type { Step } from "./TerminalAnimation";
 
 export default function BrowserAnimation({
-  activeStep,
   globalIndex,
 }: {
-  activeStep: Step | null;
   globalIndex: number;
 }) {
   useEffect(() => {
-    if (!activeStep) return;
-    runAnimationFor(globalIndex, activeStep.time, activeStep.restartSpeed);
-  }, [activeStep, globalIndex]);
+    runAnimationFor(globalIndex);
+  }, [globalIndex]);
 
-  function runAnimationFor(index: number, time: number, restartSpeed: number) {
+  function runAnimationFor(index: number) {
     if (index === 0) {
-      // console.log("animation 1");
-
       // 1) URL: simulate hover+click and text selection immediately
       const urlEl = document.getElementById("url");
       if (urlEl) {
@@ -28,14 +22,7 @@ export default function BrowserAnimation({
         // void (urlEl as HTMLElement).offsetWidth;
         urlEl.classList.add("animate-url");
         const sel = window.getSelection();
-        // simulated SELECT HIGHLIGHT
-        if (sel) {
-          sel.removeAllRanges();
-          const range = document.createRange();
-          range.selectNodeContents(urlEl);
-          sel.addRange(range);
-          setTimeout(() => sel.removeAllRanges(), 700);
-        }
+        // TODO: simulated SELECT HIGHLIGHT
       }
 
       // 2) KEYCAPS: trigger your existing keycap animation class on all .keycap
