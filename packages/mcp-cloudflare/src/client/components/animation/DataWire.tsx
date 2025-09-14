@@ -13,7 +13,7 @@ type DatarWireProps = {
 export default function DataWire({
   active = true,
   direction = "ltr",
-  baseColorClass = "bg-white/20",
+  baseColorClass = "bg-white/0",
   pulseColorClass = "text-violet-400",
   heightClass = "h-0.5",
   periodSec = 0.5,
