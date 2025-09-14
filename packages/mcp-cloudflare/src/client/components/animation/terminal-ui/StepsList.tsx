@@ -57,19 +57,15 @@ export default function StepsList({
                 <>
                   <div className="-ml-3 h-6 w-2 animate-ping rounded-r-3xl bg-lime-300" />
                   <div className="-ml-5 mr-1.5 h-8 w-2 rounded-r-3xl bg-lime-500" />
-                  {step.type && (
-                    <span className="font-mono h-8 flex items-center text-sm opacity-50">
-                      [{step.type}]
-                    </span>
-                  )}
+                  <span className="font-mono h-8 flex items-center text-sm opacity-50">
+                    {step.type}
+                  </span>
                 </>
               ) : (
                 <>
-                  {step.type && (
-                    <span className="font-mono flex items-center  h-8 text-sm opacity-50 ml-3.5">
-                      [{step.type}]
-                    </span>
-                  )}
+                  <span className="font-mono flex items-center  h-8 text-sm opacity-50 ml-3.5">
+                    {step.type}
+                  </span>
                   <span className="float-left opacity-0 duration-200 ease-[cubic-bezier(0.64,0.57,0.67,1.53)] group-hover:translate-x-4 group-hover:opacity-100 -ml-4 group-hover:duration-75 max-sm:hidden">
                     →
                   </span>

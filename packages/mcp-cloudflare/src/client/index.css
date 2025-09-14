@@ -254,6 +254,25 @@
     linear-gradient(to bottom, #fff2 1px, transparent 1px);
 }
 
+.animate-issue-context {
+  animation: issueFlyover 1s 1 forwards;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes issueFlyover {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+  50% {
+    translate: 0 -50%;
+  }
+  100% {
+    transform: translateX(-200%) translateY(0);
+    opacity: 0;
+    scale: 50%;
+  }
+}
+
 .animate-cursor-blink {
   animation: blink 1s step-end infinite;
 }
@@ -306,12 +325,14 @@
     height: 100%;
     will-change: transform;
     transform: translate3d(0, 0, 0) translateX(-120%);
-    animation: wire-ltr var(--period, 0.3s) linear infinite;
+    animation: wire-ltr var(--period, 0.3s) var(--delay, 0s) linear infinite;
+    transition: opacity 0.25s ease;
   }
   .wire-rtl::before {
     animation-name: wire-rtl;
   }
   .wire-paused::before {
+    opacity: 0;
     animation-play-state: paused;
   }
 
