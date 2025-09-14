@@ -8,7 +8,9 @@ export default function IDEWindow({ step }: { step: number }) {
         step >= 3 && step < 5
           ? "translate-x-0 scale-100 blur-none"
           : "-translate-x-32 scale-75 opacity-0 blur-xl"
-      } absolute bottom-2.5 flex h-[calc(100%-0.625rem)] w-full origin-bottom flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/15 pb-1 backdrop-blur duration-300`}
+      } ${
+        step === 4 ? "border-lime-400/50" : "border-white/10"
+      } absolute bottom-2.5 flex h-[calc(100%-0.625rem)] w-full origin-bottom flex-col overflow-hidden rounded-2xl border bg-white/15 pb-1 backdrop-blur duration-300`}
       id="window2-ide"
     >
       <WindowHeader ide />
@@ -47,11 +49,12 @@ export default function IDEWindow({ step }: { step: number }) {
             <X className="size-4 flex-shrink-0" />
           </div>
         </div>
+        {/* https://media.tenor.com/6kWOxIkVNPwAAAAM/nails-family-guy.gif */}
         <img
           alt="cooking"
           className="mx-auto mt-12"
           height={393}
-          src="https://media.tenor.com/6kWOxIkVNPwAAAAM/nails-family-guy.gif"
+          src="https://media1.tenor.com/m/PLmzsF8-WkoAAAAC/dancing-bender.gif"
           width={220}
         />
         {/* <DiffBlock code={diff1} step={step} /> */}
