@@ -181,16 +181,15 @@
   /* fade-out (~120ms) */
 }
 
-.keycap.animate-keycap {
+.animate-keycap {
   animation: keycapPulse var(--dur, 750ms) ease-out both;
   animation-delay: var(--delay, 0s);
 }
 
-/* globals.css */
 @keyframes urlHoverClick {
   /* base */
   0% {
-    background-color: var(--gray600);
+    background-color: transparent;
   }
 
   /* hover (≈200ms) */
@@ -200,8 +199,8 @@
 
   /* active press (≈75ms) */
   68% {
-    background-color: var(--color-violet-300);
-    color: var(--background);
+    background-color: #f22;
+    /* color: var(--background); */
   }
 
   /* release back to hover quickly, then fade out */
@@ -210,12 +209,12 @@
   }
 
   100% {
-    background-color: var(--color-violet-300);
-    color: var(--background);
+    background-color: #f22;
+    /* color: var(--background); */
   }
 }
 
-#url.animate-url {
+.animate-url {
   /* total ≈ 400ms (200 hover + 75 active + ~125 release) */
   animation: urlHoverClick 400ms ease-out forwards;
   animation-delay: var(--delay, 0s);
@@ -278,4 +277,58 @@
 /* optional: also remove outer container bg */
 .ap-wrapper {
   background: transparent !important;
+}
+
+@layer utilities {
+  .wire {
+    position: relative;
+    overflow: hidden;
+  }
+  .wire::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    /* the solid wire is on the element itself via Tailwind bg-*, this (::before)
+       is only the moving pulse overlay */
+    background: transparent;
+    /* size & look of the pulse */
+    width: var(--pulse-w, 24%); /* % of wire width */
+    left: -30%; /* start off-screen */
+    margin: auto 0; /* vertically center */
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      currentColor 25%,
+      currentColor 75%,
+      transparent 100%
+    );
+    filter: drop-shadow(0 0 6px currentColor);
+    height: 100%;
+    will-change: transform;
+    transform: translate3d(0, 0, 0) translateX(-120%);
+    animation: wire-ltr var(--period, 0.3s) linear infinite;
+  }
+  .wire-rtl::before {
+    animation-name: wire-rtl;
+  }
+  .wire-paused::before {
+    animation-play-state: paused;
+  }
+
+  @keyframes wire-ltr {
+    from {
+      transform: translate3d(0, 0, 0) translateX(-120%);
+    }
+    to {
+      transform: translate3d(0, 0, 0) translateX(220%);
+    }
+  }
+  @keyframes wire-rtl {
+    from {
+      transform: translate3d(0, 0, 0) translateX(220%);
+    }
+    to {
+      transform: translate3d(0, 0, 0) translateX(-120%);
+    }
+  }
 }
