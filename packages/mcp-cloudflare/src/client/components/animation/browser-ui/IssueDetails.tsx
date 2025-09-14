@@ -18,13 +18,13 @@ export default function IssueDetails({ step }: { step: number }) {
           Stack Trace
           <ChevronDown className="h-5 w-5 text-white/50 -scale-y-100" />
         </div>
-        <div className="relative grid grid-cols-2 gap-2 w-full p-2 pb-12">
+        <div className="relative w-[calc(100%-1rem)] m-2">
           <div
             className={`${
               step >= 1
                 ? "-translate-x-[150%] translate-y-1/2 origin-bottom scale-50 opacity-0 delay-675 duration-1000"
                 : ""
-            } top-12 pb-4 rounded-xl border border-white/20 bg-pink-900 text-pink100`}
+            } pb-4 rounded-xl border border-white/20 bg-pink-900 text-pink100`}
           >
             <div className="h-full w-full rounded-xl border border-white/20 bg-white/10">
               <pre>
@@ -40,21 +40,21 @@ export default function IssueDetails({ step }: { step: number }) {
               step >= 1
                 ? "-translate-x-[150%] translate-y-1/2 origin-bottom scale-0 opacity-0 delay-675 duration-1000"
                 : ""
-            } top-0 h-32 rounded-xl border border-white/20 bg-white/5`}
+            } absolute top-0 w-full h-32 rounded-xl border border-white/20 bg-white/5`}
           />
           <div
             className={`${
               step >= 1
                 ? "-translate-x-[150%] -translate-y-1/2 origin-bottom scale-25 opacity-0 delay-750 duration-1000"
                 : ""
-            } top-4 h-32 rounded-xl border border-white/20 bg-white/5`}
+            } absolute top-0 w-full h-full rounded-xl border border-white/20 bg-white/5`}
           />
           <div
             className={`${
               step >= 1
                 ? "-translate-x-[150%] -translate-y-1/2 origin-bottom scale-33 opacity-0 delay-750 duration-1000"
                 : ""
-            } top-8 h-32 rounded-xl border border-white/20 bg-white/5`}
+            } absolute top-0 h-full w-full rounded-xl border border-white/20 bg-white/5`}
           />
         </div>
       </div>
