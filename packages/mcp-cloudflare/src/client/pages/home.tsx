@@ -18,6 +18,8 @@ import Section from "../components/ui/section";
 import { Prose } from "../components/ui/prose";
 import JsonSchemaParams from "../components/ui/json-schema-params";
 import TemplateVars from "../components/ui/template-vars";
+import { useAuth } from "../contexts/auth-context";
+import { useMcpMetadata } from "../hooks/use-mcp-metadata";
 
 interface HomeProps {
   onChatClick: () => void;
@@ -25,6 +27,12 @@ interface HomeProps {
 
 export default function Home({ onChatClick }: HomeProps) {
   const [stdio, setStdio] = useState(false);
+  const { isAuthenticated } = useAuth();
+  const {
+    metadata,
+    isLoading: isMetadataLoading,
+    error: metadataError,
+  } = useMcpMetadata(isAuthenticated);
 
   return (
     <main className="flex gap-4 max-w-3xl">
@@ -156,45 +164,89 @@ export default function Home({ onChatClick }: HomeProps) {
             <code>organization_slug</code> parameter will try to infer a default
             organization, otherwise you should mention it in the prompt.
           </Note>
+
+          {!isAuthenticated ? (
+            <Note>
+              <strong>Sign in to view filtered tools.</strong> The actual list
+              of available tools may be filtered based on server configuration
+              and your authentication status.
+            </Note>
+          ) : isMetadataLoading ? (
+            <div className="flex items-center gap-2 p-4 text-slate-400">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-violet-400" />
+              Loading available tools...
+            </div>
+          ) : metadataError ? (
+            <Note>
+              <strong>Error loading tools:</strong> {metadataError}
+              <br />
+              Falling back to default tool list.
+            </Note>
+          ) : null}
+
           <Accordion type="single" collapsible className="w-full space-y-1">
-            {TOOL_DEFINITIONS.sort((a, b) => a.name.localeCompare(b.name)).map(
-              (tool) => (
-                <AccordionItem value={tool.name} key={tool.name}>
-                  <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
-                    {tool.name}
-                  </AccordionTrigger>
-                  <AccordionContent className="py-4">
-                    <Prose>
-                      <p className="mb-0">{tool.description.split("\n")[0]}</p>
-                    </Prose>
-                    <div className="mt-4 space-y-4">
-                      {/* Authorization / Scopes */}
-                      <section className="rounded-md border border-slate-700/60 bg-black/30 p-3">
-                        <div className="text-xs uppercase tracking-wide text-slate-300/80 mb-2">
-                          Authorization
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {tool.requiredScopes &&
-                          tool.requiredScopes.length > 0 ? (
-                            tool.requiredScopes.map((s) => (
-                              <span
-                                key={s}
-                                className="inline-flex items-center rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-xs font-mono text-violet-200"
-                              >
-                                {s}
+            {(() => {
+              // Use filtered tools from metadata if available and authenticated, otherwise fall back to static definitions
+              const toolsToShow =
+                isAuthenticated && metadata
+                  ? TOOL_DEFINITIONS.filter((tool) =>
+                      metadata.tools.includes(tool.name),
+                    )
+                  : TOOL_DEFINITIONS;
+
+              if (isAuthenticated && metadata && toolsToShow.length === 0) {
+                return (
+                  <div className="p-4 text-slate-400 text-center">
+                    All tools have been filtered out by server configuration.
+                  </div>
+                );
+              }
+
+              return toolsToShow
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((tool) => (
+                  <AccordionItem value={tool.name} key={tool.name}>
+                    <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
+                      {tool.name}
+                    </AccordionTrigger>
+                    <AccordionContent className="py-4">
+                      <Prose>
+                        <p className="mb-0">
+                          {tool.description.split("\n")[0]}
+                        </p>
+                      </Prose>
+                      <div className="mt-4 space-y-4">
+                        {/* Authorization / Scopes */}
+                        <section className="rounded-md border border-slate-700/60 bg-black/30 p-3">
+                          <div className="text-xs uppercase tracking-wide text-slate-300/80 mb-2">
+                            Authorization
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {tool.requiredScopes &&
+                            tool.requiredScopes.length > 0 ? (
+                              tool.requiredScopes.map((s) => (
+                                <span
+                                  key={s}
+                                  className="inline-flex items-center rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-xs font-mono text-violet-200"
+                                >
+                                  {s}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-sm text-slate-400">
+                                None
                               </span>
-                            ))
-                          ) : (
-                            <span className="text-sm text-slate-400">None</span>
-                          )}
-                        </div>
-                      </section>
-                      <JsonSchemaParams schema={tool.inputSchema as unknown} />
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ),
-            )}
+                            )}
+                          </div>
+                        </section>
+                        <JsonSchemaParams
+                          schema={tool.inputSchema as unknown}
+                        />
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ));
+            })()}
           </Accordion>
         </Section>
 

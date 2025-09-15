@@ -39,6 +39,7 @@ import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
+import { filterDeniedTools } from "./internal/tool-helpers/filter-denied-tools";
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -347,7 +348,10 @@ export async function configureServer({
     );
   }
 
-  for (const [toolKey, tool] of Object.entries(tools)) {
+  // Apply tool filtering based on denied tools regex
+  const filteredTools = filterDeniedTools(tools, context.deniedToolsRegex);
+
+  for (const [toolKey, tool] of Object.entries(filteredTools)) {
     // Check if this tool is allowed based on granted scopes
     if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
       console.debug(

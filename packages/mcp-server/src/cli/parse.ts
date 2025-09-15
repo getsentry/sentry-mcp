@@ -13,6 +13,7 @@ export function parseArgv(argv: string[]): CliArgs {
     scopes: { type: "string" as const },
     "add-scopes": { type: "string" as const },
     "all-scopes": { type: "boolean" as const },
+    "denied-tools": { type: "string" as const },
     help: { type: "boolean" as const, short: "h" as const },
     version: { type: "boolean" as const, short: "v" as const },
   };
@@ -55,6 +56,7 @@ export function parseArgv(argv: string[]): CliArgs {
     scopes: values.scopes as string | undefined,
     addScopes: values["add-scopes"] as string | undefined,
     allScopes: (values["all-scopes"] as boolean | undefined) === true,
+    deniedTools: values["denied-tools"] as string | undefined,
     help: (values.help as boolean | undefined) === true,
     version: (values.version as boolean | undefined) === true,
     unknownArgs:
@@ -72,6 +74,8 @@ export function parseEnv(env: NodeJS.ProcessEnv): EnvArgs {
     fromEnv.sentryDsn = env.SENTRY_DSN || env.DEFAULT_SENTRY_DSN;
   if (env.MCP_SCOPES) fromEnv.scopes = env.MCP_SCOPES;
   if (env.MCP_ADD_SCOPES) fromEnv.addScopes = env.MCP_ADD_SCOPES;
+  if (env.SENTRY_DENIED_TOOLS_REGEX)
+    fromEnv.deniedToolsRegex = env.SENTRY_DENIED_TOOLS_REGEX;
   return fromEnv;
 }
 
@@ -93,6 +97,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     help: cli.help === true,
     version: cli.version === true,
     unknownArgs: cli.unknownArgs,
+    deniedToolsRegex: cli.deniedTools ?? env.deniedToolsRegex,
   };
 
   // If CLI provided scopes, ignore additive env var
