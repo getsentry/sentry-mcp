@@ -24,6 +24,12 @@ export default function RemoteSetup() {
     args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
   };
 
+  const codexRemoteConfigToml = [
+    "[mcp_servers.sentry]",
+    'command = "npx"',
+    `args = ["-y", "${NPM_REMOTE_NAME}@latest", "${endpoint}"]`,
+  ].join("\n");
+
   const sentryMCPConfig = {
     url: endpoint,
   };
@@ -160,6 +166,46 @@ export default function RemoteSetup() {
                 Claude Code MCP documentation
               </a>
               .
+            </small>
+          </p>
+        </SetupGuide>
+
+        <SetupGuide id="codex-cli" title="Codex">
+          <ol>
+            <li>Open your terminal to access the CLI.</li>
+            <li>
+              <CodeSnippet
+                noMargin
+                snippet={`codex mcp add sentry -- ${coreConfig.command} ${coreConfig.args.join(" ")}`}
+              />
+            </li>
+            <li>
+              Next time you run <code>codex</code>, the Sentry MCP server will
+              be available. It will automatically open the OAuth flow to connect
+              to your Sentry account.
+            </li>
+          </ol>
+          Or
+          <ol>
+            <li>
+              Edit <code>~/.codex/config.toml</code> and add the remote MCP
+              configuration:
+              <CodeSnippet noMargin snippet={codexRemoteConfigToml} />
+            </li>
+            <li>
+              Save the file and restart any running <code>codex</code> session
+            </li>
+            <li>
+              Next time you run <code>codex</code>, the Sentry MCP server will
+              be available. It will automatically open the OAuth flow to connect
+              to your Sentry account.
+            </li>
+          </ol>
+          <p>
+            <small>
+              Need verbose logs? Launch Codex with
+              <code>RUST_LOG=codex_core=info,codex_tui=info</code> to stream MCP
+              activity while you iterate.
             </small>
           </p>
         </SetupGuide>
