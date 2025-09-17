@@ -75,5 +75,6 @@ export function finalize(input: MergedArgs): ResolvedConfig {
     finalScopes,
     organizationSlug: input.organizationSlug,
     projectSlug: input.projectSlug,
+    deniedToolsRegex: input.deniedToolsRegex,
   };
 }

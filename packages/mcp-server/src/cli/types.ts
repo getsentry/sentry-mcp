@@ -14,6 +14,7 @@ export type CliArgs = {
   help?: boolean;
   version?: boolean;
   unknownArgs: string[];
+  deniedTools?: string;
 };
 
 export type EnvArgs = {
@@ -24,6 +25,7 @@ export type EnvArgs = {
   sentryDsn?: string;
   scopes?: string;
   addScopes?: string;
+  deniedToolsRegex?: string;
 };
 
 export type MergedArgs = {
@@ -40,6 +42,7 @@ export type MergedArgs = {
   help?: boolean;
   version?: boolean;
   unknownArgs: string[];
+  deniedToolsRegex?: string;
 };
 
 export type ResolvedConfig = {
@@ -50,4 +53,5 @@ export type ResolvedConfig = {
   finalScopes?: Set<Scope>;
   organizationSlug?: string;
   projectSlug?: string;
+  deniedToolsRegex?: string;
 };

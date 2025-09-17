@@ -43,7 +43,32 @@ Note: You can also use environment variables:
 SENTRY_ACCESS_TOKEN=
 SENTRY_HOST=
 OPENAI_API_KEY=  # Required for AI-powered search tools (search_events, search_issues)
+SENTRY_DENIED_TOOLS_REGEX=  # Optional: Hide tools matching regex pattern (e.g., "^search_" to hide search tools)
 ```
+
+### Tool Filtering
+
+To reduce context bloat and limit available tools, you can use either the `SENTRY_DENIED_TOOLS_REGEX` environment variable or the `--denied-tools` command line argument. Any tools matching the regex pattern will be completely hidden from the MCP server response.
+
+Examples:
+```shell
+# Environment variable approach
+export SENTRY_DENIED_TOOLS_REGEX="^search_"
+pnpm start:stdio --access-token=TOKEN --host=sentry.io
+
+# Command line argument approach (CLI takes precedence)
+pnpm start:stdio --access-token=TOKEN --host=sentry.io --denied-tools="^search_"
+
+# Hide all but a specific set of tools
+pnpm start:stdio --access-token=TOKEN --denied-tools="^(?!(?:find_projects|get_issue_details)$).*$"
+
+# Hide specific tools
+pnpm start:stdio --access-token=TOKEN --denied-tools="^(whoami|get_doc)$"
+```
+
+**Note:** The `--denied-tools` command line argument takes precedence over the `SENTRY_DENIED_TOOLS_REGEX` environment variable.
+
+If the regex pattern is invalid, a warning will be logged and all tools will remain available.
 
 ### MCP Inspector
 
