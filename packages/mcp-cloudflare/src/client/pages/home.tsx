@@ -190,7 +190,7 @@ export default function Home({ onChatClick }: HomeProps) {
               const toolsToShow =
                 isAuthenticated && metadata
                   ? TOOL_DEFINITIONS.filter((tool) =>
-                      metadata.tools.includes(tool.name),
+                      (metadata.tools || []).includes(tool.name),
                     )
                   : TOOL_DEFINITIONS;
 
