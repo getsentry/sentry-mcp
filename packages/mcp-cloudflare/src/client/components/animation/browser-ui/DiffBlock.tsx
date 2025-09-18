@@ -1,7 +1,17 @@
-export default function DiffBlock(diff: string[], step: number, delay: number) {
+export default function DiffBlock({
+  diff,
+  step,
+  delay,
+}: {
+  diff: string[];
+  step: number;
+  delay: number;
+}) {
   return (
     <pre
-      className={`${step === 4 ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"} absolute inset-0 top-10 z-50 h-full bg-500 text-sm duration-300`}
+      className={`${
+        step === 4 ? "opacity-100 duration-300" : "opacity-0"
+      } absolute inset-0 top-10 z-50 h-full bg-neutral-900 text-sm`}
       style={{
         transitionDelay: step === 4 ? `${delay}s` : "0s",
       }}
@@ -9,7 +19,17 @@ export default function DiffBlock(diff: string[], step: number, delay: number) {
       {Array.isArray(diff) &&
         diff.map((line, idx) => (
           <div
-            className={`${step === 4 ? "translate-x-0 opacity-100 blur-none duration-300" : "-translate-x-8 opacity-0 blur-xl"} ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${line.includes("+") ? "!text-lime-800 !bg-lime-400" : line.includes("-") ? "!text-red-800 !bg-red-400" : "text-white/70"}}`}
+            className={`${
+              step === 4
+                ? "translate-x-0 opacity-100 blur-none duration-300"
+                : "-translate-x-8 opacity-0 blur-xl"
+            } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
+              line.includes("+")
+                ? "bg-lime-300/30 text-lime-400"
+                : line.includes("-")
+                  ? "bg-red-300/30 text-red-400"
+                  : "text-white/70"
+            }}`}
             key={line}
             style={{
               transitionDelay: step === 4 ? `${delay + 0.05 * idx}s` : "0s",

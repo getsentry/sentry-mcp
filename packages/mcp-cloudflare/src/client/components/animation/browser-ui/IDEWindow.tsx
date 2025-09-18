@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import WindowHeader from "./WindowHeader";
+import DiffBlock from "./DiffBlock";
 
 export default function IDEWindow({ step }: { step: number }) {
   return (
@@ -57,92 +58,9 @@ export default function IDEWindow({ step }: { step: number }) {
           src="https://media1.tenor.com/m/PLmzsF8-WkoAAAAC/dancing-bender.gif"
           width={220}
         />
-        {/* <DiffBlock code={diff1} step={step} /> */}
-        <pre
-          className={`${
-            step === 4 ? "opacity-100" : "opacity-0"
-          } absolute inset-0 top-10 z-50 h-full bg-neutral-900 text-sm duration-300`}
-          style={{
-            transitionDelay: step === 4 ? `${3}s` : "0s",
-          }}
-        >
-          {Array.isArray(diff1) &&
-            diff1.map((line, idx) => (
-              <div
-                className={`${
-                  step === 4
-                    ? "translate-x-0 opacity-100 blur-none duration-300"
-                    : "-translate-x-8 opacity-0 blur-xl"
-                } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
-                  line.includes("+")
-                    ? "bg-lime-300/30 text-lime-400"
-                    : line.includes("-")
-                      ? "bg-red-300/30 text-red-400"
-                      : "text-white/70"
-                }}`}
-                key={line}
-                style={{
-                  transitionDelay: step === 4 ? `${3 + 0.05 * idx}s` : "0s",
-                }}
-              >
-                {line}
-              </div>
-            ))}
-        </pre>
-        <pre
-          className={`${
-            step >= 4 ? "opacity-100" : "opacity-0"
-          } absolute inset-0 top-10 z-40 h-full bg-neutral-900 text-sm delay-2000 duration-300`}
-        >
-          {diff2.map((line, idx) => (
-            <div
-              className={`${
-                step >= 4
-                  ? "translate-x-0 opacity-100 blur-none duration-300"
-                  : "-translate-x-8 opacity-0 blur-xl"
-              } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
-                line.includes("+")
-                  ? "bg-lime-300/30 text-lime-400"
-                  : line.includes("-")
-                    ? "bg-red-300/30 text-red-400"
-                    : "text-white/70"
-              }}`}
-              key={line}
-              style={{
-                transitionDelay: step >= 4 ? `${2 + 0.05 * idx}s` : "0s",
-              }}
-            >
-              {line}
-            </div>
-          ))}
-        </pre>
-        <pre
-          className={`${
-            step >= 4 ? "opacity-100" : "opacity-0"
-          } absolute inset-0 top-10 z-30 h-full bg-neutral-900 text-sm delay-100 duration-300`}
-        >
-          {diff3.map((line, idx) => (
-            <div
-              className={`${
-                step >= 4
-                  ? "translate-x-0 opacity-100 blur-none duration-300"
-                  : "-translate-x-8 opacity-0 blur-xl"
-              } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
-                line.includes("+")
-                  ? "bg-lime-300/30 text-lime-400"
-                  : line.includes("-")
-                    ? "bg-red-300/30 text-red-400"
-                    : "ext-white/70"
-              }}`}
-              key={line}
-              style={{
-                transitionDelay: step >= 4 ? `${0.1 + 0.05 * idx}s` : "0s",
-              }}
-            >
-              {line}
-            </div>
-          ))}
-        </pre>
+        <DiffBlock diff={diff3} step={step} delay={0.1} />
+        <DiffBlock diff={diff2} step={step} delay={2} />
+        <DiffBlock diff={diff1} step={step} delay={3} />
       </div>
     </div>
   );

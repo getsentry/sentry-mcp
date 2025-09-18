@@ -99,7 +99,7 @@ export default function App() {
               />
             </div>
             <div
-              className="overflow-wrap relative grid h-[calc(100vh-12rem)] max-h-[69rem] w-full gap-8 rounded-2xl p-2 md:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 md:grid-rows-1"
+              className="overflow-wrap relative grid h-[calc(100vh-12rem)] max-h-[69rem] w-full gap-8 rounded-2xl md:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 md:grid-rows-1"
               id="demo"
             >
               <div className="contents z-50">
