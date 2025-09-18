@@ -10,7 +10,7 @@ export default function BrowserWindow({ step }: { step: number }) {
         step >= 3
           ? "pointer-events-none translate-x-32 scale-75 opacity-0 blur-xl"
           : step === 1
-            ? "border-pink-300/50"
+            ? "border-pink-400/50"
             : step === 2
               ? "border-orange-400/50"
               : "border-white/10"
