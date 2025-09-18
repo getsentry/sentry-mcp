@@ -45,7 +45,7 @@ export default function TerminalAnimation({
       label: "You Copy Paste the Issue URL",
       description: "Copy the Sentry issue url directly from your browser",
       startTime: 31.6,
-      startSpeed: 2,
+      startSpeed: 5,
       autoContinueMs: 1950,
       autoPlay: false,
     },
@@ -74,7 +74,7 @@ export default function TerminalAnimation({
       description: "LLM analyzes the context and comes up with a solution",
       startTime: 48.5,
       startSpeed: 30,
-      autoContinueMs: 1000,
+      autoContinueMs: 100,
       autoPlay: false,
     },
     {
@@ -91,7 +91,7 @@ export default function TerminalAnimation({
       description: "Automaticall running tests to verify the solution works",
       startTime: 242,
       startSpeed: 20,
-      autoContinueMs: 1000,
+      autoContinueMs: 100,
       autoPlay: false,
     },
   ];
@@ -210,6 +210,25 @@ export default function TerminalAnimation({
     }
   }
 
+  function restart() {
+    currentStepRef.current = -1;
+    setCurrentIndex(-1);
+    setSpeed(0.5);
+    autoContinueTimerRef.current = null;
+    playerRef.current.pause?.();
+    // remove previous marker listener if present
+    if (playerRef.current.__onMarker) {
+      try {
+        playerRef.current.removeEventListener?.(
+          "marker",
+          playerRef.current.__onMarker,
+        );
+      } catch {}
+    }
+    playerRef.current.dispose?.();
+    mountPlayer(31, 0.5, steps[0].startTime, true);
+  }
+
   useEffect(() => {
     // initial
     mountPlayer(31, 0.5, steps[0].startTime);
@@ -248,13 +267,13 @@ export default function TerminalAnimation({
             <div className="hidden sm:block">
               <CodeSnippet noMargin snippet={endpoint} />
             </div>
-            <div className="px-6 py-2 flex items-center bg-gradient-to-br from-violet-300 via-violet-600 to-violet-700 hover:bg-violet-700 text-white transition rounded-2xl font-bold border-2 border-white/20">
-              Docs
+            <div className="px-6 py-2 flex items-center cursor-pointer bg-violet-600 hover:bg-violet-700 text-white transition font-bold">
+              /docs
             </div>
             <button
               type="button"
               onClick={() => onChatClick()}
-              className="cursor-pointer px-5 py-2 flex items-center bg-neutral-700 hover:bg-neutral-600 transition rounded-2xl font-bold border-2 border-white/10"
+              className="cursor-pointer px-5 py-2 flex items-center bg-gradient-to-r from-violet-600 to-violet-900 hover:bg-neutral-600/50 text-white transition font-bold"
             >
               <Sparkles className="size-5 mr-2" />
               Live Demo
@@ -277,10 +296,10 @@ export default function TerminalAnimation({
             direction={currentIndex === 4 ? "ltr" : "rtl"}
             pulseColorClass={
               currentIndex === 4
-                ? "text-lime-400"
+                ? "text-lime-400/50"
                 : currentIndex === 2
-                  ? "text-orange-400"
-                  : "text-pink-400"
+                  ? "text-orange-400/50"
+                  : "text-pink-400/50"
             }
             heightClass="h-0.5"
             periodSec={0.3}
@@ -296,11 +315,12 @@ export default function TerminalAnimation({
         <div className="relative">
           <button
             type="button"
-            className={`border group/replay border-white/20 bg-white/5 hover:bg-white/20 active:bg-white/30 active:duration-75 duration-300 absolute -top-12 rounded-full px-3 py-1 left-1/2 -translate-x-1/2 z-50 cursor-pointer hover:duration-300 hover:delay-0 ${
+            className={`border group/replay border-white/20 bg-white/15 hover:bg-white/30 active:bg-white/50 active:duration-75 duration-300 absolute -top-12 rounded-full px-3 py-1 left-1/2 -translate-x-1/2 z-50 cursor-pointer hover:duration-300 hover:delay-0 ${
               currentIndex === 5
                 ? "opacity-100 -translate-y-full delay-1000 duration-500 blur-none pointer-events-auto"
                 : "opacity-0 -translate-y-1/2 pointer-events-none blur-xl"
             }`}
+            onClick={() => restart()}
           >
             Missed a step? Replay
             <RotateCcw className="inline-block size-4 ml-2 group-hover/replay:-rotate-360 group-hover/replay:ease-out group-hover/replay:duration-1000" />
@@ -308,28 +328,7 @@ export default function TerminalAnimation({
         </div>
         <div className="md:mt-0 group/griditem overflow-clip">
           <StepsList
-            onSelectAction={(i) =>
-              i === 0
-                ? (() => {
-                    currentStepRef.current = -1;
-                    setCurrentIndex(-1);
-                    setSpeed(0.5);
-                    autoContinueTimerRef.current = null;
-                    playerRef.current.pause?.();
-                    // remove previous marker listener if present
-                    if (playerRef.current.__onMarker) {
-                      try {
-                        playerRef.current.removeEventListener?.(
-                          "marker",
-                          playerRef.current.__onMarker,
-                        );
-                      } catch {}
-                    }
-                    playerRef.current.dispose?.();
-                    mountPlayer(31, 0.5, steps[0].startTime, true);
-                  })()
-                : activateStep(i)
-            }
+            onSelectAction={(i) => (i === 0 ? restart() : activateStep(i))}
             globalIndex={Math.max(currentIndex, 0)}
             steps={steps}
           />
