@@ -1,5 +1,3 @@
-
-
 type JsonSchema =
   | {
       properties?: Record<string, { description?: string } | undefined>;

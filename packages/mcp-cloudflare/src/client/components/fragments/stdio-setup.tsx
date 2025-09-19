@@ -20,6 +20,13 @@ export default function StdioSetup() {
     },
   };
 
+  const codexConfigToml = [
+    "[mcp_servers.sentry]",
+    'command = "npx"',
+    'args = ["@sentry/mcp-server@latest"]',
+    'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", SENTRY_HOST = "sentry.io", OPENAI_API_KEY = "your-openai-key" }',
+  ].join("\n");
+
   return (
     <>
       <Prose className="mb-6">
@@ -162,6 +169,32 @@ export default function StdioSetup() {
                 Claude Code MCP documentation
               </Link>
               .
+            </small>
+          </p>
+        </SetupGuide>
+
+        <SetupGuide id="codex-cli" title="Codex">
+          <ol>
+            <li>
+              Edit <code>~/.codex/config.toml</code> and add the MCP server
+              configuration:
+              <CodeSnippet noMargin snippet={codexConfigToml} />
+            </li>
+            <li>
+              Replace <code>sentry-user-token</code> with your Sentry User Auth
+              Token. Update <code>SENTRY_HOST</code> if you are using a
+              self-hosted deployment.
+            </li>
+            <li>
+              Restart any running <code>codex</code> session to load the new MCP
+              configuration.
+            </li>
+          </ol>
+          <p>
+            <small>
+              Codex stores session logs under <code>~/.codex/log/</code>. Set
+              <code>RUST_LOG=codex_core=info</code> before launching if you need
+              verbose output while debugging the MCP connection.
             </small>
           </p>
         </SetupGuide>

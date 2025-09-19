@@ -1,5 +1,3 @@
-
-
 interface TemplateVarsProps {
   variables?: readonly string[] | null;
   title?: string;
