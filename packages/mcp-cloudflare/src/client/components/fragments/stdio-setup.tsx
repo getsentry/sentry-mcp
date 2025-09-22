@@ -20,6 +20,13 @@ export default function StdioSetup() {
     },
   };
 
+  const codexConfigToml = [
+    "[mcp_servers.sentry]",
+    'command = "npx"',
+    'args = ["@sentry/mcp-server@latest"]',
+    'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", SENTRY_HOST = "sentry.io", OPENAI_API_KEY = "your-openai-key" }',
+  ].join("\n");
+
   return (
     <>
       <Prose className="mb-6">
@@ -164,6 +171,25 @@ export default function StdioSetup() {
               .
             </small>
           </p>
+        </SetupGuide>
+
+        <SetupGuide id="codex-cli" title="Codex">
+          <ol>
+            <li>
+              Edit <code>~/.codex/config.toml</code> and add the MCP server
+              configuration:
+              <CodeSnippet noMargin snippet={codexConfigToml} />
+            </li>
+            <li>
+              Replace <code>sentry-user-token</code> with your Sentry User Auth
+              Token. Update <code>SENTRY_HOST</code> if you are using a
+              self-hosted deployment.
+            </li>
+            <li>
+              Restart any running <code>codex</code> session to load the new MCP
+              configuration.
+            </li>
+          </ol>
         </SetupGuide>
 
         <SetupGuide id="windsurf" title="Windsurf">
