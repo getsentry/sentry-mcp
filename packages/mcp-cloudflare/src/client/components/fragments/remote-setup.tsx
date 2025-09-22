@@ -201,13 +201,6 @@ export default function RemoteSetup() {
               to your Sentry account.
             </li>
           </ol>
-          <p>
-            <small>
-              Need verbose logs? Launch Codex with
-              <code>RUST_LOG=codex_core=info,codex_tui=info</code> to stream MCP
-              activity while you iterate.
-            </small>
-          </p>
         </SetupGuide>
 
         <SetupGuide id="windsurf" title="Windsurf">
