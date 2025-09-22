@@ -190,13 +190,6 @@ export default function StdioSetup() {
               configuration.
             </li>
           </ol>
-          <p>
-            <small>
-              Codex stores session logs under <code>~/.codex/log/</code>. Set
-              <code>RUST_LOG=codex_core=info</code> before launching if you need
-              verbose output while debugging the MCP connection.
-            </small>
-          </p>
         </SetupGuide>
 
         <SetupGuide id="windsurf" title="Windsurf">
