@@ -10,22 +10,32 @@ const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 export default function StdioSetup() {
   const mcpStdioSnippet = `npx ${NPM_PACKAGE_NAME}@latest`;
 
+  const defaultEnv = {
+    SENTRY_ACCESS_TOKEN: "sentry-user-token",
+    OPENAI_API_KEY: "your-openai-key", // Required for AI-powered search tools
+  } as const;
+
   const coreConfig = {
     command: "npx",
     args: ["@sentry/mcp-server@latest"],
-    env: {
-      SENTRY_ACCESS_TOKEN: "sentry-user-token",
-      SENTRY_HOST: "sentry.io",
-      OPENAI_API_KEY: "your-openai-key", // Required for AI-powered search tools
-    },
+    env: defaultEnv,
   };
 
   const codexConfigToml = [
     "[mcp_servers.sentry]",
     'command = "npx"',
     'args = ["@sentry/mcp-server@latest"]',
-    'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", SENTRY_HOST = "sentry.io", OPENAI_API_KEY = "your-openai-key" }',
+    'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", OPENAI_API_KEY = "your-openai-key" }',
   ].join("\n");
+
+  const selfHostedHostExample = [
+    `${mcpStdioSnippet}`,
+    "--access-token=sentry-user-token",
+    "--host=sentry.example.com",
+  ].join(" \\\n  ");
+
+  const selfHostedEnvLine =
+    'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", SENTRY_HOST = "sentry.example.com", OPENAI_API_KEY = "your-openai-key" }';
 
   return (
     <>
@@ -45,6 +55,11 @@ export default function StdioSetup() {
         </p>
 
         <p>
+          The CLI targets Sentry's hosted service by default. Add host overrides
+          only when you run self-hosted Sentry.
+        </p>
+
+        <p>
           Create a User Auth Token in your account settings with the following
           scopes:
         </p>
@@ -55,60 +70,110 @@ export default function StdioSetup() {
             </li>
           ))}
         </ul>
-        <p>
-          You'll then bind that to your MCP instance using the following
-          command:
-        </p>
+        <p>Now wire up that token to the MCP configuration:</p>
         <CodeSnippet
           snippet={[
             `${mcpStdioSnippet}`,
             "--access-token=sentry-user-token",
-            "--host=sentry.io",
           ].join(" \\\n  ")}
         />
-        <p>
-          <strong>Note:</strong> We enable Sentry reporting by default (to
-          sentry.io). If you wish to disable it, pass <code>--sentry-dsn=</code>{" "}
-          with an empty value.
-        </p>
+        <div className="mt-6">
+          <h4 className="text-base font-semibold text-slate-100">
+            Using with Self-Hosted Sentry
+          </h4>
+          <p>
+            You'll need to provide the hostname of your self-hosted Sentry
+            instance:
+          </p>
+          <CodeSnippet snippet={selfHostedHostExample} />
+        </div>
 
-        <p>
-          <strong>Constraints (stdio only):</strong> Restrict all tool calls to
-          a specific organization, and optionally to a project within that
-          organization using CLI flags.
-        </p>
-        <CodeSnippet
-          snippet={[
-            `${mcpStdioSnippet}`,
-            "--access-token=sentry-user-token",
-            "--host=sentry.io",
-            "--organization-slug=sentry",
-            "--project-slug=mcp-server",
-          ].join(" \\\n  ")}
-        />
-        <p>
-          You can provide just <code>--organization-slug</code> to scope to an
-          org, or include <code>--project-slug</code> to scope to a single
-          project within that org.
-        </p>
+        <h4 className="mb-6 text-lg font-semibold text-slate-100">
+          Configuration
+        </h4>
 
-        <p>
-          <strong>Scopes:</strong> The default configuration grants read-only
-          access (listed above). To grant full access to all available tools use
-          <code>--all-scopes</code>.
-        </p>
-        <CodeSnippet
-          snippet={[
-            `${mcpStdioSnippet}`,
-            "--access-token=sentry-user-token",
-            "--host=sentry.io",
-            "--all-scopes",
-          ].join(" \\\n  ")}
-        />
-        <p>
-          For more options and details, run{" "}
-          <code>npx @sentry/mcp-server@latest --help</code> — there are many
-          flags available.
+        <div className="mt-6 space-y-6 text-sm text-slate-200">
+          <section>
+            <h5 className="font-semibold uppercase tracking-wide text-slate-300 text-xs">
+              Core setup
+            </h5>
+            <dl className="mt-3 space-y-2">
+              <dt className="font-medium text-slate-100">
+                <code>--access-token</code> / <code>SENTRY_ACCESS_TOKEN</code>
+              </dt>
+              <dd className="text-slate-300">Required user auth token.</dd>
+
+              <dt className="font-medium text-slate-100">
+                <code>--host</code> / <code>SENTRY_HOST</code>
+              </dt>
+              <dd className="text-slate-300">
+                Hostname override when you run self-hosted Sentry.
+              </dd>
+
+              <dt className="font-medium text-slate-100">
+                <code>--sentry-dsn</code> / <code>SENTRY_DSN</code>
+              </dt>
+              <dd className="text-slate-300">
+                Send telemetry elsewhere or disable it by passing an empty
+                value.
+              </dd>
+            </dl>
+          </section>
+
+          <section>
+            <h5 className="font-semibold uppercase tracking-wide text-slate-300 text-xs">
+              Constraints
+            </h5>
+            <dl className="mt-3 space-y-2">
+              <dt className="font-medium text-slate-100">
+                <code>--organization-slug</code>
+              </dt>
+              <dd className="text-slate-300">
+                Scope all tools to a single organization (CLI only).
+              </dd>
+
+              <dt className="font-medium text-slate-100">
+                <code>--project-slug</code>
+              </dt>
+              <dd className="text-slate-300">
+                Scope all tools to a specific project within that organization
+                (CLI only).
+              </dd>
+            </dl>
+          </section>
+
+          <section>
+            <h5 className="font-semibold uppercase tracking-wide text-slate-300 text-xs">
+              Permissions
+            </h5>
+            <dl className="mt-3 space-y-2">
+              <dt className="font-medium text-slate-100">
+                <code>--all-scopes</code>
+              </dt>
+              <dd className="text-slate-300">
+                Expand the token to the full permission set for every tool.
+              </dd>
+
+              <dt className="font-medium text-slate-100">
+                <code>--scopes</code> / <code>MCP_SCOPES</code>
+              </dt>
+              <dd className="text-slate-300">
+                Replace the default read-only scopes with an explicit list.
+              </dd>
+
+              <dt className="font-medium text-slate-100">
+                <code>--add-scopes</code> / <code>MCP_ADD_SCOPES</code>
+              </dt>
+              <dd className="text-slate-300">
+                Keep the read-only defaults and layer on additional scopes.
+              </dd>
+            </dl>
+          </section>
+        </div>
+        <p className="mt-4 text-sm text-slate-300">
+          Need something else? Run{" "}
+          <code>npx @sentry/mcp-server@latest --help</code> to view the full
+          flag list.
         </p>
       </Prose>
       <Heading as="h3">Integration Guides</Heading>
@@ -153,13 +218,16 @@ export default function StdioSetup() {
             <li>
               <CodeSnippet
                 noMargin
-                snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e SENTRY_HOST=sentry.io -e OPENAI_API_KEY=your-openai-key -- ${mcpStdioSnippet}`}
+                snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e OPENAI_API_KEY=your-openai-key -- ${mcpStdioSnippet}`}
               />
             </li>
             <li>
               Replace <code>sentry-user-token</code> with your actual User Auth
-              Token and, if using self-hosted Sentry, replace{" "}
-              <code>sentry.io</code> with your Sentry host.
+              Token.
+            </li>
+            <li>
+              Connecting to self-hosted Sentry? Append
+              <code>-e SENTRY_HOST=your-hostname</code>.
             </li>
           </ol>
           <p>
@@ -182,8 +250,8 @@ export default function StdioSetup() {
             </li>
             <li>
               Replace <code>sentry-user-token</code> with your Sentry User Auth
-              Token. Update <code>SENTRY_HOST</code> if you are using a
-              self-hosted deployment.
+              Token. Add <code>SENTRY_HOST</code> if you run self-hosted Sentry.
+              <CodeSnippet noMargin snippet={selfHostedEnvLine} />
             </li>
             <li>
               Restart any running <code>codex</code> session to load the new MCP
@@ -364,6 +432,32 @@ export default function StdioSetup() {
           </ol>
         </SetupGuide>
       </Accordion>
+
+      <Heading as="h3">Troubleshooting Connectivity</Heading>
+      <Prose>
+        <p>
+          <strong>Having trouble connecting via the stdio client?</strong>
+          Start with these checks:
+        </p>
+        <ul>
+          <li>
+            <strong>401/403 errors:</strong> Verify your User Auth Token still
+            exists and includes the required scopes. Reissue the token if it was
+            rotated or downgraded.
+          </li>
+          <li>
+            <strong>404s for organizations or issues:</strong> Confirm the
+            <code>--organization-slug</code> / <code>--project-slug</code>
+            values and make sure the host matches your self-hosted Sentry
+            endpoint (e.g. <code>--host=sentry.example.com</code>).
+          </li>
+          <li>
+            <strong>TLS or network failures:</strong> Ensure you are using HTTPS
+            endpoints and that firewalls allow outbound traffic to your Sentry
+            instance.
+          </li>
+        </ul>
+      </Prose>
     </>
   );
 }
