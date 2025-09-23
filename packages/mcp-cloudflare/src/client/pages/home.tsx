@@ -64,7 +64,7 @@ export default function Home({ onChatClick }: HomeProps) {
             </div>
           </div>
 
-          <Section heading="What is a Model Context Protocol?">
+          <Section>
             <Prose>
               <p>
                 Simply put, it's a way to plug Sentry's API into an LLM, letting
@@ -102,21 +102,20 @@ export default function Home({ onChatClick }: HomeProps) {
             heading={
               <>
                 <div className="flex-1">Getting Started</div>
-                <div className="flex self-justify-end items-center gap-1 text-xs">
+                <div className="flex items-center gap-2 text-xs">
                   <Button
-                    variant="link"
+                    variant={!stdio ? "default" : "secondary"}
                     size="xs"
                     onClick={() => setStdio(false)}
-                    active={!stdio}
+                    className={!stdio ? "shadow-sm" : undefined}
                   >
-                    Remote
+                    Cloud
                   </Button>
-                  <span>/</span>
                   <Button
-                    variant="link"
+                    variant={stdio ? "default" : "secondary"}
                     size="xs"
                     onClick={() => setStdio(true)}
-                    active={stdio}
+                    className={stdio ? "shadow-sm" : undefined}
                   >
                     Stdio
                   </Button>
@@ -127,14 +126,14 @@ export default function Home({ onChatClick }: HomeProps) {
             <div className="relative min-h-0">
               {!stdio ? (
                 <div
-                  key="remote"
+                  key="cloud"
                   className="animate-in fade-in slide-in-from-left-4 duration-300"
                 >
                   <RemoteSetup />
                 </div>
               ) : (
                 <div
-                  key="stdio"
+                  key="stdio-self-hosted"
                   className="animate-in fade-in slide-in-from-right-4 duration-300"
                 >
                   <StdioSetup />

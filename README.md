@@ -34,16 +34,23 @@ event:write
 Launch the transport:
 
 ```shell
-npx @sentry/mcp-server@latest --access-token=sentry-user-token --host=sentry.example.com
+npx @sentry/mcp-server@latest --access-token=sentry-user-token
 ```
+
+Need to connect to a self-hosted deployment? Add <code>--host</code> (hostname
+only, e.g. <code>--host=sentry.example.com</code>) when you run the command.
 
 Note: You can also use environment variables:
 
 ```shell
 SENTRY_ACCESS_TOKEN=
+# Optional overrides for self-hosted deployments
 SENTRY_HOST=
 OPENAI_API_KEY=  # Required for AI-powered search tools (search_events, search_issues)
 ```
+
+If you leave the host variable unset, the CLI automatically targets the Sentry
+SaaS service. Only set the override when you operate self-hosted Sentry.
 
 ### MCP Inspector
 
