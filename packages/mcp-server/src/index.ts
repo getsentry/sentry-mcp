@@ -117,6 +117,7 @@ startStdio(instrumentedServer, {
   },
   sentryHost: cfg.sentryHost,
   mcpUrl: cfg.mcpUrl,
+  deniedToolsRegex: cfg.deniedToolsRegex,
 }).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events

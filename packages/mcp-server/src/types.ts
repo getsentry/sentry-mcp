@@ -58,6 +58,8 @@ export type ServerContext = {
   grantedScopes?: Set<Scope> | ReadonlySet<Scope>;
   // URL-based session constraints
   constraints: Constraints;
+  // Tool filtering regex pattern
+  deniedToolsRegex?: string;
   // MCP client information captured during initialization
   mcpClientName?: string;
   mcpClientVersion?: string;
