@@ -37,7 +37,7 @@ describe("tokenExchangeCallback", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("should throw error when no refresh token in props", async () => {
+  it("should return undefined when no refresh token in props", async () => {
     const options: TokenExchangeCallbackOptions = {
       grantType: "refresh_token",
       clientId: "test-client-id",
@@ -51,9 +51,9 @@ describe("tokenExchangeCallback", () => {
       } as WorkerProps,
     };
 
-    await expect(tokenExchangeCallback(options, mockEnv)).rejects.toThrow(
-      "No refresh token available in stored props",
-    );
+    await expect(
+      tokenExchangeCallback(options, mockEnv),
+    ).resolves.toBeUndefined();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
