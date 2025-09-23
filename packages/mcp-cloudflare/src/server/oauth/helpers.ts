@@ -223,11 +223,7 @@ export async function tokenExchangeCallback(
     // For authorization code grants, the tokens were already exchanged by the /oauth/callback route
     // and stored in props. We just need to return them to ensure they're properly stored
     // in the workers-oauth-provider grant for future refresh operations.
-    return {
-      newProps: {
-        ...options.props,
-      },
-    };
+    return undefined;
   }
 
   if (options.grantType === "refresh_token") {
@@ -263,7 +259,7 @@ export async function tokenExchangeCallback(
       ).href;
 
       // Use our refresh token function to get new tokens from Sentry
-      const [tokenResponse, errorResponse] = await refreshAccessToken({
+      const [payload, errorResponse] = await refreshAccessToken({
         client_id: env.SENTRY_CLIENT_ID,
         client_secret: env.SENTRY_CLIENT_SECRET,
         refresh_token: currentRefreshToken,
@@ -283,11 +279,13 @@ export async function tokenExchangeCallback(
         // This updates ctx.props
         newProps: {
           ...options.props,
-          accessToken: tokenResponse.access_token,
-          refreshToken: tokenResponse.refresh_token,
-          accessTokenExpiresAt: Date.now() + tokenResponse.expires_in * 1000,
+          id: payload.user.id,
+          name: payload.user.name,
+          accessToken: payload.access_token,
+          refreshToken: payload.refresh_token,
+          accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
         },
-        accessTokenTTL: tokenResponse.expires_in,
+        accessTokenTTL: payload.expires_in,
       };
     } catch (error) {
       logError(error);
