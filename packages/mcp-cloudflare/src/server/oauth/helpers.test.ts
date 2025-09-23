@@ -23,9 +23,48 @@ describe("tokenExchangeCallback", () => {
     vi.clearAllMocks();
   });
 
-  it("should skip non-refresh_token grant types", async () => {
+  it("should handle authorization_code grant type", async () => {
+    // Mock successful token exchange response with correct schema
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        access_token: "new-access-token",
+        refresh_token: "new-refresh-token",
+        token_type: "bearer",
+        expires_in: 3600,
+        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+        user: {
+          id: "user-123",
+          name: "Test User",
+          email: "test@example.com",
+        },
+        scope: "org:read project:read",
+      }),
+    });
+
     const options: TokenExchangeCallbackOptions = {
       grantType: "authorization_code",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
+      props: {
+        code: "auth-code-123",
+        redirectUri: "https://example.com/callback",
+      } as WorkerProps,
+    };
+
+    const result = await tokenExchangeCallback(options, mockEnv);
+
+    expect(result).toBeDefined();
+    expect(result?.newProps.accessToken).toBe("new-access-token");
+    expect(result?.newProps.refreshToken).toBe("new-refresh-token");
+    expect(result?.accessTokenTTL).toBe(3600);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("should skip unsupported grant types", async () => {
+    const options: TokenExchangeCallbackOptions = {
+      grantType: "client_credentials" as any,
       clientId: "test-client-id",
       userId: "test-user-id",
       scope: ["org:read", "project:read"],

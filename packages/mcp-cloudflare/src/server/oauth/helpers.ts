@@ -208,7 +208,7 @@ export async function refreshAccessToken({
 }
 
 /**
- * Token exchange callback for handling Sentry OAuth token refreshes.
+ * Token exchange callback for handling Sentry OAuth token exchanges and refreshes.
  */
 export async function tokenExchangeCallback(
   options: TokenExchangeCallbackOptions,
@@ -218,61 +218,31 @@ export async function tokenExchangeCallback(
     SENTRY_HOST?: string;
   },
 ): Promise<TokenExchangeCallbackResult | undefined> {
-  // Only handle refresh_token grant type
-  if (options.grantType !== "refresh_token") {
-    return undefined; // No-op for other grant types
-  }
-
-  // Extract the refresh token from the stored props
-  const currentRefreshToken = options.props.refreshToken;
-
-  if (!currentRefreshToken) {
-    throw new Error("No refresh token available in stored props");
-  }
-
-  try {
-    // If we have a cached upstream expiry, and there's ample time left,
-    // avoid calling upstream to reduce unnecessary refreshes.
-    // Mint a new provider token with the remaining TTL.
-    const props = options.props as WorkerProps;
-    const maybeExpiresAt = props.accessTokenExpiresAt;
-    if (maybeExpiresAt && Number.isFinite(maybeExpiresAt)) {
-      const remainingMs = maybeExpiresAt - Date.now();
-      const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes safety window
-      if (remainingMs > SAFE_WINDOW_MS) {
-        const remainingSec = Math.floor(remainingMs / 1000);
-        return {
-          newProps: { ...options.props },
-          accessTokenTTL: remainingSec,
-        };
-      }
-    }
-
-    // Construct the upstream token URL for Sentry
+  // Handle both authorization_code and refresh_token grant types
+  if (options.grantType === "authorization_code") {
+    // For authorization code grants, exchange the code for tokens
     const upstreamTokenUrl = new URL(
       SENTRY_TOKEN_URL,
       `https://${env.SENTRY_HOST || "sentry.io"}`,
     ).href;
 
-    // Use our refresh token function to get new tokens from Sentry
-    const [tokenResponse, errorResponse] = await refreshAccessToken({
+    const [tokenResponse, errorResponse] = await exchangeCodeForAccessToken({
       client_id: env.SENTRY_CLIENT_ID,
       client_secret: env.SENTRY_CLIENT_SECRET,
-      refresh_token: currentRefreshToken,
+      code: options.props.code,
       upstream_url: upstreamTokenUrl,
+      redirect_uri: options.props.redirectUri,
     });
 
     if (errorResponse) {
-      // Convert the Response to an Error for the OAuth provider
       const errorText = await errorResponse.text();
       throw new Error(
-        `Failed to refresh upstream token in OAuth provider: ${errorText}`,
+        `Failed to exchange authorization code for tokens: ${errorText}`,
       );
     }
 
-    // Return the updated props with new tokens and TTL
+    // Return the tokens and store them in props for future refreshes
     return {
-      // This updates ctx.props
       newProps: {
         ...options.props,
         accessToken: tokenResponse.access_token,
@@ -281,10 +251,75 @@ export async function tokenExchangeCallback(
       },
       accessTokenTTL: tokenResponse.expires_in,
     };
-  } catch (error) {
-    logError(error);
-    throw new Error("Failed to refresh upstream token in OAuth provider", {
-      cause: error,
-    });
   }
+
+  if (options.grantType === "refresh_token") {
+    // Extract the refresh token from the stored props
+    const currentRefreshToken = options.props.refreshToken;
+
+    if (!currentRefreshToken) {
+      throw new Error("No refresh token available in stored props");
+    }
+
+    try {
+      // If we have a cached upstream expiry, and there's ample time left,
+      // avoid calling upstream to reduce unnecessary refreshes.
+      // Mint a new provider token with the remaining TTL.
+      const props = options.props as WorkerProps;
+      const maybeExpiresAt = props.accessTokenExpiresAt;
+      if (maybeExpiresAt && Number.isFinite(maybeExpiresAt)) {
+        const remainingMs = maybeExpiresAt - Date.now();
+        const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes safety window
+        if (remainingMs > SAFE_WINDOW_MS) {
+          const remainingSec = Math.floor(remainingMs / 1000);
+          return {
+            newProps: { ...options.props },
+            accessTokenTTL: remainingSec,
+          };
+        }
+      }
+
+      // Construct the upstream token URL for Sentry
+      const upstreamTokenUrl = new URL(
+        SENTRY_TOKEN_URL,
+        `https://${env.SENTRY_HOST || "sentry.io"}`,
+      ).href;
+
+      // Use our refresh token function to get new tokens from Sentry
+      const [tokenResponse, errorResponse] = await refreshAccessToken({
+        client_id: env.SENTRY_CLIENT_ID,
+        client_secret: env.SENTRY_CLIENT_SECRET,
+        refresh_token: currentRefreshToken,
+        upstream_url: upstreamTokenUrl,
+      });
+
+      if (errorResponse) {
+        // Convert the Response to an Error for the OAuth provider
+        const errorText = await errorResponse.text();
+        throw new Error(
+          `Failed to refresh upstream token in OAuth provider: ${errorText}`,
+        );
+      }
+
+      // Return the updated props with new tokens and TTL
+      return {
+        // This updates ctx.props
+        newProps: {
+          ...options.props,
+          accessToken: tokenResponse.access_token,
+          refreshToken: tokenResponse.refresh_token,
+          accessTokenExpiresAt: Date.now() + tokenResponse.expires_in * 1000,
+        },
+        accessTokenTTL: tokenResponse.expires_in,
+      };
+    } catch (error) {
+      logError(error);
+      throw new Error("Failed to refresh upstream token in OAuth provider", {
+        cause: error,
+      });
+    }
+  }
+
+  // Unsupported grant type
+  return undefined;
 }
