@@ -9,6 +9,7 @@ describe("cli/parseArgv", () => {
       "--url=https://example.com",
       "--mcp-url=https://mcp.example.com",
       "--sentry-dsn=dsn",
+      "--openai-base-url=https://api.example.com/v1",
       "--scopes=org:read",
       "--add-scopes=event:write",
       "--all-scopes",
@@ -20,6 +21,7 @@ describe("cli/parseArgv", () => {
     expect(parsed.url).toBe("https://example.com");
     expect(parsed.mcpUrl).toBe("https://mcp.example.com");
     expect(parsed.sentryDsn).toBe("dsn");
+    expect(parsed.openaiBaseUrl).toBe("https://api.example.com/v1");
     expect(parsed.scopes).toBe("org:read");
     expect(parsed.addScopes).toBe("event:write");
     expect(parsed.allScopes).toBe(true);
@@ -49,6 +51,7 @@ describe("cli/parseEnv + merge", () => {
       "--host=clihost",
       "--mcp-url=climcp",
       "--sentry-dsn=clidsn",
+      "--openai-base-url=https://api.cli/v1",
       "--scopes=org:admin",
       "--add-scopes=project:write",
     ]);
@@ -57,6 +60,7 @@ describe("cli/parseEnv + merge", () => {
     expect(merged.host).toBe("clihost");
     expect(merged.mcpUrl).toBe("climcp");
     expect(merged.sentryDsn).toBe("clidsn");
+    expect(merged.openaiBaseUrl).toBe("https://api.cli/v1");
     expect(merged.scopes).toBe("org:admin");
     expect(merged.addScopes).toBe("project:write");
   });

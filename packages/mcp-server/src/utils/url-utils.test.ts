@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   validateSentryHostThrows,
   validateAndParseSentryUrlThrows,
+  validateOpenAiBaseUrlThrows,
   getIssueUrl,
   getIssuesSearchUrl,
   getTraceUrl,
@@ -34,6 +35,43 @@ describe("url-utils", () => {
       );
       expect(() => validateSentryHostThrows("https://example.com:443")).toThrow(
         "SENTRY_HOST should only contain a hostname",
+      );
+    });
+  });
+
+  describe("validateOpenAiBaseUrlThrows", () => {
+    it("should accept valid HTTPS URLs", () => {
+      expect(() =>
+        validateOpenAiBaseUrlThrows("https://api.openai.com/v1"),
+      ).not.toThrow();
+      expect(() =>
+        validateOpenAiBaseUrlThrows(
+          "https://custom.example.com/openai/deployments/model",
+        ),
+      ).not.toThrow();
+    });
+
+    it("should accept valid HTTP URLs for local development", () => {
+      expect(() =>
+        validateOpenAiBaseUrlThrows("http://localhost:8080/v1"),
+      ).not.toThrow();
+    });
+
+    it("should reject empty strings", () => {
+      expect(() => validateOpenAiBaseUrlThrows(" ")).toThrow(
+        "OPENAI base URL must not be empty.",
+      );
+    });
+
+    it("should reject URLs with unsupported protocols", () => {
+      expect(() => validateOpenAiBaseUrlThrows("ftp://example.com")).toThrow(
+        "OPENAI base URL must use http or https scheme",
+      );
+    });
+
+    it("should reject invalid URLs", () => {
+      expect(() => validateOpenAiBaseUrlThrows("not-a-url")).toThrow(
+        "OPENAI base URL must be a valid HTTP or HTTPS URL",
       );
     });
   });

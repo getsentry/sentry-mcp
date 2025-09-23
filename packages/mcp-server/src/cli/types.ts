@@ -6,6 +6,7 @@ export type CliArgs = {
   url?: string;
   mcpUrl?: string;
   sentryDsn?: string;
+  openaiBaseUrl?: string;
   scopes?: string;
   addScopes?: string;
   allScopes?: boolean;
@@ -32,6 +33,7 @@ export type MergedArgs = {
   url?: string;
   mcpUrl?: string;
   sentryDsn?: string;
+  openaiBaseUrl?: string;
   scopes?: string;
   addScopes?: string;
   allScopes?: boolean;
@@ -47,6 +49,7 @@ export type ResolvedConfig = {
   sentryHost: string;
   mcpUrl?: string;
   sentryDsn?: string;
+  openaiBaseUrl?: string;
   finalScopes?: Set<Scope>;
   organizationSlug?: string;
   projectSlug?: string;

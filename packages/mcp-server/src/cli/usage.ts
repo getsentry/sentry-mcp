@@ -5,35 +5,30 @@ export function buildUsage(
   defaults: ReadonlyArray<Scope>,
   all: ReadonlyArray<Scope>,
 ): string {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>|--url=<url>] [--mcp-url=<url>] [--sentry-dsn=<dsn>] [--scopes=<scope1,scope2>] [--add-scopes=<scope1,scope2>] [--all-scopes]
+  return `Usage: ${packageName} --access-token=<token> [--host=<host>]
 
-Default scopes (read-only):
-  - ${defaults.join(", ")}
+Required:
+  --access-token <token>  Sentry User Auth Token with API access
 
-Scope options:
-  --scopes      Override default scopes completely
-  --add-scopes  Add scopes to the default read-only set
-  --all-scopes  Grant all available scopes (admin-level and implied)
+Common optional flags:
+  --host <host>           Change Sentry host (self-hosted)
+  --sentry-dsn <dsn>      Override DSN used for telemetry reporting
+  --openai-base-url <url> Override OpenAI API base URL for embedded agents
 
-Constraints (stdio only):
-  --organization-slug <slug>  Constrain all tool calls to this org
-  --project-slug <slug>       Constrain to a project (optional)
+Session constraints:
+  --organization-slug <slug>  Force all calls to an organization
+  --project-slug <slug>       Optional project constraint
 
-Available scopes (higher scopes include lower):
-  - org:read, org:write, org:admin
-  - project:read, project:write, project:admin
-  - team:read, team:write, team:admin
-  - member:read, member:write, member:admin
-  - event:read, event:write, event:admin
-  - project:releases
+Scope controls:
+  --scopes <list>     Override default scopes
+  --add-scopes <list> Add scopes to defaults
+  --all-scopes        Grant every available scope
+
+Defaults: ${defaults.join(", ")}
+All scopes: ${all.join(", ")}
 
 Examples:
-  # Default read-only access
   ${packageName} --access-token=TOKEN
-  
-  # Override with specific scopes only
-  ${packageName} --access-token=TOKEN --scopes=org:read,event:read
-  
-  # Add write permissions to defaults
-  ${packageName} --access-token=TOKEN --add-scopes=event:write,project:write`;
+  ${packageName} --access-token=TOKEN --host=sentry.example.com
+  ${packageName} --access-token=TOKEN --openai-base-url=https://proxy.example.com/v1`;
 }

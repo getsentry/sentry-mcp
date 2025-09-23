@@ -8,6 +8,7 @@ export function parseArgv(argv: string[]): CliArgs {
     url: { type: "string" as const },
     "mcp-url": { type: "string" as const },
     "sentry-dsn": { type: "string" as const },
+    "openai-base-url": { type: "string" as const },
     "organization-slug": { type: "string" as const },
     "project-slug": { type: "string" as const },
     scopes: { type: "string" as const },
@@ -50,6 +51,7 @@ export function parseArgv(argv: string[]): CliArgs {
     url: values.url as string | undefined,
     mcpUrl: values["mcp-url"] as string | undefined,
     sentryDsn: values["sentry-dsn"] as string | undefined,
+    openaiBaseUrl: values["openai-base-url"] as string | undefined,
     organizationSlug: values["organization-slug"] as string | undefined,
     projectSlug: values["project-slug"] as string | undefined,
     scopes: values.scopes as string | undefined,
@@ -84,6 +86,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     host: cli.host ?? env.host,
     mcpUrl: cli.mcpUrl ?? env.mcpUrl,
     sentryDsn: cli.sentryDsn ?? env.sentryDsn,
+    openaiBaseUrl: cli.openaiBaseUrl,
     // Scopes precedence: CLI scopes/add-scopes override their env counterparts
     scopes: cli.scopes ?? env.scopes,
     addScopes: cli.addScopes ?? env.addScopes,

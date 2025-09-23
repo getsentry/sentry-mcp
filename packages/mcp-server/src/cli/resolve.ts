@@ -7,6 +7,7 @@ import {
 import { DEFAULT_SCOPES } from "../constants";
 import {
   validateAndParseSentryUrlThrows,
+  validateOpenAiBaseUrlThrows,
   validateSentryHostThrows,
 } from "../utils/url-utils";
 import type { MergedArgs, ResolvedConfig } from "./types";
@@ -67,11 +68,16 @@ export function finalize(input: MergedArgs): ResolvedConfig {
     }
   }
 
+  const resolvedOpenAiBaseUrl = input.openaiBaseUrl
+    ? validateOpenAiBaseUrlThrows(input.openaiBaseUrl)
+    : undefined;
+
   return {
     accessToken: input.accessToken,
     sentryHost,
     mcpUrl: input.mcpUrl,
     sentryDsn: input.sentryDsn,
+    openaiBaseUrl: resolvedOpenAiBaseUrl,
     finalScopes,
     organizationSlug: input.organizationSlug,
     projectSlug: input.projectSlug,

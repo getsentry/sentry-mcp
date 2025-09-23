@@ -6,9 +6,13 @@ import { generateText } from "ai";
 import { UserInputError } from "../errors";
 
 // Mock the AI SDK
-vi.mock("@ai-sdk/openai", () => ({
-  openai: vi.fn(() => "mocked-model"),
-}));
+vi.mock("@ai-sdk/openai", () => {
+  const mockModel = vi.fn(() => "mocked-model");
+  return {
+    openai: mockModel,
+    createOpenAI: vi.fn(() => mockModel),
+  };
+});
 
 vi.mock("ai", () => ({
   generateText: vi.fn(),
