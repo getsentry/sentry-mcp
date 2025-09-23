@@ -24,42 +24,29 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should handle authorization_code grant type", async () => {
-    // Mock successful token exchange response with correct schema
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        access_token: "new-access-token",
-        refresh_token: "new-refresh-token",
-        token_type: "bearer",
-        expires_in: 3600,
-        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        user: {
-          id: "user-123",
-          name: "Test User",
-          email: "test@example.com",
-        },
-        scope: "org:read project:read",
-      }),
-    });
-
+    // For authorization_code grants, tokens are already in props from /oauth/callback
+    // The tokenExchangeCallback just passes them through
     const options: TokenExchangeCallbackOptions = {
       grantType: "authorization_code",
       clientId: "test-client-id",
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        code: "auth-code-123",
-        redirectUri: "https://example.com/callback",
+        id: "user-123",
+        name: "Test User",
+        accessToken: "existing-access-token",
+        refreshToken: "existing-refresh-token",
+        accessTokenExpiresAt: Date.now() + 3600 * 1000,
       } as WorkerProps,
     };
 
     const result = await tokenExchangeCallback(options, mockEnv);
 
     expect(result).toBeDefined();
-    expect(result?.newProps.accessToken).toBe("new-access-token");
-    expect(result?.newProps.refreshToken).toBe("new-refresh-token");
-    expect(result?.accessTokenTTL).toBe(3600);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result?.newProps.accessToken).toBe("existing-access-token");
+    expect(result?.newProps.refreshToken).toBe("existing-refresh-token");
+    // No fetch should be called since we're just passing through existing props
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("should skip unsupported grant types", async () => {

@@ -220,36 +220,13 @@ export async function tokenExchangeCallback(
 ): Promise<TokenExchangeCallbackResult | undefined> {
   // Handle both authorization_code and refresh_token grant types
   if (options.grantType === "authorization_code") {
-    // For authorization code grants, exchange the code for tokens
-    const upstreamTokenUrl = new URL(
-      SENTRY_TOKEN_URL,
-      `https://${env.SENTRY_HOST || "sentry.io"}`,
-    ).href;
-
-    const [tokenResponse, errorResponse] = await exchangeCodeForAccessToken({
-      client_id: env.SENTRY_CLIENT_ID,
-      client_secret: env.SENTRY_CLIENT_SECRET,
-      code: options.props.code,
-      upstream_url: upstreamTokenUrl,
-      redirect_uri: options.props.redirectUri,
-    });
-
-    if (errorResponse) {
-      const errorText = await errorResponse.text();
-      throw new Error(
-        `Failed to exchange authorization code for tokens: ${errorText}`,
-      );
-    }
-
-    // Return the tokens and store them in props for future refreshes
+    // For authorization code grants, the tokens were already exchanged by the /oauth/callback route
+    // and stored in props. We just need to return them to ensure they're properly stored
+    // in the workers-oauth-provider grant for future refresh operations.
     return {
       newProps: {
         ...options.props,
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token,
-        accessTokenExpiresAt: Date.now() + tokenResponse.expires_in * 1000,
       },
-      accessTokenTTL: tokenResponse.expires_in,
     };
   }
 
