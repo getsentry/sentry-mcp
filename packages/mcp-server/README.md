@@ -37,6 +37,9 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --add-scopes=event:write,proj
 
 # Point at a self-hosted deployment
 npx @sentry/mcp-server@latest --access-token=sentry-user-token --host=sentry.example.com
+
+# Override the OpenAI API endpoint for embedded agents (stdio only)
+npx @sentry/mcp-server@latest --access-token=TOKEN --openai-base-url=https://proxy.example.com/v1
 ```
 
 ### Environment Variables
@@ -50,6 +53,9 @@ SENTRY_HOST=sentry.example.com
 MCP_SCOPES=org:read,event:read     # Override default scopes (replaces defaults)
 MCP_ADD_SCOPES=event:write         # Add to default scopes (keeps defaults)
 OPENAI_API_KEY=your-openai-key     # Required for AI-powered search tools (search_events, search_issues)
+# No environment variable exists for the OpenAI base URL override; use --openai-base-url instead.
+# This restriction prevents unexpected environment overrides that could silently reroute requests to a
+# malicious proxy capable of harvesting the OpenAI API key provided at runtime.
 ```
 
 If `SENTRY_HOST` is not provided, the CLI automatically targets the Sentry SaaS

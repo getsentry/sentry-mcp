@@ -24,6 +24,7 @@ import { finalize } from "./cli/resolve";
 import { sentryBeforeSend } from "./internal/sentry-scrubbing";
 import { ALL_SCOPES } from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
+import { configureOpenAIProvider } from "./internal/agents/openai-provider";
 
 const packageName = "@sentry/mcp-server";
 const usageText = buildUsage(packageName, DEFAULT_SCOPES, ALL_SCOPES);
@@ -68,6 +69,8 @@ if (!process.env.OPENAI_API_KEY) {
   );
   console.warn("");
 }
+
+configureOpenAIProvider({ baseUrl: cfg.openaiBaseUrl });
 
 Sentry.init({
   dsn: cfg.sentryDsn,
@@ -117,6 +120,7 @@ startStdio(instrumentedServer, {
   },
   sentryHost: cfg.sentryHost,
   mcpUrl: cfg.mcpUrl,
+  openaiBaseUrl: cfg.openaiBaseUrl,
 }).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events

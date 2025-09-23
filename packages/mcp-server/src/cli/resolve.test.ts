@@ -55,6 +55,27 @@ describe("cli/finalize", () => {
     expect(cfg.sentryHost).toBe("sentry.example.com");
   });
 
+  it("accepts valid OpenAI base URL", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      openaiBaseUrl: "https://api.proxy.example/v1",
+      unknownArgs: [],
+    });
+    expect(cfg.openaiBaseUrl).toBe(
+      new URL("https://api.proxy.example/v1").toString(),
+    );
+  });
+
+  it("rejects invalid OpenAI base URL", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        openaiBaseUrl: "ftp://example.com",
+        unknownArgs: [],
+      }),
+    ).toThrow(/OPENAI base URL must use http or https scheme/);
+  });
+
   it("throws on non-https URL", () => {
     expect(() =>
       finalize({ accessToken: "tok", url: "http://bad", unknownArgs: [] }),

@@ -225,3 +225,36 @@ export function validateSentryHostThrows(host: string): void {
 export function validateAndParseSentryUrlThrows(url: string): string {
   return _validateAndParseSentryUrlInternal(url);
 }
+
+/**
+ * Validates that the provided OpenAI base URL is a valid HTTP(S) URL and returns a normalized string.
+ *
+ * @param url The URL to validate and normalize
+ * @returns The normalized URL string
+ * @throws {Error} If the URL is empty, invalid, or uses an unsupported protocol
+ */
+export function validateOpenAiBaseUrlThrows(url: string): string {
+  const trimmed = url.trim();
+  if (trimmed.length === 0) {
+    throw new Error("OPENAI base URL must not be empty.");
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch (error) {
+    throw new Error(
+      "OPENAI base URL must be a valid HTTP or HTTPS URL (e.g., https://example.com/v1).",
+      { cause: error },
+    );
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(
+      "OPENAI base URL must use http or https scheme (e.g., https://example.com/v1).",
+    );
+  }
+
+  // Preserve the exact path to support Azure or proxy endpoints that include version/path segments
+  return parsed.toString();
+}

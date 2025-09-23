@@ -1,5 +1,5 @@
 import { generateText, Output } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { getOpenAIModel } from "./openai-provider";
 import type { z } from "zod";
 
 export type ToolCall = {
@@ -34,7 +34,7 @@ export async function callEmbeddedAgent<T>({
   const capturedToolCalls: ToolCall[] = [];
 
   const result = await generateText({
-    model: openai("gpt-4o"),
+    model: getOpenAIModel("gpt-4o"),
     system,
     prompt,
     tools,

@@ -52,6 +52,7 @@ export type ServerContext = {
   sentryHost?: string;
   mcpUrl?: string;
   accessToken: string;
+  openaiBaseUrl?: string;
   userId?: string | null;
   clientId?: string;
   // Granted scopes for tool access control
