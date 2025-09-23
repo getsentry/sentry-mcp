@@ -6,6 +6,7 @@ import type { z } from "zod";
 import { logError } from "@sentry/mcp-server/logging";
 import { TokenResponseSchema, SENTRY_TOKEN_URL } from "./constants";
 import type { WorkerProps } from "../types";
+import * as Sentry from "@sentry/cloudflare";
 
 /**
  * Constructs an authorization URL for Sentry.
@@ -223,11 +224,16 @@ export async function tokenExchangeCallback(
     return undefined; // No-op for other grant types
   }
 
+  Sentry.setUser({ id: options.props.id, name: options.props.name });
+
   // Extract the refresh token from the stored props
   const currentRefreshToken = options.props.refreshToken;
-
   if (!currentRefreshToken) {
-    throw new Error("No refresh token available in stored props");
+    Sentry.captureException(
+      new Error("No refresh token available in stored props"),
+    );
+
+    return undefined;
   }
 
   try {
