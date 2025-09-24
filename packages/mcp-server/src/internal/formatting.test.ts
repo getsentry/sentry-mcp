@@ -1804,29 +1804,29 @@ describe("formatEventOutput", () => {
               span_id: "parent123",
               op: "http.server",
               description: "GET /users",
-              timestamp: 1000,
-              start_timestamp: 900,
+              timestamp: 1722963600.25,
+              start_timestamp: 1722963600.0,
             },
             {
               span_id: "span1",
               op: "db.query",
               description: "SELECT * FROM users WHERE id = 1",
-              timestamp: 920,
-              start_timestamp: 910,
+              timestamp: 1722963600.013,
+              start_timestamp: 1722963600.01,
             },
             {
               span_id: "span2",
               op: "db.query",
               description: "SELECT * FROM users WHERE id = 2",
-              timestamp: 940,
-              start_timestamp: 928,
+              timestamp: 1722963600.018,
+              start_timestamp: 1722963600.014,
             },
             {
               span_id: "span3",
               op: "db.query",
               description: "SELECT * FROM users WHERE id = 3",
-              timestamp: 960,
-              start_timestamp: 949,
+              timestamp: 1722963600.027,
+              start_timestamp: 1722963600.019,
             },
           ],
         })
@@ -1835,15 +1835,15 @@ describe("formatEventOutput", () => {
       const output = formatEventOutput(event);
 
       expect(output).toContain("### Span Tree (Limited to 10 spans)");
-      expect(output).toContain("http.server: GET /users (100ms)");
+      expect(output).toContain("http.server: GET /users (250ms)");
       expect(output).toContain(
-        "├─ db.query: SELECT * FROM users WHERE id = 1 (10ms) [N+1]",
+        "├─ db.query: SELECT * FROM users WHERE id = 1 (3ms) [N+1]",
       );
       expect(output).toContain(
-        "├─ db.query: SELECT * FROM users WHERE id = 2 (12ms) [N+1]",
+        "├─ db.query: SELECT * FROM users WHERE id = 2 (4ms) [N+1]",
       );
       expect(output).toContain(
-        "└─ db.query: SELECT * FROM users WHERE id = 3 (11ms) [N+1]",
+        "└─ db.query: SELECT * FROM users WHERE id = 3 (8ms) [N+1]",
       );
     });
 

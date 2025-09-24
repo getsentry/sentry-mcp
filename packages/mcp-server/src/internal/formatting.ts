@@ -642,6 +642,38 @@ interface PerformanceSpan {
   level: number; // Nesting level for tree rendering
 }
 
+interface RawSpan {
+  span_id?: string;
+  id?: string;
+  op?: string;
+  description?: string;
+  timestamp?: number;
+  start_timestamp?: number;
+  duration?: number;
+}
+
+function getSpanDurationMs(span: RawSpan): number {
+  if (
+    typeof span.timestamp === "number" &&
+    typeof span.start_timestamp === "number"
+  ) {
+    const deltaSeconds = span.timestamp - span.start_timestamp;
+    if (Number.isFinite(deltaSeconds) && deltaSeconds >= 0) {
+      return deltaSeconds * 1000;
+    }
+  }
+
+  if (typeof span.duration === "number" && Number.isFinite(span.duration)) {
+    if (span.duration < 0) {
+      return 0;
+    }
+
+    return span.duration < 1 ? span.duration * 1000 : span.duration;
+  }
+
+  return 0;
+}
+
 /**
  * Selects and organizes spans for N+1 query visualization.
  *
@@ -684,7 +716,7 @@ function selectN1QuerySpans(
         op: parent.op || "unknown",
         description:
           parent.description || evidence.parentSpan || "Parent Operation",
-        duration: parent.timestamp - parent.start_timestamp || parent.duration,
+        duration: getSpanDurationMs(parent),
         is_n1_query: false,
         children: [],
         level: 0,
@@ -706,7 +738,7 @@ function selectN1QuerySpans(
         span_id: span.span_id || span.id || "unknown",
         op: span.op || "db.query",
         description: span.description || "Database Query",
-        duration: span.timestamp - span.start_timestamp || span.duration,
+        duration: getSpanDurationMs(span),
         is_n1_query: true,
         children: [],
         level: parentSpan ? 1 : 0,
