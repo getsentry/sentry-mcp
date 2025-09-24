@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import findProjects from "./find-projects.js";
+import { getServerContext } from "../test-setup.js";
 
 describe("find_projects", () => {
   it("serializes", async () => {
@@ -8,11 +9,7 @@ describe("find_projects", () => {
         organizationSlug: "sentry-mcp-evals",
         regionUrl: undefined,
       },
-      {
-        accessToken: "access-token",
-        userId: "1",
-        organizationSlug: null,
-      },
+      getServerContext(),
     );
     expect(result).toMatchInlineSnapshot(`
       "# Projects in **sentry-mcp-evals**

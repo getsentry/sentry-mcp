@@ -51,8 +51,17 @@ Required in production:
 SENTRY_CLIENT_ID=your_oauth_app_id
 SENTRY_CLIENT_SECRET=your_oauth_app_secret
 COOKIE_SECRET=32_char_random_string
-SENTRY_HOST=sentry.io  # Optional for self-hosted
 ```
+
+Optional overrides for self-hosted deployments:
+```bash
+# Leave unset to target the SaaS host
+SENTRY_HOST=sentry.example.com     # Hostname only (self-hosted only)
+```
+
+Configure these overrides only when your Cloudflare deployment connects to a
+self-hosted Sentry instance; no additional host variables are required for the
+SaaS service.
 
 Development (.dev.vars):
 ```bash

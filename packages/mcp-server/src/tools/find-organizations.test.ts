@@ -6,9 +6,11 @@ describe("find_organizations", () => {
     const result = await findOrganizations.handler(
       {},
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -32,9 +34,11 @@ describe("find_organizations", () => {
     const result = await findOrganizations.handler(
       {},
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toContain("Organizations");
@@ -44,9 +48,11 @@ describe("find_organizations", () => {
     const result = await findOrganizations.handler(
       {},
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toContain("Organizations");

@@ -13,9 +13,11 @@ describe("update_issue", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -53,9 +55,11 @@ describe("update_issue", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -92,9 +96,11 @@ describe("update_issue", () => {
         regionUrl: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -134,9 +140,11 @@ describe("update_issue", () => {
           regionUrl: undefined,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow("Either `issueId` or `issueUrl` must be provided");
@@ -154,9 +162,11 @@ describe("update_issue", () => {
           regionUrl: undefined,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow(
@@ -176,9 +186,11 @@ describe("update_issue", () => {
           regionUrl: undefined,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow(

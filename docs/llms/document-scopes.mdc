@@ -2,6 +2,12 @@
 
 Defines the specific purpose and content for each documentation file.
 
+## Reference Style (MANDATORY)
+
+- Use @path for all local file references, repo-root relative (e.g., `@packages/mcp-server/src/server.ts`).
+- Refer to sections by name: `See "Error Handling" in @docs/common-patterns.mdc`.
+- Keep Markdown links only for external sites.
+
 ## Core Documents
 
 ### architecture.mdc
@@ -201,14 +207,14 @@ Defines the specific purpose and content for each documentation file.
 - General coding guidelines
 - Project overview
 
-### CLAUDE.md
-**Purpose**: Claude Code entry point
+### AGENTS.md
+**Purpose**: Agent entry point (Claude Code, Cursor, etc.)
 
 **Must Include**:
 - Brief project description
 - Documentation directory reference
 - Critical quality checks
-- Claude Code-specific notes
+- Agent-specific notes (tools, transports, auth defaults)
 
 **Must Exclude**:
 - Detailed architecture (link to architecture.mdc)

@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
@@ -12,11 +11,38 @@ export default defineTool({
     "- Get the user's name and email address.",
   ].join("\n"),
   inputSchema: {},
+  requiredScopes: [], // No specific scopes required - uses authentication token
   async handler(params, context: ServerContext) {
     // User data endpoints (like /auth/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
+    // API client will throw ApiClientError/ApiServerError which the MCP server wrapper handles
     const user = await apiService.getAuthenticatedUser();
-    return `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
+
+    let output = `You are authenticated as ${user.name} (${user.email}).\n\nYour Sentry User ID is ${user.id}.`;
+
+    // Add constraints information
+    const constraints = context.constraints;
+    if (
+      constraints.organizationSlug ||
+      constraints.projectSlug ||
+      constraints.regionUrl
+    ) {
+      output += "\n\n## Session Constraints\n\n";
+
+      if (constraints.organizationSlug) {
+        output += `- **Organization**: ${constraints.organizationSlug}\n`;
+      }
+      if (constraints.projectSlug) {
+        output += `- **Project**: ${constraints.projectSlug}\n`;
+      }
+      if (constraints.regionUrl) {
+        output += `- **Region URL**: ${constraints.regionUrl}\n`;
+      }
+
+      output += "\nThese constraints limit the scope of this MCP session.";
+    }
+
+    return output;
   },
 });

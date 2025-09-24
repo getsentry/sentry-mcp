@@ -7,11 +7,13 @@
  */
 import { z } from "zod";
 import { SENTRY_GUIDES } from "./constants";
+import { validateSlug } from "./utils/slug-validation";
 
 export const ParamOrganizationSlug = z
   .string()
   .toLowerCase()
   .trim()
+  .superRefine(validateSlug)
   .describe(
     "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool.",
   );
@@ -20,6 +22,7 @@ export const ParamTeamSlug = z
   .string()
   .toLowerCase()
   .trim()
+  .superRefine(validateSlug)
   .describe(
     "The team's slug. You can find a list of existing teams in an organization using the `find_teams()` tool.",
   );
@@ -28,6 +31,7 @@ export const ParamProjectSlug = z
   .string()
   .toLowerCase()
   .trim()
+  .superRefine(validateSlug)
   .describe(
     "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool.",
   );
@@ -36,6 +40,7 @@ export const ParamProjectSlugOrAll = z
   .string()
   .toLowerCase()
   .trim()
+  .superRefine(validateSlug)
   .describe(
     "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
   );

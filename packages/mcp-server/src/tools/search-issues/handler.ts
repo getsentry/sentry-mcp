@@ -1,23 +1,16 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
-import {
-  apiServiceFromContext,
-  withApiErrorHandling,
-} from "../../internal/tool-helpers/api";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
-import {
-  ParamOrganizationSlug,
-  ParamRegionUrl,
-  ParamProjectSlug,
-} from "../../schema";
+import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import { validateSlugOrId, isNumericId } from "../../utils/slug-validation";
 import { searchIssuesAgent } from "./agent";
 import { formatIssueResults, formatExplanation } from "./formatters";
-import { UserInputError } from "../../errors";
-import type { SentryApiService } from "../../api-client";
 
 export default defineTool({
   name: "search_issues",
+  requiredScopes: ["event:read"],
   description: [
     "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.",
     "",
@@ -63,6 +56,9 @@ export default defineTool({
       .describe("Natural language description of issues to search for"),
     projectSlugOrId: z
       .string()
+      .toLowerCase()
+      .trim()
+      .superRefine(validateSlugOrId)
       .optional()
       .describe("The project's slug or numeric ID (optional)"),
     regionUrl: ParamRegionUrl.optional(),
@@ -87,7 +83,7 @@ export default defineTool({
     setTag("organization.slug", params.organizationSlug);
     if (params.projectSlugOrId) {
       // Check if it's a numeric ID or a slug and tag appropriately
-      if (/^\d+$/.test(params.projectSlugOrId)) {
+      if (isNumericId(params.projectSlugOrId)) {
         setTag("project.id", params.projectSlugOrId);
       } else {
         setTag("project.slug", params.projectSlugOrId);
@@ -98,58 +94,36 @@ export default defineTool({
     let projectId: string | undefined;
     if (params.projectSlugOrId) {
       // Check if it's already a numeric ID
-      if (/^\d+$/.test(params.projectSlugOrId)) {
+      if (isNumericId(params.projectSlugOrId)) {
         projectId = params.projectSlugOrId;
       } else {
         // It's a slug, convert to ID
-        const project = await withApiErrorHandling(
-          () =>
-            apiService.getProject({
-              organizationSlug: params.organizationSlug,
-              projectSlugOrId: params.projectSlugOrId!,
-            }),
-          {
-            organizationSlug: params.organizationSlug,
-            projectSlugOrId: params.projectSlugOrId,
-          },
-        );
+        const project = await apiService.getProject({
+          organizationSlug: params.organizationSlug,
+          projectSlugOrId: params.projectSlugOrId!,
+        });
         projectId = String(project.id);
       }
     }
 
     // Translate natural language to Sentry query
-    const agentResult = await withApiErrorHandling(
-      () =>
-        searchIssuesAgent(
-          params.naturalLanguageQuery,
-          params.organizationSlug,
-          apiService,
-          projectId,
-        ),
-      {
-        organizationSlug: params.organizationSlug,
-        projectSlugOrId: params.projectSlugOrId,
-      },
-    );
+    const agentResult = await searchIssuesAgent({
+      query: params.naturalLanguageQuery,
+      organizationSlug: params.organizationSlug,
+      apiService,
+      projectId,
+    });
 
     const translatedQuery = agentResult.result;
 
     // Execute the search - listIssues accepts projectSlug directly
-    const issues = await withApiErrorHandling(
-      () =>
-        apiService.listIssues({
-          organizationSlug: params.organizationSlug,
-          projectSlug: params.projectSlugOrId,
-          query: translatedQuery.query,
-          sortBy: translatedQuery.sort || "date",
-          limit: params.limit,
-        }),
-      {
-        organizationSlug: params.organizationSlug,
-        projectSlug: params.projectSlugOrId,
-        query: translatedQuery.query,
-      },
-    );
+    const issues = await apiService.listIssues({
+      organizationSlug: params.organizationSlug,
+      projectSlug: params.projectSlugOrId,
+      query: translatedQuery.query,
+      sortBy: translatedQuery.sort || "date",
+      limit: params.limit,
+    });
 
     // Build output with explanation first (if requested), then results
     let output = "";

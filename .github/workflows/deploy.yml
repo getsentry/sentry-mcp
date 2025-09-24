@@ -2,6 +2,8 @@ name: Deploy to Cloudflare
 
 permissions:
   contents: read
+  deployments: write
+  checks: write
 
 on:
   workflow_run:
@@ -14,7 +16,6 @@ on:
 jobs:
   deploy:
     name: Deploy to Cloudflare
-    environment: Actions
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
 
@@ -48,12 +49,52 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      # === BUILD AND DEPLOY CANARY WORKER ===
       - name: Build
+        working-directory: packages/mcp-cloudflare
         run: pnpm build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
-      - name: Deploy to Cloudflare
+      - name: Deploy to Canary Worker
+        id: deploy_canary
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/mcp-cloudflare
+          command: deploy --config wrangler.canary.jsonc
+          packageManager: pnpm
+
+      - name: Wait for Canary to Propagate
+        if: success()
+        run: |
+          echo "Waiting 30 seconds for canary deployment to propagate..."
+          sleep 30
+
+      # === SMOKE TEST CANARY ===
+      - name: Run Smoke Tests on Canary
+        id: canary_smoke_tests
+        if: success()
+        env:
+          PREVIEW_URL: https://sentry-mcp-canary.getsentry.workers.dev
+        run: |
+          echo "Running smoke tests against canary worker..."
+          cd packages/smoke-tests
+          pnpm test:ci
+
+      - name: Publish Canary Smoke Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: always() && steps.canary_smoke_tests.outcome != 'skipped'
+        with:
+          report_paths: "packages/smoke-tests/tests.junit.xml"
+          check_name: "Canary Smoke Test Results"
+          fail_on_failure: false
+
+      # === DEPLOY PRODUCTION WORKER (only if canary tests pass) ===
+      - name: Deploy to Production Worker
+        id: deploy_production
+        if: steps.canary_smoke_tests.outcome == 'success'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -61,3 +102,46 @@ jobs:
           workingDirectory: packages/mcp-cloudflare
           command: deploy
           packageManager: pnpm
+
+      - name: Wait for Production to Propagate
+        if: steps.deploy_production.outcome == 'success'
+        run: |
+          echo "Waiting 30 seconds for production deployment to propagate..."
+          sleep 30
+
+      # === SMOKE TEST PRODUCTION ===
+      - name: Run Smoke Tests on Production
+        id: production_smoke_tests
+        if: steps.deploy_production.outcome == 'success'
+        env:
+          PREVIEW_URL: https://mcp.sentry.dev
+        run: |
+          echo "Running smoke tests on production..."
+          cd packages/smoke-tests
+          pnpm test:ci
+
+      - name: Publish Production Smoke Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: always() && steps.production_smoke_tests.outcome != 'skipped'
+        with:
+          report_paths: "packages/smoke-tests/tests.junit.xml"
+          check_name: "Production Smoke Test Results"
+          fail_on_failure: false
+
+      # === ROLLBACK IF PRODUCTION SMOKE TESTS FAIL ===
+      - name: Rollback Production on Smoke Test Failure
+        if: steps.production_smoke_tests.outcome == 'failure'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/mcp-cloudflare
+          command: rollback
+          packageManager: pnpm
+        continue-on-error: true
+
+      - name: Fail Job if Production Smoke Tests Failed
+        if: steps.production_smoke_tests.outcome == 'failure'
+        run: |
+          echo "Production smoke tests failed - job failed after rollback"
+          exit 1

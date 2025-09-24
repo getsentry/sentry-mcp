@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-server",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "type": "module",
   "packageManager": "pnpm@10.8.1",
   "engines": {
@@ -42,6 +42,10 @@
       "types": "./dist/logging.ts",
       "default": "./dist/logging.js"
     },
+    "./permissions": {
+      "types": "./dist/permissions.ts",
+      "default": "./dist/permissions.js"
+    },
     "./transports/stdio": {
       "types": "./dist/transports/stdio.ts",
       "default": "./dist/transports/stdio.js"
@@ -50,21 +54,25 @@
       "types": "./dist/server.ts",
       "default": "./dist/server.js"
     },
-    "./promptDefinitions": {
-      "types": "./dist/promptDefinitions.ts",
-      "default": "./dist/promptDefinitions.js"
-    },
     "./prompts": {
       "types": "./dist/prompts.ts",
       "default": "./dist/prompts.js"
     },
-    "./resources": {
-      "types": "./dist/resources.ts",
-      "default": "./dist/resources.js"
-    },
     "./toolDefinitions": {
       "types": "./dist/toolDefinitions.ts",
       "default": "./dist/toolDefinitions.js"
+    },
+    "./promptDefinitions": {
+      "types": "./dist/promptDefinitionsData.ts",
+      "default": "./dist/promptDefinitionsData.js"
+    },
+    "./resourceDefinitions": {
+      "types": "./dist/resourceDefinitions.ts",
+      "default": "./dist/resourceDefinitions.js"
+    },
+    "./promptDefinitionsData": {
+      "types": "./dist/promptDefinitionsData.ts",
+      "default": "./dist/promptDefinitionsData.js"
     },
     "./types": {
       "types": "./dist/types.ts",
@@ -96,17 +104,17 @@
     }
   },
   "scripts": {
-    "prebuild": "pnpm run generate-tool-definitions",
+    "prebuild": "pnpm run generate-definitions",
     "build": "tsdown",
-    "dev": "pnpm run generate-tool-definitions && tsdown -w",
+    "dev": "pnpm run generate-definitions && tsdown -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
-    "pretest": "pnpm run generate-tool-definitions",
+    "pretest": "pnpm run generate-definitions",
     "test": "vitest run",
-    "test:ci": "pnpm run generate-tool-definitions && vitest run --coverage --reporter=junit --outputFile=tests.junit.xml",
-    "test:watch": "pnpm run generate-tool-definitions && vitest",
+    "test:ci": "pnpm run generate-definitions && vitest run --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "pnpm run generate-definitions && vitest",
     "tsc": "tsc --noEmit",
-    "generate-tool-definitions": "tsx scripts/generate-tool-definitions.ts",
+    "generate-definitions": "tsx scripts/generate-definitions.ts",
     "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts"
   },
   "devDependencies": {
@@ -122,6 +130,7 @@
     "@sentry/core": "catalog:",
     "@sentry/node": "catalog:",
     "ai": "catalog:",
+    "dotenv": "catalog:",
     "zod": "catalog:"
   }
 }

@@ -3,7 +3,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { MessagePart } from ".";
 import { PromptActions } from "../ui/prompt-actions";
-import { SlashCommandActions } from "../ui/slash-command-actions";
+import { ToolActions } from "../ui/tool-actions";
 import type { Message, ProcessedMessagePart, ChatMessagesProps } from "./types";
 import { isAuthError, getErrorMessage } from "../../utils/chat-error-handler";
 import { useAuth } from "../../contexts/auth-context";
@@ -139,6 +139,10 @@ export function ChatMessages({
               messageData?.type === "prompts-list" &&
               messageData?.prompts &&
               Array.isArray(messageData.prompts);
+            const hasToolActions =
+              messageData?.type === "tools-list" &&
+              messageData?.toolsDetailed &&
+              Array.isArray(messageData.toolsDetailed);
             const hasSlashCommandActions =
               messageData?.type === "help-message" &&
               messageData?.hasSlashCommands;
@@ -164,6 +168,14 @@ export function ChatMessages({
                         prompts={messageData.prompts}
                         onPromptSelect={onPromptSelect}
                       />
+                    </div>
+                  )}
+                {/* Show tool actions list for tools-list messages */}
+                {hasToolActions &&
+                  item.partIndex ===
+                    (originalMessage?.parts?.length ?? 1) - 1 && (
+                    <div className="mr-8 mt-4">
+                      <ToolActions tools={messageData.toolsDetailed} />
                     </div>
                   )}
               </div>

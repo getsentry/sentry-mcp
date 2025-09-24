@@ -2,13 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events";
-import { generateText, tool, Output } from "ai";
+import { generateText } from "ai";
 import { UserInputError } from "../errors";
 
 // Mock the AI SDK
-vi.mock("@ai-sdk/openai", () => ({
-  openai: vi.fn(() => "mocked-model"),
-}));
+vi.mock("@ai-sdk/openai", () => {
+  const mockModel = vi.fn(() => "mocked-model");
+  return {
+    openai: mockModel,
+    createOpenAI: vi.fn(() => mockModel),
+  };
+});
 
 vi.mock("ai", () => ({
   generateText: vi.fn(),
@@ -111,9 +115,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -163,9 +169,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -213,9 +221,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -239,9 +249,11 @@ describe("search_events", () => {
           includeExplanation: false,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "test-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow(UserInputError);
@@ -266,9 +278,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -306,9 +320,11 @@ describe("search_events", () => {
           includeExplanation: false,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "test-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow();
@@ -338,9 +354,11 @@ describe("search_events", () => {
           includeExplanation: false,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "test-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow("missing required 'sort' parameter");
@@ -388,9 +406,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -456,9 +476,11 @@ describe("search_events", () => {
         includeExplanation: false,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "test-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 

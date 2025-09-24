@@ -8,6 +8,7 @@
 import type { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import type { z } from "zod";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import type { Scope } from "./permissions";
 
 type ZodifyRecord<T extends Record<string, any>> = {
   [K in keyof T]: z.infer<T[K]>;
@@ -38,13 +39,26 @@ export type PromptHandlers = {
   [K in PromptName]: PromptHandlerExtended<K>;
 };
 
+/**
+ * Constraints that restrict the MCP session scope
+ */
+export type Constraints = {
+  organizationSlug?: string | null;
+  projectSlug?: string | null;
+  regionUrl?: string | null;
+};
+
 export type ServerContext = {
   sentryHost?: string;
   mcpUrl?: string;
   accessToken: string;
-  organizationSlug: string | null;
+  openaiBaseUrl?: string;
   userId?: string | null;
   clientId?: string;
+  // Granted scopes for tool access control
+  grantedScopes?: Set<Scope> | ReadonlySet<Scope>;
+  // URL-based session constraints
+  constraints: Constraints;
   // MCP client information captured during initialization
   mcpClientName?: string;
   mcpClientVersion?: string;

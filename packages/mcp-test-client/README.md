@@ -57,8 +57,9 @@ OPENAI_API_KEY=your_openai_api_key
 # Required - Sentry access token with appropriate permissions
 SENTRY_ACCESS_TOKEN=your_sentry_access_token
 
-# Optional
-SENTRY_HOST=sentry.io  # For self-hosted Sentry instances (hostname or full URL)
+# Optional (self-hosted only)
+# Leave unset to target the SaaS host
+SENTRY_HOST=sentry.example.com  # Hostname only
 MCP_URL=https://mcp.sentry.dev  # MCP server host (defaults to production)
 MCP_MODEL=gpt-4o  # Override default model (GPT-4)
 
@@ -167,6 +168,8 @@ Use local stdio transport with custom Sentry host:
 ```bash
 SENTRY_HOST=sentry.example.com SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client "Show my projects"
 ```
+
+Only configure `SENTRY_HOST` when you run self-hosted Sentry.
 
 ## Development
 

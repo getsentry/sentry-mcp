@@ -12,7 +12,7 @@ You'll find everything you need to know by visiting the deployed service in prod
 
 <https://mcp.sentry.dev>
 
-If you're looking to contribute, learn how it works, or to run this for self-hosted Sentry, continue below..
+If you're looking to contribute, learn how it works, or to run this for self-hosted Sentry, continue below.
 
 ### Stdio vs Remote
 
@@ -34,16 +34,23 @@ event:write
 Launch the transport:
 
 ```shell
-npx @sentry/mcp-server@latest --access-token=sentry-user-token --host=sentry.example.com
+npx @sentry/mcp-server@latest --access-token=sentry-user-token
 ```
+
+Need to connect to a self-hosted deployment? Add <code>--host</code> (hostname
+only, e.g. <code>--host=sentry.example.com</code>) when you run the command.
 
 Note: You can also use environment variables:
 
 ```shell
 SENTRY_ACCESS_TOKEN=
+# Optional overrides for self-hosted deployments
 SENTRY_HOST=
 OPENAI_API_KEY=  # Required for AI-powered search tools (search_events, search_issues)
 ```
+
+If you leave the host variable unset, the CLI automatically targets the Sentry
+SaaS service. Only set the override when you operate self-hosted Sentry.
 
 ### MCP Inspector
 
@@ -59,19 +66,33 @@ Note: If you have issues with your OAuth flow when accessing the inspector on `1
 
 ## Local Development
 
-To contribute changes against the server, you'll need to set things up in in local development. This will require you to create another OAuth App in Sentry (Settings => API => [Applications](https://sentry.io/settings/account/api/applications/)):
+To contribute changes, you'll need to set up your local environment:
 
-- For the Homepage URL, specify `http://localhost:5173`
-- For the Authorized Redirect URIs, specify `http://localhost:5173/callback`
-- Note your Client ID and generate a Client secret.
-- Create a `.dev.vars` file in `packages/mcp-cloudflare/` root with:
+1. **Set up environment files:**
 
-```shell
-# packages/mcp-cloudflare/.dev.vars
-SENTRY_CLIENT_ID=your_development_sentry_client_id
-SENTRY_CLIENT_SECRET=your_development_sentry_client_secret
-COOKIE_SECRET=my-super-secret-cookie
-```
+   ```shell
+   make setup-env  # Creates both .env files from examples
+   ```
+
+2. **Create an OAuth App in Sentry** (Settings => API => [Applications](https://sentry.io/settings/account/api/applications/)):
+
+   - Homepage URL: `http://localhost:5173`
+   - Authorized Redirect URIs: `http://localhost:5173/oauth/callback`
+   - Note your Client ID and generate a Client secret
+
+3. **Configure your credentials:**
+
+   - Edit `.env` in the root directory and add your `OPENAI_API_KEY`
+   - Edit `packages/mcp-cloudflare/.env` and add:
+     - `SENTRY_CLIENT_ID=your_development_sentry_client_id`
+     - `SENTRY_CLIENT_SECRET=your_development_sentry_client_secret`
+     - `COOKIE_SECRET=my-super-secret-cookie`
+
+4. **Start the development server:**
+
+   ```shell
+   pnpm dev
+   ```
 
 ### Verify
 
@@ -93,11 +114,14 @@ Unit tests can be run using:
 pnpm test
 ```
 
-Evals will require a `.env` file with some config:
+Evals will require a `.env` file in the project root with some config:
 
 ```shell
+# .env (in project root)
 OPENAI_API_KEY=  # Also required for AI-powered search tools in production
 ```
+
+Note: The root `.env` file provides defaults for all packages. Individual packages can have their own `.env` files to override these defaults during development.
 
 Once that's done you can run them using:
 
@@ -112,9 +136,14 @@ pnpm eval
 This repository uses automated code review tools (like Cursor BugBot) to help identify potential issues in pull requests. These tools provide helpful feedback and suggestions, but **we do not recommend making these checks required** as the accuracy is still evolving and can produce false positives.
 
 The automated reviews should be treated as:
+
 - ✅ **Helpful suggestions** to consider during code review
-- ✅ **Starting points** for discussion and improvement  
+- ✅ **Starting points** for discussion and improvement
 - ❌ **Not blocking requirements** for merging PRs
 - ❌ **Not replacements** for human code review
 
 When addressing automated feedback, focus on the underlying concerns rather than strictly following every suggestion.
+
+### Contributor Documentation
+
+Looking to contribute or explore the full documentation map? See `CLAUDE.md` (also available as `AGENTS.md`) for contributor workflows and the complete docs index. The `docs/` folder contains the per-topic guides and tool-integrated `.mdc` files.

@@ -37,7 +37,8 @@ import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
-import { MCP_SERVER_NAME } from "./constants";
+import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
+import { isToolAllowed, type Scope } from "./permissions";
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -84,6 +85,13 @@ function createResourceHandler(
             }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
+            ...(context.constraints.organizationSlug && {
+              "sentry-mcp.constraint-organization":
+                context.constraints.organizationSlug,
+            }),
+            ...(context.constraints.projectSlug && {
+              "sentry-mcp.constraint-project": context.constraints.projectSlug,
+            }),
           },
         },
         async () => {
@@ -134,6 +142,13 @@ function createTemplateResourceHandler(
             }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
+            ...(context.constraints.organizationSlug && {
+              "sentry-mcp.constraint-organization":
+                context.constraints.organizationSlug,
+            }),
+            ...(context.constraints.projectSlug && {
+              "sentry-mcp.constraint-project": context.constraints.projectSlug,
+            }),
             ...extractMcpParameters(variables),
           },
         },
@@ -186,6 +201,12 @@ export async function configureServer({
   onToolComplete?: () => void;
   onInitialized?: () => void | Promise<void>;
 }) {
+  // Get granted scopes with default to read-only scopes
+  // Normalize to a mutable Set regardless of input being Set or ReadonlySet
+  const grantedScopes: Set<Scope> = context.grantedScopes
+    ? new Set<Scope>(context.grantedScopes)
+    : new Set<Scope>(DEFAULT_SCOPES);
+
   server.server.onerror = (error) => {
     logError(error);
   };
@@ -272,6 +293,14 @@ export async function configureServer({
                   }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
+                  ...(context.constraints.organizationSlug && {
+                    "sentry-mcp.constraint-organization":
+                      context.constraints.organizationSlug,
+                  }),
+                  ...(context.constraints.projectSlug && {
+                    "sentry-mcp.constraint-project":
+                      context.constraints.projectSlug,
+                  }),
                   ...extractMcpParameters(args[0] || {}),
                 },
               },
@@ -319,10 +348,30 @@ export async function configureServer({
   }
 
   for (const [toolKey, tool] of Object.entries(tools)) {
+    // Check if this tool is allowed based on granted scopes
+    if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
+      console.debug(
+        `[MCP] Skipping tool '${tool.name}' - missing required scopes`,
+      );
+      continue;
+    }
+
+    // Only consider constraints that exist in this tool's schema
+    const toolConstraintKeys = Object.entries(context.constraints)
+      .filter(([key, value]) => !!value && key in tool.inputSchema)
+      .map(([key, _]) => key);
+
+    // Create modified schema by removing constraint parameters that will be injected
+    const modifiedInputSchema = Object.fromEntries(
+      Object.entries(tool.inputSchema).filter(
+        ([key, _]) => !toolConstraintKeys.includes(key),
+      ),
+    );
+
     server.tool(
       tool.name,
       tool.description,
-      tool.inputSchema,
+      modifiedInputSchema,
       async (
         params: any,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
@@ -345,6 +394,14 @@ export async function configureServer({
                   }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
+                  ...(context.constraints.organizationSlug && {
+                    "sentry-mcp.constraint-organization":
+                      context.constraints.organizationSlug,
+                  }),
+                  ...(context.constraints.projectSlug && {
+                    "sentry-mcp.constraint-project":
+                      context.constraints.projectSlug,
+                  }),
                   ...extractMcpParameters(params || {}),
                 },
               },
@@ -359,7 +416,29 @@ export async function configureServer({
                 }
 
                 try {
-                  const output = await tool.handler(params, context);
+                  // Double-check scopes at runtime (defense in depth)
+                  if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
+                    throw new Error(
+                      `Tool '${tool.name}' is not allowed - missing required scopes`,
+                    );
+                  }
+
+                  // Apply URL constraints as normal parameters - only for params that exist in tool schema
+                  const applicableConstraints = Object.fromEntries(
+                    Object.entries(context.constraints).filter(
+                      ([key, value]) => !!value && key in tool.inputSchema,
+                    ),
+                  );
+
+                  const paramsWithConstraints = {
+                    ...params,
+                    ...applicableConstraints,
+                  };
+
+                  const output = await tool.handler(
+                    paramsWithConstraints,
+                    context,
+                  );
                   span.setStatus({
                     code: 1, // ok
                   });

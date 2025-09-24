@@ -8,6 +8,7 @@ import type { ServerContext } from "../types";
 
 export default defineTool({
   name: "get_doc",
+  requiredScopes: [], // Documentation reading doesn't require specific scopes
   description: [
     "Fetch the full markdown content of a Sentry documentation page.",
     "",

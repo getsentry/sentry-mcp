@@ -15,10 +15,14 @@ import type {
   RequestEntrySchema,
   MessageEntrySchema,
   ThreadsEntrySchema,
-  TransactionEventSchema,
   SentryApiService,
+  AutofixRunStepRootCauseAnalysisSchema,
 } from "../api-client";
-import { getOutputForAutofixStep, isTerminalStatus } from "./tool-helpers/seer";
+import {
+  getOutputForAutofixStep,
+  isTerminalStatus,
+  getStatusDisplayName,
+} from "./tool-helpers/seer";
 
 // Language detection mappings
 const LANGUAGE_EXTENSIONS: Record<string, string> = {
@@ -1046,14 +1050,20 @@ function formatContexts(contexts: z.infer<typeof EventSchema>["contexts"]) {
 }
 
 /**
- * Formats Seer AI analysis context for inclusion in issue details.
- * Provides a minimal summary showing just the key solution when available.
+ * Formats a brief Seer AI analysis summary for inclusion in issue details.
+ * Shows current status and high-level insights, prompting to use analyze_issue_with_seer for full details.
  *
  * @param autofixState - The autofix state containing Seer analysis data
- * @returns Formatted markdown string with Seer context, or empty string if no analysis exists
+ * @param organizationSlug - The organization slug for the issue
+ * @param issueId - The issue ID (shortId)
+ * @returns Formatted markdown string with Seer summary, or empty string if no analysis exists
  */
-function formatSeerContext(autofixState: AutofixRunState): string {
-  if (!autofixState.autofix) {
+function formatSeerSummary(
+  autofixState: AutofixRunState | undefined,
+  organizationSlug: string,
+  issueId: string,
+): string {
+  if (!autofixState || !autofixState.autofix) {
     return "";
   }
 
@@ -1063,13 +1073,20 @@ function formatSeerContext(autofixState: AutofixRunState): string {
   parts.push("## Seer AI Analysis");
   parts.push("");
 
-  // For completed analyses, show just the key solution
-  if (isTerminalStatus(autofix.status) && autofix.steps.length > 0) {
+  // Show status first
+  const statusDisplay = getStatusDisplayName(autofix.status);
+  if (!isTerminalStatus(autofix.status)) {
+    parts.push(`**Status:** ${statusDisplay}`);
+    parts.push("");
+  }
+
+  // Show summary of what we have so far
+  if (autofix.steps.length > 0) {
     const completedSteps = autofix.steps.filter(
       (step) => step.status === "COMPLETED",
     );
 
-    // Find the solution step and show its description directly
+    // Find the solution step if available
     const solutionStep = completedSteps.find(
       (step) => step.type === "solution",
     );
@@ -1082,6 +1099,7 @@ function formatSeerContext(autofixState: AutofixRunState): string {
         typeof solutionDescription === "string" &&
         solutionDescription.trim()
       ) {
+        parts.push("**Summary:**");
         parts.push(solutionDescription.trim());
       } else {
         // Fallback to extracting from output if no description
@@ -1094,11 +1112,80 @@ function formatSeerContext(autofixState: AutofixRunState): string {
             !line.startsWith("*"),
         );
         if (firstParagraph) {
+          parts.push("**Summary:**");
           parts.push(firstParagraph.trim());
         }
       }
+    } else if (completedSteps.length > 0) {
+      // Show what steps have been completed so far
+      const rootCauseStep = completedSteps.find(
+        (step) => step.type === "root_cause_analysis",
+      );
+
+      if (rootCauseStep) {
+        const typedStep = rootCauseStep as z.infer<
+          typeof AutofixRunStepRootCauseAnalysisSchema
+        >;
+        if (
+          typedStep.causes &&
+          typedStep.causes.length > 0 &&
+          typedStep.causes[0].description
+        ) {
+          parts.push("**Root Cause Identified:**");
+          parts.push(typedStep.causes[0].description.trim());
+        }
+      } else {
+        // Show generic progress
+        parts.push(
+          `**Progress:** ${completedSteps.length} of ${autofix.steps.length} steps completed`,
+        );
+      }
+    }
+  } else {
+    // No steps yet - check for terminal states first
+    if (isTerminalStatus(autofix.status)) {
+      if (autofix.status === "FAILED" || autofix.status === "ERROR") {
+        parts.push("**Status:** Analysis failed.");
+      } else if (autofix.status === "CANCELLED") {
+        parts.push("**Status:** Analysis was cancelled.");
+      } else if (
+        autofix.status === "NEED_MORE_INFORMATION" ||
+        autofix.status === "WAITING_FOR_USER_RESPONSE"
+      ) {
+        parts.push(
+          "**Status:** Analysis paused - additional information needed.",
+        );
+      }
+    } else {
+      parts.push("Analysis has started but no results yet.");
     }
   }
+
+  // Add specific messages for terminal states when steps exist
+  if (autofix.steps.length > 0 && isTerminalStatus(autofix.status)) {
+    if (autofix.status === "FAILED" || autofix.status === "ERROR") {
+      parts.push("");
+      parts.push("**Status:** Analysis failed.");
+    } else if (autofix.status === "CANCELLED") {
+      parts.push("");
+      parts.push("**Status:** Analysis was cancelled.");
+    } else if (
+      autofix.status === "NEED_MORE_INFORMATION" ||
+      autofix.status === "WAITING_FOR_USER_RESPONSE"
+    ) {
+      parts.push("");
+      parts.push(
+        "**Status:** Analysis paused - additional information needed.",
+      );
+    }
+  }
+
+  // Always suggest using analyze_issue_with_seer for more details
+  parts.push("");
+  parts.push(
+    `**Note:** For detailed root cause analysis and solutions, call \`analyze_issue_with_seer(organizationSlug='${organizationSlug}', issueId='${issueId}')\``,
+  );
+
   return `${parts.join("\n")}\n\n`;
 }
 
@@ -1169,7 +1256,7 @@ export function formatIssueOutput({
 
   // Add Seer context if available
   if (autofixState) {
-    output += formatSeerContext(autofixState);
+    output += formatSeerSummary(autofixState, organizationSlug, issue.shortId);
   }
 
   output += "# Using this information\n\n";

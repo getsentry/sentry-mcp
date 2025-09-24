@@ -11,6 +11,7 @@ import {
 
 export default defineTool({
   name: "create_dsn",
+  requiredScopes: ["project:write"],
   description: [
     "Create an additional DSN for an EXISTING project.",
     "",

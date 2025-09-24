@@ -1,6 +1,11 @@
-import { SentryApiService, ApiError } from "../../api-client/index";
+import {
+  SentryApiService,
+  ApiClientError,
+  ApiNotFoundError,
+} from "../../api-client/index";
 import { UserInputError } from "../../errors";
 import type { ServerContext } from "../../types";
+import { validateRegionUrl } from "./validate-region-url";
 
 /**
  * Create a Sentry API service from server context with optional region override
@@ -16,32 +21,10 @@ export function apiServiceFromContext(
   let host = context.sentryHost;
 
   if (opts.regionUrl?.trim()) {
-    try {
-      const parsedUrl = new URL(opts.regionUrl);
-
-      // Validate that the URL has a proper protocol
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        throw new UserInputError(
-          `Invalid regionUrl provided: ${opts.regionUrl}. Must include protocol (http:// or https://).`,
-        );
-      }
-
-      // Validate that the host is not just the protocol name
-      if (parsedUrl.host === "https" || parsedUrl.host === "http") {
-        throw new UserInputError(
-          `Invalid regionUrl provided: ${opts.regionUrl}. The host cannot be just a protocol name.`,
-        );
-      }
-
-      host = parsedUrl.host;
-    } catch (error) {
-      if (error instanceof UserInputError) {
-        throw error;
-      }
-      throw new UserInputError(
-        `Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`,
-      );
-    }
+    // Validate the regionUrl against the base host to prevent SSRF
+    // Use default host if context.sentryHost is not set
+    const baseHost = context.sentryHost || "sentry.io";
+    host = validateRegionUrl(opts.regionUrl.trim(), baseHost);
   }
 
   return new SentryApiService({
@@ -62,31 +45,28 @@ export function handleApiError(
   error: unknown,
   params?: Record<string, unknown>,
 ): never {
-  if (error instanceof ApiError) {
-    // For 4xx errors, convert to UserInputError with status code in message
-    // This provides agents with the specific error type while using the appropriate error class
-    if (error.status >= 400 && error.status < 500) {
-      let message = `API error (${error.status}): ${error.message}`;
+  // Use the new error hierarchy - all 4xx errors extend ApiClientError
+  if (error instanceof ApiClientError) {
+    let message = `API error (${error.status}): ${error.message}`;
 
-      // For 404s, add helpful context about parameters if available
-      if (error.status === 404 && params) {
-        const paramsList: string[] = [];
-        for (const [key, value] of Object.entries(params)) {
-          if (value !== undefined && value !== null && value !== "") {
-            paramsList.push(`${key}: '${value}'`);
-          }
-        }
-
-        if (paramsList.length > 0) {
-          message = `Resource not found (404): ${error.message}\nPlease verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`;
+    // Special handling for 404s with parameter context
+    if (error instanceof ApiNotFoundError && params) {
+      const paramsList: string[] = [];
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null && value !== "") {
+          paramsList.push(`${key}: '${value}'`);
         }
       }
 
-      throw new UserInputError(message, { cause: error });
+      if (paramsList.length > 0) {
+        message = `Resource not found (404): ${error.message}\nPlease verify these parameters are correct:\n${paramsList.map((p) => `  - ${p}`).join("\n")}`;
+      }
     }
+
+    throw new UserInputError(message, { cause: error });
   }
 
-  // Re-throw any other errors as-is (including 5xx server errors)
+  // All other errors bubble up (including ApiServerError for 5xx)
   throw error;
 }
 

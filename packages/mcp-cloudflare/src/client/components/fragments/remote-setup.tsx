@@ -1,9 +1,15 @@
-import { Accordion } from "../ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "../ui/accordion";
 import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
 import { Prose } from "../ui/prose";
 import { NPM_REMOTE_NAME } from "@/constants";
 import { Button } from "../ui/button";
+import { Heading } from "../ui/base";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -17,6 +23,12 @@ export default function RemoteSetup() {
     command: "npx",
     args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
   };
+
+  const codexRemoteConfigToml = [
+    "[mcp_servers.sentry]",
+    'command = "npx"',
+    `args = ["-y", "${NPM_REMOTE_NAME}@latest", "${endpoint}"]`,
+  ].join("\n");
 
   const sentryMCPConfig = {
     url: endpoint,
@@ -42,21 +54,47 @@ export default function RemoteSetup() {
 
   return (
     <>
-      <Prose>
+      <Prose className="mb-6">
         <p>
           If you've got a client that natively supports the current MCP
           specification, including OAuth, you can connect directly.
         </p>
         <CodeSnippet snippet={endpoint} />
         <p>
-          Sentry's MCP server supports both the SSE and HTTP Streaming
-          protocols, and will negotiate based on your client's capabilities. If
-          for some reason your client does not handle this well you can pin to
-          the SSE-only implementation with the following URL:
+          <strong>Organization and Project Constraints:</strong> You can
+          optionally constrain your MCP session to a specific organization and
+          project by including them in the URL path:
         </p>
-        <CodeSnippet snippet={sseEndpoint} />
-        <h3>Integration Guides</h3>
+        <ul>
+          <li>
+            <code>{endpoint}/:organization</code> — Restricts the session to a
+            specific organization
+          </li>
+          <li>
+            <code>{endpoint}/:organization/:project</code> — Restricts the
+            session to a specific organization and project
+          </li>
+        </ul>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="sse-deprecated">
+            <AccordionTrigger>SSE support is deprecated</AccordionTrigger>
+            <AccordionContent>
+              <p className="mb-2">
+                New clients should use HTTP Streaming via the main
+                <code>/mcp</code> endpoint. If you must use the SSE-only
+                implementation, use the following URL:
+              </p>
+              <CodeSnippet noMargin snippet={sseEndpoint} />
+              <p className="mt-2">
+                <strong>Limitations:</strong> SSE endpoints do not support
+                organization or project constraints. Use the main
+                <code>/mcp</code> endpoint if you need scoped access.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </Prose>
+      <Heading as="h3">Integration Guides</Heading>
       <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
           <Button
@@ -96,6 +134,10 @@ export default function RemoteSetup() {
                 )}
               />
             </li>
+            <li>
+              Optional: To use the service with <code>cursor-agent</code>:
+              <CodeSnippet noMargin snippet={`cursor-agent mcp login sentry`} />
+            </li>
           </ol>
         </SetupGuide>
 
@@ -112,6 +154,10 @@ export default function RemoteSetup() {
               This will trigger an OAuth authentication flow to connect Claude
               Code to your Sentry account.
             </li>
+            <li>
+              You may need to manually authenticate if it doesnt happen
+              automatically, which can be doe via <code>/mcp</code>.
+            </li>
           </ol>
           <p>
             <small>
@@ -122,6 +168,39 @@ export default function RemoteSetup() {
               .
             </small>
           </p>
+        </SetupGuide>
+
+        <SetupGuide id="codex-cli" title="Codex">
+          <ol>
+            <li>Open your terminal to access the CLI.</li>
+            <li>
+              <CodeSnippet
+                noMargin
+                snippet={`codex mcp add sentry -- ${coreConfig.command} ${coreConfig.args.join(" ")}`}
+              />
+            </li>
+            <li>
+              Next time you run <code>codex</code>, the Sentry MCP server will
+              be available. It will automatically open the OAuth flow to connect
+              to your Sentry account.
+            </li>
+          </ol>
+          Or
+          <ol>
+            <li>
+              Edit <code>~/.codex/config.toml</code> and add the remote MCP
+              configuration:
+              <CodeSnippet noMargin snippet={codexRemoteConfigToml} />
+            </li>
+            <li>
+              Save the file and restart any running <code>codex</code> session
+            </li>
+            <li>
+              Next time you run <code>codex</code>, the Sentry MCP server will
+              be available. It will automatically open the OAuth flow to connect
+              to your Sentry account.
+            </li>
+          </ol>
         </SetupGuide>
 
         <SetupGuide id="windsurf" title="Windsurf">
@@ -190,6 +269,70 @@ export default function RemoteSetup() {
           </ol>
           <p>
             <small>Note: MCP is supported in VSCode 1.99 and above.</small>
+          </p>
+        </SetupGuide>
+
+        <SetupGuide id="warp" title="Warp">
+          <ol>
+            <li>
+              Open{" "}
+              <a
+                href="https://warp.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Warp
+              </a>{" "}
+              and navigate to MCP server settings using one of these methods:
+              <ul>
+                <li>
+                  From Warp Drive: <strong>Personal → MCP Servers</strong>
+                </li>
+                <li>
+                  From Command Palette: search for{" "}
+                  <strong>Open MCP Servers</strong>
+                </li>
+                <li>
+                  From Settings:{" "}
+                  <strong>Settings → AI → Manage MCP servers</strong>
+                </li>
+              </ul>
+            </li>
+            <li>
+              Click <strong>+ Add</strong> button.
+            </li>
+            <li>
+              Select <strong>CLI Server (Command)</strong> option.
+            </li>
+            <li>
+              <CodeSnippet
+                noMargin
+                snippet={JSON.stringify(
+                  {
+                    Sentry: {
+                      ...coreConfig,
+                      env: {},
+                      working_directory: null,
+                    },
+                  },
+                  undefined,
+                  2,
+                )}
+              />
+            </li>
+          </ol>
+          <p>
+            <small>
+              For more details, see the{" "}
+              <a
+                href="https://docs.warp.dev/knowledge-and-collaboration/mcp"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Warp MCP documentation
+              </a>
+              .
+            </small>
           </p>
         </SetupGuide>
 

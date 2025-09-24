@@ -9,17 +9,43 @@ import { experimental_createMCPClient } from "ai";
 import type { Env } from "../types";
 import { logError } from "@sentry/mcp-server/logging";
 import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
+import RESOURCE_DEFINITIONS from "@sentry/mcp-server/resourceDefinitions";
 import type { ErrorResponse } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
+import { z } from "zod";
+
+type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
 function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
   return errorResponse;
 }
 
 export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
-  // Get the authorization header for MCP authentication
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  // Support cookie-based auth (preferred) with fallback to Authorization header
+  let accessToken: string | null = null;
+
+  // Try to read from signed cookie set during OAuth
+  try {
+    const { getCookie } = await import("hono/cookie");
+    const authDataCookie = getCookie(c, "sentry_auth_data");
+    if (authDataCookie) {
+      const AuthDataSchema = z.object({ access_token: z.string() });
+      const authData = AuthDataSchema.parse(JSON.parse(authDataCookie));
+      accessToken = authData.access_token;
+    }
+  } catch {
+    // Ignore cookie parse errors; we'll check header below
+  }
+
+  // Fallback to Authorization header if cookie is not present
+  if (!accessToken) {
+    const authHeader = c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      accessToken = authHeader.substring(7);
+    }
+  }
+
+  if (!accessToken) {
     return c.json(
       createErrorResponse({
         error: "Authorization required",
@@ -29,8 +55,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     );
   }
 
-  const accessToken = authHeader.substring(7); // Remove "Bearer " prefix
-
   try {
     // Get prompts directly from MCP server definitions
     const prompts = getMcpPrompts();
@@ -38,11 +62,12 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
     // Get tools by connecting to MCP server
     let tools: string[] = [];
+    let mcpClient: MCPClient | undefined;
     try {
       const requestUrl = new URL(c.req.url);
       const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
 
-      const mcpClient = await experimental_createMCPClient({
+      mcpClient = await experimental_createMCPClient({
         name: "sentry",
         transport: {
           type: "sse" as const,
@@ -58,6 +83,15 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     } catch (error) {
       // If we can't get tools, continue with just prompts
       console.warn("Failed to fetch tools from MCP server:", error);
+    } finally {
+      // Ensure the MCP client connection is properly closed to prevent hanging connections
+      if (mcpClient && typeof mcpClient.close === "function") {
+        try {
+          await mcpClient.close();
+        } catch (closeError) {
+          console.warn("Failed to close MCP client connection:", closeError);
+        }
+      }
     }
 
     // Return the metadata
@@ -65,6 +99,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       type: "mcp-metadata",
       prompts: serializedPrompts,
       tools,
+      resources: RESOURCE_DEFINITIONS.map((r) => ({
+        name: r.name,
+        description: r.description,
+      })),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

@@ -17,7 +17,7 @@ This guide defines how to write effective documentation for LLMs working with th
 
 ### 3. Show, Don't Tell
 - Include minimal, focused code examples
-- Reference actual implementations: `See packages/mcp-server/src/tools.ts:45`
+- Reference actual implementations: `See @packages/mcp-server/src/server.ts:45`
 - Use real patterns from the codebase
 
 ## MDC Header Format
@@ -61,12 +61,12 @@ Project-specific rules that must be followed.
 
 ## Common Patterns
 
-Link to reusable patterns: See `common-patterns.mdc#error-handling`
+Link to reusable patterns: See "Error Handling" in @docs/common-patterns.mdc
 
 ## References
 
-- Implementation: `packages/mcp-server/src/[file].ts`
-- Tests: `packages/mcp-server/src/[file].test.ts`
+- Implementation: `@packages/mcp-server/src/[file].ts`
+- Tests: `@packages/mcp-server/src/[file].test.ts`
 - Examples in codebase: [specific function/tool names]
 ```
 
@@ -115,15 +115,24 @@ export const ParamOrganizationSlug = z
 
 ## Cross-References
 
-### Internal Links:
-- Use relative references: `See common-patterns.mdc#error-handling`
-- Link to specific sections with anchors
-- Avoid duplicating content - link instead
+### File References (MANDATORY):
+- Use @path syntax for local files: `@docs/common-patterns.mdc`
+- Always reference from repo root: `@packages/mcp-server/src/server.ts`
+- Do NOT use Markdown links for local files (avoid markdown `[text](./...)` patterns)
+- Prefer path-only mentions to help agents parse
+
+### Section References:
+- Refer to sections by name, not anchors: `See "Error Handling" in @docs/common-patterns.mdc`
+- If multiple sections share a name, include a short hint: `("Zod Patterns" in @docs/common-patterns.mdc)`
 
 ### Code References:
-- Use specific file paths: `packages/mcp-server/src/tools.ts`
-- Include line numbers for specific examples: `tools.ts:45-52`
-- Reference actual implementations over creating examples
+- Use concrete paths and identifiers: `@packages/mcp-server/src/tools/search-events/index.ts:buildQuery`
+- Optional line hints for humans: `server.ts:45-52` (agents may ignore)
+- Prefer real implementations over fabricated examples
+
+### External Links:
+- Keep standard Markdown links for external sites
+- Use concise link text; avoid link-only bullets
 
 ## Language and Tone
 
@@ -191,7 +200,15 @@ pnpm install
 cp .env.example .env  # Add your API keys
 ```
 
-See `CLAUDE.md#development-setup` for environment variables.
+See "Development Setup" in @AGENTS.md for environment variables.
 ```
+
+## Agent Readability Checklist
+
+- Uses @path for all local file references
+- Short, focused sections with concrete examples
+- Minimal prose; prefers code and commands
+- Clear preconditions and environment notes
+- Error handling and validation rules are explicit
 
 This style guide ensures documentation remains focused, valuable, and maintainable for LLM consumption.

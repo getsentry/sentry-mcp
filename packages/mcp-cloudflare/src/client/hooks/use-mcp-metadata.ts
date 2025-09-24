@@ -20,6 +20,10 @@ export interface McpMetadata {
     >;
   }>;
   tools: string[];
+  resources?: Array<{
+    name: string;
+    description: string;
+  }>;
   timestamp: string;
 }
 

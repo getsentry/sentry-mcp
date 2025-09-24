@@ -196,7 +196,7 @@ describe("fetch-utils", () => {
         retryWithBackoff(fn, {
           shouldRetry: (error) => {
             if (error instanceof ApiError) {
-              return error.status >= 500;
+              return (error.status ?? 0) >= 500;
             }
             return true;
           },

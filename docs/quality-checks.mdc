@@ -68,7 +68,7 @@ Before completing any task:
 - [ ] New tools have comprehensive tests
 - [ ] Build process generates tool definitions successfully
 - [ ] Documentation updated if patterns changed
-- [ ] CLAUDE.md ↔ cursor.mdc sync maintained (if applicable)
+- [ ] AGENTS.md ↔ cursor.mdc sync maintained (if applicable)
 
 ## References
 

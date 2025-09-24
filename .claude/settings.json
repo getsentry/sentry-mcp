@@ -17,8 +17,7 @@
       "Bash(gh pr checks:*)",
       "Bash(gh pr view:*)",
       "Bash(gh run view:*)",
-      "Bash(git status:*)",
-      "mcp__sentry__*"
+      "Bash(git status:*)"
     ],
     "deny": []
   },
@@ -36,6 +35,6 @@
     ]
   },
   "enableAllProjectMcpServers": true,
-  "includeCoAuthoredBy": false,
+  "includeCoAuthoredBy": true,
   "enabledMcpjsonServers": ["sentry"]
 }

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer, autofixStateFixture } from "@sentry/mcp-server-mocks";
 import analyzeIssueWithSeer from "./analyze-issue-with-seer.js";
-import { ApiError } from "../api-client/index.js";
 
 describe("analyze_issue_with_seer", () => {
   beforeEach(() => {
@@ -27,9 +26,11 @@ describe("analyze_issue_with_seer", () => {
         instruction: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -63,9 +64,11 @@ describe("analyze_issue_with_seer", () => {
         issueId: "CLOUDFLARE-MCP-99",
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -105,9 +108,11 @@ describe("analyze_issue_with_seer", () => {
         issueId: "CLOUDFLARE-MCP-500",
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -157,9 +162,11 @@ describe("analyze_issue_with_seer", () => {
         issueId: "CLOUDFLARE-MCP-TIMEOUT",
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -206,9 +213,11 @@ describe("analyze_issue_with_seer", () => {
         issueId: "CLOUDFLARE-MCP-ERRORS",
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 
@@ -266,9 +275,11 @@ describe("analyze_issue_with_seer", () => {
         instruction: "Focus on memory leaks",
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
       },
     );
 

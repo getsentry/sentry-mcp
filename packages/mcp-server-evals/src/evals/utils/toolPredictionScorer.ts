@@ -19,7 +19,12 @@ async function getAvailableTools(): Promise<string[]> {
   // Use pnpm exec to run the binary from the workspace
   const transport = new Experimental_StdioMCPTransport({
     command: "pnpm",
-    args: ["exec", "sentry-mcp", "--access-token=mocked-access-token"],
+    args: [
+      "exec",
+      "sentry-mcp",
+      "--access-token=mocked-access-token",
+      "--all-scopes",
+    ],
     env: {
       ...process.env,
       SENTRY_ACCESS_TOKEN: "mocked-access-token",

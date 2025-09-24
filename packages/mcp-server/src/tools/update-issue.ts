@@ -1,10 +1,6 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
-import {
-  apiServiceFromContext,
-  withApiErrorHandling,
-} from "../internal/tool-helpers/api";
+import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { parseIssueParams } from "../internal/tool-helpers/issue";
 import { formatAssignedTo } from "../internal/tool-helpers/formatting";
 import { UserInputError } from "../errors";
@@ -20,6 +16,7 @@ import {
 
 export default defineTool({
   name: "update_issue",
+  requiredScopes: ["event:write"],
   description: [
     "Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.",
     "",
@@ -107,32 +104,18 @@ export default defineTool({
     setTag("organization.slug", orgSlug);
 
     // Get current issue details first
-    const currentIssue = await withApiErrorHandling(
-      () =>
-        apiService.getIssue({
-          organizationSlug: orgSlug,
-          issueId: parsedIssueId!,
-        }),
-      {
-        organizationSlug: orgSlug,
-        issueId: parsedIssueId,
-      },
-    );
+    const currentIssue = await apiService.getIssue({
+      organizationSlug: orgSlug,
+      issueId: parsedIssueId!,
+    });
 
     // Update the issue
-    const updatedIssue = await withApiErrorHandling(
-      () =>
-        apiService.updateIssue({
-          organizationSlug: orgSlug,
-          issueId: parsedIssueId!,
-          status: params.status,
-          assignedTo: params.assignedTo,
-        }),
-      {
-        organizationSlug: orgSlug,
-        issueId: parsedIssueId,
-      },
-    );
+    const updatedIssue = await apiService.updateIssue({
+      organizationSlug: orgSlug,
+      issueId: parsedIssueId!,
+      status: params.status,
+      assignedTo: params.assignedTo,
+    });
 
     let output = `# Issue ${updatedIssue.shortId} Updated in **${orgSlug}**\n\n`;
     output += `**Issue**: ${updatedIssue.title}\n`;

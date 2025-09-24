@@ -35,6 +35,20 @@ describe("getIssueUrl", () => {
       `"https://localhost:8000/organizations/sentry-mcp/issues/123456"`,
     );
   });
+  it("should handle regional URLs correctly for SaaS", () => {
+    const apiService = new SentryApiService({ host: "us.sentry.io" });
+    const result = apiService.getIssueUrl("sentry", "PROJ-THREAD-LEAKS-12");
+    // Should use sentry.io, not us.sentry.io for web UI
+    expect(result).toEqual(
+      "https://sentry.sentry.io/issues/PROJ-THREAD-LEAKS-12",
+    );
+  });
+  it("should handle EU regional URLs correctly for SaaS", () => {
+    const apiService = new SentryApiService({ host: "eu.sentry.io" });
+    const result = apiService.getIssueUrl("myorg", "PROJECT-456");
+    // Should use sentry.io, not eu.sentry.io for web UI
+    expect(result).toEqual("https://myorg.sentry.io/issues/PROJECT-456");
+  });
 });
 
 describe("getTraceUrl", () => {
@@ -68,6 +82,17 @@ describe("getTraceUrl", () => {
     );
     expect(result).toMatchInlineSnapshot(
       `"https://localhost:8000/organizations/sentry-mcp/explore/traces/trace/6a477f5b0f31ef7b6b9b5e1dea66c91d"`,
+    );
+  });
+  it("should handle regional URLs correctly for SaaS", () => {
+    const apiService = new SentryApiService({ host: "us.sentry.io" });
+    const result = apiService.getTraceUrl(
+      "sentry",
+      "6a477f5b0f31ef7b6b9b5e1dea66c91d",
+    );
+    // Should use sentry.io, not us.sentry.io for web UI
+    expect(result).toEqual(
+      "https://sentry.sentry.io/explore/traces/trace/6a477f5b0f31ef7b6b9b5e1dea66c91d",
     );
   });
 });
@@ -121,6 +146,14 @@ describe("getEventsExplorerUrl", () => {
     const result = apiService.getEventsExplorerUrl("sentry-mcp", "level:error");
     expect(result).toMatchInlineSnapshot(
       `"https://localhost:8000/organizations/sentry-mcp/explore/traces/?query=level%3Aerror&statsPeriod=24h&table=span"`,
+    );
+  });
+  it("should handle regional URLs correctly for SaaS", () => {
+    const apiService = new SentryApiService({ host: "us.sentry.io" });
+    const result = apiService.getEventsExplorerUrl("sentry", "level:error");
+    // Should use sentry.io, not us.sentry.io for web UI
+    expect(result).toEqual(
+      "https://sentry.sentry.io/explore/traces/?query=level%3Aerror&statsPeriod=24h&table=span",
     );
   });
 

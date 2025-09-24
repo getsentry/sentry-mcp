@@ -210,29 +210,11 @@ export function createHtmlPage(options: HtmlPageOptions): string {
 export function createSuccessPage(
   options: Partial<HtmlPageOptions> = {},
 ): string {
-  const bodyScript = `
-    // Notify parent window of success
-    if (window.opener) {
-      window.opener.postMessage({
-        type: 'SENTRY_AUTH_SUCCESS',
-        data: {
-          // No token needed - auth handled via cookies
-        }
-      }, '*');
-    }
-    
-    // Close the popup after a short delay
-    setTimeout(() => {
-      window.close();
-    }, 1000);
-  `;
-
   return createHtmlPage({
     title: "Authentication Successful",
     statusMessage: "Authentication Successful",
-    description: "You can now close this window and return to the chat.",
+    description: "Authentication completed successfully.",
     type: "success",
-    bodyScript,
     ...options,
   });
 }
@@ -243,25 +225,13 @@ export function createSuccessPage(
 export function createErrorPage(
   title: string,
   message: string,
-  error: string,
   options: Partial<HtmlPageOptions> = {},
 ): string {
-  const bodyScript = `
-    if (window.opener) {
-      window.opener.postMessage({
-        type: 'SENTRY_AUTH_ERROR',
-        error: ${JSON.stringify(error)}
-      }, '*');
-    }
-    setTimeout(() => window.close(), 3000);
-  `;
-
   return createHtmlPage({
     title: sanitizeHtml(title),
     statusMessage: sanitizeHtml(title),
     description: sanitizeHtml(message),
     type: "error",
-    bodyScript,
     ...options,
   });
 }

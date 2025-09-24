@@ -10,6 +10,17 @@
 export const MCP_SERVER_NAME = "Sentry MCP" as const;
 
 /**
+ * Allowed region domains for sentry.io
+ * Only these specific domains are permitted when using Sentry's cloud service
+ * This is used to prevent SSRF attacks by restricting regionUrl to known domains
+ */
+export const SENTRY_ALLOWED_REGION_DOMAINS = new Set([
+  "sentry.io",
+  "us.sentry.io",
+  "de.sentry.io",
+]);
+
+/**
  * Common Sentry platforms that have documentation available
  */
 export const SENTRY_PLATFORMS_BASE = [
@@ -160,3 +171,13 @@ export const SENTRY_GUIDES = [
     guides.map((guide) => `${platform}/${guide}`),
   ),
 ] as const;
+
+export const DEFAULT_SCOPES = [
+  "org:read",
+  "project:read",
+  "team:read",
+  "event:read",
+] as const;
+
+// Note: All scopes are now exported from permissions.ts to avoid pulling this
+// heavy constants module into scope-only consumers.

@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
-import {
-  apiServiceFromContext,
-  withApiErrorHandling,
-} from "../../internal/tool-helpers/api";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
@@ -22,6 +19,7 @@ import { UserInputError } from "../../errors";
 
 export default defineTool({
   name: "search_events",
+  requiredScopes: ["event:read"],
   description: [
     "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.",
     "",
@@ -96,35 +94,21 @@ export default defineTool({
     // Convert project slug to ID if needed - we need this for attribute fetching
     let projectId: string | undefined;
     if (params.projectSlug) {
-      const project = await withApiErrorHandling(
-        () =>
-          apiService.getProject({
-            organizationSlug,
-            projectSlugOrId: params.projectSlug!,
-          }),
-        {
-          organizationSlug,
-          projectSlugOrId: params.projectSlug,
-        },
-      );
+      const project = await apiService.getProject({
+        organizationSlug,
+        projectSlugOrId: params.projectSlug!,
+      });
       projectId = String(project.id);
     }
 
     // Translate the natural language query using Search Events Agent
     // The agent will determine the dataset and fetch the appropriate attributes
-    const agentResult = await withApiErrorHandling(
-      () =>
-        searchEventsAgent(
-          params.naturalLanguageQuery,
-          organizationSlug,
-          apiService,
-          projectId,
-        ),
-      {
-        organizationSlug,
-        projectSlug: params.projectSlug,
-      },
-    );
+    const agentResult = await searchEventsAgent({
+      query: params.naturalLanguageQuery,
+      organizationSlug,
+      apiService,
+      projectId,
+    });
 
     const parsed = agentResult.result;
 
@@ -190,23 +174,16 @@ export default defineTool({
       timeParams.statsPeriod = "14d";
     }
 
-    const eventsResponse = await withApiErrorHandling(
-      () =>
-        apiService.searchEvents({
-          organizationSlug,
-          query: sentryQuery,
-          fields,
-          limit: params.limit,
-          projectId, // API requires numeric project ID, not slug
-          dataset: dataset === "logs" ? "ourlogs" : dataset,
-          sort: sortParam,
-          ...timeParams, // Spread the time parameters
-        }),
-      {
-        organizationSlug,
-        projectSlug: params.projectSlug,
-      },
-    );
+    const eventsResponse = await apiService.searchEvents({
+      organizationSlug,
+      query: sentryQuery,
+      fields,
+      limit: params.limit,
+      projectId, // API requires numeric project ID, not slug
+      dataset: dataset === "logs" ? "ourlogs" : dataset,
+      sort: sortParam,
+      ...timeParams, // Spread the time parameters
+    });
 
     // Generate the Sentry explorer URL with structured aggregate information
     // Derive aggregate functions and groupBy fields from the fields array

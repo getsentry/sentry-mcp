@@ -13,6 +13,7 @@ export interface ExtendedMessage extends Message {
   data?: {
     type?: string;
     prompts?: any[];
+    toolsDetailed?: Array<{ name: string; description: string }>;
     hasSlashCommands?: boolean;
     error?: string;
     // Prompt execution data
@@ -54,9 +55,7 @@ export type AuthContextType = AuthState & AuthActions;
 // OAuth message types
 export interface OAuthSuccessMessage {
   type: "SENTRY_AUTH_SUCCESS";
-  data: {
-    accessToken: string;
-  };
+  data: Record<string, never>;
 }
 
 export interface OAuthErrorMessage {
@@ -145,7 +144,6 @@ export interface ChatInputProps {
 
 export interface AuthFormProps {
   authError: string;
-  isAuthenticating: boolean;
   onOAuthLogin: () => void;
 }
 

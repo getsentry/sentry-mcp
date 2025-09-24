@@ -13,9 +13,11 @@ describe("search_docs", () => {
         guide: undefined,
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
         mcpUrl: "https://mcp.sentry.dev",
       },
     );
@@ -64,9 +66,11 @@ describe("search_docs", () => {
           guide: undefined,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow();
@@ -88,9 +92,11 @@ describe("search_docs", () => {
           guide: undefined,
         },
         {
+          constraints: {
+            organizationSlug: null,
+          },
           accessToken: "access-token",
           userId: "1",
-          organizationSlug: null,
         },
       ),
     ).rejects.toThrow("Request timeout after 15000ms");
@@ -106,9 +112,11 @@ describe("search_docs", () => {
         guide: "javascript/nextjs",
       },
       {
+        constraints: {
+          organizationSlug: null,
+        },
         accessToken: "access-token",
         userId: "1",
-        organizationSlug: null,
         mcpUrl: "https://mcp.sentry.dev",
       },
     );

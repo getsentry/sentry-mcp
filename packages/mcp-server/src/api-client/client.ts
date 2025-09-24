@@ -1,11 +1,11 @@
 import {
   getIssueUrl as getIssueUrlUtil,
   getTraceUrl as getTraceUrlUtil,
-  getEventsExplorerUrl as getEventsExplorerUrlUtil,
   isSentryHost,
 } from "../utils/url-utils";
 import {
   OrganizationListSchema,
+  OrganizationSchema,
   ClientKeySchema,
   TeamListSchema,
   TeamSchema,
@@ -29,6 +29,7 @@ import {
   UserRegionsSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
+import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
 import type {
   AutofixRun,
   AutofixRunState,
@@ -83,26 +84,6 @@ const NETWORK_ERROR_MESSAGES: Record<string, string> = {
  * }
  * ```
  */
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-  ) {
-    // HACK: improving this error message for the LLMs
-    let finalMessage = message;
-    if (
-      message.includes(
-        "You do not have the multi project stream feature enabled",
-      ) ||
-      message.includes("You cannot view events from multiple projects")
-    ) {
-      finalMessage =
-        "You do not have access to query across multiple projects. Please select a project for your query.";
-    }
-
-    super(finalMessage);
-  }
-}
 
 type RequestOptions = {
   host?: string;
@@ -300,8 +281,12 @@ export class SentryApiService {
             `[sentryApi] Received HTML error page instead of JSON (status ${response.status})`,
             error,
           );
-          throw new Error(
+          // HTML response instead of JSON typically indicates a server configuration issue
+          throw createApiError(
             `Server error: Received HTML instead of JSON (${response.status} ${response.statusText}). This may indicate an invalid URL or server issue.`,
+            response.status,
+            errorText,
+            undefined,
           );
         }
         console.error(
@@ -314,7 +299,13 @@ export class SentryApiService {
         const { data, success, error } = ApiErrorSchema.safeParse(parsed);
 
         if (success) {
-          throw new ApiError(data.detail, response.status);
+          // Use the new error factory to create the appropriate error type
+          throw createApiError(
+            data.detail,
+            response.status,
+            data.detail,
+            parsed,
+          );
         }
 
         console.error(
@@ -323,8 +314,12 @@ export class SentryApiService {
         );
       }
 
-      throw new Error(
-        `API request failed: ${response.status} ${response.statusText}\n${errorText}`,
+      // Use the error factory to create the appropriate error type based on status
+      throw createApiError(
+        `API request failed: ${response.statusText}\n${errorText}`,
+        response.status,
+        errorText,
+        undefined,
       );
     }
 
@@ -356,6 +351,7 @@ export class SentryApiService {
         responseText.includes("<!DOCTYPE") ||
         responseText.includes("<html")
       ) {
+        // HTML when expecting JSON usually indicates authentication or routing issues
         throw new Error(
           `Expected JSON response but received HTML (${response.status} ${response.statusText}). This may indicate you're not authenticated, the URL is incorrect, or there's a server issue.`,
         );
@@ -371,6 +367,7 @@ export class SentryApiService {
     try {
       return await response.json();
     } catch (error) {
+      // JSON parsing failure after successful response
       throw new Error(
         `Failed to parse JSON response: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -527,8 +524,11 @@ export class SentryApiService {
       urlParams.set("yAxis", "count()");
     }
 
+    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+    const webHost = this.isSaas() ? "sentry.io" : this.host;
     const path = this.isSaas()
-      ? `https://${organizationSlug}.sentry.io/explore/discover/homepage/`
+      ? `https://${organizationSlug}.${webHost}/explore/discover/homepage/`
       : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
 
     return `${path}?${urlParams.toString()}`;
@@ -662,8 +662,11 @@ export class SentryApiService {
     }
 
     const basePath = dataset === "logs" ? "logs" : "traces";
+    // For SaaS instances, always use sentry.io for web UI URLs regardless of region
+    // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
+    const webHost = this.isSaas() ? "sentry.io" : this.host;
     const path = this.isSaas()
-      ? `https://${organizationSlug}.sentry.io/explore/${basePath}/`
+      ? `https://${organizationSlug}.${webHost}/explore/${basePath}/`
       : `https://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
 
     return `${path}?${urlParams.toString()}`;
@@ -810,7 +813,7 @@ export class SentryApiService {
     } catch (error) {
       // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
       // fall back to direct organizations endpoint
-      if (error instanceof ApiError && error.status === 404) {
+      if (error instanceof ApiNotFoundError) {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
         const body = await this.requestJSON("/organizations/", undefined, opts);
         return OrganizationListSchema.parse(body);
@@ -819,6 +822,22 @@ export class SentryApiService {
       // Re-throw other errors
       throw error;
     }
+  }
+
+  /**
+   * Gets a single organization by slug.
+   *
+   * @param organizationSlug Organization identifier
+   * @param opts Request options including host override
+   * @returns Organization data
+   */
+  async getOrganization(organizationSlug: string, opts?: RequestOptions) {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/`,
+      undefined,
+      opts,
+    );
+    return OrganizationSchema.parse(body);
   }
 
   /**
@@ -1216,12 +1235,12 @@ export class SentryApiService {
     }
     // Validate time parameters - can't use both relative and absolute
     if (statsPeriod && (start || end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
       );
     }
     if ((start && !end) || (!start && end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Both start and end parameters must be provided together for absolute time ranges.",
       );
     }
@@ -1351,12 +1370,12 @@ export class SentryApiService {
     }
     // Validate time parameters - can't use both relative and absolute
     if (statsPeriod && (start || end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
       );
     }
     if ((start && !end) || (!start && end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Both start and end parameters must be provided together for absolute time ranges.",
       );
     }
@@ -1551,7 +1570,7 @@ export class SentryApiService {
     const attachment = attachments.find((att) => att.id === attachmentId);
 
     if (!attachment) {
-      throw new Error(
+      throw new ApiNotFoundError(
         `Attachment with ID ${attachmentId} not found for event ${eventId}`,
       );
     }
@@ -1760,12 +1779,12 @@ export class SentryApiService {
 
     // Validate time parameters - can't use both relative and absolute
     if (params.statsPeriod && (params.start || params.end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
       );
     }
     if ((params.start && !params.end) || (!params.start && params.end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Both start and end parameters must be provided together for absolute time ranges.",
       );
     }
@@ -1834,12 +1853,12 @@ export class SentryApiService {
 
     // Validate time parameters - can't use both relative and absolute
     if (params.statsPeriod && (params.start || params.end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
       );
     }
     if ((params.start && !params.end) || (!params.start && params.end)) {
-      throw new Error(
+      throw new ApiValidationError(
         "Both start and end parameters must be provided together for absolute time ranges.",
       );
     }

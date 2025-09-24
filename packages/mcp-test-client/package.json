@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-test-client",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "private": true,
   "type": "module",
   "description": "CLI tool to test the Sentry MCP server",
@@ -12,7 +12,7 @@
     "start": "node dist/index.js",
     "test-client": "node dist/index.js",
     "test": "vitest run",
-    "test:ci": "vitest run --reporter=junit --outputFile=tests.junit.xml",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

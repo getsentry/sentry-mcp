@@ -1,5 +1,5 @@
 import { Header } from "./components/ui/header";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Chat } from "./components/chat";
 import { useAuth } from "./contexts/auth-context";
 import Home from "./pages/home";

@@ -3,6 +3,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // Use thread-based workers to avoid process-kill issues in sandboxed environments
+    pool: "threads",
     poolOptions: {
       workers: {
         miniflare: {},
@@ -18,6 +20,6 @@ export default defineConfig({
       reporter: ["text", "json", "html"],
       include: ["**/*.ts"],
     },
-    setupFiles: ["dotenv/config"],
+    setupFiles: ["dotenv/config", "src/test-setup.ts"],
   },
 });

@@ -54,7 +54,13 @@ import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attrib
   type: "json",
 };
 import traceMetaFixture from "./fixtures/trace-meta.json" with { type: "json" };
+import traceMetaWithNullsFixture from "./fixtures/trace-meta-with-nulls.json" with {
+  type: "json",
+};
 import traceFixture from "./fixtures/trace.json" with { type: "json" };
+import traceMixedFixture from "./fixtures/trace-mixed.json" with {
+  type: "json",
+};
 import traceEventFixture from "./fixtures/trace-event.json" with {
   type: "json",
 };
@@ -461,6 +467,27 @@ export const restHandlers = buildHandlers([
       return HttpResponse.json(OrganizationPayload);
     },
   },
+  // 404 handlers for test scenarios
+  {
+    method: "get",
+    path: "/api/0/organizations/nonexistent-org/",
+    fetch: () => {
+      return HttpResponse.json(
+        { detail: "The requested resource does not exist" },
+        { status: 404 },
+      );
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/nonexistent-project/",
+    fetch: () => {
+      return HttpResponse.json(
+        { detail: "The requested resource does not exist" },
+        { status: 404 },
+      );
+    },
+  },
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/teams/",
@@ -524,6 +551,13 @@ export const restHandlers = buildHandlers([
         slug: body?.slug || "cloudflare-mcp",
         platform: body?.platform || "node",
       });
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
+    fetch: () => {
+      return HttpResponse.json(projectFixture);
     },
   },
   {
@@ -910,6 +944,11 @@ export const restHandlers = buildHandlers([
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
     fetch: () => HttpResponse.json(autofixStateFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
   },
   {
     method: "post",
@@ -1331,7 +1370,9 @@ export const mswServer = setupServer(
 export {
   autofixStateFixture,
   traceMetaFixture,
+  traceMetaWithNullsFixture,
   traceFixture,
+  traceMixedFixture,
   traceEventFixture,
 };
 

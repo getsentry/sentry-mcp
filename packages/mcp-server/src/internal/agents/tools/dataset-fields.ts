@@ -1,7 +1,6 @@
-import { tool } from "ai";
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
-import { wrapAgentToolExecute } from "./utils";
+import { agentTool } from "./utils";
 
 export type DatasetType = "events" | "errors" | "search_issues";
 
@@ -27,10 +26,9 @@ export async function discoverDatasetFields(
   dataset: DatasetType,
   options: {
     projectId?: string;
-    includeExamples?: boolean;
   } = {},
 ): Promise<DatasetFieldsResult> {
-  const { projectId, includeExamples = false } = options;
+  const { projectId } = options;
 
   // Get available tags for the dataset
   const tags = await apiService.listTags({
@@ -47,9 +45,7 @@ export async function discoverDatasetFields(
       key: tag.key,
       name: tag.name,
       totalValues: tag.totalValues,
-      examples: includeExamples
-        ? getFieldExamples(tag.key, dataset)
-        : undefined,
+      examples: getFieldExamples(tag.key, dataset),
     }));
 
   return {
@@ -61,28 +57,23 @@ export async function discoverDatasetFields(
 
 /**
  * Create a tool for discovering available fields in a dataset
+ * The tool is pre-bound with the API service and organization configured for the appropriate region
  */
-export function createDatasetFieldsTool(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  dataset: DatasetType,
-  projectId?: string,
-) {
-  return tool({
-    description: `Discover available fields for ${dataset} searches in Sentry`,
-    parameters: z.object({
-      includeExamples: z
-        .boolean()
-        .describe(
-          "Include example values for each field (set to false if you don't need examples)",
-        ),
-    }),
-    execute: wrapAgentToolExecute(async ({ includeExamples }) => {
+export function createDatasetFieldsTool(options: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  dataset: DatasetType;
+  projectId?: string;
+}) {
+  const { apiService, organizationSlug, dataset, projectId } = options;
+  return agentTool({
+    description: `Discover available fields for ${dataset} searches in Sentry (includes example values)`,
+    parameters: z.object({}),
+    execute: async () => {
       return discoverDatasetFields(apiService, organizationSlug, dataset, {
         projectId,
-        includeExamples,
       });
-    }),
+    },
   });
 }
 

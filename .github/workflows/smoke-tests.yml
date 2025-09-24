@@ -1,0 +1,139 @@
+name: Smoke Tests (Local)
+
+permissions:
+  contents: read
+  checks: write
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke-tests:
+    name: Run Smoke Tests Against Local Server
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # pnpm/action-setup@v4
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      
+      - name: Build
+        run: pnpm build
+
+      - name: Start local dev server
+        working-directory: packages/mcp-cloudflare
+        run: |
+          # Start wrangler in background and capture output
+          pnpm exec wrangler dev --port 8788 --local > wrangler.log 2>&1 &
+          WRANGLER_PID=$!
+          echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
+          echo "Waiting for server to start (PID: $WRANGLER_PID)..."
+          
+          # Wait for server to be ready (up to 2 minutes)
+          MAX_ATTEMPTS=24
+          ATTEMPT=0
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            # Check if wrangler process is still running
+            if ! kill -0 $WRANGLER_PID 2>/dev/null; then
+              echo "❌ Wrangler process died unexpectedly!"
+              echo "📋 Last 50 lines of wrangler.log:"
+              tail -50 wrangler.log
+              exit 1
+            fi
+            
+            if curl -s -f -o /dev/null http://localhost:8788/; then
+              echo "✅ Server is ready!"
+              echo "📋 Wrangler startup log:"
+              cat wrangler.log
+              break
+            else
+              echo "⏳ Waiting for server to start (attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)..."
+              # Show partial log every 5 attempts
+              if [ $((ATTEMPT % 5)) -eq 0 ] && [ $ATTEMPT -gt 0 ]; then
+                echo "📋 Current wrangler.log output:"
+                tail -20 wrangler.log
+              fi
+            fi
+            
+            ATTEMPT=$((ATTEMPT+1))
+            sleep 5
+          done
+          
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "❌ Server failed to start after $MAX_ATTEMPTS attempts"
+            echo "📋 Full wrangler.log:"
+            cat wrangler.log
+            exit 1
+          fi
+
+      - name: Run smoke tests against local server
+        env:
+          PREVIEW_URL: http://localhost:8788
+        working-directory: packages/smoke-tests
+        run: |
+          echo "🧪 Running smoke tests against local server at $PREVIEW_URL"
+          
+          # Give server a bit more time to stabilize after startup
+          echo "⏳ Waiting 5 seconds for server to stabilize..."
+          sleep 5
+          
+          # Verify server is still responding before running tests
+          if ! curl -s -f -o /dev/null http://localhost:8788/; then
+            echo "❌ Server is not responding before tests!"
+            echo "📋 Wrangler log:"
+            cat ../mcp-cloudflare/wrangler.log
+            exit 1
+          fi
+          
+          echo "✅ Server is responding, running tests..."
+          pnpm test:ci || TEST_EXIT_CODE=$?
+          
+          # If tests failed, show server logs for debugging
+          if [ "${TEST_EXIT_CODE:-0}" -ne 0 ]; then
+            echo "❌ Tests failed with exit code ${TEST_EXIT_CODE}"
+            echo "📋 Wrangler log at time of failure:"
+            cat ../mcp-cloudflare/wrangler.log
+            exit ${TEST_EXIT_CODE}
+          fi
+
+      - name: Publish Smoke Test Report
+        uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+        if: always()
+        with:
+          report_paths: "packages/smoke-tests/tests.junit.xml"
+          check_name: "Local Smoke Test Results"
+          fail_on_failure: true
+
+      - name: Stop local server
+        if: always()
+        run: |
+          if [ ! -z "$WRANGLER_PID" ]; then
+            kill $WRANGLER_PID || true
+          fi

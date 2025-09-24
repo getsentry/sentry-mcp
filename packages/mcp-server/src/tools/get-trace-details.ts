@@ -1,10 +1,6 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
-import {
-  apiServiceFromContext,
-  withApiErrorHandling,
-} from "../internal/tool-helpers/api";
+import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl, ParamTraceId } from "../schema";
@@ -17,6 +13,7 @@ const MIN_AVG_DURATION_MS = 5;
 
 export default defineTool({
   name: "get_trace_details",
+  requiredScopes: ["event:read"],
   description: [
     "Get detailed information about a specific Sentry trace by ID.",
     "",
@@ -67,33 +64,19 @@ export default defineTool({
     setTag("trace.id", params.traceId);
 
     // Get trace metadata for overview
-    const traceMeta = await withApiErrorHandling(
-      () =>
-        apiService.getTraceMeta({
-          organizationSlug: params.organizationSlug,
-          traceId: params.traceId,
-          statsPeriod: "14d", // Fixed stats period
-        }),
-      {
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-      },
-    );
+    const traceMeta = await apiService.getTraceMeta({
+      organizationSlug: params.organizationSlug,
+      traceId: params.traceId,
+      statsPeriod: "14d", // Fixed stats period
+    });
 
     // Get minimal trace data to show key transactions
-    const trace = await withApiErrorHandling(
-      () =>
-        apiService.getTrace({
-          organizationSlug: params.organizationSlug,
-          traceId: params.traceId,
-          limit: 10, // Only get top-level spans for overview
-          statsPeriod: "14d", // Fixed stats period
-        }),
-      {
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-      },
-    );
+    const trace = await apiService.getTrace({
+      organizationSlug: params.organizationSlug,
+      traceId: params.traceId,
+      limit: 10, // Only get top-level spans for overview
+      statsPeriod: "14d", // Fixed stats period
+    });
 
     return formatTraceOutput({
       organizationSlug: params.organizationSlug,
@@ -152,6 +135,17 @@ function selectInterestingSpans(
   const selected: SelectedSpan[] = [];
   let spanCount = 0;
 
+  // Filter out non-span items (issues) from the trace data
+  // Spans must have children array, duration, and other span-specific fields
+  const actualSpans = spans.filter(
+    (item) =>
+      item &&
+      typeof item === "object" &&
+      "children" in item &&
+      Array.isArray(item.children) &&
+      "duration" in item,
+  );
+
   function addSpan(span: any, level: number): boolean {
     if (spanCount >= maxSpans || level > MAX_DEPTH) return false;
 
@@ -209,7 +203,7 @@ function selectInterestingSpans(
   }
 
   // Sort root spans by duration and select the most interesting ones
-  const sortedRoots = spans
+  const sortedRoots = actualSpans
     .sort((a, b) => (b.duration || 0) - (a.duration || 0))
     .slice(0, 5); // Start with top 5 root spans
 
@@ -370,6 +364,17 @@ function calculateOperationStats(spans: any[]): Record<
 function getAllSpansFlattened(spans: any[]): any[] {
   const result: any[] = [];
 
+  // Filter out non-span items (issues) from the trace data
+  // Spans must have children array and duration
+  const actualSpans = spans.filter(
+    (item) =>
+      item &&
+      typeof item === "object" &&
+      "children" in item &&
+      Array.isArray(item.children) &&
+      "duration" in item,
+  );
+
   function collectSpans(spanList: any[]) {
     for (const span of spanList) {
       result.push(span);
@@ -379,7 +384,7 @@ function getAllSpansFlattened(spans: any[]): any[] {
     }
   }
 
-  collectSpans(spans);
+  collectSpans(actualSpans);
   return result;
 }
 

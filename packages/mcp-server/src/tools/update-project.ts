@@ -16,6 +16,7 @@ import {
 
 export default defineTool({
   name: "update_project",
+  requiredScopes: ["project:write"],
   description: [
     "Update project settings in Sentry, such as name, slug, platform, and team assignment.",
     "",
