@@ -610,13 +610,6 @@ const MAX_SPANS_IN_TREE = 10;
 const MAX_QUERY_GROUPS = 10;
 
 /**
- * Type guard to check if data is a valid span array
- */
-function isValidSpanArray(data: unknown): data is Array<any> {
-  return Array.isArray(data) && data.length > 0;
-}
-
-/**
  * Safely parse a number from a string, returning a default if invalid
  */
 function safeParseInt(value: unknown, defaultValue: number): number {
@@ -652,6 +645,42 @@ interface RawSpan {
   duration?: number;
 }
 
+interface N1EvidenceData {
+  parentSpan?: string;
+  repeatingSpansCompact?: string;
+  repeatingSpans?: string;
+  numberRepeatingSpans?: string | number;
+  offenderSpanIds?: string[];
+  parentSpanIds?: string[];
+  transactionName?: string;
+  [key: string]: unknown;
+}
+
+interface SlowDbEvidenceData {
+  parentSpan?: string;
+  [key: string]: unknown;
+}
+
+function normalizeSpanId(value: unknown): string | undefined {
+  if (typeof value === "string" && value) {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toString();
+  }
+  return undefined;
+}
+
+function getSpanIdentifier(span: RawSpan): string | undefined {
+  if (span.span_id !== undefined) {
+    return normalizeSpanId(span.span_id);
+  }
+  if (span.id !== undefined) {
+    return normalizeSpanId(span.id);
+  }
+  return undefined;
+}
+
 function getSpanDurationMs(span: RawSpan): number {
   if (
     typeof span.timestamp === "number" &&
@@ -663,12 +692,9 @@ function getSpanDurationMs(span: RawSpan): number {
     }
   }
 
+  // Trace APIs expose `duration` in milliseconds. Preserve fractional values.
   if (typeof span.duration === "number" && Number.isFinite(span.duration)) {
-    if (span.duration < 0) {
-      return 0;
-    }
-
-    return span.duration < 1 ? span.duration * 1000 : span.duration;
+    return span.duration >= 0 ? span.duration : 0;
   }
 
   return 0;
@@ -687,32 +713,30 @@ function getSpanDurationMs(span: RawSpan): number {
  * @returns Array of selected spans organized hierarchically
  */
 function selectN1QuerySpans(
-  spansData: unknown,
-  evidence: any,
+  spans: RawSpan[],
+  evidence: N1EvidenceData,
   maxSpans = MAX_SPANS_IN_TREE,
 ): PerformanceSpan[] {
   const selected: PerformanceSpan[] = [];
   let spanCount = 0;
 
-  // Validate spansData is an array
-  if (!isValidSpanArray(spansData)) {
-    return selected;
-  }
-  const spans = spansData as any[];
-
   // Use offenderSpanIds to identify N+1 queries
-  const n1SpanIds = new Set(evidence?.offenderSpanIds || []);
-  const parentSpanIds = evidence?.parentSpanIds || [];
+  const offenderSpanIds = normalizeIdArray(evidence.offenderSpanIds);
+  const parentSpanIds = normalizeIdArray(evidence.parentSpanIds);
+
+  const n1SpanIds = new Set(offenderSpanIds);
+  const parentSpanIdSet = new Set(parentSpanIds);
 
   // Find the parent span(s) if we have IDs
   let parentSpan: PerformanceSpan | null = null;
   if (parentSpanIds.length > 0) {
-    const parent = spans.find((s: any) =>
-      parentSpanIds.includes(s.span_id || s.id),
-    );
+    const parent = spans.find((span) => {
+      const identifier = getSpanIdentifier(span);
+      return identifier ? parentSpanIdSet.has(identifier) : false;
+    });
     if (parent) {
       parentSpan = {
-        span_id: parent.span_id || parent.id || "unknown",
+        span_id: getSpanIdentifier(parent) ?? "unknown",
         op: parent.op || "unknown",
         description:
           parent.description || evidence.parentSpan || "Parent Operation",
@@ -730,12 +754,15 @@ function selectN1QuerySpans(
   if (n1SpanIds.size > 0) {
     // Find all spans that are part of the N+1 pattern
     const n1Spans = spans
-      .filter((s: any) => n1SpanIds.has(s.span_id || s.id))
+      .filter((span) => {
+        const identifier = getSpanIdentifier(span);
+        return identifier ? n1SpanIds.has(identifier) : false;
+      })
       .slice(0, maxSpans - spanCount);
 
     for (const span of n1Spans) {
       const perfSpan: PerformanceSpan = {
-        span_id: span.span_id || span.id || "unknown",
+        span_id: getSpanIdentifier(span) ?? "unknown",
         op: span.op || "db.query",
         description: span.description || "Database Query",
         duration: getSpanDurationMs(span),
@@ -756,6 +783,16 @@ function selectN1QuerySpans(
   }
 
   return selected;
+}
+
+function normalizeIdArray(values: unknown): string[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values
+    .map((value) => normalizeSpanId(value))
+    .filter((value): value is string => value !== undefined);
 }
 
 /**
@@ -871,7 +908,7 @@ const OCCURRENCE_TYPE_TO_ISSUE_TYPE: Record<number, string> = {
  * - parentSpanIds: IDs of parent spans for tree visualization
  */
 function formatN1QueryEvidence(
-  evidenceData: Record<string, any>,
+  evidenceData: N1EvidenceData,
   spansData: unknown,
 ): string {
   const parts: string[] = [];
@@ -907,14 +944,13 @@ function formatN1QueryEvidence(
     }
   }
 
-  // Add span tree visualization if we have spans data and span IDs
+  // Add span tree visualization if we have span data
   if (
-    isValidSpanArray(spansData) &&
-    (evidenceData.offenderSpanIds?.length > 0 ||
-      evidenceData.parentSpanIds?.length > 0)
+    Array.isArray(spansData) &&
+    (evidenceData.offenderSpanIds?.length || evidenceData.parentSpanIds?.length)
   ) {
     const selectedSpans = selectN1QuerySpans(
-      spansData,
+      spansData as RawSpan[],
       evidenceData,
       MAX_SPANS_IN_TREE,
     );
@@ -942,7 +978,7 @@ function formatN1QueryEvidence(
  * provide sufficient information for slow query issues.
  */
 function formatSlowDbQueryEvidence(
-  evidenceData: Record<string, any>,
+  evidenceData: SlowDbEvidenceData,
   spansData: unknown,
 ): string {
   const parts: string[] = [];

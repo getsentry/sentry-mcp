@@ -1847,6 +1847,57 @@ describe("formatEventOutput", () => {
       );
     });
 
+    it("should render span tree using duration fields when timestamps are missing", () => {
+      const event = new EventBuilder("python")
+        .withType("transaction")
+        .withOccurrence({
+          issueTitle: "N+1 Query",
+          issueType: "performance_n_plus_one_db_queries",
+          evidenceData: {
+            parentSpanIds: ["parentDur"],
+            parentSpan: "GET /api/durations",
+            offenderSpanIds: ["spanA", "spanB"],
+            repeatingSpansCompact: "SELECT * FROM durations WHERE bucket = %s",
+            numberRepeatingSpans: "2",
+          },
+        })
+        .withEntry({
+          type: "spans",
+          data: [
+            {
+              span_id: "parentDur",
+              op: "http.server",
+              description: "GET /durations",
+              duration: 1250,
+            },
+            {
+              span_id: "spanA",
+              op: "db.query",
+              description: "SELECT * FROM durations WHERE bucket = 'fast'",
+              duration: 0.5,
+            },
+            {
+              span_id: "spanB",
+              op: "db.query",
+              description: "SELECT * FROM durations WHERE bucket = 'slow'",
+              duration: 1500,
+            },
+          ],
+        })
+        .build();
+
+      const output = formatEventOutput(event);
+
+      expect(output).toContain("### Span Tree (Limited to 10 spans)");
+      expect(output).toContain("http.server: GET /durations (1250ms)");
+      expect(output).toContain(
+        "├─ db.query: SELECT * FROM durations WHERE bucket = 'fast' (1ms) [N+1]",
+      );
+      expect(output).toContain(
+        "└─ db.query: SELECT * FROM durations WHERE bucket = 'slow' (1500ms) [N+1]",
+      );
+    });
+
     it("should handle transaction event without performance data", () => {
       const event = new EventBuilder("python")
         .withType("transaction")
