@@ -23,9 +23,60 @@ describe("tokenExchangeCallback", () => {
     vi.clearAllMocks();
   });
 
-  it("should skip non-refresh_token grant types", async () => {
+  it("should handle authorization_code grant type and store props", async () => {
+    const mockProps = {
+      id: "user-id",
+      name: "Test User",
+      accessToken: "initial-access-token",
+      refreshToken: "initial-refresh-token",
+      accessTokenExpiresAt: Date.now() + 3600 * 1000, // 1 hour from now
+    } as WorkerProps;
+
     const options: TokenExchangeCallbackOptions = {
       grantType: "authorization_code",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
+      props: mockProps,
+    };
+
+    const result = await tokenExchangeCallback(options, mockEnv);
+
+    expect(result).toBeDefined();
+    expect(result?.newProps).toEqual(mockProps);
+    expect(result?.accessTokenTTL).toBeGreaterThan(0);
+    expect(result?.accessTokenTTL).toBeLessThanOrEqual(3600);
+    expect(mockFetch).not.toHaveBeenCalled(); // Should not call upstream for authorization_code
+  });
+
+  it("should handle authorization_code grant type with default TTL when no expiry", async () => {
+    const mockProps = {
+      id: "user-id",
+      name: "Test User",
+      accessToken: "initial-access-token",
+      refreshToken: "initial-refresh-token",
+      // No accessTokenExpiresAt
+    } as WorkerProps;
+
+    const options: TokenExchangeCallbackOptions = {
+      grantType: "authorization_code",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
+      props: mockProps,
+    };
+
+    const result = await tokenExchangeCallback(options, mockEnv);
+
+    expect(result).toBeDefined();
+    expect(result?.newProps).toEqual(mockProps);
+    expect(result?.accessTokenTTL).toBe(8 * 60 * 60); // 8 hours default
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("should skip other grant types", async () => {
+    const options: TokenExchangeCallbackOptions = {
+      grantType: "client_credentials" as any,
       clientId: "test-client-id",
       userId: "test-user-id",
       scope: ["org:read", "project:read"],

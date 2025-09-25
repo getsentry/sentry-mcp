@@ -209,7 +209,7 @@ export async function refreshAccessToken({
 }
 
 /**
- * Token exchange callback for handling Sentry OAuth token refreshes.
+ * Token exchange callback for handling Sentry OAuth token exchanges and refreshes.
  */
 export async function tokenExchangeCallback(
   options: TokenExchangeCallbackOptions,
@@ -219,7 +219,27 @@ export async function tokenExchangeCallback(
     SENTRY_HOST?: string;
   },
 ): Promise<TokenExchangeCallbackResult | undefined> {
-  // Only handle refresh_token grant type
+  // Handle both authorization_code and refresh_token grant types
+  if (options.grantType === "authorization_code") {
+    // For authorization_code grants, just ensure the props are stored correctly
+    // The props should already contain the refreshToken from the callback route
+    Sentry.setUser({ id: options.props.id, name: options.props.name });
+
+    // Return the props as-is to ensure they get stored in the OAuth provider
+    return {
+      newProps: options.props,
+      // Calculate TTL based on stored expiry, default to 8 hours if not specified
+      accessTokenTTL: options.props.accessTokenExpiresAt
+        ? Math.max(
+            0,
+            Math.floor(
+              (options.props.accessTokenExpiresAt - Date.now()) / 1000,
+            ),
+          )
+        : 8 * 60 * 60, // 8 hours default
+    };
+  }
+
   if (options.grantType !== "refresh_token") {
     return undefined; // No-op for other grant types
   }
@@ -232,7 +252,6 @@ export async function tokenExchangeCallback(
     Sentry.captureException(
       new Error("No refresh token available in stored props"),
     );
-
     return undefined;
   }
 
