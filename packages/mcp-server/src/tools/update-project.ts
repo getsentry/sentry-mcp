@@ -2,7 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { logError } from "../logging";
+import { logIssue } from "../logging";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import type { Project } from "../api-client/index";
@@ -90,7 +90,7 @@ export default defineTool({
           teamSlug: params.teamSlug,
         });
       } catch (err) {
-        logError(err);
+        logIssue(err);
         throw new Error(
           `Failed to assign team ${params.teamSlug} to project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
         );
@@ -111,7 +111,7 @@ export default defineTool({
           platform: params.platform,
         });
       } catch (err) {
-        logError(err);
+        logIssue(err);
         throw new Error(
           `Failed to update project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
         );

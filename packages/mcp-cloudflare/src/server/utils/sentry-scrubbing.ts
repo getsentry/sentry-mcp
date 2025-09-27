@@ -1,3 +1,5 @@
+import { logWarn } from "@sentry/mcp-server/logging";
+
 /**
  * Error thrown when an event cannot be serialized for scrubbing
  */
@@ -83,9 +85,9 @@ export function sentryBeforeSend(event: any, hint: any) {
   for (const { pattern, description } of SCRUB_PATTERNS) {
     if (pattern.test(eventString)) {
       containsSensitive = true;
-      console.error(
-        `[Sentry Scrubbing] Event contained sensitive data: ${description}`,
-      );
+      logWarn(`Event contained sensitive data: ${description}`, {
+        loggerScope: ["cloudflare", "sentry-scrubbing"],
+      });
     }
   }
 

@@ -3,7 +3,7 @@ import type {
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
 import type { z } from "zod";
-import { logError } from "@sentry/mcp-server/logging";
+import { logIssue } from "@sentry/mcp-server/logging";
 import { TokenResponseSchema, SENTRY_TOKEN_URL } from "./constants";
 import type { WorkerProps } from "../types";
 import * as Sentry from "@sentry/cloudflare";
@@ -50,7 +50,7 @@ export async function exchangeCodeForAccessToken({
   redirect_uri?: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!code) {
-    const eventId = logError("[oauth] Missing code in token exchange", {
+    const eventId = logIssue("[oauth] Missing code in token exchange", {
       oauth: {
         client_id,
       },
@@ -80,7 +80,7 @@ export async function exchangeCodeForAccessToken({
     }).toString(),
   });
   if (!resp.ok) {
-    const eventId = logError(
+    const eventId = logIssue(
       `[oauth] Failed to exchange code for access token: ${await resp.text()}`,
       {
         oauth: {
@@ -102,7 +102,7 @@ export async function exchangeCodeForAccessToken({
     const output = TokenResponseSchema.parse(body);
     return [output, null];
   } catch (e) {
-    const eventId = logError(
+    const eventId = logIssue(
       new Error("Failed to parse token response", {
         cause: e,
       }),
@@ -137,7 +137,7 @@ export async function refreshAccessToken({
   client_id: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!refresh_token) {
-    const eventId = logError("[oauth] Missing refresh token in token refresh", {
+    const eventId = logIssue("[oauth] Missing refresh token in token refresh", {
       oauth: {
         client_id,
       },
@@ -166,7 +166,7 @@ export async function refreshAccessToken({
   });
 
   if (!resp.ok) {
-    const eventId = logError(
+    const eventId = logIssue(
       `[oauth] Failed to refresh access token: ${await resp.text()}`,
       {
         oauth: {
@@ -188,7 +188,7 @@ export async function refreshAccessToken({
     const output = TokenResponseSchema.parse(body);
     return [output, null];
   } catch (e) {
-    const eventId = logError(
+    const eventId = logIssue(
       new Error("Failed to parse refresh token response", {
         cause: e,
       }),
@@ -288,7 +288,7 @@ export async function tokenExchangeCallback(
       accessTokenTTL: tokenResponse.expires_in,
     };
   } catch (error) {
-    logError(error);
+    logIssue(error);
     throw new Error("Failed to refresh upstream token in OAuth provider", {
       cause: error,
     });

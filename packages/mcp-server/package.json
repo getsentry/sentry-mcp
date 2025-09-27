@@ -126,6 +126,8 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "catalog:",
+    "@logtape/logtape": "^1.1.1",
+    "@logtape/sentry": "^1.1.1",
     "@modelcontextprotocol/sdk": "catalog:",
     "@sentry/core": "catalog:",
     "@sentry/node": "catalog:",

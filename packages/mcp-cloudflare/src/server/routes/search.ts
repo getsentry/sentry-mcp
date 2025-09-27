@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { logError } from "@sentry/mcp-server/logging";
+import { logIssue } from "@sentry/mcp-server/logging";
 import { SENTRY_GUIDES } from "@sentry/mcp-server/constants";
 import { z } from "zod";
 import type { RateLimitResult } from "../types/chat";
@@ -55,7 +55,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           );
         }
       } catch (error) {
-        const eventId = logError(error);
+        const eventId = logIssue(error);
         return c.json(
           {
             error: "There was an error communicating with the rate limiter.",
@@ -198,7 +198,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           }) || [],
       });
     } catch (error) {
-      const eventId = logError(error);
+      const eventId = logIssue(error);
       return c.json(
         {
           error: "Failed to search documentation. Please try again later.",
@@ -209,7 +209,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       );
     }
   } catch (error) {
-    const eventId = logError(error);
+    const eventId = logIssue(error);
     return c.json(
       {
         error: "Internal server error",

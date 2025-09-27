@@ -19,30 +19,7 @@ Different Sentry SDKs for different environments:
 
 ### Error Logging
 
-```typescript
-import { captureException, withScope } from "@sentry/core";
-
-export function logError(
-  error: Error | unknown,
-  contexts?: Record<string, any>,
-  attachments?: Record<string, any>
-): string | undefined {
-  // Skip UserInputErrors - these are expected
-  if (error instanceof UserInputError) {
-    return;
-  }
-
-  return withScope((scope) => {
-    if (contexts) scope.setContext("mcp", contexts);
-    if (attachments) {
-      for (const [key, data] of Object.entries(attachments)) {
-        scope.addAttachment({ data, filename: key });
-      }
-    }
-    return captureException(error);
-  });
-}
-```
+See `logIssue` in @packages/mcp-server/src/logging.ts (documented in @docs/logging.mdc) for the canonical way to create an Issue and structured log entry.
 
 ### Tracing Pattern
 

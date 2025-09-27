@@ -3,6 +3,7 @@ import {
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
 } from "../utils/url-utils";
+import { logWarn } from "../logging";
 import {
   OrganizationListSchema,
   OrganizationSchema,
@@ -277,10 +278,17 @@ export class SentryApiService {
       } catch (error) {
         // If we can't parse JSON, check if it's HTML (server error)
         if (errorText.includes("<!DOCTYPE") || errorText.includes("<html")) {
-          console.error(
-            `[sentryApi] Received HTML error page instead of JSON (status ${response.status})`,
-            error,
-          );
+          logWarn("Received HTML error page instead of JSON", {
+            loggerScope: ["api", "client"],
+            extra: {
+              status: response.status,
+              statusText: response.statusText,
+              host: this.host,
+              path,
+              parseErrorMessage:
+                error instanceof Error ? error.message : String(error),
+            },
+          });
           // HTML response instead of JSON typically indicates a server configuration issue
           throw createApiError(
             `Server error: Received HTML instead of JSON (${response.status} ${response.statusText}). This may indicate an invalid URL or server issue.`,
@@ -289,10 +297,21 @@ export class SentryApiService {
             undefined,
           );
         }
-        console.error(
-          `[sentryApi] Failed to parse error response: ${errorText}`,
-          error,
-        );
+        logWarn("Failed to parse JSON error response", {
+          loggerScope: ["api", "client"],
+          extra: {
+            status: response.status,
+            statusText: response.statusText,
+            host: this.host,
+            path,
+            bodyPreview:
+              errorText.length > 256
+                ? `${errorText.slice(0, 253)}…`
+                : errorText,
+            parseErrorMessage:
+              error instanceof Error ? error.message : String(error),
+          },
+        });
       }
 
       if (parsed) {
@@ -308,10 +327,21 @@ export class SentryApiService {
           );
         }
 
-        console.error(
-          `[sentryApi] Failed to parse error response: ${errorText}`,
-          error,
-        );
+        logWarn("Failed to parse validated API error response", {
+          loggerScope: ["api", "client"],
+          extra: {
+            status: response.status,
+            statusText: response.statusText,
+            host: this.host,
+            path,
+            bodyPreview:
+              errorText.length > 256
+                ? `${errorText.slice(0, 253)}…`
+                : errorText,
+            validationErrorMessage:
+              error instanceof Error ? error.message : String(error),
+          },
+        });
       }
 
       // Use the error factory to create the appropriate error type based on status

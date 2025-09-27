@@ -4,7 +4,7 @@ import { z } from "zod";
 import { SCOPES } from "../../constants";
 import type { Env } from "../types";
 import { createErrorPage, createSuccessPage } from "../lib/html-utils";
-import { logError } from "@sentry/mcp-server/logging";
+import { logIssue, logWarn } from "@sentry/mcp-server/logging";
 
 // Generate a secure random state parameter using Web Crypto API
 function generateState(): string {
@@ -108,9 +108,12 @@ export async function getOrRegisterChatClient(
       return registration.client_id;
     }
     // If redirect URI doesn't match, we need to re-register
-    console.warn("Redirect URI mismatch, re-registering chat client", {
-      existing: registration.redirect_uris,
-      requested: redirectUri,
+    logWarn("Redirect URI mismatch, re-registering chat client", {
+      loggerScope: ["cloudflare", "chat-oauth"],
+      extra: {
+        existingRedirects: registration.redirect_uris,
+        requestedRedirect: redirectUri,
+      },
     });
   }
 
@@ -235,7 +238,7 @@ export default new Hono<{
 
       return c.redirect(authUrl.toString());
     } catch (error) {
-      const eventId = logError(error);
+      const eventId = logIssue(error);
       return c.json({ error: "Failed to initiate OAuth flow", eventId }, 500);
     }
   })
@@ -252,7 +255,7 @@ export default new Hono<{
     // Validate state parameter to prevent CSRF attacks
     if (!state || !storedState || state !== storedState) {
       deleteCookie(c, "chat_oauth_state", getSecureCookieOptions(c.req.url));
-      logError("Invalid state parameter received", {
+      logIssue("Invalid state parameter received", {
         oauth: {
           state,
           expectedState: storedState,
@@ -285,7 +288,7 @@ export default new Hono<{
     deleteCookie(c, "chat_oauth_state", getSecureCookieOptions(c.req.url));
 
     if (!code) {
-      logError("No authorization code received");
+      logIssue("No authorization code received");
       return c.html(
         createErrorPage(
           "Authentication Failed",
@@ -364,7 +367,7 @@ export default new Hono<{
         }),
       );
     } catch (error) {
-      logError(error);
+      logIssue(error);
       return c.html(
         createErrorPage(
           "Authentication Error",

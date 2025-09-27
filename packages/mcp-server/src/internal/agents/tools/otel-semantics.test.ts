@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SentryApiService } from "../../../api-client";
 
 vi.mock("../logging", () => ({
-  logError: vi.fn(),
+  logIssue: vi.fn(),
 }));
 
 // Import the actual function - no mocking needed since build runs first

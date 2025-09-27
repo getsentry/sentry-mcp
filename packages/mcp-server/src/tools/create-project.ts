@@ -2,7 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { logError } from "../logging";
+import { logIssue } from "../logging";
 import type { ServerContext } from "../types";
 import type { ClientKey } from "../api-client/index";
 import {
@@ -75,7 +75,7 @@ export default defineTool({
         name: "Default",
       });
     } catch (err) {
-      logError(err);
+      logIssue(err);
     }
     let output = `# New Project in **${organizationSlug}**\n\n`;
     output += `**ID**: ${project.id}\n`;

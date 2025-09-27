@@ -1,6 +1,6 @@
 import type { Constraints } from "@sentry/mcp-server/types";
 import { SentryApiService, ApiError } from "@sentry/mcp-server/api-client";
-import { logError } from "@sentry/mcp-server/logging";
+import { logIssue } from "@sentry/mcp-server/logging";
 
 /**
  * Verify that provided org/project constraints exist and the user has access
@@ -58,7 +58,7 @@ export async function verifyConstraintsAccess(
           : error.message;
       return { ok: false, status: error.status, message };
     }
-    const eventId = logError(error);
+    const eventId = logIssue(error);
     return {
       ok: false,
       status: 502,
@@ -85,7 +85,7 @@ export async function verifyConstraintsAccess(
             : error.message;
         return { ok: false, status: error.status, message };
       }
-      const eventId = logError(error);
+      const eventId = logIssue(error);
       return {
         ok: false,
         status: 502,

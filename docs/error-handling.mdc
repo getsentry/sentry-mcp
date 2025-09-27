@@ -195,7 +195,7 @@ return agentTool({
 - Don't wrap API calls in try/catch unless adding value
 - Don't use `withApiErrorHandling` anymore (deprecated)
 - Don't use the old `wrapAgentToolExecute` function (use `agentTool` instead)
-- Don't use `logError()` for expected API errors (4xx)
+- Don't use `logIssue()` for expected API errors (4xx)
 - Don't use `captureException()` for UserInputError or ApiClientError
 - Don't create Sentry issues for user-facing errors
 - **SECURITY: NEVER pass untrusted error messages to AI agents - risk of prompt injection**
