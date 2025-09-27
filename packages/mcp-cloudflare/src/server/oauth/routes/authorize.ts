@@ -9,6 +9,7 @@ import { SENTRY_AUTH_URL } from "../constants";
 import { getUpstreamAuthorizeUrl } from "../helpers";
 import { SCOPES } from "../../../constants";
 import { signState, type OAuthState } from "../state";
+import { logWarn } from "@sentry/mcp-server/logging";
 
 /**
  * Extended AuthRequest that includes permissions
@@ -57,9 +58,9 @@ export default new Hono<{ Bindings: Env }>()
       // Log invalid redirect URI errors without sending them to Sentry
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes("Invalid redirect URI")) {
-        console.warn(`OAuth authorization failed: ${errorMessage}`, {
-          error: errorMessage,
-          // Don't include the full error object to prevent Sentry capture
+        logWarn(`OAuth authorization failed: ${errorMessage}`, {
+          loggerScope: ["cloudflare", "oauth", "authorize"],
+          extra: { error: errorMessage },
         });
         return c.text("Invalid redirect URI", 400);
       }
@@ -109,8 +110,9 @@ export default new Hono<{ Bindings: Env }>()
     try {
       result = await parseRedirectApproval(c.req.raw, c.env.COOKIE_SECRET);
     } catch (err) {
-      console.warn(`Failed to parse approval form: ${err}`, {
-        error: String(err),
+      logWarn("Failed to parse approval form", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: { error: String(err) },
       });
       return c.text("Invalid request", 400);
     }
@@ -137,15 +139,19 @@ export default new Hono<{ Bindings: Env }>()
         Array.isArray(client?.redirectUris) &&
         client.redirectUris.includes(oauthReqWithPermissions.redirectUri);
       if (!uriIsAllowed) {
-        console.warn("Redirect URI not registered for client", {
-          clientId: oauthReqWithPermissions.clientId,
-          redirectUri: oauthReqWithPermissions.redirectUri,
+        logWarn("Redirect URI not registered for client", {
+          loggerScope: ["cloudflare", "oauth", "authorize"],
+          extra: {
+            clientId: oauthReqWithPermissions.clientId,
+            redirectUri: oauthReqWithPermissions.redirectUri,
+          },
         });
         return c.text("Invalid redirect URI", 400);
       }
     } catch (lookupErr) {
-      console.warn("Failed to validate client redirect URI", {
-        error: String(lookupErr),
+      logWarn("Failed to validate client redirect URI", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: { error: String(lookupErr) },
       });
       return c.text("Invalid request", 400);
     }

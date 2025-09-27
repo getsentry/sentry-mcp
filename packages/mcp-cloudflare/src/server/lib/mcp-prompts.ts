@@ -10,6 +10,7 @@ import PROMPT_DEFINITIONS from "@sentry/mcp-server/promptDefinitions";
 // use mcpClient.executePrompt() or similar instead of directly importing these.
 import { PROMPT_HANDLERS } from "@sentry/mcp-server/prompts";
 import type { ServerContext } from "@sentry/mcp-server/types";
+import { logIssue } from "@sentry/mcp-server/logging";
 
 export interface PromptDefinition {
   name: string;
@@ -85,7 +86,14 @@ export async function executePromptHandler(
   try {
     return await handler(context, parameters as any);
   } catch (error) {
-    console.error(`Failed to execute prompt handler ${promptName}:`, error);
+    logIssue(error, {
+      loggerScope: ["cloudflare", "mcp-prompts"],
+      contexts: {
+        prompt: {
+          name: promptName,
+        },
+      },
+    });
     return null;
   }
 }

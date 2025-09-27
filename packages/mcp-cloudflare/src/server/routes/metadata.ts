@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import { experimental_createMCPClient } from "ai";
 import type { Env } from "../types";
-import { logError } from "@sentry/mcp-server/logging";
+import { logIssue, logWarn } from "@sentry/mcp-server/logging";
 import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
 import RESOURCE_DEFINITIONS from "@sentry/mcp-server/resourceDefinitions";
 import type { ErrorResponse } from "../types/chat";
@@ -82,14 +82,24 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       tools = Object.keys(mcpTools);
     } catch (error) {
       // If we can't get tools, continue with just prompts
-      console.warn("Failed to fetch tools from MCP server:", error);
+      logWarn(error, {
+        loggerScope: ["cloudflare", "metadata"],
+        extra: {
+          message: "Failed to fetch tools from MCP server",
+        },
+      });
     } finally {
       // Ensure the MCP client connection is properly closed to prevent hanging connections
       if (mcpClient && typeof mcpClient.close === "function") {
         try {
           await mcpClient.close();
         } catch (closeError) {
-          console.warn("Failed to close MCP client connection:", closeError);
+          logWarn(closeError, {
+            loggerScope: ["cloudflare", "metadata"],
+            extra: {
+              message: "Failed to close MCP client connection",
+            },
+          });
         }
       }
     }
@@ -106,7 +116,12 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Metadata API error:", error);
+    logIssue(error, {
+      loggerScope: ["cloudflare", "metadata"],
+      extra: {
+        message: "Metadata API error",
+      },
+    });
 
     // Check if this is an authentication error
     const authInfo = analyzeAuthError(error);
@@ -117,7 +132,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       );
     }
 
-    const eventId = logError(error);
+    const eventId = logIssue(error);
     return c.json(
       createErrorResponse({
         error: "Failed to fetch MCP metadata",

@@ -7,6 +7,7 @@ import { DEFAULT_SCOPES } from "@sentry/mcp-server/constants";
 import { SENTRY_TOKEN_URL } from "../constants";
 import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
+import { logWarn } from "@sentry/mcp-server/logging";
 
 /**
  * Extended AuthRequest that includes permissions
@@ -64,8 +65,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     const rawState = c.req.query("state") ?? "";
     parsedState = await verifyAndParseState(rawState, c.env.COOKIE_SECRET);
   } catch (err) {
-    console.warn("Invalid state received on OAuth callback", {
-      error: String(err),
+    logWarn("Invalid state received on OAuth callback", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: { error: String(err) },
     });
     return c.text("Invalid state", 400);
   }
@@ -74,25 +76,27 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   const oauthReqInfo = parsedState.req as unknown as AuthRequestWithPermissions;
 
   if (!oauthReqInfo.clientId) {
-    console.warn("Missing clientId in OAuth state");
+    logWarn("Missing clientId in OAuth state", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+    });
     return c.text("Invalid state", 400);
   }
 
   // Validate redirectUri is a valid URL
   if (!oauthReqInfo.redirectUri) {
-    console.warn("Missing redirectUri in OAuth state");
+    logWarn("Missing redirectUri in OAuth state", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+    });
     return c.text("Authorization failed: No redirect URL provided", 400);
   }
 
   try {
     new URL(oauthReqInfo.redirectUri);
   } catch (err) {
-    console.warn(
-      `Invalid redirectUri in OAuth state: ${oauthReqInfo.redirectUri}`,
-      {
-        error: String(err),
-      },
-    );
+    logWarn(`Invalid redirectUri in OAuth state: ${oauthReqInfo.redirectUri}`, {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: { error: String(err) },
+    });
     return c.text("Authorization failed: Invalid redirect URL", 400);
   }
 
@@ -117,15 +121,19 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       Array.isArray(client?.redirectUris) &&
       client.redirectUris.includes(oauthReqInfo.redirectUri);
     if (!uriIsAllowed) {
-      console.warn("Redirect URI not registered for client on callback", {
-        clientId: oauthReqInfo.clientId,
-        redirectUri: oauthReqInfo.redirectUri,
+      logWarn("Redirect URI not registered for client on callback", {
+        loggerScope: ["cloudflare", "oauth", "callback"],
+        extra: {
+          clientId: oauthReqInfo.clientId,
+          redirectUri: oauthReqInfo.redirectUri,
+        },
       });
       return c.text("Authorization failed: Invalid redirect URL", 400);
     }
   } catch (lookupErr) {
-    console.warn("Failed to validate client redirect URI on callback", {
-      error: String(lookupErr),
+    logWarn("Failed to validate client redirect URI on callback", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: { error: String(lookupErr) },
     });
     return c.text("Authorization failed: Invalid redirect URL", 400);
   }

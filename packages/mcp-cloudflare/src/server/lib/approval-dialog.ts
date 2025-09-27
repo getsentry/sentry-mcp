@@ -2,7 +2,7 @@ import type {
   AuthRequest,
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
-import { logError } from "@sentry/mcp-server/logging";
+import { logError, logIssue, logWarn } from "@sentry/mcp-server/logging";
 import { sanitizeHtml } from "./html-utils";
 
 const COOKIE_NAME = "mcp-approved-clients";
@@ -71,9 +71,13 @@ async function verifySignature(
       signatureBytes.buffer,
       enc.encode(data),
     );
-  } catch (e) {
-    // Handle errors during hex parsing or verification
-    console.error("Error verifying signature:", e);
+  } catch (error) {
+    logError(error, {
+      loggerScope: ["cloudflare", "approval-dialog"],
+      extra: {
+        message: "Error verifying signature",
+      },
+    });
     return false;
   }
 }
@@ -99,7 +103,9 @@ async function getApprovedClientsFromCookie(
   const parts = cookieValue.split(".");
 
   if (parts.length !== 2) {
-    console.warn("Invalid cookie format received.");
+    logWarn("Invalid approval cookie format", {
+      loggerScope: ["cloudflare", "approval-dialog"],
+    });
     return null; // Invalid format
   }
 
@@ -110,24 +116,30 @@ async function getApprovedClientsFromCookie(
   const isValid = await verifySignature(key, signatureHex, payload);
 
   if (!isValid) {
-    console.warn("Cookie signature verification failed.");
+    logWarn("Approval cookie signature verification failed", {
+      loggerScope: ["cloudflare", "approval-dialog"],
+    });
     return null; // Signature invalid
   }
 
   try {
     const approvedClients = JSON.parse(payload);
     if (!Array.isArray(approvedClients)) {
-      console.warn("Cookie payload is not an array.");
+      logWarn("Approval cookie payload is not an array", {
+        loggerScope: ["cloudflare", "approval-dialog"],
+      });
       return null; // Payload isn't an array
     }
     // Ensure all elements are strings
     if (!approvedClients.every((item) => typeof item === "string")) {
-      console.warn("Cookie payload contains non-string elements.");
+      logWarn("Approval cookie payload contains non-string elements", {
+        loggerScope: ["cloudflare", "approval-dialog"],
+      });
       return null;
     }
     return approvedClients as string[];
   } catch (e) {
-    logError(new Error(`Error parsing cookie payload: ${e}`, { cause: e }));
+    logIssue(new Error(`Error parsing cookie payload: ${e}`, { cause: e }));
     return null; // JSON parsing failed
   }
 }
@@ -190,8 +202,13 @@ function encodeState(data: any): string {
     // Use btoa for simplicity, assuming Worker environment supports it well enough
     // For complex binary data, a Buffer/Uint8Array approach might be better
     return btoa(jsonString);
-  } catch (e) {
-    console.error("Error encoding state:", e);
+  } catch (error) {
+    logError(error, {
+      loggerScope: ["cloudflare", "approval-dialog"],
+      extra: {
+        message: "Error encoding approval dialog state",
+      },
+    });
     throw new Error("Could not encode state");
   }
 }
@@ -205,8 +222,13 @@ function decodeState<T = any>(encoded: string): T {
   try {
     const jsonString = atob(encoded);
     return JSON.parse(jsonString);
-  } catch (e) {
-    console.error("Error decoding state:", e);
+  } catch (error) {
+    logError(error, {
+      loggerScope: ["cloudflare", "approval-dialog"],
+      extra: {
+        message: "Error decoding approval dialog state",
+      },
+    });
     throw new Error("Could not decode state");
   }
 }
@@ -773,11 +795,15 @@ export async function parseRedirectApproval(
     permissions = formData
       .getAll("permission")
       .filter((p): p is string => typeof p === "string");
-  } catch (e) {
-    console.error("Error processing form submission:", e);
-    // Rethrow or handle as appropriate, maybe return a specific error response
+  } catch (error) {
+    logError(error, {
+      loggerScope: ["cloudflare", "approval-dialog"],
+      extra: {
+        message: "Error processing approval form submission",
+      },
+    });
     throw new Error(
-      `Failed to parse approval form: ${e instanceof Error ? e.message : String(e)}`,
+      `Failed to parse approval form: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 

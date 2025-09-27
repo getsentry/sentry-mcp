@@ -4,7 +4,7 @@ import { streamText, type ToolSet } from "ai";
 import { experimental_createMCPClient } from "ai";
 import { z } from "zod";
 import type { Env } from "../types";
-import { logError } from "@sentry/mcp-server/logging";
+import { logInfo, logIssue } from "@sentry/mcp-server/logging";
 import type {
   ErrorResponse,
   ChatRequest,
@@ -80,7 +80,7 @@ async function refreshTokenIfNeeded(
 
     if (!response.ok) {
       const error = await response.text();
-      logError(`Token refresh failed: ${response.status} - ${error}`);
+      logIssue(`Token refresh failed: ${response.status} - ${error}`);
       const { getSecureCookieOptions } = await import("./chat-oauth");
       deleteCookie(c, "sentry_auth_data", getSecureCookieOptions(c.req.url));
       return null;
@@ -100,7 +100,7 @@ async function refreshTokenIfNeeded(
 
     return { token: tokenResponse.access_token, authData: newAuthData };
   } catch (error) {
-    logError(error);
+    logIssue(error);
     return null;
   }
 }
@@ -108,7 +108,9 @@ async function refreshTokenIfNeeded(
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   // Validate that we have an OpenAI API key
   if (!c.env.OPENAI_API_KEY) {
-    console.error("OPENAI_API_KEY is not configured");
+    logIssue("OPENAI_API_KEY is not configured", {
+      loggerScope: ["cloudflare", "chat"],
+    });
     return c.json(
       createErrorResponse({
         error: "AI service not configured",
@@ -175,7 +177,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
         );
       }
     } catch (error) {
-      const eventId = logError(error);
+      const eventId = logIssue(error);
       return c.json(
         createErrorResponse({
           error: "There was an error communicating with the rate limiter.",
@@ -247,7 +249,14 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             };
           } catch (error) {
             // Handler threw an error
-            console.error(`Prompt execution error for ${promptName}:`, error);
+            logIssue(error, {
+              loggerScope: ["cloudflare", "chat", "prompt"],
+              contexts: {
+                prompt: {
+                  name: promptName,
+                },
+              },
+            });
             return {
               ...message,
               content: `Error executing prompt "${promptName}": ${error instanceof Error ? error.message : "Unknown error"}. Please check your parameters and try again.`,
@@ -288,9 +297,13 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
       // Get available tools from MCP server
       Object.assign(tools, await mcpClient.tools());
-      console.log(
-        `Connected to ${sseUrl} with ${Object.keys(tools).length} tools`,
-      );
+      logInfo(`Connected to ${sseUrl}`, {
+        loggerScope: ["cloudflare", "chat", "connection"],
+        extra: {
+          toolCount: Object.keys(tools).length,
+          endpoint: sseUrl,
+        },
+      });
     } catch (error) {
       // Check if this is an authentication error
       const authInfo = analyzeAuthError(error);
@@ -316,9 +329,14 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             });
 
             Object.assign(tools, await mcpClient.tools());
-            console.log(
-              `Connected to ${sseUrl} with ${Object.keys(tools).length} tools after refresh`,
-            );
+            logInfo(`Connected to ${sseUrl} (after refresh)`, {
+              loggerScope: ["cloudflare", "chat", "connection"],
+              extra: {
+                toolCount: Object.keys(tools).length,
+                endpoint: sseUrl,
+                refreshed: true,
+              },
+            });
 
             // Update cookie with new auth data
             const { setCookie } = await import("hono/cookie");
@@ -354,7 +372,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
           );
         }
       } else {
-        const eventId = logError(error);
+        const eventId = logIssue(error);
         return c.json(
           createErrorResponse({
             error: "Failed to connect to MCP server",
@@ -407,12 +425,14 @@ Remember: You're a test assistant, not a general-purpose helper. Stay focused on
 
     return response;
   } catch (error) {
-    console.error("Chat API error:", error);
+    logIssue(error, {
+      loggerScope: ["cloudflare", "chat"],
+    });
 
     // Provide more specific error messages for common issues
     if (error instanceof Error) {
       if (error.message.includes("API key")) {
-        const eventId = logError(error);
+        const eventId = logIssue(error);
         return c.json(
           createErrorResponse({
             error: "Authentication failed with AI service",
@@ -423,7 +443,7 @@ Remember: You're a test assistant, not a general-purpose helper. Stay focused on
         );
       }
       if (error.message.includes("rate limit")) {
-        const eventId = logError(error);
+        const eventId = logIssue(error);
         return c.json(
           createErrorResponse({
             error: "Rate limit exceeded. Please try again later.",
@@ -434,7 +454,7 @@ Remember: You're a test assistant, not a general-purpose helper. Stay focused on
         );
       }
       if (error.message.includes("Authorization")) {
-        const eventId = logError(error);
+        const eventId = logIssue(error);
         return c.json(
           createErrorResponse({
             error: "Invalid or missing Sentry authentication",
@@ -445,7 +465,7 @@ Remember: You're a test assistant, not a general-purpose helper. Stay focused on
         );
       }
 
-      const eventId = logError(error);
+      const eventId = logIssue(error);
       return c.json(
         createErrorResponse({
           error: "Internal server error",
