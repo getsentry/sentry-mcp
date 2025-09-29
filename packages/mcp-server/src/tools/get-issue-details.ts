@@ -9,7 +9,12 @@ import {
 import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { ApiNotFoundError } from "../api-client";
 import type { SentryApiService } from "../api-client";
-import type { Event, Trace } from "../api-client/types";
+import type {
+  Event,
+  ErrorEvent,
+  TransactionEvent,
+  Trace,
+} from "../api-client/types";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import {
@@ -243,56 +248,51 @@ async function maybeFetchPerformanceTrace({
   }
 }
 
+function isErrorEvent(event: Event): event is ErrorEvent {
+  return event.type === "error";
+}
+
+function isTransactionEvent(event: Event): event is TransactionEvent {
+  return event.type === "transaction";
+}
+
 function shouldFetchTraceForEvent(
   event: Event,
 ): { traceId: string; timestamp?: number; eventId?: string } | null {
-  const occurrence = (event as unknown as { occurrence?: unknown }).occurrence;
-  if (!isPotentialNPlusOneOccurrence(occurrence)) {
+  // Only fetch traces for non-error events (transactions, profiling, etc.)
+  if (isErrorEvent(event)) {
     return null;
   }
 
-  const evidenceData = (occurrence as { evidenceData?: unknown } | undefined)
-    ?.evidenceData;
-  if (!evidenceData) {
-    return null;
-  }
-
-  const parentSpanIds = extractSpanIdArray(
-    (evidenceData as { parentSpanIds?: unknown }).parentSpanIds,
-  );
-  const offenderSpanIds = extractSpanIdArray(
-    (evidenceData as { offenderSpanIds?: unknown }).offenderSpanIds,
-  );
-
-  if (parentSpanIds.length === 0 && offenderSpanIds.length === 0) {
-    return null;
-  }
-
-  const traceId = (
-    event as unknown as {
-      contexts?: { trace?: { trace_id?: unknown } };
-    }
-  ).contexts?.trace?.trace_id;
+  // Check if we have a trace ID
+  const traceId = event.contexts?.trace?.trace_id;
 
   if (typeof traceId !== "string" || traceId.length === 0) {
     return null;
   }
 
   // Extract timestamp from event (convert to seconds)
-  const dateCreated = (event as { dateCreated?: unknown }).dateCreated;
+  // At this point, event is guaranteed to be non-error (transaction, etc.)
   let timestamp: number | undefined;
-  if (typeof dateCreated === "string") {
-    const date = new Date(dateCreated);
+
+  // TransactionEventSchema has occurrence.detectionTime
+  if (isTransactionEvent(event)) {
+    const detectionTime = event.occurrence?.detectionTime;
+    if (typeof detectionTime === "number") {
+      timestamp = detectionTime; // Already in seconds
+    }
+  }
+
+  // All events should have dateReceived as fallback
+  if (timestamp === undefined && event.dateReceived) {
+    const date = new Date(event.dateReceived);
     if (!Number.isNaN(date.getTime())) {
       timestamp = date.getTime() / 1000; // Convert ms to seconds
     }
   }
 
-  // Extract event ID
-  const eventId = (event as { eventID?: unknown }).eventID;
-  const errorId = typeof eventId === "string" ? eventId : undefined;
-
-  return { traceId, timestamp, eventId: errorId };
+  // Extract event ID (from BaseEventSchema)
+  return { traceId, timestamp, eventId: event.id };
 }
 
 function extractSpanIdArray(value: unknown): string[] {
@@ -311,23 +311,4 @@ function extractSpanIdArray(value: unknown): string[] {
       return undefined;
     })
     .filter((item): item is string => item !== undefined);
-}
-
-function isPotentialNPlusOneOccurrence(occurrence: unknown): boolean {
-  if (!occurrence || typeof occurrence !== "object") {
-    return false;
-  }
-
-  const issueType = (occurrence as { issueType?: unknown; type?: unknown })
-    .issueType;
-  if (typeof issueType === "string") {
-    return issueType.includes("n_plus_one");
-  }
-
-  const numericType = (occurrence as { type?: unknown }).type;
-  if (typeof numericType === "number") {
-    return [1006, 1906, 1010, 1910].includes(numericType);
-  }
-
-  return false;
 }

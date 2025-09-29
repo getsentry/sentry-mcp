@@ -45,6 +45,9 @@ import type {
   AutofixRunStateSchema,
   ClientKeyListSchema,
   ClientKeySchema,
+  ErrorEventSchema,
+  TransactionEventSchema,
+  UnknownEventSchema,
   EventSchema,
   EventAttachmentSchema,
   EventAttachmentListSchema,
@@ -74,7 +77,16 @@ export type Project = z.infer<typeof ProjectSchema>;
 export type ClientKey = z.infer<typeof ClientKeySchema>;
 export type Release = z.infer<typeof ReleaseSchema>;
 export type Issue = z.infer<typeof IssueSchema>;
-export type Event = z.infer<typeof EventSchema>;
+
+// Individual event types
+export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
+export type TransactionEvent = z.infer<typeof TransactionEventSchema>;
+export type UnknownEvent = z.infer<typeof UnknownEventSchema>;
+
+// Event union - use RawEvent for parsing, Event for known types only
+export type RawEvent = z.infer<typeof EventSchema>;
+export type Event = ErrorEvent | TransactionEvent;
+
 export type EventAttachment = z.infer<typeof EventAttachmentSchema>;
 export type Tag = z.infer<typeof TagSchema>;
 export type AutofixRun = z.infer<typeof AutofixRunSchema>;

@@ -1497,7 +1497,24 @@ export class SentryApiService {
       undefined,
       opts,
     );
-    return EventSchema.parse(body);
+    const rawEvent = EventSchema.parse(body);
+
+    // Filter out unknown events - only return known error/transaction types
+    if (rawEvent.type === "error") {
+      return rawEvent as Event;
+    }
+    if (rawEvent.type === "transaction") {
+      return rawEvent as Event;
+    }
+
+    const eventType =
+      typeof rawEvent.type === "string" ? rawEvent.type : String(rawEvent.type);
+    throw new ApiValidationError(
+      `Unknown event type: ${eventType}`,
+      400,
+      `Only error and transaction events are supported, got: ${eventType}`,
+      body,
+    );
   }
 
   async getLatestEventForIssue(
