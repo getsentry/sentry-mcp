@@ -294,21 +294,3 @@ function shouldFetchTraceForEvent(
   // Extract event ID (from BaseEventSchema)
   return { traceId, timestamp, eventId: event.id };
 }
-
-function extractSpanIdArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((item) => {
-      if (typeof item === "string" && item.trim().length > 0) {
-        return item;
-      }
-      if (typeof item === "number" && Number.isFinite(item)) {
-        return item.toString();
-      }
-      return undefined;
-    })
-    .filter((item): item is string => item !== undefined);
-}
