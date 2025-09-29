@@ -193,9 +193,10 @@ export class EventBuilder {
     if (
       existingThread?.data &&
       typeof existingThread.data === "object" &&
-      "values" in existingThread.data
+      "values" in existingThread.data &&
+      Array.isArray(existingThread.data.values)
     ) {
-      (existingThread.data as any).values.push(thread);
+      existingThread.data.values.push(thread);
     } else {
       this.event.entries.push({
         type: "threads",
