@@ -44,10 +44,10 @@
       "transactionName": "/api/users",
       "parentSpan": "GET /api/users",
       "parentSpanIds": ["parent123"],
-      "repeatingSpansCompact": "SELECT * FROM users WHERE id = %s",
-      "repeatingSpansDescription": "SELECT * FROM users WHERE id = %s",
-      "repeatingSpansCount": 25,
+      "repeatingSpansCompact": ["SELECT * FROM users WHERE id = %s"],
+      "repeatingSpans": ["db - SELECT * FROM users WHERE id = %s"],
       "numberRepeatingSpans": "25",
+      "numPatternRepetitions": 25,
       "offenderSpanIds": [
         "span001",
         "span002",

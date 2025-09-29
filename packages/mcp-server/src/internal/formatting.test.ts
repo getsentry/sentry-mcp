@@ -1642,7 +1642,7 @@ describe("formatEventOutput", () => {
           evidenceData: {
             parentSpanIds: ["span_123"],
             parentSpan: "GET /api/users",
-            repeatingSpansCompact: "SELECT * FROM users WHERE id = %s",
+            repeatingSpansCompact: ["SELECT * FROM users WHERE id = %s"],
             numberRepeatingSpans: "5",
             offenderSpanIds: [
               "span_456",
@@ -1792,7 +1792,7 @@ describe("formatEventOutput", () => {
             parentSpanIds: ["parent123"],
             parentSpan: "GET /api/users",
             offenderSpanIds: ["span1", "span2", "span3"],
-            repeatingSpansCompact: "SELECT * FROM users WHERE id = %s",
+            repeatingSpansCompact: ["SELECT * FROM users WHERE id = %s"],
             numberRepeatingSpans: "3",
             op: "db",
           },
@@ -1834,17 +1834,28 @@ describe("formatEventOutput", () => {
 
       const output = formatEventOutput(event);
 
-      expect(output).toContain("### Span Tree (Limited to 10 spans)");
-      expect(output).toContain("http.server: GET /users (250ms)");
-      expect(output).toContain(
-        "├─ db.query: SELECT * FROM users WHERE id = 1 (3ms) [N+1]",
-      );
-      expect(output).toContain(
-        "├─ db.query: SELECT * FROM users WHERE id = 2 (4ms) [N+1]",
-      );
-      expect(output).toContain(
-        "└─ db.query: SELECT * FROM users WHERE id = 3 (8ms) [N+1]",
-      );
+      expect(output).toMatchInlineSnapshot(`
+        "**Parent Operation:**
+        GET /api/users
+
+        ### Repeated Database Queries
+
+        **Query executed 3 times:**
+        \`\`\`sql
+        SELECT * FROM users WHERE id = %s
+        \`\`\`
+
+        ### Span Tree (Limited to 10 spans)
+
+        \`\`\`
+        GET /users [parent12 · http.server · 250ms]
+           ├─ SELECT * FROM users WHERE id = 1 [span1 · db.query · 3ms] [N+1]
+           ├─ SELECT * FROM users WHERE id = 2 [span2 · db.query · 4ms] [N+1]
+           └─ SELECT * FROM users WHERE id = 3 [span3 · db.query · 8ms] [N+1]
+        \`\`\`
+
+        "
+      `);
     });
 
     it("should render span tree using duration fields when timestamps are missing", () => {
@@ -1857,7 +1868,9 @@ describe("formatEventOutput", () => {
             parentSpanIds: ["parentDur"],
             parentSpan: "GET /api/durations",
             offenderSpanIds: ["spanA", "spanB"],
-            repeatingSpansCompact: "SELECT * FROM durations WHERE bucket = %s",
+            repeatingSpansCompact: [
+              "SELECT * FROM durations WHERE bucket = %s",
+            ],
             numberRepeatingSpans: "2",
           },
         })
@@ -1888,14 +1901,27 @@ describe("formatEventOutput", () => {
 
       const output = formatEventOutput(event);
 
-      expect(output).toContain("### Span Tree (Limited to 10 spans)");
-      expect(output).toContain("http.server: GET /durations (1250ms)");
-      expect(output).toContain(
-        "├─ db.query: SELECT * FROM durations WHERE bucket = 'fast' (1ms) [N+1]",
-      );
-      expect(output).toContain(
-        "└─ db.query: SELECT * FROM durations WHERE bucket = 'slow' (1500ms) [N+1]",
-      );
+      expect(output).toMatchInlineSnapshot(`
+        "**Parent Operation:**
+        GET /api/durations
+
+        ### Repeated Database Queries
+
+        **Query executed 2 times:**
+        \`\`\`sql
+        SELECT * FROM durations WHERE bucket = %s
+        \`\`\`
+
+        ### Span Tree (Limited to 10 spans)
+
+        \`\`\`
+        GET /durations [parentDu · http.server · 1250ms]
+           ├─ SELECT * FROM durations WHERE bucket = 'fast' [spanA · db.query · 1ms] [N+1]
+           └─ SELECT * FROM durations WHERE bucket = 'slow' [spanB · db.query · 1500ms] [N+1]
+        \`\`\`
+
+        "
+      `);
     });
 
     it("should handle transaction event without performance data", () => {

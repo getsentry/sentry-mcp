@@ -2099,19 +2099,30 @@ export class SentryApiService {
       limit = 1000,
       project = "-1",
       statsPeriod = "14d",
+      timestamp,
+      errorId,
     }: {
       organizationSlug: string;
       traceId: string;
       limit?: number;
       project?: string;
       statsPeriod?: string;
+      timestamp?: number;
+      errorId?: string;
     },
     opts?: RequestOptions,
   ): Promise<Trace> {
     const queryParams = new URLSearchParams();
     queryParams.set("limit", String(limit));
     queryParams.set("project", project);
-    queryParams.set("statsPeriod", statsPeriod);
+
+    // Prefer timestamp+errorId if available, otherwise use statsPeriod
+    if (timestamp !== undefined && errorId !== undefined) {
+      queryParams.set("timestamp", String(timestamp));
+      queryParams.set("errorId", errorId);
+    } else {
+      queryParams.set("statsPeriod", statsPeriod);
+    }
 
     const body = await this.requestJSON(
       `/organizations/${organizationSlug}/trace/${traceId}/?${queryParams.toString()}`,

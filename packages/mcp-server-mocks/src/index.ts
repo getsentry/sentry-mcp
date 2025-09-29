@@ -1371,6 +1371,7 @@ export {
   autofixStateFixture,
   traceMetaFixture,
   traceMetaWithNullsFixture,
+  performanceEventFixture,
   traceFixture,
   traceMixedFixture,
   traceEventFixture,

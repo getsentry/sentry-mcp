@@ -6,7 +6,13 @@
  * and contextual information with consistent formatting patterns.
  */
 import type { z } from "zod";
-import type { Event, Issue, AutofixRunState } from "../api-client/types";
+import type {
+  Event,
+  Issue,
+  AutofixRunState,
+  Trace,
+  TraceSpan,
+} from "../api-client/types";
 import type {
   ErrorEntrySchema,
   ErrorEventSchema,
@@ -149,9 +155,15 @@ export function formatFrameHeader(
  * Includes error messages, stack traces, request info, and contextual data.
  *
  * @param event - The Sentry event to format
+ * @param options - Additional formatting context
  * @returns Formatted markdown string
  */
-export function formatEventOutput(event: Event) {
+export function formatEventOutput(
+  event: Event,
+  options?: {
+    performanceTrace?: Trace;
+  },
+) {
   let output = "";
 
   // Look for the primary error information
@@ -193,7 +205,7 @@ export function formatEventOutput(event: Event) {
   // Performance issue details (N+1 queries, etc.)
   // Pass spans data for additional context even if we have evidence
   if (event.type === "transaction") {
-    output += formatPerformanceIssueOutput(event, spansEntry?.data);
+    output += formatPerformanceIssueOutput(event, spansEntry?.data, options);
   }
 
   output += formatTags(event.tags);
@@ -607,7 +619,6 @@ function findFirstInAppFrame(
  * Constants for performance issue formatting
  */
 const MAX_SPANS_IN_TREE = 10;
-const MAX_QUERY_GROUPS = 10;
 
 /**
  * Safely parse a number from a string, returning a default if invalid
@@ -647,11 +658,12 @@ interface RawSpan {
 
 interface N1EvidenceData {
   parentSpan?: string;
-  repeatingSpansCompact?: string;
-  repeatingSpans?: string;
-  numberRepeatingSpans?: string | number;
-  offenderSpanIds?: string[];
   parentSpanIds?: string[];
+  repeatingSpansCompact?: string[];
+  repeatingSpans?: string[];
+  numberRepeatingSpans?: string; // API returns string even though it's a number
+  numPatternRepetitions?: number;
+  offenderSpanIds?: string[];
   transactionName?: string;
   [key: string]: unknown;
 }
@@ -700,91 +712,6 @@ function getSpanDurationMs(span: RawSpan): number {
   return 0;
 }
 
-/**
- * Selects and organizes spans for N+1 query visualization.
- *
- * Creates a simplified span tree showing the relationship between parent
- * operations and the repeated queries. Limits output to prevent overwhelming
- * the CLI display.
- *
- * @param spans - Raw span data from the event
- * @param evidence - Evidence data containing offenderSpanIds and parentSpanIds
- * @param maxSpans - Maximum number of spans to include (default: 10)
- * @returns Array of selected spans organized hierarchically
- */
-function selectN1QuerySpans(
-  spans: RawSpan[],
-  evidence: N1EvidenceData,
-  maxSpans = MAX_SPANS_IN_TREE,
-): PerformanceSpan[] {
-  const selected: PerformanceSpan[] = [];
-  let spanCount = 0;
-
-  // Use offenderSpanIds to identify N+1 queries
-  const offenderSpanIds = normalizeIdArray(evidence.offenderSpanIds);
-  const parentSpanIds = normalizeIdArray(evidence.parentSpanIds);
-
-  const n1SpanIds = new Set(offenderSpanIds);
-  const parentSpanIdSet = new Set(parentSpanIds);
-
-  // Find the parent span(s) if we have IDs
-  let parentSpan: PerformanceSpan | null = null;
-  if (parentSpanIds.length > 0) {
-    const parent = spans.find((span) => {
-      const identifier = getSpanIdentifier(span);
-      return identifier ? parentSpanIdSet.has(identifier) : false;
-    });
-    if (parent) {
-      parentSpan = {
-        span_id: getSpanIdentifier(parent) ?? "unknown",
-        op: parent.op || "unknown",
-        description:
-          parent.description || evidence.parentSpan || "Parent Operation",
-        duration: getSpanDurationMs(parent),
-        is_n1_query: false,
-        children: [],
-        level: 0,
-      };
-      selected.push(parentSpan);
-      spanCount++;
-    }
-  }
-
-  // Add N+1 query spans
-  if (n1SpanIds.size > 0) {
-    // Find all spans that are part of the N+1 pattern
-    const n1Spans = spans
-      .filter((span) => {
-        const identifier = getSpanIdentifier(span);
-        return identifier ? n1SpanIds.has(identifier) : false;
-      })
-      .slice(0, maxSpans - spanCount);
-
-    for (const span of n1Spans) {
-      const perfSpan: PerformanceSpan = {
-        span_id: getSpanIdentifier(span) ?? "unknown",
-        op: span.op || "db.query",
-        description: span.description || "Database Query",
-        duration: getSpanDurationMs(span),
-        is_n1_query: true,
-        children: [],
-        level: parentSpan ? 1 : 0,
-      };
-
-      if (parentSpan) {
-        parentSpan.children.push(perfSpan);
-      } else {
-        selected.push(perfSpan);
-      }
-      spanCount++;
-
-      if (spanCount >= maxSpans) break;
-    }
-  }
-
-  return selected;
-}
-
 function normalizeIdArray(values: unknown): string[] {
   if (!Array.isArray(values)) {
     return [];
@@ -793,6 +720,242 @@ function normalizeIdArray(values: unknown): string[] {
   return values
     .map((value) => normalizeSpanId(value))
     .filter((value): value is string => value !== undefined);
+}
+
+function isValidSpanArray(value: unknown): value is RawSpan[] {
+  return Array.isArray(value);
+}
+
+/**
+ * Get the repeating span descriptions from evidence data.
+ * Prefers repeatingSpansCompact (more concise) over repeatingSpans (verbose).
+ */
+function getRepeatingSpanLines(evidenceData: N1EvidenceData): string[] {
+  // Try compact version first (preferred for display)
+  if (
+    Array.isArray(evidenceData.repeatingSpansCompact) &&
+    evidenceData.repeatingSpansCompact.length > 0
+  ) {
+    return evidenceData.repeatingSpansCompact
+      .map((s) => (typeof s === "string" ? s.trim() : ""))
+      .filter((s): s is string => s.length > 0);
+  }
+
+  // Fall back to full version
+  if (
+    Array.isArray(evidenceData.repeatingSpans) &&
+    evidenceData.repeatingSpans.length > 0
+  ) {
+    return evidenceData.repeatingSpans
+      .map((s) => (typeof s === "string" ? s.trim() : ""))
+      .filter((s): s is string => s.length > 0);
+  }
+
+  return [];
+}
+
+function isTraceSpan(node: unknown): node is TraceSpan {
+  if (node === null || typeof node !== "object") {
+    return false;
+  }
+  const candidate = node as { event_type?: unknown; event_id?: unknown };
+  // Trace API returns spans with event_type: "span"
+  return (
+    candidate.event_type === "span" && typeof candidate.event_id === "string"
+  );
+}
+
+function buildTraceSpanTree(
+  trace: Trace,
+  parentSpanIds: string[],
+  offenderSpanIds: string[],
+  maxSpans: number,
+): string[] {
+  const offenderSet = new Set(offenderSpanIds);
+  const spanMap = new Map<string, TraceSpan>();
+
+  function indexSpan(span: TraceSpan): void {
+    // Try to get span_id from additional_attributes, fall back to event_id
+    const spanId = span.additional_attributes?.span_id || span.event_id;
+    if (typeof spanId === "string" && spanId.length > 0) {
+      spanMap.set(spanId, span);
+    }
+    for (const child of span.children ?? []) {
+      if (isTraceSpan(child)) {
+        indexSpan(child);
+      }
+    }
+  }
+
+  for (const node of trace) {
+    if (isTraceSpan(node)) {
+      indexSpan(node);
+    }
+  }
+
+  const roots: PerformanceSpan[] = [];
+  const budget = { count: 0, limit: maxSpans };
+
+  // First, try to find parent spans
+  for (const parentId of parentSpanIds) {
+    const span = spanMap.get(parentId);
+    if (!span) {
+      continue;
+    }
+    const perfSpan = convertTraceSpanToPerformanceSpan(
+      span,
+      offenderSet,
+      budget,
+      0,
+    );
+    if (perfSpan) {
+      roots.push(perfSpan);
+    }
+    if (budget.count >= budget.limit) {
+      break;
+    }
+  }
+
+  // If no parent spans found, try to find offender spans directly
+  if (roots.length === 0 && offenderSpanIds.length > 0) {
+    for (const offenderId of offenderSpanIds) {
+      const span = spanMap.get(offenderId);
+      if (!span) {
+        continue;
+      }
+      const perfSpan = convertTraceSpanToPerformanceSpan(
+        span,
+        offenderSet,
+        budget,
+        0,
+      );
+      if (perfSpan) {
+        roots.push(perfSpan);
+      }
+      if (budget.count >= budget.limit) {
+        break;
+      }
+    }
+  }
+
+  if (roots.length === 0) {
+    return [];
+  }
+
+  return renderPerformanceSpanTree(roots);
+}
+
+function convertTraceSpanToPerformanceSpan(
+  span: TraceSpan,
+  offenderSet: Set<string>,
+  budget: { count: number; limit: number },
+  level: number,
+): PerformanceSpan | null {
+  if (budget.count >= budget.limit) {
+    return null;
+  }
+
+  budget.count += 1;
+
+  // Get span ID from additional_attributes or fall back to event_id
+  const spanId =
+    (span.additional_attributes?.span_id as string | undefined) ||
+    span.event_id;
+
+  const performanceSpan: PerformanceSpan = {
+    span_id: spanId,
+    op: span.op || "unknown",
+    description: formatTraceSpanDescription(span),
+    duration: getTraceSpanDurationMs(span),
+    is_n1_query: offenderSet.has(spanId),
+    children: [],
+    level,
+  };
+
+  for (const child of span.children ?? []) {
+    if (!isTraceSpan(child)) {
+      continue;
+    }
+    if (budget.count >= budget.limit) {
+      break;
+    }
+    const childSpan = convertTraceSpanToPerformanceSpan(
+      child,
+      offenderSet,
+      budget,
+      level + 1,
+    );
+    if (childSpan) {
+      performanceSpan.children.push(childSpan);
+    }
+    if (budget.count >= budget.limit) {
+      break;
+    }
+  }
+
+  return performanceSpan;
+}
+
+function formatTraceSpanDescription(span: TraceSpan): string {
+  if (span.name && span.name.trim().length > 0) {
+    return span.name.trim();
+  }
+  if (span.description && span.description.trim().length > 0) {
+    return span.description.trim();
+  }
+  if (span.op && span.op.trim().length > 0) {
+    return span.op.trim();
+  }
+  return "unnamed";
+}
+
+function getTraceSpanDurationMs(span: TraceSpan): number {
+  if (typeof span.duration === "number" && span.duration >= 0) {
+    return span.duration;
+  }
+  if (
+    typeof (span as { end_timestamp?: number }).end_timestamp === "number" &&
+    typeof span.start_timestamp === "number"
+  ) {
+    const deltaSeconds =
+      (span as { end_timestamp: number }).end_timestamp - span.start_timestamp;
+    if (Number.isFinite(deltaSeconds) && deltaSeconds >= 0) {
+      return deltaSeconds * 1000;
+    }
+  }
+  return 0;
+}
+
+function buildOffenderSummaries(
+  spans: RawSpan[],
+  offenderSpanIds: string[],
+): string[] {
+  if (offenderSpanIds.length === 0) {
+    return [];
+  }
+
+  const spanMap = new Map<string, RawSpan>();
+  for (const span of spans) {
+    const identifier = getSpanIdentifier(span);
+    if (identifier) {
+      spanMap.set(identifier, span);
+    }
+  }
+
+  const summaries: string[] = [];
+  for (const offenderId of offenderSpanIds) {
+    const span = spanMap.get(offenderId);
+    if (span) {
+      const description = span.description || span.op || `Span ${offenderId}`;
+      const duration = getSpanDurationMs(span);
+      const durationLabel = duration > 0 ? ` (${Math.round(duration)}ms)` : "";
+      summaries.push(`${description}${durationLabel} [${offenderId}] [N+1]`);
+    } else {
+      summaries.push(`Span ${offenderId} [N+1]`);
+    }
+  }
+
+  return summaries;
 }
 
 /**
@@ -807,13 +970,22 @@ function renderPerformanceSpanTree(spans: PerformanceSpan[]): string[] {
 
   function renderSpan(span: PerformanceSpan, prefix = "", isLast = true): void {
     const connector = prefix === "" ? "" : isLast ? "└─ " : "├─ ";
-    const duration =
-      span.duration > 0 ? ` (${Math.round(span.duration)}ms)` : "";
-    const n1Indicator = span.is_n1_query ? " [N+1]" : "";
 
-    // Format the span line
-    const spanLine = `${prefix}${connector}${span.op}: ${span.description}${duration}${n1Indicator}`;
-    lines.push(spanLine);
+    const displayName = span.description?.trim() || span.op || "unnamed";
+    const shortId = span.span_id ? span.span_id.substring(0, 8) : "unknown";
+    const durationDisplay =
+      span.duration > 0 ? `${Math.round(span.duration)}ms` : "unknown";
+
+    const metadataParts: string[] = [shortId];
+    if (span.op && span.op !== "default") {
+      metadataParts.push(span.op);
+    }
+    metadataParts.push(durationDisplay);
+
+    const line = `${prefix}${connector}${displayName} [${metadataParts.join(
+      " · ",
+    )}]${span.is_n1_query ? " [N+1]" : ""}`;
+    lines.push(line);
 
     // Render children
     for (let i = 0; i < span.children.length; i++) {
@@ -831,6 +1003,76 @@ function renderPerformanceSpanTree(spans: PerformanceSpan[]): string[] {
   }
 
   return lines;
+}
+
+function selectN1QuerySpans(
+  spans: RawSpan[],
+  evidence: N1EvidenceData,
+  maxSpans = MAX_SPANS_IN_TREE,
+): PerformanceSpan[] {
+  const selected: PerformanceSpan[] = [];
+  let spanCount = 0;
+
+  const offenderSpanIds = normalizeIdArray(evidence.offenderSpanIds);
+  const parentSpanIds = normalizeIdArray(evidence.parentSpanIds);
+
+  let parentSpan: PerformanceSpan | null = null;
+  if (parentSpanIds.length > 0) {
+    const parent = spans.find((span) => {
+      const identifier = getSpanIdentifier(span);
+      return identifier ? parentSpanIds.includes(identifier) : false;
+    });
+
+    if (parent) {
+      parentSpan = {
+        span_id: getSpanIdentifier(parent) ?? "unknown",
+        op: parent.op || "unknown",
+        description:
+          parent.description || evidence.parentSpan || "Parent Operation",
+        duration: getSpanDurationMs(parent),
+        is_n1_query: false,
+        children: [],
+        level: 0,
+      };
+      selected.push(parentSpan);
+      spanCount += 1;
+    }
+  }
+
+  if (offenderSpanIds.length > 0) {
+    const offenderSet = new Set(offenderSpanIds);
+    const offenderSpans = spans
+      .filter((span) => {
+        const identifier = getSpanIdentifier(span);
+        return identifier ? offenderSet.has(identifier) : false;
+      })
+      .slice(0, Math.max(0, maxSpans - spanCount));
+
+    for (const span of offenderSpans) {
+      const perfSpan: PerformanceSpan = {
+        span_id: getSpanIdentifier(span) ?? "unknown",
+        op: span.op || "db.query",
+        description: span.description || "Database Query",
+        duration: getSpanDurationMs(span),
+        is_n1_query: true,
+        children: [],
+        level: parentSpan ? 1 : 0,
+      };
+
+      if (parentSpan) {
+        parentSpan.children.push(perfSpan);
+      } else {
+        selected.push(perfSpan);
+      }
+
+      spanCount += 1;
+      if (spanCount >= maxSpans) {
+        break;
+      }
+    }
+  }
+
+  return selected;
 }
 
 /**
@@ -910,6 +1152,7 @@ const OCCURRENCE_TYPE_TO_ISSUE_TYPE: Record<number, string> = {
 function formatN1QueryEvidence(
   evidenceData: N1EvidenceData,
   spansData: unknown,
+  performanceTrace?: Trace,
 ): string {
   const parts: string[] = [];
 
@@ -921,47 +1164,81 @@ function formatN1QueryEvidence(
   }
 
   // Format repeating spans (the N+1 queries)
-  if (evidenceData.repeatingSpansCompact || evidenceData.repeatingSpans) {
+  const repeatingLines = getRepeatingSpanLines(evidenceData);
+  if (repeatingLines.length > 0) {
     parts.push("### Repeated Database Queries");
     parts.push("");
 
     const queryCount = evidenceData.numberRepeatingSpans
       ? safeParseInt(evidenceData.numberRepeatingSpans, 0)
-      : evidenceData.offenderSpanIds?.length || 0;
+      : evidenceData.numPatternRepetitions ||
+        evidenceData.offenderSpanIds?.length ||
+        0;
 
     if (queryCount > 0) {
       parts.push(`**Query executed ${queryCount} times:**`);
+    }
 
-      // Show the query pattern (prefer compact version)
-      const queryPattern =
-        evidenceData.repeatingSpansCompact || evidenceData.repeatingSpans;
-      if (queryPattern) {
-        parts.push("```sql");
-        parts.push(queryPattern);
-        parts.push("```");
-        parts.push("");
+    // Show the query pattern - if single line, render as SQL block; if multiple, as list
+    if (repeatingLines.length === 1) {
+      parts.push("```sql");
+      parts.push(repeatingLines[0]);
+      parts.push("```");
+      parts.push("");
+    } else {
+      parts.push("**Repeated operations:**");
+      for (const line of repeatingLines) {
+        parts.push(`- ${line}`);
       }
+      parts.push("");
     }
   }
 
-  // Add span tree visualization if we have span data
-  if (
-    Array.isArray(spansData) &&
-    (evidenceData.offenderSpanIds?.length || evidenceData.parentSpanIds?.length)
-  ) {
-    const selectedSpans = selectN1QuerySpans(
-      spansData as RawSpan[],
-      evidenceData,
-      MAX_SPANS_IN_TREE,
-    );
-    if (selectedSpans.length > 0) {
+  const parentSpanIds = normalizeIdArray(evidenceData.parentSpanIds);
+  const offenderSpanIds = normalizeIdArray(evidenceData.offenderSpanIds);
+
+  const traceLines = performanceTrace
+    ? buildTraceSpanTree(
+        performanceTrace,
+        parentSpanIds,
+        offenderSpanIds,
+        MAX_SPANS_IN_TREE,
+      )
+    : [];
+
+  if (traceLines.length > 0) {
+    parts.push(`### Span Tree (Limited to ${MAX_SPANS_IN_TREE} spans)`);
+    parts.push("");
+    parts.push("```");
+    parts.push(...traceLines);
+    parts.push("```");
+    parts.push("");
+  } else {
+    const spanTree = isValidSpanArray(spansData)
+      ? selectN1QuerySpans(spansData, evidenceData, MAX_SPANS_IN_TREE)
+      : [];
+
+    if (spanTree.length > 0) {
       parts.push(`### Span Tree (Limited to ${MAX_SPANS_IN_TREE} spans)`);
       parts.push("");
       parts.push("```");
-      const treeLines = renderPerformanceSpanTree(selectedSpans);
-      parts.push(...treeLines);
+      parts.push(...renderPerformanceSpanTree(spanTree));
       parts.push("```");
       parts.push("");
+    } else if (isValidSpanArray(spansData)) {
+      // Only show offender summaries if we have spans data but couldn't build a tree
+      const offenderSummaries = buildOffenderSummaries(
+        spansData as RawSpan[],
+        offenderSpanIds,
+      );
+
+      if (offenderSummaries.length > 0) {
+        parts.push("### Offending Spans");
+        parts.push("");
+        for (const summary of offenderSummaries) {
+          parts.push(`- ${summary}`);
+        }
+      }
     }
   }
 
@@ -1018,6 +1295,9 @@ function formatSlowDbQueryEvidence(
 function formatPerformanceIssueOutput(
   event: Event,
   spansData: unknown,
+  options?: {
+    performanceTrace?: Trace;
+  },
 ): string {
   const parts: string[] = [];
 
@@ -1043,7 +1323,11 @@ function formatPerformanceIssueOutput(
       case KNOWN_PERFORMANCE_ISSUE_TYPES.N_PLUS_ONE_DB_QUERIES:
       case KNOWN_PERFORMANCE_ISSUE_TYPES.N_PLUS_ONE_API_CALLS:
       case KNOWN_PERFORMANCE_ISSUE_TYPES.M_N_PLUS_ONE_DB_QUERIES: {
-        const result = formatN1QueryEvidence(evidenceData, spansData);
+        const result = formatN1QueryEvidence(
+          evidenceData,
+          spansData,
+          options?.performanceTrace,
+        );
         if (result) parts.push(result);
         break;
       }
@@ -1270,12 +1554,14 @@ export function formatIssueOutput({
   event,
   apiService,
   autofixState,
+  performanceTrace,
 }: {
   organizationSlug: string;
   issue: Issue;
   event: Event;
   apiService: SentryApiService;
   autofixState?: AutofixRunState;
+  performanceTrace?: Trace;
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
 
@@ -1320,7 +1606,7 @@ export function formatIssueOutput({
     output += `**Message**:\n${event.message}\n`;
   }
   output += "\n";
-  output += formatEventOutput(event);
+  output += formatEventOutput(event, { performanceTrace });
 
   // Add Seer context if available
   if (autofixState) {

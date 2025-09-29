@@ -8,6 +8,8 @@ import {
 } from "../internal/tool-helpers/issue";
 import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { ApiNotFoundError } from "../api-client";
+import type { SentryApiService } from "../api-client";
+import type { Event, Trace } from "../api-client/types";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import {
@@ -119,12 +121,19 @@ export default defineTool({
         // This ensures the tool works even if Seer is not enabled
       }
 
+      const performanceTrace = await maybeFetchPerformanceTrace({
+        apiService,
+        organizationSlug: orgSlug,
+        event,
+      });
+
       return formatIssueOutput({
         organizationSlug: orgSlug,
         issue,
         event,
         apiService,
         autofixState,
+        performanceTrace,
       });
     }
 
@@ -186,12 +195,139 @@ export default defineTool({
       // This ensures the tool works even if Seer is not enabled
     }
 
+    const performanceTrace = await maybeFetchPerformanceTrace({
+      apiService,
+      organizationSlug: orgSlug,
+      event,
+    });
+
     return formatIssueOutput({
       organizationSlug: orgSlug,
       issue,
       event,
       apiService,
       autofixState,
+      performanceTrace,
     });
   },
 });
+
+async function maybeFetchPerformanceTrace({
+  apiService,
+  organizationSlug,
+  event,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  event: Event;
+}): Promise<Trace | undefined> {
+  const context = shouldFetchTraceForEvent(event);
+  if (!context) {
+    return undefined;
+  }
+
+  try {
+    return await apiService.getTrace({
+      organizationSlug,
+      traceId: context.traceId,
+      limit: 10000,
+      timestamp: context.timestamp,
+      errorId: context.eventId,
+    });
+  } catch (error) {
+    console.warn(
+      `[get_issue_details] Failed to fetch trace ${context.traceId}:`,
+      error,
+    );
+    return undefined;
+  }
+}
+
+function shouldFetchTraceForEvent(
+  event: Event,
+): { traceId: string; timestamp?: number; eventId?: string } | null {
+  const occurrence = (event as unknown as { occurrence?: unknown }).occurrence;
+  if (!isPotentialNPlusOneOccurrence(occurrence)) {
+    return null;
+  }
+
+  const evidenceData = (occurrence as { evidenceData?: unknown } | undefined)
+    ?.evidenceData;
+  if (!evidenceData) {
+    return null;
+  }
+
+  const parentSpanIds = extractSpanIdArray(
+    (evidenceData as { parentSpanIds?: unknown }).parentSpanIds,
+  );
+  const offenderSpanIds = extractSpanIdArray(
+    (evidenceData as { offenderSpanIds?: unknown }).offenderSpanIds,
+  );
+
+  if (parentSpanIds.length === 0 && offenderSpanIds.length === 0) {
+    return null;
+  }
+
+  const traceId = (
+    event as unknown as {
+      contexts?: { trace?: { trace_id?: unknown } };
+    }
+  ).contexts?.trace?.trace_id;
+
+  if (typeof traceId !== "string" || traceId.length === 0) {
+    return null;
+  }
+
+  // Extract timestamp from event (convert to seconds)
+  const dateCreated = (event as { dateCreated?: unknown }).dateCreated;
+  let timestamp: number | undefined;
+  if (typeof dateCreated === "string") {
+    const date = new Date(dateCreated);
+    if (!Number.isNaN(date.getTime())) {
+      timestamp = date.getTime() / 1000; // Convert ms to seconds
+    }
+  }
+
+  // Extract event ID
+  const eventId = (event as { eventID?: unknown }).eventID;
+  const errorId = typeof eventId === "string" ? eventId : undefined;
+
+  return { traceId, timestamp, eventId: errorId };
+}
+
+function extractSpanIdArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (typeof item === "string" && item.trim().length > 0) {
+        return item;
+      }
+      if (typeof item === "number" && Number.isFinite(item)) {
+        return item.toString();
+      }
+      return undefined;
+    })
+    .filter((item): item is string => item !== undefined);
+}
+
+function isPotentialNPlusOneOccurrence(occurrence: unknown): boolean {
+  if (!occurrence || typeof occurrence !== "object") {
+    return false;
+  }
+
+  const issueType = (occurrence as { issueType?: unknown; type?: unknown })
+    .issueType;
+  if (typeof issueType === "string") {
+    return issueType.includes("n_plus_one");
+  }
+
+  const numericType = (occurrence as { type?: unknown }).type;
+  if (typeof numericType === "number") {
+    return [1006, 1906, 1010, 1910].includes(numericType);
+  }
+
+  return false;
+}
