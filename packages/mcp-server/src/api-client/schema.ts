@@ -411,7 +411,7 @@ export const TransactionEventSchema = BaseEventSchema.omit({
       priority: z.number().optional(),
       assignee: z.string().nullable().optional(),
     })
-    .optional(),
+    .nullish(), // Allow both null and undefined
 });
 
 export const UnknownEventSchema = BaseEventSchema.omit({

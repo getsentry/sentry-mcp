@@ -677,9 +677,6 @@ function normalizeSpanId(value: unknown): string | undefined {
   if (typeof value === "string" && value) {
     return value;
   }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value.toString();
-  }
   return undefined;
 }
 
@@ -776,8 +773,9 @@ function buildTraceSpanTree(
 
   function indexSpan(span: TraceSpan): void {
     // Try to get span_id from additional_attributes, fall back to event_id
-    const spanId = span.additional_attributes?.span_id || span.event_id;
-    if (typeof spanId === "string" && spanId.length > 0) {
+    const spanId =
+      normalizeSpanId(span.additional_attributes?.span_id) || span.event_id;
+    if (spanId && spanId.length > 0) {
       spanMap.set(spanId, span);
     }
     for (const child of span.children ?? []) {
@@ -859,8 +857,7 @@ function convertTraceSpanToPerformanceSpan(
 
   // Get span ID from additional_attributes or fall back to event_id
   const spanId =
-    (span.additional_attributes?.span_id as string | undefined) ||
-    span.event_id;
+    normalizeSpanId(span.additional_attributes?.span_id) || span.event_id;
 
   const performanceSpan: PerformanceSpan = {
     span_id: spanId,
