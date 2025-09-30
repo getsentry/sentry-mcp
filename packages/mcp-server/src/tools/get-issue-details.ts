@@ -17,6 +17,7 @@ import type {
 } from "../api-client/types";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
+import { logError } from "../logging";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -236,14 +237,9 @@ async function maybeFetchPerformanceTrace({
       organizationSlug,
       traceId: context.traceId,
       limit: 10000,
-      timestamp: context.timestamp,
-      errorId: context.eventId,
     });
   } catch (error) {
-    console.warn(
-      `[get_issue_details] Failed to fetch trace ${context.traceId}:`,
-      error,
-    );
+    logError(error);
     return undefined;
   }
 }
@@ -256,9 +252,7 @@ function isTransactionEvent(event: Event): event is TransactionEvent {
   return event.type === "transaction";
 }
 
-function shouldFetchTraceForEvent(
-  event: Event,
-): { traceId: string; timestamp?: number; eventId?: string } | null {
+function shouldFetchTraceForEvent(event: Event): { traceId: string } | null {
   // Only fetch traces for non-error events (transactions, profiling, etc.)
   if (isErrorEvent(event)) {
     return null;
@@ -271,26 +265,5 @@ function shouldFetchTraceForEvent(
     return null;
   }
 
-  // Extract timestamp from event (convert to seconds)
-  // At this point, event is guaranteed to be non-error (transaction, etc.)
-  let timestamp: number | undefined;
-
-  // TransactionEventSchema has occurrence.detectionTime
-  if (isTransactionEvent(event)) {
-    const detectionTime = event.occurrence?.detectionTime;
-    if (typeof detectionTime === "number") {
-      timestamp = detectionTime; // Already in seconds
-    }
-  }
-
-  // All events should have dateReceived as fallback
-  if (timestamp === undefined && event.dateReceived) {
-    const date = new Date(event.dateReceived);
-    if (!Number.isNaN(date.getTime())) {
-      timestamp = date.getTime() / 1000; // Convert ms to seconds
-    }
-  }
-
-  // Extract event ID (from BaseEventSchema)
-  return { traceId, timestamp, eventId: event.id };
+  return { traceId };
 }

@@ -369,7 +369,7 @@ const BaseEventSchema = z.object({
   // The _meta field contains metadata about fields in the response
   // It's safer to type as unknown since its structure varies
   _meta: z.unknown().optional(),
-  // dateReceived is when the server received the event (always present)
+  // dateReceived is when the server received the event (may not be present in all contexts)
   dateReceived: z.string().datetime().optional(),
 });
 
