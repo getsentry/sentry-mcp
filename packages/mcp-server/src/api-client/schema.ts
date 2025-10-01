@@ -197,9 +197,9 @@ export const IssueSchema = z.object({
   issueCategory: z.string().optional(),
   metadata: z
     .object({
-      title: z.string().optional(),
-      location: z.string().optional(),
-      value: z.string().optional(),
+      title: z.string().nullable().optional(),
+      location: z.string().nullable().optional(),
+      value: z.string().nullable().optional(),
     })
     .optional(),
 });
