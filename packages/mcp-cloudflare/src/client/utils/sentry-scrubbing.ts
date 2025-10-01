@@ -154,7 +154,9 @@ export function addScrubPattern(
   replacement: string,
   description: string,
 ): void {
-  SCRUB_PATTERNS.push({ pattern, replacement, description });
+  // Create global version of the pattern
+  const globalPattern = new RegExp(pattern.source, "g");
+  SCRUB_PATTERNS.push({ pattern, globalPattern, replacement, description });
 }
 
 /**

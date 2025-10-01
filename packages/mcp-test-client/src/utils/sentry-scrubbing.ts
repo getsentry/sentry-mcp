@@ -13,50 +13,63 @@ export class EventSerializationError extends Error {
 
 interface ScrubPattern {
   pattern: RegExp;
+  globalPattern: RegExp;
   replacement: string;
   description: string;
 }
 
 // Patterns for sensitive data that should be scrubbed
+// Pre-compile global patterns to avoid regex compilation overhead in scrubbing loop
 const SCRUB_PATTERNS: ScrubPattern[] = [
   {
     pattern: /\bsk-[a-zA-Z0-9]{48}\b/,
+    globalPattern: /\bsk-[a-zA-Z0-9]{48}\b/g,
     replacement: "[REDACTED_OPENAI_KEY]",
     description: "OpenAI API key",
   },
   {
     pattern: /\bBearer\s+[a-zA-Z0-9\-._~+/]+=*/,
+    globalPattern: /\bBearer\s+[a-zA-Z0-9\-._~+/]+={0,}/g,
     replacement: "Bearer [REDACTED_TOKEN]",
     description: "Bearer token",
   },
   {
     pattern: /\bsntrys_[a-zA-Z0-9_]+\b/,
+    globalPattern: /\bsntrys_[a-zA-Z0-9_]+\b/g,
     replacement: "[REDACTED_SENTRY_TOKEN]",
     description: "Sentry access token",
   },
 ];
 
+// Maximum depth for recursive scrubbing to prevent stack overflow
+const MAX_SCRUB_DEPTH = 20;
+
 /**
  * Recursively scrub sensitive data from any value
  */
-function scrubValue(value: unknown): unknown {
+function scrubValue(value: unknown, depth = 0): unknown {
+  // Prevent stack overflow by limiting recursion depth
+  if (depth >= MAX_SCRUB_DEPTH) {
+    return "[MAX_DEPTH_EXCEEDED]";
+  }
+
   if (typeof value === "string") {
     let scrubbed = value;
-    for (const { pattern, replacement } of SCRUB_PATTERNS) {
-      // Use global flag for replace to replace all occurrences
-      scrubbed = scrubbed.replace(new RegExp(pattern.source, "g"), replacement);
+    for (const { globalPattern, replacement } of SCRUB_PATTERNS) {
+      // Use pre-compiled global pattern to avoid regex compilation overhead
+      scrubbed = scrubbed.replace(globalPattern, replacement);
     }
     return scrubbed;
   }
 
   if (Array.isArray(value)) {
-    return value.map(scrubValue);
+    return value.map((item) => scrubValue(item, depth + 1));
   }
 
   if (value && typeof value === "object") {
     const scrubbed: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value)) {
-      scrubbed[key] = scrubValue(val);
+      scrubbed[key] = scrubValue(val, depth + 1);
     }
     return scrubbed;
   }
@@ -140,7 +153,9 @@ export function addScrubPattern(
   replacement: string,
   description: string,
 ): void {
-  SCRUB_PATTERNS.push({ pattern, replacement, description });
+  // Create global version of the pattern
+  const globalPattern = new RegExp(pattern.source, "g");
+  SCRUB_PATTERNS.push({ pattern, globalPattern, replacement, description });
 }
 
 /**
