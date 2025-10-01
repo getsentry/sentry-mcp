@@ -704,7 +704,16 @@ export function renderApprovalDialog(
                 <!-- Optional permissions section -->
                 <div class="optional-permissions">
                   <h4 class="optional-permissions-title">Optional additional access:</h4>
-                  
+
+                  <label class="optional-permission-item">
+                    <input type="checkbox" name="permission" value="seer" checked>
+                    <span class="permission-checkbox"></span>
+                    <div class="optional-permission-content">
+                      <span class="optional-permission-name">Seer</span>
+                      <div class="optional-permission-description">Use Seer to analyze issues and generate fix recommendations (may incur costs)</div>
+                    </div>
+                  </label>
+
                   <label class="optional-permission-item">
                     <input type="checkbox" name="permission" value="issue_triage">
                     <span class="permission-checkbox"></span>
@@ -713,7 +722,7 @@ export function renderApprovalDialog(
                       <div class="optional-permission-description">Update and manage issues - resolve, assign, and analyze problems</div>
                     </div>
                   </label>
-                  
+
                   <label class="optional-permission-item">
                     <input type="checkbox" name="permission" value="project_management">
                     <span class="permission-checkbox"></span>

@@ -1399,7 +1399,7 @@ function formatContexts(contexts: z.infer<typeof EventSchema>["contexts"]) {
 }
 
 /**
- * Formats a brief Seer AI analysis summary for inclusion in issue details.
+ * Formats a brief Seer analysis summary for inclusion in issue details.
  * Shows current status and high-level insights, prompting to use analyze_issue_with_seer for full details.
  *
  * @param autofixState - The autofix state containing Seer analysis data
@@ -1419,7 +1419,7 @@ function formatSeerSummary(
   const { autofix } = autofixState;
   const parts: string[] = [];
 
-  parts.push("## Seer AI Analysis");
+  parts.push("## Seer Analysis");
   parts.push("");
 
   // Show status first

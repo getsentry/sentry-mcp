@@ -34,7 +34,7 @@ describe("analyze_issue_with_seer", () => {
       },
     );
 
-    expect(result).toContain("# Seer AI Analysis for Issue CLOUDFLARE-MCP-45");
+    expect(result).toContain("# Seer Analysis for Issue CLOUDFLARE-MCP-45");
     expect(result).toContain("Found existing analysis (Run ID: 13)");
     expect(result).toContain("## Analysis Complete");
     expect(result).toContain("## 1. **Root Cause Analysis**");
@@ -78,7 +78,7 @@ describe("analyze_issue_with_seer", () => {
     const result = await promise;
 
     expect(attempts).toBe(3);
-    expect(result).toContain("# Seer AI Analysis for Issue CLOUDFLARE-MCP-99");
+    expect(result).toContain("# Seer Analysis for Issue CLOUDFLARE-MCP-99");
     expect(result).toContain("Found existing analysis");
   });
 
@@ -122,7 +122,7 @@ describe("analyze_issue_with_seer", () => {
     const result = await promise;
 
     expect(attempts).toBe(2);
-    expect(result).toContain("# Seer AI Analysis for Issue CLOUDFLARE-MCP-500");
+    expect(result).toContain("# Seer Analysis for Issue CLOUDFLARE-MCP-500");
   });
 
   it.skip("handles polling with transient errors", async () => {
