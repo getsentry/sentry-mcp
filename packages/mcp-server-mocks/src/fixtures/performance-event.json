@@ -1,0 +1,197 @@
+{
+  "id": "a1b2c3d4e5f6789012345678901234567",
+  "groupID": "7890123456",
+  "eventID": "a1b2c3d4e5f6789012345678901234567",
+  "projectID": "4509062593708032",
+  "size": 8432,
+  "type": "transaction",
+  "title": "GET /api/users",
+  "message": "",
+  "platform": "python",
+  "datetime": "2025-08-06T18:00:00.000000Z",
+  "dateCreated": "2025-08-06T18:00:00.000000Z",
+  "contexts": {
+    "trace": {
+      "trace_id": "abcdef1234567890abcdef1234567890",
+      "span_id": "1234567890abcdef",
+      "op": "http.server",
+      "status": "ok",
+      "exclusive_time": 250.5,
+      "data": {
+        "http.request.method": "GET",
+        "url.path": "/api/users"
+      }
+    }
+  },
+  "occurrence": {
+    "id": "occ_123456789",
+    "projectId": 4509062593708032,
+    "eventId": "a1b2c3d4e5f6789012345678901234567",
+    "fingerprint": [
+      "n_plus_one_db_queries",
+      "SELECT * FROM users WHERE id = %s"
+    ],
+    "issueTitle": "N+1 Query: SELECT * FROM users WHERE id = %s",
+    "subtitle": "Database query repeated 25 times",
+    "resourceId": null,
+    "type": 1006,
+    "detectionTime": 1722963600,
+    "level": "warning",
+    "culprit": "SELECT * FROM users WHERE id = %s",
+    "priority": 50,
+    "assignee": null,
+    "evidenceData": {
+      "transactionName": "/api/users",
+      "parentSpan": "GET /api/users",
+      "parentSpanIds": ["parent123"],
+      "repeatingSpansCompact": ["SELECT * FROM users WHERE id = %s"],
+      "repeatingSpans": ["db - SELECT * FROM users WHERE id = %s"],
+      "numberRepeatingSpans": "25",
+      "numPatternRepetitions": 25,
+      "offenderSpanIds": [
+        "span001",
+        "span002",
+        "span003",
+        "span004",
+        "span005",
+        "span006",
+        "span007",
+        "span008",
+        "span009",
+        "span010",
+        "span011",
+        "span012",
+        "span013",
+        "span014",
+        "span015",
+        "span016",
+        "span017",
+        "span018",
+        "span019",
+        "span020",
+        "span021",
+        "span022",
+        "span023",
+        "span024",
+        "span025"
+      ],
+      "op": "db"
+    },
+    "evidenceDisplay": [
+      {
+        "name": "Offending Spans",
+        "value": "SELECT * FROM users WHERE id = %s",
+        "important": true
+      },
+      {
+        "name": "Repeated",
+        "value": "25 times",
+        "important": true
+      }
+    ]
+  },
+  "entries": [
+    {
+      "type": "spans",
+      "data": [
+        {
+          "span_id": "parent123",
+          "trace_id": "abcdef1234567890abcdef1234567890",
+          "parent_span_id": "1234567890abcdef",
+          "op": "http.server",
+          "description": "GET /api/users",
+          "status": "ok",
+          "start_timestamp": 1722963600.0,
+          "timestamp": 1722963600.25,
+          "data": {
+            "http.request.method": "GET",
+            "url.path": "/api/users"
+          }
+        },
+        {
+          "span_id": "span001",
+          "trace_id": "abcdef1234567890abcdef1234567890",
+          "parent_span_id": "parent123",
+          "op": "db.query",
+          "description": "SELECT * FROM users WHERE id = 1",
+          "status": "ok",
+          "start_timestamp": 1722963600.01,
+          "timestamp": 1722963600.015,
+          "data": {
+            "db.system": "postgresql",
+            "db.operation": "SELECT"
+          }
+        },
+        {
+          "span_id": "span002",
+          "trace_id": "abcdef1234567890abcdef1234567890",
+          "parent_span_id": "parent123",
+          "op": "db.query",
+          "description": "SELECT * FROM users WHERE id = 2",
+          "status": "ok",
+          "start_timestamp": 1722963600.02,
+          "timestamp": 1722963600.025,
+          "data": {
+            "db.system": "postgresql",
+            "db.operation": "SELECT"
+          }
+        },
+        {
+          "span_id": "span003",
+          "trace_id": "abcdef1234567890abcdef1234567890",
+          "parent_span_id": "parent123",
+          "op": "db.query",
+          "description": "SELECT * FROM users WHERE id = 3",
+          "status": "ok",
+          "start_timestamp": 1722963600.03,
+          "timestamp": 1722963600.035,
+          "data": {
+            "db.system": "postgresql",
+            "db.operation": "SELECT"
+          }
+        },
+        {
+          "span_id": "span004",
+          "trace_id": "abcdef1234567890abcdef1234567890",
+          "parent_span_id": "parent123",
+          "op": "db.query",
+          "description": "SELECT * FROM users WHERE id = 4",
+          "status": "ok",
+          "start_timestamp": 1722963600.04,
+          "timestamp": 1722963600.045,
+          "data": {
+            "db.system": "postgresql",
+            "db.operation": "SELECT"
+          }
+        },
+        {
+          "span_id": "span005",
+          "trace_id": "abcdef1234567890abcdef1234567890",
+          "parent_span_id": "parent123",
+          "op": "db.query",
+          "description": "SELECT * FROM users WHERE id = 5",
+          "status": "ok",
+          "start_timestamp": 1722963600.05,
+          "timestamp": 1722963600.055,
+          "data": {
+            "db.system": "postgresql",
+            "db.operation": "SELECT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "request",
+      "data": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "query": [],
+        "headers": [["Accept", "application/json"], ["Host", "api.example.com"]]
+      }
+    }
+  ],
+  "tags": [
+    { "key": "environment", "value": "production" },
+    { "key": "transaction", "value": "/api/users" }
+  ]
+}

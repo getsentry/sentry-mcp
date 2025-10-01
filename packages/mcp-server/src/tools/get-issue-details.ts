@@ -8,8 +8,16 @@ import {
 } from "../internal/tool-helpers/issue";
 import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { ApiNotFoundError } from "../api-client";
+import type { SentryApiService } from "../api-client";
+import type {
+  Event,
+  ErrorEvent,
+  TransactionEvent,
+  Trace,
+} from "../api-client/types";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
+import { logError } from "../logging";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -119,12 +127,19 @@ export default defineTool({
         // This ensures the tool works even if Seer is not enabled
       }
 
+      const performanceTrace = await maybeFetchPerformanceTrace({
+        apiService,
+        organizationSlug: orgSlug,
+        event,
+      });
+
       return formatIssueOutput({
         organizationSlug: orgSlug,
         issue,
         event,
         apiService,
         autofixState,
+        performanceTrace,
       });
     }
 
@@ -186,12 +201,69 @@ export default defineTool({
       // This ensures the tool works even if Seer is not enabled
     }
 
+    const performanceTrace = await maybeFetchPerformanceTrace({
+      apiService,
+      organizationSlug: orgSlug,
+      event,
+    });
+
     return formatIssueOutput({
       organizationSlug: orgSlug,
       issue,
       event,
       apiService,
       autofixState,
+      performanceTrace,
     });
   },
 });
+
+async function maybeFetchPerformanceTrace({
+  apiService,
+  organizationSlug,
+  event,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  event: Event;
+}): Promise<Trace | undefined> {
+  const context = shouldFetchTraceForEvent(event);
+  if (!context) {
+    return undefined;
+  }
+
+  try {
+    return await apiService.getTrace({
+      organizationSlug,
+      traceId: context.traceId,
+      limit: 10000,
+    });
+  } catch (error) {
+    logError(error);
+    return undefined;
+  }
+}
+
+function isErrorEvent(event: Event): event is ErrorEvent {
+  return event.type === "error";
+}
+
+function isTransactionEvent(event: Event): event is TransactionEvent {
+  return event.type === "transaction";
+}
+
+function shouldFetchTraceForEvent(event: Event): { traceId: string } | null {
+  // Only fetch traces for non-error events (transactions, profiling, etc.)
+  if (isErrorEvent(event)) {
+    return null;
+  }
+
+  // Check if we have a trace ID
+  const traceId = event.contexts?.trace?.trace_id;
+
+  if (typeof traceId !== "string" || traceId.length === 0) {
+    return null;
+  }
+
+  return { traceId };
+}

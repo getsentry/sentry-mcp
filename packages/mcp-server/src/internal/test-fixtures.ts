@@ -95,9 +95,54 @@ export function createThread(overrides: Partial<Thread> = {}): Thread {
   };
 }
 
+// Base type that includes all possible fields from ErrorEvent and TransactionEvent
+// This allows the builder to mutate fields without type casts
+type MutableEvent = {
+  id: string;
+  title: string;
+  message: string | null;
+  platform: string | null;
+  type: "error" | "transaction";
+  entries: Array<{
+    type: string;
+    data: any;
+  }>;
+  contexts?: Record<string, any>;
+  tags?: Array<{ key: string; value: string }>;
+  _meta?: unknown;
+  dateReceived?: string;
+  // ErrorEvent specific fields
+  culprit?: string | null;
+  dateCreated?: string;
+  // TransactionEvent specific fields
+  occurrence?: {
+    id?: string;
+    projectId?: number;
+    eventId?: string;
+    fingerprint?: string[];
+    issueTitle: string;
+    subtitle?: string;
+    resourceId?: string | null;
+    evidenceData?: Record<string, any>;
+    evidenceDisplay?: Array<{
+      name: string;
+      value: string;
+      important?: boolean;
+    }>;
+    type?: number;
+    detectionTime?: number;
+    level?: string;
+    culprit?: string | null;
+    priority?: number;
+    assignee?: string | null;
+    // Allow extra fields for test flexibility (like issueType)
+    [key: string]: unknown;
+  };
+};
+
 // Event factory with builder pattern
 export class EventBuilder {
-  private event: Event;
+  private event: MutableEvent;
 
   constructor(platform = "javascript") {
     this.event = {
@@ -108,7 +153,9 @@ export class EventBuilder {
       type: "error",
       entries: [],
       contexts: {},
-    } as Event;
+      culprit: null,
+      dateCreated: new Date().toISOString(),
+    };
   }
 
   withId(id: string): this {
@@ -146,9 +193,10 @@ export class EventBuilder {
     if (
       existingThread?.data &&
       typeof existingThread.data === "object" &&
-      "values" in existingThread.data
+      "values" in existingThread.data &&
+      Array.isArray(existingThread.data.values)
     ) {
-      (existingThread.data as any).values.push(thread);
+      existingThread.data.values.push(thread);
     } else {
       this.event.entries.push({
         type: "threads",
@@ -175,7 +223,7 @@ export class EventBuilder {
     return this;
   }
 
-  withType(type: string): this {
+  withType(type: "error" | "transaction"): this {
     this.event.type = type;
     return this;
   }
@@ -185,8 +233,42 @@ export class EventBuilder {
     return this;
   }
 
+  withOccurrence(occurrence: {
+    id?: string;
+    projectId?: number;
+    eventId?: string;
+    fingerprint?: string[];
+    issueTitle: string;
+    subtitle?: string;
+    resourceId?: string | null;
+    evidenceData?: Record<string, any>;
+    evidenceDisplay?: Array<{
+      name: string;
+      value: string;
+      important?: boolean;
+    }>;
+    type?: number;
+    detectionTime?: number;
+    level?: string;
+    culprit?: string | null;
+    priority?: number;
+    assignee?: string | null;
+    // Allow extra fields for test flexibility (like issueType)
+    [key: string]: unknown;
+  }): this {
+    this.event.occurrence = occurrence;
+    return this;
+  }
+
+  withEntry(entry: { type: string; data: any }): this {
+    this.event.entries.push(entry);
+    return this;
+  }
+
   build(): Event {
-    return { ...this.event };
+    // Cast is safe here because we ensure MutableEvent has all fields needed
+    // for either ErrorEvent or TransactionEvent based on the type field
+    return { ...this.event } as Event;
   }
 }
 

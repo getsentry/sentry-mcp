@@ -29,6 +29,9 @@ import autofixStateFixture from "./fixtures/autofix-state.json" with {
 };
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
 import eventsFixture from "./fixtures/event.json" with { type: "json" };
+import performanceEventFixture from "./fixtures/performance-event.json" with {
+  type: "json",
+};
 import eventAttachmentsFixture from "./fixtures/event-attachments.json" with {
   type: "json",
 };
@@ -843,6 +846,23 @@ export const restHandlers = buildHandlers([
     fetch: () => HttpResponse.json(eventsFixture),
   },
 
+  // Performance issue with N+1 query detection
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
+    fetch: () => HttpResponse.json(performanceEventFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/7890123456/events/latest/",
+    fetch: () => HttpResponse.json(performanceEventFixture),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/a1b2c3d4e5f6789012345678901234567/",
+    fetch: () => HttpResponse.json(performanceEventFixture),
+  },
+
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/releases/",
@@ -1351,6 +1371,7 @@ export {
   autofixStateFixture,
   traceMetaFixture,
   traceMetaWithNullsFixture,
+  performanceEventFixture,
   traceFixture,
   traceMixedFixture,
   traceEventFixture,

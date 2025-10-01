@@ -6,7 +6,13 @@
  * and contextual information with consistent formatting patterns.
  */
 import type { z } from "zod";
-import type { Event, Issue, AutofixRunState } from "../api-client/types";
+import type {
+  Event,
+  Issue,
+  AutofixRunState,
+  Trace,
+  TraceSpan,
+} from "../api-client/types";
 import type {
   ErrorEntrySchema,
   ErrorEventSchema,
@@ -149,9 +155,15 @@ export function formatFrameHeader(
  * Includes error messages, stack traces, request info, and contextual data.
  *
  * @param event - The Sentry event to format
+ * @param options - Additional formatting context
  * @returns Formatted markdown string
  */
-export function formatEventOutput(event: Event) {
+export function formatEventOutput(
+  event: Event,
+  options?: {
+    performanceTrace?: Trace;
+  },
+) {
   let output = "";
 
   // Look for the primary error information
@@ -159,6 +171,7 @@ export function formatEventOutput(event: Event) {
   const exceptionEntry = event.entries.find((e) => e.type === "exception");
   const threadsEntry = event.entries.find((e) => e.type === "threads");
   const requestEntry = event.entries.find((e) => e.type === "request");
+  const spansEntry = event.entries.find((e) => e.type === "spans");
 
   // Error message (if present)
   if (messageEntry) {
@@ -187,6 +200,12 @@ export function formatEventOutput(event: Event) {
       event,
       requestEntry.data as z.infer<typeof RequestEntrySchema>,
     );
+  }
+
+  // Performance issue details (N+1 queries, etc.)
+  // Pass spans data for additional context even if we have evidence
+  if (event.type === "transaction") {
+    output += formatPerformanceIssueOutput(event, spansEntry?.data, options);
   }
 
   output += formatTags(event.tags);
@@ -596,6 +615,761 @@ function findFirstInAppFrame(
   return undefined;
 }
 
+/**
+ * Constants for performance issue formatting
+ */
+const MAX_SPANS_IN_TREE = 10;
+
+/**
+ * Safely parse a number from a string, returning a default if invalid
+ */
+function safeParseInt(value: unknown, defaultValue: number): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? defaultValue : parsed;
+  }
+  return defaultValue;
+}
+
+/**
+ * Simplified span structure for rendering span trees in performance issues.
+ * This is a subset of the full span data focused on visualization needs.
+ */
+interface PerformanceSpan {
+  span_id: string;
+  op: string; // Operation type (e.g., "db.query", "http.client")
+  description: string; // Human-readable description of what the span did
+  duration: number; // Duration in milliseconds
+  is_n1_query: boolean; // Whether this span is part of the N+1 pattern
+  children: PerformanceSpan[];
+  level: number; // Nesting level for tree rendering
+}
+
+interface RawSpan {
+  span_id?: string;
+  id?: string;
+  op?: string;
+  description?: string;
+  timestamp?: number;
+  start_timestamp?: number;
+  duration?: number;
+}
+
+interface N1EvidenceData {
+  parentSpan?: string;
+  parentSpanIds?: string[];
+  repeatingSpansCompact?: string[];
+  repeatingSpans?: string[];
+  numberRepeatingSpans?: string; // API returns string even though it's a number
+  numPatternRepetitions?: number;
+  offenderSpanIds?: string[];
+  transactionName?: string;
+  [key: string]: unknown;
+}
+
+interface SlowDbEvidenceData {
+  parentSpan?: string;
+  [key: string]: unknown;
+}
+
+function normalizeSpanId(value: unknown): string | undefined {
+  if (typeof value === "string" && value) {
+    return value;
+  }
+  return undefined;
+}
+
+function getSpanIdentifier(span: RawSpan): string | undefined {
+  if (span.span_id !== undefined) {
+    return normalizeSpanId(span.span_id);
+  }
+  if (span.id !== undefined) {
+    return normalizeSpanId(span.id);
+  }
+  return undefined;
+}
+
+function getSpanDurationMs(span: RawSpan): number {
+  if (
+    typeof span.timestamp === "number" &&
+    typeof span.start_timestamp === "number"
+  ) {
+    const deltaSeconds = span.timestamp - span.start_timestamp;
+    if (Number.isFinite(deltaSeconds) && deltaSeconds >= 0) {
+      return deltaSeconds * 1000;
+    }
+  }
+
+  // Trace APIs expose `duration` in milliseconds. Preserve fractional values.
+  if (typeof span.duration === "number" && Number.isFinite(span.duration)) {
+    return span.duration >= 0 ? span.duration : 0;
+  }
+
+  return 0;
+}
+
+function normalizeIdArray(values: unknown): string[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values
+    .map((value) => normalizeSpanId(value))
+    .filter((value): value is string => value !== undefined);
+}
+
+function isValidSpanArray(value: unknown): value is RawSpan[] {
+  return Array.isArray(value);
+}
+
+/**
+ * Get the repeating span descriptions from evidence data.
+ * Prefers repeatingSpansCompact (more concise) over repeatingSpans (verbose).
+ */
+function getRepeatingSpanLines(evidenceData: N1EvidenceData): string[] {
+  // Try compact version first (preferred for display)
+  if (
+    Array.isArray(evidenceData.repeatingSpansCompact) &&
+    evidenceData.repeatingSpansCompact.length > 0
+  ) {
+    return evidenceData.repeatingSpansCompact
+      .map((s) => (typeof s === "string" ? s.trim() : ""))
+      .filter((s): s is string => s.length > 0);
+  }
+
+  // Fall back to full version
+  if (
+    Array.isArray(evidenceData.repeatingSpans) &&
+    evidenceData.repeatingSpans.length > 0
+  ) {
+    return evidenceData.repeatingSpans
+      .map((s) => (typeof s === "string" ? s.trim() : ""))
+      .filter((s): s is string => s.length > 0);
+  }
+
+  return [];
+}
+
+function isTraceSpan(node: unknown): node is TraceSpan {
+  if (node === null || typeof node !== "object") {
+    return false;
+  }
+  const candidate = node as { event_type?: unknown; event_id?: unknown };
+  // Trace API returns spans with event_type: "span"
+  return (
+    candidate.event_type === "span" && typeof candidate.event_id === "string"
+  );
+}
+
+function buildTraceSpanTree(
+  trace: Trace,
+  parentSpanIds: string[],
+  offenderSpanIds: string[],
+  maxSpans: number,
+): string[] {
+  const offenderSet = new Set(offenderSpanIds);
+  const spanMap = new Map<string, TraceSpan>();
+
+  function indexSpan(span: TraceSpan): void {
+    // Try to get span_id from additional_attributes, fall back to event_id
+    const spanId =
+      normalizeSpanId(span.additional_attributes?.span_id) || span.event_id;
+    if (spanId && spanId.length > 0) {
+      spanMap.set(spanId, span);
+    }
+    for (const child of span.children ?? []) {
+      if (isTraceSpan(child)) {
+        indexSpan(child);
+      }
+    }
+  }
+
+  for (const node of trace) {
+    if (isTraceSpan(node)) {
+      indexSpan(node);
+    }
+  }
+
+  const roots: PerformanceSpan[] = [];
+  const budget = { count: 0, limit: maxSpans };
+
+  // First, try to find parent spans
+  for (const parentId of parentSpanIds) {
+    const span = spanMap.get(parentId);
+    if (!span) {
+      continue;
+    }
+    const perfSpan = convertTraceSpanToPerformanceSpan(
+      span,
+      offenderSet,
+      budget,
+      0,
+    );
+    if (perfSpan) {
+      roots.push(perfSpan);
+    }
+    if (budget.count >= budget.limit) {
+      break;
+    }
+  }
+
+  // If no parent spans found, try to find offender spans directly
+  if (roots.length === 0 && offenderSpanIds.length > 0) {
+    for (const offenderId of offenderSpanIds) {
+      const span = spanMap.get(offenderId);
+      if (!span) {
+        continue;
+      }
+      const perfSpan = convertTraceSpanToPerformanceSpan(
+        span,
+        offenderSet,
+        budget,
+        0,
+      );
+      if (perfSpan) {
+        roots.push(perfSpan);
+      }
+      if (budget.count >= budget.limit) {
+        break;
+      }
+    }
+  }
+
+  if (roots.length === 0) {
+    return [];
+  }
+
+  return renderPerformanceSpanTree(roots);
+}
+
+function convertTraceSpanToPerformanceSpan(
+  span: TraceSpan,
+  offenderSet: Set<string>,
+  budget: { count: number; limit: number },
+  level: number,
+): PerformanceSpan | null {
+  if (budget.count >= budget.limit) {
+    return null;
+  }
+
+  budget.count += 1;
+
+  // Get span ID from additional_attributes or fall back to event_id
+  const spanId =
+    normalizeSpanId(span.additional_attributes?.span_id) || span.event_id;
+
+  const performanceSpan: PerformanceSpan = {
+    span_id: spanId,
+    op: span.op || "unknown",
+    description: formatTraceSpanDescription(span),
+    duration: getTraceSpanDurationMs(span),
+    is_n1_query: offenderSet.has(spanId),
+    children: [],
+    level,
+  };
+
+  for (const child of span.children ?? []) {
+    if (!isTraceSpan(child)) {
+      continue;
+    }
+    if (budget.count >= budget.limit) {
+      break;
+    }
+    const childSpan = convertTraceSpanToPerformanceSpan(
+      child,
+      offenderSet,
+      budget,
+      level + 1,
+    );
+    if (childSpan) {
+      performanceSpan.children.push(childSpan);
+    }
+    if (budget.count >= budget.limit) {
+      break;
+    }
+  }
+
+  return performanceSpan;
+}
+
+function formatTraceSpanDescription(span: TraceSpan): string {
+  if (span.name && span.name.trim().length > 0) {
+    return span.name.trim();
+  }
+  if (span.description && span.description.trim().length > 0) {
+    return span.description.trim();
+  }
+  if (span.op && span.op.trim().length > 0) {
+    return span.op.trim();
+  }
+  return "unnamed";
+}
+
+function getTraceSpanDurationMs(span: TraceSpan): number {
+  if (typeof span.duration === "number" && span.duration >= 0) {
+    return span.duration;
+  }
+  if (
+    typeof (span as { end_timestamp?: number }).end_timestamp === "number" &&
+    typeof span.start_timestamp === "number"
+  ) {
+    const deltaSeconds =
+      (span as { end_timestamp: number }).end_timestamp - span.start_timestamp;
+    if (Number.isFinite(deltaSeconds) && deltaSeconds >= 0) {
+      return deltaSeconds * 1000;
+    }
+  }
+  return 0;
+}
+
+function buildOffenderSummaries(
+  spans: RawSpan[],
+  offenderSpanIds: string[],
+): string[] {
+  if (offenderSpanIds.length === 0) {
+    return [];
+  }
+
+  const spanMap = new Map<string, RawSpan>();
+  for (const span of spans) {
+    const identifier = getSpanIdentifier(span);
+    if (identifier) {
+      spanMap.set(identifier, span);
+    }
+  }
+
+  const summaries: string[] = [];
+  for (const offenderId of offenderSpanIds) {
+    const span = spanMap.get(offenderId);
+    if (span) {
+      const description = span.description || span.op || `Span ${offenderId}`;
+      const duration = getSpanDurationMs(span);
+      const durationLabel = duration > 0 ? ` (${Math.round(duration)}ms)` : "";
+      summaries.push(`${description}${durationLabel} [${offenderId}] [N+1]`);
+    } else {
+      summaries.push(`Span ${offenderId} [N+1]`);
+    }
+  }
+
+  return summaries;
+}
+
+/**
+ * Renders a hierarchical tree of performance spans using box-drawing characters.
+ * Highlights N+1 queries with a special indicator.
+ *
+ * @param spans - Array of selected performance spans
+ * @returns Array of formatted strings representing the tree
+ */
+function renderPerformanceSpanTree(spans: PerformanceSpan[]): string[] {
+  const lines: string[] = [];
+
+  function renderSpan(span: PerformanceSpan, prefix = "", isLast = true): void {
+    const connector = prefix === "" ? "" : isLast ? "└─ " : "├─ ";
+
+    const displayName = span.description?.trim() || span.op || "unnamed";
+    const shortId = span.span_id ? span.span_id.substring(0, 8) : "unknown";
+    const durationDisplay =
+      span.duration > 0 ? `${Math.round(span.duration)}ms` : "unknown";
+
+    const metadataParts: string[] = [shortId];
+    if (span.op && span.op !== "default") {
+      metadataParts.push(span.op);
+    }
+    metadataParts.push(durationDisplay);
+
+    const line = `${prefix}${connector}${displayName} [${metadataParts.join(
+      " · ",
+    )}]${span.is_n1_query ? " [N+1]" : ""}`;
+    lines.push(line);
+
+    // Render children
+    for (let i = 0; i < span.children.length; i++) {
+      const child = span.children[i];
+      const isLastChild = i === span.children.length - 1;
+      const childPrefix = prefix + (isLast ? "   " : "│  ");
+      renderSpan(child, childPrefix, isLastChild);
+    }
+  }
+
+  for (let i = 0; i < spans.length; i++) {
+    const span = spans[i];
+    const isLastRoot = i === spans.length - 1;
+    renderSpan(span, "", isLastRoot);
+  }
+
+  return lines;
+}
+
+function selectN1QuerySpans(
+  spans: RawSpan[],
+  evidence: N1EvidenceData,
+  maxSpans = MAX_SPANS_IN_TREE,
+): PerformanceSpan[] {
+  const selected: PerformanceSpan[] = [];
+  let spanCount = 0;
+
+  const offenderSpanIds = normalizeIdArray(evidence.offenderSpanIds);
+  const parentSpanIds = normalizeIdArray(evidence.parentSpanIds);
+
+  let parentSpan: PerformanceSpan | null = null;
+  if (parentSpanIds.length > 0) {
+    const parent = spans.find((span) => {
+      const identifier = getSpanIdentifier(span);
+      return identifier ? parentSpanIds.includes(identifier) : false;
+    });
+
+    if (parent) {
+      parentSpan = {
+        span_id: getSpanIdentifier(parent) ?? "unknown",
+        op: parent.op || "unknown",
+        description:
+          parent.description || evidence.parentSpan || "Parent Operation",
+        duration: getSpanDurationMs(parent),
+        is_n1_query: false,
+        children: [],
+        level: 0,
+      };
+      selected.push(parentSpan);
+      spanCount += 1;
+    }
+  }
+
+  if (offenderSpanIds.length > 0) {
+    const offenderSet = new Set(offenderSpanIds);
+    const offenderSpans = spans
+      .filter((span) => {
+        const identifier = getSpanIdentifier(span);
+        return identifier ? offenderSet.has(identifier) : false;
+      })
+      .slice(0, Math.max(0, maxSpans - spanCount));
+
+    for (const span of offenderSpans) {
+      const perfSpan: PerformanceSpan = {
+        span_id: getSpanIdentifier(span) ?? "unknown",
+        op: span.op || "db.query",
+        description: span.description || "Database Query",
+        duration: getSpanDurationMs(span),
+        is_n1_query: true,
+        children: [],
+        level: parentSpan ? 1 : 0,
+      };
+
+      if (parentSpan) {
+        parentSpan.children.push(perfSpan);
+      } else {
+        selected.push(perfSpan);
+      }
+
+      spanCount += 1;
+      if (spanCount >= maxSpans) {
+        break;
+      }
+    }
+  }
+
+  return selected;
+}
+
+/**
+ * Known Sentry performance issue types that we handle.
+ *
+ * NOTE: We intentionally only implement formatters for high-value performance issues
+ * that provide complex insights. Not all issue types need custom formatting - many
+ * can rely on the generic evidenceDisplay fields that Sentry provides.
+ *
+ * Currently fully implemented:
+ * - N+1 query detection (DB and API)
+ *
+ * Partially implemented:
+ * - Slow DB queries (shows parent span only)
+ *
+ * Not implemented (lower priority):
+ * - Asset-related issues (render blocking, uncompressed, large payloads)
+ * - File I/O issues
+ * - Consecutive queries
+ */
+const KNOWN_PERFORMANCE_ISSUE_TYPES = {
+  N_PLUS_ONE_DB_QUERIES: "performance_n_plus_one_db_queries",
+  N_PLUS_ONE_API_CALLS: "performance_n_plus_one_api_calls",
+  SLOW_DB_QUERY: "performance_slow_db_query",
+  RENDER_BLOCKING_ASSET: "performance_render_blocking_asset",
+  CONSECUTIVE_DB_QUERIES: "performance_consecutive_db_queries",
+  FILE_IO_MAIN_THREAD: "performance_file_io_main_thread",
+  M_N_PLUS_ONE_DB_QUERIES: "performance_m_n_plus_one_db_queries",
+  UNCOMPRESSED_ASSET: "performance_uncompressed_asset",
+  LARGE_HTTP_PAYLOAD: "performance_large_http_payload",
+} as const;
+
+/**
+ * Map numeric occurrence types to issue types (from Sentry's codebase).
+ *
+ * Sentry uses numeric type IDs internally in the occurrence data structure,
+ * but string issue types in the UI and other APIs. This mapping converts
+ * between them.
+ *
+ * Source: sentry/static/app/types/group.tsx in Sentry's codebase
+ * Range: 1xxx = transaction-based performance issues
+ *        2xxx = profile-based performance issues
+ */
+const OCCURRENCE_TYPE_TO_ISSUE_TYPE: Record<number, string> = {
+  1001: KNOWN_PERFORMANCE_ISSUE_TYPES.SLOW_DB_QUERY,
+  1004: KNOWN_PERFORMANCE_ISSUE_TYPES.RENDER_BLOCKING_ASSET,
+  1006: KNOWN_PERFORMANCE_ISSUE_TYPES.N_PLUS_ONE_DB_QUERIES,
+  1906: KNOWN_PERFORMANCE_ISSUE_TYPES.N_PLUS_ONE_DB_QUERIES, // Alternative ID for N+1 DB
+  1007: KNOWN_PERFORMANCE_ISSUE_TYPES.CONSECUTIVE_DB_QUERIES,
+  1008: KNOWN_PERFORMANCE_ISSUE_TYPES.FILE_IO_MAIN_THREAD,
+  1009: "performance_consecutive_http",
+  1010: KNOWN_PERFORMANCE_ISSUE_TYPES.N_PLUS_ONE_API_CALLS,
+  1910: KNOWN_PERFORMANCE_ISSUE_TYPES.N_PLUS_ONE_API_CALLS, // Alternative ID for N+1 API
+  1012: KNOWN_PERFORMANCE_ISSUE_TYPES.UNCOMPRESSED_ASSET,
+  1013: "performance_db_main_thread",
+  1015: KNOWN_PERFORMANCE_ISSUE_TYPES.LARGE_HTTP_PAYLOAD,
+  1016: "performance_http_overhead",
+};
+
+// Type alias currently unused but kept for potential future type safety
+// type PerformanceIssueType = typeof KNOWN_PERFORMANCE_ISSUE_TYPES[keyof typeof KNOWN_PERFORMANCE_ISSUE_TYPES];
+
+/**
+ * Formats N+1 query issue evidence data.
+ *
+ * N+1 queries are a common performance anti-pattern where code executes
+ * 1 query to get a list of items, then N additional queries (one per item)
+ * instead of using a single JOIN or batch query.
+ *
+ * Evidence fields we use:
+ * - parentSpan: The operation that triggered the N+1 queries
+ * - repeatingSpansCompact/repeatingSpans: The query pattern being repeated
+ * - numberRepeatingSpans: How many times the query was executed
+ * - offenderSpanIds: IDs of the actual span instances
+ * - parentSpanIds: IDs of parent spans for tree visualization
+ */
+function formatN1QueryEvidence(
+  evidenceData: N1EvidenceData,
+  spansData: unknown,
+  performanceTrace?: Trace,
+): string {
+  const parts: string[] = [];
+
+  // Format parent span info if available
+  if (evidenceData.parentSpan) {
+    parts.push("**Parent Operation:**");
+    parts.push(`${evidenceData.parentSpan}`);
+    parts.push("");
+  }
+
+  // Format repeating spans (the N+1 queries)
+  const repeatingLines = getRepeatingSpanLines(evidenceData);
+  if (repeatingLines.length > 0) {
+    parts.push("### Repeated Database Queries");
+    parts.push("");
+
+    const queryCount = evidenceData.numberRepeatingSpans
+      ? safeParseInt(evidenceData.numberRepeatingSpans, 0)
+      : evidenceData.numPatternRepetitions ||
+        evidenceData.offenderSpanIds?.length ||
+        0;
+
+    if (queryCount > 0) {
+      parts.push(`**Query executed ${queryCount} times:**`);
+    }
+
+    // Show the query pattern - if single line, render as SQL block; if multiple, as list
+    if (repeatingLines.length === 1) {
+      parts.push("```sql");
+      parts.push(repeatingLines[0]);
+      parts.push("```");
+      parts.push("");
+    } else {
+      parts.push("**Repeated operations:**");
+      for (const line of repeatingLines) {
+        parts.push(`- ${line}`);
+      }
+      parts.push("");
+    }
+  }
+
+  const parentSpanIds = normalizeIdArray(evidenceData.parentSpanIds);
+  const offenderSpanIds = normalizeIdArray(evidenceData.offenderSpanIds);
+
+  const traceLines = performanceTrace
+    ? buildTraceSpanTree(
+        performanceTrace,
+        parentSpanIds,
+        offenderSpanIds,
+        MAX_SPANS_IN_TREE,
+      )
+    : [];
+
+  if (traceLines.length > 0) {
+    parts.push(`### Span Tree (Limited to ${MAX_SPANS_IN_TREE} spans)`);
+    parts.push("");
+    parts.push("```");
+    parts.push(...traceLines);
+    parts.push("```");
+    parts.push("");
+  } else {
+    const spanTree = isValidSpanArray(spansData)
+      ? selectN1QuerySpans(spansData, evidenceData, MAX_SPANS_IN_TREE)
+      : [];
+
+    if (spanTree.length > 0) {
+      parts.push(`### Span Tree (Limited to ${MAX_SPANS_IN_TREE} spans)`);
+      parts.push("");
+      parts.push("```");
+      parts.push(...renderPerformanceSpanTree(spanTree));
+      parts.push("```");
+      parts.push("");
+    } else if (isValidSpanArray(spansData)) {
+      // Only show offender summaries if we have spans data but couldn't build a tree
+      const offenderSummaries = buildOffenderSummaries(
+        spansData as RawSpan[],
+        offenderSpanIds,
+      );
+
+      if (offenderSummaries.length > 0) {
+        parts.push("### Offending Spans");
+        parts.push("");
+        for (const summary of offenderSummaries) {
+          parts.push(`- ${summary}`);
+        }
+      }
+    }
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Formats slow DB query issue evidence data.
+ *
+ * Currently only partially implemented - shows parent span information.
+ * Full implementation would show query duration, explain plan, etc.
+ *
+ * This is lower priority as the generic evidenceDisplay fields usually
+ * provide sufficient information for slow query issues.
+ */
+function formatSlowDbQueryEvidence(
+  evidenceData: SlowDbEvidenceData,
+  spansData: unknown,
+): string {
+  const parts: string[] = [];
+
+  // Show parent span if available (generic field that applies to slow queries)
+  if (evidenceData.parentSpan) {
+    parts.push("**Parent Operation:**");
+    parts.push(`${evidenceData.parentSpan}`);
+    parts.push("");
+  }
+
+  // TODO: Implement slow query specific fields when we know the structure
+  // Potential fields: query duration, database name, query plan
+  console.warn(
+    "[formatSlowDbQueryEvidence] Evidence data rendering not yet fully implemented",
+  );
+
+  return parts.join("\n");
+}
+
+/**
+ * Formats performance issue details from transaction events based on the issue type.
+ *
+ * This is the main dispatcher for performance issue formatting. It:
+ * 1. Detects the issue type from occurrence data (numeric or string)
+ * 2. Calls the appropriate type-specific formatter if implemented
+ * 3. Falls back to generic evidenceDisplay fields for unimplemented types
+ * 4. Provides span analysis fallback for events without occurrence data
+ *
+ * The occurrence data structure comes from Sentry's performance issue detection
+ * and contains evidence about what triggered the issue.
+ *
+ * @param event - The transaction event containing performance issue data
+ * @param spansData - The spans data from the event entries
+ * @returns Formatted markdown string with performance issue details
+ */
+function formatPerformanceIssueOutput(
+  event: Event,
+  spansData: unknown,
+  options?: {
+    performanceTrace?: Trace;
+  },
+): string {
+  const parts: string[] = [];
+
+  // Check if we have occurrence data
+  const occurrence = (event as any).occurrence;
+  if (!occurrence) {
+    return "";
+  }
+
+  // Get issue type - occurrence.type is numeric, issueType may be a string
+  let issueType: string | undefined;
+  if (typeof occurrence.type === "number") {
+    issueType = OCCURRENCE_TYPE_TO_ISSUE_TYPE[occurrence.type];
+  } else {
+    issueType = occurrence.issueType || occurrence.type;
+  }
+
+  const evidenceData = occurrence.evidenceData;
+
+  // Process evidence data based on known performance issue types
+  if (evidenceData) {
+    switch (issueType) {
+      case KNOWN_PERFORMANCE_ISSUE_TYPES.N_PLUS_ONE_DB_QUERIES:
+      case KNOWN_PERFORMANCE_ISSUE_TYPES.N_PLUS_ONE_API_CALLS:
+      case KNOWN_PERFORMANCE_ISSUE_TYPES.M_N_PLUS_ONE_DB_QUERIES: {
+        const result = formatN1QueryEvidence(
+          evidenceData,
+          spansData,
+          options?.performanceTrace,
+        );
+        if (result) parts.push(result);
+        break;
+      }
+
+      case KNOWN_PERFORMANCE_ISSUE_TYPES.SLOW_DB_QUERY: {
+        const result = formatSlowDbQueryEvidence(evidenceData, spansData);
+        if (result) parts.push(result);
+        break;
+      }
+
+      default:
+        // We don't implement formatters for all performance issue types.
+        // Many lower-priority issues (consecutive queries, asset issues, file I/O)
+        // work fine with just the generic evidenceDisplay fields below.
+        // Only high-value, complex issues like N+1 queries need custom formatting.
+        if (issueType) {
+          console.warn(
+            `[formatPerformanceIssueOutput] No custom formatter for issue type: ${issueType}`,
+          );
+        }
+      // Fall through to show generic evidence display below
+    }
+  }
+
+  // Show transaction name if available for any performance issue (generic field)
+  if (evidenceData?.transactionName) {
+    parts.push("**Transaction:**");
+    parts.push(`${evidenceData.transactionName}`);
+    parts.push("");
+  }
+
+  // Always show evidence display if available (this is generic and doesn't require type knowledge)
+  if (occurrence.evidenceDisplay?.length > 0) {
+    for (const display of occurrence.evidenceDisplay) {
+      if (display.important) {
+        parts.push(`**${display.name}:**`);
+        parts.push(`${display.value}`);
+        parts.push("");
+      }
+    }
+  }
+
+  return parts.length > 0 ? `${parts.join("\n")}\n` : "";
+}
+
 function formatTags(tags: z.infer<typeof EventSchema>["tags"]) {
   if (!tags || tags.length === 0) {
     return "";
@@ -777,16 +1551,40 @@ export function formatIssueOutput({
   event,
   apiService,
   autofixState,
+  performanceTrace,
 }: {
   organizationSlug: string;
   issue: Issue;
   event: Event;
   apiService: SentryApiService;
   autofixState?: AutofixRunState;
+  performanceTrace?: Trace;
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
-  output += `**Description**: ${issue.title}\n`;
-  output += `**Culprit**: ${issue.culprit}\n`;
+
+  // Check if this is a performance issue based on issueCategory or issueType
+  // Performance issues can have various categories like 'db_query' but issueType starts with 'performance_'
+  const isPerformanceIssue =
+    issue.issueType?.startsWith("performance_") ||
+    issue.issueCategory === "performance";
+
+  if (isPerformanceIssue && issue.metadata) {
+    // For performance issues, use metadata for better context
+    const issueTitle = issue.metadata.title || issue.title;
+    output += `**Description**: ${issueTitle}\n`;
+
+    if (issue.metadata.location) {
+      output += `**Location**: ${issue.metadata.location}\n`;
+    }
+    if (issue.metadata.value) {
+      output += `**Query Pattern**: \`${issue.metadata.value}\`\n`;
+    }
+  } else {
+    // For regular errors and other issues
+    output += `**Description**: ${issue.title}\n`;
+    output += `**Culprit**: ${issue.culprit}\n`;
+  }
+
   output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
   output += `**Last Seen**: ${new Date(issue.lastSeen).toISOString()}\n`;
   output += `**Occurrences**: ${issue.count}\n`;
@@ -805,7 +1603,7 @@ export function formatIssueOutput({
     output += `**Message**:\n${event.message}\n`;
   }
   output += "\n";
-  output += formatEventOutput(event);
+  output += formatEventOutput(event, { performanceTrace });
 
   // Add Seer context if available
   if (autofixState) {
