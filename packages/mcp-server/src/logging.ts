@@ -67,9 +67,9 @@ function createSentryLogsSink(): Sink {
       if (i % 2 === 0) {
         message += record.message[i];
       } else {
-        // Template values - convert to string
+        // Template values - convert to string safely
         const value = record.message[i];
-        message += typeof value === "string" ? value : JSON.stringify(value);
+        message += typeof value === "string" ? value : coerceMessage(value);
       }
     }
 
