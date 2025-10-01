@@ -8,9 +8,11 @@
       "type": "http",
       "url": "http://localhost:5173/mcp/sentry/mcp-server"
     },
-    "spotlight": {
-      "type": "http",
-      "url": "http://localhost:8969/mcp"
+    "sentry-spotlight": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@spotlightjs/spotlight", "--stdio-mcp"],
+      "env": {}
     }
   }
 }

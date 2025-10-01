@@ -14,9 +14,11 @@ import {
   parseLogLevel,
   type LogLevel,
   type Logger,
+  type LogRecord,
+  type Sink,
 } from "@logtape/logtape";
-import { getSentrySink } from "@logtape/sentry";
 import { captureException, captureMessage, withScope } from "@sentry/core";
+import * as Sentry from "@sentry/node";
 
 const ROOT_LOG_CATEGORY = ["sentry", "mcp"] as const;
 
@@ -42,6 +44,65 @@ function resolveLowestLevel(): LogLevel {
     : "info";
 }
 
+/**
+ * Creates a LogTape sink that sends logs to Sentry's Logs product using Sentry.logger.
+ *
+ * Unlike @logtape/sentry's getSentrySink which uses captureException/captureMessage
+ * (creating Issues), this sink uses Sentry.logger.* methods to send data to the
+ * Logs product.
+ *
+ * Note: This uses @sentry/node logger API. Cloudflare Workers will need a separate
+ * implementation using @sentry/cloudflare logger API.
+ */
+function createSentryLogsSink(): Sink {
+  return (record: LogRecord) => {
+    // Check if Sentry.logger is available (may not be in all environments)
+    if (!Sentry.logger) {
+      return;
+    }
+
+    // Extract message from LogRecord
+    let message = "";
+    for (let i = 0; i < record.message.length; i++) {
+      if (i % 2 === 0) {
+        message += record.message[i];
+      } else {
+        // Template values - convert to string safely
+        const value = record.message[i];
+        message += typeof value === "string" ? value : coerceMessage(value);
+      }
+    }
+
+    // Extract attributes from properties
+    const attributes = record.properties as Record<string, unknown>;
+
+    // Map LogTape levels to Sentry.logger methods
+    // Note: Sentry.logger methods are fire-and-forget and handle errors gracefully
+    switch (record.level) {
+      case "trace":
+        Sentry.logger.trace(message, attributes);
+        break;
+      case "debug":
+        Sentry.logger.debug(message, attributes);
+        break;
+      case "info":
+        Sentry.logger.info(message, attributes);
+        break;
+      case "warning":
+        Sentry.logger.warn(message, attributes);
+        break;
+      case "error":
+        Sentry.logger.error(message, attributes);
+        break;
+      case "fatal":
+        Sentry.logger.fatal(message, attributes);
+        break;
+      default:
+        Sentry.logger.info(message, attributes);
+    }
+  };
+}
+
 function ensureLoggingConfigured(): void {
   if (loggingConfigured) {
     return;
@@ -50,7 +111,7 @@ function ensureLoggingConfigured(): void {
   const consoleSink = getConsoleSink({
     formatter: getJsonLinesFormatter(),
   });
-  const sentrySink = getSentrySink();
+  const sentrySink = createSentryLogsSink();
 
   configureSync<SinkId, never>({
     reset: getConfig() !== null,
