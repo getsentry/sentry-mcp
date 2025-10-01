@@ -3,7 +3,7 @@ import {
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
 } from "../utils/url-utils";
-import { logWarn } from "../logging";
+import { logWarn } from "../telem/logging";
 import {
   OrganizationListSchema,
   OrganizationSchema,

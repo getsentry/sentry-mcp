@@ -10,7 +10,7 @@ import PROMPT_DEFINITIONS from "@sentry/mcp-server/promptDefinitions";
 // use mcpClient.executePrompt() or similar instead of directly importing these.
 import { PROMPT_HANDLERS } from "@sentry/mcp-server/prompts";
 import type { ServerContext } from "@sentry/mcp-server/types";
-import { logIssue } from "@sentry/mcp-server/logging";
+import { logIssue } from "@sentry/mcp-server/telem/logging";
 
 export interface PromptDefinition {
   name: string;

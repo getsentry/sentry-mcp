@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/react";
-import { sentryBeforeSend } from "@sentry/mcp-server/internal/sentry-scrubbing";
+import { sentryBeforeSend } from "@sentry/mcp-server/telem/instrumentation";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,

@@ -1,6 +1,6 @@
 import type { Constraints } from "@sentry/mcp-server/types";
 import { SentryApiService, ApiError } from "@sentry/mcp-server/api-client";
-import { logIssue } from "@sentry/mcp-server/logging";
+import { logIssue } from "@sentry/mcp-server/telem/logging";
 
 /**
  * Verify that provided org/project constraints exist and the user has access

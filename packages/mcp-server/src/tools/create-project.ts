@@ -2,7 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { logIssue } from "../logging";
+import { logIssue } from "../telem/logging";
 import type { ServerContext } from "../types";
 import type { ClientKey } from "../api-client/index";
 import {

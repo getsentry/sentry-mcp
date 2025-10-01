@@ -31,7 +31,7 @@ import type { Variables } from "@modelcontextprotocol/sdk/shared/uriTemplate.js"
 import tools from "./tools/index";
 import type { ServerContext } from "./types";
 import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
-import { getLogger, logIssue, type LogIssueOptions } from "./logging";
+import { getLogger, logIssue, type LogIssueOptions } from "./telem/logging";
 import { RESOURCES, isTemplateResource } from "./resources";
 import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";

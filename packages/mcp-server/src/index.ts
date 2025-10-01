@@ -21,7 +21,7 @@ import { LIB_VERSION } from "./version";
 import { buildUsage } from "./cli/usage";
 import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
-import { sentryBeforeSend } from "./internal/sentry-scrubbing";
+import { sentryBeforeSend } from "./telem/sentry";
 import { ALL_SCOPES } from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
 import { configureOpenAIProvider } from "./internal/agents/openai-provider";

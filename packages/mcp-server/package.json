@@ -38,9 +38,17 @@
       "types": "./dist/constants.ts",
       "default": "./dist/constants.js"
     },
-    "./logging": {
-      "types": "./dist/logging.ts",
-      "default": "./dist/logging.js"
+    "./telem": {
+      "types": "./dist/telem/index.ts",
+      "default": "./dist/telem/index.js"
+    },
+    "./telem/logging": {
+      "types": "./dist/telem/logging.ts",
+      "default": "./dist/telem/logging.js"
+    },
+    "./telem/sentry": {
+      "types": "./dist/telem/sentry.ts",
+      "default": "./dist/telem/sentry.js"
     },
     "./permissions": {
       "types": "./dist/permissions.ts",

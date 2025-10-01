@@ -2,7 +2,7 @@ import type {
   AuthRequest,
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
-import { logError, logIssue, logWarn } from "@sentry/mcp-server/logging";
+import { logError, logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
 import { sanitizeHtml } from "./html-utils";
 
 const COOKIE_NAME = "mcp-approved-clients";

@@ -1,4 +1,4 @@
-import { logWarn } from "../logging";
+import { logWarn } from "./logging";
 
 /**
  * Error thrown when an event cannot be serialized for scrubbing

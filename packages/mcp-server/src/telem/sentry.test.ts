@@ -4,10 +4,10 @@ import {
   addScrubPattern,
   getScrubPatterns,
   EventSerializationError,
-} from "./sentry-scrubbing";
+} from "./sentry";
 import type * as Sentry from "@sentry/node";
 
-describe("sentry-scrubbing", () => {
+describe("sentry", () => {
   describe("OpenAI API key scrubbing", () => {
     it("should scrub OpenAI API keys from message", () => {
       const event: Sentry.Event = {
