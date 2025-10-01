@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sentryBeforeSend, addScrubPattern, getScrubPatterns } from "./sentry";
+import { sentryBeforeSend } from "./sentry";
 import type * as Sentry from "@sentry/node";
 
 describe("sentry", () => {
@@ -199,28 +199,6 @@ describe("sentry", () => {
       // Should not throw, and should handle max depth gracefully
       expect(result).toBeDefined();
       expect(result.message).toBe("Deep nesting test");
-    });
-  });
-
-  describe("Custom patterns", () => {
-    it("should support adding custom patterns", () => {
-      const initialPatterns = getScrubPatterns().length;
-
-      addScrubPattern(
-        /custom_secret_\w+/,
-        "[REDACTED_CUSTOM]",
-        "Custom secret",
-      );
-
-      expect(getScrubPatterns().length).toBe(initialPatterns + 1);
-
-      // The new pattern is now available in sentryBeforeSend
-      const event: Sentry.Event = {
-        message: "Secret: custom_secret_12345",
-      };
-
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
-      expect(result.message).toBe("Secret: [REDACTED_CUSTOM]");
     });
   });
 });

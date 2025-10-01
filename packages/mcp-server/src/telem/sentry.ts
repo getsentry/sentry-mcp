@@ -114,25 +114,3 @@ export function sentryBeforeSend(event: any, hint: any): any {
 
   return scrubbedEvent as any;
 }
-
-/**
- * Add a new pattern to scrub
- */
-export function addScrubPattern(
-  pattern: RegExp,
-  replacement: string,
-  description: string,
-): void {
-  // Ensure pattern has global flag
-  const globalPattern = pattern.global
-    ? pattern
-    : new RegExp(pattern.source, "g");
-  SCRUB_PATTERNS.push({ pattern: globalPattern, replacement, description });
-}
-
-/**
- * Get current scrub patterns (for testing)
- */
-export function getScrubPatterns(): ReadonlyArray<ScrubPattern> {
-  return [...SCRUB_PATTERNS];
-}

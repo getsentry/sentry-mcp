@@ -17,8 +17,4 @@ export {
 } from "./logging";
 
 // Re-export Sentry instrumentation utilities
-export {
-  sentryBeforeSend,
-  addScrubPattern,
-  getScrubPatterns,
-} from "./sentry";
+export { sentryBeforeSend } from "./sentry";
