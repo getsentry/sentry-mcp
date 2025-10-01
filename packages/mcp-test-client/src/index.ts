@@ -12,7 +12,7 @@ import { connectToMCPServer } from "./mcp-test-client.js";
 import { connectToRemoteMCPServer } from "./mcp-test-client-remote.js";
 import { runAgent } from "./agent.js";
 import { logError, logInfo } from "./logger.js";
-import { sentryBeforeSend } from "./utils/sentry-scrubbing.js";
+import { sentryBeforeSend } from "@sentry/mcp-server/internal/sentry-scrubbing";
 import type { MCPConnection } from "./types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
