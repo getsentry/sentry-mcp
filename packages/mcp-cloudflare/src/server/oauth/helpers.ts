@@ -276,6 +276,13 @@ export async function tokenExchangeCallback(
       );
     }
 
+    if (!tokenResponse.refresh_token) {
+      logIssue("[oauth] Upstream refresh response missing refresh_token", {
+        loggerScope: ["cloudflare", "oauth", "refresh"],
+      });
+      return undefined;
+    }
+
     // Return the updated props with new tokens and TTL
     return {
       // This updates ctx.props
