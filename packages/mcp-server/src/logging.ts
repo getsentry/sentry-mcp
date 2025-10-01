@@ -66,6 +66,11 @@ function ensureLoggingConfigured(): void {
         lowestLevel: resolveLowestLevel(),
       },
       {
+        category: ["logtape", "meta"],
+        sinks: ["console"],
+        lowestLevel: "warning",
+      },
+      {
         category: "logtape",
         sinks: ["console"],
         lowestLevel: "error",

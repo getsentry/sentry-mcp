@@ -1,12 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
 import { tokenExchangeCallback, refreshAccessToken } from "./helpers";
 import type { WorkerProps } from "../types";
-
-// Mock the logIssue function
-vi.mock("@sentry/mcp-server/logging", () => ({
-  logIssue: vi.fn(),
-}));
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -20,7 +15,7 @@ describe("tokenExchangeCallback", () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockFetch.mockReset();
   });
 
   it("should skip non-refresh_token grant types", async () => {
