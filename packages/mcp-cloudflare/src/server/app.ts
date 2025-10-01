@@ -8,22 +8,22 @@ import chatOauth from "./routes/chat-oauth";
 import chat from "./routes/chat";
 import search from "./routes/search";
 import metadata from "./routes/metadata";
-import { logError } from "@sentry/mcp-server/logging";
+import { logIssue } from "@sentry/mcp-server/logging";
+import { createRequestLogger } from "./logging";
 import mcpRoutes from "./routes/mcp";
 
 const app = new Hono<{
   Bindings: Env;
 }>()
+  .use("*", createRequestLogger())
   // Set user IP address from X-Real-IP header for Sentry
   .use("*", async (c, next) => {
-    // Extract client IP from headers in order of preference
     const clientIP =
       c.req.header("X-Real-IP") ||
       c.req.header("CF-Connecting-IP") ||
       c.req.header("X-Forwarded-For")?.split(",")[0]?.trim();
 
     if (clientIP) {
-      // Set the user context with the correct IP address
       Sentry.setUser({ ip_address: clientIP });
     }
 
@@ -43,12 +43,9 @@ const app = new Hono<{
     "*",
     csrf({
       origin: (origin, c) => {
-        // If no Origin header is present, this cannot be a CSRF attack
-        // (CSRF requires a cross-origin request which always has an Origin header)
         if (!origin) {
           return true;
         }
-        // If Origin is present, verify it matches the request URL's origin
         const requestUrl = new URL(c.req.url);
         return origin === requestUrl.origin;
       },
@@ -78,7 +75,7 @@ const app = new Hono<{
 
 // TODO: propagate the error as sentry isnt injecting into hono
 app.onError((err, c) => {
-  logError(err);
+  logIssue(err);
   return c.text("Internal Server Error", 500);
 });
 

@@ -3,11 +3,6 @@ import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-pro
 import { tokenExchangeCallback, refreshAccessToken } from "./helpers";
 import type { WorkerProps } from "../types";
 
-// Mock the logError function
-vi.mock("@sentry/mcp-server/logging", () => ({
-  logError: vi.fn(),
-}));
-
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;

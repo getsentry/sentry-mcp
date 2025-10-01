@@ -31,7 +31,7 @@ import type { Variables } from "@modelcontextprotocol/sdk/shared/uriTemplate.js"
 import tools from "./tools/index";
 import type { ServerContext } from "./types";
 import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
-import { logError } from "./logging";
+import { getLogger, logIssue, type LogIssueOptions } from "./logging";
 import { RESOURCES, isTemplateResource } from "./resources";
 import { PROMPT_DEFINITIONS } from "./promptDefinitions";
 import { PROMPT_HANDLERS } from "./prompts";
@@ -39,6 +39,8 @@ import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
+
+const toolLogger = getLogger(["server", "tools"]);
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -208,7 +210,16 @@ export async function configureServer({
     : new Set<Scope>(DEFAULT_SCOPES);
 
   server.server.onerror = (error) => {
-    logError(error);
+    const transportLogOptions: LogIssueOptions = {
+      loggerScope: ["server", "transport"] as const,
+      contexts: {
+        transport: {
+          phase: "server.onerror",
+        },
+      },
+    };
+
+    logIssue(error, transportLogOptions);
   };
 
   // Hook into the initialized notification to capture client information
@@ -234,8 +245,19 @@ export async function configureServer({
       const result = onInitialized();
       if (result instanceof Promise) {
         result.catch((error) => {
-          console.error("Error in onInitialized callback:", error);
-          logError(error);
+          const lifecycleLogOptions: LogIssueOptions = {
+            loggerScope: ["server", "lifecycle"] as const,
+            contexts: {
+              lifecycle: {
+                hook: "onInitialized",
+                clientName: context.mcpClientName ?? null,
+                clientVersion: context.mcpClientVersion ?? null,
+                protocolVersion: context.mcpProtocolVersion ?? null,
+              },
+            },
+          };
+
+          logIssue(error, lifecycleLogOptions);
         });
       }
     }
@@ -350,8 +372,17 @@ export async function configureServer({
   for (const [toolKey, tool] of Object.entries(tools)) {
     // Check if this tool is allowed based on granted scopes
     if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-      console.debug(
-        `[MCP] Skipping tool '${tool.name}' - missing required scopes`,
+      toolLogger.debug(
+        "Skipping tool {tool} - missing required scopes",
+        () => ({
+          tool: tool.name,
+          requiredScopes: Array.isArray(tool.requiredScopes)
+            ? tool.requiredScopes
+            : tool.requiredScopes
+              ? Array.from(tool.requiredScopes)
+              : [],
+          grantedScopes: [...grantedScopes],
+        }),
       );
       continue;
     }

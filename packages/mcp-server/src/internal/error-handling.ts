@@ -1,6 +1,6 @@
 import { UserInputError, ConfigurationError } from "../errors";
 import { ApiError, ApiClientError, ApiServerError } from "../api-client";
-import { logError } from "../logging";
+import { logIssue } from "../logging";
 
 /**
  * Type guard to identify user input validation errors.
@@ -81,7 +81,7 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
 
   // Handle ApiServerError (5xx) - system errors, SHOULD be logged to Sentry
   if (isApiServerError(error)) {
-    const eventId = logError(error);
+    const eventId = logIssue(error);
     const statusText = error.status
       ? `There was an HTTP ${error.status} server error with the Sentry API.`
       : "There was a server error.";
@@ -109,7 +109,7 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
     ].join("\n\n");
   }
 
-  const eventId = logError(error);
+  const eventId = logIssue(error);
 
   return [
     "**Error**",

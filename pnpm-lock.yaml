@@ -355,6 +355,12 @@ importers:
       '@ai-sdk/openai':
         specifier: 'catalog:'
         version: 1.3.22(zod@3.25.72)
+      '@logtape/logtape':
+        specifier: ^1.1.1
+        version: 1.1.1
+      '@logtape/sentry':
+        specifier: ^1.1.1
+        version: 1.1.1(@logtape/logtape@1.1.1)
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.17.2
@@ -1317,6 +1323,14 @@ packages:
   '@jsdoc/salty@0.2.9':
     resolution: {integrity: sha512-yYxMVH7Dqw6nO0d5NIV8OQWnitU8k6vXH8NtgqAfIa/IUqRMxRv/NUJJ08VEKbAakwxlgBl5PJdrU0dMPStsnw==}
     engines: {node: '>=v12.0.0'}
+
+  '@logtape/logtape@1.1.1':
+    resolution: {integrity: sha512-/zpMuB2BZnL3LnBsy6PfFJp/4qP/60U9hE5j6eFwk25wBVtLpd7/bF3B1j7cnMD37R02fFyDyyHEmRSOz6+Qfg==}
+
+  '@logtape/sentry@1.1.1':
+    resolution: {integrity: sha512-tAKUC9DSJ4HDDD95ZOvnpLVoMFlwBW2spw6bC6+M3bJOqBL6krk5fI5X/4jeZDXUEEZQEERBxl/fUriLOu8AYw==}
+    peerDependencies:
+      '@logtape/logtape': ^1.1.1
 
   '@mjackson/node-fetch-server@0.6.1':
     resolution: {integrity: sha512-9ZJnk/DJjt805uv5PPv11haJIW+HHf3YEEyVXv+8iLQxLD/iXA68FH220XoiTPBC4gCg5q+IMadDw8qPqlA5wg==}
@@ -5511,6 +5525,13 @@ snapshots:
   '@jsdoc/salty@0.2.9':
     dependencies:
       lodash: 4.17.21
+
+  '@logtape/logtape@1.1.1': {}
+
+  '@logtape/sentry@1.1.1(@logtape/logtape@1.1.1)':
+    dependencies:
+      '@logtape/logtape': 1.1.1
+      '@sentry/core': 9.34.0
 
   '@mjackson/node-fetch-server@0.6.1': {}
 

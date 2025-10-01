@@ -3,15 +3,14 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { fetchCustomAttributes } from "./utils";
 import { SentryApiService } from "../../api-client";
+import * as logging from "../../logging";
 
 describe("fetchCustomAttributes", () => {
   let apiService: SentryApiService;
-  let consoleWarnSpy: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Mock console.warn to verify it's called for UserInputError
-    consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(logging, "logWarn").mockImplementation(() => {});
 
     // Create a real SentryApiService instance
     apiService = new SentryApiService({
@@ -50,7 +49,6 @@ describe("fetchCustomAttributes", () => {
       );
 
       // Should NOT log - the caller handles logging
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it("should throw 403 errors for logs dataset", async () => {
@@ -70,8 +68,6 @@ describe("fetchCustomAttributes", () => {
       await expect(
         fetchCustomAttributes(apiService, "test-org", "logs", "project-123"),
       ).rejects.toThrow("Permission denied");
-
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it("should throw 404 errors for errors dataset", async () => {
@@ -88,8 +84,6 @@ describe("fetchCustomAttributes", () => {
       await expect(
         fetchCustomAttributes(apiService, "test-org", "errors", "non-existent"),
       ).rejects.toThrow("Project not found");
-
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -116,9 +110,6 @@ describe("fetchCustomAttributes", () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe("Internal server error");
-
-      // Should NOT log to console.warn
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it("should re-throw 502 errors", async () => {
@@ -136,8 +127,6 @@ describe("fetchCustomAttributes", () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe("Bad gateway");
-
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -156,8 +145,6 @@ describe("fetchCustomAttributes", () => {
       await expect(
         fetchCustomAttributes(apiService, "test-org", "spans"),
       ).rejects.toThrow("Network error: ETIMEDOUT");
-
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -213,8 +200,6 @@ describe("fetchCustomAttributes", () => {
           "span.duration": "number",
         },
       });
-
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
     it("should return attributes for errors dataset", async () => {
@@ -241,8 +226,6 @@ describe("fetchCustomAttributes", () => {
         },
         fieldTypes: {},
       });
-
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 });

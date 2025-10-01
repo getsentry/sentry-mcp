@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { UserInputError } from "../../../errors";
 import { ApiClientError, ApiServerError } from "../../../api-client";
-import { logError } from "../../../logging";
+import { logIssue, logWarn } from "../../../logging";
 
 /**
  * Standard response schema for all embedded agent tools.
@@ -30,7 +30,14 @@ export type AgentToolResponse<T = unknown> = {
 function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
   if (error instanceof UserInputError) {
     // Log UserInputError for Sentry logging (as log, not exception)
-    console.warn(`[agent-tool] ${error.message}`);
+    logWarn(error, {
+      loggerScope: ["agent-tools", "user-input"],
+      contexts: {
+        agentTool: {
+          errorType: "UserInputError",
+        },
+      },
+    });
     return {
       error: `Input Error: ${error.message}. You may be able to resolve this by addressing the concern and trying again.`,
     };
@@ -39,7 +46,15 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
   if (error instanceof ApiClientError) {
     // Log ApiClientError for Sentry logging (as log, not exception)
     const message = error.toUserMessage();
-    console.warn(`[agent-tool] ${message}`);
+    logWarn(message, {
+      loggerScope: ["agent-tools", "api-client"],
+      contexts: {
+        agentTool: {
+          errorType: error.name,
+          status: error.status ?? null,
+        },
+      },
+    });
     return {
       error: `Input Error: ${message}. You may be able to resolve this by addressing the concern and trying again.`,
     };
@@ -47,7 +62,7 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
 
   if (error instanceof ApiServerError) {
     // Log server errors to Sentry and get Event ID
-    const eventId = logError(error);
+    const eventId = logIssue(error);
     const statusText = error.status ? ` (${error.status})` : "";
     return {
       error: `Server Error${statusText}: ${error.message}. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
@@ -56,7 +71,7 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
 
   // Log unexpected errors to Sentry and return safe generic message
   // SECURITY: Don't return untrusted error messages that could enable prompt injection
-  const eventId = logError(error);
+  const eventId = logIssue(error);
   return {
     error: `System Error: An unexpected error occurred. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
   };
