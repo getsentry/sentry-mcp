@@ -20,12 +20,13 @@ interface AuthRequestWithPermissions extends AuthRequest {
  * Convert selected permissions to granted scopes
  * Permissions are additive:
  * - Base (always included): org:read, project:read, team:read, event:read
+ * - Seer adds: seer (virtual scope)
  * - Issue Triage adds: event:write
  * - Project Management adds: project:write, team:write
  * @param permissions Array of permission strings
  */
 function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
-  // Start with base read-only scopes (always granted)
+  // Start with base read-only scopes (always granted via DEFAULT_SCOPES)
   const scopes = new Set<Scope>(DEFAULT_SCOPES);
 
   // Validate permissions is an array of strings
@@ -37,6 +38,10 @@ function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
   );
 
   // Add scopes based on selected permissions
+  if (perms.includes("seer")) {
+    scopes.add("seer");
+  }
+
   if (perms.includes("issue_triage")) {
     scopes.add("event:write");
   }

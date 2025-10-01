@@ -806,7 +806,7 @@ describe("get_issue_details", () => {
       },
     );
 
-    expect(result).toContain("## Seer AI Analysis");
+    expect(result).toContain("## Seer Analysis");
     expect(result).toContain("**Status:** Processing");
     expect(result).toContain("**Root Cause Identified:**");
     expect(result).toContain(
@@ -853,7 +853,7 @@ describe("get_issue_details", () => {
       },
     );
 
-    expect(result).toContain("## Seer AI Analysis");
+    expect(result).toContain("## Seer Analysis");
     expect(result).toContain("**Status:** Analysis failed.");
     expect(result).toContain(
       "For detailed root cause analysis and solutions, call `analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')`",
@@ -915,7 +915,7 @@ describe("get_issue_details", () => {
       },
     );
 
-    expect(result).toContain("## Seer AI Analysis");
+    expect(result).toContain("## Seer Analysis");
     expect(result).toContain("**Root Cause Identified:**");
     expect(result).toContain(
       "Partial analysis completed but more context needed.",

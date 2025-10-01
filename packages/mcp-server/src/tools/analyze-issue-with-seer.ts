@@ -25,9 +25,9 @@ import {
 
 export default defineTool({
   name: "analyze_issue_with_seer",
-  requiredScopes: ["event:read"],
+  requiredScopes: ["event:read", "seer"],
   description: [
-    "Use Seer AI to analyze production errors and get detailed root cause analysis with specific code fixes.",
+    "Use Seer to analyze production errors and get detailed root cause analysis with specific code fixes.",
     "",
     "Use this tool when you need:",
     "- Detailed AI-powered root cause analysis",
@@ -90,7 +90,7 @@ export default defineTool({
 
     setTag("organization.slug", orgSlug);
 
-    let output = `# Seer AI Analysis for Issue ${parsedIssueId}\n\n`;
+    let output = `# Seer Analysis for Issue ${parsedIssueId}\n\n`;
 
     // Step 1: Check if analysis already exists
     let autofixState = await retryWithBackoff(
