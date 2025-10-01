@@ -26,8 +26,7 @@ let loggingConfigured = false;
 
 function resolveLowestLevel(): LogLevel {
   const envLevel =
-    (typeof process !== "undefined" && process.env.MCP_LOG_LEVEL) ||
-    (typeof process !== "undefined" && process.env.LOG_LEVEL);
+    typeof process !== "undefined" ? process.env.LOG_LEVEL : undefined;
 
   if (envLevel) {
     try {

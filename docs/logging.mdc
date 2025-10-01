@@ -26,7 +26,7 @@ import { getSentrySink } from "@logtape/sentry";
 const ROOT_CATEGORY = ["sentry", "mcp"] as const;
 
 function resolveLowestLevel() {
-  const candidate = process.env.MCP_LOG_LEVEL ?? process.env.LOG_LEVEL;
+  const candidate = process.env.LOG_LEVEL;
   if (candidate) {
     try {
       return parseLogLevel(candidate);
@@ -124,7 +124,7 @@ Skip logging `UserInputError` and expected 4xx responses; follow the skip rules 
 ## Observability Expectations
 - Dashboards: create Sentry Log views for MCP connection churn, tool failures, and rate-limit retries.
 - Alerts: trigger on sustained `logWarn`/`logError` volume spikes and frequent `logIssue` events.
-- Sampling: default `info` to 100% in staging, tune prod via `MCP_LOG_LEVEL`; `logWarn`/`logError`/`logIssue` should remain unsampled.
+- Sampling: default `info` to 100% in staging, tune prod via `LOG_LEVEL` or rely on `NODE_ENV`-based defaults; `logWarn`/`logError`/`logIssue` should remain unsampled.
 
 ## References
 - Existing monitoring guidance: @docs/monitoring.mdc
