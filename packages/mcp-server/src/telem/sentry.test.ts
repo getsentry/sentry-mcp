@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  sentryBeforeSend,
-  addScrubPattern,
-  getScrubPatterns,
-  EventSerializationError,
-} from "./sentry";
+import { sentryBeforeSend, addScrubPattern, getScrubPatterns } from "./sentry";
 import type * as Sentry from "@sentry/node";
 
 describe("sentry", () => {
@@ -15,8 +10,8 @@ describe("sentry", () => {
           "Error with key: sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.message).toBe("Error with key: [REDACTED_OPENAI_KEY]");
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.message).toBe("Error with key: [REDACTED_OPENAI_KEY]");
     });
 
     it("should scrub multiple OpenAI keys", () => {
@@ -25,8 +20,8 @@ describe("sentry", () => {
           "Keys: sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234 and sk-xyz123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.message).toBe(
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.message).toBe(
         "Keys: [REDACTED_OPENAI_KEY] and [REDACTED_OPENAI_KEY]",
       );
     });
@@ -37,8 +32,8 @@ describe("sentry", () => {
           "Not a key: sk-abc or task-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.message).toBe(event.message);
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.message).toBe(event.message);
     });
   });
 
@@ -49,8 +44,8 @@ describe("sentry", () => {
           "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.message).toBe("Authorization: Bearer [REDACTED_TOKEN]");
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.message).toBe("Authorization: Bearer [REDACTED_TOKEN]");
     });
   });
 
@@ -61,8 +56,8 @@ describe("sentry", () => {
           "Using token: sntrys_eyJpYXQiOjE2OTQwMzMxNTMuNzk0NjI4LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbyIsIm9yZyI6InNlbnRyeSJ9_abcdef123456",
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.message).toBe("Using token: [REDACTED_SENTRY_TOKEN]");
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.message).toBe("Using token: [REDACTED_SENTRY_TOKEN]");
     });
   });
 
@@ -79,8 +74,8 @@ describe("sentry", () => {
         },
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.extra).toEqual({
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.extra).toEqual({
         config: {
           apiKey: "[REDACTED_OPENAI_KEY]",
           headers: {
@@ -90,7 +85,7 @@ describe("sentry", () => {
       });
     });
 
-    it("should remove breadcrumbs entirely", () => {
+    it("should scrub breadcrumbs", () => {
       const event: Sentry.Event = {
         message: "Test event",
         breadcrumbs: [
@@ -104,9 +99,15 @@ describe("sentry", () => {
         ],
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.breadcrumbs).toBeUndefined();
-      expect(result?.message).toBe("Test event");
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.breadcrumbs?.[0].message).toBe(
+        "API call with [REDACTED_OPENAI_KEY]",
+      );
+      expect(result.breadcrumbs?.[0].data?.tokens).toEqual([
+        "[REDACTED_SENTRY_TOKEN]",
+        "[REDACTED_SENTRY_TOKEN]",
+      ]);
+      expect(result.message).toBe("Test event");
     });
   });
 
@@ -124,8 +125,8 @@ describe("sentry", () => {
         },
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.exception?.values?.[0].value).toBe(
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.exception?.values?.[0].value).toBe(
         "Failed to authenticate with [REDACTED_OPENAI_KEY]",
       );
     });
@@ -140,7 +141,7 @@ describe("sentry", () => {
         },
       };
 
-      const result = sentryBeforeSend(event, {});
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
       expect(result).toEqual(event);
     });
   });
@@ -179,38 +180,25 @@ describe("sentry", () => {
     });
   });
 
-  describe("Error handling", () => {
-    it("should throw EventSerializationError for circular references", () => {
-      const circular: any = { message: "Error occurred" };
-      circular.self = circular; // Create circular reference
+  describe("Max depth handling", () => {
+    it("should handle deeply nested objects without stack overflow", () => {
+      // Create a deeply nested object
+      let deep: any = {
+        value: "sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
+      };
+      for (let i = 0; i < 25; i++) {
+        deep = { nested: deep };
+      }
 
-      const event: Sentry.Event = circular;
-
-      // Should throw EventSerializationError
-      expect(() => sentryBeforeSend(event, {})).toThrow(
-        EventSerializationError,
-      );
-      expect(() => sentryBeforeSend(event, {})).toThrow(
-        "[Sentry Scrubbing] Cannot serialize event for sensitive data check",
-      );
-    });
-
-    it("should throw EventSerializationError for non-serializable values", () => {
-      const event: any = {
-        message: "Error with function",
-        extra: {
-          fn: () => console.log("test"),
-          bigint: BigInt(123),
-        },
+      const event: Sentry.Event = {
+        message: "Deep nesting test",
+        extra: deep,
       };
 
-      // Should throw EventSerializationError
-      expect(() => sentryBeforeSend(event, {})).toThrow(
-        EventSerializationError,
-      );
-      expect(() => sentryBeforeSend(event, {})).toThrow(
-        "[Sentry Scrubbing] Cannot serialize event for sensitive data check",
-      );
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      // Should not throw, and should handle max depth gracefully
+      expect(result).toBeDefined();
+      expect(result.message).toBe("Deep nesting test");
     });
   });
 
@@ -231,8 +219,8 @@ describe("sentry", () => {
         message: "Secret: custom_secret_12345",
       };
 
-      const result = sentryBeforeSend(event, {});
-      expect(result?.message).toBe("Secret: [REDACTED_CUSTOM]");
+      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      expect(result.message).toBe("Secret: [REDACTED_CUSTOM]");
     });
   });
 });

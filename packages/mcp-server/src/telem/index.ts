@@ -21,5 +21,4 @@ export {
   sentryBeforeSend,
   addScrubPattern,
   getScrubPatterns,
-  EventSerializationError,
 } from "./sentry";
