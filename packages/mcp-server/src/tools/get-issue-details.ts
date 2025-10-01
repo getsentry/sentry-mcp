@@ -17,7 +17,7 @@ import type {
 } from "../api-client/types";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
-import { logError } from "../logging";
+import { logError } from "../telem/logging";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,

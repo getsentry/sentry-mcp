@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import { experimental_createMCPClient } from "ai";
 import type { Env } from "../types";
-import { logIssue, logWarn } from "@sentry/mcp-server/logging";
+import { logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
 import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
 import RESOURCE_DEFINITIONS from "@sentry/mcp-server/resourceDefinitions";
 import type { ErrorResponse } from "../types/chat";

@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { UserInputError } from "../../../errors";
 import { ApiClientError, ApiServerError } from "../../../api-client";
-import { logIssue, logWarn } from "../../../logging";
+import { logIssue, logWarn } from "../../../telem/logging";
 
 /**
  * Standard response schema for all embedded agent tools.

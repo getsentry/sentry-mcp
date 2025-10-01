@@ -4,7 +4,7 @@ import { z } from "zod";
 import { SCOPES } from "../../constants";
 import type { Env } from "../types";
 import { createErrorPage, createSuccessPage } from "../lib/html-utils";
-import { logIssue, logWarn } from "@sentry/mcp-server/logging";
+import { logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
 
 // Generate a secure random state parameter using Web Crypto API
 function generateState(): string {

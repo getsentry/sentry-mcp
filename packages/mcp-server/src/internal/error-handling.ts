@@ -1,6 +1,6 @@
 import { UserInputError, ConfigurationError } from "../errors";
 import { ApiError, ApiClientError, ApiServerError } from "../api-client";
-import { logIssue } from "../logging";
+import { logIssue } from "../telem/logging";
 
 /**
  * Type guard to identify user input validation errors.

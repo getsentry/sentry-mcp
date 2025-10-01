@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { fetchCustomAttributes } from "./utils";
 import { SentryApiService } from "../../api-client";
-import * as logging from "../../logging";
+import * as logging from "../../telem/logging";
 
 describe("fetchCustomAttributes", () => {
   let apiService: SentryApiService;

@@ -3,7 +3,7 @@ import type {
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
 import type { z } from "zod";
-import { logIssue } from "@sentry/mcp-server/logging";
+import { logIssue } from "@sentry/mcp-server/telem/logging";
 import { TokenResponseSchema, SENTRY_TOKEN_URL } from "./constants";
 import type { WorkerProps } from "../types";
 import * as Sentry from "@sentry/cloudflare";

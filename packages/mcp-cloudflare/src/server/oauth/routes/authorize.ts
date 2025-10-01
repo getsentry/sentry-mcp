@@ -9,7 +9,7 @@ import { SENTRY_AUTH_URL } from "../constants";
 import { getUpstreamAuthorizeUrl } from "../helpers";
 import { SCOPES } from "../../../constants";
 import { signState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-server/logging";
+import { logWarn } from "@sentry/mcp-server/telem/logging";
 
 /**
  * Extended AuthRequest that includes permissions

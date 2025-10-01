@@ -3,7 +3,7 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
 import { expandScopes, parseScopes } from "@sentry/mcp-server/permissions";
-import { logWarn } from "@sentry/mcp-server/logging";
+import { logWarn } from "@sentry/mcp-server/telem/logging";
 import type { Env, WorkerProps } from "../types";
 import type { Constraints } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";

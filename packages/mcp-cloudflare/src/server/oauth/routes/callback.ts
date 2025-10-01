@@ -7,7 +7,7 @@ import { DEFAULT_SCOPES } from "@sentry/mcp-server/constants";
 import { SENTRY_TOKEN_URL } from "../constants";
 import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-server/logging";
+import { logWarn } from "@sentry/mcp-server/telem/logging";
 
 /**
  * Extended AuthRequest that includes permissions
