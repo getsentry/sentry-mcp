@@ -77,6 +77,7 @@ function createSentryLogsSink(): Sink {
     const attributes = record.properties as Record<string, unknown>;
 
     // Map LogTape levels to Sentry.logger methods
+    // Note: Sentry.logger methods are fire-and-forget and handle errors gracefully
     switch (record.level) {
       case "trace":
         Sentry.logger.trace(message, attributes);
