@@ -36,10 +36,18 @@ const SCRUB_PATTERNS: ScrubPattern[] = [
   },
 ];
 
+// Maximum depth for recursive scrubbing to prevent stack overflow
+const MAX_SCRUB_DEPTH = 20;
+
 /**
  * Recursively scrub sensitive data from any value
  */
-function scrubValue(value: unknown): unknown {
+function scrubValue(value: unknown, depth = 0): unknown {
+  // Prevent stack overflow by limiting recursion depth
+  if (depth >= MAX_SCRUB_DEPTH) {
+    return "[MAX_DEPTH_EXCEEDED]";
+  }
+
   if (typeof value === "string") {
     let scrubbed = value;
     for (const { pattern, replacement } of SCRUB_PATTERNS) {
@@ -50,13 +58,13 @@ function scrubValue(value: unknown): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value.map(scrubValue);
+    return value.map((item) => scrubValue(item, depth + 1));
   }
 
   if (value && typeof value === "object") {
     const scrubbed: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value)) {
-      scrubbed[key] = scrubValue(val);
+      scrubbed[key] = scrubValue(val, depth + 1);
     }
     return scrubbed;
   }
