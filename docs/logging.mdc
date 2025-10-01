@@ -1,134 +1,131 @@
 ---
-description: Logging runbook using LogTape and Sentry
+description: Logging reference using LogTape and Sentry
 ---
-# Logging Runbook
+# Logging Reference
 
-How to emit and ship logs across MCP server, Cloudflare Workers, and React clients using LogTape and Sentry Logs. For tracing, spans, or metrics see @docs/monitoring.mdc.
+How logging works in the Sentry MCP server using LogTape and Sentry. For tracing, spans, or metrics see @docs/monitoring.mdc.
 
-## Scope
-- Adding or updating logging in any package under `packages/mcp-*`
-- Instrumenting MCP connection lifecycle, tool handlers, prompts, or resources
-- Emitting structured events that must surface in Sentry Logs or Sentry Issues
-- Establishing new sinks (Console, Cloudflare Logpush, other observability backends)
-- Deciding how to categorize log levels vs. Sentry issue creation
+## Overview
 
-## Implementation Pattern
+We use [LogTape](https://logtape.org/) for structured logging with two sinks:
+- **Console sink**: JSON Lines format for log aggregation
+- **Sentry sink**: Sends logs to Sentry for monitoring
+
+Log levels are controlled by:
+1. `LOG_LEVEL` environment variable (e.g., `"debug"`, `"info"`, `"warning"`, `"error"`)
+2. Falls back to `NODE_ENV`: `"debug"` in development, `"info"` in production
+
+Implementation: @packages/mcp-server/src/logging.ts
+
+## Using the Log Helpers
+
+### logInfo() - Routine telemetry
 ```typescript
-// packages/mcp-server/src/logging.ts
-import {
-  configureSync,
-  getConsoleSink,
-  getLogger as getLogTapeLogger,
-  parseLogLevel,
-} from "@logtape/logtape";
-import { getSentrySink } from "@logtape/sentry";
+import { logInfo } from "@sentry/mcp-server/logging";
 
-const ROOT_CATEGORY = ["sentry", "mcp"] as const;
-
-function resolveLowestLevel() {
-  const candidate = process.env.LOG_LEVEL;
-  if (candidate) {
-    try {
-      return parseLogLevel(candidate);
-    } catch (error) {
-      // fall through to default when value is invalid
-    }
-  }
-
-  return process.env.NODE_ENV === "development" ? "debug" : "info";
-}
-
-configureSync({
-  reset: true,
-  sinks: {
-    console: getConsoleSink({ formatter: getJsonLinesFormatter() }),
-    sentry: getSentrySink(),
-  },
-  loggers: [
-    {
-      category: ROOT_CATEGORY,
-      sinks: ["console", "sentry"],
-      lowestLevel: resolveLowestLevel(),
-    },
-    {
-      category: "logtape",
-      sinks: ["console"],
-      lowestLevel: "error",
-    },
-  ],
+logInfo("MCP server started", {
+  loggerScope: ["server", "lifecycle"],
+  extra: { port: 3000 }
 });
+```
 
-export function getLogger(scope: string | readonly string[], defaults?: Record<string, unknown>) {
-  const category = Array.isArray(scope) ? scope : [scope];
-  const logger = getLogTapeLogger([...ROOT_CATEGORY, ...category]);
-  return defaults ? logger.with(defaults) : logger;
-}
+### logWarn() - Operational warnings
+```typescript
+import { logWarn } from "@sentry/mcp-server/logging";
 
-export const logger = getLogger([]); // default "sentry-mcp" logger
+logWarn("Rate limit approaching", {
+  loggerScope: ["api", "rate-limit"],
+  extra: { remaining: 10, limit: 100 }
+});
+```
 
-export function logInfo(message: unknown, options?: LogOptions) {
-  // delegate to logger.info with structured payloads
-}
+### logError() - Operational errors (no Sentry issue)
+```typescript
+import { logError } from "@sentry/mcp-server/logging";
 
-export function logWarn(message: unknown, options?: LogOptions) {
-  // delegate to logger.warn
-}
+logError(error, {
+  loggerScope: ["tools", "fetch-trace"],
+  extra: { traceId: "abc123" }
+});
+```
 
-export function logError(message: unknown, options?: LogOptions) {
-  // delegate to logger.error without creating a Sentry issue
-}
+### logIssue() - System errors (creates Sentry issue)
+```typescript
+import { logIssue } from "@sentry/mcp-server/logging";
 
-export function logIssue(error: unknown, options?: LogIssueOptions) {
-  // captureException + logError including event_id and attachment metadata
+const eventId = logIssue(error, {
+  loggerScope: ["oauth", "token-refresh"],
+  contexts: {
+    oauth: { client_id: "..." }
+  }
+});
+```
+
+## When to Use Each Helper
+
+**Use `logIssue()` for:**
+- System errors (5xx, network failures, unexpected exceptions)
+- Critical failures that need investigation
+- Creates a Sentry Issue + emits a log entry with Event ID
+
+**Use `logError()` for:**
+- Expected operational errors (trace fetch failed, encoding error)
+- Errors that are handled gracefully
+- Sends to Sentry Logs only (no Issue created)
+
+**Use `logWarn()` for:**
+- Rate limit approaching
+- Deprecated API usage
+- Configuration warnings
+
+**Use `logInfo()` for:**
+- Request lifecycle (connection established, tool invoked)
+- Configuration output
+- Routine telemetry
+
+**Skip logging:**
+- `UserInputError` - Expected validation failures
+- 4xx API responses - Client errors (except 429 rate limits)
+- See @docs/error-handling.mdc for complete rules
+
+## Log Options
+
+All helpers accept:
+
+```typescript
+interface LogOptions {
+  loggerScope?: string | readonly string[];  // e.g., ["cloudflare", "oauth"]
+  extra?: Record<string, unknown>;           // Additional context
+  contexts?: Record<string, Record<string, unknown>>;  // Sentry contexts
 }
 ```
-> `getSentrySink()` uses the active Sentry client you configure via `Sentry.init`.
-Cloudflare requests use the middleware defined in @packages/mcp-cloudflare/src/server/logging.ts to emit per-request logs. Wrap the Sentry sink with `fromAsyncSink()` in environments where you need non-blocking batching or custom retries. Cloudflare builds reuse the same sink but rely on the Workers `fetch` runtime instead of Node HTTPS.
 
-## Runtime Coverage
-- **Node.js (stdio server, CLI tools)**: use the default LogTape bundle with Node-specific transport that posts to Sentry via HTTPS and flushes during process shutdown. Backpressure-sensitive code should favor async batching.
-- **Cloudflare Workers**: consume the ESM build plus the Worker-safe Sentry transport (`fetch` + Durable Object queue when available). Avoid Node stream helpers; rely on Workers runtime primitives.
-- **React client**: leverage LogTape’s browser build to capture structured telemetry (e.g., chat UI failures). Forward logs via `navigator.sendBeacon` or `fetch` to an edge endpoint that reuses the same Sentry ingestion helper. Continue to use `@sentry/react` for exception tracking.
+`logIssue()` also accepts `attachments` for files to attach to the Sentry event.
 
-## Log Categories
-- **Category 1 – Issues**: Call `logIssue`. It captures the exception (or message) in Sentry Issues **and** emits a `logError` entry with the resulting `eventId`, attachment names, and supplied contexts.
-- **Category 2 – Operational Errors & Warnings**: Use the helper that matches severity (`logError` or `logWarn`). These feed Sentry Logs only; provide remediation hints in `options.extra` and any request context via `options.contexts`.
-- **Category 3 – Informational**: Use `logInfo` (or `logger.info`) for routine telemetry such as connection lifecycle, tool invocations, and configuration output.
+## Configuration
 
-All helpers accept `loggerScope`, `contexts`, and `extra`. `logIssue` also accepts `attachments` to mirror files added to the captured event.
+**Environment Variables:**
+- `LOG_LEVEL` - Override log level (`"debug"`, `"info"`, `"warning"`, `"error"`)
+- `NODE_ENV` - Determines default level (`"development"` = debug, else info)
 
-**Testing note:** unit tests should avoid asserting on log helper invocations. Mock the helpers to silence output, but treat logs as an implementation detail.
+**Sinks:**
+- Console: JSON Lines format for log aggregation
+- Sentry: Sends logs to Sentry for monitoring (uses `Sentry.init` config)
 
-Skip logging `UserInputError` and expected 4xx responses; follow the skip rules in @docs/monitoring.mdc.
+## HTTP Request Logging
 
-## Context Propagation
-- Bind request or connection IDs once (stdio server: `@packages/mcp-server/src/server.ts`; Cloudflare: `@packages/mcp-cloudflare/src/server/routes/*.ts`).
-- Use LogTape’s async context helpers so child loggers inherit `mcp.session.id`, `gen_ai.system`, and `network.transport`.
-- Expose helpers like `withRequestContext` to wrap tool handlers and prompt executions.
+Cloudflare middleware logs all HTTP requests automatically:
 
-## Sentry Integration
-- Configure a dedicated Sentry Logs project + dataset for ingestion; authenticate with log tokens exposed as `SENTRY_LOG_TOKEN`.
-- Node transport posts to `https://ingest.sentry.io/api/{org}/{project}/log/` with `retryLimit`, `retryBackoff`, and chunk size ≤ 64 KB.
-- Cloudflare transport uses `fetch` with streaming body; respect Workers’ 50 ms CPU limit by yielding between batches.
-- React transport sends payloads to an MCP logging endpoint (or Sentry browser ingestion once available) using `sendBeacon` fallback; ensure payload size stays under 60 KB to avoid browser truncation.
-- Map `logger.warn` → `level=warning`, `logger.info` → `level=info`, etc. Attach tags for `mcp.transport`, `service.version`, and deployment environment.
+```typescript
+// Middleware in packages/mcp-cloudflare/src/server/logging.ts
+app.use(createRequestLogger(["cloudflare", "http"]));
 
-## Rollout Checklist
-- [ ] Replace `console.*` calls in `packages/mcp-server/src/server.ts` and `src/index.ts` with `logInfo`/`logWarn`/`logIssue` as appropriate.
-- [ ] Ensure `logIssue` paths include enough context to correlate with upstream tool requests.
-- [ ] Confirm Cloudflare routes import `logIssue`/`logWarn` from `@sentry/mcp-server/logging` (no extra wrapper needed).
-- [ ] Document configuration flags (`LOG_LEVEL`, `LOG_SAMPLE_RATE`, `SENTRY_LOG_TOKEN`) in @docs/deployment.mdc if needed.
-- [ ] Verify redaction of API keys and secrets before enabling production sinks.
-- [ ] Run `pnpm run tsc && pnpm run lint && pnpm run test` before merging.
-
-## Observability Expectations
-- Dashboards: create Sentry Log views for MCP connection churn, tool failures, and rate-limit retries.
-- Alerts: trigger on sustained `logWarn`/`logError` volume spikes and frequent `logIssue` events.
-- Sampling: default `info` to 100% in staging, tune prod via `LOG_LEVEL` or rely on `NODE_ENV`-based defaults; `logWarn`/`logError`/`logIssue` should remain unsampled.
+// Logs: {"level":"INFO","message":"GET /api/search","properties":{"status":200,"duration_ms":42}}
+```
 
 ## References
-- Existing monitoring guidance: @docs/monitoring.mdc
-- Current error logging helper: @packages/mcp-server/src/logging.ts
-- MCP server lifecycle hooks: @packages/mcp-server/src/server.ts
-- Cloudflare routes: @packages/mcp-cloudflare/src/server/routes/
-- Sentry Logs product docs: https://docs.sentry.io/product/logs/
+
+- Implementation: @packages/mcp-server/src/logging.ts
+- Error handling patterns: @docs/error-handling.mdc
+- Monitoring and tracing: @docs/monitoring.mdc
+- LogTape docs: https://logtape.org/
