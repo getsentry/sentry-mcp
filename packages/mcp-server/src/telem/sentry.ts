@@ -1,5 +1,3 @@
-import { logWarn } from "./logging";
-
 interface ScrubPattern {
   pattern: RegExp;
   replacement: string;
@@ -97,18 +95,12 @@ export function sentryBeforeSend(event: any, hint: any): any {
   // Always scrub the entire event
   const [scrubbedEvent, didScrub, descriptions] = scrubValue(event);
 
-  // Log if we found and scrubbed sensitive data
+  // Log to console if we found and scrubbed sensitive data
+  // (avoiding LogTape dependency for edge/browser compatibility)
   if (didScrub) {
-    // Get unique descriptions
     const uniqueDescriptions = [...new Set(descriptions)];
-    logWarn(
-      `Event contained sensitive data: ${uniqueDescriptions.join(", ")}`,
-      {
-        loggerScope: ["security", "scrubbing"],
-        extra: {
-          patterns_matched: uniqueDescriptions,
-        },
-      },
+    console.warn(
+      `[Sentry] Event contained sensitive data: ${uniqueDescriptions.join(", ")}`,
     );
   }
 
