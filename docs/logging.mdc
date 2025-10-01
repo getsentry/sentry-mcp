@@ -9,11 +9,13 @@ How logging works in the Sentry MCP server using LogTape and Sentry. For tracing
 
 We use [LogTape](https://logtape.org/) for structured logging with two sinks:
 - **Console sink**: JSON Lines format for log aggregation
-- **Sentry sink**: Sends logs to Sentry for monitoring
+- **Sentry sink**: Sends logs to Sentry's Logs product using `Sentry.logger.*` API
 
 Log levels are controlled by:
 1. `LOG_LEVEL` environment variable (e.g., `"debug"`, `"info"`, `"warning"`, `"error"`)
 2. Falls back to `NODE_ENV`: `"debug"` in development, `"info"` in production
+
+**Important**: We use a custom LogTape sink that calls `Sentry.logger.*` methods to send logs to Sentry's Logs product. The `@logtape/sentry` package uses `captureException/captureMessage` which creates Issues instead of Logs.
 
 Implementation: @packages/mcp-server/src/logging.ts
 
