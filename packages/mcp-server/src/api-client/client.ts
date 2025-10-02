@@ -842,7 +842,7 @@ export class SentryApiService {
       );
       const regionData = UserRegionsSchema.parse(regionsBody);
 
-      return (
+      const allOrganizations = (
         await Promise.all(
           regionData.regions.map(async (region) =>
             this.requestJSON(path, undefined, {
@@ -854,6 +854,9 @@ export class SentryApiService {
       )
         .map((data) => OrganizationListSchema.parse(data))
         .reduce((acc, curr) => acc.concat(curr), []);
+
+      // Apply the limit after combining results from all regions
+      return allOrganizations.slice(0, 25);
     } catch (error) {
       // If regions endpoint fails (e.g., older self-hosted versions identifying as sentry.io),
       // fall back to direct organizations endpoint
