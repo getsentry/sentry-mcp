@@ -798,8 +798,10 @@ export class SentryApiService {
    * Automatically handles multi-region queries by fetching from all
    * available regions and combining results.
    *
+   * @param params Query parameters
+   * @param params.query Search query to filter organizations by name/slug
    * @param opts Request options
-   * @returns Array of organizations across all accessible regions
+   * @returns Array of organizations across all accessible regions (limited to 25 results)
    *
    * @example
    * ```typescript
@@ -810,10 +812,22 @@ export class SentryApiService {
    * });
    * ```
    */
-  async listOrganizations(opts?: RequestOptions): Promise<OrganizationList> {
+  async listOrganizations(
+    params?: { query?: string },
+    opts?: RequestOptions,
+  ): Promise<OrganizationList> {
+    // Build query parameters
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", "25");
+    if (params?.query) {
+      queryParams.set("query", params.query);
+    }
+    const queryString = queryParams.toString();
+    const path = `/organizations/?${queryString}`;
+
     // For self-hosted instances, the regions endpoint doesn't exist
     if (!this.isSaas()) {
-      const body = await this.requestJSON("/organizations/", undefined, opts);
+      const body = await this.requestJSON(path, undefined, opts);
       return OrganizationListSchema.parse(body);
     }
 
@@ -831,7 +845,7 @@ export class SentryApiService {
       return (
         await Promise.all(
           regionData.regions.map(async (region) =>
-            this.requestJSON(`/organizations/`, undefined, {
+            this.requestJSON(path, undefined, {
               ...opts,
               host: new URL(region.url).host,
             }),
@@ -845,7 +859,7 @@ export class SentryApiService {
       // fall back to direct organizations endpoint
       if (error instanceof ApiNotFoundError) {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
-        const body = await this.requestJSON("/organizations/", undefined, opts);
+        const body = await this.requestJSON(path, undefined, opts);
         return OrganizationListSchema.parse(body);
       }
 
@@ -874,18 +888,25 @@ export class SentryApiService {
    * Lists teams within an organization.
    *
    * @param organizationSlug Organization identifier
+   * @param params Query parameters
+   * @param params.query Search query to filter teams by name/slug
    * @param opts Request options including host override
-   * @returns Array of teams in the organization
+   * @returns Array of teams in the organization (limited to 25 results)
    */
   async listTeams(
     organizationSlug: string,
+    params?: { query?: string },
     opts?: RequestOptions,
   ): Promise<TeamList> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/teams/`,
-      undefined,
-      opts,
-    );
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", "25");
+    if (params?.query) {
+      queryParams.set("query", params.query);
+    }
+    const queryString = queryParams.toString();
+    const path = `/organizations/${organizationSlug}/teams/?${queryString}`;
+
+    const body = await this.requestJSON(path, undefined, opts);
     return TeamListSchema.parse(body);
   }
 
@@ -924,18 +945,25 @@ export class SentryApiService {
    * Lists projects within an organization.
    *
    * @param organizationSlug Organization identifier
+   * @param params Query parameters
+   * @param params.query Search query to filter projects by name/slug
    * @param opts Request options
-   * @returns Array of projects in the organization
+   * @returns Array of projects in the organization (limited to 25 results)
    */
   async listProjects(
     organizationSlug: string,
+    params?: { query?: string },
     opts?: RequestOptions,
   ): Promise<ProjectList> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/projects/`,
-      undefined,
-      opts,
-    );
+    const queryParams = new URLSearchParams();
+    queryParams.set("per_page", "25");
+    if (params?.query) {
+      queryParams.set("query", params.query);
+    }
+    const queryString = queryParams.toString();
+    const path = `/organizations/${organizationSlug}/projects/?${queryString}`;
+
+    const body = await this.requestJSON(path, undefined, opts);
     return ProjectListSchema.parse(body);
   }
 

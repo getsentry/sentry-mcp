@@ -1,6 +1,9 @@
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
+import { ParamSearchQuery } from "../schema";
+
+const RESULT_LIMIT = 25;
 
 export default defineTool({
   name: "find_organizations",
@@ -9,20 +12,33 @@ export default defineTool({
     "Find organizations that the user has access to in Sentry.",
     "",
     "Use this tool when you need to:",
-    "- View all organizations in Sentry",
+    "- View organizations in Sentry",
     "- Find an organization's slug to aid other tool requests",
+    "- Search for specific organizations by name or slug",
+    "",
+    `Returns up to ${RESULT_LIMIT} results. If you hit this limit, use the query parameter to narrow down results.`,
   ].join("\n"),
-  inputSchema: {},
+  inputSchema: {
+    query: ParamSearchQuery.optional(),
+  },
   async handler(params, context: ServerContext) {
     // User data endpoints (like /users/me/regions/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
-    const organizations = await apiService.listOrganizations();
+    const organizations = await apiService.listOrganizations({
+      query: params.query,
+    });
 
     let output = "# Organizations\n\n";
 
+    if (params.query) {
+      output += `**Search query:** "${params.query}"\n\n`;
+    }
+
     if (organizations.length === 0) {
-      output += "You don't appear to be a member of any organizations.\n";
+      output += params.query
+        ? `No organizations found matching "${params.query}".\n`
+        : "You don't appear to be a member of any organizations.\n";
       return output;
     }
 
@@ -36,6 +52,10 @@ export default defineTool({
         ].join("\n"),
       )
       .join("\n\n");
+
+    if (organizations.length === RESULT_LIMIT) {
+      output += `\n\n---\n\n**Note:** Showing ${RESULT_LIMIT} results (maximum). There may be more organizations available. Use the \`query\` parameter to search for specific organizations.`;
+    }
 
     output += "\n\n# Using this information\n\n";
     output += `- The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.\n`;
