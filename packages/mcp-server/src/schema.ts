@@ -45,6 +45,13 @@ export const ParamProjectSlugOrAll = z
     "The project's slug. This will default to all projects you have access to. It is encouraged to specify this when possible.",
   );
 
+export const ParamSearchQuery = z
+  .string()
+  .trim()
+  .describe(
+    "Search query to filter results by name or slug. Use this to narrow down results when there are many items.",
+  );
+
 export const ParamIssueShortId = z
   .string()
   .toUpperCase()
