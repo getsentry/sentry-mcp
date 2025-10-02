@@ -224,14 +224,14 @@ export async function tokenExchangeCallback(
     return undefined; // No-op for other grant types
   }
 
-  Sentry.setUser({ id: options.props.id, name: options.props.name });
+  Sentry.setUser({ id: options.props.id });
 
   // Extract the refresh token from the stored props
   const currentRefreshToken = options.props.refreshToken;
   if (!currentRefreshToken) {
-    Sentry.captureException(
-      new Error("No refresh token available in stored props"),
-    );
+    logIssue("No refresh token available in stored props", {
+      loggerScope: ["cloudflare", "oauth", "refresh"],
+    });
 
     return undefined;
   }
