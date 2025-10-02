@@ -381,6 +381,14 @@ export const ErrorEventSchema = BaseEventSchema.omit({
   dateCreated: z.string().datetime(),
 });
 
+export const DefaultEventSchema = BaseEventSchema.omit({
+  type: true,
+}).extend({
+  type: z.literal("default"),
+  culprit: z.string().nullable().optional(),
+  dateCreated: z.string().datetime(),
+});
+
 export const TransactionEventSchema = BaseEventSchema.omit({
   type: true,
 }).extend({
@@ -425,6 +433,7 @@ export const UnknownEventSchema = BaseEventSchema.omit({
 // are completely different, for example.
 export const EventSchema = z.union([
   ErrorEventSchema,
+  DefaultEventSchema,
   TransactionEventSchema,
   UnknownEventSchema,
 ]);

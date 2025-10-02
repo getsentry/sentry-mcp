@@ -927,4 +927,89 @@ describe("get_issue_details", () => {
       "For detailed root cause analysis and solutions, call `analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')`",
     );
   });
+
+  it("handles default event type (error without exception data)", async () => {
+    // Mock a "default" event type - represents errors without exception data
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/DEFAULT-001/events/latest/",
+        () => {
+          return HttpResponse.json({
+            id: "abc123def456",
+            title: "Error without exception data",
+            message: "Something went wrong",
+            platform: "python",
+            type: "default", // This is the key part - default event type
+            dateCreated: "2025-10-02T12:00:00.000Z",
+            culprit: "unknown",
+            entries: [
+              {
+                type: "message",
+                data: {
+                  formatted: "Something went wrong",
+                  message: "Something went wrong",
+                },
+              },
+            ],
+            tags: [
+              { key: "level", value: "error" },
+              { key: "environment", value: "production" },
+            ],
+            contexts: {},
+          });
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/DEFAULT-001/",
+        () => {
+          return HttpResponse.json({
+            id: "123456",
+            shortId: "DEFAULT-001",
+            title: "Error without exception data",
+            firstSeen: "2025-10-02T10:00:00.000Z",
+            lastSeen: "2025-10-02T12:00:00.000Z",
+            count: "5",
+            userCount: 2,
+            permalink: "https://sentry-mcp-evals.sentry.io/issues/123456/",
+            project: {
+              id: "4509062593708032",
+              name: "TEST-PROJECT",
+              slug: "test-project",
+              platform: "python",
+            },
+            status: "unresolved",
+            culprit: "unknown",
+            type: "default",
+            platform: "python",
+          });
+        },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "DEFAULT-001",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    // Verify the event was processed successfully
+    expect(result).toContain("# Issue DEFAULT-001 in **sentry-mcp-evals**");
+    expect(result).toContain("Error without exception data");
+    expect(result).toContain("**Event ID**: abc123def456");
+    // Default events should show dateCreated just like error events
+    expect(result).toContain("**Occurred At**: 2025-10-02T12:00:00.000Z");
+    expect(result).toContain("### Error");
+    expect(result).toContain("Something went wrong");
+  });
 });
