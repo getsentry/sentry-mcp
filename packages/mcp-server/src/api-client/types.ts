@@ -46,6 +46,7 @@ import type {
   ClientKeyListSchema,
   ClientKeySchema,
   ErrorEventSchema,
+  DefaultEventSchema,
   TransactionEventSchema,
   UnknownEventSchema,
   EventSchema,
@@ -80,12 +81,13 @@ export type Issue = z.infer<typeof IssueSchema>;
 
 // Individual event types
 export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
+export type DefaultEvent = z.infer<typeof DefaultEventSchema>;
 export type TransactionEvent = z.infer<typeof TransactionEventSchema>;
 export type UnknownEvent = z.infer<typeof UnknownEventSchema>;
 
 // Event union - use RawEvent for parsing, Event for known types only
 export type RawEvent = z.infer<typeof EventSchema>;
-export type Event = ErrorEvent | TransactionEvent;
+export type Event = ErrorEvent | DefaultEvent | TransactionEvent;
 
 export type EventAttachment = z.infer<typeof EventAttachmentSchema>;
 export type Tag = z.infer<typeof TagSchema>;

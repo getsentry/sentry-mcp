@@ -12,6 +12,7 @@ import type { SentryApiService } from "../api-client";
 import type {
   Event,
   ErrorEvent,
+  DefaultEvent,
   TransactionEvent,
   Trace,
 } from "../api-client/types";
@@ -244,8 +245,9 @@ async function maybeFetchPerformanceTrace({
   }
 }
 
-function isErrorEvent(event: Event): event is ErrorEvent {
-  return event.type === "error";
+function isErrorEvent(event: Event): event is ErrorEvent | DefaultEvent {
+  // "default" type represents error events without exception data
+  return event.type === "error" || event.type === "default";
 }
 
 function isTransactionEvent(event: Event): event is TransactionEvent {

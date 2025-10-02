@@ -1596,7 +1596,8 @@ export function formatIssueOutput({
   output += "\n";
   output += "## Event Details\n\n";
   output += `**Event ID**: ${event.id}\n`;
-  if (event.type === "error") {
+  // "default" type represents error events without exception data
+  if (event.type === "error" || event.type === "default") {
     output += `**Occurred At**: ${new Date((event as z.infer<typeof ErrorEventSchema>).dateCreated).toISOString()}\n`;
   }
   if (event.message) {

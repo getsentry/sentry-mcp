@@ -1529,8 +1529,9 @@ export class SentryApiService {
     );
     const rawEvent = EventSchema.parse(body);
 
-    // Filter out unknown events - only return known error/transaction types
-    if (rawEvent.type === "error") {
+    // Filter out unknown events - only return known error/default/transaction types
+    // "default" type represents error events without exception data
+    if (rawEvent.type === "error" || rawEvent.type === "default") {
       return rawEvent as Event;
     }
     if (rawEvent.type === "transaction") {
@@ -1542,7 +1543,7 @@ export class SentryApiService {
     throw new ApiValidationError(
       `Unknown event type: ${eventType}`,
       400,
-      `Only error and transaction events are supported, got: ${eventType}`,
+      `Only error, default, and transaction events are supported, got: ${eventType}`,
       body,
     );
   }
