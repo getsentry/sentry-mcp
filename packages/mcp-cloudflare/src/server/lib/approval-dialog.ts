@@ -719,7 +719,7 @@ export function renderApprovalDialog(
                     <span class="permission-checkbox"></span>
                     <div class="optional-permission-content">
                       <span class="optional-permission-name">Issue Triage (event:write)</span>
-                      <div class="optional-permission-description">Update and manage issues - resolve, assign, and analyze problems</div>
+                      <div class="optional-permission-description">Update and manage issues - resolve, assign, and triage problems</div>
                     </div>
                   </label>
 
