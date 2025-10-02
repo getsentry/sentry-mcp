@@ -229,9 +229,9 @@ export async function tokenExchangeCallback(
   // Extract the refresh token from the stored props
   const currentRefreshToken = options.props.refreshToken;
   if (!currentRefreshToken) {
-    Sentry.captureException(
-      new Error("No refresh token available in stored props"),
-    );
+    logIssue("No refresh token available in stored props", {
+      loggerScope: ["cloudflare", "oauth", "refresh"],
+    });
 
     return undefined;
   }
