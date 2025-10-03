@@ -7,7 +7,11 @@ import BrowserAnimation from "./BrowserAnimation";
 import Paste from "./terminal-ui/Paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
 import StepsList from "./terminal-ui/StepsList";
-import { ChevronRight, RotateCcw, Sparkles } from "lucide-react";
+import {
+  BookText,
+  MessageSquareText,
+  RotateCcw,
+} from "lucide-react";
 import CodeSnippet from "../ui/code-snippet";
 import DataWire from "./DataWire";
 
@@ -19,6 +23,7 @@ export type Step = {
   startSpeed: number;
   autoContinueMs: number | null;
   autoPlay: boolean;
+  lines: number;
 };
 
 type ActivationSource = "marker" | "manual";
@@ -48,6 +53,7 @@ export default function TerminalAnimation({
       startSpeed: 5,
       autoContinueMs: 1950,
       autoPlay: false,
+      lines: 5,
     },
     {
       type: "[toolcall]",
@@ -55,8 +61,9 @@ export default function TerminalAnimation({
       description: "MCP performs a toolcall to fetch issue details",
       startTime: 40,
       startSpeed: 3,
-      autoContinueMs: 1000,
+      autoContinueMs: 1500,
       autoPlay: false,
+      lines: 10,
     },
     {
       type: "[toolcall]",
@@ -67,6 +74,7 @@ export default function TerminalAnimation({
       startSpeed: 5,
       autoContinueMs: 2000,
       autoPlay: false,
+      lines: 9,
     },
     {
       type: "[LLM]",
@@ -74,8 +82,9 @@ export default function TerminalAnimation({
       description: "LLM analyzes the context and comes up with a solution",
       startTime: 48.5,
       startSpeed: 30,
-      autoContinueMs: 100,
+      autoContinueMs: 10,
       autoPlay: false,
+      lines: 9,
     },
     {
       type: "[LLM]",
@@ -85,6 +94,7 @@ export default function TerminalAnimation({
       startSpeed: 20,
       autoContinueMs: 1000,
       autoPlay: false,
+      lines: 8,
     },
     {
       label: "Validation",
@@ -93,6 +103,8 @@ export default function TerminalAnimation({
       startSpeed: 20,
       autoContinueMs: 100,
       autoPlay: false,
+      // 32
+      lines: 8,
     },
   ];
 
@@ -100,6 +112,7 @@ export default function TerminalAnimation({
     async (
       resumeAtSec: number,
       newSpeed: number,
+      lines: number,
       marker?: number,
       manual?: boolean,
     ) => {
@@ -112,12 +125,7 @@ export default function TerminalAnimation({
         "demo.cast",
         cliDemoRef.current,
         {
-          rows:
-            window.innerWidth > 1024
-              ? window.innerWidth > 1234
-                ? 24
-                : 32
-              : undefined,
+          rows: lines || 7,
           fit: window.innerWidth > 1024 ? "none" : "none",
           theme: "dracula",
           controls: false,
@@ -151,7 +159,7 @@ export default function TerminalAnimation({
               steps[currentStepRef.current].autoPlay
             )
           ) {
-            player.pause?.();
+            // player.pause?.();
           }
         } catch {}
       }, 0);
@@ -175,35 +183,37 @@ export default function TerminalAnimation({
     setCurrentIndex(stepIndex);
     const step = steps[currentStepRef.current];
     if (!step) return;
-    playerRef.current.pause?.();
-    // remove previous marker listener if present
-    if (playerRef.current.__onMarker) {
-      try {
-        playerRef.current.removeEventListener?.(
-          "marker",
-          playerRef.current.__onMarker,
-        );
-      } catch {}
-    }
-    playerRef.current.dispose?.();
 
     if (autoContinueTimerRef.current) {
       clearTimeout(autoContinueTimerRef.current);
       autoContinueTimerRef.current = null;
     }
 
-    setSpeed(step.startSpeed);
-    mountPlayer(
-      step.startTime,
-      step.startSpeed,
-      steps[stepIndex + 1]?.startTime,
-    );
-    if (!step.autoPlay) playerRef.current.pause?.();
+    // if (!step.autoPlay) playerRef.current.pause?.();
 
     // Step 0 special-case: if auto-activated by marker, do NOT auto-continue.
     // const shouldAutoContinue = !(stepIndex === 0 && source === "marker");
     if (step.autoContinueMs) {
       autoContinueTimerRef.current = setTimeout(async () => {
+        playerRef.current.pause?.();
+        // remove previous marker listener if present
+        if (playerRef.current.__onMarker) {
+          try {
+            playerRef.current.removeEventListener?.(
+              "marker",
+              playerRef.current.__onMarker,
+            );
+          } catch {}
+        }
+        playerRef.current.dispose?.();
+        setSpeed(step.startSpeed);
+        mountPlayer(
+          step.startTime,
+          step.startSpeed,
+          // last step 7
+          steps[stepIndex + 1]?.lines || 7,
+          steps[stepIndex + 1]?.startTime,
+        );
         playerRef.current?.play?.();
         autoContinueTimerRef.current = null; // finished
       }, step.autoContinueMs);
@@ -226,12 +236,12 @@ export default function TerminalAnimation({
       } catch {}
     }
     playerRef.current.dispose?.();
-    mountPlayer(31, 0.5, steps[0].startTime, true);
+    mountPlayer(31, 0.5, steps[0].lines, steps[0].startTime, true);
   }
 
   useEffect(() => {
     // initial
-    mountPlayer(31, 0.5, steps[0].startTime);
+    mountPlayer(31, 0.5, steps[0].lines, steps[0].startTime);
     return () => {
       try {
         playerRef.current?.dispose?.();
@@ -244,47 +254,84 @@ export default function TerminalAnimation({
   return (
     <>
       {/* Terminal Side */}
-      <div className="relative w-full col-span-2 max-md:row-span-6 border border-white/10 bg-white/5 backdrop-blur-3xl rounded-2xl overflow-hidden">
-        <div
-          className="relative flex h-full w-full overflow-hidden rounded-2xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)]"
-          ref={cliDemoRef}
-        />
+      <div
+        className={`${
+          currentIndex === 1
+            ? "xl:border-pink-400/50"
+            : currentIndex === 2
+              ? "xl:border-orange-400/50"
+              : currentIndex === 4
+                ? "border-lime-400/50"
+                : "border-white/10"
+        } relative w-full col-span-2 max-xl:row-span-6 border bg-[#160f24]/50 backdrop-blur-3xl rounded-3xl overflow-hidden`}
+      >
+        <div className="w-full h-full [mask-image:linear-gradient(190deg,red_31%,transparent_50%)]">
+          <div
+            className="relative flex h-full w-full overflow-hidden rounded-3xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)]"
+            ref={cliDemoRef}
+          />
+        </div>
         {/* <CustomControls
           onChangeSpeedAction={(i) => onChangeSpeed(i)}
           speed={speed}
         /> */}
         <SpeedDisplay speed={speed} />
         <Paste step={currentIndex} />
-        <div className="absolute bottom-0 left-0 right-0 p-4 lg:p-12 text-shadow-md bg-neutral-950 h-full flex flex-col justify-end [mask-image:linear-gradient(190deg,transparent_50%,red_69%)] pointer-events-none">
-          <h1 className="text-4xl font-bold font-serif my-5 flex items-center pointer-events-auto">
-            <ChevronRight className="-ml-2 size-8" /> fix the url
-            <span className="animate-cursor-blink">_</span>
-          </h1>
-          <span className="opacity-60 ml-0.5 pointer-events-auto">
-            That's all it could take to fix your bugs
-          </span>
-          <div className="mt-6 flex flex-wrap gap-4 w-full pointer-events-auto">
-            <div className="hidden sm:block">
-              <CodeSnippet noMargin snippet={endpoint} />
-            </div>
-            <div className="px-6 py-2 flex items-center cursor-pointer bg-violet-600 hover:bg-violet-700 text-white transition font-bold">
-              /docs
-            </div>
+        <div className="absolute bottom-0 left-0 right-0 p-4 text-shadow-md h-full flex flex-col justify-end">
+          <div className="relative">
             <button
               type="button"
-              onClick={() => onChatClick()}
-              className="cursor-pointer px-5 py-2 flex items-center bg-gradient-to-r from-violet-600 to-violet-900 hover:bg-neutral-600/50 text-white transition font-bold"
+              className={`border group/replay border-white/20 bg-white/15 hover:bg-white/30 active:bg-white/50 active:duration-75 duration-300 absolute -top-12 rounded-full px-3 py-1 left-0 sm:left-1/2 sm:-translate-x-1/2 z-50 cursor-pointer hover:duration-300 hover:delay-0 text-nowrap ${
+                currentIndex === 5
+                  ? "opacity-100 translate-y-0 delay-3000 duration-500 blur-none pointer-events-auto"
+                  : "opacity-0 translate-y-1/2 pointer-events-none blur-xl"
+              }`}
+              onClick={() => restart()}
             >
-              <Sparkles className="size-5 mr-2" />
-              Live Demo
+              Missed a step? Replay
+              <RotateCcw className="inline-block size-4 ml-2 group-hover/replay:-rotate-360 group-hover/replay:ease-out group-hover/replay:duration-1000" />
             </button>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-col gap-4">
+            <div className="xl:mt-0 group/griditem overflow-clip">
+              <StepsList
+                onSelectAction={(i) => (i === 0 ? restart() : activateStep(i))}
+                globalIndex={Math.max(currentIndex, 0)}
+                steps={steps}
+              />
+            </div>
+            {/* <h1 className="text-4xl font-bold font-sans my-5 flex items-center pointer-events-auto">
+            <ChevronRight className="-ml-2 size-8" />
+            fix the url
+            <span className="animate-cursor-blink">_</span>
+          </h1> */}
+            {/* <span className="pointer-events-auto">
+            That's all it could take to fix your bugs
+          </span> */}
+            <div className="flex flex-wrap gap-4 w-full pointer-events-auto">
+              <div className="hidden sm:block">
+                <CodeSnippet noMargin snippet={endpoint} />
+              </div>
+              <div className="pl-3 pr-3.5 py-2 rounded-xl flex items-center cursor-pointer bg-[#362e5a] hover:bg-[#665e8a] text-white transition font-bold font-sans border border-violet-300/25">
+                <BookText className="size-5 mr-2" />
+                Docs
+              </div>
+              <button
+                type="button"
+                onClick={() => onChatClick()}
+                className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-[#362e5a] hover:bg-[#665e8a] text-white transition font-bold font-sans border border-violet-300/25"
+              >
+                <MessageSquareText className="size-5 mr-2" />
+                Live Demo
+              </button>
+            </div>
           </div>
         </div>
       </div>
       <div
         className={`${
           currentIndex > 4 ? "opacity-0 scale-y-50" : "opacity-100 scale-y-100"
-        } duration-300 max-md:hidden absolute h-[calc(100%-24rem)] inset-y-0 left-1/2 -translate-x-1/2 w-8 py-12 flex justify-around flex-col`}
+        } duration-300 max-xl:hidden absolute h-[calc(100%-24rem)] inset-y-0 left-1/2 -translate-x-1/2 w-8 py-12 flex justify-around flex-col`}
       >
         {Array.from({ length: 12 }).map((_, i) => (
           <DataWire
@@ -310,29 +357,15 @@ export default function TerminalAnimation({
       </div>
 
       {/* Browser Window side */}
-      <div className="relative max-md:row-span-0 hidden col-span-2 md:flex flex-col w-full">
+      <div className="relative max-xl:row-span-0 hidden col-span-2 xl:flex flex-col w-full">
         <BrowserAnimation globalIndex={currentIndex} />
-        <div className="relative">
-          <button
-            type="button"
-            className={`border group/replay border-white/20 bg-white/15 hover:bg-white/30 active:bg-white/50 active:duration-75 duration-300 absolute -top-12 rounded-full px-3 py-1 left-1/2 -translate-x-1/2 z-50 cursor-pointer hover:duration-300 hover:delay-0 ${
-              currentIndex === 5
-                ? "opacity-100 -translate-y-full delay-1000 duration-500 blur-none pointer-events-auto"
-                : "opacity-0 -translate-y-1/2 pointer-events-none blur-xl"
-            }`}
-            onClick={() => restart()}
-          >
-            Missed a step? Replay
-            <RotateCcw className="inline-block size-4 ml-2 group-hover/replay:-rotate-360 group-hover/replay:ease-out group-hover/replay:duration-1000" />
-          </button>
-        </div>
-        <div className="md:mt-0 group/griditem overflow-clip">
+        {/* <div className="xl:mt-0 group/griditem overflow-clip">
           <StepsList
             onSelectAction={(i) => (i === 0 ? restart() : activateStep(i))}
             globalIndex={Math.max(currentIndex, 0)}
             steps={steps}
           />
-        </div>
+        </div> */}
       </div>
     </>
   );

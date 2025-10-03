@@ -26,7 +26,7 @@ export default function StepsList({
         return (
           <button
             aria-current={isActive ? "step" : undefined}
-            className={`group flex cursor-pointer flex-col group-hover/griditem:!transform-none group-hover/griditem:!z-0 group-hover/griditem:!opacity-100  max-md:!transform-none max-md:!z-0 max-md:!opacity-100 overflow-hidden rounded-xl border p-3 pb-0 text-left duration-500 hover:duration-75 backdrop-blur-xl
+            className={`group flex cursor-pointer flex-col group-hover/griditem:!transform-none group-hover/griditem:!z-0 group-hover/griditem:!opacity-100  max-md:!transform-none max-md:!z-0 max-md:!opacity-100 overflow-hidden rounded-xl border p-2 sm:p-3 pb-0 sm:pb-0 text-left duration-500 hover:duration-75 backdrop-blur-xl
             ${
               isActive
                 ? "border-violet-300/30 bg-gradient-to-r from-transparent to-violet-500/50 text-white"
@@ -52,7 +52,7 @@ export default function StepsList({
             onClick={() => onSelectAction(idx)}
             type="button"
           >
-            <div className="flex items-center gap-3 pb-3">
+            <div className="flex items-center gap-3 pb-2 sm:pb-3">
               {isActive ? (
                 <>
                   <div className="-ml-3 h-6 w-2 animate-ping rounded-r-3xl bg-lime-300" />
@@ -63,7 +63,7 @@ export default function StepsList({
                 </>
               ) : (
                 <>
-                  <span className="font-mono flex items-center  h-8 text-sm opacity-50 ml-3.5">
+                  <span className="font-mono flex items-center h-8 text-sm opacity-50 ml-3.5">
                     {step.type}
                   </span>
                   <span className="float-left opacity-0 duration-200 ease-[cubic-bezier(0.64,0.57,0.67,1.53)] group-hover:translate-x-4 group-hover:opacity-100 -ml-4 group-hover:duration-75 max-sm:hidden">

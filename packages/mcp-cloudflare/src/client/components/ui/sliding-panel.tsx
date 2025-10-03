@@ -5,6 +5,8 @@
 
 import type { ReactNode } from "react";
 import { useScrollLock } from "../../hooks/use-scroll-lock";
+import { Button } from "./button";
+import { X } from "lucide-react";
 
 interface SlidingPanelProps {
   isOpen: boolean;
@@ -26,7 +28,7 @@ export function SlidingPanel({
     <>
       {/* Mobile: Slide from right */}
       <div
-        className={`md:hidden fixed inset-0 bg-transparent max-w-none max-h-none w-full h-full m-0 p-0 z-40 ${
+        className={`xl:hidden fixed inset-0 bg-transparent max-w-none max-h-none w-full h-full m-0 p-0 z-40 ${
           isOpen ? "" : "pointer-events-none"
         }`}
       >
@@ -48,7 +50,7 @@ export function SlidingPanel({
 
         {/* Panel */}
         <div
-          className={`fixed inset-y-0 right-0 w-full max-w-2xl bg-slate-950 border-l border-slate-800 z-50 shadow-2xl flex flex-col transition-transform duration-500 ease-in-out ${
+          className={`fixed inset-y-0 right-0 w-full max-w-2xl bg-background border-l border-slate-800 z-50 shadow-2xl flex flex-col transition-transform duration-500 ease-in-out ${
             isOpen ? "translate-x-0" : "translate-x-full"
           } ${className}`}
         >
@@ -59,9 +61,18 @@ export function SlidingPanel({
       {/* Desktop: placed inside the hero animation container */}
       <div
         className={`${
-          isOpen ? "md:flex flex-col" : "hidden"
-        } absolute top-0 right-0 z-50 max-md:hidden h-[calc(100%-1rem)] w-[calc(50%-1rem)] m-2 border border-white/20 backdrop-blur-3xl bg-slate-950/10 rounded-2xl transition-opacity duration-300 ${className}`}
+          isOpen ? "xl:flex flex-col" : "hidden"
+        } absolute top-0 right-0 z-50 max-xl:hidden h-full w-[calc(50%-1rem)] border border-white/10 backdrop-blur-3xl bg-background rounded-3xl transition-opacity duration-300 overflow-hidden ${className}`}
       >
+        <Button
+          type="button"
+          onClick={onClose}
+          size="icon"
+          title="Close"
+          className="z-50 right-4 top-4 absolute rounded-xl"
+        >
+          <X className="h-4 w-4" />
+        </Button>
         {children}
       </div>
     </>
