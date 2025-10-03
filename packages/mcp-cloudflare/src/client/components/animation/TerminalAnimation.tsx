@@ -311,7 +311,7 @@ export default function TerminalAnimation({
             : currentIndex === 2
               ? "xl:border-orange-400/50"
               : currentIndex === 4
-                ? "border-lime-400/50"
+                ? "xl:border-lime-400/50"
                 : "border-white/10"
         } relative w-full col-span-2 max-xl:row-span-6 border bg-[#160f24]/50 backdrop-blur-3xl rounded-3xl overflow-hidden`}
       >
@@ -369,7 +369,7 @@ export default function TerminalAnimation({
               <button
                 type="button"
                 onClick={() => onChatClick()}
-                className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-[#362e5a] hover:bg-[#665e8a] text-white transition font-bold font-sans border border-violet-300/25"
+                className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-white text-background hover:bg-violet-300 transition font-bold font-sans border border-background"
               >
                 <MessageSquareText className="size-5 mr-2" />
                 Live Demo
@@ -381,9 +381,9 @@ export default function TerminalAnimation({
       <div
         className={`${
           currentIndex > 4 ? "opacity-0 scale-y-50" : "opacity-100 scale-y-100"
-        } duration-300 max-xl:hidden absolute h-[calc(100%-24rem)] inset-y-0 left-1/2 -translate-x-1/2 w-8 py-12 flex justify-around flex-col`}
+        } duration-300 max-xl:hidden absolute h-full inset-y-0 left-1/2 -translate-x-1/2 w-8 py-12 flex justify-around flex-col`}
       >
-        {Array.from({ length: 12 }).map((_, i) => (
+        {Array.from({ length: 24 }).map((_, i) => (
           <DataWire
             // biome-ignore lint/suspicious/noArrayIndexKey: fake array in-place
             key={i}

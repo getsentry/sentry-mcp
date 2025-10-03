@@ -1,4 +1,5 @@
 "use client";
+import { BookCheck, User } from "lucide-react";
 import type { Step } from "../TerminalAnimation";
 
 export default function StepsList({
@@ -26,7 +27,7 @@ export default function StepsList({
         return (
           <button
             aria-current={isActive ? "step" : undefined}
-            className={`group flex cursor-pointer flex-col group-hover/griditem:!transform-none group-hover/griditem:!z-0 group-hover/griditem:!opacity-100  max-md:!transform-none max-md:!z-0 max-md:!opacity-100 overflow-hidden rounded-xl border p-2 sm:p-3 pb-0 sm:pb-0 text-left duration-500 hover:duration-75 backdrop-blur-xl
+            className={`group flex cursor-pointer flex-col group-hover/griditem:!transform-none group-hover/griditem:!z-0 group-hover/griditem:!opacity-100  max-md:!transform-none max-md:!z-0 max-md:!opacity-100 overflow-hidden rounded-xl border p-2 pb-0 text-left duration-500 hover:duration-75 backdrop-blur-xl
             ${
               isActive
                 ? "border-violet-300/30 bg-gradient-to-r from-transparent to-violet-500/50 text-white"
@@ -52,19 +53,31 @@ export default function StepsList({
             onClick={() => onSelectAction(idx)}
             type="button"
           >
-            <div className="flex items-center gap-3 pb-2 sm:pb-3">
+            <div className="flex items-center gap-3 pb-2">
               {isActive ? (
                 <>
                   <div className="-ml-3 h-6 w-2 animate-ping rounded-r-3xl bg-lime-300" />
                   <div className="-ml-5 mr-1.5 h-8 w-2 rounded-r-3xl bg-lime-500" />
                   <span className="font-mono h-8 flex items-center text-sm opacity-50">
-                    {step.type}
+                    {idx === 0 ? (
+                      <User className="size-4" />
+                    ) : idx > 4 ? (
+                      <BookCheck className="size-4" />
+                    ) : (
+                      step.type
+                    )}
                   </span>
                 </>
               ) : (
                 <>
                   <span className="font-mono flex items-center h-8 text-sm opacity-50 ml-3.5">
-                    {step.type}
+                    {idx === 0 ? (
+                      <User className="size-4" />
+                    ) : idx > 4 ? (
+                      <BookCheck className="size-4" />
+                    ) : (
+                      step.type
+                    )}
                   </span>
                   <span className="float-left opacity-0 duration-200 ease-[cubic-bezier(0.64,0.57,0.67,1.53)] group-hover:translate-x-4 group-hover:opacity-100 -ml-4 group-hover:duration-75 max-sm:hidden">
                     →
@@ -80,7 +93,7 @@ export default function StepsList({
                 {step.label}
               </span>
             </div>
-            {/* <div
+            <div
               className={`grid ${
                 isActive
                   ? "-mt-1 grid-rows-[1fr] opacity-100"
@@ -93,12 +106,12 @@ export default function StepsList({
                     isActive
                       ? "translate-y-0 scale-100 opacity-100"
                       : "translate-y-10 scale-96 opacity-0"
-                  } px-4 pb-5 text-copy-lg text-white/50 transition-all duration-500 ease-out-cubic`}
+                  } px-4 pb-3 text-copy-lg text-white/50 transition-all duration-500 ease-out-cubic`}
                 >
                   {step.description}
                 </p>
               </div>
-            </div> */}
+            </div>
           </button>
         );
       })}
