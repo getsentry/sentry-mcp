@@ -68,15 +68,15 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen text-white">
+    <div className="min-h-screen overflow-x-clip max-w-screen relative text-white">
       <BackgroundDecorations />
       {/* Mobile layout: Single column with overlay chat */}
-      <div className="md:hidden flex flex-col">
+      <div className="xl:hidden flex flex-col">
         <div className="flex-1 sm:p-8 p-4">
           <div className=" mx-auto">
             <Header isAuthenticated={isAuthenticated} onLogout={handleLogout} />
             <div
-              className="overflow-wrap relative grid h-[calc(100svh-12rem)] max-h-[69rem] w-full gap-8 overflow-hidden rounded-2xl md:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 md:grid-rows-1"
+              className="overflow-wrap relative grid h-[calc(100svh-5rem)] sm:h-[calc(100svh-12rem)] max-h-[69rem] w-full gap-8 overflow-hidden rounded-2xl xl:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 xl:grid-rows-1"
               id="demo"
             >
               <TerminalAnimation onChatClick={() => toggleChat(true)} />
@@ -88,8 +88,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* Desktop layout: Main content adjusts width based on chat state */}
-      <div className="hidden md:flex">
+      {/* Desktop layout */}
+      <div className="hidden xl:flex">
         <div className="flex flex-col container mx-auto">
           <div className="flex-1 sm:p-8 p-4">
             <div className="max-w-3xl mx-auto">
@@ -99,7 +99,7 @@ export default function App() {
               />
             </div>
             <div
-              className="overflow-wrap relative grid h-[calc(100vh-12rem)] max-h-[69rem] w-full gap-8 rounded-2xl md:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 md:grid-rows-1"
+              className="overflow-wrap relative grid h-[calc(100vh-12rem)] max-h-[69rem] w-full gap-8 rounded-2xl xl:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 xl:grid-rows-1"
               id="demo"
             >
               <div className="contents z-50">
@@ -118,7 +118,7 @@ export default function App() {
         </div>
       </div>
 
-      <div className="md:hidden">
+      <div className="xl:hidden">
         <Chat
           isMobile
           isOpen={isChatOpen}
