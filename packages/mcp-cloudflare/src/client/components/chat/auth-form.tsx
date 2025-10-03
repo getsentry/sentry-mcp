@@ -8,19 +8,20 @@ export function AuthForm({ authError, onOAuthLogin }: AuthFormProps) {
     <div className="sm:p-8 p-4 flex flex-col items-center">
       <div className="max-w-md w-full space-y-6">
         {/* Chat illustration - hidden on short screens */}
-        <div className="text-slate-400 hidden [@media(min-height:500px)]:block">
+        <div className=" hidden [@media(min-height:500px)]:block">
           <img
             src="/flow-transparent.png"
             alt="Flow"
             width={1536}
             height={1024}
-            className="w-full mb-6 bg-violet-300 rounded"
+            className="w-full mb-6 bg-violet-300 rounded-xl"
+            draggable={false}
           />
         </div>
 
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">Live MCP Demo</h1>
-          <p className="text-slate-400">
+          <h1 className="text-2xl font-bold text-white">Live MCP Demo</h1>
+          <p className="">
             Connect your Sentry account to test the Model Context Protocol with
             real data from your projects.
           </p>
@@ -37,7 +38,7 @@ export function AuthForm({ authError, onOAuthLogin }: AuthFormProps) {
           <Button
             onClick={onOAuthLogin}
             variant="default"
-            className="w-full cursor-pointer"
+            className="w-full cursor-pointer rounded-xl"
           >
             Connect with Sentry
           </Button>
