@@ -90,7 +90,7 @@ export default function App() {
 
       {/* Desktop layout */}
       <div className="hidden xl:flex">
-        <div className="flex flex-col container mx-auto">
+        <div className="flex flex-col 2xl:container mx-auto">
           <div className="flex-1 sm:p-8 p-4">
             <div className="max-w-3xl mx-auto">
               <Header
