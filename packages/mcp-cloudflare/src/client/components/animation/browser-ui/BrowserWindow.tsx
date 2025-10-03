@@ -1,3 +1,10 @@
+import {
+  ChartNoAxesCombined,
+  Compass,
+  LayoutDashboard,
+  Shield,
+} from "lucide-react";
+import { SentryIcon } from "../../ui/icons/sentry";
 import Copy from "./Copy";
 import IssueDetails from "./IssueDetails";
 import Seer from "./Seer";
@@ -14,18 +21,28 @@ export default function BrowserWindow({ step }: { step: number }) {
             : step === 2
               ? "border-orange-400/50"
               : "border-white/10"
-      } absolute bottom-2.5 flex h-[calc(100%-0.625rem)] w-full flex-col rounded-2xl border bg-white/5 duration-300`}
+      } absolute inset-0 flex h-full w-full flex-col rounded-3xl border bg-white/5 duration-300 backdrop-blur-3xl`}
       id="window"
     >
       <Copy step={step} />
       <WindowHeader />
       <div className={`flex h-full w-full ${step > 1 && "overflow-hidden"}`}>
         <div className="flex flex-col gap-3 px-4 pt-2 overflow-clip max-h-full">
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/15" />
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/13" />
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/11" />
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/9" />
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/6" />
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/15 grid place-content-center">
+            <SentryIcon className="h-8 w-8" />
+          </div>
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/13 grid place-content-center">
+            <Compass className="h-8 w-8 text-white/50" />
+          </div>
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/11 grid place-content-center">
+            <LayoutDashboard className="h-8 w-8 text-white/40" />
+          </div>
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/9 grid place-content-center">
+            <ChartNoAxesCombined className="h-8 w-8 text-white/30" />
+          </div>
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/6 grid place-content-center">
+            <Shield className="h-8 w-8 text-white/20" />
+          </div>
         </div>
         {/* WINDOW CONTENTS */}
         <div
