@@ -7,11 +7,7 @@ import BrowserAnimation from "./BrowserAnimation";
 import Paste from "./terminal-ui/Paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
 import StepsList from "./terminal-ui/StepsList";
-import {
-  BookText,
-  MessageSquareText,
-  RotateCcw,
-} from "lucide-react";
+import { BookText, MessageSquareText, RotateCcw } from "lucide-react";
 import CodeSnippet from "../ui/code-snippet";
 import DataWire from "./DataWire";
 
@@ -71,7 +67,7 @@ export default function TerminalAnimation({
       description:
         "A toolcall to Seer to analyze the stack trace and pinpoint the root cause",
       startTime: 46,
-      startSpeed: 5,
+      startSpeed: 1,
       autoContinueMs: 2000,
       autoPlay: false,
       lines: 9,
@@ -154,12 +150,13 @@ export default function TerminalAnimation({
         try {
           player.seek?.(target + EPS);
           if (
+            manual &&
             !(
               currentStepRef.current === -1 ||
               steps[currentStepRef.current].autoPlay
             )
           ) {
-            // player.pause?.();
+            player.pause?.();
           }
         } catch {}
       }, 0);
@@ -167,7 +164,8 @@ export default function TerminalAnimation({
       const onMarker = () => {
         // eliminates race condition that happpens before 1st step (steps 0 and 1 firing at the same time with idelTimeLimit timeline adjustments)
         if (player !== playerRef.current) return; // ignore stale instance
-        activateStep(currentStepRef.current + 1, manual ? "manual" : "marker");
+        activateStep(currentStepRef.current + 1, "marker");
+        // activateStep(currentStepRef.current + 1, manual ? "manual" : "marker");
       };
       player.addEventListener("marker", onMarker);
       (player as any).__onMarker = onMarker;
@@ -193,10 +191,63 @@ export default function TerminalAnimation({
 
     // Step 0 special-case: if auto-activated by marker, do NOT auto-continue.
     // const shouldAutoContinue = !(stepIndex === 0 && source === "marker");
-    if (step.autoContinueMs) {
-      autoContinueTimerRef.current = setTimeout(async () => {
+    // if (step.autoContinueMs) {
+    //   autoContinueTimerRef.current = setTimeout(async () => {
+    //     playerRef.current.pause?.();
+    //     // remove previous marker listener if present
+    //     if (playerRef.current.__onMarker) {
+    //       try {
+    //         playerRef.current.removeEventListener?.(
+    //           "marker",
+    //           playerRef.current.__onMarker,
+    //         );
+    //       } catch {}
+    //     }
+    //     playerRef.current.dispose?.();
+    //     setSpeed(step.startSpeed);
+    //     mountPlayer(
+    //       step.startTime,
+    //       step.startSpeed,
+    //       // last step 7
+    //       steps[stepIndex + 1]?.lines || 7,
+    //       steps[stepIndex + 1]?.startTime,
+    //     );
+    //     playerRef.current?.play?.();
+    //     autoContinueTimerRef.current = null; // finished
+    //   }, step.autoContinueMs);
+    // }
+    if (source === "manual") {
+      // instant remount for manual selection, then pause; delay starts NOW
+      // remove previous marker listener if present
+      if (playerRef.current.__onMarker) {
+        try {
+          playerRef.current.removeEventListener?.(
+            "marker",
+            playerRef.current.__onMarker,
+          );
+        } catch {}
+      }
+      playerRef.current.dispose?.();
+      setSpeed(step.startSpeed);
+      mountPlayer(
+        step.startTime,
+        step.startSpeed,
+        steps[stepIndex + 1]?.lines || 9,
+        steps[stepIndex + 1]?.startTime,
+        true,
+      );
+      playerRef.current.pause?.();
+      if (step.autoContinueMs) {
+        autoContinueTimerRef.current = setTimeout(() => {
+          // simply play; marker listener will advance to next step
+          playerRef.current?.play?.();
+          autoContinueTimerRef.current = null;
+        }, step.autoContinueMs);
+      }
+    } else if (step.autoContinueMs) {
+      // auto progression: keep your delayed remount
+      autoContinueTimerRef.current = setTimeout(() => {
         playerRef.current.pause?.();
-        // remove previous marker listener if present
         if (playerRef.current.__onMarker) {
           try {
             playerRef.current.removeEventListener?.(
@@ -210,12 +261,11 @@ export default function TerminalAnimation({
         mountPlayer(
           step.startTime,
           step.startSpeed,
-          // last step 7
-          steps[stepIndex + 1]?.lines || 7,
+          steps[stepIndex + 1]?.lines || 9,
           steps[stepIndex + 1]?.startTime,
         );
         playerRef.current?.play?.();
-        autoContinueTimerRef.current = null; // finished
+        autoContinueTimerRef.current = null;
       }, step.autoContinueMs);
     }
   }
@@ -236,7 +286,7 @@ export default function TerminalAnimation({
       } catch {}
     }
     playerRef.current.dispose?.();
-    mountPlayer(31, 0.5, steps[0].lines, steps[0].startTime, true);
+    mountPlayer(31, 0.5, steps[0].lines, steps[0].startTime);
   }
 
   useEffect(() => {

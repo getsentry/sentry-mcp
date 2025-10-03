@@ -6,7 +6,7 @@ export default function IDEWindow({ step }: { step: number }) {
   return (
     <div
       className={`${
-        step >= 3 && step < 5
+        step >= 4 && step < 5
           ? "translate-x-0 scale-100 blur-none"
           : "-translate-x-32 scale-75 opacity-0 blur-xl"
       } ${

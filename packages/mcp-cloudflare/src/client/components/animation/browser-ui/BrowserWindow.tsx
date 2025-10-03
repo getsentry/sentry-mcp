@@ -2,6 +2,7 @@ import {
   ChartNoAxesCombined,
   Compass,
   LayoutDashboard,
+  Settings,
   Shield,
 } from "lucide-react";
 import { SentryIcon } from "../../ui/icons/sentry";
@@ -28,20 +29,23 @@ export default function BrowserWindow({ step }: { step: number }) {
       <WindowHeader />
       <div className={`flex h-full w-full ${step > 1 && "overflow-hidden"}`}>
         <div className="flex flex-col gap-3 px-4 pt-2 overflow-clip max-h-full">
-          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/15 grid place-content-center">
-            <SentryIcon className="h-8 w-8" />
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-gradient-to-tr from-[#362e5a] to-[#885091] grid place-content-center text-white">
+            <SentryIcon className="h-8 w-8 text-white" />
           </div>
           <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/13 grid place-content-center">
-            <Compass className="h-8 w-8 text-white/50" />
+            <Compass className="h-8 w-8 stroke-1" />
           </div>
           <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/11 grid place-content-center">
-            <LayoutDashboard className="h-8 w-8 text-white/40" />
+            <LayoutDashboard className="h-8 w-8 stroke-1" />
           </div>
           <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/9 grid place-content-center">
-            <ChartNoAxesCombined className="h-8 w-8 text-white/30" />
+            <ChartNoAxesCombined className="h-8 w-8 stroke-1" />
           </div>
           <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/6 grid place-content-center">
-            <Shield className="h-8 w-8 text-white/20" />
+            <Shield className="h-8 w-8 stroke-1" />
+          </div>
+          <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-white/3 grid place-content-center">
+            <Settings className="h-8 w-8 stroke-1" />
           </div>
         </div>
         {/* WINDOW CONTENTS */}
