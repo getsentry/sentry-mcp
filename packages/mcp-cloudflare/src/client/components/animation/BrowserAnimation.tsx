@@ -11,7 +11,7 @@ export default function BrowserAnimation({
     <div
       className={`relative h-full w-full ${
         globalIndex >= 2 && "overflow-hidden"
-      } hidden md:block`}
+      } hidden md:block rounded-3xl`}
     >
       <IDEWindow step={globalIndex} />
       <BrowserWindow step={globalIndex} />

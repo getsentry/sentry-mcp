@@ -14,12 +14,14 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
 }) => {
   return (
-    <header className="mb-6 w-full">
+    <header className="mb-4 sm:mb-8 pl-4 sm:px-0 w-full">
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 flex-shrink-0">
-          <SentryIcon className="h-8 w-8 text-violet-400" />
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold whitespace-nowrap">Sentry MCP</h1>
+          <SentryIcon className="h-8 w-8" />
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-2xl font-semibold whitespace-nowrap">
+              Sentry MCP
+            </h1>
             <Badge
               variant="outline"
               className="text-xs text-muted-foreground font-normal"
@@ -29,24 +31,24 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" asChild>
+          <Button className="rounded-xl" variant="secondary" asChild>
             <a
               href="https://github.com/getsentry/sentry-mcp"
               target="_blank"
               rel="noopener noreferrer"
             >
               <Github className="h-5 w-5" />
-              <span>GitHub</span>
+              <span className="max-sm:sr-only">GitHub</span>
             </a>
           </Button>
           {isAuthenticated && onLogout && (
             <Button
               variant="secondary"
               onClick={onLogout}
-              className="hidden md:flex cursor-pointer"
+              className="cursor-pointer rounded-xl"
             >
               <LogOut className="h-4 w-4" />
-              <span>Logout</span>
+              <span className="max-sm:sr-only">Logout</span>
             </Button>
           )}
         </div>

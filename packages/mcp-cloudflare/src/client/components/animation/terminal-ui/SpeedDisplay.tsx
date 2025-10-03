@@ -27,12 +27,12 @@ export default function SpeedDisplay({
   return (
     <div
       aria-live="polite"
-      className={`absolute top-8 right-10 z-40 flex items-center font-bold text-4xl opacity-50 ${
+      className={`absolute top-4 right-5 sm:top-8 sm:right-10 z-40 flex items-center font-bold text-3xl opacity-50 ${
         animate ? "speed-animate" : ""
       } ${className}`}
       style={{ ["--speed-pop-dur" as any]: `${durationMs}ms` }}
     >
-      <ChevronsRight className="size-12" />
+      <ChevronsRight className="size-10" />
       {speed}x
     </div>
   );
