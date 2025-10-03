@@ -41,8 +41,46 @@ export default function Seer({ step }: { step: number }) {
           </div>
         </div>
       </div>
-      <div className="mt-6 mb-12 grid place-items-center text-lg text-violet-300">
-        Seeking the Root Cause...
+      <div className="mt-6 mb-12 text-lg text-violet-300 flex items-center justify-center">
+        <div className="relative mr-1.5">
+          <span
+            className={`${
+              step === 2 &&
+              "delay-[2s] duration-300 translate-y-1/2 opacity-0 scale-90 blur-xl"
+            }`}
+          >
+            Seeking
+          </span>
+          <span
+            className={`absolute right-0 ${
+              step === 2
+                ? "delay-[2.15s] duration-300 translate-y-0 opacity-100 scale-100 blur-none"
+                : "-translate-y-1/2 opacity-0 scale-90 blur-xl"
+            }`}
+          >
+            Found
+          </span>
+        </div>{" "}
+        the Root Cause
+        <div className="relative">
+          <span
+            className={`${
+              step === 2 &&
+              "delay-[2s] duration-300 -translate-y-1/2 opacity-0 scale-90 blur-xl"
+            }`}
+          >
+            ...
+          </span>
+          <span
+            className={`absolute inset-0 ${
+              step === 2
+                ? "delay-[2.15s] duration-300 translate-y-0 opacity-100 scale-100 blur-none"
+                : "translate-y-1/2 opacity-0 scale-90 blur-xl"
+            }`}
+          >
+            !
+          </span>
+        </div>
       </div>
       {/* 🛑 Root Cause */}
       <div

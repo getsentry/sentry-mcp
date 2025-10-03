@@ -54,8 +54,8 @@
   --darkorange: #df5128;
   --lightorange: #f48350;
 
-  --darkpink: #fe5999;
   --ligtpink: #ffc3da;
+  --darkpink: #fe5999;
 
   --darkerpink: #e1567d;
   --brightpink: #f758b6;
@@ -276,6 +276,11 @@
   background-position: -20px -20px;
   background-image: linear-gradient(to right, #fff2 1px, transparent 1px),
     linear-gradient(to bottom, #fff2 1px, transparent 1px);
+}
+
+.bg-dots {
+  background-image: radial-gradient(#fff4 1px, transparent 0);
+  background-size: 40px 40px;
 }
 
 .animate-issue-context {
