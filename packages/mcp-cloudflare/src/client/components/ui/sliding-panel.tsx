@@ -37,7 +37,7 @@ export function SlidingPanel({
           className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity ${
             isOpen
               ? "opacity-100 pointer-events-auto duration-200"
-              : "opacity-0 pointer-events-none duration-300"
+              : "opacity-0 select-none pointer-events-none duration-300"
           }`}
           onClick={isOpen ? onClose : undefined}
           onKeyDown={
