@@ -105,17 +105,11 @@ export const ChatUI = ({
       )}
 
       {/* Mobile header with close and logout buttons */}
-      <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
+      <div className="xl:hidden flex items-center justify-end p-4 border-b border-slate-800 flex-shrink-0">
         {showControls && (
-          <>
-            <Button type="button" onClick={onClose} size="icon" title="Close">
-              <X className="h-4 w-4" />
-            </Button>
-
-            <Button type="button" onClick={onLogout} size="icon" title="Logout">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </>
+          <Button type="button" onClick={onClose} size="icon" title="Close">
+            <X className="h-4 w-4" />
+          </Button>
         )}
       </div>
 
@@ -138,7 +132,7 @@ export const ChatUI = ({
       </ScrollToBottom>
 
       {/* Chat Input - Always pinned at bottom */}
-      <div className="py-4 px-6 bottom-0 left-0 right-0 absolute bg-slate-950/95 h-34 overflow-hidden z-10">
+      <div className="py-4 px-6 bottom-0 left-0 right-0 absolute bg-background/95 h-34 overflow-hidden z-10">
         {/* Sample Prompt Buttons - Always visible above input */}
         {onSendPrompt && (
           <div className="mb-4 flex flex-wrap gap-2 justify-center">
