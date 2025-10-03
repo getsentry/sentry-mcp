@@ -27,7 +27,6 @@
     "@cloudflare/vite-plugin": "catalog:",
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
-    "@sentry/mcp-server": "workspace:*",
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "@sentry/vite-plugin": "catalog:",
@@ -44,6 +43,8 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@sentry/core": "catalog:",
+    "@sentry/mcp-server": "workspace:*",
     "@ai-sdk/openai": "catalog:",
     "@ai-sdk/react": "catalog:",
     "@cloudflare/workers-oauth-provider": "catalog:",
