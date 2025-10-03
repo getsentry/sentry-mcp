@@ -61,15 +61,17 @@ export function SlidingPanel({
       {/* Desktop: placed inside the hero animation container */}
       <div
         className={`${
-          isOpen ? "xl:flex flex-col" : "hidden"
-        } absolute top-0 right-0 z-50 max-xl:hidden h-full w-[calc(50%-1rem)] border border-white/10 backdrop-blur-3xl bg-background rounded-3xl transition-opacity duration-300 overflow-hidden ${className}`}
+          isOpen
+            ? "xl:flex flex-col blur-none opacity-100 scale-100"
+            : "opacity-0 pointer-events-none blur-xl scale-90"
+        } absolute top-0 right-0 z-50 max-xl:hidden h-full w-[calc(50%-1rem)] border border-white/10 backdrop-blur-3xl bg-background rounded-3xl transition-all duration-300 overflow-hidden ${className}`}
       >
         <Button
           type="button"
           onClick={onClose}
           size="icon"
           title="Close"
-          className="z-50 right-4 top-4 absolute rounded-xl"
+          className="z-50 right-4 top-4 absolute rounded-xl hover:scale-110 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] active:scale-90 active:duration-75 hover:bg-[#201633] hover:text-violet-300 duration-300 transition-all"
         >
           <X className="h-4 w-4" />
         </Button>
