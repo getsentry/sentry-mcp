@@ -46,7 +46,7 @@ export default function Seer({ step }: { step: number }) {
           <span
             className={`${
               step === 2 &&
-              "delay-[2s] duration-300 translate-y-1/2 opacity-0 scale-90 blur-xl"
+              "delay-[1.5s] duration-300 translate-y-1/2 opacity-0 scale-90 blur-xl"
             }`}
           >
             Seeking
@@ -54,7 +54,7 @@ export default function Seer({ step }: { step: number }) {
           <span
             className={`absolute right-0 ${
               step === 2
-                ? "delay-[2.15s] duration-300 translate-y-0 opacity-100 scale-100 blur-none"
+                ? "delay-[1.65s] duration-300 translate-y-0 opacity-100 scale-100 blur-none"
                 : "-translate-y-1/2 opacity-0 scale-90 blur-xl"
             }`}
           >
@@ -66,7 +66,7 @@ export default function Seer({ step }: { step: number }) {
           <span
             className={`${
               step === 2 &&
-              "delay-[2s] duration-300 -translate-y-1/2 opacity-0 scale-90 blur-xl"
+              "delay-[1.5s] duration-300 -translate-y-1/2 opacity-0 scale-90 blur-xl"
             }`}
           >
             ...
@@ -74,7 +74,7 @@ export default function Seer({ step }: { step: number }) {
           <span
             className={`absolute inset-0 ${
               step === 2
-                ? "delay-[2.15s] duration-300 translate-y-0 opacity-100 scale-100 blur-none"
+                ? "delay-[1.65s] duration-300 translate-y-0 opacity-100 scale-100 blur-none"
                 : "translate-y-1/2 opacity-0 scale-90 blur-xl"
             }`}
           >

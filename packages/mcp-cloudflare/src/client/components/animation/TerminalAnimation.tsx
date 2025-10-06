@@ -43,11 +43,11 @@ export default function TerminalAnimation({
 
   const steps: Step[] = [
     {
-      label: "You Copy Paste the Issue URL",
+      label: "Copypaste Sentry Issue URL",
       description: "Copy the Sentry issue url directly from your browser",
       startTime: 31.6,
       startSpeed: 5,
-      autoContinueMs: 1950,
+      autoContinueMs: 2300,
       autoPlay: false,
       lines: 5,
     },
@@ -57,7 +57,7 @@ export default function TerminalAnimation({
       description: "MCP performs a toolcall to fetch issue details",
       startTime: 40,
       startSpeed: 3,
-      autoContinueMs: 1500,
+      autoContinueMs: 1750,
       autoPlay: false,
       lines: 10,
     },
@@ -67,7 +67,7 @@ export default function TerminalAnimation({
       description:
         "A toolcall to Seer to analyze the stack trace and pinpoint the root cause",
       startTime: 46,
-      startSpeed: 1,
+      startSpeed: 2,
       autoContinueMs: 2000,
       autoPlay: false,
       lines: 9,
@@ -87,8 +87,8 @@ export default function TerminalAnimation({
       label: "Applying Edits",
       description: "LLM adds the suggested solution to the codebase",
       startTime: 146,
-      startSpeed: 20,
-      autoContinueMs: 1000,
+      startSpeed: 15,
+      autoContinueMs: 10,
       autoPlay: false,
       lines: 8,
     },

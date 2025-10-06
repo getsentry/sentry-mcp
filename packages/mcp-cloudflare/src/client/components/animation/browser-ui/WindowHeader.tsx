@@ -15,7 +15,13 @@ import {
   Share,
 } from "lucide-react";
 
-export default function WindowHeader({ ide = false }: { ide?: boolean }) {
+export default function WindowHeader({
+  step,
+  ide = false,
+}: {
+  step?: number;
+  ide?: boolean;
+}) {
   return (
     <div className={`flex items-center gap-2 p-2 pr-2 pl-4 ${ide && "pr-1"}`}>
       <div className="size-3 flex-shrink-0 rounded-full border border-white/20 bg-pink-300/50" />
@@ -42,7 +48,14 @@ export default function WindowHeader({ ide = false }: { ide?: boolean }) {
       >
         {!ide && <Lock className="size-4 flex-shrink-0" />}
         {ide && <Search className="size-4 flex-shrink-0" />}
-        <div className="truncate">
+        <div className="truncate relative">
+          <div
+            className={`absolute w-full h-[1lh] bg-pink-500 -z-10 ${
+              step === 0
+                ? "animate-select opacity-100"
+                : "opacity-0 duration-300"
+            }`}
+          />
           {ide
             ? "Search"
             : "https://sentry.sentry.io/issues/6811213890/?environment=cloudflare&project=4509062593708032&query=is%3Aunresolved&referrer=issue-stream&seerDrawer=true"}
