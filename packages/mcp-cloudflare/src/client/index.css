@@ -182,7 +182,7 @@
 @keyframes keycapPulse {
   0% {
     opacity: 0;
-    transform: translateY(4px) scale(0.98);
+    transform: translateY(0.75rem) scale(0.98);
   }
 
   11% {
@@ -199,7 +199,7 @@
   /* hold 300ms */
   100% {
     opacity: 0;
-    transform: translateY(-2px) scale(0.985);
+    transform: translateY(-1rem) scale(0.985);
   }
 
   /* fade-out (~120ms) */
@@ -212,31 +212,34 @@
 
 @keyframes keyPress {
   0% {
-    transform: translateY(0.5rem) scale(1);
+    filter: brightness(0.85);
+    transform: translateY(0rem) scale(1);
   }
 
   30% {
-    filter: brightness(0.75);
+    filter: brightness(1.25);
     transform: translateY(2.5rem) scale(0.95);
   }
 
   100% {
+    filter: brightness(0.95);
     transform: translateY(0.5rem) scale(1);
   }
 }
 
 @keyframes metaKeyPress {
   0% {
-    transform: translateY(0.5rem) scale(1);
+    filter: brightness(0.95);
+    transform: translateY(0rem) scale(1);
   }
 
   30% {
-    filter: brightness(0.95);
-    transform: translateY(2rem) scale(0.95);
+    filter: brightness(1.25);
+    transform: translateY(2.5rem) scale(0.95);
   }
 
   100% {
-    filter: brightness(0.8);
+    filter: brightness(1.1);
     transform: translateY(2rem) scale(0.95);
   }
 }
