@@ -8,7 +8,7 @@ import {
 import { SentryIcon } from "../../ui/icons/sentry";
 import Copy from "./Copy";
 import IssueDetails from "./IssueDetails";
-import Seer from "./Seer";
+import Seer from "./👀";
 import WindowHeader from "./WindowHeader";
 
 export default function BrowserWindow({ step }: { step: number }) {
@@ -26,7 +26,7 @@ export default function BrowserWindow({ step }: { step: number }) {
       id="window"
     >
       <Copy step={step} />
-      <WindowHeader />
+      <WindowHeader step={step} />
       <div className={`flex h-full w-full ${step > 1 && "overflow-hidden"}`}>
         <div className="flex flex-col gap-3 px-4 pt-2 overflow-clip max-h-full">
           <div className="size-12 flex-shrink-0 rounded-xl border border-white/20 bg-gradient-to-tr from-[#362e5a] to-[#885091] grid place-content-center text-white">
