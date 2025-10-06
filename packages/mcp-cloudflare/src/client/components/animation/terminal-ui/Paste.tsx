@@ -1,6 +1,6 @@
 export default function Paste({ step }: { step?: number }) {
   return (
-    <div className="-translate-1/2 absolute top-1/2 left-1/2 z-50 hidden items-center gap-3 md:flex">
+    <div className="-translate-1/2 absolute top-1/2 left-1/2 z-50 hidden items-center gap-3 md:flex pointer-events-none">
       <div
         className={`${
           step === 0 && "animate-keycap"
