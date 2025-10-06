@@ -1,6 +1,6 @@
 export default function Copy({ step }: { step?: number }) {
   return (
-    <div className="-translate-1/2 absolute top-1/2 left-1/2 z-10 flex items-center gap-3">
+    <div className="-translate-1/2 absolute top-1/2 left-1/2 z-10 flex items-center gap-3 pointer-events-none">
       <div
         className={`${
           step === 0 && "animate-keycap"

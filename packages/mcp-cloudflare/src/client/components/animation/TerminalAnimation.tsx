@@ -78,17 +78,17 @@ export default function TerminalAnimation({
       description: "LLM analyzes the context and comes up with a solution",
       startTime: 48.5,
       startSpeed: 30,
-      autoContinueMs: 10,
+      autoContinueMs: 50,
       autoPlay: false,
-      lines: 9,
+      lines: 8,
     },
     {
       type: "[LLM]",
       label: "Applying Edits",
       description: "LLM adds the suggested solution to the codebase",
       startTime: 146,
-      startSpeed: 15,
-      autoContinueMs: 10,
+      startSpeed: 20,
+      autoContinueMs: 50,
       autoPlay: false,
       lines: 8,
     },
@@ -97,10 +97,10 @@ export default function TerminalAnimation({
       description: "Automaticall running tests to verify the solution works",
       startTime: 242,
       startSpeed: 20,
-      autoContinueMs: 100,
+      autoContinueMs: 50,
       autoPlay: false,
       // 32
-      lines: 8,
+      lines: 7,
     },
   ];
 
@@ -121,7 +121,7 @@ export default function TerminalAnimation({
         "demo.cast",
         cliDemoRef.current,
         {
-          rows: lines || 7,
+          rows: lines || 10,
           fit: window.innerWidth > 1024 ? "none" : "none",
           theme: "dracula",
           controls: false,
@@ -173,7 +173,7 @@ export default function TerminalAnimation({
     [],
   );
 
-  function activateStep(
+  async function activateStep(
     stepIndex: number,
     source: ActivationSource = "manual",
   ) {
@@ -229,10 +229,11 @@ export default function TerminalAnimation({
       }
       playerRef.current.dispose?.();
       setSpeed(step.startSpeed);
-      mountPlayer(
+      await mountPlayer(
         step.startTime,
         step.startSpeed,
-        steps[stepIndex + 1]?.lines || 9,
+        // current step lines on manual step click
+        step.lines,
         steps[stepIndex + 1]?.startTime,
         true,
       );
@@ -261,7 +262,8 @@ export default function TerminalAnimation({
         mountPlayer(
           step.startTime,
           step.startSpeed,
-          steps[stepIndex + 1]?.lines || 9,
+          // next step lines because currentIndex starts at -1 so markers are 1 behind
+          steps[stepIndex + 1]?.lines || 7,
           steps[stepIndex + 1]?.startTime,
         );
         playerRef.current?.play?.();
