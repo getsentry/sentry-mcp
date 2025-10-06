@@ -13,8 +13,9 @@ export default function Paste({ step }: { step?: number }) {
           <img
             className={`${
               step === 0 && "animate-keycap-inner-meta"
-            } bg-clip-content`}
+            } bg-clip-content select-none`}
             src="/keycap-⌘.png"
+            draggable={false}
             alt="keycap-⌘"
             style={{ ["--delay" as any]: "2.05s" }}
           />
@@ -33,8 +34,9 @@ export default function Paste({ step }: { step?: number }) {
           <img
             className={`${
               step === 0 && "animate-keycap-inner"
-            } bg-clip-content`}
+            } bg-clip-content select-none`}
             src="/keycap-v.png"
+            draggable={false}
             alt="keycap-v"
             style={{ ["--delay" as any]: "2.30s" }}
           />
