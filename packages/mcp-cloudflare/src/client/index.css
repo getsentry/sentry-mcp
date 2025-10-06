@@ -191,7 +191,7 @@
   }
 
   /* fade-in (~120ms of 540ms) */
-  78% {
+  88% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
@@ -206,7 +206,62 @@
 }
 
 .animate-keycap {
-  animation: keycapPulse var(--dur, 750ms) ease-out both;
+  animation: keycapPulse var(--dur, 950ms) ease-out both;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes keyPress {
+  0% {
+    transform: translateY(0.5rem) scale(1);
+  }
+
+  30% {
+    filter: brightness(0.75);
+    transform: translateY(2.5rem) scale(0.95);
+  }
+
+  100% {
+    transform: translateY(0.5rem) scale(1);
+  }
+}
+
+@keyframes metaKeyPress {
+  0% {
+    transform: translateY(0.5rem) scale(1);
+  }
+
+  30% {
+    filter: brightness(0.95);
+    transform: translateY(2rem) scale(0.95);
+  }
+
+  100% {
+    filter: brightness(0.8);
+    transform: translateY(2rem) scale(0.95);
+  }
+}
+
+.animate-keycap-inner {
+  animation: keyPress var(--dur, 500ms) ease both;
+  animation-delay: var(--delay, 0s);
+}
+
+.animate-keycap-inner-meta {
+  animation: metaKeyPress var(--dur, 500ms) ease both;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes urlSelect {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+.animate-select {
+  animation: urlSelect 500ms steps(20) both;
   animation-delay: var(--delay, 0s);
 }
 
