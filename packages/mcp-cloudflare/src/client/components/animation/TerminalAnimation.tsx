@@ -47,7 +47,7 @@ export default function TerminalAnimation({
       description: "Copy the Sentry issue url directly from your browser",
       startTime: 31.6,
       startSpeed: 5,
-      autoContinueMs: 2300,
+      autoContinueMs: 2500,
       autoPlay: false,
       lines: 5,
     },
