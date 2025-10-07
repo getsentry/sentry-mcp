@@ -11,7 +11,7 @@ export default function DiffBlock({
     <pre
       className={`${
         step === 4 ? "opacity-100 duration-300" : "opacity-0"
-      } absolute inset-0 top-10 z-50 h-full bg-neutral-900 text-sm`}
+      } absolute inset-0 top-10 z-50 h-full bg-[#201633] ![color:unset] text-sm`}
       style={{
         transitionDelay: step === 4 ? `${delay}s` : "0s",
       }}
@@ -32,7 +32,7 @@ export default function DiffBlock({
             }}`}
             key={line}
             style={{
-              transitionDelay: step === 4 ? `${delay + 0.05 * idx}s` : "0s",
+              transitionDelay: step === 4 ? `${delay + 0.025 * idx}s` : "0s",
             }}
           >
             {line}
