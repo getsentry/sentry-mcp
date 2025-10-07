@@ -24,14 +24,15 @@ export default function Seer({ step }: { step: number }) {
       </svg>
       {/* ⚠️ Seer */}
       <div
-        className="relative z-10 mx-auto aspect-square w-36 overflow-hidden bg-gradient-to-br from-pink-400 to-pink-600"
+        className="relative z-10 mx-auto aspect-square w-36 overflow-hidden bg-gradient-to-b from-pink-600 to-pink-400"
         style={{
           clipPath: `url(#${id})`,
         }}
       >
+        <div className="bg-pink-300 [mask-image:linear-gradient(to_top,red,transparent)] absolute inset-0 [filter:url(#nnnoise-darken-fine)]" />
         {/* eye mask */}
         <div className="-translate-x-1/2 absolute left-1/2 mt-16 w-full shadow-2xl shadow-amber-500 [mask-image:radial-gradient(ellipse_100%_200%_at_top,red_50%,transparent_50%)]">
-          <div className="bg-amber-200 [mask-image:radial-gradient(ellipse_at_bottom,red_50%,transparent_50%)]">
+          <div className="bg-amber-100 [mask-image:radial-gradient(ellipse_at_bottom,red_50%,transparent_50%)]">
             {/* 👁️ Eye of the Seer */}
             <div
               className={`mx-auto h-8 w-8 translate-y-1/2 rounded-full bg-blue-700 delay-300 duration-1000 ${
@@ -41,8 +42,8 @@ export default function Seer({ step }: { step: number }) {
           </div>
         </div>
       </div>
-      <div className="mt-6 mb-12 text-lg text-violet-300 flex items-center justify-center">
-        <div className="relative mr-1.5">
+      <div className="mt-6 mb-12 text-4xl font-semibold font-sans text-white flex items-center justify-center">
+        <div className="relative mr-2 text-violet-300 font-bold">
           <span
             className={`${
               step === 2 &&
