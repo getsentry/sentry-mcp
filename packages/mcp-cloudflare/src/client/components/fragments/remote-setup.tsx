@@ -5,6 +5,7 @@ import { Prose } from "../ui/prose";
 import { NPM_REMOTE_NAME } from "@/constants";
 import { Button } from "../ui/button";
 import { Heading } from "../ui/base";
+import InstallTabs from "./install-tabs";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -79,6 +80,50 @@ export default function RemoteSetup() {
         </ul>
       </Prose>
       <Heading as="h3">Integration Guides</Heading>
+      <InstallTabs>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            const deepLink =
+              "cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9";
+            window.location.href = deepLink;
+          }}
+          className="mt-2 mb-2 bg-violet-300 text-black hover:bg-violet-400 hover:text-black"
+        >
+          Install in Cursor
+        </Button>
+        <ol>
+          <li>
+            Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
+            Settings.
+          </li>
+          <li>
+            Select <strong>Tools and Integrations</strong>.
+          </li>
+          <li>
+            Select <strong>New MCP Server</strong>.
+          </li>
+          <li>
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  mcpServers: {
+                    sentry: sentryMCPConfig,
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+          <li>
+            Optional: To use the service with <code>cursor-agent</code>:
+            <CodeSnippet noMargin snippet={`cursor-agent mcp login sentry`} />
+          </li>
+        </ol>
+      </InstallTabs>
       <Accordion type="single" collapsible>
         <SetupGuide id="cursor" title="Cursor">
           <Button

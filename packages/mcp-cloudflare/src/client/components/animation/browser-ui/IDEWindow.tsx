@@ -31,7 +31,7 @@ export default function IDEWindow({ step }: { step: number }) {
           <div
             className={`${
               step === 4
-                ? "bg-black/20 opacity-100 delay-2000 translate-y-0"
+                ? "bg-black/20 opacity-100 delay-1250 translate-y-0"
                 : "opacity-0 translate-y-2"
             } flex items-center justify-between gap-2 truncate duration-300 border-white/10 border-r px-4 py-2`}
           >
@@ -42,7 +42,7 @@ export default function IDEWindow({ step }: { step: number }) {
           <div
             className={`${
               step === 4
-                ? "bg-black/20 opacity-100 delay-3000 translate-y-0"
+                ? "bg-black/20 opacity-100 delay-2000 translate-y-0"
                 : "opacity-0 translate-y-2"
             } flex items-center justify-between gap-2 truncate duration-300 border-white/10 border-r px-4 py-2`}
           >
@@ -51,8 +51,8 @@ export default function IDEWindow({ step }: { step: number }) {
           </div>
         </div>
         <DiffBlock diff={diff3} step={step} delay={0.1} />
-        <DiffBlock diff={diff2} step={step} delay={2} />
-        <DiffBlock diff={diff1} step={step} delay={3} />
+        <DiffBlock diff={diff2} step={step} delay={1.25} />
+        <DiffBlock diff={diff1} step={step} delay={2.0} />
       </div>
     </div>
   );
