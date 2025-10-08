@@ -1,50 +1,224 @@
+"use client";
+
+import * as React from "react";
 import { Grip } from "lucide-react";
 import { Prose } from "../ui/prose";
 
+export type TabProps = {
+  id: string;
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+};
+export function Tab(_props: TabProps) {
+  return null;
+}
+
 export default function InstallTabs({
   children,
+  initialIndex = 0,
+  current,
+  onChange,
 }: {
   children: React.ReactNode;
+  initialIndex?: number;
+  current?: number;
+  onChange?: (next: number) => void;
 }) {
+  const items = React.Children.toArray(children).filter(
+    React.isValidElement,
+  ) as React.ReactElement<TabProps>[];
+
+  const [internal, setInternal] = React.useState(initialIndex);
+  const active = typeof current === "number" ? current : internal;
+
+  const setActive = React.useCallback(
+    (next: number) => {
+      if (next < 0 || next >= items.length) return;
+      if (typeof current === "number") onChange?.(next);
+      else {
+        setInternal(next);
+        onChange?.(next);
+      }
+    },
+    [current, items.length, onChange],
+  );
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!items.length) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((active + 1) % items.length);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((active - 1 + items.length) % items.length);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActive(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setActive(items.length - 1);
+    }
+  };
+
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const panelRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+
+  React.useLayoutEffect(() => {
+    const c = containerRef.current;
+    const p = panelRefs.current[active];
+    if (c && p) c.style.height = `${p.offsetHeight}px`;
+  }, [active]);
+
+  React.useEffect(() => {
+    const c = containerRef.current;
+    const next = panelRefs.current[active];
+    if (!c || !next) return;
+    const from = c.offsetHeight;
+    const to = next.offsetHeight;
+    c.style.height = `${from}px`;
+    c.offsetHeight;
+    c.style.transition = "height 300ms cubic-bezier(0.2, 0.8, 0.2, 1)";
+    c.style.height = `${to}px`;
+    const done = () => {
+      c.style.transition = "";
+    };
+    c.addEventListener("transitionend", done, { once: true });
+  }, [active]);
+
+  React.useEffect(() => {
+    const c = containerRef.current;
+    const p = panelRefs.current[active];
+    if (!c || !p) return;
+    const ro = new ResizeObserver(() => {
+      c.style.height = `${p.offsetHeight}px`;
+    });
+    ro.observe(p);
+    return () => ro.disconnect();
+  }, [active]);
+
   return (
-    // <div className="mb-6 flex w-full items-center rounded-2xl bg-gradient-to-r from-purple-600/30 via-pink-600/30 to-red-600/30 p-1">
-    <div className="relative bg-[#201633] rounded-2xl mb-6">
-      <div className="flex">
-        <div className="flex max-w-full">
-          {/* <div className="absolute inset-x-1 bottom-1 rounded-xl h-17 w-full bg-[#201633]" /> */}
-          {Array.from([
-            "Cursor",
-            "Claude Code",
-            "Windsurf",
-            "Visual Studio Code",
-            "Warp",
-            "Zed",
-          ]).map((name, i) => (
-            <div key={name} className="relative group/tab cursor-pointer">
-              {i > 0 && (
-                <>
-                  <div className="group-hover/tab:scale-100 group-hover/tab:duration-200 duration-0 scale-0 absolute left-1 -translate-x-full -top-2 size-3 bg-[#201633] origin-bottom-right" />
-                  <div className="group-hover/tab:scale-100 group-hover/tab:duration-200 duration-0 scale-0 absolute left-0 -translate-x-full top-0 -translate-y-full size-4 rounded-full bg-[#392f59] origin-bottom-right" />
-                </>
-              )}
-              <div className="absolute inset-[0.5px] bottom-4 bg-orange-400 bg-dots rounded-xl z-0" />
-              <div className="absolute inset-[0.5px] bottom-6 bg-pink-600 bg-grid [--size:10px] rounded-xl z-0" />
-              <div className="bg-[#201633] relative group-hover/tab:-translate-y-6 rounded-xl py-4 px-6 duration-200 group-hover/tab:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] perspective-distant group-hover/tab:-rotate-x-45 text-nowrap">
-                {name}
-              </div>
-              {i < 5 && (
-                <>
-                  <div className="group-hover/tab:scale-100 group-hover/tab:duration-200 duration-0 scale-0 absolute right-1 translate-x-full -top-2 size-3 bg-[#201633] origin-bottom-left" />
-                  <div className="group-hover/tab:scale-100 group-hover/tab:duration-200 duration-0 scale-0 absolute right-0 translate-x-full top-0 -translate-y-full size-4 rounded-full bg-[#392f59] origin-bottom-left" />
-                </>
-              )}
-            </div>
-          ))}
+    <div className="relative bg-[#201633] mb-6 mt-12 rounded-2xl">
+      <div
+        className="flex"
+        role="tablist"
+        aria-orientation="horizontal"
+        onKeyDown={onKeyDown}
+      >
+        <div className="flex max-w-full overflow-x-auto hide-scrollbar overflow-y-visible pt-8 pb-4 -mb-4 -mt-8 relative">
+          {items.map((el, i) => {
+            const { id, title, icon } = el.props;
+            const selected = i === active;
+            const lastIdx = items.length - 1;
+            const tabId = `${id}-tab`;
+            const panelId = `${id}-panel`;
+            return (
+              <button
+                type="button"
+                key={id}
+                id={tabId}
+                role="tab"
+                aria-selected={selected}
+                aria-controls={panelId}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setActive(i)}
+                className="relative group/tab cursor-pointer"
+              >
+                {i > 0 && !selected && (
+                  <>
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-1 -translate-x-full -top-2 size-3 bg-[#201633] origin-bottom-right" />
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-0 -translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-[#392f59] origin-bottom-right" />
+                  </>
+                )}
+                <div className="absolute inset-[0.5px] bottom-3 bg-orange-300 bg-[repeating-linear-gradient(-45deg,#f97316,#f97316_12px,#f9731600_12px,#f9731600_24px)] rounded-xl z-0 group-active/tab:duration-75 group-active/tab:opacity-0 duration-300 group-active/tab:translate-y-2 group-active/tab:scale-90" />
+                <div
+                  className={`absolute inset-[0.5px] bottom-1 duration-300 bg-pink-600 bg-grid [--size:10px] rounded-xl z-0 group-active/tab:duration-75 group-active/tab:opacity-50 group-active/tab:scale-x-95 group-active/tab:translate-y-0.5 group-active/tab:scale-y-115 group-active/tab:bg-violet-600 group-active/tab:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] ${
+                    selected
+                      ? ""
+                      : "group-hover/tab:-translate-y-4 group-hover/tab:duration-400 group-hover/tab:ease-[cubic-bezier(0.175,0.885,0.32,1.275)]"
+                  }`}
+                />
+                <div
+                  className={`bg-[#201633] relative rounded-xl py-4 pl-4 pr-6 duration-300 perspective-distant text-nowrap flex items-center gap-2 group-active/tab:duration-100 group-active/tab:rotate-x-5 group-active/tab:translate-y-1.5 group-active/tab:text-violet-500 ${
+                    selected
+                      ? "text-violet-300 underline"
+                      : "group-hover/tab:text-violet-300 group-hover/tab:underline group-hover/tab:-rotate-x-45 group-hover/tab:-translate-y-6.5 group-hover/tab:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] group-active/tab:scale-[0.95]"
+                  }`}
+                >
+                  {icon ? (
+                    <span
+                      className="size-4 grid place-items-center"
+                      aria-hidden="true"
+                    >
+                      {icon}
+                    </span>
+                  ) : (
+                    <svg
+                      id="Ebene_1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      version="1.1"
+                      className="size-4"
+                      viewBox="0 0 466.73 532.09"
+                      aria-hidden="true"
+                    >
+                      <title>{title}</title>
+                      <path
+                        className="fill-current"
+                        d="M457.43,125.94L244.42,2.96c-6.84-3.95-15.28-3.95-22.12,0L9.3,125.94c-5.75,3.32-9.3,9.46-9.3,16.11v247.99c0,6.65,3.55,12.79,9.3,16.11l213.01,122.98c6.84,3.95,15.28,3.95,22.12,0l213.01-122.98c5.75,3.32,9.3,9.46,9.3,16.11v-247.99c0-6.65-3.55-12.79-9.3-16.11h-.01ZM444.05,151.99l-205.63,356.16c-1.39,2.4-5.06,1.42-5.06-1.36v-233.21c0-4.66-2.49-8.97-6.53-11.31L24.87,145.67c-2.4-1.39-1.42-5.06,1.36-5.06h411.26c5.84,0,9.49,6.33,6.57,11.39h-.01Z"
+                      />
+                    </svg>
+                  )}
+                  {title}
+                </div>
+                {i < lastIdx && !selected && (
+                  <>
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-1 translate-x-full -top-2 size-3 bg-[#201633] origin-bottom-left" />
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-0 translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-[#392f59] origin-bottom-left" />
+                  </>
+                )}
+              </button>
+            );
+          })}
         </div>
-        <Grip className="flex-shrink-0 ml-auto cursor-grab mr-4 mt-5 size-4 text-white/50 active:cursor-grabbing" />
+        <Grip className="flex-shrink-0 ml-auto cursor-grab mr-4 mt-5 size-4 text-white/50 active:cursor-grabbing pl-2 border-l border-white/10 w-8 bg-gradient-to-r from-transparent to-30% to-transparent" />
       </div>
-      <Prose className="p-4 pt-0">{children}</Prose>
+
+      <div
+        ref={containerRef}
+        className="relative transition-[height] delay-500 duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] overflow-hidden"
+      >
+        {items.map((el, i) => {
+          const { id, children: panelChildren } = el.props;
+          const panelId = `${id}-panel`;
+          const tabId = `${id}-tab`;
+          const selected = i === active;
+          const pos = i === active ? "current" : i < active ? "left" : "right";
+          return (
+            <div
+              key={id}
+              ref={(node) => {
+                panelRefs.current[i] = node;
+              }}
+              id={panelId}
+              role="tabpanel"
+              aria-labelledby={tabId}
+              aria-hidden={!selected}
+              data-pos={pos}
+              data-idx={i}
+              data-current={active}
+              className={`duration-400 ${
+                selected
+                  ? "visible opacity-100 blur-none"
+                  : `invisible opacity-0 blur-xl scale-x-110 scale-y-90 absolute top-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] ${
+                      i < active ? "-translate-x-1/4" : "translate-x-1/4"
+                    }`
+              }`}
+            >
+              <Prose className="p-4 pt-0">{panelChildren}</Prose>
+            </div>
+          );
+        })}
+      </div>
     </div>
-    // </div>
   );
 }
