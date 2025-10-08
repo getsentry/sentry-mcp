@@ -16,9 +16,11 @@ export default function StepsList({
   return (
     <div
       className={`flex flex-col justify-center group-hover/griditem:!transform-none gap-1 max-md:!transform-none duration-500 ${className}`}
-      style={{
-        transform: `translateY(${17.5 * (3.5 - globalIndex - 1)}%)`,
-      }}
+      style={
+        {
+          // transform: `translateY(${17.5 * (3.5 - globalIndex - 1)}%)`,
+        }
+      }
     >
       {/* 3.5 = 7/2 (center of 7 steps) */}
       {/* 17.5 is what each step is transitioned by below for stacking */}
