@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Grip } from "lucide-react";
 import { Prose } from "../ui/prose";
 
 export type TabProps = {
@@ -98,14 +97,15 @@ export default function InstallTabs({
   }, [active]);
 
   return (
-    <div className="relative bg-[#201633] mb-6 mt-12 rounded-2xl">
+    <div className="relative bg-[#201633] mb-6 mt-4 rounded-2xl">
       <div
         className="flex"
         role="tablist"
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
       >
-        <div className="flex max-w-full overflow-x-auto hide-scrollbar overflow-y-visible pt-8 pb-4 -mb-4 -mt-8 relative">
+        {/* [mask:radial-gradient(circle_at_var(--r)_var(--t),blue_var(--r),transparent_var(--r)),radial-gradient(circle_at_calc(100%-var(--r))_var(--t),green_var(--r),transparent_var(--r)),radial-gradient(circle_at_var(--2r)_var(--r),blue_var(--r),transparent_var(--r)),radial-gradient(circle_at_calc(100%-var(--2r))_var(--r),green_var(--r),transparent_var(--r)),linear-gradient(to_right,transparent,transparent_var(--r),red_var(--r),red_calc(100%-var(--r)),transparent_calc(100%-var(--r))),linear-gradient(to_bottom,transparent,transparent_var(--t),red_var(--t))] */}
+        <div className="flex max-w-full overflow-x-auto hide-scrollbar overflow-y-visible pt-8 pb-4 -mb-4 -mt-8 relative [--r:1rem] [--2r:2rem] [--t:3rem] [mask:radial-gradient(circle_at_calc(100%-var(--r))_var(--t),green_var(--r),transparent_var(--r)),radial-gradient(circle_at_var(--2r)_var(--r),blue_var(--r),transparent_var(--r)),radial-gradient(circle_at_calc(100%-var(--2r))_var(--r),green_var(--r),transparent_var(--r)),linear-gradient(to_right,red_calc(100%-var(--r)),transparent_calc(100%-var(--r))),linear-gradient(to_bottom,transparent,transparent_var(--t),red_var(--t))] pr-20">
           {items.map((el, i) => {
             const { id, title, icon } = el.props;
             const selected = i === active;
@@ -139,34 +139,20 @@ export default function InstallTabs({
                   }`}
                 />
                 <div
-                  className={`bg-[#201633] relative rounded-xl py-4 pl-4 pr-6 duration-300 perspective-distant text-nowrap flex items-center gap-2 group-active/tab:duration-100 group-active/tab:rotate-x-5 group-active/tab:translate-y-1.5 group-active/tab:text-violet-500 ${
+                  className={`bg-[#201633] relative rounded-xl py-4 pr-5 pl-6 duration-300 perspective-distant text-nowrap flex items-center overflow-hidden gap-2 group-active/tab:duration-100 group-active/tab:rotate-x-5 group-active/tab:translate-y-1.5 group-active/tab:text-violet-500 z-10 ${
                     selected
                       ? "text-violet-300 underline"
                       : "group-hover/tab:text-violet-300 group-hover/tab:underline group-hover/tab:-rotate-x-45 group-hover/tab:-translate-y-6.5 group-hover/tab:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] group-active/tab:scale-[0.95]"
                   }`}
                 >
-                  {icon ? (
+                  {/* <div className="absolute top-0 left-1/2 -translate-1/2 w-20 h-6 duration-300 group-hover/tab:bg-violet-400/50 rounded-[100%] blur-lg -z-10 pointer-events-none" /> */}
+                  {icon && (
                     <span
-                      className="size-4 grid place-items-center"
+                      className="size-4 -ml-2 grid place-items-center"
                       aria-hidden="true"
                     >
                       {icon}
                     </span>
-                  ) : (
-                    <svg
-                      id="Ebene_1"
-                      xmlns="http://www.w3.org/2000/svg"
-                      version="1.1"
-                      className="size-4"
-                      viewBox="0 0 466.73 532.09"
-                      aria-hidden="true"
-                    >
-                      <title>{title}</title>
-                      <path
-                        className="fill-current"
-                        d="M457.43,125.94L244.42,2.96c-6.84-3.95-15.28-3.95-22.12,0L9.3,125.94c-5.75,3.32-9.3,9.46-9.3,16.11v247.99c0,6.65,3.55,12.79,9.3,16.11l213.01,122.98c6.84,3.95,15.28,3.95,22.12,0l213.01-122.98c5.75,3.32,9.3,9.46,9.3,16.11v-247.99c0-6.65-3.55-12.79-9.3-16.11h-.01ZM444.05,151.99l-205.63,356.16c-1.39,2.4-5.06,1.42-5.06-1.36v-233.21c0-4.66-2.49-8.97-6.53-11.31L24.87,145.67c-2.4-1.39-1.42-5.06,1.36-5.06h411.26c5.84,0,9.49,6.33,6.57,11.39h-.01Z"
-                      />
-                    </svg>
                   )}
                   {title}
                 </div>
@@ -180,7 +166,7 @@ export default function InstallTabs({
             );
           })}
         </div>
-        <Grip className="flex-shrink-0 ml-auto cursor-grab mr-4 mt-5 size-4 text-white/50 active:cursor-grabbing pl-2 border-l border-white/10 w-8 bg-gradient-to-r from-transparent to-30% to-transparent" />
+        <div className="absolute top-0 right-0 h-14 w-20 bg-gradient-to-l from-[#201633] to-transparent rounded-tr-2xl z-10" />
       </div>
 
       <div
