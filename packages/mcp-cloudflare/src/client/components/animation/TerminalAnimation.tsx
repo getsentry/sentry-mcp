@@ -333,7 +333,7 @@ export default function TerminalAnimation({
           <div className="relative">
             <button
               type="button"
-              className={`border group/replay border-white/20 bg-white/15 hover:bg-white/30 active:bg-white/50 active:duration-75 duration-300 absolute -top-12 rounded-full px-3 py-1 left-0 sm:left-1/2 sm:-translate-x-1/2 z-50 cursor-pointer hover:duration-300 hover:delay-0 text-nowrap ${
+              className={`border group/replay border-white/20 bg-white/15 hover:bg-white/30 active:bg-white/50 active:duration-75 duration-300 absolute -top-14 rounded-full px-3 py-1 left-0 z-50 cursor-pointer hover:duration-300 hover:delay-0 text-nowrap ${
                 currentIndex === 5
                   ? "opacity-100 translate-y-0 delay-3000 duration-500 blur-none pointer-events-auto"
                   : "opacity-0 translate-y-1/2 pointer-events-none blur-xl"

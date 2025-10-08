@@ -1,11 +1,10 @@
 import { Accordion } from "../ui/accordion";
 import CodeSnippet from "../ui/code-snippet";
-import SetupGuide from "./setup-guide";
 import { Prose } from "../ui/prose";
 import { NPM_REMOTE_NAME } from "@/constants";
 import { Button } from "../ui/button";
 import { Heading } from "../ui/base";
-import InstallTabs from "./install-tabs";
+import InstallTabs, { Tab } from "./install-tabs";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -81,51 +80,7 @@ export default function RemoteSetup() {
       </Prose>
       <Heading as="h3">Integration Guides</Heading>
       <InstallTabs>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            const deepLink =
-              "cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9";
-            window.location.href = deepLink;
-          }}
-          className="mt-2 mb-2 bg-violet-300 text-black hover:bg-violet-400 hover:text-black"
-        >
-          Install in Cursor
-        </Button>
-        <ol>
-          <li>
-            Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
-            Settings.
-          </li>
-          <li>
-            Select <strong>Tools and Integrations</strong>.
-          </li>
-          <li>
-            Select <strong>New MCP Server</strong>.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: sentryMCPConfig,
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>
-            Optional: To use the service with <code>cursor-agent</code>:
-            <CodeSnippet noMargin snippet={`cursor-agent mcp login sentry`} />
-          </li>
-        </ol>
-      </InstallTabs>
-      <Accordion type="single" collapsible>
-        <SetupGuide id="cursor" title="Cursor">
+        <Tab id="cursor" title="Cursor">
           <Button
             variant="secondary"
             size="sm"
@@ -168,9 +123,9 @@ export default function RemoteSetup() {
               <CodeSnippet noMargin snippet={`cursor-agent mcp login sentry`} />
             </li>
           </ol>
-        </SetupGuide>
+        </Tab>
 
-        <SetupGuide id="claude-code" title="Claude Code">
+        <Tab id="claude-code" title="Claude Code">
           <ol>
             <li>Open your terminal to access the CLI.</li>
             <li>
@@ -197,15 +152,17 @@ export default function RemoteSetup() {
               .
             </small>
           </p>
-        </SetupGuide>
+        </Tab>
 
-        <SetupGuide id="codex-cli" title="Codex">
+        <Tab id="codex-cli" title="Codex">
           <ol>
             <li>Open your terminal to access the CLI.</li>
             <li>
               <CodeSnippet
                 noMargin
-                snippet={`codex mcp add sentry -- ${coreConfig.command} ${coreConfig.args.join(" ")}`}
+                snippet={`codex mcp add sentry -- ${
+                  coreConfig.command
+                } ${coreConfig.args.join(" ")}`}
               />
             </li>
             <li>
@@ -230,9 +187,9 @@ export default function RemoteSetup() {
               to your Sentry account.
             </li>
           </ol>
-        </SetupGuide>
+        </Tab>
 
-        <SetupGuide id="windsurf" title="Windsurf">
+        <Tab id="windsurf" title="Windsurf">
           <ol>
             <li>Open Windsurf Settings.</li>
             <li>
@@ -257,9 +214,9 @@ export default function RemoteSetup() {
               />
             </li>
           </ol>
-        </SetupGuide>
+        </Tab>
 
-        <SetupGuide id="vscode" title="Visual Studio Code">
+        <Tab id="vscode" title="Visual Studio Code">
           <Button
             variant="secondary"
             size="sm"
@@ -299,9 +256,9 @@ export default function RemoteSetup() {
           <p>
             <small>Note: MCP is supported in VSCode 1.99 and above.</small>
           </p>
-        </SetupGuide>
+        </Tab>
 
-        <SetupGuide id="warp" title="Warp">
+        <Tab id="warp" title="Warp">
           <ol>
             <li>
               Open{" "}
@@ -363,9 +320,9 @@ export default function RemoteSetup() {
               .
             </small>
           </p>
-        </SetupGuide>
+        </Tab>
 
-        <SetupGuide id="zed" title="Zed">
+        <Tab id="zed" title="Zed">
           <ol>
             <li>
               <strong>CMD + ,</strong> to open Zed settings.
@@ -374,8 +331,8 @@ export default function RemoteSetup() {
               <CodeSnippet noMargin snippet={zedInstructions} />
             </li>
           </ol>
-        </SetupGuide>
-      </Accordion>
+        </Tab>
+      </InstallTabs>
     </>
   );
 }
