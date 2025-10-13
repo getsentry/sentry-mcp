@@ -12,7 +12,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
   return (
     <header className="pl-4 container mx-auto w-full px-4 sm:px-8 sticky py-4 top-0 z-30 backdrop-blur-xl bg-gradient-to-b from-background to-1% to-background/80 border-b-[1px] border-white/10">
-      <div className="absolute inset-0 h-full w-full -z-10 pointer-events-none bg-gradient-to-r from-transparent to-black/40" />
+      <div className="absolute inset-0 h-full w-full -z-10 pointer-events-none bg-gradient-to-r from-transparent to-black/40 hidden md:block" />
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 flex-shrink-0">
           <SentryIcon className="h-8 w-8" />
