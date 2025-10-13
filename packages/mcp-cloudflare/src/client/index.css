@@ -160,6 +160,11 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    @apply scroll-smooth;
+    scroll-padding-top: 6rem;
+  }
+
   body {
     @apply bg-[#160f24] bg-gradient-to-b from-background to-background text-foreground;
     min-height: 100vh;
