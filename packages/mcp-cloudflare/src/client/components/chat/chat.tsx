@@ -4,7 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef, useCallback } from "react";
 import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogOut, PanelLeftOpen, } from "lucide-react";
 import type { ChatProps } from "./types";
 import { usePersistedChat } from "../../hooks/use-persisted-chat";
 import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
@@ -13,6 +13,7 @@ import { useStreamingSimulation } from "../../hooks/use-streaming-simulation";
 import { SlidingPanel } from "../ui/sliding-panel";
 import { isAuthError } from "../../utils/chat-error-handler";
 import { useEndpointMode } from "../../hooks/use-endpoint-mode";
+import { Button } from "../ui/button";
 
 // We don't need user info since we're using MCP tokens
 // The MCP server handles all Sentry authentication internally
@@ -362,6 +363,30 @@ Try asking me things like:
         <AuthForm authError={authError} onOAuthLogin={handleOAuthLogin} />
       </div>
 
+      {/* {showControls && ( */}
+      <div className="w-full [mask-image:linear-gradient(to_bottom,red,transparent)] pointer-events-none absolute top-0 left-0 h-20 z-10 backdrop-blur-md bg-gradient-to-b from-background to-background/20 xl:from-[#201633] xl:to-[#20163333]" />
+      <div className="flex items-center absolute right-6 top-4 gap-4 z-20">
+        {isAuthenticated && onLogout && (
+          <Button
+            variant="secondary"
+            onClick={onLogout}
+            className="cursor-pointer rounded-xl bg-[#201633] xl:bg-background"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="max-sm:sr-only">Logout</span>
+          </Button>
+        )}
+        <Button
+          type="button"
+          onClick={onClose}
+          size="icon"
+          title="Close"
+          className="rounded-xl hover:scale-110 active:scale-90 active:duration-75 hover:bg-[#201633] xl:hover:bg-background hover:text-violet-300 duration-300 transition-[color_ease,background-color_ease,scale_cubic-bezier(0.175,0.885,0.32,1.275)] pointer-events-auto"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </Button>
+      </div>
+
       {/* Chat UI with fade transition */}
       <div
         className={`absolute inset-0 transition-all duration-500 ease-in-out ${
@@ -389,8 +414,6 @@ Try asking me things like:
           onSubmit={handleFormSubmit}
           onStop={stop}
           onRetry={reload}
-          onClose={onClose}
-          onLogout={onLogout}
           onSlashCommand={handleSlashCommand}
           onSendPrompt={handleSendPrompt}
           onToggleEndpointMode={toggleEndpointMode}

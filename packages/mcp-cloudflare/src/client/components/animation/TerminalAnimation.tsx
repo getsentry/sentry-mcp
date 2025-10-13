@@ -7,8 +7,7 @@ import BrowserAnimation from "./BrowserAnimation";
 import Paste from "./terminal-ui/Paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
 import StepsList from "./terminal-ui/StepsList";
-import { BookText, MessageSquareText, RotateCcw } from "lucide-react";
-import CodeSnippet from "../ui/code-snippet";
+import { RotateCcw } from "lucide-react";
 import DataWire from "./DataWire";
 
 export type Step = {
@@ -24,11 +23,7 @@ export type Step = {
 
 type ActivationSource = "marker" | "manual";
 
-export default function TerminalAnimation({
-  onChatClick,
-}: {
-  onChatClick: () => void;
-}) {
+export default function TerminalAnimation() {
   const playerRef = useRef<any>(null);
   const cliDemoRef = useRef<HTMLDivElement | null>(null);
   const autoContinueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -301,8 +296,6 @@ export default function TerminalAnimation({
     };
   }, [mountPlayer]);
 
-  const endpoint = new URL("/mcp", window.location.href).href;
-
   return (
     <>
       {/* Terminal Side */}
@@ -352,34 +345,11 @@ export default function TerminalAnimation({
                 steps={steps}
               />
             </div>
-            {/* <h1 className="text-4xl font-bold font-sans my-5 flex items-center pointer-events-auto">
-            <ChevronRight className="-ml-2 size-8" />
-            fix the url
-            <span className="animate-cursor-blink">_</span>
-          </h1> */}
-            {/* <span className="pointer-events-auto">
-            That's all it could take to fix your bugs
-          </span> */}
-            <div className="flex flex-wrap gap-4 w-full pointer-events-auto">
-              <div className="hidden sm:block">
-                <CodeSnippet noMargin snippet={endpoint} />
-              </div>
-              <div className="pl-3 pr-3.5 py-2 rounded-xl flex items-center cursor-pointer bg-[#362e5a] hover:bg-[#665e8a] text-white transition font-bold font-sans border border-violet-300/25">
-                <BookText className="size-5 mr-2" />
-                Docs
-              </div>
-              <button
-                type="button"
-                onClick={() => onChatClick()}
-                className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-white text-background hover:bg-violet-300 transition font-bold font-sans border border-background"
-              >
-                <MessageSquareText className="size-5 mr-2" />
-                Live Demo
-              </button>
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Data wires */}
       <div
         className={`${
           currentIndex > 4 ? "opacity-0 scale-y-50" : "opacity-100 scale-y-100"
@@ -411,13 +381,6 @@ export default function TerminalAnimation({
       {/* Browser Window side */}
       <div className="relative max-xl:row-span-0 hidden col-span-2 xl:flex flex-col w-full">
         <BrowserAnimation globalIndex={currentIndex} />
-        {/* <div className="xl:mt-0 group/griditem overflow-clip">
-          <StepsList
-            onSelectAction={(i) => (i === 0 ? restart() : activateStep(i))}
-            globalIndex={Math.max(currentIndex, 0)}
-            steps={steps}
-          />
-        </div> */}
       </div>
     </>
   );
