@@ -2,9 +2,9 @@ export default function () {
   return (
     <>
       {/* <div className="bg-[radial-gradient(ellipse_110%_100%_at_top_right,transparent_80%,#8d5596_95%,transparent)] absolute inset-0 -z-10 h-screen w-full opacity-100 [filter:url(#nnnoise-darken)] pointer-events-none" /> */}
-      <div className="bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[100vh] w-[100vh] blur-3xl pointer-events-none -z-10" />
-      <div className="bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[150vh] w-[150vh] opacity-50 blur-3xl pointer-events-none -z-10" />
-      <div className="bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[200vh] w-[200vh] opacity-50 blur-3xl pointer-events-none -z-10" />
+      <div className="hidden md:block bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[100vh] w-[100vh] blur-3xl pointer-events-none -z-10" />
+      <div className="hidden md:block bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[150vh] w-[150vh] opacity-50 blur-3xl pointer-events-none -z-10" />
+      <div className="hidden md:block bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[200vh] w-[200vh] opacity-50 blur-3xl pointer-events-none -z-10" />
       {/* <div className="bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[100vh] w-[100vh] blur-3xl pointer-events-none -z-10 [filter:url(#nnnoise-darken)] [mask-image:radial-gradient(circle_at_center,red_50%,transparent_69%)]" />
       <div className="bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[150vh] w-[150vh] opacity-50 blur-3xl pointer-events-none -z-10 [filter:url(#nnnoise-darken)] [mask-image:radial-gradient(circle_at_center,red_50%,transparent_69%)]" />
       <div className="bg-[#201633] absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 rounded-full h-[200vh] w-[200vh] opacity-50 blur-3xl pointer-events-none -z-10 [filter:url(#nnnoise-darken)] [mask-image:radial-gradient(circle_at_center,red_50%,transparent_69%)]" /> */}
