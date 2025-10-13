@@ -96,7 +96,7 @@ export function ChatMessages({
   const errorIsAuth = error ? isAuthError(error) : false;
   const errorMessage = error ? getErrorMessage(error) : null;
   return (
-    <div className="mx-6 mt-6 space-y-4 flex-1">
+    <div className="mx-6 mt-6 space-y-4 pt-12 pb-16 flex-1">
       {/* Empty State when no messages */}
       {messages.length === 0 && (
         <div className="flex flex-col items-center justify-center h-full">
