@@ -118,14 +118,14 @@ export function ChatInput({
           placeholder="Ask me anything about your Sentry data..."
           disabled={isLoading}
           rows={1}
-          className="w-full p-4 pr-12 rounded bg-slate-800/50 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent disabled:opacity-50 resize-none overflow-hidden"
+          className="w-full p-4 pr-12 rounded duration-150 bg-slate-800/50 xl:bg-background/50 xl:rounded-xl text-white placeholder-slate-400 xl:placeholder-white/50 focus:outline-none focus:ring-2 focus:border-transparent focus:ring-violet-300 disabled:opacity-50"
         />
         <Button
           type={isLoading ? "button" : "submit"}
           variant="ghost"
           onClick={isLoading ? onStop : undefined}
           disabled={!isLoading && !input.trim()}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-colors"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 xl:text-white/50 xl:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-colors"
           title={isLoading ? "Stop generation" : "Send message"}
         >
           {isLoading ? (

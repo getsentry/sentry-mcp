@@ -7,9 +7,9 @@ export default function Paste({ step }: { step?: number }) {
         } relative size-fit opacity-0 translate-x-8 -translate-y-4`}
         style={{ ["--delay" as any]: "1.75s" }}
       >
-        {/* <div className="absolute bottom-0 left-1/2 h-[69%] w-[72.5%] -translate-x-[51%] rotate-x-50 rotate-z-27 rounded-3xl rounded-br-2xl bg-[#160f24] perspective-distant" /> */}
+        {/* <div className="absolute bottom-0 left-1/2 h-[69%] w-[72.5%] -translate-x-[51%] rotate-x-50 rotate-z-27 rounded-3xl rounded-br-2xl bg-[#160f24]" /> */}
         <div className="[mask-image:url('/keycap-⌘.png')] [mask-size:100%] bg-clip-content size-fit relative [filter:drop-shadow(inset_0_-1rem_1rem_rgba(0,0,0,1))] translate-y-2">
-          <div className="absolute bottom-0 left-1/2 h-[69%] w-[75%] -translate-x-[51%] rotate-x-50 rotate-z-27 rounded-3xl rounded-br-2xl rounded-tr-2xl bg-[#160f2488] perspective-distant -z-10" />
+          <div className="absolute bottom-0 left-1/2 h-[69%] w-[75%] -translate-x-[51%] rotate-x-50 rotate-z-27 rounded-3xl rounded-br-2xl rounded-tr-2xl bg-[#160f2488] -z-10" />
           <img
             className={`${
               step === 0 && "animate-keycap-inner-meta"
@@ -28,9 +28,9 @@ export default function Paste({ step }: { step?: number }) {
         } relative size-fit opacity-0 -translate-x-8 translate-y-4`}
         style={{ ["--delay" as any]: "2.00s" }}
       >
-        {/* <div className="absolute bottom-0 left-1/2 h-[69%] w-[72.5%] -translate-x-[51%] rotate-x-50 rotate-z-27 rounded-3xl rounded-br-2xl bg-[#160f24] perspective-distant" /> */}
+        {/* <div className="absolute bottom-0 left-1/2 h-[69%] w-[72.5%] -translate-x-[51%] rotate-x-50 rotate-z-27 rounded-3xl rounded-br-2xl bg-[#160f24]" /> */}
         <div className="[mask-image:url('/keycap-v.png')] [mask-size:100%] bg-clip-content size-fit relative [filter:drop-shadow(inset_0_-1rem_1rem_rgba(0,0,0,1))] translate-y-2">
-          <div className="absolute bottom-0 left-1/2 h-[69%] w-[72.5%] -translate-x-[51%] rotate-x-50 rotate-z-27 rounded-3xl rounded-br-2xl bg-[#160f2488] perspective-distant -z-10" />
+          <div className="absolute bottom-0 left-1/2 h-[69%] w-[72.5%] -translate-x-[51%] rotate-x-50 rotate-z-27 rounded-3xl rounded-br-2xl bg-[#160f2488] -z-10" />
           <img
             className={`${
               step === 0 && "animate-keycap-inner"

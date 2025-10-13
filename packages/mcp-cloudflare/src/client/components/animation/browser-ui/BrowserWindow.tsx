@@ -14,6 +14,7 @@ import WindowHeader from "./WindowHeader";
 export default function BrowserWindow({ step }: { step: number }) {
   return (
     <div
+      // rotate-x-60 -rotate-z-45 scale-75 perspective-distant
       className={`${
         step >= 3
           ? "pointer-events-none translate-x-32 scale-75 opacity-0 blur-xl"

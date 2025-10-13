@@ -1,20 +1,18 @@
 import type React from "react";
 import { SentryIcon } from "./icons/sentry";
-import { Github, LogOut } from "lucide-react";
+import { Github, Sparkles } from "lucide-react";
 import { Button } from "./button";
 import { Badge } from "./badge";
 
 interface HeaderProps {
-  isAuthenticated?: boolean;
-  onLogout?: () => void;
+  toggleChat?: (open: boolean) => void;
+  isChatOpen?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({
-  isAuthenticated,
-  onLogout,
-}) => {
+export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
   return (
-    <header className="mb-4 sm:mb-8 pl-4 sm:px-0 w-full">
+    <header className="pl-4 container mx-auto w-full px-4 sm:px-8 sticky py-4 top-0 z-30 backdrop-blur-xl bg-gradient-to-b from-background to-1% to-background/80 border-b-[1px] border-white/10">
+      <div className="absolute inset-0 h-full w-full -z-10 pointer-events-none bg-gradient-to-r from-transparent to-black/40" />
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 flex-shrink-0">
           <SentryIcon className="h-8 w-8" />
@@ -30,7 +28,13 @@ export const Header: React.FC<HeaderProps> = ({
             </Badge>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div
+          className={`flex items-center gap-4 duration-300 ${
+            isChatOpen
+              ? "-translate-x-[16rem] xl:-translate-x-[24rem] 2xl:-translate-x-[38rem]"
+              : ""
+          }`}
+        >
           <Button className="rounded-xl" variant="secondary" asChild>
             <a
               href="https://github.com/getsentry/sentry-mcp"
@@ -41,14 +45,14 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="max-sm:sr-only">GitHub</span>
             </a>
           </Button>
-          {isAuthenticated && onLogout && (
+          {toggleChat && isChatOpen !== undefined && (
             <Button
-              variant="secondary"
-              onClick={onLogout}
-              className="cursor-pointer rounded-xl"
+              type="button"
+              onClick={() => toggleChat(!isChatOpen)}
+              className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-white text-background hover:bg-violet-300 transition font-bold font-sans border border-background"
             >
-              <LogOut className="h-4 w-4" />
-              <span className="max-sm:sr-only">Logout</span>
+              <Sparkles className="size-5" />
+              Live Demo
             </Button>
           )}
         </div>
