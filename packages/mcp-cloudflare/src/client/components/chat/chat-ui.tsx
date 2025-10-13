@@ -43,8 +43,6 @@ interface ChatUIProps {
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onStop?: () => void;
   onRetry?: () => void;
-  onClose?: () => void;
-  onLogout?: () => void;
   onSlashCommand?: (command: string) => void;
   onSendPrompt?: (prompt: string) => void;
   onToggleEndpointMode?: () => void;
@@ -64,8 +62,6 @@ export const ChatUI = ({
   onSubmit,
   onStop,
   onRetry,
-  onClose,
-  onLogout,
   onSlashCommand,
   onSendPrompt,
   onToggleEndpointMode,
@@ -115,7 +111,7 @@ export const ChatUI = ({
 
       {/* Chat Messages - Scrollable area */}
       <ScrollToBottom
-        className="flex-1 mb-34 flex overflow-y-auto"
+        className="flex-1 mb-18 flex overflow-y-auto"
         scrollViewClassName="px-0"
         followButtonClassName="hidden"
         initialScrollBehavior="smooth"
@@ -132,14 +128,16 @@ export const ChatUI = ({
       </ScrollToBottom>
 
       {/* Chat Input - Always pinned at bottom */}
-      <div className="py-4 px-6 bottom-0 left-0 right-0 absolute bg-background/95 h-34 overflow-hidden z-10">
+      <div className="w-full [mask-image:linear-gradient(to_top,red_50%,transparent)] pointer-events-none absolute bottom-0 left-0 h-34 z-10 backdrop-blur-md bg-gradient-to-t from-background/80 xl:from-[#160f24] to-background/20 xl:to-[#160f2433]" />
+      <div className="py-4 px-6 bottom-0 left-0 right-0 absolute h-34 overflow-hidden z-10">
         {/* Sample Prompt Buttons - Always visible above input */}
         {onSendPrompt && (
-          <div className="mb-4 flex flex-wrap gap-2 justify-center">
+          <div className="mb-4 flex flex-wrap gap-2 justify-center xl:justify-end">
             {SAMPLE_PROMPTS.map((samplePrompt) => (
               <Button
                 key={samplePrompt.label}
                 type="button"
+                className="backdrop-blur"
                 onClick={() => onSendPrompt(samplePrompt.prompt)}
                 size="sm"
                 variant="outline"

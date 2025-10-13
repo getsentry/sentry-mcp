@@ -42,7 +42,7 @@ export default function Seer({ step }: { step: number }) {
           </div>
         </div>
       </div>
-      <div className="mt-6 mb-12 text-4xl font-semibold font-sans text-white flex items-center justify-center">
+      <div className="mt-6 mb-12 text-2xl 2xl:text-4xl font-semibold font-sans text-white flex items-center justify-center">
         <div className="relative mr-2 text-violet-300 font-bold">
           <span
             className={`${
