@@ -14,7 +14,7 @@ export function AuthForm({ authError, onOAuthLogin }: AuthFormProps) {
             alt="Flow"
             width={1536}
             height={1024}
-            className="w-full mb-6 bg-violet-300 rounded-xl"
+            className="w-full mb-6 bg-violet-300 rounded-xl select-none"
             draggable={false}
           />
         </div>
