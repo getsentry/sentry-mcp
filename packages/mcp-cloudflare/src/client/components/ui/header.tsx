@@ -29,10 +29,8 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
           </div>
         </div>
         <div
-          className={`flex items-center gap-4 duration-300 ${
-            isChatOpen
-              ? "-translate-x-[16rem] xl:-translate-x-[24rem] 2xl:-translate-x-[38rem]"
-              : ""
+          className={`flex items-center gap-4 duration-300 [--x:0] xl:[--x:30rem] 2xl:[--x:38rem] ${
+            isChatOpen ? "-translate-x-[var(--x)]" : ""
           }`}
         >
           <Button className="rounded-xl" variant="secondary" asChild>
@@ -49,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
             <Button
               type="button"
               onClick={() => toggleChat(!isChatOpen)}
-              className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-white text-background hover:bg-violet-300 transition font-bold font-sans border border-background"
+              className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-violet-300 text-background hover:bg-white/90 transition font-bold font-sans border border-background"
             >
               <Sparkles className="size-5" />
               Live Demo

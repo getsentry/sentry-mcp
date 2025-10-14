@@ -114,8 +114,21 @@ export default function RemoteSetup() {
             </Button>
             <ol>
               <li>
-                Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
-                Settings.
+                Or manually:{" "}
+                <strong>
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                    ⌘
+                  </div>{" "}
+                  +{" "}
+                  <div className="h-8 pl-1.5 pr-2 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                    Shift
+                  </div>{" "}
+                  +{" "}
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                    J
+                  </div>
+                </strong>{" "}
+                to open Cursor Settings.
               </li>
               <li>
                 Select <strong>Tools and Integrations</strong>.
@@ -332,8 +345,17 @@ export default function RemoteSetup() {
             </p>
             <ol>
               <li>
-                <strong>CMD + P</strong> and search for{" "}
-                <strong>MCP: Add Server</strong>.
+                <strong>
+                  {" "}
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                    ⌘
+                  </div>{" "}
+                  +{" "}
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                    P
+                  </div>
+                </strong>{" "}
+                and search for <strong>MCP: Add Server</strong>.
               </li>
               <li>
                 Select <strong>HTTP (HTTP or Server-Sent Events)</strong>.
@@ -452,7 +474,16 @@ export default function RemoteSetup() {
           >
             <ol>
               <li>
-                <strong>CMD + ,</strong> to open Zed settings.
+                <strong>
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                    ⌘
+                  </div>{" "}
+                  +{" "}
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                    ,
+                  </div>
+                </strong>{" "}
+                to open Zed settings.
               </li>
               <li>
                 <CodeSnippet noMargin snippet={zedInstructions} />
