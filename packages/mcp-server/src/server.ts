@@ -486,9 +486,11 @@ export async function configureServer({
                         }
 
                         // Special handling: projectSlug constraint can also apply to projectSlugOrId parameter
+                        // Only apply alias if the target parameter isn't already being constrained
                         if (
                           key === "projectSlug" &&
-                          "projectSlugOrId" in tool.inputSchema
+                          "projectSlugOrId" in tool.inputSchema &&
+                          !("projectSlugOrId" in context.constraints)
                         ) {
                           entries.push(["projectSlugOrId", value]);
                         }
