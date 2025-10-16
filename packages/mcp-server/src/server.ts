@@ -388,9 +388,26 @@ export async function configureServer({
     }
 
     // Only consider constraints that exist in this tool's schema
-    const toolConstraintKeys = Object.entries(context.constraints)
-      .filter(([key, value]) => !!value && key in tool.inputSchema)
-      .map(([key, _]) => key);
+    // Also include constraint aliases (e.g., projectSlug can match projectSlugOrId)
+    const toolConstraintKeys = Object.entries(context.constraints).flatMap(
+      ([key, value]) => {
+        if (!value) return [];
+
+        const keys = [];
+
+        // If this constraint key exists in the schema, include it
+        if (key in tool.inputSchema) {
+          keys.push(key);
+        }
+
+        // Special handling: projectSlug constraint can also apply to projectSlugOrId parameter
+        if (key === "projectSlug" && "projectSlugOrId" in tool.inputSchema) {
+          keys.push("projectSlugOrId");
+        }
+
+        return keys;
+      },
+    );
 
     // Create modified schema by removing constraint parameters that will be injected
     const modifiedInputSchema = Object.fromEntries(
@@ -455,9 +472,29 @@ export async function configureServer({
                   }
 
                   // Apply URL constraints as normal parameters - only for params that exist in tool schema
+                  // Also expand constraint aliases (e.g., projectSlug → projectSlugOrId)
                   const applicableConstraints = Object.fromEntries(
-                    Object.entries(context.constraints).filter(
-                      ([key, value]) => !!value && key in tool.inputSchema,
+                    Object.entries(context.constraints).flatMap(
+                      ([key, value]) => {
+                        if (!value) return [];
+
+                        const entries = [];
+
+                        // If this constraint key exists in the schema, add it
+                        if (key in tool.inputSchema) {
+                          entries.push([key, value]);
+                        }
+
+                        // Special handling: projectSlug constraint can also apply to projectSlugOrId parameter
+                        if (
+                          key === "projectSlug" &&
+                          "projectSlugOrId" in tool.inputSchema
+                        ) {
+                          entries.push(["projectSlugOrId", value]);
+                        }
+
+                        return entries;
+                      },
                     ),
                   );
 
