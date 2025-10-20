@@ -118,11 +118,19 @@ The MCP server supports multiple transport mechanisms:
 - Configured via command-line args
 - This is the standard MCP transport
 
-**HTTP/SSE Transport** (For web apps):
+**HTTP Transport** (For web apps):
 
-- Allows web applications to connect to MCP
+- Allows web applications to connect to MCP via HTTP streaming
 - Used by the example Cloudflare chat app
+- Main endpoint: `/mcp`
 - Not part of core MCP spec
+
+**SSE Transport** (Deprecated - will be removed):
+
+- Legacy Server-Sent Events transport
+- Endpoint: `/sse`
+- Does not support organization/project constraints
+- New integrations should use HTTP transport via `/mcp` endpoint
 
 ### 3. Authentication Strategy
 

@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "catalog:",
+    "@modelcontextprotocol/sdk": "catalog:",
     "@sentry/core": "catalog:",
     "@sentry/mcp-server": "workspace:*",
     "@sentry/node": "catalog:",
