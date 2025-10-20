@@ -39,6 +39,10 @@ import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
+import {
+  getConstraintKeysToFilter,
+  getConstraintParametersToInject,
+} from "./internal/constraint-helpers";
 
 const toolLogger = getLogger(["server", "tools"]);
 
@@ -387,10 +391,12 @@ export async function configureServer({
       continue;
     }
 
-    // Only consider constraints that exist in this tool's schema
-    const toolConstraintKeys = Object.entries(context.constraints)
-      .filter(([key, value]) => !!value && key in tool.inputSchema)
-      .map(([key, _]) => key);
+    // Determine which constraint parameters should be filtered from the schema
+    // because they will be injected at runtime
+    const toolConstraintKeys = getConstraintKeysToFilter(
+      context.constraints,
+      tool.inputSchema,
+    );
 
     // Create modified schema by removing constraint parameters that will be injected
     const modifiedInputSchema = Object.fromEntries(
@@ -454,11 +460,10 @@ export async function configureServer({
                     );
                   }
 
-                  // Apply URL constraints as normal parameters - only for params that exist in tool schema
-                  const applicableConstraints = Object.fromEntries(
-                    Object.entries(context.constraints).filter(
-                      ([key, value]) => !!value && key in tool.inputSchema,
-                    ),
+                  // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
+                  const applicableConstraints = getConstraintParametersToInject(
+                    context.constraints,
+                    tool.inputSchema,
                   );
 
                   const paramsWithConstraints = {
