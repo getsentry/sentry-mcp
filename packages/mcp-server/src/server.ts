@@ -80,15 +80,6 @@ function createResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.mcpClientName && {
-              "mcp.client.name": context.mcpClientName,
-            }),
-            ...(context.mcpClientVersion && {
-              "mcp.client.version": context.mcpClientVersion,
-            }),
-            ...(context.mcpProtocolVersion && {
-              "mcp.protocol.version": context.mcpProtocolVersion,
-            }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
             ...(context.constraints.organizationSlug && {
@@ -137,15 +128,6 @@ function createTemplateResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.mcpClientName && {
-              "mcp.client.name": context.mcpClientName,
-            }),
-            ...(context.mcpClientVersion && {
-              "mcp.client.version": context.mcpClientVersion,
-            }),
-            ...(context.mcpProtocolVersion && {
-              "mcp.protocol.version": context.mcpProtocolVersion,
-            }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
             ...(context.constraints.organizationSlug && {
@@ -200,12 +182,10 @@ export async function configureServer({
   server,
   context,
   onToolComplete,
-  onInitialized,
 }: {
   server: McpServer;
   context: ServerContext;
   onToolComplete?: () => void;
-  onInitialized?: () => void | Promise<void>;
 }) {
   // Get granted scopes with default to read-only scopes
   // Normalize to a mutable Set regardless of input being Set or ReadonlySet
@@ -224,47 +204,6 @@ export async function configureServer({
     };
 
     logIssue(error, transportLogOptions);
-  };
-
-  // Hook into the initialized notification to capture client information
-  server.server.oninitialized = () => {
-    const serverInstance = server.server as any;
-    const clientInfo = serverInstance._clientVersion;
-    const protocolVersion = serverInstance._protocolVersion;
-
-    // Update the context object with client information
-    if (clientInfo) {
-      context.mcpClientName = clientInfo.name;
-      context.mcpClientVersion = clientInfo.version;
-    }
-
-    if (protocolVersion) {
-      context.mcpProtocolVersion = protocolVersion;
-    }
-
-    // Call the custom onInitialized handler if provided
-    // Note: MCP SDK doesn't support async callbacks, so we handle promises
-    // without awaiting to avoid blocking the initialization flow
-    if (onInitialized) {
-      const result = onInitialized();
-      if (result instanceof Promise) {
-        result.catch((error) => {
-          const lifecycleLogOptions: LogIssueOptions = {
-            loggerScope: ["server", "lifecycle"] as const,
-            contexts: {
-              lifecycle: {
-                hook: "onInitialized",
-                clientName: context.mcpClientName ?? null,
-                clientVersion: context.mcpClientVersion ?? null,
-                protocolVersion: context.mcpProtocolVersion ?? null,
-              },
-            },
-          };
-
-          logIssue(error, lifecycleLogOptions);
-        });
-      }
-    }
   };
 
   for (const resource of RESOURCES) {
@@ -308,15 +247,6 @@ export async function configureServer({
                 name: `prompts/get ${prompt.name}`,
                 attributes: {
                   "mcp.prompt.name": prompt.name,
-                  ...(context.mcpClientName && {
-                    "mcp.client.name": context.mcpClientName,
-                  }),
-                  ...(context.mcpClientVersion && {
-                    "mcp.client.version": context.mcpClientVersion,
-                  }),
-                  ...(context.mcpProtocolVersion && {
-                    "mcp.protocol.version": context.mcpProtocolVersion,
-                  }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
                   ...(context.constraints.organizationSlug && {
@@ -420,15 +350,6 @@ export async function configureServer({
                 name: `tools/call ${tool.name}`,
                 attributes: {
                   "mcp.tool.name": tool.name,
-                  ...(context.mcpClientName && {
-                    "mcp.client.name": context.mcpClientName,
-                  }),
-                  ...(context.mcpClientVersion && {
-                    "mcp.client.version": context.mcpClientVersion,
-                  }),
-                  ...(context.mcpProtocolVersion && {
-                    "mcp.protocol.version": context.mcpProtocolVersion,
-                  }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
                   ...(context.constraints.organizationSlug && {
