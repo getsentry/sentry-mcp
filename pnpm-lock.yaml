@@ -455,6 +455,9 @@ importers:
       '@ai-sdk/openai':
         specifier: 'catalog:'
         version: 1.3.22(zod@3.25.72)
+      '@modelcontextprotocol/sdk':
+        specifier: 'catalog:'
+        version: 1.17.2
       '@sentry/core':
         specifier: 'catalog:'
         version: 9.34.0

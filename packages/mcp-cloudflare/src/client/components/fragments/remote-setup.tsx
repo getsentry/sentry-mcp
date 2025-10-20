@@ -1,9 +1,4 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "../ui/accordion";
+import { Accordion } from "../ui/accordion";
 import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
 import { Prose } from "../ui/prose";
@@ -15,7 +10,6 @@ const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
 export default function RemoteSetup() {
   const endpoint = new URL("/mcp", window.location.href).href;
-  const sseEndpoint = new URL("/sse", window.location.href).href;
 
   const mcpRemoteSnippet = `npx ${NPM_REMOTE_NAME}@latest ${endpoint}`;
   // the shared configuration for all clients
@@ -75,24 +69,6 @@ export default function RemoteSetup() {
             session to a specific organization and project
           </li>
         </ul>
-        <Accordion type="single" collapsible>
-          <AccordionItem value="sse-deprecated">
-            <AccordionTrigger>SSE support is deprecated</AccordionTrigger>
-            <AccordionContent>
-              <p className="mb-2">
-                New clients should use HTTP Streaming via the main
-                <code>/mcp</code> endpoint. If you must use the SSE-only
-                implementation, use the following URL:
-              </p>
-              <CodeSnippet noMargin snippet={sseEndpoint} />
-              <p className="mt-2">
-                <strong>Limitations:</strong> SSE endpoints do not support
-                organization or project constraints. Use the main
-                <code>/mcp</code> endpoint if you need scoped access.
-              </p>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
       </Prose>
       <Heading as="h3">Integration Guides</Heading>
       <Accordion type="single" collapsible>
