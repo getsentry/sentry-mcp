@@ -38,6 +38,10 @@
       "types": "./dist/constants.ts",
       "default": "./dist/constants.js"
     },
+    "./context": {
+      "types": "./dist/context.ts",
+      "default": "./dist/context.js"
+    },
     "./telem": {
       "types": "./dist/telem/index.ts",
       "default": "./dist/telem/index.js"

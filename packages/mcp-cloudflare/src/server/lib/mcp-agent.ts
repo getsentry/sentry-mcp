@@ -2,10 +2,10 @@ import * as Sentry from "@sentry/cloudflare";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "@sentry/mcp-server/server";
+import { runWithContext } from "@sentry/mcp-server/context";
 import { expandScopes, parseScopes } from "@sentry/mcp-server/permissions";
-import { logWarn } from "@sentry/mcp-server/telem/logging";
 import type { Env, WorkerProps } from "../types";
-import type { Constraints } from "@sentry/mcp-server/types";
+import type { Constraints, ServerContext } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import getSentryConfig from "../sentry.config";
 import { verifyConstraintsAccess } from "./constraint-utils";
@@ -53,9 +53,9 @@ import type { ExecutionContext } from "@cloudflare/workers-types";
 /**
  * Sentry MCP Agent - A Durable Object that provides Model Context Protocol access to Sentry.
  *
- * Following the pattern from the gist: this class extends McpAgent and mutates props
- * directly on first request to include URL-extracted constraints. Props are then immutable
- * throughout the DO's lifetime.
+ * Each DO instance creates its own MCP server with context bound at initialization.
+ * This ensures context is available throughout the server's lifecycle without
+ * relying on AsyncLocalStorage propagation through the agents library's event handling.
  */
 class SentryMCPBase extends McpAgent<
   Env,
@@ -67,11 +67,11 @@ class SentryMCPBase extends McpAgent<
     projectSlug?: string;
   }
 > {
-  // Create server once in constructor, as per Cloudflare MCP Agent API docs
-  server = new McpServer({
-    name: "Sentry MCP",
-    version: LIB_VERSION,
-  });
+  // Each DO instance gets its own MCP server with context bound at creation
+  server!: McpServer;
+
+  // Store context for this DO instance
+  private serverContext!: ServerContext;
 
   // biome-ignore lint/complexity/noUselessConstructor: Need the constructor to match the durable object types.
   constructor(state: DurableObjectState, env: Env) {
@@ -79,47 +79,85 @@ class SentryMCPBase extends McpAgent<
   }
 
   /**
-   * Initialize Durable Object state and MCP server configuration
+   * Initialize Durable Object state
    *
    * Called when the DO is first created or wakes from hibernation.
-   * Configures the MCP server with user authentication and constraint scoping.
+   * Creates a per-DO MCP server instance with context stored in the DO instance.
    *
-   * Since props (including constraints) are set on first request and then immutable,
-   * the server configuration remains constant throughout the DO's lifetime.
+   * NOTE: We cannot use AsyncLocalStorage for Cloudflare because the agents
+   * library's event handling breaks the async context chain. Instead, we store
+   * context in the DO instance and retrieve it via a temporary global variable
+   * during tool invocations.
    */
   async init() {
+    // Initialize constraint state
     if (!this.state?.constraints) {
       this.setState({
         constraints: this.props.constraints,
       });
     }
 
-    await configureServer({
-      server: this.server,
-      context: {
-        userId: this.props.id,
-        mcpUrl: process.env.MCP_URL,
-        accessToken: this.props.accessToken,
-        grantedScopes: this.props.grantedScopes
-          ? (() => {
-              const { valid, invalid } = parseScopes(this.props.grantedScopes);
-              if (invalid.length > 0) {
-                logWarn(`Ignoring invalid scopes from OAuth provider`, {
-                  loggerScope: ["cloudflare", "mcp-agent"],
-                  extra: {
-                    invalidScopes: invalid,
-                  },
-                });
-              }
-              return expandScopes(valid);
-            })()
-          : undefined,
-        constraints: this.state.constraints || {},
-      },
-      onToolComplete: () => {
-        this.ctx.waitUntil(Sentry.flush(2000));
-      },
+    // Build context for this DO instance
+    this.serverContext = {
+      userId: this.props.id,
+      mcpUrl: process.env.MCP_URL,
+      accessToken: this.props.accessToken,
+      grantedScopes: this.props.grantedScopes
+        ? expandScopes(parseScopes(this.props.grantedScopes).valid)
+        : undefined,
+      constraints: this.state.constraints || {},
+      sentryHost: (this.env as any)?.SENTRY_HOST || "sentry.io",
+    };
+
+    console.log('[mcp-agent] init() creating server for userId:', this.serverContext.userId);
+
+    // Create a new MCP server for this DO instance
+    this.server = new McpServer({
+      name: "Sentry MCP",
+      version: LIB_VERSION,
     });
+
+    // Store this DO instance in a global so handlers can access its context
+    // This is a workaround because AsyncLocalStorage doesn't work with the agents library
+    (globalThis as any).__currentSentryMCPAgent = this;
+
+    try {
+      // Configure the server - handlers will use the global to get context
+      await configureServer({
+        server: this.server,
+        onToolComplete: () => {
+          this.ctx.waitUntil(Sentry.flush(2000));
+        },
+      });
+
+      console.log('[mcp-agent] init() server configured');
+    } finally {
+      // Clean up the global reference
+      delete (globalThis as any).__currentSentryMCPAgent;
+    }
+  }
+
+  /**
+   * Override fetch to make context available for tool handlers.
+   * Sets this DO instance in a global so handlers can access its context.
+   */
+  async fetch(request: Request): Promise<Response> {
+    console.log('[mcp-agent] fetch() called for userId:', this.serverContext.userId);
+
+    // Store this DO instance in a global so handlers can access its context
+    // This is needed because AsyncLocalStorage doesn't propagate through the agents library
+    (globalThis as any).__currentSentryMCPAgent = this;
+
+    try {
+      // Also wrap with runWithContext for any code that might still use AsyncLocalStorage
+      return await runWithContext(this.serverContext, () => {
+        console.log('[mcp-agent] Inside runWithContext, about to call super.fetch()');
+        return super.fetch(request);
+      });
+    } finally {
+      // Clean up after the request completes
+      delete (globalThis as any).__currentSentryMCPAgent;
+    }
   }
 }
 

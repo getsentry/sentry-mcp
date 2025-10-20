@@ -5,7 +5,9 @@
     "description": "Sentry SDK documentation for {platform}",
     "mimeType": "text/markdown",
     "template": "https://docs.sentry.io/platforms/{platform}/",
-    "variables": ["platform"]
+    "variables": [
+      "platform"
+    ]
   },
   {
     "kind": "template",
@@ -13,7 +15,10 @@
     "description": "Sentry integration guide for {framework} on {platform}",
     "mimeType": "text/markdown",
     "template": "https://docs.sentry.io/platforms/{platform}/guides/{framework}/",
-    "variables": ["platform", "framework"]
+    "variables": [
+      "platform",
+      "framework"
+    ]
   },
   {
     "kind": "uri",

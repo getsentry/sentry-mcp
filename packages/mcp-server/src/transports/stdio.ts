@@ -24,6 +24,7 @@ import { configureServer } from "../server";
 import type { ServerContext } from "../types";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "../version";
+import { runWithContext } from "../context";
 
 /**
  * Starts the MCP server with stdio transport and telemetry.
@@ -31,6 +32,9 @@ import { LIB_VERSION } from "../version";
  * Configures the server with all tools, prompts, and resources, then connects
  * using stdio transport for process-based communication. All operations are
  * wrapped in Sentry tracing for observability.
+ *
+ * The server is configured once (statically), and the context is made available
+ * via AsyncLocalStorage for all requests during the connection lifecycle.
  *
  * @param server - MCP server instance to configure and start
  * @param context - Server context with authentication and configuration
@@ -41,9 +45,10 @@ import { LIB_VERSION } from "../version";
  * const server = new McpServer();
  * await startStdio(server, {
  *   accessToken: userToken,
- *   host: userHost,
+ *   sentryHost: "sentry.io",
  *   userId: "user-123",
- *   clientId: "cursor-ide"
+ *   clientId: "cursor-ide",
+ *   constraints: {}
  * });
  * ```
  */
@@ -59,9 +64,15 @@ export async function startStdio(server: McpServer, context: ServerContext) {
         },
       },
       async () => {
-        const transport = new StdioServerTransport();
-        await configureServer({ server, context });
-        await server.connect(transport);
+        // Configure server once (static, no context needed during registration)
+        await configureServer({ server });
+
+        // Wrap the entire connection lifecycle with context
+        // Handlers will retrieve context from AsyncLocalStorage at call time
+        await runWithContext(context, async () => {
+          const transport = new StdioServerTransport();
+          await server.connect(transport);
+        });
       },
     );
   });

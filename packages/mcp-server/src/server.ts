@@ -29,7 +29,6 @@ import type {
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Variables } from "@modelcontextprotocol/sdk/shared/uriTemplate.js";
 import tools from "./tools/index";
-import type { ServerContext } from "./types";
 import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
 import { getLogger, logIssue, type LogIssueOptions } from "./telem/logging";
 import { RESOURCES, isTemplateResource } from "./resources";
@@ -40,9 +39,9 @@ import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
 import {
-  getConstraintKeysToFilter,
   getConstraintParametersToInject,
 } from "./internal/constraint-helpers";
+import { getServerContext } from "./context";
 
 const toolLogger = getLogger(["server", "tools"]);
 
@@ -67,28 +66,22 @@ function extractMcpParameters(args: Record<string, unknown>) {
 /**
  * Creates a telemetry wrapper for regular URI resource handlers.
  * Captures URI access and user context for observability.
+ * Gets context from AsyncLocalStorage.
  */
-function createResourceHandler(
-  resource: { name: string; handler: ReadResourceCallback },
-  context: ServerContext,
-): ReadResourceCallback {
+function createResourceHandler(resource: {
+  name: string;
+  handler: ReadResourceCallback;
+}): ReadResourceCallback {
   return async (uri: URL, extra: RequestHandlerExtra<any, any>) => {
     return await startNewTrace(async () => {
+      // Get context from AsyncLocalStorage
+      const context = getServerContext();
       return await startSpan(
         {
           name: `resources/read ${resource.name}`,
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.mcpClientName && {
-              "mcp.client.name": context.mcpClientName,
-            }),
-            ...(context.mcpClientVersion && {
-              "mcp.client.version": context.mcpClientVersion,
-            }),
-            ...(context.mcpProtocolVersion && {
-              "mcp.protocol.version": context.mcpProtocolVersion,
-            }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
             ...(context.constraints.organizationSlug && {
@@ -120,32 +113,26 @@ function createResourceHandler(
 /**
  * Creates a telemetry wrapper for URI template resource handlers.
  * Captures template parameters and user context for observability.
+ * Gets context from AsyncLocalStorage.
  */
-function createTemplateResourceHandler(
-  resource: { name: string; handler: ReadResourceCallback },
-  context: ServerContext,
-): ReadResourceTemplateCallback {
+function createTemplateResourceHandler(resource: {
+  name: string;
+  handler: ReadResourceCallback;
+}): ReadResourceTemplateCallback {
   return async (
     uri: URL,
     variables: Variables,
     extra: RequestHandlerExtra<any, any>,
   ) => {
     return await startNewTrace(async () => {
+      // Get context from AsyncLocalStorage
+      const context = getServerContext();
       return await startSpan(
         {
           name: `resources/read ${resource.name}`,
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.mcpClientName && {
-              "mcp.client.name": context.mcpClientName,
-            }),
-            ...(context.mcpClientVersion && {
-              "mcp.client.version": context.mcpClientVersion,
-            }),
-            ...(context.mcpProtocolVersion && {
-              "mcp.protocol.version": context.mcpProtocolVersion,
-            }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
             ...(context.constraints.organizationSlug && {
@@ -180,39 +167,41 @@ function createTemplateResourceHandler(
 /**
  * Configures an MCP server with all tools, prompts, resources, and telemetry.
  *
- * Transforms a bare MCP server instance into a fully-featured Sentry integration
- * with comprehensive observability, error handling, and handler registration.
+ * This function is called ONCE to set up the server. All handlers are wrapped to:
+ * 1. Get context from AsyncLocalStorage at call time
+ * 2. Apply telemetry/tracing
+ * 3. Pass context explicitly to the actual handler
  *
- * @example Basic Configuration
+ * The server can be shared across multiple connections/contexts because context
+ * is retrieved dynamically at each call rather than bound at registration time.
+ *
+ * @example Static Server Configuration
  * ```typescript
- * const server = new McpServer();
- * const context = {
- *   accessToken: process.env.SENTRY_TOKEN,
- *   host: "sentry.io",
- *   userId: "user-123",
- *   clientId: "cursor-ide"
- * };
+ * import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+ * import { configureServer } from "./server";
+ * import { runWithContext } from "./context";
  *
- * await configureServer({ server, context });
+ * // Configure once
+ * const server = new McpServer({ name: "Sentry MCP", version: "1.0.0" });
+ * await configureServer({ server });
+ *
+ * // Use with different contexts
+ * await runWithContext(context1, async () => {
+ *   await server.connect(transport1);
+ * });
+ *
+ * await runWithContext(context2, async () => {
+ *   await server.connect(transport2);
+ * });
  * ```
  */
 export async function configureServer({
   server,
-  context,
   onToolComplete,
-  onInitialized,
 }: {
   server: McpServer;
-  context: ServerContext;
   onToolComplete?: () => void;
-  onInitialized?: () => void | Promise<void>;
 }) {
-  // Get granted scopes with default to read-only scopes
-  // Normalize to a mutable Set regardless of input being Set or ReadonlySet
-  const grantedScopes: Set<Scope> = context.grantedScopes
-    ? new Set<Scope>(context.grantedScopes)
-    : new Set<Scope>(DEFAULT_SCOPES);
-
   server.server.onerror = (error) => {
     const transportLogOptions: LogIssueOptions = {
       loggerScope: ["server", "transport"] as const,
@@ -226,47 +215,6 @@ export async function configureServer({
     logIssue(error, transportLogOptions);
   };
 
-  // Hook into the initialized notification to capture client information
-  server.server.oninitialized = () => {
-    const serverInstance = server.server as any;
-    const clientInfo = serverInstance._clientVersion;
-    const protocolVersion = serverInstance._protocolVersion;
-
-    // Update the context object with client information
-    if (clientInfo) {
-      context.mcpClientName = clientInfo.name;
-      context.mcpClientVersion = clientInfo.version;
-    }
-
-    if (protocolVersion) {
-      context.mcpProtocolVersion = protocolVersion;
-    }
-
-    // Call the custom onInitialized handler if provided
-    // Note: MCP SDK doesn't support async callbacks, so we handle promises
-    // without awaiting to avoid blocking the initialization flow
-    if (onInitialized) {
-      const result = onInitialized();
-      if (result instanceof Promise) {
-        result.catch((error) => {
-          const lifecycleLogOptions: LogIssueOptions = {
-            loggerScope: ["server", "lifecycle"] as const,
-            contexts: {
-              lifecycle: {
-                hook: "onInitialized",
-                clientName: context.mcpClientName ?? null,
-                clientVersion: context.mcpClientVersion ?? null,
-                protocolVersion: context.mcpProtocolVersion ?? null,
-              },
-            },
-          };
-
-          logIssue(error, lifecycleLogOptions);
-        });
-      }
-    }
-  };
-
   for (const resource of RESOURCES) {
     if (isTemplateResource(resource)) {
       // Handle URI template resources
@@ -277,7 +225,7 @@ export async function configureServer({
           description: resource.description,
           mimeType: resource.mimeType,
         },
-        createTemplateResourceHandler(resource, context),
+        createTemplateResourceHandler(resource),
       );
     } else {
       // Handle regular URI resources
@@ -288,7 +236,7 @@ export async function configureServer({
           description: resource.description,
           mimeType: resource.mimeType,
         },
-        createResourceHandler(resource, context),
+        createResourceHandler(resource),
       );
     }
   }
@@ -303,20 +251,13 @@ export async function configureServer({
       async (...args) => {
         try {
           return await startNewTrace(async () => {
+            // Get context from AsyncLocalStorage at request time
+            const context = getServerContext();
             return await startSpan(
               {
                 name: `prompts/get ${prompt.name}`,
                 attributes: {
                   "mcp.prompt.name": prompt.name,
-                  ...(context.mcpClientName && {
-                    "mcp.client.name": context.mcpClientName,
-                  }),
-                  ...(context.mcpClientVersion && {
-                    "mcp.client.version": context.mcpClientVersion,
-                  }),
-                  ...(context.mcpProtocolVersion && {
-                    "mcp.protocol.version": context.mcpProtocolVersion,
-                  }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
                   ...(context.constraints.organizationSlug && {
@@ -340,7 +281,7 @@ export async function configureServer({
                   setTag("client.id", context.clientId);
                 }
                 try {
-                  // TODO(dcramer): I'm too dumb to figure this out
+                  // Pass context explicitly to prompt handler
                   // @ts-ignore
                   const output = await handler(context, ...args);
                   span.setStatus({
@@ -374,61 +315,51 @@ export async function configureServer({
   }
 
   for (const [toolKey, tool] of Object.entries(tools)) {
-    // Check if this tool is allowed based on granted scopes
-    if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-      toolLogger.debug(
-        "Skipping tool {tool} - missing required scopes",
-        () => ({
-          tool: tool.name,
-          requiredScopes: Array.isArray(tool.requiredScopes)
-            ? tool.requiredScopes
-            : tool.requiredScopes
-              ? Array.from(tool.requiredScopes)
-              : [],
-          grantedScopes: [...grantedScopes],
-        }),
-      );
-      continue;
-    }
-
-    // Determine which constraint parameters should be filtered from the schema
-    // because they will be injected at runtime
-    const toolConstraintKeys = getConstraintKeysToFilter(
-      context.constraints,
-      tool.inputSchema,
-    );
-
-    // Create modified schema by removing constraint parameters that will be injected
-    const modifiedInputSchema = Object.fromEntries(
-      Object.entries(tool.inputSchema).filter(
-        ([key, _]) => !toolConstraintKeys.includes(key),
-      ),
-    );
-
+    // Register all tools - scope checking and constraint filtering happens at request time
     server.tool(
       tool.name,
       tool.description,
-      modifiedInputSchema,
+      tool.inputSchema, // Full schema - constraints will be injected at request time
       async (
         params: any,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
       ) => {
         try {
           return await startNewTrace(async () => {
+            // Get context from AsyncLocalStorage at request time
+            console.log('[server] Tool handler called, attempting to get context...');
+            const context = getServerContext();
+            console.log('[server] Context retrieved successfully for userId:', context.userId);
+
+            // Get granted scopes with default to read-only scopes
+            const grantedScopes: Set<Scope> = context.grantedScopes
+              ? new Set<Scope>(context.grantedScopes)
+              : new Set<Scope>(DEFAULT_SCOPES);
+
+            // Check if this tool is allowed based on granted scopes
+            if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
+              toolLogger.debug(
+                "Tool {tool} not allowed - missing required scopes",
+                () => ({
+                  tool: tool.name,
+                  requiredScopes: Array.isArray(tool.requiredScopes)
+                    ? tool.requiredScopes
+                    : tool.requiredScopes
+                      ? Array.from(tool.requiredScopes)
+                      : [],
+                  grantedScopes: [...grantedScopes],
+                }),
+              );
+              throw new Error(
+                `Tool '${tool.name}' is not allowed - missing required scopes`,
+              );
+            }
+
             return await startSpan(
               {
                 name: `tools/call ${tool.name}`,
                 attributes: {
                   "mcp.tool.name": tool.name,
-                  ...(context.mcpClientName && {
-                    "mcp.client.name": context.mcpClientName,
-                  }),
-                  ...(context.mcpClientVersion && {
-                    "mcp.client.version": context.mcpClientVersion,
-                  }),
-                  ...(context.mcpProtocolVersion && {
-                    "mcp.protocol.version": context.mcpProtocolVersion,
-                  }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
                   ...(context.constraints.organizationSlug && {
@@ -453,13 +384,6 @@ export async function configureServer({
                 }
 
                 try {
-                  // Double-check scopes at runtime (defense in depth)
-                  if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-                    throw new Error(
-                      `Tool '${tool.name}' is not allowed - missing required scopes`,
-                    );
-                  }
-
                   // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
                   const applicableConstraints = getConstraintParametersToInject(
                     context.constraints,
@@ -471,6 +395,7 @@ export async function configureServer({
                     ...applicableConstraints,
                   };
 
+                  // Pass context explicitly to tool handler!
                   const output = await tool.handler(
                     paramsWithConstraints,
                     context,

@@ -14,7 +14,10 @@
           "description": "The filename to search for errors in."
         }
       },
-      "required": ["organizationSlug", "filename"],
+      "required": [
+        "organizationSlug",
+        "filename"
+      ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
