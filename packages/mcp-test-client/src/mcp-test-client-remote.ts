@@ -1,4 +1,5 @@
 import { experimental_createMCPClient } from "ai";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { startNewTrace, startSpan } from "@sentry/core";
 import { OAuthClient } from "./auth/oauth.js";
 import { DEFAULT_MCP_URL } from "./constants.js";
@@ -15,9 +16,9 @@ export async function connectToRemoteMCPServer(
   return await startNewTrace(async () => {
     return await startSpan(
       {
-        name: "mcp.connect/sse",
+        name: "mcp.connect/http",
         attributes: {
-          "mcp.transport": "sse",
+          "mcp.transport": "http",
           "gen_ai.conversation.id": sessionId,
           "service.version": LIB_VERSION,
         },
@@ -54,16 +55,21 @@ export async function connectToRemoteMCPServer(
             );
           }
 
-          // Create SSE client with authentication
-          const client = await experimental_createMCPClient({
-            name: "mcp.sentry.dev (test-client)",
-            transport: {
-              type: "sse" as const,
-              url: `${mcpHost}/sse`,
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
+          // Create HTTP streaming client with authentication
+          const httpTransport = new StreamableHTTPClientTransport(
+            new URL(`${mcpHost}/mcp`),
+            {
+              requestInit: {
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
               },
             },
+          );
+
+          const client = await experimental_createMCPClient({
+            name: "mcp.sentry.dev (test-client)",
+            transport: httpTransport,
           });
 
           // Discover available tools
@@ -91,7 +97,7 @@ export async function connectToRemoteMCPServer(
             tools,
             disconnect,
             sessionId,
-            transport: "sse" as const,
+            transport: "http" as const,
           };
         } catch (error) {
           span.setStatus({ code: 2 });

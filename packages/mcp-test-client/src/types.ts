@@ -5,7 +5,7 @@ export interface MCPConnection {
   tools: Map<string, any>;
   disconnect: () => Promise<void>;
   sessionId: string;
-  transport: "stdio" | "sse";
+  transport: "stdio" | "http";
 }
 
 export interface MCPConfig {

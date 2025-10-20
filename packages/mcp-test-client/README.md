@@ -9,7 +9,7 @@ A simple CLI tool to test the Sentry MCP server using stdio transport with an AI
 - 💬 Interactive mode by default when no prompt provided
 - 🎨 Colorized output for better readability
 - 🔄 Streaming responses for real-time feedback
-- 🌐 Remote MCP server support via SSE transport (with OAuth)
+- 🌐 Remote MCP server support via HTTP streaming (with OAuth)
 - 🏠 Local stdio transport for development
 
 ## Prerequisites
@@ -86,7 +86,7 @@ The client automatically determines the connection mode:
 2. Environment variable (`SENTRY_ACCESS_TOKEN`)
 3. `.env` file
 
-**Remote Mode (SSE transport)**: Used when no access token is provided, prompts for OAuth authentication
+**Remote Mode (HTTP streaming)**: Used when no access token is provided, prompts for OAuth authentication
 
 ### Required Sentry Permissions
 
@@ -103,17 +103,17 @@ Your Sentry access token needs the following scopes:
 
 ### Remote Mode (Default)
 
-Connect to the remote MCP server via SSE transport (uses OAuth for authentication):
+Connect to the remote MCP server via HTTP streaming (uses OAuth for authentication):
 
 ```bash
-# Connect to production MCP server (uses /sse endpoint)
+# Connect to production MCP server (uses /mcp endpoint)
 pnpm mcp-test-client
 
 # Connect to local development MCP server
 pnpm mcp-test-client --mcp-host http://localhost:8787
 ```
 
-**Note**: Remote mode uses Server-Sent Events (SSE) transport and connects to the `/sse` endpoint on the MCP server.
+**Note**: Remote mode uses HTTP streaming transport and connects to the `/mcp` endpoint on the MCP server.
 
 ### Local Mode
 
