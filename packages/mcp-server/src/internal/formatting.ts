@@ -209,6 +209,7 @@ export function formatEventOutput(
   }
 
   output += formatTags(event.tags);
+  output += formatContext(event.context);
   output += formatContexts(event.contexts);
   return output;
 }
@@ -1376,6 +1377,19 @@ function formatTags(tags: z.infer<typeof EventSchema>["tags"]) {
   }
   return `### Tags\n\n${tags
     .map((tag) => `**${tag.key}**: ${tag.value}`)
+    .join("\n")}\n\n`;
+}
+
+function formatContext(context: z.infer<typeof EventSchema>["context"]) {
+  if (!context || Object.keys(context).length === 0) {
+    return "";
+  }
+  return `### Extra Data\n\nAdditional data attached to this event.\n\n${Object.entries(
+    context,
+  )
+    .map(([key, value]) => {
+      return `**${key}**: ${JSON.stringify(value, undefined, 2)}`;
+    })
     .join("\n")}\n\n`;
 }
 
