@@ -78,7 +78,7 @@ export default defineTool({
       .optional(),
   },
   annotations: {
-    readOnlyHint: true,
+    readOnlyHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
