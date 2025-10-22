@@ -12,6 +12,10 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {},
   requiredScopes: [], // No specific scopes required - uses authentication token
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     // User data endpoints (like /auth/) should never use regionUrl
     // as they must always query the main API server, not region-specific servers

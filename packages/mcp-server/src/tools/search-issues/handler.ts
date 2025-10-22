@@ -75,6 +75,10 @@ export default defineTool({
       .default(false)
       .describe("Include explanation of how the query was translated"),
   },
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

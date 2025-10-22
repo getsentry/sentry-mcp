@@ -34,6 +34,11 @@ export default defineTool({
     regionUrl: ParamRegionUrl.optional(),
     name: z.string().trim().describe("The name of the team to create."),
   },
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

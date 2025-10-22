@@ -409,6 +409,7 @@ export async function configureServer({
       tool.name,
       tool.description,
       modifiedInputSchema,
+      tool.annotations,
       async (
         params: any,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,

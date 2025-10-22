@@ -71,6 +71,12 @@ export default defineTool({
       "The team to assign this project to. Note: this will replace the current team assignment.",
     ),
   },
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
