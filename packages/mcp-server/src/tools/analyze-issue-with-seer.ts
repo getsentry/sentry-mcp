@@ -79,6 +79,7 @@ export default defineTool({
   },
   annotations: {
     readOnlyHint: false,
+    destructiveHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
