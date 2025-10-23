@@ -45,7 +45,6 @@ interface ChatUIProps {
   onLogout?: () => void;
   onSlashCommand?: (command: string) => void;
   onSendPrompt?: (prompt: string) => void;
-  onPromptSelect?: (prompt: any) => void;
 }
 
 export const ChatUI = ({
@@ -65,7 +64,6 @@ export const ChatUI = ({
   onLogout,
   onSlashCommand,
   onSendPrompt,
-  onPromptSelect,
 }: ChatUIProps) => {
   return (
     <div className="h-full flex flex-col">
@@ -98,7 +96,6 @@ export const ChatUI = ({
           isMessageStreaming={isMessageStreaming}
           error={error}
           onRetry={onRetry}
-          onPromptSelect={onPromptSelect}
           onSlashCommand={onSlashCommand}
         />
       </ScrollToBottom>

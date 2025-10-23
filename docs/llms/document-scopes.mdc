@@ -70,35 +70,6 @@ Defines the specific purpose and content for each documentation file.
 - Duplicate testing patterns (link to testing.mdc)
 - Full code examples (reference real implementations)
 
-### adding-prompts.mdc
-**Purpose**: How to add new MCP prompts
-
-**Must Include**:
-- Prompt definition pattern
-- Multi-step workflow structure
-- Instruction writing guidelines
-- References to existing prompts
-
-**Must Exclude**:
-- Duplicate patterns from adding-tools.mdc
-- General prompt engineering advice
-- Testing details (link to testing.mdc)
-
-### adding-resources.mdc
-**Purpose**: How to add new MCP resources
-
-**Must Include**:
-- Resource types (context, live data, reference)
-- URI template patterns
-- Handler implementation
-- Binary content handling
-- References to existing resources
-
-**Must Exclude**:
-- MCP resource protocol details
-- Duplicate patterns
-- Verbose examples that could be code references
-
 ## Technical Guides
 
 ### testing.mdc
@@ -226,10 +197,9 @@ Defines the specific purpose and content for each documentation file.
 Focus on clarity and usefulness, not arbitrary line counts.
 
 Key improvements needed:
-- **adding-resources.mdc** (765 lines): Too many verbose examples → show pattern, reference implementations
-- **security.mdc** (604 lines): Too much OAuth theory → focus on implementation
-- **api-patterns.mdc** (576 lines): Redundant examples → consolidate patterns
-- **deployment.mdc** (574 lines): Too much CloudFlare docs → focus on config
-- **monitoring.mdc** (559 lines): Verbose explanations → code examples
+- **security.mdc**: Too much OAuth theory → focus on implementation
+- **api-patterns.mdc**: Redundant examples → consolidate patterns
+- **deployment.mdc**: Too much CloudFlare docs → focus on config
+- **monitoring.mdc**: Verbose explanations → code examples
 
 The goal: Each document should be focused enough to be useful in a single context window while remaining comprehensive for its topic.

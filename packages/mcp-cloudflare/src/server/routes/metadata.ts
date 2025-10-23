@@ -1,15 +1,13 @@
 /**
  * MCP Metadata API endpoint
  *
- * Provides immediate access to MCP server metadata including prompts and tools
+ * Provides immediate access to MCP server metadata including tools
  * without requiring a chat stream to be initialized.
  */
 import { Hono } from "hono";
 import { experimental_createMCPClient } from "ai";
 import type { Env } from "../types";
 import { logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
-import { getMcpPrompts, serializePromptsForClient } from "../lib/mcp-prompts";
-import RESOURCE_DEFINITIONS from "@sentry/mcp-server/resourceDefinitions";
 import type { ErrorResponse } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 import { z } from "zod";
@@ -56,10 +54,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   }
 
   try {
-    // Get prompts directly from MCP server definitions
-    const prompts = getMcpPrompts();
-    const serializedPrompts = serializePromptsForClient(prompts);
-
     // Get tools by connecting to MCP server
     let tools: string[] = [];
     let mcpClient: MCPClient | undefined;
@@ -81,7 +75,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       const mcpTools = await mcpClient.tools();
       tools = Object.keys(mcpTools);
     } catch (error) {
-      // If we can't get tools, continue with just prompts
+      // If we can't get tools, return empty array
       logWarn(error, {
         loggerScope: ["cloudflare", "metadata"],
         extra: {
@@ -107,12 +101,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     // Return the metadata
     return c.json({
       type: "mcp-metadata",
-      prompts: serializedPrompts,
       tools,
-      resources: RESOURCE_DEFINITIONS.map((r) => ({
-        name: r.name,
-        description: r.description,
-      })),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

@@ -129,7 +129,6 @@ export interface ChatMessagesProps {
   isMessageStreaming?: (messageId: string) => boolean;
   error?: Error | null;
   onRetry?: () => void;
-  onPromptSelect?: (prompt: any) => void;
   onSlashCommand?: (command: string) => void;
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
 import { Loader2 } from "lucide-react";
@@ -11,7 +11,6 @@ import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
 import { useMcpMetadata } from "../../hooks/use-mcp-metadata";
 import { useStreamingSimulation } from "../../hooks/use-streaming-simulation";
 import { SlidingPanel } from "../ui/sliding-panel";
-import { PromptDialog } from "../ui/prompt-dialog";
 import { isAuthError } from "../../utils/chat-error-handler";
 
 // We don't need user info since we're using MCP tokens
@@ -68,51 +67,10 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     clearPersistedMessages();
   }, [setMessages, clearPersistedMessages]);
 
-  // Prompt dialog state
-  const [selectedPrompt, setSelectedPrompt] = useState<any>(null);
-  const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
-
   // Get MCP metadata from the dedicated endpoint
   const getMcpMetadata = useCallback(() => {
     return mcpMetadata;
   }, [mcpMetadata]);
-
-  // Generate metadata-based messages for custom commands
-  const createPromptsMessage = useCallback(() => {
-    const metadata = getMcpMetadata();
-
-    // Determine content based on loading/error state
-    let content: string;
-    let messageMetadata: any;
-
-    if (isMetadataLoading) {
-      content = "🔄 Loading prompts from MCP server...";
-      messageMetadata = { type: "prompts-loading" };
-    } else if (metadataError) {
-      content = `❌ Failed to load prompts: ${metadataError}\n\nPlease check your connection and try again.`;
-      messageMetadata = { type: "prompts-error", error: metadataError };
-    } else if (
-      !metadata ||
-      !metadata.prompts ||
-      !Array.isArray(metadata.prompts)
-    ) {
-      content =
-        "No prompts are currently available. The MCP server may not have loaded prompt definitions yet.\n\nPlease check your connection and try again.";
-      messageMetadata = { type: "prompts-empty" };
-    } else {
-      content =
-        "These prompts provide guided workflows for complex Sentry tasks. Click any prompt below to fill in parameters and execute it.";
-      messageMetadata = {
-        type: "prompts-list",
-        prompts: metadata.prompts,
-      };
-    }
-
-    return {
-      content,
-      data: messageMetadata,
-    };
-  }, [getMcpMetadata, isMetadataLoading, metadataError]);
 
   // Generate tools-based messages for custom commands
   const createToolsMessage = useCallback(() => {
@@ -162,46 +120,6 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     };
   }, [getMcpMetadata, isMetadataLoading, metadataError]);
 
-  // Generate resources-based messages for custom commands
-  const createResourcesMessage = useCallback(() => {
-    const metadata = getMcpMetadata();
-
-    let content: string;
-    let messageMetadata: Record<string, unknown>;
-
-    if (isMetadataLoading) {
-      content = "🔄 Loading resources from MCP server...";
-      messageMetadata = { type: "resources-loading" };
-    } else if (metadataError) {
-      content = `❌ Failed to load resources: ${metadataError}\n\nPlease check your connection and try again.`;
-      messageMetadata = { type: "resources-error", error: metadataError };
-    } else if (
-      !metadata ||
-      !metadata.resources ||
-      !Array.isArray(metadata.resources)
-    ) {
-      content =
-        "No resources are currently available. The MCP server may not have loaded resources yet.\n\nPlease check your connection and try again.";
-      messageMetadata = { type: "resources-empty" };
-    } else {
-      const resourcesList = metadata.resources
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((r) => `- ${r.name}: ${r.description}`)
-        .join("\n");
-      content = `Available MCP Resources:\n\n${resourcesList}`;
-      messageMetadata = {
-        type: "resources-list",
-        resources: metadata.resources,
-      };
-    }
-
-    return {
-      content,
-      data: messageMetadata,
-    };
-  }, [getMcpMetadata, isMetadataLoading, metadataError]);
-
   const createHelpMessage = useCallback(() => {
     const content = `Welcome to the Sentry Model Context Protocol chat interface! This AI assistant helps you test and explore Sentry functionality.
 
@@ -209,8 +127,6 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
 
 - **\`/help\`** - Show this help message
 - **\`/tools\`** - List all available MCP tools
-- **\`/resources\`** - List all available MCP resources
-- **\`/prompts\`** - List all available MCP prompts with detailed information
 - **\`/clear\`** - Clear all chat messages
 - **\`/logout\`** - Log out of the current session
 
@@ -239,8 +155,6 @@ Try asking me things like:
 - "Help me find errors in my React components"
 - "Use Seer to analyze issue ABC-123"
 
-Or use \`/prompts\` to see available guided workflows for complex tasks.
-
 **Need more help?** Visit [Sentry Documentation](https://docs.sentry.io/) or check out our [careers page](https://sentry.io/careers/) if you're interested in working on projects like this! 🐱`;
 
     return {
@@ -250,46 +164,6 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
         hasSlashCommands: true,
       },
     };
-  }, []);
-
-  // Handle prompt selection
-  const handlePromptSelect = useCallback((prompt: any) => {
-    setSelectedPrompt(prompt);
-    setIsPromptDialogOpen(true);
-  }, []);
-
-  // Handle prompt execution
-  const handlePromptExecute = useCallback(
-    (promptName: string, parameters: Record<string, string>) => {
-      // Create a formatted prompt message that includes the prompt name and parameters
-      // This will be displayed to the user
-      let displayContent = `Execute prompt: ${promptName}`;
-      if (Object.keys(parameters).length > 0) {
-        const paramList = Object.entries(parameters)
-          .map(([key, value]) => `${key}: ${value}`)
-          .join(", ");
-        displayContent += ` with ${paramList}`;
-      }
-
-      // Send a message with custom data indicating this is a prompt execution
-      // The server will recognize this and execute the prompt handler
-      append({
-        role: "user",
-        content: displayContent,
-        data: {
-          type: "prompt-execution",
-          promptName,
-          parameters,
-        },
-      } as any);
-    },
-    [append],
-  );
-
-  // Close prompt dialog
-  const handlePromptDialogClose = useCallback(() => {
-    setIsPromptDialogOpen(false);
-    setSelectedPrompt(null);
   }, []);
 
   // Track previous auth state to detect logout events
@@ -384,25 +258,6 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
           // Start streaming simulation
           startStreaming(helpMessage.id, 1200);
         }, 100);
-      } else if (command === "prompts") {
-        // Add user message first
-        setMessages((prev: any[]) => [...prev, userMessage]);
-
-        // Create prompts message with metadata and add after a brief delay for better UX
-        setTimeout(() => {
-          const promptsMessageData = createPromptsMessage();
-          const promptsMessage = {
-            id: (Date.now() + 1).toString(),
-            role: "system" as const,
-            content: promptsMessageData.content,
-            createdAt: new Date(),
-            data: { ...promptsMessageData.data, simulateStreaming: true },
-          };
-          setMessages((prev) => [...prev, promptsMessage]);
-
-          // Start streaming simulation
-          startStreaming(promptsMessage.id, 800);
-        }, 100);
       } else if (command === "tools") {
         // Add user message first
         setMessages((prev: any[]) => [...prev, userMessage]);
@@ -421,30 +276,12 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
 
           startStreaming(toolsMessage.id, 600);
         }, 100);
-      } else if (command === "resources") {
-        // Add user message first
-        setMessages((prev: any[]) => [...prev, userMessage]);
-
-        // Create resources message
-        setTimeout(() => {
-          const resourcesMessageData = createResourcesMessage();
-          const resourcesMessage = {
-            id: (Date.now() + 1).toString(),
-            role: "system" as const,
-            content: resourcesMessageData.content,
-            createdAt: new Date(),
-            data: { ...resourcesMessageData.data, simulateStreaming: true },
-          };
-          setMessages((prev) => [...prev, resourcesMessage]);
-
-          startStreaming(resourcesMessage.id, 600);
-        }, 100);
       } else {
         // Handle unknown slash commands - add user message and error
         const errorMessage = {
           id: (Date.now() + 1).toString(),
           role: "system" as const,
-          content: `Unknown command: /${command}. Available commands: /help, /tools, /resources, /prompts, /clear, /logout`,
+          content: `Unknown command: /${command}. Available commands: /help, /tools, /clear, /logout`,
           createdAt: new Date(),
         };
         setMessages((prev) => [...prev, userMessage, errorMessage]);
@@ -456,9 +293,7 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
       setInput,
       setMessages,
       createHelpMessage,
-      createPromptsMessage,
       createToolsMessage,
-      createResourcesMessage,
       startStreaming,
     ],
   );
@@ -549,17 +384,8 @@ Or use \`/prompts\` to see available guided workflows for complex tasks.
           onLogout={onLogout}
           onSlashCommand={handleSlashCommand}
           onSendPrompt={handleSendPrompt}
-          onPromptSelect={handlePromptSelect}
         />
       </div>
-
-      {/* Prompt Dialog */}
-      <PromptDialog
-        prompt={selectedPrompt}
-        isOpen={isPromptDialogOpen}
-        onClose={handlePromptDialogClose}
-        onExecute={handlePromptExecute}
-      />
     </SlidingPanel>
   );
 }

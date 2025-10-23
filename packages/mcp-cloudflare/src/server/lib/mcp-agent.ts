@@ -15,7 +15,7 @@ import type { ExecutionContext } from "@cloudflare/workers-types";
  * Sentry MCP Agent - A Durable Object that provides Model Context Protocol access to Sentry.
  *
  * This class extends the Cloudflare agents library McpAgent to provide authenticated,
- * constraint-scoped access to Sentry's API through MCP tools and resources.
+ * constraint-scoped access to Sentry's API through MCP tools.
  *
  * ARCHITECTURE:
  *
@@ -30,7 +30,7 @@ import type { ExecutionContext } from "@cloudflare/workers-types";
  * 2. Authentication: OAuth flow provides user credentials and permissions
  * 3. DO Creation: Agents library creates DO with unique sessionId for this context
  * 4. Initialization: init() configures MCP server with user auth and URL constraints
- * 5. Request Handling: fetch() processes MCP protocol messages (tools, resources, prompts)
+ * 5. Request Handling: fetch() processes MCP protocol messages (tools)
  * 6. Hibernation: DO persists state and hibernates after inactivity
  * 7. Recovery: init() restores state when DO wakes from hibernation
  *

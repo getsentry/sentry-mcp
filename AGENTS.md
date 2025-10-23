@@ -11,8 +11,6 @@
 **MANDATORY reads:**
 - Start here: CLAUDE.md — Contributor doc map
 - Tools → @docs/adding-tools.mdc
-- Prompts → @docs/adding-prompts.mdc
-- Resources → @docs/adding-resources.mdc
 - Testing → @docs/testing.mdc
 - PRs → @docs/pr-management.mdc
 
@@ -34,8 +32,6 @@ sentry-mcp/
 │   ├── mcp-server/          # Main MCP server
 │   │   ├── src/
 │   │   │   ├── tools/       # 19 tool modules
-│   │   │   ├── prompts.ts   # MCP prompts
-│   │   │   ├── resources.ts # MCP resources
 │   │   │   ├── server.ts    # MCP protocol
 │   │   │   ├── api-client/  # Sentry API
 │   │   │   └── internal/    # Shared utils
@@ -95,8 +91,6 @@ grep -r "TODO\|FIXME" src/     # Find tech debt
 
 - API and Tools
   - @docs/adding-tools.mdc — Add new MCP tools
-  - @docs/adding-prompts.mdc — Add prompts
-  - @docs/adding-resources.mdc — Add resources
   - @docs/api-patterns.mdc — Sentry API usage
   - @docs/search-events-api-patterns.md — search_events specifics
 

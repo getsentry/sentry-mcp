@@ -9,7 +9,7 @@ This file provides instructions for Cursor IDE when working with the Sentry MCP 
 
 ## Project Overview
 
-Sentry MCP is a Model Context Protocol server that provides access to Sentry's functionality through tools, prompts, and resources.
+Sentry MCP is a Model Context Protocol server that provides access to Sentry's functionality through tools.
 
 ## 🔴 CRITICAL: Pre-Development Requirements
 
@@ -59,10 +59,8 @@ All documentation is in the `docs/` directory:
 - `common-patterns.mdc` - Reusable code patterns
 - `quality-checks.mdc` - Required quality checks
 
-### Implementation Guides  
+### Implementation Guides
 - `adding-tools.mdc` - Adding new MCP tools
-- `adding-prompts.mdc` - Adding new MCP prompts
-- `adding-resources.mdc` - Adding new MCP resources
 
 ### Technical References
 - `api-patterns.mdc` - Sentry API client usage
@@ -163,11 +161,9 @@ See specific guides for required environment variables:
 ```
 sentry-mcp/
 ├── packages/
-│   ├── mcp-server/           # Main MCP server (tools, prompts, resources)
+│   ├── mcp-server/           # Main MCP server (tools)
 │   │   ├── src/
 │   │   │   ├── tools/        # 19 individual tool modules + utils
-│   │   │   ├── prompts.ts    # MCP prompts
-│   │   │   ├── resources.ts  # MCP resources
 │   │   │   ├── server.ts     # MCP server configuration
 │   │   │   ├── api-client/   # Sentry API client
 │   │   │   └── internal/     # Shared utilities
@@ -192,8 +188,6 @@ When making changes, consider these component interactions:
 
 ### MCP Server (`packages/mcp-server/`)
 - **Tools** (19 modules): Query, create, update Sentry resources
-- **Prompts**: Help text and guidance for LLMs  
-- **Resources**: Static documentation and references
 - **API Client**: Sentry API integration layer
 - **Server**: MCP protocol handler and error formatting
 

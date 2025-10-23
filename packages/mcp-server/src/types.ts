@@ -1,43 +1,11 @@
 /**
- * Core type system for MCP tools and prompts.
+ * Core type system for MCP tools.
  *
- * Defines TypeScript types derived from tool/prompt definitions, handler signatures,
+ * Defines TypeScript types derived from tool definitions, handler signatures,
  * and server context. Uses advanced TypeScript patterns for type-safe parameter
  * extraction and handler registration.
  */
-import type { PROMPT_DEFINITIONS } from "./promptDefinitions";
-import type { z } from "zod";
-import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
 import type { Scope } from "./permissions";
-
-type ZodifyRecord<T extends Record<string, any>> = {
-  [K in keyof T]: z.infer<T[K]>;
-};
-export type PromptName = (typeof PROMPT_DEFINITIONS)[number]["name"];
-
-export type PromptDefinition<T extends PromptName> = Extract<
-  (typeof PROMPT_DEFINITIONS)[number],
-  { name: T }
->;
-
-export type PromptParams<T extends PromptName> = PromptDefinition<T> extends {
-  paramsSchema: Record<string, any>;
-}
-  ? ZodifyRecord<PromptDefinition<T>["paramsSchema"]>
-  : Record<string, never>;
-
-export type PromptHandler<T extends PromptName> = (
-  params: PromptParams<T>,
-) => Promise<GetPromptResult>;
-
-export type PromptHandlerExtended<T extends PromptName> = (
-  context: ServerContext,
-  params: PromptParams<T>,
-) => Promise<string>;
-
-export type PromptHandlers = {
-  [K in PromptName]: PromptHandlerExtended<K>;
-};
 
 /**
  * Constraints that restrict the MCP session scope

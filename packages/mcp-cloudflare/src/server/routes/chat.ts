@@ -10,7 +10,6 @@ import type {
   ChatRequest,
   RateLimitResult,
 } from "../types/chat";
-import { executePromptHandler } from "../lib/mcp-prompts";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
@@ -203,77 +202,6 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       );
     }
 
-    // Process messages to handle prompt executions
-    const processedMessages = await Promise.all(
-      messages.map(async (message) => {
-        // Check if this is a prompt execution message
-        if (
-          message.data?.type === "prompt-execution" &&
-          message.data.promptName
-        ) {
-          const { promptName, parameters } = message.data;
-
-          try {
-            // Execute the prompt handler to get the filled template
-            const promptContent = await executePromptHandler(
-              promptName,
-              parameters || {},
-              {
-                accessToken,
-                sentryHost: c.env.SENTRY_HOST || "sentry.io",
-                constraints: {},
-              },
-            );
-
-            // If we got a filled template, replace the message content
-            if (promptContent) {
-              return {
-                ...message,
-                content: promptContent,
-                // Keep the data to preserve context
-                data: {
-                  ...message.data,
-                  wasExecuted: true,
-                },
-              };
-            }
-            // Handler returned null - prompt not found
-            return {
-              ...message,
-              content: `Error: The prompt "${promptName}" could not be found or executed. Please check the prompt name and try again.`,
-              data: {
-                ...message.data,
-                wasExecuted: false,
-                error: "Prompt not found",
-              },
-            };
-          } catch (error) {
-            // Handler threw an error
-            logIssue(error, {
-              loggerScope: ["cloudflare", "chat", "prompt"],
-              contexts: {
-                prompt: {
-                  name: promptName,
-                },
-              },
-            });
-            return {
-              ...message,
-              content: `Error executing prompt "${promptName}": ${error instanceof Error ? error.message : "Unknown error"}. Please check your parameters and try again.`,
-              data: {
-                ...message.data,
-                wasExecuted: false,
-                error: error instanceof Error ? error.message : "Unknown error",
-              },
-            };
-          }
-        }
-
-        // Return message unchanged if not a prompt execution
-        return message;
-      }),
-    );
-
     // Create MCP client connection to the SSE endpoint
     let mcpClient: MCPClient | null = null;
     const tools: ToolSet = {};
@@ -386,7 +314,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
     const result = streamText({
       model: openai("gpt-4o"),
-      messages: processedMessages,
+      messages,
       tools,
       system: `You are an AI assistant designed EXCLUSIVELY for testing the Sentry MCP service. Your sole purpose is to help users test MCP functionality with their real Sentry account data - nothing more, nothing less.
 

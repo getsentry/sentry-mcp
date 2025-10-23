@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Generate definitions JSON (tools, prompts, resources) for external consumption.
+ * Generate tool definitions JSON for external consumption.
  *
  * Outputs to src/ so they can be bundled and imported by clients and the Cloudflare app.
  */
@@ -15,8 +15,6 @@ const __dirname = path.dirname(__filename);
 
 // Lazy imports of server modules to avoid type bleed
 const toolsModule = await import("../src/tools/index.ts");
-const promptsModule = await import("../src/promptDefinitions.ts");
-const resourcesModule = await import("../src/resources.ts");
 
 function writeJson(file: string, data: unknown) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
@@ -86,98 +84,17 @@ function generateToolDefinitions() {
   return defs.sort(byName);
 }
 
-// Prompts
-function generatePromptDefinitions() {
-  const PROMPT_DEFINITIONS = (
-    promptsModule as unknown as {
-      PROMPT_DEFINITIONS: Array<{
-        name: string;
-        description: string;
-        paramsSchema?: Record<string, ZodTypeAny>;
-      }>;
-    }
-  ).PROMPT_DEFINITIONS;
-
-  if (!Array.isArray(PROMPT_DEFINITIONS))
-    throw new Error("Invalid PROMPT_DEFINITIONS import");
-
-  const defs = PROMPT_DEFINITIONS.map((p) => {
-    const fields = p.paramsSchema || {};
-    return {
-      name: p.name,
-      description: p.description,
-      // Export full JSON Schema under a uniform key: inputSchema
-      inputSchema: zodFieldMapToJsonSchema(fields),
-    };
-  });
-  return defs.sort(byName);
-}
-
-// Resources
-function generateResourceDefinitions() {
-  const RESOURCES = (resourcesModule as unknown as { RESOURCES: unknown[] })
-    .RESOURCES;
-  const isTemplateResource = (
-    resourcesModule as unknown as {
-      isTemplateResource: (r: unknown) => boolean;
-    }
-  ).isTemplateResource;
-
-  if (!Array.isArray(RESOURCES)) throw new Error("Invalid RESOURCES import");
-
-  const defs = RESOURCES.map((resource) => {
-    const base = resource as {
-      name: string;
-      description: string;
-      mimeType: string;
-    };
-    if (isTemplateResource(resource)) {
-      const t = resource as { templateString: string };
-      const variables = Array.from(
-        new Set(
-          (t.templateString.match(/\{([a-zA-Z0-9_]+)\}/g) || []).map((m) =>
-            m.slice(1, -1),
-          ),
-        ),
-      );
-      return {
-        kind: "template" as const,
-        name: base.name,
-        description: base.description,
-        mimeType: base.mimeType,
-        template: t.templateString,
-        variables,
-      };
-    }
-    const u = resource as { uri: string };
-    return {
-      kind: "uri" as const,
-      name: base.name,
-      description: base.description,
-      mimeType: base.mimeType,
-      uri: u.uri,
-    };
-  });
-  return defs.sort(byName);
-}
-
 async function main() {
   try {
-    console.log("Generating definitions (tools, prompts, resources)...");
+    console.log("Generating tool definitions...");
     const outDir = path.join(__dirname, "../src");
     ensureDirExists(outDir);
 
     const tools = generateToolDefinitions();
-    const prompts = generatePromptDefinitions();
-    const resources = generateResourceDefinitions();
 
     writeJson(path.join(outDir, "toolDefinitions.json"), tools);
-    writeJson(path.join(outDir, "promptDefinitions.json"), prompts);
-    writeJson(path.join(outDir, "resourceDefinitions.json"), resources);
 
-    console.log(
-      `✅ Generated: tools(${tools.length}), prompts(${prompts.length}), resources(${resources.length})`,
-    );
+    console.log(`✅ Generated: tools(${tools.length})`);
   } catch (error) {
     const err = error as Error;
     console.error("[ERROR]", err.message, err.stack);
