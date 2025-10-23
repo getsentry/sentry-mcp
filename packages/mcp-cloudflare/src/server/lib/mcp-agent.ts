@@ -83,11 +83,6 @@ class SentryMCPBase extends McpAgent<
    *
    * Called when the DO is first created or wakes from hibernation.
    * Creates a per-DO MCP server instance with context stored in the DO instance.
-   *
-   * NOTE: We cannot use AsyncLocalStorage for Cloudflare because the agents
-   * library's event handling breaks the async context chain. Instead, we store
-   * context in the DO instance and retrieve it via a temporary global variable
-   * during tool invocations.
    */
   async init() {
     // Initialize constraint state
@@ -109,55 +104,55 @@ class SentryMCPBase extends McpAgent<
       sentryHost: (this.env as any)?.SENTRY_HOST || "sentry.io",
     };
 
-    console.log('[mcp-agent] init() creating server for userId:', this.serverContext.userId);
-
     // Create a new MCP server for this DO instance
     this.server = new McpServer({
       name: "Sentry MCP",
       version: LIB_VERSION,
     });
 
-    // Store this DO instance in a global so handlers can access its context
-    // This is a workaround because AsyncLocalStorage doesn't work with the agents library
-    (globalThis as any).__currentSentryMCPAgent = this;
-
-    try {
-      // Configure the server - handlers will use the global to get context
-      await configureServer({
-        server: this.server,
-        onToolComplete: () => {
-          this.ctx.waitUntil(Sentry.flush(2000));
-        },
-      });
-
-      console.log('[mcp-agent] init() server configured');
-    } finally {
-      // Clean up the global reference
-      delete (globalThis as any).__currentSentryMCPAgent;
-    }
+    // Configure the server
+    await configureServer({
+      server: this.server,
+      onToolComplete: () => {
+        this.ctx.waitUntil(Sentry.flush(2000));
+      },
+    });
   }
 
   /**
-   * Override fetch to make context available for tool handlers.
-   * Sets this DO instance in a global so handlers can access its context.
+   * Override onStart to wrap the transport's onmessage callback with async context.
+   *
+   * After the parent's onStart connects the server to transport, we intercept
+   * the transport's onmessage callback and wrap it with runWithContext().
+   * This ensures AsyncLocalStorage propagates through to tool handlers.
    */
-  async fetch(request: Request): Promise<Response> {
-    console.log('[mcp-agent] fetch() called for userId:', this.serverContext.userId);
+  async onStart(
+    props?: WorkerProps & {
+      organizationSlug?: string;
+      projectSlug?: string;
+    },
+  ) {
+    // Call parent implementation which connects server to transport
+    await super.onStart(props);
 
-    // Store this DO instance in a global so handlers can access its context
-    // This is needed because AsyncLocalStorage doesn't propagate through the agents library
-    (globalThis as any).__currentSentryMCPAgent = this;
-
-    try {
-      // Also wrap with runWithContext for any code that might still use AsyncLocalStorage
-      return await runWithContext(this.serverContext, () => {
-        console.log('[mcp-agent] Inside runWithContext, about to call super.fetch()');
-        return super.fetch(request);
-      });
-    } finally {
-      // Clean up after the request completes
-      delete (globalThis as any).__currentSentryMCPAgent;
+    // Get the transport after parent has set it up
+    const transport = (this as any)._transport;
+    if (!transport) {
+      throw new Error("Transport not initialized after onStart");
     }
+
+    // Store the original onmessage callback
+    const originalOnMessage = transport.onmessage;
+    if (!originalOnMessage) {
+      throw new Error("Transport onmessage not set after server.connect()");
+    }
+
+    // Wrap it with our async context
+    transport.onmessage = (message: any, extra?: any) => {
+      runWithContext(this.serverContext, () => {
+        originalOnMessage.call(transport, message, extra);
+      });
+    };
   }
 }
 

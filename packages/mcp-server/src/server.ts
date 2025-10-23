@@ -38,9 +38,7 @@ import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
-import {
-  getConstraintParametersToInject,
-} from "./internal/constraint-helpers";
+import { getConstraintParametersToInject } from "./internal/constraint-helpers";
 import { getServerContext } from "./context";
 
 const toolLogger = getLogger(["server", "tools"]);
@@ -327,9 +325,7 @@ export async function configureServer({
         try {
           return await startNewTrace(async () => {
             // Get context from AsyncLocalStorage at request time
-            console.log('[server] Tool handler called, attempting to get context...');
             const context = getServerContext();
-            console.log('[server] Context retrieved successfully for userId:', context.userId);
 
             // Get granted scopes with default to read-only scopes
             const grantedScopes: Set<Scope> = context.grantedScopes

@@ -15,39 +15,28 @@ import type { ServerContext } from "./types";
 const contextStorage = new AsyncLocalStorage<ServerContext>();
 
 /**
- * Get the current ServerContext from AsyncLocalStorage or Cloudflare global.
+ * Get the current ServerContext from AsyncLocalStorage.
  *
  * This should only be called from within the MCP server infrastructure
  * (e.g., server.ts during tool registration). Tool handlers should receive
  * context as an explicit parameter.
  *
- * For Cloudflare Workers, AsyncLocalStorage doesn't propagate through the
- * agents library's event handling, so we fall back to checking a global
- * reference to the current Durable Object.
- *
- * @throws {Error} If context is not set (not within runWithContext or Cloudflare DO)
+ * @throws {Error} If context is not set (not within runWithContext)
  * @returns The current ServerContext
  *
  * @example
  * ```typescript
  * // In server.ts tool registration
  * server.tool("tool_name", schema, async (params) => {
- *   const context = getServerContext(); // Get from AsyncLocalStorage or Cloudflare global
+ *   const context = getServerContext(); // Get from AsyncLocalStorage
  *   return tool.handler(params, context); // Pass explicitly to handler
  * });
  * ```
  */
 export function getServerContext(): ServerContext {
-  // First try AsyncLocalStorage (works for stdio transport)
   const context = contextStorage.getStore();
   if (context) {
     return context;
-  }
-
-  // Fallback for Cloudflare: check if there's a current SentryMCPAgent in the global
-  const agent = (globalThis as any).__currentSentryMCPAgent;
-  if (agent?.serverContext) {
-    return agent.serverContext;
   }
 
   throw new Error(
