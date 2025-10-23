@@ -1012,4 +1012,107 @@ describe("get_issue_details", () => {
     expect(result).toContain("### Error");
     expect(result).toContain("Something went wrong");
   });
+
+  it("displays context (extra) data when present", async () => {
+    const eventWithContext = {
+      id: "abc123def456",
+      type: "error",
+      title: "TypeError",
+      culprit: "app.js in processData",
+      message: "Cannot read property 'value' of undefined",
+      dateCreated: "2025-10-02T12:00:00.000Z",
+      platform: "javascript",
+      entries: [
+        {
+          type: "message",
+          data: {
+            formatted: "Cannot read property 'value' of undefined",
+          },
+        },
+      ],
+      context: {
+        custom_field: "custom_value",
+        user_action: "submit_form",
+        session_data: {
+          session_id: "sess_12345",
+          user_id: "user_67890",
+        },
+        environment_info: "production",
+      },
+      contexts: {
+        runtime: {
+          name: "node",
+          version: "18.0.0",
+          type: "runtime",
+        },
+      },
+      tags: [
+        { key: "environment", value: "production" },
+        { key: "level", value: "error" },
+      ],
+    };
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CONTEXT-001/",
+        () => {
+          return HttpResponse.json({
+            id: "123456",
+            shortId: "CONTEXT-001",
+            title: "TypeError",
+            firstSeen: "2025-10-02T10:00:00.000Z",
+            lastSeen: "2025-10-02T12:00:00.000Z",
+            count: "5",
+            userCount: 2,
+            permalink: "https://sentry-mcp-evals.sentry.io/issues/123456/",
+            project: {
+              id: "4509062593708032",
+              name: "TEST-PROJECT",
+              slug: "test-project",
+              platform: "javascript",
+            },
+            status: "unresolved",
+            culprit: "app.js in processData",
+            type: "error",
+            platform: "javascript",
+          });
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CONTEXT-001/events/latest/",
+        () => {
+          return HttpResponse.json(eventWithContext);
+        },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CONTEXT-001",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    // Verify the context (extra) data is displayed
+    expect(result).toContain("### Extra Data");
+    expect(result).toContain("Additional data attached to this event");
+    expect(result).toContain('**custom_field**: "custom_value"');
+    expect(result).toContain('**user_action**: "submit_form"');
+    expect(result).toContain("**session_data**:");
+    expect(result).toContain('"session_id": "sess_12345"');
+    expect(result).toContain('"user_id": "user_67890"');
+    expect(result).toContain('**environment_info**: "production"');
+    // Verify contexts are still displayed
+    expect(result).toContain("### Additional Context");
+  });
 });

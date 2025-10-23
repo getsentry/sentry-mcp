@@ -80,15 +80,6 @@ function createResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.mcpClientName && {
-              "mcp.client.name": context.mcpClientName,
-            }),
-            ...(context.mcpClientVersion && {
-              "mcp.client.version": context.mcpClientVersion,
-            }),
-            ...(context.mcpProtocolVersion && {
-              "mcp.protocol.version": context.mcpProtocolVersion,
-            }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
             ...(context.constraints.organizationSlug && {
@@ -137,15 +128,6 @@ function createTemplateResourceHandler(
           attributes: {
             "mcp.resource.name": resource.name,
             "mcp.resource.uri": uri.toString(),
-            ...(context.mcpClientName && {
-              "mcp.client.name": context.mcpClientName,
-            }),
-            ...(context.mcpClientVersion && {
-              "mcp.client.version": context.mcpClientVersion,
-            }),
-            ...(context.mcpProtocolVersion && {
-              "mcp.protocol.version": context.mcpProtocolVersion,
-            }),
             "mcp.server.name": "Sentry MCP",
             "mcp.server.version": LIB_VERSION,
             ...(context.constraints.organizationSlug && {
@@ -200,12 +182,10 @@ export async function configureServer({
   server,
   context,
   onToolComplete,
-  onInitialized,
 }: {
   server: McpServer;
   context: ServerContext;
   onToolComplete?: () => void;
-  onInitialized?: () => void | Promise<void>;
 }) {
   // Get granted scopes with default to read-only scopes
   // Normalize to a mutable Set regardless of input being Set or ReadonlySet
@@ -224,47 +204,6 @@ export async function configureServer({
     };
 
     logIssue(error, transportLogOptions);
-  };
-
-  // Hook into the initialized notification to capture client information
-  server.server.oninitialized = () => {
-    const serverInstance = server.server as any;
-    const clientInfo = serverInstance._clientVersion;
-    const protocolVersion = serverInstance._protocolVersion;
-
-    // Update the context object with client information
-    if (clientInfo) {
-      context.mcpClientName = clientInfo.name;
-      context.mcpClientVersion = clientInfo.version;
-    }
-
-    if (protocolVersion) {
-      context.mcpProtocolVersion = protocolVersion;
-    }
-
-    // Call the custom onInitialized handler if provided
-    // Note: MCP SDK doesn't support async callbacks, so we handle promises
-    // without awaiting to avoid blocking the initialization flow
-    if (onInitialized) {
-      const result = onInitialized();
-      if (result instanceof Promise) {
-        result.catch((error) => {
-          const lifecycleLogOptions: LogIssueOptions = {
-            loggerScope: ["server", "lifecycle"] as const,
-            contexts: {
-              lifecycle: {
-                hook: "onInitialized",
-                clientName: context.mcpClientName ?? null,
-                clientVersion: context.mcpClientVersion ?? null,
-                protocolVersion: context.mcpProtocolVersion ?? null,
-              },
-            },
-          };
-
-          logIssue(error, lifecycleLogOptions);
-        });
-      }
-    }
   };
 
   for (const resource of RESOURCES) {
@@ -308,15 +247,6 @@ export async function configureServer({
                 name: `prompts/get ${prompt.name}`,
                 attributes: {
                   "mcp.prompt.name": prompt.name,
-                  ...(context.mcpClientName && {
-                    "mcp.client.name": context.mcpClientName,
-                  }),
-                  ...(context.mcpClientVersion && {
-                    "mcp.client.version": context.mcpClientVersion,
-                  }),
-                  ...(context.mcpProtocolVersion && {
-                    "mcp.protocol.version": context.mcpProtocolVersion,
-                  }),
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
                   ...(context.constraints.organizationSlug && {
@@ -405,136 +335,123 @@ export async function configureServer({
       ),
     );
 
-    // Conditionally register tool with or without annotations
-    const toolHandler = async (
-      params: any,
-      extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-    ) => {
-      try {
-        return await startNewTrace(async () => {
-          return await startSpan(
-            {
-              name: `tools/call ${tool.name}`,
-              attributes: {
-                "mcp.tool.name": tool.name,
-                ...(context.mcpClientName && {
-                  "mcp.client.name": context.mcpClientName,
-                }),
-                ...(context.mcpClientVersion && {
-                  "mcp.client.version": context.mcpClientVersion,
-                }),
-                ...(context.mcpProtocolVersion && {
-                  "mcp.protocol.version": context.mcpProtocolVersion,
-                }),
-                "mcp.server.name": MCP_SERVER_NAME,
-                "mcp.server.version": LIB_VERSION,
-                ...(context.constraints.organizationSlug && {
-                  "sentry-mcp.constraint-organization":
-                    context.constraints.organizationSlug,
-                }),
-                ...(context.constraints.projectSlug && {
-                  "sentry-mcp.constraint-project":
-                    context.constraints.projectSlug,
-                }),
-                ...extractMcpParameters(params || {}),
-              },
-            },
-            async (span) => {
-              if (context.userId) {
-                setUser({
-                  id: context.userId,
-                });
-              }
-              if (context.clientId) {
-                setTag("client.id", context.clientId);
-              }
-
-              try {
-                // Double-check scopes at runtime (defense in depth)
-                if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-                  throw new Error(
-                    `Tool '${tool.name}' is not allowed - missing required scopes`,
-                  );
-                }
-
-                // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
-                const applicableConstraints = getConstraintParametersToInject(
-                  context.constraints,
-                  tool.inputSchema,
-                );
-
-                const paramsWithConstraints = {
-                  ...params,
-                  ...applicableConstraints,
-                };
-
-                const output = await tool.handler(
-                  paramsWithConstraints,
-                  context,
-                );
-                span.setStatus({
-                  code: 1, // ok
-                });
-                // if the tool returns a string, assume it's a message
-                if (typeof output === "string") {
-                  return {
-                    content: [
-                      {
-                        type: "text" as const,
-                        text: output,
-                      },
-                    ],
-                  };
-                }
-                // if the tool returns a list, assume it's a content list
-                if (Array.isArray(output)) {
-                  return {
-                    content: output,
-                  };
-                }
-                throw new Error(`Invalid tool output: ${output}`);
-              } catch (error) {
-                span.setStatus({
-                  code: 2, // error
-                });
-
-                // CRITICAL: Tool errors MUST be returned as formatted text responses,
-                // NOT thrown as exceptions. This ensures consistent error handling
-                // and prevents the MCP client from receiving raw error objects.
-                //
-                // The logAndFormatError function provides user-friendly error messages
-                // with appropriate formatting for different error types:
-                // - UserInputError: Clear guidance for fixing input problems
-                // - ConfigurationError: Clear guidance for fixing configuration issues
-                // - ApiError: HTTP status context with helpful messaging
-                // - System errors: Sentry event IDs for debugging
-                //
-                // DO NOT change this to throw error - it breaks error handling!
-                return {
-                  content: [
-                    {
-                      type: "text" as const,
-                      text: await formatErrorForUser(error),
-                    },
-                  ],
-                  isError: true,
-                };
-              }
-            },
-          );
-        });
-      } finally {
-        onToolComplete?.();
-      }
-    };
-
-    // Register tool with MCP server
     server.tool(
       tool.name,
       tool.description,
       modifiedInputSchema,
       tool.annotations,
-      toolHandler,
+      async (
+        params: any,
+        extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
+      ) => {
+        try {
+          return await startNewTrace(async () => {
+            return await startSpan(
+              {
+                name: `tools/call ${tool.name}`,
+                attributes: {
+                  "mcp.tool.name": tool.name,
+                  "mcp.server.name": MCP_SERVER_NAME,
+                  "mcp.server.version": LIB_VERSION,
+                  ...(context.constraints.organizationSlug && {
+                    "sentry-mcp.constraint-organization":
+                      context.constraints.organizationSlug,
+                  }),
+                  ...(context.constraints.projectSlug && {
+                    "sentry-mcp.constraint-project":
+                      context.constraints.projectSlug,
+                  }),
+                  ...extractMcpParameters(params || {}),
+                },
+              },
+              async (span) => {
+                if (context.userId) {
+                  setUser({
+                    id: context.userId,
+                  });
+                }
+                if (context.clientId) {
+                  setTag("client.id", context.clientId);
+                }
+
+                try {
+                  // Double-check scopes at runtime (defense in depth)
+                  if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
+                    throw new Error(
+                      `Tool '${tool.name}' is not allowed - missing required scopes`,
+                    );
+                  }
+
+                  // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
+                  const applicableConstraints = getConstraintParametersToInject(
+                    context.constraints,
+                    tool.inputSchema,
+                  );
+
+                  const paramsWithConstraints = {
+                    ...params,
+                    ...applicableConstraints,
+                  };
+
+                  const output = await tool.handler(
+                    paramsWithConstraints,
+                    context,
+                  );
+                  span.setStatus({
+                    code: 1, // ok
+                  });
+                  // if the tool returns a string, assume it's a message
+                  if (typeof output === "string") {
+                    return {
+                      content: [
+                        {
+                          type: "text" as const,
+                          text: output,
+                        },
+                      ],
+                    };
+                  }
+                  // if the tool returns a list, assume it's a content list
+                  if (Array.isArray(output)) {
+                    return {
+                      content: output,
+                    };
+                  }
+                  throw new Error(`Invalid tool output: ${output}`);
+                } catch (error) {
+                  span.setStatus({
+                    code: 2, // error
+                  });
+
+                  // CRITICAL: Tool errors MUST be returned as formatted text responses,
+                  // NOT thrown as exceptions. This ensures consistent error handling
+                  // and prevents the MCP client from receiving raw error objects.
+                  //
+                  // The logAndFormatError function provides user-friendly error messages
+                  // with appropriate formatting for different error types:
+                  // - UserInputError: Clear guidance for fixing input problems
+                  // - ConfigurationError: Clear guidance for fixing configuration issues
+                  // - ApiError: HTTP status context with helpful messaging
+                  // - System errors: Sentry event IDs for debugging
+                  //
+                  // DO NOT change this to throw error - it breaks error handling!
+                  return {
+                    content: [
+                      {
+                        type: "text" as const,
+                        text: await formatErrorForUser(error),
+                      },
+                    ],
+                    isError: true,
+                  };
+                }
+              },
+            );
+          });
+        } finally {
+          onToolComplete?.();
+        }
+      },
     );
   }
 }
