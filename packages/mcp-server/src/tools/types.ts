@@ -14,7 +14,7 @@ export interface ToolConfig<
   description: string;
   inputSchema: TSchema;
   requiredScopes: Scope[];
-  annotations?: {
+  annotations: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
     idempotentHint?: boolean;
