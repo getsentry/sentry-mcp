@@ -6,8 +6,6 @@
  */
 import { Hono } from "hono";
 import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
-import PROMPT_DEFINITIONS from "@sentry/mcp-server/promptDefinitions";
-import RESOURCE_DEFINITIONS from "@sentry/mcp-server/resourceDefinitions";
 
 function withCors(json: unknown, status = 200) {
   const body = JSON.stringify(json);
@@ -29,16 +27,8 @@ export default new Hono()
   // Index: advertise available endpoints
   .get("/", (c) =>
     withCors({
-      endpoints: [
-        "/.mcp/tools.json",
-        "/.mcp/prompts.json",
-        "/.mcp/resources.json",
-      ],
+      endpoints: ["/.mcp/tools.json"],
     }),
   )
   // Tools
-  .get("/tools.json", (c) => withCors(TOOL_DEFINITIONS))
-  // Prompts
-  .get("/prompts.json", (c) => withCors(PROMPT_DEFINITIONS))
-  // Resources
-  .get("/resources.json", (c) => withCors(RESOURCE_DEFINITIONS));
+  .get("/tools.json", (c) => withCors(TOOL_DEFINITIONS));

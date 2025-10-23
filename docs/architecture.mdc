@@ -9,7 +9,7 @@ System design and package interactions for the Sentry MCP server.
 
 ## Overview
 
-Sentry MCP is a Model Context Protocol server that exposes Sentry's functionality to AI assistants. It provides tools, prompts, and resources that enable LLMs to interact with Sentry's error tracking, performance monitoring, and other features.
+Sentry MCP is a Model Context Protocol server that exposes Sentry's functionality to AI assistants. It provides tools that enable LLMs to interact with Sentry's error tracking, performance monitoring, and other features.
 
 ## Package Structure
 
@@ -35,10 +35,9 @@ src/
 ├── api-client/         # Sentry API client
 ├── internal/           # Utilities (not exposed)
 ├── transports/         # Transport implementations
-├── tools.ts            # Tool handler implementations
+├── tools/              # Tool implementations
 ├── toolDefinitions.ts  # Tool schemas and metadata
-├── prompts.ts          # Prompt implementations
-├── resources.ts        # Resource handlers
+├── server.ts           # MCP server configuration
 ├── errors.ts           # Custom error types
 └── types.ts            # TypeScript definitions
 ```
@@ -232,21 +231,6 @@ Execute actions and retrieve data:
 - `create_issue_comment` - Add comments
 - `search_docs` - Search Sentry documentation
 - `get_doc` - Fetch full documentation pages
-
-### Prompts
-
-Multi-step workflows:
-
-- `find_errors_in_file` - Search for errors in a specific file
-- `fix_issue_with_seer` - AI-suggested fixes
-
-### Resources
-
-External documentation and data:
-
-- Platform docs (React, Python, etc.)
-- API references
-- Configuration examples
 
 ## Performance Considerations
 

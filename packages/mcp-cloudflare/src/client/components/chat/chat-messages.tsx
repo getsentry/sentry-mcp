@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { MessagePart } from ".";
-import { PromptActions } from "../ui/prompt-actions";
 import { ToolActions } from "../ui/tool-actions";
 import type { Message, ProcessedMessagePart, ChatMessagesProps } from "./types";
 import { isAuthError, getErrorMessage } from "../../utils/chat-error-handler";
@@ -78,7 +77,6 @@ export function ChatMessages({
   isMessageStreaming,
   error,
   onRetry,
-  onPromptSelect,
   onSlashCommand,
 }: ChatMessagesProps) {
   const { handleOAuthLogin } = useAuth();
@@ -135,17 +133,10 @@ export function ChatMessages({
               (m) => m.id === item.messageId,
             );
             const messageData = originalMessage?.data as any;
-            const hasPromptActions =
-              messageData?.type === "prompts-list" &&
-              messageData?.prompts &&
-              Array.isArray(messageData.prompts);
             const hasToolActions =
               messageData?.type === "tools-list" &&
               messageData?.toolsDetailed &&
               Array.isArray(messageData.toolsDetailed);
-            const hasSlashCommandActions =
-              messageData?.type === "help-message" &&
-              messageData?.hasSlashCommands;
 
             return (
               <div key={`${item.messageId}-part-${item.partIndex}`}>
@@ -158,18 +149,6 @@ export function ChatMessages({
                   messageData={originalMessage?.data}
                   onSlashCommand={onSlashCommand}
                 />
-                {/* Show prompt actions only for the last part of messages with prompt metadata */}
-                {hasPromptActions &&
-                  item.partIndex ===
-                    (originalMessage?.parts?.length ?? 1) - 1 &&
-                  onPromptSelect && (
-                    <div className="mr-8 mt-4">
-                      <PromptActions
-                        prompts={messageData.prompts}
-                        onPromptSelect={onPromptSelect}
-                      />
-                    </div>
-                  )}
                 {/* Show tool actions list for tools-list messages */}
                 {hasToolActions &&
                   item.partIndex ===

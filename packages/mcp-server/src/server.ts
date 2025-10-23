@@ -1,8 +1,8 @@
 /**
  * MCP Server Configuration and Request Handling Infrastructure.
  *
- * This module orchestrates tool execution, prompt handling, resource management,
- * and telemetry collection in a unified server interface for LLMs.
+ * This module orchestrates tool execution and telemetry collection
+ * in a unified server interface for LLMs.
  *
  * **Configuration Example:**
  * ```typescript
@@ -23,18 +23,10 @@ import type {
   ServerRequest,
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
-import type {
-  ReadResourceCallback,
-  ReadResourceTemplateCallback,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Variables } from "@modelcontextprotocol/sdk/shared/uriTemplate.js";
 import tools from "./tools/index";
 import type { ServerContext } from "./types";
 import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
 import { getLogger, logIssue, type LogIssueOptions } from "./telem/logging";
-import { RESOURCES, isTemplateResource } from "./resources";
-import { PROMPT_DEFINITIONS } from "./promptDefinitions";
-import { PROMPT_HANDLERS } from "./prompts";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
@@ -65,102 +57,7 @@ function extractMcpParameters(args: Record<string, unknown>) {
 }
 
 /**
- * Creates a telemetry wrapper for regular URI resource handlers.
- * Captures URI access and user context for observability.
- */
-function createResourceHandler(
-  resource: { name: string; handler: ReadResourceCallback },
-  context: ServerContext,
-): ReadResourceCallback {
-  return async (uri: URL, extra: RequestHandlerExtra<any, any>) => {
-    return await startNewTrace(async () => {
-      return await startSpan(
-        {
-          name: `resources/read ${resource.name}`,
-          attributes: {
-            "mcp.resource.name": resource.name,
-            "mcp.resource.uri": uri.toString(),
-            "mcp.server.name": "Sentry MCP",
-            "mcp.server.version": LIB_VERSION,
-            ...(context.constraints.organizationSlug && {
-              "sentry-mcp.constraint-organization":
-                context.constraints.organizationSlug,
-            }),
-            ...(context.constraints.projectSlug && {
-              "sentry-mcp.constraint-project": context.constraints.projectSlug,
-            }),
-          },
-        },
-        async () => {
-          if (context.userId) {
-            setUser({
-              id: context.userId,
-            });
-          }
-          if (context.clientId) {
-            setTag("client.id", context.clientId);
-          }
-
-          return resource.handler(uri, extra);
-        },
-      );
-    });
-  };
-}
-
-/**
- * Creates a telemetry wrapper for URI template resource handlers.
- * Captures template parameters and user context for observability.
- */
-function createTemplateResourceHandler(
-  resource: { name: string; handler: ReadResourceCallback },
-  context: ServerContext,
-): ReadResourceTemplateCallback {
-  return async (
-    uri: URL,
-    variables: Variables,
-    extra: RequestHandlerExtra<any, any>,
-  ) => {
-    return await startNewTrace(async () => {
-      return await startSpan(
-        {
-          name: `resources/read ${resource.name}`,
-          attributes: {
-            "mcp.resource.name": resource.name,
-            "mcp.resource.uri": uri.toString(),
-            "mcp.server.name": "Sentry MCP",
-            "mcp.server.version": LIB_VERSION,
-            ...(context.constraints.organizationSlug && {
-              "sentry-mcp.constraint-organization":
-                context.constraints.organizationSlug,
-            }),
-            ...(context.constraints.projectSlug && {
-              "sentry-mcp.constraint-project": context.constraints.projectSlug,
-            }),
-            ...extractMcpParameters(variables),
-          },
-        },
-        async () => {
-          if (context.userId) {
-            setUser({
-              id: context.userId,
-            });
-          }
-          if (context.clientId) {
-            setTag("client.id", context.clientId);
-          }
-
-          // The MCP SDK has already constructed the URI from the template and variables
-          // We just need to call the handler with the constructed URI
-          return resource.handler(uri, extra);
-        },
-      );
-    });
-  };
-}
-
-/**
- * Configures an MCP server with all tools, prompts, resources, and telemetry.
+ * Configures an MCP server with all tools and telemetry.
  *
  * Transforms a bare MCP server instance into a fully-featured Sentry integration
  * with comprehensive observability, error handling, and handler registration.
@@ -205,103 +102,6 @@ export async function configureServer({
 
     logIssue(error, transportLogOptions);
   };
-
-  for (const resource of RESOURCES) {
-    if (isTemplateResource(resource)) {
-      // Handle URI template resources
-      server.registerResource(
-        resource.name,
-        resource.template,
-        {
-          description: resource.description,
-          mimeType: resource.mimeType,
-        },
-        createTemplateResourceHandler(resource, context),
-      );
-    } else {
-      // Handle regular URI resources
-      server.registerResource(
-        resource.name,
-        resource.uri,
-        {
-          description: resource.description,
-          mimeType: resource.mimeType,
-        },
-        createResourceHandler(resource, context),
-      );
-    }
-  }
-
-  for (const prompt of PROMPT_DEFINITIONS) {
-    const handler = PROMPT_HANDLERS[prompt.name];
-
-    server.prompt(
-      prompt.name,
-      prompt.description,
-      prompt.paramsSchema ? prompt.paramsSchema : {},
-      async (...args) => {
-        try {
-          return await startNewTrace(async () => {
-            return await startSpan(
-              {
-                name: `prompts/get ${prompt.name}`,
-                attributes: {
-                  "mcp.prompt.name": prompt.name,
-                  "mcp.server.name": MCP_SERVER_NAME,
-                  "mcp.server.version": LIB_VERSION,
-                  ...(context.constraints.organizationSlug && {
-                    "sentry-mcp.constraint-organization":
-                      context.constraints.organizationSlug,
-                  }),
-                  ...(context.constraints.projectSlug && {
-                    "sentry-mcp.constraint-project":
-                      context.constraints.projectSlug,
-                  }),
-                  ...extractMcpParameters(args[0] || {}),
-                },
-              },
-              async (span) => {
-                if (context.userId) {
-                  setUser({
-                    id: context.userId,
-                  });
-                }
-                if (context.clientId) {
-                  setTag("client.id", context.clientId);
-                }
-                try {
-                  // TODO(dcramer): I'm too dumb to figure this out
-                  // @ts-ignore
-                  const output = await handler(context, ...args);
-                  span.setStatus({
-                    code: 1, // ok
-                  });
-                  return {
-                    messages: [
-                      {
-                        role: "user" as const,
-                        content: {
-                          type: "text" as const,
-                          text: output,
-                        },
-                      },
-                    ],
-                  };
-                } catch (error) {
-                  span.setStatus({
-                    code: 2, // error
-                  });
-                  throw error;
-                }
-              },
-            );
-          });
-        } finally {
-          onToolComplete?.();
-        }
-      },
-    );
-  }
 
   for (const [toolKey, tool] of Object.entries(tools)) {
     // Check if this tool is allowed based on granted scopes

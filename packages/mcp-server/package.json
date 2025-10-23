@@ -62,25 +62,9 @@
       "types": "./dist/server.ts",
       "default": "./dist/server.js"
     },
-    "./prompts": {
-      "types": "./dist/prompts.ts",
-      "default": "./dist/prompts.js"
-    },
     "./toolDefinitions": {
       "types": "./dist/toolDefinitions.ts",
       "default": "./dist/toolDefinitions.js"
-    },
-    "./promptDefinitions": {
-      "types": "./dist/promptDefinitionsData.ts",
-      "default": "./dist/promptDefinitionsData.js"
-    },
-    "./resourceDefinitions": {
-      "types": "./dist/resourceDefinitions.ts",
-      "default": "./dist/resourceDefinitions.js"
-    },
-    "./promptDefinitionsData": {
-      "types": "./dist/promptDefinitionsData.ts",
-      "default": "./dist/promptDefinitionsData.js"
     },
     "./types": {
       "types": "./dist/types.ts",

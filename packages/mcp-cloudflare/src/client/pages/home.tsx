@@ -1,6 +1,4 @@
 import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
-import RESOURCE_DEFINITIONS from "@sentry/mcp-server/resourceDefinitions";
-import PROMPT_DEFINITIONS from "@sentry/mcp-server/promptDefinitions";
 import { Link } from "../components/ui/base";
 import {
   Accordion,
@@ -17,7 +15,6 @@ import StdioSetup from "../components/fragments/stdio-setup";
 import Section from "../components/ui/section";
 import { Prose } from "../components/ui/prose";
 import JsonSchemaParams from "../components/ui/json-schema-params";
-import TemplateVars from "../components/ui/template-vars";
 
 interface HomeProps {
   onChatClick: () => void;
@@ -194,81 +191,6 @@ export default function Home({ onChatClick }: HomeProps) {
                 </AccordionItem>
               ),
             )}
-          </Accordion>
-        </Section>
-
-        <Section heading="Available Prompts" id="prompts">
-          <Prose>
-            <p>
-              Prompts are pre-configured workflows that can be used to help with
-              common tasks.
-            </p>
-          </Prose>
-          <Accordion type="single" collapsible className="w-full space-y-1">
-            {PROMPT_DEFINITIONS.sort((a, b) =>
-              a.name.localeCompare(b.name),
-            ).map((prompt) => (
-              <AccordionItem value={prompt.name} key={prompt.name}>
-                <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
-                  {prompt.name}
-                </AccordionTrigger>
-                <AccordionContent className="max-w-none py-4">
-                  <Prose>
-                    <p className="mb-0">{prompt.description.split("\n")[0]}</p>
-                  </Prose>
-                  {/* Parameters (JSON Schema) */}
-                  <div className="mt-4">
-                    <JsonSchemaParams schema={prompt.inputSchema as unknown} />
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Section>
-
-        <Section heading="Available Resources" id="resources">
-          <Prose>
-            <p>
-              Generally speaking, resources that are made available can also be
-              found{" "}
-              <a href="https://github.com/getsentry/sentry-ai-rules">
-                on GitHub in the sentry-ai-rules repository
-              </a>
-              .
-            </p>
-          </Prose>
-          <Accordion type="single" collapsible className="w-full space-y-1">
-            {RESOURCE_DEFINITIONS.sort((a, b) =>
-              a.name.localeCompare(b.name),
-            ).map((resource) => (
-              <AccordionItem value={resource.name} key={resource.name}>
-                <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
-                  {resource.name}
-                </AccordionTrigger>
-                <AccordionContent className="max-w-none py-4">
-                  <Prose>
-                    <p className="mb-0">
-                      {resource.description.split("\n")[0]}
-                    </p>
-                  </Prose>
-                  {/* Template variables (if applicable) */}
-                  {resource.kind === "template" ? (
-                    <div className="mt-4">
-                      <TemplateVars
-                        variables={
-                          (
-                            resource as unknown as {
-                              variables?: readonly string[];
-                            }
-                          ).variables
-                        }
-                        title="Parameters"
-                      />
-                    </div>
-                  ) : null}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
           </Accordion>
         </Section>
 
