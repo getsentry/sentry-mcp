@@ -1,0 +1,25 @@
+/**
+ * Wrangler config for the docs worker.
+ * See https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sentry-mcp-docs",
+  "main": "./src/index.ts",
+  "compatibility_date": "2025-03-21",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env",
+    "global_fetch_strictly_public"
+  ],
+  "keep_vars": true,
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {},
+  "dev": {
+    "port": 8790
+  }
+}

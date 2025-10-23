@@ -1,0 +1,42 @@
+{
+  "name": "@sentry/mcp-docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "FSL-1.1-ALv2",
+  "files": ["./dist/*"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && vite build -c vite.client.config.ts",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "@tailwindcss/typography": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "autoprefixer": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "vite": "catalog:",
+    "wrangler": "catalog:"
+  },
+  "dependencies": {
+    "@sentry/mcp-server": "workspace:*",
+    "clsx": "catalog:",
+    "hono": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router-dom": "catalog:",
+    "tailwind-merge": "catalog:"
+  }
+}
