@@ -74,6 +74,10 @@ export default defineTool({
       .optional(),
     guide: ParamSentryGuide.optional(),
   },
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     let output = `# Documentation Search Results\n\n`;
     output += `**Query**: "${params.query}"\n`;

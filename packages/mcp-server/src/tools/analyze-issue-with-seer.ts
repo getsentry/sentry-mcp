@@ -77,6 +77,11 @@ export default defineTool({
       .describe("Optional custom instruction for the AI analysis")
       .optional(),
   },
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

@@ -48,6 +48,10 @@ export default defineTool({
     regionUrl: ParamRegionUrl.optional(),
     traceId: ParamTraceId,
   },
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     // Validate trace ID format
     if (!/^[0-9a-fA-F]{32}$/.test(params.traceId)) {

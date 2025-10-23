@@ -29,6 +29,10 @@ export default defineTool({
     regionUrl: ParamRegionUrl.optional(),
     query: ParamSearchQuery.optional(),
   },
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

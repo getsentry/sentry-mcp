@@ -45,6 +45,11 @@ export default defineTool({
       .trim()
       .describe("The name of the DSN to create, for example 'Production'."),
   },
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

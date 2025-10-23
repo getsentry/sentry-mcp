@@ -14,6 +14,12 @@ export interface ToolConfig<
   description: string;
   inputSchema: TSchema;
   requiredScopes: Scope[];
+  annotations: {
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
+  };
   handler: (
     params: z.infer<z.ZodObject<TSchema>>,
     context: ServerContext,

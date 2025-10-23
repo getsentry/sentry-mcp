@@ -59,10 +59,49 @@ export default defineTool({
     regionUrl: z.string().optional().describe("Optional region URL"),
     yourParam: z.string().describe("What values are expected"),
   },
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     // Implementation here
   },
 });
+```
+
+### Safety Annotations
+
+**REQUIRED**: All tools must include safety annotations for MCP directory compliance.
+
+**Available annotations:**
+- `readOnlyHint` (boolean): Tool doesn't modify data
+- `destructiveHint` (boolean): Tool may modify/delete existing data
+- `idempotentHint` (boolean): Repeated calls with same arguments have no additional effect
+- `openWorldHint` (boolean): Tool interacts with external services (default: true for API calls)
+
+**Annotation patterns:**
+
+```typescript
+// Read-only tools (queries, lists, searches)
+annotations: {
+  readOnlyHint: true,
+  openWorldHint: true,
+}
+
+// Create tools (additive, non-destructive)
+annotations: {
+  readOnlyHint: false,
+  destructiveHint: false,
+  openWorldHint: true,
+}
+
+// Update tools (modify existing data)
+annotations: {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,  // Same update twice = same result
+  openWorldHint: true,
+}
 ```
 
 ### Writing LLM-Friendly Descriptions

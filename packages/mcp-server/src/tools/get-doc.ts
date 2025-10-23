@@ -39,6 +39,10 @@ export default defineTool({
         "The documentation path (e.g., '/platforms/javascript/guides/nextjs.md'). Get this from search_docs results.",
       ),
   },
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     setTag("doc.path", params.path);
 

@@ -69,6 +69,12 @@ export default defineTool({
     status: ParamIssueStatus.optional(),
     assignedTo: ParamAssignedTo.optional(),
   },
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

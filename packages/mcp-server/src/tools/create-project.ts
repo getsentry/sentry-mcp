@@ -52,6 +52,11 @@ export default defineTool({
       ),
     platform: ParamPlatform.optional(),
   },
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,

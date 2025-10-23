@@ -71,6 +71,10 @@ export default defineTool({
     eventId: z.string().trim().describe("The ID of the event.").optional(),
     issueUrl: ParamIssueUrl.optional(),
   },
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl,
