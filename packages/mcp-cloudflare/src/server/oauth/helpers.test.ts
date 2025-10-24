@@ -39,9 +39,11 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        id: "user-id",
-        name: "Test User",
+        userId: "user-id",
+        email: "test@example.com",
+        clientId: "test-client",
         accessToken: "old-access-token",
+        scope: "org:read project:read",
         // No refreshToken
       } as WorkerProps,
     };
@@ -60,11 +62,13 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        id: "user-id",
-        name: "Test User",
+        userId: "user-id",
+        email: "test@example.com",
+        clientId: "test-client-id",
         accessToken: "cached-access-token",
         refreshToken: "refresh-token",
         accessTokenExpiresAt: futureExpiry,
+        scope: "org:read project:read",
       } as WorkerProps,
     };
 
@@ -88,11 +92,13 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        id: "user-id",
-        name: "Test User",
+        userId: "user-id",
+        email: "test@example.com",
+        clientId: "test-client-id",
         accessToken: "old-access-token",
         refreshToken: "old-refresh-token",
         accessTokenExpiresAt: nearExpiry,
+        scope: "org:read project:read",
       } as WorkerProps,
     };
 
@@ -145,10 +151,12 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        id: "user-id",
-        name: "Test User",
+        userId: "user-id",
+        email: "test@example.com",
+        clientId: "test-client-id",
         accessToken: "old-access-token",
         refreshToken: "old-refresh-token",
+        scope: "org:read project:read",
         // No accessTokenExpiresAt
       } as WorkerProps,
     };
@@ -191,10 +199,12 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        id: "user-id",
-        name: "Test User",
+        userId: "user-id",
+        email: "test@example.com",
+        clientId: "test-client-id",
         accessToken: "old-access-token",
         refreshToken: "invalid-refresh-token",
+        scope: "org:read project:read",
       } as WorkerProps,
     };
 

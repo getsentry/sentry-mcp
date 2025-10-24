@@ -13,12 +13,6 @@
     "global_fetch_strictly_public"
   ],
   "keep_vars": true,
-  "migrations": [
-    {
-      "new_sqlite_classes": ["SentryMCP"],
-      "tag": "v1"
-    }
-  ],
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS",
@@ -28,14 +22,6 @@
     "binding": "CF_VERSION_METADATA"
   },
   "vars": {},
-  "durable_objects": {
-    "bindings": [
-      {
-        "class_name": "SentryMCP",
-        "name": "MCP_OBJECT"
-      }
-    ]
-  },
   "unsafe": {
     "bindings": [
       {
