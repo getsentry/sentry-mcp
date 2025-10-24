@@ -16,6 +16,17 @@ export type Constraints = {
   regionUrl?: string | null;
 };
 
+/**
+ * Tool parameter keys that can be auto-injected from constraints.
+ * These are filtered from tool schemas when constraints are active.
+ */
+export const CONSTRAINT_PARAMETER_KEYS = new Set<string>([
+  "organizationSlug",
+  "projectSlug",
+  "projectSlugOrId", // Alias for projectSlug
+  "regionUrl",
+]);
+
 export type ServerContext = {
   sentryHost?: string;
   mcpUrl?: string;
