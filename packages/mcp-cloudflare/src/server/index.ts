@@ -1,17 +1,16 @@
 import * as Sentry from "@sentry/cloudflare";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
-import sentryMcpHandler, { SentryMCP } from "./lib/mcp-agent";
+import sentryMcpHandler from "./lib/mcp-handler";
 import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
 import { tokenExchangeCallback } from "./oauth";
 
-// required for Durable Objects
-export { SentryMCP };
-
-// SentryMCP handles URLPattern-based constraint extraction from request URLs
-// and passes context to Durable Objects via headers for org/project scoping.
+// New MCP handler using experimental_createMcpHandler from agents library
+// - Stateless (no Durable Objects)
+// - Auth context from getMcpAuthContext() (set by OAuth provider)
+// - Constraints from AsyncLocalStorage (per-request)
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
@@ -48,7 +47,7 @@ const corsWrappedOAuthProvider = {
     }
 
     const oAuthProvider = new OAuthProvider({
-      apiRoute: ["/sse", "/mcp"],
+      apiRoute: "/mcp",
       apiHandler: sentryMcpHandler,
       // @ts-ignore
       defaultHandler: app,
