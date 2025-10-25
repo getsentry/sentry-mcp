@@ -456,3 +456,35 @@
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Safari and Chrome */
 }
+
+/* two-step: original -> underscore -> original */
+@keyframes mcp_openchat_orig {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+@keyframes mcp_openchat_underscore {
+  0%,
+  100% {
+    transform: translateY(0.5rem);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+    transform: translateY(0);
+  }
+}
+
+/* trigger the animations on group-hover, use --delay per-index */
+.group:hover .animate-openchat .original {
+  animation: mcp_openchat_orig 550ms steps(3) var(--delay, 0ms) 1 both;
+}
+.group:hover .animate-openchat .underscore {
+  animation: mcp_openchat_underscore 550ms steps(3) var(--delay, 0ms) 1 both;
+}
