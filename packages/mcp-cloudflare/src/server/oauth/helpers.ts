@@ -75,16 +75,21 @@ export async function exchangeCodeForAccessToken({
       client_id,
       client_secret,
       code,
-      // binding the redirect_uri creates an unsupported_grant_type error
-      // ...(redirect_uri ? { redirect_uri } : {}),
+      ...(redirect_uri ? { redirect_uri } : {}),
     }).toString(),
   });
   if (!resp.ok) {
+    const responseText = await resp.text();
     const eventId = logIssue(
-      `[oauth] Failed to exchange code for access token: ${await resp.text()}`,
+      `[oauth] Failed to exchange code for access token: ${responseText}`,
       {
         oauth: {
           client_id,
+          status: resp.status,
+          statusText: resp.statusText,
+          hasRedirectUri: !!redirect_uri,
+          redirectUri: redirect_uri,
+          hasCode: !!code,
         },
       },
     );
