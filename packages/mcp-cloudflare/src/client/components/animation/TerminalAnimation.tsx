@@ -261,7 +261,7 @@ export default function TerminalAnimation() {
           steps[stepIndex + 1]?.lines || 7,
           steps[stepIndex + 1]?.startTime,
         );
-        // playerRef.current?.play?.();
+        playerRef.current?.play?.();
         autoContinueTimerRef.current = null;
       }, step.autoContinueMs);
     }
