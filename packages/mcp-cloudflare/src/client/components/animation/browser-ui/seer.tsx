@@ -12,7 +12,6 @@ export default function Seer({ step }: { step: number }) {
       } absolute top-0 right-0 z-10 h-full w-full bg-600 flex flex-col justify-center p-4 pr-16 pb-16 ease-out`}
     >
       <div className="-z-10 absolute inset-0 bg-grid [mask-image:linear-gradient(to_bottom,transparent,red,transparent),linear-gradient(to_right,transparent,red,transparent)] [mask-composite:intersect]" />
-      {/* <h1 className="font-bold text-2xl">👀 Seer</h1> */}
       {/*<!-- Seer's triangles scalable clipPath mask -->*/}
       <svg className="absolute" height="0" width="0">
         <title>Seer's Triangle</title>
@@ -42,54 +41,14 @@ export default function Seer({ step }: { step: number }) {
           </div>
         </div>
       </div>
-      <div className="mt-6 mb-12 text-2xl 2xl:text-4xl font-semibold font-sans text-white flex items-center justify-center">
-        <div className="relative mr-2 text-violet-300 font-bold">
-          <span
-            className={`${
-              step === 2 &&
-              "delay-[1.5s] duration-300 translate-y-1/2 opacity-0 scale-90 blur-xl"
-            }`}
-          >
-            Seeking
-          </span>
-          <span
-            className={`absolute right-0 ${
-              step === 2
-                ? "delay-[1.65s] duration-300 translate-y-0 opacity-100 scale-100 blur-none"
-                : "-translate-y-1/2 opacity-0 scale-90 blur-xl"
-            }`}
-          >
-            Found
-          </span>
-        </div>{" "}
-        the Root Cause
-        <div className="relative">
-          <span
-            className={`${
-              step === 2 &&
-              "delay-[1.5s] duration-300 -translate-y-1/2 opacity-0 scale-90 blur-xl"
-            }`}
-          >
-            ...
-          </span>
-          <span
-            className={`absolute inset-0 ${
-              step === 2
-                ? "delay-[1.65s] duration-300 translate-y-0 opacity-100 scale-100 blur-none"
-                : "translate-y-1/2 opacity-0 scale-90 blur-xl"
-            }`}
-          >
-            !
-          </span>
-        </div>
-      </div>
+
       {/* 🛑 Root Cause */}
       <div
         className={`${
           step === 2
             ? "border-orange-300/40 bg-orange-500/20 delay-1000 duration-300"
             : "border-orange-300/20 bg-orange-500/10"
-        } group relative mx-auto size-32 rounded-xl border`}
+        } group relative mx-auto size-32 rounded-xl mt-64 border`}
       >
         {/*<div className="relative">*/}
         <Plus

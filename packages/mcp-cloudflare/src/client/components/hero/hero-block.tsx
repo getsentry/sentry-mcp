@@ -22,8 +22,8 @@ export default function HeroBlock() {
             href="cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9"
             className="relative size-fit my-2 group cursor-pointer"
           >
-            <div className="absolute inset-0 size-full rounded-xl bg-violet-400 bg-[repeating-linear-gradient(-45deg,var(--background),var(--background)_0.5px,#fff0_0.5px,#fff0_12px)]" />
-            <div className="bg-grid absolute inset-0 size-full duration-200 delay-50 opacity-100 [--size:10px] [--grid-color:#fff2] bg-[#392f59] group-hover:rotate-x-15 group-hover:translate-1 group-hover:-rotate-y-2 !px-6 transform-3d perspective-distant rounded-xl ease-[cubic-bezier(0.175,0.885,0.32,1.275)] origin-bottom-right group-active:rotate-y-1 group-active:translate-0.5 group-active:rotate-x-3" />
+            <div className="absolute inset-0 size-full rounded-xl bg-violet-400/80 bg-[repeating-linear-gradient(-45deg,var(--background),var(--background)_0.5px,#fff0_0.5px,#fff0_12px)]" />
+            <div className="bg-grid absolute inset-0 size-full duration-200 delay-50 opacity-100 [--size:10px] [--grid-color:#0002] bg-pink-400 group-hover:rotate-x-15 group-hover:translate-1 group-hover:-rotate-y-2 !px-6 transform-3d perspective-distant rounded-xl ease-[cubic-bezier(0.175,0.885,0.32,1.275)] origin-bottom-right group-active:rotate-y-1 group-active:translate-0.5 group-active:rotate-x-3" />
             <Button
               variant="secondary"
               onClick={() => {
@@ -33,7 +33,7 @@ export default function HeroBlock() {
               }}
               className="h-13 group-hover:rotate-x-30 group-hover:translate-2 group-hover:-rotate-y-4 group-active:rotate-x-6 group-active:translate-1 group-active:rotate-y-2 !px-6 relative rounded-xl bg-white text-black duration-200 hover:bg-white transform-3d perspective-distant backface-hidden ease-[cubic-bezier(0.175,0.885,0.32,1.275)] origin-bottom-right "
             >
-              <div className="bg-grid absolute inset-0 opacity-0 duration-300 group-hover:opacity-30 [--size:10px] [--grid-color:#0008] [mask-image:radial-gradient(ellipse_at_center,transparent,red)]" />
+              <div className="bg-grid absolute inset-0 opacity-0 duration-300 group-hover:opacity-30 [--size:10px] [--grid-color:#44130644] [mask-image:radial-gradient(ellipse_at_center,transparent,red)]" />
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 version="1.1"

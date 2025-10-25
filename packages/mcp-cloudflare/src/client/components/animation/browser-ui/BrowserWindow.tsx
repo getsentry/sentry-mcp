@@ -8,7 +8,7 @@ import {
 import { SentryIcon } from "../../ui/icons/sentry";
 import Copy from "./Copy";
 import IssueDetails from "./IssueDetails";
-import Seer from "./👀";
+import Seer from "./seer";
 import WindowHeader from "./WindowHeader";
 
 export default function BrowserWindow({ step }: { step: number }) {
