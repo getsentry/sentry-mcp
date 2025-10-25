@@ -24,8 +24,11 @@ export default function Home({ onChatClick }: HomeProps) {
   const [stdio, setStdio] = useState(false);
 
   return (
-    <main className="flex gap-4 max-w-3xl">
-      <article>
+    <main className="flex gap-4 relative">
+      <aside className="max-xl:hidden absolute h-full right-0 inset-y-0 translate-x-[150%]">
+        {/* <TableOfContents /> */}
+      </aside>
+      <article className="max-w-full overflow-x-clip">
         <div id="top" />
         <Section className="space-y-4 mb-10">
           <Prose>
@@ -63,7 +66,7 @@ export default function Home({ onChatClick }: HomeProps) {
 
           <Section>
             <Prose>
-              <p>
+              <p className="sm:hidden">
                 Simply put, it's a way to plug Sentry's API into an LLM, letting
                 you ask questions about your data in context of the LLM itself.
                 This lets you take a coding agent that you already use, like
@@ -96,6 +99,7 @@ export default function Home({ onChatClick }: HomeProps) {
           </Section>
 
           <Section
+            id="getting-started"
             heading={
               <>
                 <div className="flex-1">Getting Started</div>
