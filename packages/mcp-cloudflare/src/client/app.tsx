@@ -73,7 +73,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="overflow-x-clip max-w-screen relative text-white">
+    <div className="overflow-x-clip max-w-screen relative">
       <BackgroundDecorations />
       <Sidebars isChatOpen={isChatOpen} toggleChat={toggleChat} />
       {/* <Ghost /> */}
