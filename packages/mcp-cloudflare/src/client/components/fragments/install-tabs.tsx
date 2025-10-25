@@ -127,7 +127,7 @@ export default function InstallTabs({
                 {i > 0 && !selected && (
                   <>
                     <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-1 -translate-x-full -top-2 size-3 bg-[#201633] origin-bottom-right" />
-                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-0 -translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-[#392f59] origin-bottom-right" />
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-0 -translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-[#160f24] origin-bottom-right" />
                   </>
                 )}
                 <div className="absolute inset-[0.5px] bottom-3 bg-orange-300 bg-[repeating-linear-gradient(-45deg,#f97316,#f97316_12px,#f9731600_12px,#f9731600_24px)] rounded-xl z-0 group-active/tab:duration-75 group-active/tab:opacity-0 duration-300 group-active/tab:translate-y-2 group-active/tab:scale-90" />
@@ -159,7 +159,7 @@ export default function InstallTabs({
                 {i < lastIdx && !selected && (
                   <>
                     <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-1 translate-x-full -top-2 size-3 bg-[#201633] origin-bottom-left" />
-                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-0 translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-[#392f59] origin-bottom-left" />
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-0 translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-[#160f24] origin-bottom-left" />
                   </>
                 )}
               </button>
