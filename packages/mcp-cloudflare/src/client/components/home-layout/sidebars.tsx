@@ -25,8 +25,29 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
         type="button"
       >
         {!isChatOpen && (
-          <div className="font-mono absolute xl:w-12 min-[1800px]:w-fit min-[1800px]:text-nowrap text-center flex justify-center xl:left-[calc((100vw-80rem)/4)] 2xl:left-[calc((100vw-96rem)/4)] top-1/2 -translate-1/2 opacity-0 group-hover:opacity-100 duration-300 bg-[#201633] px-1">
-            Open Chat
+          <div className="font-mono absolute xl:w-12 min-[1800px]:w-fit min-[1800px]:text-nowrap text-center flex justify-center xl:left-[calc((100vw-80rem)/4)] 2xl:left-[calc((100vw-96rem)/4)] top-1/2 -translate-1/2 opacity-0 group-hover:opacity-100 px-1 gap-0.25">
+            {"open chat".split("").map((char, i) => (
+              <span
+                // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+                key={i}
+                className="animate-openchat"
+                // per-index delay so animation cascades
+                style={{ ["--delay" as any]: `${i * 80}ms` }}
+              >
+                <span className="relative" aria-hidden>
+                  <span className="original inline-block leading-[1]">
+                    {char === " " ? "\u00A0" : char}
+                  </span>
+                  <span
+                    className="underscore absolute inset-0 leading-[1]"
+                    aria-hidden="true"
+                    role="presentation"
+                  >
+                    _
+                  </span>
+                </span>
+              </span>
+            ))}
           </div>
         )}
       </button>
