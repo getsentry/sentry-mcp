@@ -1,6 +1,6 @@
 import BrowserWindow from "./browser-ui/BrowserWindow";
 import IDEWindow from "./browser-ui/IDEWindow";
-import ValidationSummary from "./✅✅✅";
+import ValidationSummary from "./tests";
 
 export default function BrowserAnimation({
   globalIndex,
