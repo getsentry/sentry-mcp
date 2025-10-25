@@ -25,7 +25,7 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
         type="button"
       >
         {!isChatOpen && (
-          <div className="font-mono absolute xl:w-12 min-[1800px]:w-fit min-[1800px]:text-nowrap text-center flex justify-center xl:left-[calc((100vw-80rem)/4)] 2xl:left-[calc((100vw-96rem)/4)] top-1/2 -translate-1/2 opacity-0 group-hover:opacity-100 px-1 gap-0.25">
+          <div className="font-mono absolute xl:w-12 min-[1800px]:w-fit min-[1800px]:flex-nowrap text-center flex flex-wrap justify-center xl:left-[calc((100vw-80rem)/4)] 2xl:left-[calc((100vw-96rem)/4)] top-1/2 -translate-1/2 opacity-0 group-hover:opacity-100 px-1 gap-0.25">
             {"open chat".split("").map((char, i) => (
               <span
                 // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
