@@ -144,6 +144,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   }
 
   // Exchange the code for an access token
+  // Note: redirect_uri must match the one used in the authorization request
+  // This is the Sentry callback URL, not the downstream MCP client's redirect URI
+  const sentryCallbackUrl = new URL("/oauth/callback", c.req.url).href;
   const [payload, errResponse] = await exchangeCodeForAccessToken({
     upstream_url: new URL(
       SENTRY_TOKEN_URL,
@@ -152,7 +155,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     client_id: c.env.SENTRY_CLIENT_ID,
     client_secret: c.env.SENTRY_CLIENT_SECRET,
     code: c.req.query("code"),
-    redirect_uri: oauthReqInfo.redirectUri,
+    redirect_uri: sentryCallbackUrl,
   });
   if (errResponse) return errResponse;
 
