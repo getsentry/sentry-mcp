@@ -30,6 +30,12 @@
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
   },
+  "services": [
+    {
+      "binding": "DOCS",
+      "service": "sentry-mcp-docs"
+    }
+  ],
   "vars": {},
   "durable_objects": {
     "bindings": [
@@ -79,6 +85,12 @@
     // { "service": "sentry-mcp-tail" }
   ],
   "dev": {
-    "port": 8788
+    "port": 8788,
+    "services": [
+      {
+        "binding": "DOCS",
+        "local_port": 8790
+      }
+    ]
   }
 }

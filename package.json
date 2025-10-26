@@ -21,7 +21,7 @@
   },
   "scripts": {
     "docs:check": "node scripts/check-doc-links.mjs",
-    "dev": "dotenv -e .env -e .env.local -- turbo dev",
+    "dev": "dotenv -e .env -e .env.local -- turbo run dev --filter @sentry/mcp-cloudflare",
     "build": "turbo build after-build",
     "deploy": "turbo deploy",
     "eval": "dotenv -e .env -e .env.local -- turbo eval",

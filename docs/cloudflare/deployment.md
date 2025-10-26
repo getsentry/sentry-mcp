@@ -300,3 +300,31 @@ Monitor via Cloudflare dashboard:
 - Client UI: `packages/mcp-cloudflare/src/client/`
 - Wrangler config: `packages/mcp-cloudflare/wrangler.jsonc`
 - Cloudflare docs: https://developers.cloudflare.com/workers/
+
+---
+
+## Multi-Worker Deployment (App + Docs)
+
+We deploy two Workers: the App (mcp-cloudflare) and Docs (docs). The App proxies `/docs` to the Docs service binding.
+
+Key configs
+- App (wrangler.jsonc):
+  - `services: [{ binding: "DOCS", service: "sentry-mcp-docs" }]`
+- App Canary (wrangler.canary.jsonc):
+  - `services: [{ binding: "DOCS", service: "sentry-mcp-docs-canary" }]`
+- Docs: `packages/docs/wrangler.jsonc` and `wrangler.canary.jsonc` (names: `sentry-mcp-docs`, `sentry-mcp-docs-canary`).
+
+Deploy order (GitHub Actions)
+- Deploy Docs Canary → curl `https://sentry-mcp-docs-canary.getsentry.workers.dev/docs` and assert `<title>Documentation`.
+- Build + Deploy App Canary (bound to docs-canary) → smoke tests via app.
+- If canary smoke passes: deploy Docs Production, then App Production.
+- Smoke-test app (existing suite) and docs directly at `https://sentry-mcp-docs.getsentry.workers.dev/docs`.
+- On failure: rollback both app and docs.
+
+Local CI smoke (smoke-tests.yml)
+- Starts Docs worker (8790) first, then App (8788), so `/docs` binding is live.
+
+Notes
+- Keep two Vite servers in dev (5173 app, 5174 docs) to mirror prod.
+- Root `pnpm run dev` uses Turbo to start app dev and co-run server/docs dev.
+- Build uses Turbo for ordering/caching; unchanged packages aren’t rebuilt.

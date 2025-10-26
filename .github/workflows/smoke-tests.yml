@@ -47,14 +47,34 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Start local dev server
-        working-directory: packages/mcp-cloudflare
+      - name: Start local dev servers (app + docs)
+        working-directory: .
         run: |
-          # Start wrangler in background and capture output
+          # Start docs worker first (port 8790)
+          cd packages/docs
+          pnpm exec wrangler dev --port 8790 --local > wrangler-docs.log 2>&1 &
+          DOCS_PID=$!
+          echo "DOCS_PID=$DOCS_PID" >> $GITHUB_ENV
+          echo "Waiting for docs server to start (PID: $DOCS_PID)..."
+
+          # Wait for docs to be ready (up to 2 minutes)
+          MAX_ATTEMPTS=24
+          ATTEMPT=0
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            if ! kill -0 $DOCS_PID 2>/dev/null; then
+              echo "❌ Docs wrangler died unexpectedly!"; tail -50 wrangler-docs.log; exit 1; fi
+            if curl -s -f -o /dev/null http://localhost:8790/docs; then
+              echo "✅ Docs server is ready!"; cat wrangler-docs.log; break; fi
+            ATTEMPT=$((ATTEMPT+1)); sleep 5
+          done
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then echo "❌ Docs failed to start"; cat wrangler-docs.log; exit 1; fi
+
+          # Start app worker (port 8788) in its package
+          cd ../mcp-cloudflare
           pnpm exec wrangler dev --port 8788 --local > wrangler.log 2>&1 &
           WRANGLER_PID=$!
           echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
-          echo "Waiting for server to start (PID: $WRANGLER_PID)..."
+          echo "Waiting for app server to start (PID: $WRANGLER_PID)..."
           
           # Wait for server to be ready (up to 2 minutes)
           MAX_ATTEMPTS=24
@@ -131,9 +151,12 @@ jobs:
           check_name: "Local Smoke Test Results"
           fail_on_failure: true
 
-      - name: Stop local server
+      - name: Stop local servers
         if: always()
         run: |
           if [ ! -z "$WRANGLER_PID" ]; then
             kill $WRANGLER_PID || true
+          fi
+          if [ ! -z "$DOCS_PID" ]; then
+            kill $DOCS_PID || true
           fi

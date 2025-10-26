@@ -126,5 +126,12 @@
     "ai": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"
+  },
+  "turbo": {
+    "pipeline": {
+      "dev": {
+        "dependsOn": []
+      }
+    }
   }
 }
