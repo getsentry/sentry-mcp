@@ -66,7 +66,7 @@ describe("mcp-handler", () => {
       const { default: handler } = await import("./mcp-handler");
       const request = new Request("https://test.mcp.sentry.io/mcp");
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       expect(response.status).toBe(200);
       const body = await response.json();
@@ -82,7 +82,7 @@ describe("mcp-handler", () => {
         "https://test.mcp.sentry.io/mcp/sentry-mcp-evals",
       );
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       expect(response.status).toBe(200);
     });
@@ -93,7 +93,7 @@ describe("mcp-handler", () => {
         "https://test.mcp.sentry.io/mcp/sentry-mcp-evals/cloudflare-mcp",
       );
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       expect(response.status).toBe(200);
     });
@@ -102,7 +102,7 @@ describe("mcp-handler", () => {
       const { default: handler } = await import("./mcp-handler");
       const request = new Request("https://test.mcp.sentry.io/api/other");
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       expect(response.status).toBe(404);
     });
@@ -119,7 +119,7 @@ describe("mcp-handler", () => {
         "https://test.mcp.sentry.io/mcp/sentry-mcp-evals",
       );
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       expect(response.status).toBe(401);
       expect(await response.text()).toContain("No authentication context");
@@ -135,7 +135,7 @@ describe("mcp-handler", () => {
         "https://test.mcp.sentry.io/mcp/sentry-mcp-evals",
       );
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       expect(response.status).toBe(401);
       expect(await response.text()).toContain("No authentication context");
@@ -232,7 +232,7 @@ describe("mcp-handler", () => {
         "https://test.mcp.sentry.io/mcp/sentry-mcp-evals",
       );
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       // Should succeed since we have valid org in mocks
       expect(response.status).toBe(200);
@@ -244,7 +244,7 @@ describe("mcp-handler", () => {
         "https://test.mcp.sentry.io/mcp/nonexistent-org",
       );
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       // Should fail with 404
       expect(response.status).toBe(404);
@@ -257,7 +257,7 @@ describe("mcp-handler", () => {
         "https://test.mcp.sentry.io/mcp/sentry-mcp-evals/nonexistent-project",
       );
 
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch!(request as any, env, ctx);
 
       // Should fail with 404
       expect(response.status).toBe(404);
@@ -271,7 +271,7 @@ describe("mcp-handler", () => {
       const { default: handler } = await import("./mcp-handler");
 
       const request = new Request("https://test.mcp.sentry.io/mcp");
-      await handler.fetch(request, env, ctx);
+      await handler.fetch!(request as any, env, ctx);
 
       // Verify createMcpHandler was called with correct config
       expect(experimental_createMcpHandler).toHaveBeenCalledWith(
@@ -294,7 +294,7 @@ describe("mcp-handler", () => {
       const request = new Request(
         "https://test.mcp.sentry.io/mcp/sentry-mcp-evals",
       );
-      await handler.fetch(request, env, ctx);
+      await handler.fetch!(request as any, env, ctx);
 
       // Verify constraintsStorage.run was called with the correct constraints
       expect(runSpy).toHaveBeenCalledWith(

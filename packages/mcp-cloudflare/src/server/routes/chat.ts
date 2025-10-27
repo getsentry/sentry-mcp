@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { openai } from "@ai-sdk/openai";
 import { streamText, type ToolSet } from "ai";
 import { experimental_createMCPClient } from "ai";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
 import type { Env } from "../types";
 import { logInfo, logIssue } from "@sentry/mcp-server/telem/logging";
@@ -208,28 +209,30 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     let currentAccessToken = accessToken;
 
     try {
-      // Get the current request URL to construct the SSE endpoint URL
+      // Get the current request URL to construct the MCP endpoint URL
       const requestUrl = new URL(c.req.url);
-      const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
+      const mcpUrl = `${requestUrl.protocol}//${requestUrl.host}/mcp`;
 
-      mcpClient = await experimental_createMCPClient({
-        name: "mcp.sentry.dev (web)",
-        transport: {
-          type: "sse" as const,
-          url: sseUrl,
+      const httpTransport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+        requestInit: {
           headers: {
             Authorization: `Bearer ${currentAccessToken}`,
           },
         },
       });
 
+      mcpClient = await experimental_createMCPClient({
+        name: "mcp.sentry.dev (web)",
+        transport: httpTransport,
+      });
+
       // Get available tools from MCP server
       Object.assign(tools, await mcpClient.tools());
-      logInfo(`Connected to ${sseUrl}`, {
+      logInfo(`Connected to ${mcpUrl}`, {
         loggerScope: ["cloudflare", "chat", "connection"],
         extra: {
           toolCount: Object.keys(tools).length,
-          endpoint: sseUrl,
+          endpoint: mcpUrl,
         },
       });
     } catch (error) {
@@ -243,25 +246,30 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             // Retry with new token
             currentAccessToken = refreshResult.token;
             const requestUrl = new URL(c.req.url);
-            const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
+            const mcpUrl = `${requestUrl.protocol}//${requestUrl.host}/mcp`;
+
+            const httpTransport = new StreamableHTTPClientTransport(
+              new URL(mcpUrl),
+              {
+                requestInit: {
+                  headers: {
+                    Authorization: `Bearer ${currentAccessToken}`,
+                  },
+                },
+              },
+            );
 
             mcpClient = await experimental_createMCPClient({
               name: "mcp.sentry.dev (web)",
-              transport: {
-                type: "sse" as const,
-                url: sseUrl,
-                headers: {
-                  Authorization: `Bearer ${currentAccessToken}`,
-                },
-              },
+              transport: httpTransport,
             });
 
             Object.assign(tools, await mcpClient.tools());
-            logInfo(`Connected to ${sseUrl} (after refresh)`, {
+            logInfo(`Connected to ${mcpUrl} (after refresh)`, {
               loggerScope: ["cloudflare", "chat", "connection"],
               extra: {
                 toolCount: Object.keys(tools).length,
-                endpoint: sseUrl,
+                endpoint: mcpUrl,
                 refreshed: true,
               },
             });

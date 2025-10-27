@@ -68,7 +68,11 @@ describe("mcp-handler E2E", () => {
       }),
     });
 
-    const response = await sentryMcpHandler.fetch(request, env, mockCtx);
+    const response = await sentryMcpHandler.fetch!(
+      request as any,
+      env,
+      mockCtx,
+    );
 
     // Should not be 401 (meaning context was read successfully)
     expect(response.status).not.toBe(401);
