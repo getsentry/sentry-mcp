@@ -39,8 +39,7 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        userId: "user-id",
-        email: "test@example.com",
+        id: "user-id",
         clientId: "test-client",
         accessToken: "old-access-token",
         scope: "org:read project:read",
@@ -62,8 +61,7 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        userId: "user-id",
-        email: "test@example.com",
+        id: "user-id",
         clientId: "test-client-id",
         accessToken: "old-access-token",
         refreshToken: "old-refresh-token",
@@ -121,8 +119,7 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        userId: "user-id",
-        email: "test@example.com",
+        id: "user-id",
         clientId: "test-client-id",
         accessToken: "old-access-token",
         refreshToken: "old-refresh-token",
@@ -169,8 +166,7 @@ describe("tokenExchangeCallback", () => {
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
       props: {
-        userId: "user-id",
-        email: "test@example.com",
+        id: "user-id",
         clientId: "test-client-id",
         accessToken: "old-access-token",
         refreshToken: "invalid-refresh-token",
