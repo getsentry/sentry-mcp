@@ -31,9 +31,9 @@ const addCorsHeaders = (response: Response): Response => {
   return newResponse;
 };
 
-// Wrap OAuth Provider to add CORS headers for public metadata endpoints
-// This is necessary because the OAuth Provider handles some endpoints internally
-// (.well-known) without going through our Hono app middleware
+// Wrap OAuth Provider to restrict CORS headers on public metadata endpoints
+// OAuth Provider v0.0.12 adds overly permissive CORS (allows all methods/headers).
+// We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
 const corsWrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     // Handle CORS preflight for public metadata endpoints
