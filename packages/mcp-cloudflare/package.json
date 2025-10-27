@@ -52,7 +52,7 @@
     "@radix-ui/react-slot": "catalog:",
     "@sentry/cloudflare": "catalog:",
     "@sentry/react": "catalog:",
-    "agents": "^0.2.16",
+    "agents": "catalog:",
     "ai": "catalog:",
     "better-sqlite3": "catalog:",
     "class-variance-authority": "catalog:",

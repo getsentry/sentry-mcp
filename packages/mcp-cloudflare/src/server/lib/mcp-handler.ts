@@ -27,73 +27,21 @@ import type { ServerContext } from "@sentry/mcp-server/types";
 import { LIB_VERSION } from "@sentry/mcp-server/version";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
-
-// Create server singleton
-const server = new McpServer({
-  name: "Sentry MCP",
-  version: LIB_VERSION,
-});
-
-// Configure server with dynamic context provider
-await configureServer({
-  server,
-  getContext: (): ServerContext => {
-    // Get OAuth-provided auth context
-    const authContext: McpAuthContext | undefined = getMcpAuthContext();
-    if (!authContext?.props) {
-      throw new Error("No authentication context available");
-    }
-
-    // Get constraints from AsyncLocalStorage (set per-request)
-    const constraints = constraintsStorage.getStore() || {};
-
-    // Parse and expand granted scopes
-    let expandedScopes: Set<Scope> | undefined;
-    if (authContext.props.grantedScopes) {
-      const { valid, invalid } = parseScopes(
-        authContext.props.grantedScopes as string[],
-      );
-      if (invalid.length > 0) {
-        logWarn("Ignoring invalid scopes from OAuth provider", {
-          loggerScope: ["cloudflare", "mcp-handler"],
-          extra: {
-            invalidScopes: invalid,
-          },
-        });
-      }
-      expandedScopes = expandScopes(new Set(valid));
-    }
-
-    // Build ServerContext from OAuth props + constraints
-    return {
-      userId: authContext.props.userId as string | undefined,
-      clientId: authContext.props.clientId as string,
-      accessToken: authContext.props.accessToken as string,
-      grantedScopes: expandedScopes,
-      constraints,
-      sentryHost: (authContext.props.sentryHost as string) || "sentry.io",
-      mcpUrl: authContext.props.mcpUrl as string | undefined,
-    };
-  },
-  onToolComplete: () => {
-    // Flush Sentry events after tool execution
-    Sentry.flush(2000);
-  },
-});
-
-// Create the MCP handler
-const mcpHandler = createMcpHandler(server, {
-  route: "/mcp",
-});
+import type { ExportedHandler } from "@cloudflare/workers-types";
 
 /**
  * Main request handler that:
- * 1. Parses org/project constraints from URL
- * 2. Verifies user has access to the constraints
- * 3. Runs MCP handler within constraint context (AsyncLocalStorage)
+ * 1. Creates and configures MCP server per-request
+ * 2. Parses org/project constraints from URL
+ * 3. Verifies user has access to the constraints
+ * 4. Runs MCP handler within constraint context (AsyncLocalStorage)
  */
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+const mcpHandler: ExportedHandler<Env> = {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(request.url);
 
     // Parse constraints from URL pattern /mcp/:org?/:project?
@@ -134,10 +82,66 @@ export default {
       });
     }
 
-    // Run MCP handler within constraint context
-    // This makes constraints available to tools via getConstraints()
+    // 1. Create MCP server
+    const server = new McpServer({
+      name: "Sentry MCP",
+      version: LIB_VERSION,
+    });
+
+    // 2. Configure server with dynamic context provider
+    await configureServer({
+      server,
+      getContext: (): ServerContext => {
+        // Get OAuth-provided auth context
+        const authContext: McpAuthContext | undefined = getMcpAuthContext();
+        if (!authContext?.props) {
+          throw new Error("No authentication context available");
+        }
+
+        // Get constraints from AsyncLocalStorage (set per-request)
+        const constraints = constraintsStorage.getStore() || {};
+
+        // Parse and expand granted scopes
+        let expandedScopes: Set<Scope> | undefined;
+        if (authContext.props.grantedScopes) {
+          const { valid, invalid } = parseScopes(
+            authContext.props.grantedScopes as string[],
+          );
+          if (invalid.length > 0) {
+            logWarn("Ignoring invalid scopes from OAuth provider", {
+              loggerScope: ["cloudflare", "mcp-handler"],
+              extra: {
+                invalidScopes: invalid,
+              },
+            });
+          }
+          expandedScopes = expandScopes(new Set(valid));
+        }
+
+        // Build ServerContext from OAuth props + constraints
+        return {
+          userId: authContext.props.userId as string | undefined,
+          clientId: authContext.props.clientId as string,
+          accessToken: authContext.props.accessToken as string,
+          grantedScopes: expandedScopes,
+          constraints,
+          sentryHost: (authContext.props.sentryHost as string) || "sentry.io",
+          mcpUrl: authContext.props.mcpUrl as string | undefined,
+        };
+      },
+      onToolComplete: () => {
+        // Flush Sentry events after tool execution
+        Sentry.flush(2000);
+      },
+    });
+
+    // 3. Return wrapped server handler within constraint context
     return constraintsStorage.run(verification.constraints, () => {
-      return mcpHandler(request, env, ctx);
+      return createMcpHandler(server, {
+        route: "/mcp",
+      })(request, env, ctx);
     });
   },
 };
+
+export default mcpHandler;
