@@ -101,7 +101,7 @@ const mcpHandler: ExportedHandler<Env> = {
 
     // Build complete ServerContext from OAuth props + verified constraints
     const serverContext: ServerContext = {
-      id: oauthCtx.props.id as string | undefined,
+      userId: oauthCtx.props.id as string | undefined,
       clientId: oauthCtx.props.clientId as string,
       accessToken: oauthCtx.props.accessToken as string,
       grantedScopes: expandedScopes,
