@@ -56,6 +56,13 @@
   "ai": {
     "binding": "AI"
   },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": [],
+      "deleted_classes": ["SentryMCP"]
+    }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
