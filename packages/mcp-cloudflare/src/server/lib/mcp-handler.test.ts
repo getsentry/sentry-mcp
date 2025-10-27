@@ -59,7 +59,7 @@ describe("mcp-handler", () => {
 
     // Verify ServerContext was built correctly
     expect(capturedContext).toMatchObject({
-      id: "test-user-123",
+      userId: "test-user-123",
       clientId: "test-client",
       accessToken: "test-token",
       sentryHost: "sentry.io",
