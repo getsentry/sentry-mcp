@@ -20,30 +20,34 @@
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { configureServer } from "../server";
-import type { ServerContext } from "../types";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "../version";
+import type { ServerContext } from "../types";
+import { serverContextStorage } from "../internal/context-storage";
 
 /**
  * Starts the MCP server with stdio transport and telemetry.
  *
- * Configures the server with all tools, prompts, and resources, then connects
+ * Binds the provided context to AsyncLocalStorage and connects the server
  * using stdio transport for process-based communication. All operations are
  * wrapped in Sentry tracing for observability.
  *
- * @param server - MCP server instance to configure and start
+ * @param server - Configured and instrumented MCP server instance
  * @param context - Server context with authentication and configuration
  *
  * @example CLI Integration
  * ```typescript
- * // In a CLI tool or IDE extension:
- * const server = new McpServer();
+ * import { buildServer } from "./server.js";
+ * import { startStdio } from "./transports/stdio.js";
+ *
+ * const server = buildServer();
+ *
  * await startStdio(server, {
  *   accessToken: userToken,
- *   host: userHost,
+ *   sentryHost: "sentry.io",
  *   userId: "user-123",
- *   clientId: "cursor-ide"
+ *   clientId: "cursor-ide",
+ *   constraints: {}
  * });
  * ```
  */
@@ -59,9 +63,11 @@ export async function startStdio(server: McpServer, context: ServerContext) {
         },
       },
       async () => {
-        const transport = new StdioServerTransport();
-        await configureServer({ server, context });
-        await server.connect(transport);
+        // Bind context to AsyncLocalStorage for the lifetime of the connection
+        return await serverContextStorage.run(context, async () => {
+          const transport = new StdioServerTransport();
+          await server.connect(transport);
+        });
       },
     );
   });

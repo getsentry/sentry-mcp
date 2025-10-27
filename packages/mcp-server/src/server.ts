@@ -6,33 +6,40 @@
  *
  * **Configuration Example:**
  * ```typescript
- * const server = new McpServer();
- * const context: ServerContext = {
- *   accessToken: "your-sentry-token",
- *   host: "sentry.io",
- *   userId: "user-123",
- *   clientId: "mcp-client"
- * };
- *
- * await configureServer({ server, context });
+ * const server = buildServer({
+ *   context: {
+ *     accessToken: "your-sentry-token",
+ *     sentryHost: "sentry.io",
+ *     userId: "user-123",
+ *     clientId: "mcp-client",
+ *     constraints: {}
+ *   },
+ *   wrapWithSentry: (s) => Sentry.wrapMcpServerWithSentry(s),
+ * });
  * ```
  */
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
   ServerRequest,
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
 import tools from "./tools/index";
-import type { ServerContext } from "./types";
 import { CONSTRAINT_PARAMETER_KEYS } from "./types";
-import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
+import {
+  setTag,
+  setUser,
+  startNewTrace,
+  startSpan,
+  wrapMcpServerWithSentry,
+} from "@sentry/core";
 import { getLogger, logIssue, type LogIssueOptions } from "./telem/logging";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
 import { getConstraintParametersToInject } from "./internal/constraint-helpers";
+import { serverContextStorage } from "./internal/context-storage";
 
 const toolLogger = getLogger(["server", "tools"]);
 
@@ -55,65 +62,79 @@ function extractMcpParameters(args: Record<string, unknown>) {
 }
 
 /**
- * Configures an MCP server with all tools and telemetry.
+ * Creates and configures a complete MCP server with Sentry instrumentation.
  *
- * Transforms a bare MCP server instance into a fully-featured Sentry integration
- * with comprehensive observability, error handling, and handler registration.
+ * Uses AsyncLocalStorage for context resolution, so context must be bound
+ * at the transport level (e.g., using serverContextStorage.run()).
  *
- * @example Static Context (stdio transport)
+ * @example Usage with stdio transport
  * ```typescript
- * const server = new McpServer();
+ * import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
+ * import { buildServer } from "@sentry/mcp-server/server";
+ * import { startStdio } from "@sentry/mcp-server/transports/stdio";
+ *
+ * const server = buildServer();
  * const context = {
  *   accessToken: process.env.SENTRY_TOKEN,
- *   host: "sentry.io",
+ *   sentryHost: "sentry.io",
  *   userId: "user-123",
- *   clientId: "cursor-ide"
+ *   clientId: "cursor-ide",
+ *   constraints: {}
  * };
  *
- * await configureServer({ server, context });
+ * // Context is bound by the transport
+ * await startStdio(server, context);
  * ```
  *
- * @example Dynamic Context (Cloudflare Workers)
+ * @example Usage with Cloudflare Workers
  * ```typescript
- * const server = new McpServer();
+ * import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
+ * import { buildServer } from "@sentry/mcp-server/server";
  *
- * await configureServer({
- *   server,
- *   getContext: () => {
- *     const authContext = getMcpAuthContext();
- *     const constraints = getConstraints();
- *     return { ...authContext.props, constraints };
- *   }
+ * const server = buildServer();
+ *
+ * // Context is bound per-request in the handler
+ * return serverContextStorage.run(serverContext, () => {
+ *   return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
  * });
  * ```
  */
-export async function configureServer({
+export function buildServer({
+  onToolComplete,
+}: {
+  onToolComplete?: () => void;
+} = {}): McpServer {
+  const server = new McpServer({
+    name: MCP_SERVER_NAME,
+    version: LIB_VERSION,
+  });
+
+  configureServer({ server, onToolComplete });
+
+  return wrapMcpServerWithSentry(server);
+}
+
+/**
+ * Configures an MCP server with all tools and telemetry.
+ *
+ * Internal function used by buildServer(). Use buildServer() instead for most cases.
+ * Context is resolved from AsyncLocalStorage via serverContextStorage.
+ */
+function configureServer({
   server,
-  context,
-  getContext,
   onToolComplete,
 }: {
   server: McpServer;
-  /** Static context for stdio/single-request usage */
-  context?: ServerContext;
-  /** Dynamic context provider for per-request usage (Cloudflare Workers) */
-  getContext?: () => ServerContext;
   onToolComplete?: () => void;
 }) {
-  // Validate that either context or getContext is provided
-  if (!context && !getContext) {
-    throw new Error("Either context or getContext must be provided");
-  }
-
-  // Create context resolver that works for both patterns
-  const resolveContext =
-    getContext ??
-    (() => {
-      if (!context) {
-        throw new Error("No context available");
-      }
-      return context;
-    });
+  // Context resolver always uses AsyncLocalStorage
+  const resolveContext = () => {
+    const context = serverContextStorage.getStore();
+    if (!context) {
+      throw new Error("No ServerContext available in async storage");
+    }
+    return context;
+  };
 
   server.server.onerror = (error) => {
     const transportLogOptions: LogIssueOptions = {

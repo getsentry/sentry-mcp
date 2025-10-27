@@ -11,10 +11,10 @@ catalog:
   "@modelcontextprotocol/sdk": ^1.20.2
   "@radix-ui/react-accordion": ^1.2.11
   "@radix-ui/react-slot": ^1.2.3
-  "@sentry/cloudflare": 9.34.0
-  "@sentry/core": 9.34.0
-  "@sentry/node": 9.34.0
-  "@sentry/react": 9.34.0
+  "@sentry/cloudflare": 10.22.0
+  "@sentry/core": 10.22.0
+  "@sentry/node": 10.22.0
+  "@sentry/react": 10.22.0
   "@sentry/vite-plugin": ^3.5.0
   "@tailwindcss/typography": ^0.5.16
   "@tailwindcss/vite": ^4.1.11

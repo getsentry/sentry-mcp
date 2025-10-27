@@ -10,8 +10,7 @@
 
 import * as Sentry from "@sentry/cloudflare";
 import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { configureServer } from "@sentry/mcp-server/server";
+import { buildServer } from "@sentry/mcp-server/server";
 import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
 import {
   expandScopes,
@@ -20,7 +19,6 @@ import {
 } from "@sentry/mcp-server/permissions";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
 import type { ServerContext } from "@sentry/mcp-server/types";
-import { LIB_VERSION } from "@sentry/mcp-server/version";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
 import type { ExportedHandler } from "@cloudflare/workers-types";
@@ -113,23 +111,8 @@ const mcpHandler: ExportedHandler<Env> = {
       mcpUrl: oauthCtx.props.mcpUrl as string | undefined,
     };
 
-    // Create MCP server
-    const server = new McpServer({
-      name: "Sentry MCP",
-      version: LIB_VERSION,
-    });
-
-    // Configure server with simple context provider
-    await configureServer({
-      server,
-      getContext: (): ServerContext => {
-        // Get ServerContext from AsyncLocalStorage (set per-request)
-        const context = serverContextStorage.getStore();
-        if (!context) {
-          throw new Error("No ServerContext available in async storage");
-        }
-        return context;
-      },
+    // Create and configure MCP server
+    const server = buildServer({
       onToolComplete: () => {
         // Flush Sentry events after tool execution
         Sentry.flush(2000);
