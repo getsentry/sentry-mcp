@@ -1,33 +1,23 @@
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  beforeAll,
-  afterEach,
-} from "vitest";
-import { fetchMock } from "cloudflare:test";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import "urlpattern-polyfill";
 import type { Env } from "../types";
 import type { ExecutionContext } from "@cloudflare/workers-types";
+import handler from "./mcp-handler.js";
 
 // Mock Sentry to avoid actual telemetry
 vi.mock("@sentry/cloudflare", () => ({
-  flush: vi.fn(),
+  flush: vi.fn(() => Promise.resolve(true)),
 }));
 
-// Enable fetch mocking
-beforeAll(() => {
-  fetchMock.activate();
-  fetchMock.disableNetConnect();
-});
+// Mock agents/mcp since it's a third-party library
+// We're not testing its behavior, just our integration with it
+vi.mock("agents/mcp", () => ({
+  experimental_createMcpHandler: vi.fn(() => {
+    return vi.fn(() => new Response("MCP handler response", { status: 200 }));
+  }),
+}));
 
-afterEach(() => {
-  fetchMock.assertNoPendingInterceptors();
-});
-
-describe("mcp-handler integration", () => {
+describe("mcp-handler", () => {
   let env: Env;
   let ctx: ExecutionContext & { props?: Record<string, unknown> };
 
@@ -55,20 +45,6 @@ describe("mcp-handler integration", () => {
   });
 
   it("handles request with valid organization constraint", async () => {
-    // Mock organization lookup
-    fetchMock
-      .get("https://sentry.io")
-      .intercept({ path: "/api/0/organizations/sentry-mcp-evals/" })
-      .reply(
-        200,
-        JSON.stringify({
-          slug: "sentry-mcp-evals",
-          name: "Sentry MCP Evals",
-          region_url: "https://us.sentry.io",
-        }),
-      );
-
-    const { default: handler } = await import("./mcp-handler");
     const request = new Request(
       "https://test.mcp.sentry.io/mcp/sentry-mcp-evals",
     );
@@ -78,20 +54,13 @@ describe("mcp-handler integration", () => {
     // Should succeed - verifies full flow:
     // 1. URL parsing extracts org constraint
     // 2. Auth extracted from ExecutionContext.props
-    // 3. Constraint verification passes (mocked API call)
+    // 3. Constraint verification passes (MSW mocked API)
     // 4. ServerContext built and stored in AsyncLocalStorage
     // 5. MCP handler invoked successfully
     expect(response.status).toBe(200);
   });
 
   it("returns 404 for invalid organization", async () => {
-    // Mock nonexistent organization
-    fetchMock
-      .get("https://sentry.io")
-      .intercept({ path: "/api/0/organizations/nonexistent-org/" })
-      .reply(404, JSON.stringify({ detail: "Organization not found" }));
-
-    const { default: handler } = await import("./mcp-handler");
     const request = new Request(
       "https://test.mcp.sentry.io/mcp/nonexistent-org",
     );
@@ -103,27 +72,6 @@ describe("mcp-handler integration", () => {
   });
 
   it("returns 404 for invalid project", async () => {
-    // Mock valid organization but nonexistent project
-    fetchMock
-      .get("https://sentry.io")
-      .intercept({ path: "/api/0/organizations/sentry-mcp-evals/" })
-      .reply(
-        200,
-        JSON.stringify({
-          slug: "sentry-mcp-evals",
-          name: "Sentry MCP Evals",
-          region_url: "https://us.sentry.io",
-        }),
-      );
-
-    fetchMock
-      .get("https://sentry.io")
-      .intercept({
-        path: "/api/0/projects/sentry-mcp-evals/nonexistent-project/",
-      })
-      .reply(404, JSON.stringify({ detail: "Project not found" }));
-
-    const { default: handler } = await import("./mcp-handler");
     const request = new Request(
       "https://test.mcp.sentry.io/mcp/sentry-mcp-evals/nonexistent-project",
     );
@@ -141,7 +89,6 @@ describe("mcp-handler integration", () => {
       props: undefined,
     };
 
-    const { default: handler } = await import("./mcp-handler");
     const request = new Request("https://test.mcp.sentry.io/mcp");
 
     await expect(

@@ -1,13 +1,18 @@
 /// <reference types="vitest" />
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { defineConfig } from "vitest/config";
 
-export default defineWorkersConfig({
+export default defineConfig({
   test: {
+    // Use thread-based workers to avoid process-kill issues in sandboxed environments
+    pool: "threads",
     poolOptions: {
       workers: {
         miniflare: {},
         wrangler: { configPath: "./wrangler.jsonc" },
       },
+    },
+    deps: {
+      interopDefault: true,
     },
     include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     coverage: {
@@ -15,6 +20,6 @@ export default defineWorkersConfig({
       reporter: ["text", "json", "html"],
       include: ["**/*.ts"],
     },
-    // MSW doesn't work in Workers pool - mock fetch directly in tests with vi.fn()
+    setupFiles: ["dotenv/config", "src/test-setup.ts"],
   },
 });
