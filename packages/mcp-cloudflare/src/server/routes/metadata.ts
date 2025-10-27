@@ -54,10 +54,12 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     );
   }
 
+  // Declare mcpClient in outer scope for cleanup in catch block
+  let mcpClient: MCPClient | undefined;
+
   try {
     // Get tools by connecting to MCP server
     let tools: string[] = [];
-    let mcpClient: MCPClient | undefined;
     try {
       const requestUrl = new URL(c.req.url);
       const mcpUrl = `${requestUrl.protocol}//${requestUrl.host}/mcp`;
@@ -108,6 +110,20 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    // Cleanup mcpClient if it was created
+    if (mcpClient && typeof mcpClient.close === "function") {
+      try {
+        await mcpClient.close();
+      } catch (closeError) {
+        logWarn(closeError, {
+          loggerScope: ["cloudflare", "metadata"],
+          extra: {
+            message: "Failed to close MCP client connection in error handler",
+          },
+        });
+      }
+    }
+
     logIssue(error, {
       loggerScope: ["cloudflare", "metadata"],
       extra: {

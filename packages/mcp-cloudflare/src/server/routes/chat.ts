@@ -5,7 +5,7 @@ import { experimental_createMCPClient } from "ai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
 import type { Env } from "../types";
-import { logInfo, logIssue } from "@sentry/mcp-server/telem/logging";
+import { logInfo, logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
 import type {
   ErrorResponse,
   ChatRequest,
@@ -189,6 +189,9 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     }
   }
 
+  // Declare mcpClient in outer scope for cleanup in catch block
+  let mcpClient: MCPClient | null = null;
+
   try {
     const { messages } = await c.req.json<ChatRequest>();
 
@@ -204,7 +207,6 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     }
 
     // Create MCP client connection to the SSE endpoint
-    let mcpClient: MCPClient | null = null;
     const tools: ToolSet = {};
     let currentAccessToken = accessToken;
 
@@ -361,6 +363,20 @@ Remember: You're a test assistant, not a general-purpose helper. Stay focused on
 
     return response;
   } catch (error) {
+    // Cleanup mcpClient if it was created
+    if (mcpClient && typeof mcpClient.close === "function") {
+      try {
+        await mcpClient.close();
+      } catch (closeError) {
+        logWarn(closeError, {
+          loggerScope: ["cloudflare", "chat"],
+          extra: {
+            message: "Failed to close MCP client connection in error handler",
+          },
+        });
+      }
+    }
+
     logIssue(error, {
       loggerScope: ["cloudflare", "chat"],
     });

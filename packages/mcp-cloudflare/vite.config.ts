@@ -8,10 +8,7 @@ import path from "node:path";
 export default defineConfig({
   plugins: [
     react(),
-    cloudflare({
-      // Configure external packages for Worker builds
-      configPath: "./wrangler.jsonc",
-    }),
+    cloudflare(),
     tailwindcss(),
     sentryVitePlugin({
       org: "sentry",
@@ -30,6 +27,4 @@ export default defineConfig({
     port: 5173,
     strictPort: true, // Fail if port is already in use instead of trying another port
   },
-  // Note: @cloudflare/vite-plugin rejects optimizeDeps.exclude and resolve.external
-  // It handles all Workers bundling internally
 });
