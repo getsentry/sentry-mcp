@@ -56,8 +56,8 @@ const mcpHandler: ExportedHandler<Env> = {
     }
 
     const { groups } = result.pathname;
-    const organizationSlug = groups?.org ?? "";
-    const projectSlug = groups?.project ?? "";
+    const organizationSlug = groups?.org || null;
+    const projectSlug = groups?.project || null;
 
     // Extract OAuth props from ExecutionContext (set by OAuth provider)
     const oauthCtx = ctx as OAuthExecutionContext;
