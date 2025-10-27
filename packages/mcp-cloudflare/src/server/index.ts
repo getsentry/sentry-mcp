@@ -23,8 +23,8 @@ const oAuthProvider = new OAuthProvider({
 
 // New MCP handler using experimental_createMcpHandler from agents library
 // - Stateless (no Durable Objects)
-// - Auth context from getMcpAuthContext() (set by OAuth provider)
-// - Constraints from AsyncLocalStorage (per-request)
+// - Auth context from ExecutionContext.props (set by OAuth provider)
+// - Complete ServerContext stored in AsyncLocalStorage (per-request)
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [

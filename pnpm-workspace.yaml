@@ -8,7 +8,7 @@ catalog:
   "@cloudflare/vitest-pool-workers": ^0.10.0
   "@cloudflare/workers-oauth-provider": ^0.0.12
   "@cloudflare/workers-types": ^4.20251014.0
-  "@modelcontextprotocol/sdk": ^1.17.1
+  "@modelcontextprotocol/sdk": ^1.20.2
   "@radix-ui/react-accordion": ^1.2.11
   "@radix-ui/react-slot": ^1.2.3
   "@sentry/cloudflare": 9.34.0
@@ -32,7 +32,7 @@ catalog:
   commander: ^14.0.0
   dotenv: ^16.6.1
   dotenv-cli: ^8.0.0
-  hono: ^4.9.7
+  hono: ^4.10.3
   lint-staged: ^15.5.2
   lucide-react: ^0.503.0
   msw: ^2.10.2

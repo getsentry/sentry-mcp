@@ -170,7 +170,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       label: payload.user.name,
     },
     scope: oauthReqInfo.scope,
-    // Props are available via getMcpAuthContext() in the MCP handler
+    // Props are available via ExecutionContext.props in the MCP handler
     props: {
       // OAuth standard fields
       userId: payload.user.id,

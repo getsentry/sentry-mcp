@@ -5,10 +5,10 @@ import type {
 } from "@cloudflare/workers-types";
 
 /**
- * Props passed through OAuth and available via getMcpAuthContext()
+ * Props passed through OAuth and available via ExecutionContext.props
  *
  * These props are set in the OAuth callback and become available
- * to the MCP handler through the agents library's auth context.
+ * to the MCP handler through ExecutionContext.props (set by OAuth provider).
  */
 export type WorkerProps = {
   // OAuth standard fields

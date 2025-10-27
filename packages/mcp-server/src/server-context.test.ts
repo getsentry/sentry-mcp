@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { configureServer } from "./server";
-import { constraintsStorage } from "./internal/context-storage";
 import type { ServerContext } from "./types";
 
 describe("server context resolution", () => {
@@ -21,6 +20,7 @@ describe("server context resolution", () => {
         clientId: "test-client",
         accessToken: "test-token",
         sentryHost: "sentry.io",
+        constraints: {},
       };
 
       await configureServer({
@@ -36,7 +36,6 @@ describe("server context resolution", () => {
       await expect(
         configureServer({
           server,
-          // @ts-expect-error - intentionally missing both context and getContext
         }),
       ).rejects.toThrow("Either context or getContext must be provided");
     });
@@ -46,13 +45,14 @@ describe("server context resolution", () => {
     it("accepts getContext callback for dynamic resolution", async () => {
       let getContextCallCount = 0;
 
-      const getContext = () => {
+      const getContext = (): ServerContext => {
         getContextCallCount++;
         return {
           userId: `user-${getContextCallCount}`,
           clientId: "test-client",
           accessToken: "test-token",
           sentryHost: "sentry.io",
+          constraints: {},
         };
       };
 
@@ -64,111 +64,6 @@ describe("server context resolution", () => {
       // Server should be configured successfully with getContext
       // (getContext will be called during actual tool execution, not during configuration)
       expect(server).toBeDefined();
-    });
-
-    it("resolves constraints from AsyncLocalStorage in getContext", async () => {
-      const getContext = (): ServerContext => {
-        // Simulate what mcp-handler does: get constraints from AsyncLocalStorage
-        const constraints = constraintsStorage.getStore() || {};
-
-        return {
-          userId: "test-user",
-          clientId: "test-client",
-          accessToken: "test-token",
-          sentryHost: "sentry.io",
-          constraints,
-        };
-      };
-
-      await configureServer({
-        server,
-        getContext,
-      });
-
-      // Simulate a request with constraints
-      const result = await constraintsStorage.run(
-        {
-          organizationSlug: "test-org",
-          projectSlug: "test-project",
-          regionUrl: "https://us.sentry.io",
-        },
-        async () => {
-          // Inside this context, getContext should pick up the constraints
-          const context = getContext();
-          return context.constraints;
-        },
-      );
-
-      expect(result).toEqual({
-        organizationSlug: "test-org",
-        projectSlug: "test-project",
-        regionUrl: "https://us.sentry.io",
-      });
-    });
-
-    it("isolates contexts between concurrent requests", async () => {
-      const getContext = (): ServerContext => {
-        const constraints = constraintsStorage.getStore() || {};
-        return {
-          userId: "test-user",
-          clientId: "test-client",
-          accessToken: "test-token",
-          sentryHost: "sentry.io",
-          constraints,
-        };
-      };
-
-      await configureServer({
-        server,
-        getContext,
-      });
-
-      // Simulate concurrent requests with different constraints
-      const [result1, result2, result3] = await Promise.all([
-        constraintsStorage.run(
-          {
-            organizationSlug: "org1",
-            projectSlug: null,
-            regionUrl: null,
-          },
-          async () => {
-            await new Promise((resolve) => setTimeout(resolve, 10));
-            return getContext().constraints;
-          },
-        ),
-        constraintsStorage.run(
-          {
-            organizationSlug: "org2",
-            projectSlug: "project2",
-            regionUrl: "https://us.sentry.io",
-          },
-          async () => {
-            await new Promise((resolve) => setTimeout(resolve, 5));
-            return getContext().constraints;
-          },
-        ),
-        constraintsStorage.run(
-          {
-            organizationSlug: "org3",
-            projectSlug: null,
-            regionUrl: "https://eu.sentry.io",
-          },
-          async () => {
-            await new Promise((resolve) => setTimeout(resolve, 15));
-            return getContext().constraints;
-          },
-        ),
-      ]);
-
-      // Each request should have its own isolated constraints
-      expect(result1?.organizationSlug).toBe("org1");
-      expect(result1?.projectSlug).toBeNull();
-
-      expect(result2?.organizationSlug).toBe("org2");
-      expect(result2?.projectSlug).toBe("project2");
-
-      expect(result3?.organizationSlug).toBe("org3");
-      expect(result3?.regionUrl).toBe("https://eu.sentry.io");
     });
   });
 
@@ -183,6 +78,7 @@ describe("server context resolution", () => {
           clientId: "test-client",
           accessToken: "test-token",
           sentryHost: "sentry.io",
+          constraints: {},
         },
         onToolComplete: () => {
           callbackExecuted = true;
@@ -201,6 +97,7 @@ describe("server context resolution", () => {
         clientId: "test-client",
         accessToken: "test-token",
         sentryHost: "sentry.io",
+        constraints: {},
       };
 
       await configureServer({
@@ -218,6 +115,7 @@ describe("server context resolution", () => {
         clientId: "test-client",
         accessToken: "test-token",
         sentryHost: "sentry.io",
+        constraints: {},
         grantedScopes: new Set(["org:read", "project:read", "project:write"]),
       };
 

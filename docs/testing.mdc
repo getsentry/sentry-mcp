@@ -2,27 +2,86 @@
 
 Testing strategies and patterns for the Sentry MCP server.
 
+## Testing Philosophy
+
+Our testing approach prioritizes **functional coverage** over implementation details:
+
+### Core Principles
+
+1. **Favor Integration Over Unit Tests**
+   - Tests should verify actual functionality, not implementation details
+   - Focus on "does this feature work?" rather than "does this internal method work?"
+   - Prefer testing through public APIs rather than testing internals directly
+
+2. **Minimize Mocking**
+   - **Only mock external network APIs** (Sentry API, OpenAI, etc.) using MSW
+   - **Don't mock internal code** - use real implementations
+   - **Don't test third-party library behavior** - trust that Node.js, npm packages, etc. work correctly
+   - Example: Don't test that AsyncLocalStorage isolates contexts - that's Node.js's job
+
+3. **Test What Matters**
+   - Test the functionality users/integrators interact with
+   - Test edge cases that could cause real problems
+   - Don't test obvious behavior or standard library functionality
+   - Don't test that dependencies work as documented
+
+4. **Keep Tests Focused**
+   - Each test should verify one clear functional behavior
+   - Avoid testing multiple unrelated things in one test
+   - Remove tests that don't catch meaningful bugs
+
+### What to Test
+
+✅ **DO test:**
+- Tool functionality: "Does find_issues return correct data?"
+- API integration: "Does our client handle API errors correctly?"
+- Error handling: "Do we provide helpful error messages?"
+- Edge cases: "What happens with empty results, special characters, etc.?"
+- Configuration: "Can the server be configured for different deployment modes?"
+
+❌ **DON'T test:**
+- Standard library behavior (AsyncLocalStorage, Promise.all, etc.)
+- Third-party package internals (Zod validation, MSW mocking, etc.)
+- Implementation details (private methods, internal state)
+- Obvious behavior that will break immediately if wrong
+
+### Example: Context Storage
+
+**Bad approach** (testing Node.js internals):
+```typescript
+// ❌ Don't test that AsyncLocalStorage works
+it("isolates context between concurrent requests", async () => {
+  await Promise.all([/* test AsyncLocalStorage isolation */]);
+});
+```
+
+**Good approach** (testing our functionality):
+```typescript
+// ✅ Test that server configuration works
+it("accepts getContext callback for dynamic resolution", async () => {
+  await configureServer({ server, getContext });
+  expect(server).toBeDefined();
+});
+```
+
 ## Testing Levels
 
-### 1. Unit Tests
-Fast, isolated tests with mocked dependencies:
+### 1. Functional Tests
+Fast, focused tests of actual functionality:
 - Located alongside source files (`*.test.ts`)
 - Use Vitest with inline snapshots
-- Mock API calls with MSW
+- Mock external APIs only (Sentry API, OpenAI) with MSW
+- Use real implementations for internal code
+- Test through public APIs rather than implementation details
 
-### 2. Integration Tests
-Test interactions between components:
-- API client with mock server
-- Tool handlers with context
-- Full request/response cycles
-
-### 3. Evaluation Tests
+### 2. Evaluation Tests
 Real-world scenarios with LLM:
 - Located in `packages/mcp-server-evals`
 - Use actual AI models
 - Verify end-to-end functionality
+- Test complete workflows
 
-## Unit Testing Patterns
+## Functional Testing Patterns
 
 See `adding-tools.mdc#step-3-add-tests` for the complete tool testing workflow.
 
