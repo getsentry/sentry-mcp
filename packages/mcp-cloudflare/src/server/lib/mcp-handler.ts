@@ -59,9 +59,7 @@ const mcpHandler: ExportedHandler<Env> = {
     // Get OAuth props from context (set by OAuth provider)
     const authContext = getMcpAuthContext();
     if (!authContext?.props) {
-      return new Response("Unauthorized - No authentication context", {
-        status: 401,
-      });
+      throw new Error("No authentication context available");
     }
 
     // Verify user has access to the requested org/project

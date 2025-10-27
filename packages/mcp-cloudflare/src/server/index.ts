@@ -5,7 +5,21 @@ import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
-import { tokenExchangeCallback } from "./oauth";
+
+const oAuthProvider = new OAuthProvider({
+  apiRoute: "/mcp",
+  // @ts-expect-error - OAuthProvider types don't support specific Env types
+  apiHandler: sentryMcpHandler,
+  // @ts-expect-error - OAuthProvider types don't support specific Env types
+  defaultHandler: app,
+  // must match the routes registered in `app.ts`
+  authorizeEndpoint: "/oauth/authorize",
+  tokenEndpoint: "/oauth/token",
+  clientRegistrationEndpoint: "/oauth/register",
+  // @ts-ignore - Environment will be passed as second parameter
+  // tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
+  scopesSupported: Object.keys(SCOPES),
+});
 
 // New MCP handler using experimental_createMcpHandler from agents library
 // - Stateless (no Durable Objects)
@@ -45,21 +59,6 @@ const corsWrappedOAuthProvider = {
         return addCorsHeaders(new Response(null, { status: 204 }));
       }
     }
-
-    const oAuthProvider = new OAuthProvider({
-      apiRoute: "/mcp",
-      // @ts-expect-error - OAuthProvider types don't support specific Env types
-      apiHandler: sentryMcpHandler,
-      // @ts-expect-error - OAuthProvider types don't support specific Env types
-      defaultHandler: app,
-      // must match the routes registered in `app.ts`
-      authorizeEndpoint: "/oauth/authorize",
-      tokenEndpoint: "/oauth/token",
-      clientRegistrationEndpoint: "/oauth/register",
-      // @ts-ignore - Environment will be passed as second parameter
-      tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
-      scopesSupported: Object.keys(SCOPES),
-    });
 
     const response = await oAuthProvider.fetch(request, env, ctx);
 
