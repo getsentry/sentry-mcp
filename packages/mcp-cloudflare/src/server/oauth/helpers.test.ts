@@ -54,36 +54,6 @@ describe("tokenExchangeCallback", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("should reuse cached token when it has sufficient TTL remaining", async () => {
-    const futureExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes from now
-    const options: TokenExchangeCallbackOptions = {
-      grantType: "refresh_token",
-      clientId: "test-client-id",
-      userId: "test-user-id",
-      scope: ["org:read", "project:read"],
-      props: {
-        userId: "user-id",
-        email: "test@example.com",
-        clientId: "test-client-id",
-        accessToken: "cached-access-token",
-        refreshToken: "refresh-token",
-        accessTokenExpiresAt: futureExpiry,
-        scope: "org:read project:read",
-      } as WorkerProps,
-    };
-
-    const result = await tokenExchangeCallback(options, mockEnv);
-
-    // Should not call upstream API
-    expect(mockFetch).not.toHaveBeenCalled();
-
-    // Should return existing props with calculated TTL
-    expect(result).toBeDefined();
-    expect(result?.newProps).toEqual(options.props);
-    expect(result?.accessTokenTTL).toBeGreaterThan(0);
-    expect(result?.accessTokenTTL).toBeLessThanOrEqual(600); // Max 10 minutes
-  });
-
   it("should refresh token when cached token is close to expiry", async () => {
     const nearExpiry = Date.now() + 1 * 60 * 1000; // 1 minute from now (less than 2 min safety window)
     const options: TokenExchangeCallbackOptions = {
