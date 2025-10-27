@@ -58,8 +58,7 @@
   },
   "migrations": [
     {
-      "tag": "v1",
-      "new_classes": [],
+      "tag": "v2",
       "deleted_classes": ["SentryMCP"]
     }
   ],
