@@ -40,7 +40,8 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        name: "Test User",
+        clientId: "test-client-id",
+        scope: "org:read project:read",
         accessToken: "old-access-token",
         // No refreshToken
       } as WorkerProps,
@@ -61,7 +62,8 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        name: "Test User",
+        clientId: "test-client-id",
+        scope: "org:read project:read",
         accessToken: "cached-access-token",
         refreshToken: "refresh-token",
         accessTokenExpiresAt: futureExpiry,
@@ -89,7 +91,8 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        name: "Test User",
+        clientId: "test-client-id",
+        scope: "org:read project:read",
         accessToken: "old-access-token",
         refreshToken: "old-refresh-token",
         accessTokenExpiresAt: nearExpiry,
@@ -146,7 +149,8 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        name: "Test User",
+        clientId: "test-client-id",
+        scope: "org:read project:read",
         accessToken: "old-access-token",
         refreshToken: "old-refresh-token",
         // No accessTokenExpiresAt
@@ -192,7 +196,8 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        name: "Test User",
+        clientId: "test-client-id",
+        scope: "org:read project:read",
         accessToken: "old-access-token",
         refreshToken: "invalid-refresh-token",
       } as WorkerProps,

@@ -12,10 +12,11 @@ MCP Client → MCP Server → Sentry OAuth → Sentry API
 
 ### Key Components
 
-1. **OAuth Provider** (Cloudflare Durable Object)
+1. **OAuth Provider** (@cloudflare/workers-oauth-provider)
    - Manages client authorization
-   - Stores tokens securely
+   - Stores tokens in KV storage
    - Handles state management
+   - Sets auth props in ExecutionContext
 
 2. **Client Approval**
    - First-time clients require user approval
@@ -53,13 +54,17 @@ const REQUIRED_SCOPES = [
 
 ```typescript
 interface ServerContext {
-  host: string;
+  userId?: string;
+  clientId: string;
   accessToken: string;
-  organizationSlug?: string;
+  grantedScopes?: Set<Scope>;
+  constraints: Constraints;
+  sentryHost: string;
+  mcpUrl?: string;
 }
 ```
 
-Context propagated through:
+Context stored in AsyncLocalStorage per-request and propagated through:
 
 - Tool handlers
 - API client initialization

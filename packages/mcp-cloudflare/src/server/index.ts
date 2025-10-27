@@ -1,14 +1,11 @@
 import * as Sentry from "@sentry/cloudflare";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
-import sentryMcpHandler, { SentryMCP } from "./lib/mcp-agent";
 import app from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
 import { tokenExchangeCallback } from "./oauth";
-
-// required for Durable Objects
-export { SentryMCP };
+import sentryMcpHandler from "./lib/mcp-handler";
 
 // SentryMCP handles URLPattern-based constraint extraction from request URLs
 // and passes context to Durable Objects via headers for org/project scoping.
@@ -34,9 +31,9 @@ const addCorsHeaders = (response: Response): Response => {
   return newResponse;
 };
 
-// Wrap OAuth Provider to add CORS headers for public metadata endpoints
-// This is necessary because the OAuth Provider handles some endpoints internally
-// (.well-known) without going through our Hono app middleware
+// Wrap OAuth Provider to restrict CORS headers on public metadata endpoints
+// OAuth Provider v0.0.12 adds overly permissive CORS (allows all methods/headers).
+// We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
 const corsWrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     // Handle CORS preflight for public metadata endpoints
@@ -48,15 +45,15 @@ const corsWrappedOAuthProvider = {
     }
 
     const oAuthProvider = new OAuthProvider({
-      apiRoute: ["/sse", "/mcp"],
+      apiRoute: "/mcp",
+      // @ts-expect-error - OAuthProvider types don't support specific Env types
       apiHandler: sentryMcpHandler,
-      // @ts-ignore
+      // @ts-expect-error - OAuthProvider types don't support specific Env types
       defaultHandler: app,
       // must match the routes registered in `app.ts`
       authorizeEndpoint: "/oauth/authorize",
       tokenEndpoint: "/oauth/token",
       clientRegistrationEndpoint: "/oauth/register",
-      // @ts-ignore - Environment will be passed as second parameter
       tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
       scopesSupported: Object.keys(SCOPES),
     });

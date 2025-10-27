@@ -6,18 +6,19 @@
  *
  * **Configuration Example:**
  * ```typescript
- * const server = new McpServer();
- * const context: ServerContext = {
- *   accessToken: "your-sentry-token",
- *   host: "sentry.io",
- *   userId: "user-123",
- *   clientId: "mcp-client"
- * };
- *
- * await configureServer({ server, context });
+ * const server = buildServer({
+ *   context: {
+ *     accessToken: "your-sentry-token",
+ *     sentryHost: "sentry.io",
+ *     userId: "user-123",
+ *     clientId: "mcp-client",
+ *     constraints: {}
+ *   },
+ *   wrapWithSentry: (s) => Sentry.wrapMcpServerWithSentry(s),
+ * });
  * ```
  */
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
   ServerRequest,
@@ -25,16 +26,23 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import tools from "./tools/index";
 import type { ServerContext } from "./types";
-import { setTag, setUser, startNewTrace, startSpan } from "@sentry/core";
+import {
+  setTag,
+  setUser,
+  startNewTrace,
+  startSpan,
+  wrapMcpServerWithSentry,
+} from "@sentry/core";
 import { getLogger, logIssue, type LogIssueOptions } from "./telem/logging";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
 import {
-  getConstraintKeysToFilter,
   getConstraintParametersToInject,
+  getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
+import { requireServerContext } from "./internal/context-storage";
 
 const toolLogger = getLogger(["server", "tools"]);
 
@@ -57,25 +65,67 @@ function extractMcpParameters(args: Record<string, unknown>) {
 }
 
 /**
- * Configures an MCP server with all tools and telemetry.
+ * Creates and configures a complete MCP server with Sentry instrumentation.
  *
- * Transforms a bare MCP server instance into a fully-featured Sentry integration
- * with comprehensive observability, error handling, and handler registration.
+ * The server is built with tools filtered based on the granted scopes in the context.
+ * AsyncLocalStorage is still used for runtime context propagation during tool execution.
  *
- * @example Basic Configuration
+ * @example Usage with stdio transport
  * ```typescript
- * const server = new McpServer();
+ * import { buildServer } from "@sentry/mcp-server/server";
+ * import { startStdio } from "@sentry/mcp-server/transports/stdio";
+ *
  * const context = {
  *   accessToken: process.env.SENTRY_TOKEN,
- *   host: "sentry.io",
+ *   sentryHost: "sentry.io",
  *   userId: "user-123",
- *   clientId: "cursor-ide"
+ *   clientId: "cursor-ide",
+ *   constraints: {}
  * };
  *
- * await configureServer({ server, context });
+ * const server = buildServer({ context });
+ * await startStdio(server, context);
+ * ```
+ *
+ * @example Usage with Cloudflare Workers
+ * ```typescript
+ * import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
+ * import { buildServer } from "@sentry/mcp-server/server";
+ *
+ * const serverContext = buildContextFromOAuth();
+ * const server = buildServer({ context: serverContext });
+ *
+ * // Context is bound per-request for runtime operations
+ * return serverContextStorage.run(serverContext, () => {
+ *   return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
+ * });
  * ```
  */
-export async function configureServer({
+export function buildServer({
+  context,
+  onToolComplete,
+}: {
+  context: ServerContext;
+  onToolComplete?: () => void;
+}): McpServer {
+  const server = new McpServer({
+    name: MCP_SERVER_NAME,
+    version: LIB_VERSION,
+  });
+
+  configureServer({ server, context, onToolComplete });
+
+  return wrapMcpServerWithSentry(server);
+}
+
+/**
+ * Configures an MCP server with tools filtered by granted scopes.
+ *
+ * Internal function used by buildServer(). Use buildServer() instead for most cases.
+ * Tools are filtered at registration time based on grantedScopes, and context is
+ * also resolved from AsyncLocalStorage at runtime for execution.
+ */
+function configureServer({
   server,
   context,
   onToolComplete,
@@ -84,8 +134,7 @@ export async function configureServer({
   context: ServerContext;
   onToolComplete?: () => void;
 }) {
-  // Get granted scopes with default to read-only scopes
-  // Normalize to a mutable Set regardless of input being Set or ReadonlySet
+  // Get granted scopes from context for tool filtering
   const grantedScopes: Set<Scope> = context.grantedScopes
     ? new Set<Scope>(context.grantedScopes)
     : new Set<Scope>(DEFAULT_SCOPES);
@@ -104,10 +153,10 @@ export async function configureServer({
   };
 
   for (const [toolKey, tool] of Object.entries(tools)) {
-    // Check if this tool is allowed based on granted scopes
+    // Filter tools BEFORE registration based on granted scopes
     if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
       toolLogger.debug(
-        "Skipping tool {tool} - missing required scopes",
+        "Tool {tool} excluded from server - missing required scopes",
         () => ({
           tool: tool.name,
           requiredScopes: Array.isArray(tool.requiredScopes)
@@ -118,27 +167,25 @@ export async function configureServer({
           grantedScopes: [...grantedScopes],
         }),
       );
-      continue;
+      continue; // Skip this tool entirely
     }
 
-    // Determine which constraint parameters should be filtered from the schema
-    // because they will be injected at runtime
-    const toolConstraintKeys = getConstraintKeysToFilter(
-      context.constraints,
-      tool.inputSchema,
+    // Filter out constraint parameters from schema that will be auto-injected
+    // Only filter parameters that are ACTUALLY constrained in the current context
+    // to avoid breaking tools when constraints are not set
+    const constraintKeysToFilter = new Set(
+      getConstraintKeysToFilter(context.constraints, tool.inputSchema),
     );
-
-    // Create modified schema by removing constraint parameters that will be injected
-    const modifiedInputSchema = Object.fromEntries(
+    const filteredInputSchema = Object.fromEntries(
       Object.entries(tool.inputSchema).filter(
-        ([key, _]) => !toolConstraintKeys.includes(key),
+        ([key]) => !constraintKeysToFilter.has(key),
       ),
     );
 
     server.tool(
       tool.name,
       tool.description,
-      modifiedInputSchema,
+      filteredInputSchema,
       tool.annotations,
       async (
         params: any,
@@ -153,18 +200,27 @@ export async function configureServer({
                   "mcp.tool.name": tool.name,
                   "mcp.server.name": MCP_SERVER_NAME,
                   "mcp.server.version": LIB_VERSION,
-                  ...(context.constraints.organizationSlug && {
-                    "sentry-mcp.constraint-organization":
-                      context.constraints.organizationSlug,
-                  }),
-                  ...(context.constraints.projectSlug && {
-                    "sentry-mcp.constraint-project":
-                      context.constraints.projectSlug,
-                  }),
                   ...extractMcpParameters(params || {}),
                 },
               },
               async (span) => {
+                // Resolve context per-request for runtime operations
+                const context = requireServerContext();
+
+                // Add constraint attributes to span
+                if (context.constraints.organizationSlug) {
+                  span.setAttribute(
+                    "sentry-mcp.constraint-organization",
+                    context.constraints.organizationSlug,
+                  );
+                }
+                if (context.constraints.projectSlug) {
+                  span.setAttribute(
+                    "sentry-mcp.constraint-project",
+                    context.constraints.projectSlug,
+                  );
+                }
+
                 if (context.userId) {
                   setUser({
                     id: context.userId,
@@ -175,13 +231,6 @@ export async function configureServer({
                 }
 
                 try {
-                  // Double-check scopes at runtime (defense in depth)
-                  if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-                    throw new Error(
-                      `Tool '${tool.name}' is not allowed - missing required scopes`,
-                    );
-                  }
-
                   // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
                   const applicableConstraints = getConstraintParametersToInject(
                     context.constraints,

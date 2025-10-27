@@ -6,6 +6,7 @@
  */
 import { Hono } from "hono";
 import { experimental_createMCPClient } from "ai";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Env } from "../types";
 import { logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
 import type { ErrorResponse } from "../types/chat";
@@ -53,23 +54,27 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     );
   }
 
+  // Declare mcpClient in outer scope for cleanup in catch block
+  let mcpClient: MCPClient | undefined;
+
   try {
     // Get tools by connecting to MCP server
     let tools: string[] = [];
-    let mcpClient: MCPClient | undefined;
     try {
       const requestUrl = new URL(c.req.url);
-      const sseUrl = `${requestUrl.protocol}//${requestUrl.host}/sse`;
+      const mcpUrl = `${requestUrl.protocol}//${requestUrl.host}/mcp`;
 
-      mcpClient = await experimental_createMCPClient({
-        name: "sentry",
-        transport: {
-          type: "sse" as const,
-          url: sseUrl,
+      const httpTransport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+        requestInit: {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
         },
+      });
+
+      mcpClient = await experimental_createMCPClient({
+        name: "sentry",
+        transport: httpTransport,
       });
 
       const mcpTools = await mcpClient.tools();
@@ -105,6 +110,20 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    // Cleanup mcpClient if it was created
+    if (mcpClient && typeof mcpClient.close === "function") {
+      try {
+        await mcpClient.close();
+      } catch (closeError) {
+        logWarn(closeError, {
+          loggerScope: ["cloudflare", "metadata"],
+          extra: {
+            message: "Failed to close MCP client connection in error handler",
+          },
+        });
+      }
+    }
+
     logIssue(error, {
       loggerScope: ["cloudflare", "metadata"],
       extra: {

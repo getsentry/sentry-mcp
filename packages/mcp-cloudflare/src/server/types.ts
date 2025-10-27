@@ -3,15 +3,27 @@ import type {
   RateLimit,
   WorkerVersionMetadata,
 } from "@cloudflare/workers-types";
-import type { ServerContext } from "@sentry/mcp-server/types";
 
-export type WorkerProps = ServerContext & {
+/**
+ * Props passed through OAuth and available via ExecutionContext.props
+ *
+ * These props are set in the OAuth callback and become available
+ * to the MCP handler through ExecutionContext.props (set by OAuth provider).
+ */
+export type WorkerProps = {
+  // OAuth standard fields
   id: string;
-  name: string;
-  scope: string;
-  grantedScopes?: string[]; // Array of scope strings passed from OAuth
-  refreshToken?: string; // Refresh token for OAuth token renewal
+
+  // Sentry-specific fields
+  accessToken: string;
+  refreshToken?: string;
   accessTokenExpiresAt?: number; // Timestamp when the upstream access token expires
+  clientId: string;
+  scope: string;
+  grantedScopes?: string[]; // Array of scope strings
+
+  // Note: constraints are NOT included - they're extracted per-request from URL
+  // Note: sentryHost and mcpUrl come from env, not OAuth props
 };
 
 export interface Env {
@@ -25,7 +37,7 @@ export interface Env {
   SENTRY_DSN?: string;
   SENTRY_HOST?: string;
   OPENAI_API_KEY: string;
-  MCP_OBJECT: DurableObjectNamespace;
+  MCP_URL?: string;
   OAUTH_PROVIDER: OAuthHelpers;
   AI: Ai;
   CF_VERSION_METADATA: WorkerVersionMetadata;

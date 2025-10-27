@@ -16,12 +16,6 @@
   // Available environment variables:
   // - AUTORAG_INDEX_NAME: Name of the AutoRAG index to use for documentation search (default: "sentry-docs")
   "keep_vars": true,
-  "migrations": [
-    {
-      "new_sqlite_classes": ["SentryMCP"],
-      "tag": "v1"
-    }
-  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -31,14 +25,6 @@
     "binding": "CF_VERSION_METADATA"
   },
   "vars": {},
-  "durable_objects": {
-    "bindings": [
-      {
-        "class_name": "SentryMCP",
-        "name": "MCP_OBJECT"
-      }
-    ]
-  },
   "unsafe": {
     "bindings": [
       {

@@ -15,7 +15,7 @@ const describeIfPreviewUrl = PREVIEW_URL ? describe : describe.skip;
  * @param url - The URL to fetch
  * @param options - Fetch options with additional helpers
  * @param options.consumeBody - Whether to read the response body (default: true)
- *                               Set to false for SSE or when you only need status/headers
+ *                               Set to false when you only need status/headers
  * @param options.timeoutMs - Timeout in milliseconds (default: DEFAULT_TIMEOUT_MS)
  *
  * NOTE: Workerd connection errors (kj/compat/http.c++:1993) are caused by
@@ -54,16 +54,13 @@ async function safeFetch(
       signal,
     });
 
-    // Only consume body if requested (not for SSE streams)
+    // Only consume body if requested
     if (consumeBody) {
       const contentType = response.headers.get("content-type") || "";
 
       try {
         if (contentType.includes("application/json")) {
           data = await response.json();
-        } else if (contentType.includes("text/event-stream")) {
-          // Don't consume SSE streams
-          data = null;
         } else {
           data = await response.text();
         }
@@ -94,8 +91,6 @@ describeIfPreviewUrl(
   () => {
     beforeAll(async () => {
       console.log(`🔍 Running smoke tests against: ${PREVIEW_URL}`);
-      // TODO: Add back workerd warmup if needed for SSE tests
-      // Currently disabled to keep tests under 15s timeout
     });
 
     it("should respond on root endpoint", async () => {
@@ -128,45 +123,6 @@ describeIfPreviewUrl(
       if (data) {
         expect(data).toHaveProperty("error");
         expect(data.error).toMatch(/invalid_token|unauthorized/i);
-      }
-    });
-
-    it("should have SSE endpoint for MCP transport", async () => {
-      /*
-       * SSE endpoints are simple:
-       * - No auth = 401 Unauthorized
-       * - Valid auth = 200 OK + stream starts
-       *
-       * For smoke tests (no auth), we expect 401 with error details.
-       * This proves the endpoint exists and auth is working.
-       */
-
-      // For SSE, we don't want to consume the stream body
-      const { response, data } = await safeFetch(`${PREVIEW_URL}/sse`, {
-        headers: {
-          Accept: "text/event-stream",
-        },
-        consumeBody: false, // Don't try to read SSE stream
-      });
-
-      console.log(`📡 SSE test result: status=${response.status}`);
-
-      // Should return 401 since we're not providing auth
-      expect(response.status).toBe(401);
-
-      // For 401 responses, we need to manually read the error since we set consumeBody: false
-      if (response.status === 401) {
-        try {
-          const errorData = await response.json();
-          console.log(
-            `📡 SSE error: ${JSON.stringify(errorData).substring(0, 100)}...`,
-          );
-          expect(errorData).toHaveProperty("error");
-          expect(errorData.error).toMatch(/invalid_token|unauthorized/i);
-        } catch {
-          // Body might already be consumed or not JSON
-          console.log("📡 SSE returned non-JSON 401 response");
-        }
       }
     });
 

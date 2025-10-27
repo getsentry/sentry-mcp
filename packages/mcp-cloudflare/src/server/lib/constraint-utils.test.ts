@@ -21,14 +21,25 @@ describe("verifyConstraintsAccess", () => {
     });
   });
 
-  it("fails when missing access token", async () => {
-    const result = await verifyConstraintsAccess(
-      { organizationSlug: "org", projectSlug: null },
-      { accessToken: "", sentryHost: host },
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.status).toBe(401);
+  it("fails when access token is missing, null, undefined, or empty", async () => {
+    const testCases = [
+      { accessToken: "", label: "empty" },
+      { accessToken: null, label: "null" },
+      { accessToken: undefined, label: "undefined" },
+    ];
+
+    for (const { accessToken, label } of testCases) {
+      const result = await verifyConstraintsAccess(
+        { organizationSlug: "org", projectSlug: null },
+        { accessToken, sentryHost: host },
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.status).toBe(401);
+        expect(result.message).toBe(
+          "Missing access token for constraint verification",
+        );
+      }
     }
   });
 
@@ -88,48 +99,6 @@ describe("verifyConstraintsAccess", () => {
       expect(result.message).toBe(
         "Project 'nonexistent-project' not found in organization 'sentry-mcp-evals'",
       );
-    }
-  });
-
-  it("handles null access token", async () => {
-    const result = await verifyConstraintsAccess(
-      { organizationSlug: "org", projectSlug: null },
-      { accessToken: null, sentryHost: host },
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.status).toBe(401);
-      expect(result.message).toBe(
-        "Missing access token for constraint verification",
-      );
-    }
-  });
-
-  it("handles undefined access token", async () => {
-    const result = await verifyConstraintsAccess(
-      { organizationSlug: "org", projectSlug: null },
-      { accessToken: undefined, sentryHost: host },
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.status).toBe(401);
-      expect(result.message).toBe(
-        "Missing access token for constraint verification",
-      );
-    }
-  });
-
-  it("handles org with missing regionUrl (regionUrl defaults to null)", async () => {
-    // This tests the case where org.links?.regionUrl is not available
-    // The mock always returns regionUrl, so this tests the fallback logic
-    const result = await verifyConstraintsAccess(
-      { organizationSlug: "sentry-mcp-evals", projectSlug: null },
-      { accessToken: token, sentryHost: host },
-    );
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      // Should still get regionUrl from the mock org data
-      expect(result.constraints.regionUrl).toBe("https://us.sentry.io");
     }
   });
 });

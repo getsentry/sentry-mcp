@@ -170,10 +170,12 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       label: payload.user.name,
     },
     scope: oauthReqInfo.scope,
-    // This will be available on this.props inside MyMCP
+    // Props are available via ExecutionContext.props in the MCP handler
     props: {
+      // OAuth standard fields
       id: payload.user.id,
-      name: payload.user.name,
+
+      // Sentry-specific fields
       accessToken: payload.access_token,
       refreshToken: payload.refresh_token,
       // Cache upstream expiry so future refresh grants can avoid
@@ -182,7 +184,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
       grantedScopes: Array.from(grantedScopes),
-      constraints: {}, // Required by ServerContext, will be populated by MCP agent
+
+      // Note: constraints are NOT included here - they're extracted per-request from URL
+      // Note: sentryHost and mcpUrl come from env, not OAuth props
     } as WorkerProps,
   });
 

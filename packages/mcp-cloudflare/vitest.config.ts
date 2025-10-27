@@ -8,7 +8,7 @@ export default defineConfig({
     poolOptions: {
       workers: {
         miniflare: {},
-        wrangler: { configPath: "./wrangler.toml" },
+        wrangler: { configPath: "./wrangler.jsonc" },
       },
     },
     deps: {

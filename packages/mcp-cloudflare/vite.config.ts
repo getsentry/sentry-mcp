@@ -23,4 +23,8 @@ export default defineConfig({
   build: {
     sourcemap: true,
   },
+  server: {
+    port: 5173,
+    strictPort: true, // Fail if port is already in use instead of trying another port
+  },
 });

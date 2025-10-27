@@ -14,7 +14,7 @@
  * ```
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { buildServer } from "./server";
 import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "./version";
@@ -99,19 +99,10 @@ Sentry.init({
     (process.env.NODE_ENV !== "production" ? "development" : "production"),
 });
 
-const server = new McpServer({
-  name: "Sentry MCP",
-  version: LIB_VERSION,
-});
-
-const instrumentedServer = Sentry.wrapMcpServerWithSentry(server);
-
 const SENTRY_TIMEOUT = 5000; // 5 seconds
 
-// Process scope configuration using shared resolver
-// XXX: we could do what we're doing in routes/auth.ts and pass the context
-// identically, but we don't really need userId and userName yet
-startStdio(instrumentedServer, {
+// Build context once for server configuration and runtime
+const context = {
   accessToken: cfg.accessToken,
   grantedScopes: cfg.finalScopes,
   constraints: {
@@ -121,7 +112,12 @@ startStdio(instrumentedServer, {
   sentryHost: cfg.sentryHost,
   mcpUrl: cfg.mcpUrl,
   openaiBaseUrl: cfg.openaiBaseUrl,
-}).catch((err) => {
+};
+
+// Build server with context to filter tools based on granted scopes
+const server = buildServer({ context });
+
+startStdio(server, context).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events
   Sentry.flush(SENTRY_TIMEOUT);

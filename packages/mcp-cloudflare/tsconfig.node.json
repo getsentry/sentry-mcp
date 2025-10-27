@@ -3,9 +3,7 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "outDir": "dist",
-    "rootDir": "",
-
-    "types": ["@cloudflare/vitest-pool-workers"]
+    "rootDir": ""
   },
   "include": ["vite.config.ts"]
 }
