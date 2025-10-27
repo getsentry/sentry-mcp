@@ -13,7 +13,7 @@ describe("find_teams", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`

@@ -17,7 +17,7 @@ describe("search_docs", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
         mcpUrl: "https://mcp.sentry.dev",
       },
     );
@@ -70,7 +70,7 @@ describe("search_docs", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow();
@@ -96,7 +96,7 @@ describe("search_docs", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow("Request timeout after 15000ms");
@@ -116,7 +116,7 @@ describe("search_docs", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
         mcpUrl: "https://mcp.sentry.dev",
       },
     );

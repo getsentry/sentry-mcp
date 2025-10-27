@@ -12,9 +12,7 @@ import type {
  */
 export type WorkerProps = {
   // OAuth standard fields
-  userId: string;
-  username?: string; // Optional - payload.user.name can be null
-  email: string; // Required by Sentry OAuth API
+  id: string;
 
   // Sentry-specific fields
   accessToken: string;
@@ -24,11 +22,8 @@ export type WorkerProps = {
   scope: string;
   grantedScopes?: string[]; // Array of scope strings
 
-  // Environment config
-  sentryHost?: string;
-  mcpUrl?: string;
-
   // Note: constraints are NOT included - they're extracted per-request from URL
+  // Note: sentryHost and mcpUrl come from env, not OAuth props
 };
 
 export interface Env {

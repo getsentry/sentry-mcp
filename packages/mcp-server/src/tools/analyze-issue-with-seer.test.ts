@@ -30,7 +30,7 @@ describe("analyze_issue_with_seer", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -68,7 +68,7 @@ describe("analyze_issue_with_seer", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -112,7 +112,7 @@ describe("analyze_issue_with_seer", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -166,7 +166,7 @@ describe("analyze_issue_with_seer", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -217,7 +217,7 @@ describe("analyze_issue_with_seer", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -279,7 +279,7 @@ describe("analyze_issue_with_seer", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 

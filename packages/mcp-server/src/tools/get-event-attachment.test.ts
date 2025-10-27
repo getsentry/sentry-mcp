@@ -17,7 +17,7 @@ describe("get_event_attachment", () => {
           projectSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -60,7 +60,7 @@ describe("get_event_attachment", () => {
           projectSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -116,7 +116,7 @@ describe("get_event_attachment", () => {
             projectSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow(

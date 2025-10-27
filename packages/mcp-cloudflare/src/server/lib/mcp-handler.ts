@@ -65,8 +65,7 @@ const mcpHandler: ExportedHandler<Env> = {
       throw new Error("No authentication context available");
     }
 
-    const sentryHost =
-      (oauthCtx.props.sentryHost as string) || env.SENTRY_HOST || "sentry.io";
+    const sentryHost = env.SENTRY_HOST || "sentry.io";
 
     // Verify user has access to the requested org/project
     const verification = await verifyConstraintsAccess(
@@ -102,13 +101,13 @@ const mcpHandler: ExportedHandler<Env> = {
 
     // Build complete ServerContext from OAuth props + verified constraints
     const serverContext: ServerContext = {
-      userId: oauthCtx.props.userId as string | undefined,
+      id: oauthCtx.props.id as string | undefined,
       clientId: oauthCtx.props.clientId as string,
       accessToken: oauthCtx.props.accessToken as string,
       grantedScopes: expandedScopes,
       constraints: verification.constraints,
       sentryHost,
-      mcpUrl: oauthCtx.props.mcpUrl as string | undefined,
+      mcpUrl: env.MCP_URL,
     };
 
     // Create and configure MCP server with tools filtered by context

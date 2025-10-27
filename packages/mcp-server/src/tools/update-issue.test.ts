@@ -17,7 +17,7 @@ describe("update_issue", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -59,7 +59,7 @@ describe("update_issue", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -100,7 +100,7 @@ describe("update_issue", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -144,7 +144,7 @@ describe("update_issue", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow("Either `issueId` or `issueUrl` must be provided");
@@ -166,7 +166,7 @@ describe("update_issue", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow(
@@ -190,7 +190,7 @@ describe("update_issue", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow(

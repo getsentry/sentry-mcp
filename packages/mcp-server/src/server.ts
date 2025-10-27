@@ -10,7 +10,7 @@
  *   context: {
  *     accessToken: "your-sentry-token",
  *     sentryHost: "sentry.io",
- *     userId: "user-123",
+ *     id: "user-123",
  *     clientId: "mcp-client",
  *     constraints: {}
  *   },
@@ -75,7 +75,7 @@ function extractMcpParameters(args: Record<string, unknown>) {
  * const context = {
  *   accessToken: process.env.SENTRY_TOKEN,
  *   sentryHost: "sentry.io",
- *   userId: "user-123",
+ *   id: "user-123",
  *   clientId: "cursor-ide",
  *   constraints: {}
  * };
@@ -215,9 +215,9 @@ function configureServer({
                   );
                 }
 
-                if (context.userId) {
+                if (context.id) {
                   setUser({
-                    id: context.userId,
+                    id: context.id,
                   });
                 }
                 if (context.clientId) {

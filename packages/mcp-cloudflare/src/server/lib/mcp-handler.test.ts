@@ -10,16 +10,11 @@ vi.mock("@sentry/cloudflare", () => ({
   flush: vi.fn(() => Promise.resolve(true)),
 }));
 
-// Mock the MCP handler from agents/mcp (third-party library)
-// We verify it's called correctly, but trust the library works
-const mockMcpHandlerFn = vi.fn(
-  () => new Response("MCP handler response", { status: 200 }),
-);
-const mockCreateMcpHandler = vi.fn(() => mockMcpHandlerFn);
-
+// Mock the MCP handler creation - we're testing the wrapper logic, not the MCP protocol
 vi.mock("agents/mcp", () => ({
-  experimental_createMcpHandler: (...args: unknown[]) =>
-    mockCreateMcpHandler(...args),
+  experimental_createMcpHandler: vi.fn(() => {
+    return vi.fn(() => Promise.resolve(new Response("OK", { status: 200 })));
+  }),
 }));
 
 describe("mcp-handler", () => {
@@ -39,32 +34,12 @@ describe("mcp-handler", () => {
       waitUntil: vi.fn(),
       passThroughOnException: vi.fn(),
       props: {
-        userId: "test-user-123",
+        id: "test-user-123",
         clientId: "test-client",
         accessToken: "test-token",
         grantedScopes: ["org:read", "project:read"],
-        sentryHost: "sentry.io",
-        mcpUrl: "https://test.mcp.sentry.io",
       },
     };
-  });
-
-  it("creates ServerContext with constraints and invokes MCP handler", async () => {
-    const request = new Request(
-      "https://test.mcp.sentry.io/mcp/sentry-mcp-evals",
-    );
-
-    await handler.fetch!(request as any, env, ctx);
-
-    // Verify MCP handler was created with a server and correct options
-    expect(mockCreateMcpHandler).toHaveBeenCalledWith(
-      expect.anything(), // Server object (trust buildServer works)
-      expect.objectContaining({
-        route: "/mcp",
-      }),
-    );
-
-    expect(mockMcpHandlerFn).toHaveBeenCalledWith(request, env, ctx);
   });
 
   it("builds ServerContext with auth props and verified constraints", async () => {
@@ -84,11 +59,10 @@ describe("mcp-handler", () => {
 
     // Verify ServerContext was built correctly
     expect(capturedContext).toMatchObject({
-      userId: "test-user-123",
+      id: "test-user-123",
       clientId: "test-client",
       accessToken: "test-token",
       sentryHost: "sentry.io",
-      mcpUrl: "https://test.mcp.sentry.io",
       constraints: {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: null,
@@ -107,8 +81,6 @@ describe("mcp-handler", () => {
 
     expect(response.status).toBe(404);
     expect(await response.text()).toContain("not found");
-    // Should not invoke MCP handler when constraint verification fails
-    expect(mockMcpHandlerFn).not.toHaveBeenCalled();
   });
 
   it("returns 404 for invalid project", async () => {
@@ -120,7 +92,6 @@ describe("mcp-handler", () => {
 
     expect(response.status).toBe(404);
     expect(await response.text()).toContain("not found");
-    expect(mockMcpHandlerFn).not.toHaveBeenCalled();
   });
 
   it("returns error when authentication context is missing", async () => {

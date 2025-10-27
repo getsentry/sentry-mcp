@@ -36,7 +36,7 @@ startMockServer({ ignoreOpenAI: true });
  *
  * // With user override
  * const context = getServerContext({
- *   userId: "custom-user-id"
+ *   id: "custom-user-id"
  * });
  * ```
  */
@@ -45,7 +45,7 @@ export function getServerContext(
 ): ServerContext {
   const defaultContext: ServerContext = {
     accessToken: "access-token",
-    userId: "1",
+    id: "1",
     constraints: {
       organizationSlug: null,
       projectSlug: null,

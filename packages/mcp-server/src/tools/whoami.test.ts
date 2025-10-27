@@ -12,7 +12,7 @@ describe("whoami", () => {
       createTestContext({
         constraints: {},
         accessToken: "access-token",
-        userId: "123456",
+        id: "123456",
       }),
     );
     expect(result).toMatchInlineSnapshot(
@@ -35,7 +35,7 @@ describe("whoami", () => {
         },
         {
           accessToken: "access-token",
-          userId: "123456",
+          id: "123456",
         },
       ),
     );
@@ -65,7 +65,7 @@ describe("whoami", () => {
         },
         {
           accessToken: "access-token",
-          userId: "123456",
+          id: "123456",
         },
       ),
     );

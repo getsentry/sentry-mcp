@@ -15,7 +15,7 @@ describe("find_dsns", () => {
           projectSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`

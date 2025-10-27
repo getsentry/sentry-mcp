@@ -459,7 +459,7 @@ describe("formatEventOutput", () => {
                 [44, "        return user.getBalance();"],
               ],
               {
-                userId: "12345",
+                id: "12345",
                 user: null,
               },
             ),
@@ -484,7 +484,7 @@ describe("formatEventOutput", () => {
           44 │         return user.getBalance();
 
       Local Variables:
-      ├─ userId: "12345"
+      ├─ id: "12345"
       └─ user: null
 
       **Full Stacktrace:**
@@ -579,7 +579,7 @@ describe("formatEventOutput", () => {
             [17, "  return ("],
           ],
           {
-            userId: "usr_123",
+            id: "usr_123",
             user: undefined,
             displayName: undefined,
           },
@@ -606,7 +606,7 @@ describe("formatEventOutput", () => {
             17 │   return (
 
         Local Variables:
-        ├─ userId: "usr_123"
+        ├─ id: "usr_123"
         ├─ user: undefined
         └─ displayName: undefined
 

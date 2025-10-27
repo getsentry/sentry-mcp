@@ -22,7 +22,7 @@ describe("get_trace_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -80,7 +80,7 @@ describe("get_trace_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
     expect(result).toContain(
@@ -112,7 +112,7 @@ describe("get_trace_details", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow();
@@ -131,7 +131,7 @@ describe("get_trace_details", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow("Trace ID must be a 32-character hexadecimal string");
@@ -171,7 +171,7 @@ describe("get_trace_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -207,7 +207,7 @@ describe("get_trace_details", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          userId: "1",
+          id: "1",
         },
       ),
     ).rejects.toThrow();
@@ -240,7 +240,7 @@ describe("get_trace_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -277,7 +277,7 @@ describe("get_trace_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
@@ -326,7 +326,7 @@ describe("get_trace_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        userId: "1",
+        id: "1",
       },
     );
 
