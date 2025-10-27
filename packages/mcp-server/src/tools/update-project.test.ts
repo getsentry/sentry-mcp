@@ -18,7 +18,7 @@ describe("update_project", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -56,7 +56,7 @@ describe("update_project", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`

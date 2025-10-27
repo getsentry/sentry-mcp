@@ -12,7 +12,7 @@ describe("get_doc", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
         mcpUrl: "https://mcp.sentry.dev",
       },
     );
@@ -196,7 +196,7 @@ describe("get_doc", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrow(
@@ -221,7 +221,7 @@ describe("get_doc", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrow();
@@ -239,7 +239,7 @@ describe("get_doc", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrow(
@@ -265,7 +265,7 @@ describe("get_doc", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrow("Request timeout after 15000ms");

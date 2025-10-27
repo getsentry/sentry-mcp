@@ -16,7 +16,7 @@ describe("create_dsn", () => {
           projectSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`

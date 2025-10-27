@@ -119,7 +119,7 @@ describe("search_events", () => {
           organizationSlug: null,
         },
         accessToken: "test-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -173,7 +173,7 @@ describe("search_events", () => {
           organizationSlug: null,
         },
         accessToken: "test-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -225,7 +225,7 @@ describe("search_events", () => {
           organizationSlug: null,
         },
         accessToken: "test-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -253,7 +253,7 @@ describe("search_events", () => {
             organizationSlug: null,
           },
           accessToken: "test-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrow(UserInputError);
@@ -282,7 +282,7 @@ describe("search_events", () => {
           organizationSlug: null,
         },
         accessToken: "test-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -324,7 +324,7 @@ describe("search_events", () => {
             organizationSlug: null,
           },
           accessToken: "test-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrow();
@@ -358,7 +358,7 @@ describe("search_events", () => {
             organizationSlug: null,
           },
           accessToken: "test-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrow("missing required 'sort' parameter");
@@ -410,7 +410,7 @@ describe("search_events", () => {
           organizationSlug: null,
         },
         accessToken: "test-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -480,7 +480,7 @@ describe("search_events", () => {
           organizationSlug: null,
         },
         accessToken: "test-token",
-        id: "1",
+        userId: "1",
       },
     );
 

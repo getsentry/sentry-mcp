@@ -10,7 +10,7 @@
  *   context: {
  *     accessToken: "your-sentry-token",
  *     sentryHost: "sentry.io",
- *     id: "user-123",
+ *     userId: "user-123",
  *     clientId: "mcp-client",
  *     constraints: {}
  *   },
@@ -25,7 +25,7 @@ import type {
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
 import tools from "./tools/index";
-import { CONSTRAINT_PARAMETER_KEYS, type ServerContext } from "./types";
+import type { ServerContext } from "./types";
 import {
   setTag,
   setUser,
@@ -38,7 +38,10 @@ import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
-import { getConstraintParametersToInject } from "./internal/constraint-helpers";
+import {
+  getConstraintParametersToInject,
+  getConstraintKeysToFilter,
+} from "./internal/constraint-helpers";
 import { requireServerContext } from "./internal/context-storage";
 
 const toolLogger = getLogger(["server", "tools"]);
@@ -75,7 +78,7 @@ function extractMcpParameters(args: Record<string, unknown>) {
  * const context = {
  *   accessToken: process.env.SENTRY_TOKEN,
  *   sentryHost: "sentry.io",
- *   id: "user-123",
+ *   userId: "user-123",
  *   clientId: "cursor-ide",
  *   constraints: {}
  * };
@@ -168,11 +171,14 @@ function configureServer({
     }
 
     // Filter out constraint parameters from schema that will be auto-injected
-    // Since constraints can vary per-request (URL-based), we filter ALL potentially
-    // constrainable parameters to avoid confusing clients
+    // Only filter parameters that are ACTUALLY constrained in the current context
+    // to avoid breaking tools when constraints are not set
+    const constraintKeysToFilter = new Set(
+      getConstraintKeysToFilter(context.constraints, tool.inputSchema),
+    );
     const filteredInputSchema = Object.fromEntries(
       Object.entries(tool.inputSchema).filter(
-        ([key]) => !CONSTRAINT_PARAMETER_KEYS.has(key),
+        ([key]) => !constraintKeysToFilter.has(key),
       ),
     );
 
@@ -215,9 +221,9 @@ function configureServer({
                   );
                 }
 
-                if (context.id) {
+                if (context.userId) {
                   setUser({
-                    id: context.id,
+                    id: context.userId,
                   });
                 }
                 if (context.clientId) {

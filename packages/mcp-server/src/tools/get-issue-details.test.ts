@@ -9,7 +9,7 @@ const baseContext = {
     organizationSlug: null,
   },
   accessToken: "access-token",
-  id: "1",
+  userId: "1",
 };
 
 function createPerformanceIssueFixture() {
@@ -242,7 +242,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -333,7 +333,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -561,7 +561,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -653,7 +653,7 @@ describe("get_issue_details", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrow(
@@ -694,7 +694,7 @@ describe("get_issue_details", () => {
             organizationSlug: null,
           },
           accessToken: "access-token",
-          id: "1",
+          userId: "1",
         },
       ),
     ).rejects.toThrowErrorMatchingInlineSnapshot(`
@@ -725,7 +725,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -802,7 +802,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -849,7 +849,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -911,7 +911,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -999,7 +999,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
 
@@ -1099,7 +1099,7 @@ describe("get_issue_details", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
 

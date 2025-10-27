@@ -14,7 +14,7 @@ describe("create_team", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`

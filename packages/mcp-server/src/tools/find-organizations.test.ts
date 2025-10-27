@@ -10,7 +10,7 @@ describe("find_organizations", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toMatchInlineSnapshot(`
@@ -38,7 +38,7 @@ describe("find_organizations", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toContain("Organizations");
@@ -52,7 +52,7 @@ describe("find_organizations", () => {
           organizationSlug: null,
         },
         accessToken: "access-token",
-        id: "1",
+        userId: "1",
       },
     );
     expect(result).toContain("Organizations");

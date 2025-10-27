@@ -32,7 +32,7 @@ export type ServerContext = {
   mcpUrl?: string;
   accessToken: string;
   openaiBaseUrl?: string;
-  id?: string | null;
+  userId?: string | null;
   clientId?: string;
   // Granted scopes for tool access control
   grantedScopes?: Set<Scope> | ReadonlySet<Scope>;
