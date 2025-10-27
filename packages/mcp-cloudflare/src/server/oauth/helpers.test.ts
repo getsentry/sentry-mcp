@@ -40,9 +40,8 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        clientId: "test-client",
+        name: "Test User",
         accessToken: "old-access-token",
-        scope: "org:read project:read",
         // No refreshToken
       } as WorkerProps,
     };
@@ -51,6 +50,34 @@ describe("tokenExchangeCallback", () => {
       tokenExchangeCallback(options, mockEnv),
     ).resolves.toBeUndefined();
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("should reuse cached token when it has sufficient TTL remaining", async () => {
+    const futureExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+    const options: TokenExchangeCallbackOptions = {
+      grantType: "refresh_token",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
+      props: {
+        id: "user-id",
+        name: "Test User",
+        accessToken: "cached-access-token",
+        refreshToken: "refresh-token",
+        accessTokenExpiresAt: futureExpiry,
+      } as WorkerProps,
+    };
+
+    const result = await tokenExchangeCallback(options, mockEnv);
+
+    // Should not call upstream API
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    // Should return existing props with calculated TTL
+    expect(result).toBeDefined();
+    expect(result?.newProps).toEqual(options.props);
+    expect(result?.accessTokenTTL).toBeGreaterThan(0);
+    expect(result?.accessTokenTTL).toBeLessThanOrEqual(600); // Max 10 minutes
   });
 
   it("should refresh token when cached token is close to expiry", async () => {
@@ -62,11 +89,10 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        clientId: "test-client-id",
+        name: "Test User",
         accessToken: "old-access-token",
         refreshToken: "old-refresh-token",
         accessTokenExpiresAt: nearExpiry,
-        scope: "org:read project:read",
       } as WorkerProps,
     };
 
@@ -120,10 +146,9 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        clientId: "test-client-id",
+        name: "Test User",
         accessToken: "old-access-token",
         refreshToken: "old-refresh-token",
-        scope: "org:read project:read",
         // No accessTokenExpiresAt
       } as WorkerProps,
     };
@@ -167,10 +192,9 @@ describe("tokenExchangeCallback", () => {
       scope: ["org:read", "project:read"],
       props: {
         id: "user-id",
-        clientId: "test-client-id",
+        name: "Test User",
         accessToken: "old-access-token",
         refreshToken: "invalid-refresh-token",
-        scope: "org:read project:read",
       } as WorkerProps,
     };
 
