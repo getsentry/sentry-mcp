@@ -25,7 +25,7 @@ import type {
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
 import tools from "./tools/index";
-import { CONSTRAINT_PARAMETER_KEYS } from "./types";
+import { CONSTRAINT_PARAMETER_KEYS, type ServerContext } from "./types";
 import {
   setTag,
   setUser,
@@ -39,7 +39,7 @@ import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
 import { getConstraintParametersToInject } from "./internal/constraint-helpers";
-import { serverContextStorage } from "./internal/context-storage";
+import { requireServerContext } from "./internal/context-storage";
 
 const toolLogger = getLogger(["server", "tools"]);
 
@@ -64,16 +64,14 @@ function extractMcpParameters(args: Record<string, unknown>) {
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
  *
- * Uses AsyncLocalStorage for context resolution, so context must be bound
- * at the transport level (e.g., using serverContextStorage.run()).
+ * The server is built with tools filtered based on the granted scopes in the context.
+ * AsyncLocalStorage is still used for runtime context propagation during tool execution.
  *
  * @example Usage with stdio transport
  * ```typescript
- * import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
  * import { buildServer } from "@sentry/mcp-server/server";
  * import { startStdio } from "@sentry/mcp-server/transports/stdio";
  *
- * const server = buildServer();
  * const context = {
  *   accessToken: process.env.SENTRY_TOKEN,
  *   sentryHost: "sentry.io",
@@ -82,7 +80,7 @@ function extractMcpParameters(args: Record<string, unknown>) {
  *   constraints: {}
  * };
  *
- * // Context is bound by the transport
+ * const server = buildServer({ context });
  * await startStdio(server, context);
  * ```
  *
@@ -91,50 +89,52 @@ function extractMcpParameters(args: Record<string, unknown>) {
  * import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
  * import { buildServer } from "@sentry/mcp-server/server";
  *
- * const server = buildServer();
+ * const serverContext = buildContextFromOAuth();
+ * const server = buildServer({ context: serverContext });
  *
- * // Context is bound per-request in the handler
+ * // Context is bound per-request for runtime operations
  * return serverContextStorage.run(serverContext, () => {
  *   return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
  * });
  * ```
  */
 export function buildServer({
+  context,
   onToolComplete,
 }: {
+  context: ServerContext;
   onToolComplete?: () => void;
-} = {}): McpServer {
+}): McpServer {
   const server = new McpServer({
     name: MCP_SERVER_NAME,
     version: LIB_VERSION,
   });
 
-  configureServer({ server, onToolComplete });
+  configureServer({ server, context, onToolComplete });
 
   return wrapMcpServerWithSentry(server);
 }
 
 /**
- * Configures an MCP server with all tools and telemetry.
+ * Configures an MCP server with tools filtered by granted scopes.
  *
  * Internal function used by buildServer(). Use buildServer() instead for most cases.
- * Context is resolved from AsyncLocalStorage via serverContextStorage.
+ * Tools are filtered at registration time based on grantedScopes, and context is
+ * also resolved from AsyncLocalStorage at runtime for execution.
  */
 function configureServer({
   server,
+  context,
   onToolComplete,
 }: {
   server: McpServer;
+  context: ServerContext;
   onToolComplete?: () => void;
 }) {
-  // Context resolver always uses AsyncLocalStorage
-  const resolveContext = () => {
-    const context = serverContextStorage.getStore();
-    if (!context) {
-      throw new Error("No ServerContext available in async storage");
-    }
-    return context;
-  };
+  // Get granted scopes from context for tool filtering
+  const grantedScopes: Set<Scope> = context.grantedScopes
+    ? new Set<Scope>(context.grantedScopes)
+    : new Set<Scope>(DEFAULT_SCOPES);
 
   server.server.onerror = (error) => {
     const transportLogOptions: LogIssueOptions = {
@@ -150,6 +150,23 @@ function configureServer({
   };
 
   for (const [toolKey, tool] of Object.entries(tools)) {
+    // Filter tools BEFORE registration based on granted scopes
+    if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
+      toolLogger.debug(
+        "Tool {tool} excluded from server - missing required scopes",
+        () => ({
+          tool: tool.name,
+          requiredScopes: Array.isArray(tool.requiredScopes)
+            ? tool.requiredScopes
+            : tool.requiredScopes
+              ? Array.from(tool.requiredScopes)
+              : [],
+          grantedScopes: [...grantedScopes],
+        }),
+      );
+      continue; // Skip this tool entirely
+    }
+
     // Filter out constraint parameters from schema that will be auto-injected
     // Since constraints can vary per-request (URL-based), we filter ALL potentially
     // constrainable parameters to avoid confusing clients
@@ -181,32 +198,8 @@ function configureServer({
                 },
               },
               async (span) => {
-                // Resolve context per-request
-                const context = resolveContext();
-
-                // Get granted scopes with default to read-only scopes
-                const grantedScopes: Set<Scope> = context.grantedScopes
-                  ? new Set<Scope>(context.grantedScopes)
-                  : new Set<Scope>(DEFAULT_SCOPES);
-
-                // Check if this tool is allowed based on granted scopes
-                if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-                  toolLogger.debug(
-                    "Tool {tool} not allowed - missing required scopes",
-                    () => ({
-                      tool: tool.name,
-                      requiredScopes: Array.isArray(tool.requiredScopes)
-                        ? tool.requiredScopes
-                        : tool.requiredScopes
-                          ? Array.from(tool.requiredScopes)
-                          : [],
-                      grantedScopes: [...grantedScopes],
-                    }),
-                  );
-                  throw new Error(
-                    `Tool '${tool.name}' is not allowed - missing required scopes`,
-                  );
-                }
+                // Resolve context per-request for runtime operations
+                const context = requireServerContext();
 
                 // Add constraint attributes to span
                 if (context.constraints.organizationSlug) {

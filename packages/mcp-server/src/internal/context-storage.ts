@@ -40,3 +40,26 @@ export const serverContextStorage = new AsyncLocalStorage<ServerContext>();
 export function getServerContext(): ServerContext | undefined {
   return serverContextStorage.getStore();
 }
+
+/**
+ * Get the current request's ServerContext from async storage, throwing if not available.
+ *
+ * Use this when you need the context and it's an error condition if it's missing.
+ *
+ * @returns ServerContext for the current request
+ * @throws Error if no context is available in async storage
+ *
+ * @example
+ * ```typescript
+ * // In a tool handler:
+ * const context = requireServerContext();
+ * // Use context knowing it's always defined
+ * ```
+ */
+export function requireServerContext(): ServerContext {
+  const context = serverContextStorage.getStore();
+  if (!context) {
+    throw new Error("No ServerContext available in async storage");
+  }
+  return context;
+}

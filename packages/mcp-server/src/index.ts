@@ -101,9 +101,8 @@ Sentry.init({
 
 const SENTRY_TIMEOUT = 5000; // 5 seconds
 
-const server = buildServer();
-
-startStdio(server, {
+// Build context once for server configuration and runtime
+const context = {
   accessToken: cfg.accessToken,
   grantedScopes: cfg.finalScopes,
   constraints: {
@@ -113,7 +112,12 @@ startStdio(server, {
   sentryHost: cfg.sentryHost,
   mcpUrl: cfg.mcpUrl,
   openaiBaseUrl: cfg.openaiBaseUrl,
-}).catch((err) => {
+};
+
+// Build server with context to filter tools based on granted scopes
+const server = buildServer({ context });
+
+startStdio(server, context).catch((err) => {
   console.error("Server error:", err);
   // ensure we've flushed all events
   Sentry.flush(SENTRY_TIMEOUT);

@@ -111,8 +111,9 @@ const mcpHandler: ExportedHandler<Env> = {
       mcpUrl: oauthCtx.props.mcpUrl as string | undefined,
     };
 
-    // Create and configure MCP server
+    // Create and configure MCP server with tools filtered by context
     const server = buildServer({
+      context: serverContext,
       onToolComplete: () => {
         // Flush Sentry events after tool execution
         Sentry.flush(2000);

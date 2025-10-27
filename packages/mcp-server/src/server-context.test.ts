@@ -1,10 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { buildServer } from "./server";
+import type { ServerContext } from "./types";
+
+const mockContext: ServerContext = {
+  accessToken: "test-token",
+  sentryHost: "sentry.io",
+  constraints: {},
+};
 
 describe("server context resolution", () => {
   describe("buildServer", () => {
-    it("creates server successfully", () => {
-      const server = buildServer();
+    it("creates server successfully with context", () => {
+      const server = buildServer({ context: mockContext });
 
       // Server should be created and configured successfully
       expect(server).toBeDefined();
@@ -14,6 +21,7 @@ describe("server context resolution", () => {
       let callbackExecuted = false;
 
       const server = buildServer({
+        context: mockContext,
         onToolComplete: () => {
           callbackExecuted = true;
         },
