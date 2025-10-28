@@ -101,40 +101,42 @@ export default defineTool({
       tools,
     });
 
-    // Connect server to its transport within the constrained context
-    await serverContextStorage.run(contextWithConstraints, async () => {
+    // Run all MCP operations within the ServerContext
+    // This ensures tools invoked through the MCP protocol have access to the context
+    return await serverContextStorage.run(contextWithConstraints, async () => {
+      // Connect server to its transport
       await server.server.connect(serverTransport);
-    });
 
-    // Create MCP client with the other end of the transport
-    const mcpClient = await experimental_createMCPClient({
-      name: "mcp.sentry.dev (use-sentry)",
-      transport: clientTransport,
-    });
-
-    try {
-      // Get tools from MCP server (returns Vercel AI SDK compatible tools)
-      const mcpTools = await mcpClient.tools();
-
-      // Call the embedded agent with MCP tools and the user's request
-      const agentResult = await useSentryAgent({
-        request: params.request,
-        tools: mcpTools,
+      // Create MCP client with the other end of the transport
+      const mcpClient = await experimental_createMCPClient({
+        name: "mcp.sentry.dev (use-sentry)",
+        transport: clientTransport,
       });
 
-      let output = agentResult.result.result;
+      try {
+        // Get tools from MCP server (returns Vercel AI SDK compatible tools)
+        const mcpTools = await mcpClient.tools();
 
-      // If tracing is enabled, append the tool call trace
-      if (params.trace && agentResult.toolCalls.length > 0) {
-        output += "\n\n---\n\n## Tool Call Trace\n\n";
-        output += formatToolCallTrace(agentResult.toolCalls);
+        // Call the embedded agent with MCP tools and the user's request
+        const agentResult = await useSentryAgent({
+          request: params.request,
+          tools: mcpTools,
+        });
+
+        let output = agentResult.result.result;
+
+        // If tracing is enabled, append the tool call trace
+        if (params.trace && agentResult.toolCalls.length > 0) {
+          output += "\n\n---\n\n## Tool Call Trace\n\n";
+          output += formatToolCallTrace(agentResult.toolCalls);
+        }
+
+        return output;
+      } finally {
+        // Clean up connections
+        await mcpClient.close();
+        await server.server.close();
       }
-
-      return output;
-    } finally {
-      // Clean up connections
-      await mcpClient.close();
-      await server.server.close();
-    }
+    });
   },
 });
