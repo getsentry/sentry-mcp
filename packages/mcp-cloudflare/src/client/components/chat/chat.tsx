@@ -349,15 +349,11 @@ Try asking me things like:
     <SlidingPanel isOpen={isOpen} onClose={onClose}>
       {/* Auth form with fade transition */}
       <div
-        className={`absolute inset-0 h-full flex flex-col items-center justify-center transition-all duration-500 ease-in-out ${
+        className={`absolute inset-0 h-full flex flex-col items-center justify-center duration-500ease-in-out ${
           !isAuthenticated
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+            ? "visible scale-100 opacity-100 pointer-events-auto"
+            : "hidden motion-safe:scale-95 opacity-0 pointer-events-none"
         }`}
-        style={{
-          visibility: !isAuthenticated ? "visible" : "hidden",
-          transform: !isAuthenticated ? "scale(1)" : "scale(0.95)",
-        }}
       >
         <AuthForm authError={authError} onOAuthLogin={handleOAuthLogin} />
       </div>

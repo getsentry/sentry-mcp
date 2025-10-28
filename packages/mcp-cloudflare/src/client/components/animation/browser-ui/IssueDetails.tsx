@@ -3,7 +3,6 @@ import { ChevronDown } from "lucide-react";
 export default function IssueDetails({ step }: { step: number }) {
   return (
     <>
-      {/*<h1 className="text-2xl font-bold">Zod Error</h1>*/}
       <div
         className={`${
           step === 1 ? "opacity-100" : step > 1 ? "opacity-0" : "opacity-40"
@@ -68,27 +67,6 @@ export default function IssueDetails({ step }: { step: number }) {
               </pre>
             </div>
           </div>
-          {/* <div
-            className={`${
-              step >= 1
-                ? "-translate-x-[150%] translate-y-1/2 origin-bottom scale-0 opacity-0 delay-675 duration-1000"
-                : ""
-            } absolute top-0 w-full h-32 rounded-xl border border-white/20 bg-white/5`}
-          />
-          <div
-            className={`${
-              step >= 1
-                ? "-translate-x-[150%] -translate-y-1/2 origin-bottom scale-25 opacity-0 delay-750 duration-1000"
-                : ""
-            } absolute top-0 w-full h-full rounded-xl border border-white/20 bg-white/5`}
-          />
-          <div
-            className={`${
-              step >= 1
-                ? "-translate-x-[150%] -translate-y-1/2 origin-bottom scale-33 opacity-0 delay-750 duration-1000"
-                : ""
-            } absolute top-0 h-full w-full rounded-xl border border-white/20 bg-white/5`}
-          /> */}
         </div>
       </div>
     </>

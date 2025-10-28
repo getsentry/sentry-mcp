@@ -4,7 +4,7 @@ import "asciinema-player/dist/bundle/asciinema-player.css";
 import "./dracula.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import BrowserAnimation from "./BrowserAnimation";
-import Paste from "./terminal-ui/Paste";
+import KeysPaste from "./terminal-ui/keys-paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
 import StepsList from "./terminal-ui/StepsList";
 import { RotateCcw } from "lucide-react";
@@ -286,12 +286,10 @@ export default function TerminalAnimation() {
             ref={cliDemoRef}
           />
         </div>
-        {/* <CustomControls
-          onChangeSpeedAction={(i) => onChangeSpeed(i)}
-          speed={speed}
-        /> */}
+
         <SpeedDisplay speed={speed} />
-        <Paste step={currentIndex} />
+        <KeysPaste step={currentIndex} />
+
         <div className="absolute bottom-0 left-0 right-0 p-4 text-shadow-md h-full flex flex-col justify-end">
           <div className="relative">
             <button

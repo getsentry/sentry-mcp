@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { Chat } from "./components/chat";
 import { useAuth } from "./contexts/auth-context";
 import Home from "./pages/home";
-import BackgroundDecorations from "./components/animation/BackgroundDecorations";
 import { HeaderDivider } from "./components/hero/header-divider";
 import { Sidebars } from "./components/home-layout/sidebars";
 import Footer from "./components/home-layout/footer";
@@ -74,7 +73,6 @@ export default function App() {
 
   return (
     <div className="overflow-x-clip max-w-screen relative">
-      <BackgroundDecorations />
       <Sidebars isChatOpen={isChatOpen} toggleChat={toggleChat} />
       {/* <Ghost /> */}
 
