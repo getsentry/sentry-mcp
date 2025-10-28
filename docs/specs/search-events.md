@@ -2,7 +2,7 @@
 
 ## Overview
 
-A unified search tool that accepts natural language queries and translates them to Sentry's discover endpoint parameters using OpenAI GPT-4o. Replaces `find_errors` and `find_transactions` with a single, more flexible interface.
+A unified search tool that accepts natural language queries and translates them to Sentry's discover endpoint parameters using OpenAI GPT-5. Replaces `find_errors` and `find_transactions` with a single, more flexible interface.
 
 ## Motivation
 
@@ -55,11 +55,10 @@ search_events({
 2. **Fetches searchable attributes** based on dataset:
    - For `spans`/`logs`: Uses `/organizations/{org}/trace-items/attributes/` endpoint with parallel calls for string and number attribute types
    - For `errors`: Uses `/organizations/{org}/tags/` endpoint (legacy, will migrate when new API supports errors)
-3. **OpenAI GPT-4o translates** natural language to Sentry query syntax using:
+3. **OpenAI GPT-5 translates** natural language to Sentry query syntax using:
    - Comprehensive system prompt with Sentry query syntax rules
    - Dataset-specific field mappings and query patterns
    - Organization's custom attributes (fetched in step 2)
-   - Low temperature (0.1) for consistent translations
 4. **Executes** discover endpoint: `/organizations/{org}/events/` with:
    - Translated query string
    - Dataset-specific field selection
@@ -74,8 +73,7 @@ search_events({
 
 ### OpenAI Integration
 
-- **Model**: GPT-4o for natural language to Sentry query translation
-- **Temperature**: 0.1 for consistent, deterministic translations
+- **Model**: GPT-5 for natural language to Sentry query translation (configurable via `configureOpenAIProvider`)
 - **System prompt**: Contains comprehensive Sentry query syntax, dataset-specific rules, and available fields
 - **Environment**: Requires `OPENAI_API_KEY` environment variable
 - **Custom attributes**: Automatically fetched and included in system prompt for each organization
@@ -151,7 +149,7 @@ search_events({
 
 ## Success Criteria - All Complete ✅
 
-- ✅ **Accurate translation of common query patterns** - GPT-4o with comprehensive system prompts
+- ✅ **Accurate translation of common query patterns** - GPT-5 with comprehensive system prompts
 - ✅ **Proper handling of org-specific custom attributes** - Parallel fetching and integration
 - ✅ **Seamless migration from old tools** - find_errors, find_transactions removed from exports
 - ✅ **Maintains performance** - Parallel API calls, efficient caching, translation overhead minimal

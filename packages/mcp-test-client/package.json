@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "start": "node dist/index.js",
+    "start": "tsx src/index.ts",
     "test-client": "node dist/index.js",
     "test": "vitest run",
     "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",

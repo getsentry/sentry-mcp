@@ -6,7 +6,7 @@ interface ChatInputProps {
   input: string;
   isLoading: boolean;
   isOpen: boolean;
-  onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onStop: () => void;
   onSlashCommand?: (command: string) => void;
@@ -21,7 +21,7 @@ export function ChatInput({
   onStop,
   onSlashCommand,
 }: ChatInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Focus when dialog opens (with delay for mobile animation)
   useEffect(() => {
@@ -61,16 +61,64 @@ export function ChatInput({
     onSubmit(e);
   };
 
+  // Handle keyboard shortcuts
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ctrl+J or Cmd+J: Insert newline
+    if ((e.ctrlKey || e.metaKey) && e.key === "j") {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newValue = `${input.substring(0, start)}\n${input.substring(end)}`;
+
+      // Create a synthetic event to update the input
+      const syntheticEvent = {
+        target: { value: newValue },
+        currentTarget: { value: newValue },
+      } as React.ChangeEvent<HTMLTextAreaElement>;
+
+      onInputChange(syntheticEvent);
+
+      // Move cursor after the inserted newline
+      setTimeout(() => {
+        if (textarea) {
+          textarea.selectionStart = textarea.selectionEnd = start + 1;
+        }
+      }, 0);
+      return;
+    }
+
+    // Enter without shift: Submit
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      if (form && input.trim()) {
+        form.requestSubmit();
+      }
+    }
+  };
+
+  // Auto-resize textarea based on content
+  // biome-ignore lint/correctness/useExhaustiveDependencies: input is needed to trigger resize when content changes
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+      inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
+    }
+  }, [input]);
+
   return (
     <form onSubmit={handleSubmit} className="relative flex-1">
       <div className="relative">
-        <input
+        <textarea
           ref={inputRef}
           value={input}
           onChange={onInputChange}
+          onKeyDown={handleKeyDown}
           placeholder="Ask me anything about your Sentry data..."
           disabled={isLoading}
-          className="w-full p-4 pr-12 rounded bg-slate-800/50 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent disabled:opacity-50"
+          rows={1}
+          className="w-full p-4 pr-12 rounded bg-slate-800/50 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-transparent disabled:opacity-50 resize-none overflow-hidden"
         />
         <Button
           type={isLoading ? "button" : "submit"}

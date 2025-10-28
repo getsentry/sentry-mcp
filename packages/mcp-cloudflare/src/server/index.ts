@@ -33,9 +33,10 @@ const addCorsHeaders = (response: Response): Response => {
 // We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
 const corsWrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
+    const url = new URL(request.url);
+
     // Handle CORS preflight for public metadata endpoints
     if (request.method === "OPTIONS") {
-      const url = new URL(request.url);
       if (isPublicMetadataEndpoint(url.pathname)) {
         return addCorsHeaders(new Response(null, { status: 204 }));
       }
@@ -58,7 +59,6 @@ const corsWrappedOAuthProvider = {
     const response = await oAuthProvider.fetch(request, env, ctx);
 
     // Add CORS headers to public metadata endpoints
-    const url = new URL(request.url);
     if (isPublicMetadataEndpoint(url.pathname)) {
       return addCorsHeaders(response);
     }

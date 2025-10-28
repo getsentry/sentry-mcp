@@ -1,10 +1,10 @@
-import { generateText, Output } from "ai";
+import { generateText, Output, type Tool } from "ai";
 import { getOpenAIModel } from "./openai-provider";
 import type { z } from "zod";
 
 export type ToolCall = {
   toolName: string;
-  args: any;
+  args: unknown;
 };
 
 interface EmbeddedAgentResult<T> {
@@ -28,17 +28,18 @@ export async function callEmbeddedAgent<T>({
 }: {
   system: string;
   prompt: string;
-  tools: Record<string, any>;
+  tools: Record<string, Tool>;
   schema: z.ZodSchema<T>;
 }): Promise<EmbeddedAgentResult<T>> {
   const capturedToolCalls: ToolCall[] = [];
 
   const result = await generateText({
-    model: getOpenAIModel("gpt-4o"),
+    model: getOpenAIModel(), // Uses configured default model (gpt-5)
     system,
     prompt,
     tools,
     maxSteps: 5,
+    temperature: 1, // GPT-5 only supports temperature of 1
     experimental_output: Output.object({ schema }),
     onStepFinish: (event) => {
       if (event.toolCalls && event.toolCalls.length > 0) {

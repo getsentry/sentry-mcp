@@ -10,6 +10,7 @@ export type CliArgs = {
   scopes?: string;
   addScopes?: string;
   allScopes?: boolean;
+  agent?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
   help?: boolean;
@@ -37,6 +38,7 @@ export type MergedArgs = {
   scopes?: string;
   addScopes?: string;
   allScopes?: boolean;
+  agent?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
   help?: boolean;

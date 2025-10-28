@@ -56,16 +56,18 @@ export async function connectToRemoteMCPServer(
           }
 
           // Create HTTP streaming client with authentication
-          const httpTransport = new StreamableHTTPClientTransport(
-            new URL(`${mcpHost}/mcp`),
-            {
-              requestInit: {
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                },
+          // Use ?agent=1 query param for agent mode, otherwise standard /mcp
+          const mcpUrl = new URL(`${mcpHost}/mcp`);
+          if (config.useAgentEndpoint) {
+            mcpUrl.searchParams.set("agent", "1");
+          }
+          const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
+            requestInit: {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
               },
             },
-          );
+          });
 
           const client = await experimental_createMCPClient({
             name: "mcp.sentry.dev (test-client)",

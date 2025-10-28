@@ -106,15 +106,15 @@ To test the local server, enter `http://localhost:5173/mcp` into Inspector and h
 
 ### Tests
 
-There are two test suites included: basic unit tests, and some evaluations.
+There are three test suites included: unit tests, evaluations, and manual testing.
 
-Unit tests can be run using:
+**Unit tests** can be run using:
 
 ```shell
 pnpm test
 ```
 
-Evals will require a `.env` file in the project root with some config:
+**Evaluations** require a `.env` file in the project root with some config:
 
 ```shell
 # .env (in project root)
@@ -128,6 +128,24 @@ Once that's done you can run them using:
 ```shell
 pnpm eval
 ```
+
+**Manual testing** (preferred for testing MCP changes):
+
+```shell
+# Test with local dev server (default: http://localhost:5173)
+pnpm -w run cli "who am I?"
+
+# Test agent mode (use_sentry tool only)
+pnpm -w run cli --agent "who am I?"
+
+# Test against production
+pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
+
+# Test with local stdio mode (requires SENTRY_ACCESS_TOKEN)
+pnpm -w run cli --access-token=TOKEN "query"
+```
+
+Note: The CLI defaults to `http://localhost:5173`. Override with `--mcp-host` or set `MCP_URL` environment variable.
 
 ## Development Notes
 

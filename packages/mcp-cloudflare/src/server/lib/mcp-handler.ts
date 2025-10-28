@@ -22,6 +22,7 @@ import type { ServerContext } from "@sentry/mcp-server/types";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
 import type { ExportedHandler } from "@cloudflare/workers-types";
+import agentTools from "@sentry/mcp-server/tools/agent-tools";
 
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
@@ -58,6 +59,9 @@ const mcpHandler: ExportedHandler<Env> = {
     const { groups } = result.pathname;
     const organizationSlug = groups?.org || null;
     const projectSlug = groups?.project || null;
+
+    // Check for agent mode query parameter
+    const isAgentMode = url.searchParams.get("agent") === "1";
 
     // Extract OAuth props from ExecutionContext (set by OAuth provider)
     const oauthCtx = ctx as OAuthExecutionContext;
@@ -113,6 +117,7 @@ const mcpHandler: ExportedHandler<Env> = {
     // Create and configure MCP server with tools filtered by context
     const server = buildServer({
       context: serverContext,
+      tools: isAgentMode ? agentTools : undefined,
       onToolComplete: () => {
         // Flush Sentry events after tool execution
         Sentry.flush(2000);

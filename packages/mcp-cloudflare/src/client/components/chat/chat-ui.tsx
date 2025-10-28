@@ -3,11 +3,12 @@
  * Extracts the common chat interface used in both mobile and desktop views
  */
 
-import { LogOut, X } from "lucide-react";
+import { LogOut, X, Bot, Sparkles } from "lucide-react";
 import ScrollToBottom from "react-scroll-to-bottom";
 import { Button } from "../ui/button";
 import { ChatInput, ChatMessages } from ".";
 import type { Message } from "ai/react";
+import type { EndpointMode } from "../../hooks/use-endpoint-mode";
 
 // Constant empty function to avoid creating new instances on every render
 const EMPTY_FUNCTION = () => {};
@@ -37,7 +38,8 @@ interface ChatUIProps {
   isMessageStreaming?: (messageId: string) => boolean;
   isOpen?: boolean;
   showControls?: boolean;
-  onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  endpointMode?: EndpointMode;
+  onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onStop?: () => void;
   onRetry?: () => void;
@@ -45,6 +47,7 @@ interface ChatUIProps {
   onLogout?: () => void;
   onSlashCommand?: (command: string) => void;
   onSendPrompt?: (prompt: string) => void;
+  onToggleEndpointMode?: () => void;
 }
 
 export const ChatUI = ({
@@ -56,6 +59,7 @@ export const ChatUI = ({
   isMessageStreaming,
   isOpen = true,
   showControls = false,
+  endpointMode = "standard",
   onInputChange,
   onSubmit,
   onStop,
@@ -64,9 +68,42 @@ export const ChatUI = ({
   onLogout,
   onSlashCommand,
   onSendPrompt,
+  onToggleEndpointMode,
 }: ChatUIProps) => {
+  const isAgentMode = endpointMode === "agent";
+
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
+      {/* Floating Agent Mode Toggle - Top Right */}
+      {onToggleEndpointMode && (
+        <div className="absolute top-4 right-4 z-20">
+          <Button
+            type="button"
+            onClick={onToggleEndpointMode}
+            size="sm"
+            variant={isAgentMode ? "default" : "outline"}
+            title={
+              isAgentMode
+                ? "Agent mode: Only use_sentry tool (click to switch to standard)"
+                : "Standard mode: All 19 tools available (click to switch to agent)"
+            }
+            className="shadow-lg"
+          >
+            {isAgentMode ? (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Agent Mode
+              </>
+            ) : (
+              <>
+                <Bot className="h-4 w-4 mr-2" />
+                Standard Mode
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
       {/* Mobile header with close and logout buttons */}
       <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 flex-shrink-0">
         {showControls && (

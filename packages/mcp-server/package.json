@@ -94,6 +94,10 @@
       "types": "./dist/tools/search-issues/agent.ts",
       "default": "./dist/tools/search-issues/agent.js"
     },
+    "./tools/agent-tools": {
+      "types": "./dist/tools/agent-tools.ts",
+      "default": "./dist/tools/agent-tools.js"
+    },
     "./internal/agents/callEmbeddedAgent": {
       "types": "./dist/internal/agents/callEmbeddedAgent.ts",
       "default": "./dist/internal/agents/callEmbeddedAgent.js"

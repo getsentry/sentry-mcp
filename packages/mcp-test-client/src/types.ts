@@ -12,9 +12,11 @@ export interface MCPConfig {
   accessToken: string;
   host?: string;
   sentryDsn?: string;
+  useAgentEndpoint?: boolean;
 }
 
 export interface RemoteMCPConfig {
   mcpHost?: string;
   accessToken?: string;
+  useAgentEndpoint?: boolean;
 }

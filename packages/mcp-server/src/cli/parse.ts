@@ -14,6 +14,7 @@ export function parseArgv(argv: string[]): CliArgs {
     scopes: { type: "string" as const },
     "add-scopes": { type: "string" as const },
     "all-scopes": { type: "boolean" as const },
+    agent: { type: "boolean" as const },
     help: { type: "boolean" as const, short: "h" as const },
     version: { type: "boolean" as const, short: "v" as const },
   };
@@ -57,6 +58,7 @@ export function parseArgv(argv: string[]): CliArgs {
     scopes: values.scopes as string | undefined,
     addScopes: values["add-scopes"] as string | undefined,
     allScopes: (values["all-scopes"] as boolean | undefined) === true,
+    agent: (values.agent as boolean | undefined) === true,
     help: (values.help as boolean | undefined) === true,
     version: (values.version as boolean | undefined) === true,
     unknownArgs:
@@ -91,6 +93,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     scopes: cli.scopes ?? env.scopes,
     addScopes: cli.addScopes ?? env.addScopes,
     allScopes: cli.allScopes === true,
+    agent: cli.agent === true,
     organizationSlug: cli.organizationSlug,
     projectSlug: cli.projectSlug,
     help: cli.help === true,
