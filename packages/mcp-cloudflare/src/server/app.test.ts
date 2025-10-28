@@ -26,4 +26,20 @@ describe("app", () => {
       expect(text).toContain("Model Context Protocol");
     });
   });
+
+  describe("GET /sse", () => {
+    it("should return deprecation message with 410 status", async () => {
+      const res = await app.request("/sse");
+
+      expect(res.status).toBe(410);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        error: "SSE transport has been removed",
+        message:
+          "The SSE transport endpoint is no longer supported. Please use the HTTP transport at /mcp instead.",
+        migrationGuide: "https://mcp.sentry.dev",
+      });
+    });
+  });
 });

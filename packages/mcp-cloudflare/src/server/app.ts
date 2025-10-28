@@ -71,7 +71,18 @@ const app = new Hono<{
   .route("/api/chat", chat)
   .route("/api/search", search)
   .route("/api/metadata", metadata)
-  .route("/.mcp", mcpRoutes);
+  .route("/.mcp", mcpRoutes)
+  .get("/sse", (c) => {
+    return c.json(
+      {
+        error: "SSE transport has been removed",
+        message:
+          "The SSE transport endpoint is no longer supported. Please use the HTTP transport at /mcp instead.",
+        migrationGuide: "https://mcp.sentry.dev",
+      },
+      410,
+    );
+  });
 
 // TODO: propagate the error as sentry isnt injecting into hono
 app.onError((err, c) => {
