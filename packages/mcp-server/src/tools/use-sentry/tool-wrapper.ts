@@ -77,16 +77,16 @@ export function wrapToolForAgent<TSchema extends Record<string, z.ZodType>>(
   return agentTool({
     description: tool.description,
     parameters: z.object(tool.inputSchema),
-    execute: async (params: any) => {
-      // Inject constrained parameters from ServerContext
+    execute: async (params: unknown) => {
+      // Type safety: params is validated by agentTool's Zod schema before reaching here
       const fullParams = injectConstrainedParams(
-        params as Record<string, any>,
+        params as Record<string, unknown>,
         options.context.constraints,
       );
 
       // Call the actual tool handler with full context
-      // Cast to any to handle the dynamic parameter types
-      const result = await tool.handler(fullParams as any, options.context);
+      // Type assertion is safe: fullParams matches the tool's input schema (enforced by Zod)
+      const result = await tool.handler(fullParams as never, options.context);
 
       // Return the result - agentTool handles error wrapping
       return result;

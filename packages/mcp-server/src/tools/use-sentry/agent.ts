@@ -1,6 +1,10 @@
 import { z } from "zod";
+import type { Tool } from "ai";
 import { ConfigurationError } from "../../errors";
-import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
+import {
+  callEmbeddedAgent,
+  type ToolCall,
+} from "../../internal/agents/callEmbeddedAgent";
 import { systemPrompt } from "./config";
 
 /**
@@ -17,7 +21,7 @@ const outputSchema = z.object({
 
 export interface UseSentryAgentOptions {
   request: string;
-  tools: Record<string, any>; // agentTool-wrapped MCP tools
+  tools: Record<string, Tool>;
 }
 
 /**
@@ -26,7 +30,7 @@ export interface UseSentryAgentOptions {
  */
 export async function useSentryAgent(options: UseSentryAgentOptions): Promise<{
   result: z.infer<typeof outputSchema>;
-  toolCalls: any[];
+  toolCalls: ToolCall[];
 }> {
   if (!process.env.OPENAI_API_KEY) {
     throw new ConfigurationError(

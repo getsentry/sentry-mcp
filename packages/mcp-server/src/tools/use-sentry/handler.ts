@@ -13,13 +13,12 @@ import { useSentryAgent } from "./agent";
 import { buildServer } from "../../server";
 import { serverContextStorage } from "../../internal/context-storage";
 import tools from "../index";
+import type { ToolCall } from "../../internal/agents/callEmbeddedAgent";
 
 /**
  * Format tool calls into a readable trace
  */
-function formatToolCallTrace(
-  toolCalls: Array<{ toolName: string; args: any }>,
-): string {
+function formatToolCallTrace(toolCalls: ToolCall[]): string {
   let trace = "";
 
   for (let i = 0; i < toolCalls.length; i++) {
