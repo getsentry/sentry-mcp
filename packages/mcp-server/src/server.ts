@@ -43,7 +43,7 @@ import {
   getConstraintParametersToInject,
   getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
-import { requireServerContext } from "./internal/context-storage";
+import { serverContextStorage } from "./internal/context-storage";
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -199,35 +199,37 @@ function configureServer({
               },
               async (span) => {
                 // Resolve context per-request for runtime operations
-                const context = requireServerContext();
+                // Try AsyncLocalStorage first (for Cloudflare Workers), fallback to closure context (for stdio)
+                const contextFromStorage = serverContextStorage.getStore();
+                const effectiveContext = contextFromStorage ?? context;
 
                 // Add constraint attributes to span
-                if (context.constraints.organizationSlug) {
+                if (effectiveContext.constraints.organizationSlug) {
                   span.setAttribute(
                     "sentry-mcp.constraint-organization",
-                    context.constraints.organizationSlug,
+                    effectiveContext.constraints.organizationSlug,
                   );
                 }
-                if (context.constraints.projectSlug) {
+                if (effectiveContext.constraints.projectSlug) {
                   span.setAttribute(
                     "sentry-mcp.constraint-project",
-                    context.constraints.projectSlug,
+                    effectiveContext.constraints.projectSlug,
                   );
                 }
 
-                if (context.userId) {
+                if (effectiveContext.userId) {
                   setUser({
-                    id: context.userId,
+                    id: effectiveContext.userId,
                   });
                 }
-                if (context.clientId) {
-                  setTag("client.id", context.clientId);
+                if (effectiveContext.clientId) {
+                  setTag("client.id", effectiveContext.clientId);
                 }
 
                 try {
                   // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
                   const applicableConstraints = getConstraintParametersToInject(
-                    context.constraints,
+                    effectiveContext.constraints,
                     tool.inputSchema,
                   );
 
@@ -238,7 +240,7 @@ function configureServer({
 
                   const output = await tool.handler(
                     paramsWithConstraints,
-                    context,
+                    effectiveContext,
                   );
                   span.setStatus({
                     code: 1, // ok

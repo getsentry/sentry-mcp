@@ -1,0 +1,208 @@
+name: Token Cost
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  statuses: write
+
+jobs:
+  measure-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # pnpm/action-setup@v4
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build tool definitions
+        run: pnpm -w run build
+
+      - name: Measure token cost
+        id: measure
+        working-directory: packages/mcp-server
+        run: |
+          # Run token counter with JSON output to file
+          pnpm run measure-tokens -- -o token-stats.json
+
+          # Extract key metrics from JSON for GitHub outputs
+          TOTAL_TOKENS=$(jq -r '.total_tokens' token-stats.json)
+          TOOL_COUNT=$(jq -r '.tool_count' token-stats.json)
+          AVG_TOKENS=$(jq -r '.avg_tokens_per_tool' token-stats.json)
+          COST=$(jq -r '.estimated_cost_per_1k_requests' token-stats.json)
+
+          # Save for later steps
+          echo "total_tokens=$TOTAL_TOKENS" >> $GITHUB_OUTPUT
+          echo "tool_count=$TOOL_COUNT" >> $GITHUB_OUTPUT
+          echo "avg_tokens=$AVG_TOKENS" >> $GITHUB_OUTPUT
+          echo "cost=$COST" >> $GITHUB_OUTPUT
+
+      - name: Generate detailed report
+        id: report
+        working-directory: packages/mcp-server
+        run: |
+          # Build markdown table from JSON
+          cat > token-report.md <<REPORT_EOF
+          ## 📊 MCP Server Token Cost Report
+
+          **Summary**
+          - **Total Tokens:** ${{ steps.measure.outputs.total_tokens }} tokens
+          - **Tool Count:** ${{ steps.measure.outputs.tool_count }} tools
+          - **Average:** ${{ steps.measure.outputs.avg_tokens }} tokens/tool
+          - **Estimated Cost:** \$${{ steps.measure.outputs.cost }} per 1,000 requests (Claude 3.5 Sonnet @ \$3/1M input tokens)
+
+          ### Per-Tool Breakdown
+
+          | Tool | Tokens | % of Total |
+          |------|--------|------------|
+          REPORT_EOF
+
+          # Add each tool as a table row
+          jq -r '.tools[] | "| `\(.name)` | \(.tokens) | \(.percentage)% |"' token-stats.json >> token-report.md
+
+          cat >> token-report.md <<REPORT_EOF
+
+          ### Top 5 Most Expensive Tools
+
+          REPORT_EOF
+
+          jq -r '.tools[0:5] | to_entries[] | "\(.key + 1). **\(.value.name)**: \(.value.tokens) tokens (\(.value.percentage)%)"' token-stats.json >> token-report.md
+
+          cat >> token-report.md <<REPORT_EOF
+
+          ---
+
+          **Note:** This measures the static overhead of tool definitions sent to LLM clients with every request. Lower is better.
+          REPORT_EOF
+
+          # Display report
+          cat token-report.md
+
+          # Save for summary
+          cat token-report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Download main branch token stats
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: token-cost.yml
+          branch: main
+          name_is_regexp: true
+          name: 'token-stats-.*'
+          path: main-stats
+          search_artifacts: true
+
+      - name: Compare with main branch
+        id: compare
+        if: github.event_name == 'pull_request'
+        working-directory: packages/mcp-server
+        run: |
+          # Check if we got main's stats
+          if [ -f ../../main-stats/token-stats.json ]; then
+            MAIN_TOKENS=$(jq -r '.total_tokens' ../../main-stats/token-stats.json)
+            CURRENT_TOKENS=${{ steps.measure.outputs.total_tokens }}
+            DELTA=$((CURRENT_TOKENS - MAIN_TOKENS))
+
+            echo "has_comparison=true" >> $GITHUB_OUTPUT
+            echo "main_tokens=$MAIN_TOKENS" >> $GITHUB_OUTPUT
+            echo "delta=$DELTA" >> $GITHUB_OUTPUT
+
+            if [ $DELTA -gt 0 ]; then
+              echo "delta_direction=increased" >> $GITHUB_OUTPUT
+              echo "delta_symbol=📈" >> $GITHUB_OUTPUT
+            elif [ $DELTA -lt 0 ]; then
+              echo "delta_direction=decreased" >> $GITHUB_OUTPUT
+              echo "delta_symbol=📉" >> $GITHUB_OUTPUT
+            else
+              echo "delta_direction=unchanged" >> $GITHUB_OUTPUT
+              echo "delta_symbol=➡️" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has_comparison=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Add comparison to report
+        if: github.event_name == 'pull_request' && steps.compare.outputs.has_comparison == 'true'
+        working-directory: packages/mcp-server
+        run: |
+          # Add comparison section at the top of the report
+          cat > comparison-header.md <<COMPARISON_EOF
+          ### ${{ steps.compare.outputs.delta_symbol }} Comparison with Main Branch
+
+          - **Current (PR):** ${{ steps.measure.outputs.total_tokens }} tokens
+          - **Main branch:** ${{ steps.compare.outputs.main_tokens }} tokens
+          - **Change:** ${{ steps.compare.outputs.delta }} tokens (${{ steps.compare.outputs.delta_direction }})
+
+          ---
+
+          COMPARISON_EOF
+
+          # Insert comparison at the beginning (after the title)
+          sed -i '2r comparison-header.md' token-report.md
+
+          # Update job summary with new report
+          cat token-report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Set commit status
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const totalTokens = '${{ steps.measure.outputs.total_tokens }}';
+            const hasComparison = '${{ steps.compare.outputs.has_comparison }}' === 'true';
+            const delta = '${{ steps.compare.outputs.delta }}';
+            const deltaSymbol = '${{ steps.compare.outputs.delta_symbol }}' || '📊';
+
+            let description = `${totalTokens} tokens`;
+            if (hasComparison && delta) {
+              const deltaPrefix = parseInt(delta) >= 0 ? '+' : '';
+              description += ` (${deltaPrefix}${delta} from main) ${deltaSymbol}`;
+            }
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'success',
+              context: 'Token Cost',
+              description: description,
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Upload token stats artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: token-stats-${{ github.sha }}
+          path: packages/mcp-server/token-stats.json
+          retention-days: 90

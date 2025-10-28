@@ -17,6 +17,7 @@ import analyzeIssueWithSeer from "./analyze-issue-with-seer";
 import searchDocs from "./search-docs";
 import getDoc from "./get-doc";
 import searchIssues from "./search-issues";
+import useSentry from "./use-sentry";
 
 // Default export: object mapping tool names to tools
 export default {
@@ -39,6 +40,7 @@ export default {
   search_docs: searchDocs,
   get_doc: getDoc,
   search_issues: searchIssues,
+  use_sentry: useSentry,
 } as const;
 
 // Type export
