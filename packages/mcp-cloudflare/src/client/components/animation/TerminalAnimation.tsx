@@ -160,7 +160,6 @@ export default function TerminalAnimation() {
         // eliminates race condition that happpens before 1st step (steps 0 and 1 firing at the same time with idelTimeLimit timeline adjustments)
         if (player !== playerRef.current) return; // ignore stale instance
         activateStep(currentStepRef.current + 1, "marker");
-        // activateStep(currentStepRef.current + 1, manual ? "manual" : "marker");
       };
       player.addEventListener("marker", onMarker);
       (player as any).__onMarker = onMarker;
@@ -182,35 +181,6 @@ export default function TerminalAnimation() {
       autoContinueTimerRef.current = null;
     }
 
-    // if (!step.autoPlay) playerRef.current.pause?.();
-
-    // Step 0 special-case: if auto-activated by marker, do NOT auto-continue.
-    // const shouldAutoContinue = !(stepIndex === 0 && source === "marker");
-    // if (step.autoContinueMs) {
-    //   autoContinueTimerRef.current = setTimeout(async () => {
-    //     playerRef.current.pause?.();
-    //     // remove previous marker listener if present
-    //     if (playerRef.current.__onMarker) {
-    //       try {
-    //         playerRef.current.removeEventListener?.(
-    //           "marker",
-    //           playerRef.current.__onMarker,
-    //         );
-    //       } catch {}
-    //     }
-    //     playerRef.current.dispose?.();
-    //     setSpeed(step.startSpeed);
-    //     mountPlayer(
-    //       step.startTime,
-    //       step.startSpeed,
-    //       // last step 7
-    //       steps[stepIndex + 1]?.lines || 7,
-    //       steps[stepIndex + 1]?.startTime,
-    //     );
-    //     playerRef.current?.play?.();
-    //     autoContinueTimerRef.current = null; // finished
-    //   }, step.autoContinueMs);
-    // }
     if (source === "manual") {
       // instant remount for manual selection, then pause; delay starts NOW
       // remove previous marker listener if present
@@ -241,7 +211,7 @@ export default function TerminalAnimation() {
         }, step.autoContinueMs);
       }
     } else if (step.autoContinueMs) {
-      // auto progression: keep your delayed remount
+      // auto progression: delayed remount
       autoContinueTimerRef.current = setTimeout(() => {
         playerRef.current.pause?.();
         if (playerRef.current.__onMarker) {
@@ -287,7 +257,7 @@ export default function TerminalAnimation() {
   }
 
   useEffect(() => {
-    // initial
+    // init
     mountPlayer(31, 0.5, steps[0].lines, steps[0].startTime);
     return () => {
       try {
@@ -302,11 +272,11 @@ export default function TerminalAnimation() {
       <div
         className={`${
           currentIndex === 1
-            ? "xl:border-pink-400/50"
+            ? "xl:border-orange-400/50"
             : currentIndex === 2
-              ? "xl:border-orange-400/50"
+              ? "xl:border-pink-400/50"
               : currentIndex === 4
-                ? "xl:border-lime-400/50"
+                ? "xl:border-lime-200/50"
                 : "border-white/10"
         } relative w-full col-span-2 max-xl:row-span-6 border bg-[#160f24]/50 backdrop-blur-3xl rounded-3xl overflow-hidden`}
       >
@@ -365,10 +335,10 @@ export default function TerminalAnimation() {
             direction={currentIndex === 4 ? "ltr" : "rtl"}
             pulseColorClass={
               currentIndex === 4
-                ? "text-lime-400/50"
+                ? "text-lime-200/50"
                 : currentIndex === 2
-                  ? "text-orange-400/50"
-                  : "text-pink-400/50"
+                  ? "text-pink-400/50"
+                  : "text-orange-400/50"
             }
             heightClass="h-0.5"
             periodSec={0.3}
