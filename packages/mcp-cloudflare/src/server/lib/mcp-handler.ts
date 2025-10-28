@@ -119,17 +119,12 @@ const mcpHandler: ExportedHandler<Env> = {
       },
     });
 
-    // Rewrite request URL to strip org/project segments since we've already
-    // extracted them into serverContext.constraints
-    const rewrittenUrl = new URL(request.url);
-    rewrittenUrl.pathname = "/mcp";
-    const rewrittenRequest = new Request(rewrittenUrl, request);
-
     // Run MCP handler within ServerContext (AsyncLocalStorage)
+    // Use the validated URL path directly instead of rewriting
     return serverContextStorage.run(serverContext, () => {
       return createMcpHandler(server, {
-        route: "/mcp",
-      })(rewrittenRequest, env, ctx);
+        route: url.pathname,
+      })(request, env, ctx);
     });
   },
 };

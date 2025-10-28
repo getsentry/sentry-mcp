@@ -9,14 +9,10 @@ vi.mock("@sentry/cloudflare", () => ({
   flush: vi.fn(() => Promise.resolve(true)),
 }));
 
-// Capture the request passed to createMcpHandler
-let capturedRequest: Request | null = null;
-
 // Mock the MCP handler creation - we're testing the wrapper logic, not the MCP protocol
 vi.mock("agents/mcp", () => ({
   experimental_createMcpHandler: vi.fn(() => {
-    return vi.fn((req: Request) => {
-      capturedRequest = req;
+    return vi.fn(() => {
       return Promise.resolve(new Response("OK", { status: 200 }));
     });
   }),
@@ -28,7 +24,6 @@ describe("mcp-handler", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    capturedRequest = null;
 
     env = {
       SENTRY_HOST: "sentry.io",
@@ -57,10 +52,6 @@ describe("mcp-handler", () => {
 
     // Verify successful response
     expect(response.status).toBe(200);
-
-    // Verify the request URL was rewritten to /mcp
-    expect(capturedRequest).toBeDefined();
-    expect(new URL(capturedRequest!.url).pathname).toBe("/mcp");
   });
 
   it("returns 404 for invalid organization", async () => {
@@ -108,10 +99,6 @@ describe("mcp-handler", () => {
 
     // Verify successful response
     expect(response.status).toBe(200);
-
-    // Verify the request URL was rewritten to /mcp
-    expect(capturedRequest).toBeDefined();
-    expect(new URL(capturedRequest!.url).pathname).toBe("/mcp");
   });
 
   it("successfully handles request without constraints", async () => {
@@ -121,9 +108,5 @@ describe("mcp-handler", () => {
 
     // Verify successful response
     expect(response.status).toBe(200);
-
-    // Verify the request URL remains /mcp
-    expect(capturedRequest).toBeDefined();
-    expect(new URL(capturedRequest!.url).pathname).toBe("/mcp");
   });
 });

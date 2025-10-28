@@ -32,7 +32,7 @@ The system uses a dual-token approach:
 sequenceDiagram
     participant Client as MCP Client (Cursor)
     participant MCPOAuth as MCP OAuth Provider<br/>(Our Server)
-    participant MCP as MCP Server<br/>(Durable Object)
+    participant MCP as MCP Server<br/>(Stateless Handler)
     participant SentryOAuth as Sentry OAuth Provider<br/>(sentry.io)
     participant SentryAPI as Sentry API
     participant User as User
@@ -167,14 +167,13 @@ const oAuthProvider = new OAuthProvider({
 });
 ```
 
-### 2. API Handlers
+### 2. API Handler
 
-The `apiHandlers` are protected endpoints that require valid OAuth tokens:
+The `apiHandler` is a protected endpoint that requires valid OAuth tokens:
 
-- `/mcp/*` - MCP protocol endpoints
-- `/sse/*` - Server-sent events for MCP
+- `/mcp` - MCP protocol endpoint (HTTP transport)
 
-These handlers receive:
+The handler receives:
 - `request`: The incoming request
 - `env`: Cloudflare environment bindings
 - `ctx`: Execution context with `ctx.props` containing decrypted user data
@@ -202,39 +201,44 @@ interface WorkerProps {
 The MCP server needs to support URL-based constraints like `/mcp/sentry/javascript` to limit agent access to specific organizations/projects. However:
 
 1. OAuth Provider only does prefix matching (`/mcp` matches `/mcp/*`)
-2. The agents library rewrites URLs to `/streamable-http` before reaching the Durable Object
-3. URL path parameters are lost in this rewrite
+2. The MCP handler needs to extract constraints from URL paths
+3. URL path parameters must be preserved through the OAuth middleware
 
 #### The Solution
 
 We use HTTP headers to preserve constraints through the URL rewriting:
 
 ```typescript
-const createMcpHandler = (basePath: string, isSSE = false) => {
-  const handler = isSSE ? SentryMCP.serveSSE("/*") : SentryMCP.serve("/*");
+// The MCP handler extracts constraints from URL path segments
+// Example URLs:
+//   /mcp - No constraints
+//   /mcp/sentry - Organization constraint
+//   /mcp/sentry/javascript - Organization + project constraints
 
-  return {
-    fetch: (request: Request, env: unknown, ctx: ExecutionContext) => {
-      const url = new URL(request.url);
-      
-      // Extract constraints from URL
-      const pathMatch = url.pathname.match(
-        /^\/(mcp|sse)(?:\/([a-z0-9._-]+))?(?:\/([a-z0-9._-]+))?/i
-      );
-      
-      // Pass constraints via headers (preserved through URL rewriting)
-      const headers = new Headers(request.headers);
-      if (pathMatch?.[2]) {
-        headers.set("X-Sentry-Org-Slug", pathMatch[2]);
-      }
-      if (pathMatch?.[3]) {
-        headers.set("X-Sentry-Project-Slug", pathMatch[3]);
-      }
-      
-      const modifiedRequest = new Request(request, { headers });
-      return handler.fetch(modifiedRequest, env, ctx);
-    },
-  };
+const mcpHandler: ExportedHandler<Env> = {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Extract auth props from ExecutionContext (set by OAuth provider)
+    const oauthCtx = ctx as OAuthExecutionContext;
+
+    // Parse constraints from URL path
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/').filter(Boolean);
+    const constraints = {
+      organizationSlug: pathSegments[1] || null,
+      projectSlug: pathSegments[2] || null,
+    };
+
+    // Build complete ServerContext
+    const serverContext: ServerContext = {
+      ...oauthCtx.props,
+      constraints,
+    };
+
+    // Run MCP handler within ServerContext (AsyncLocalStorage)
+    return serverContextStorage.run(serverContext, () => {
+      return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
+    });
+  },
 };
 ```
 
@@ -375,19 +379,19 @@ Note: These describe the MCP OAuth server, not Sentry's OAuth endpoints.
 
 ## Integration Between MCP OAuth and MCP Server
 
-The MCP Server (Durable Object `SentryMCP`) receives:
+The MCP Server (stateless handler) receives context via AsyncLocalStorage:
 
-1. **Props via constructor**: Decrypted data from MCP token (includes Sentry tokens)
-2. **Constraints via headers**: Organization/project limits from URL path
-3. **Both stored**: In Durable Object storage for session persistence
+1. **Props via ExecutionContext**: Decrypted data from MCP token (includes Sentry tokens)
+2. **Constraints from URL**: Organization/project limits parsed from URL path
+3. **Context storage**: AsyncLocalStorage provides per-request isolation
 
-The MCP Server then uses the Sentry access token from props to make Sentry API calls.
+The MCP Server then uses the Sentry access token from context to make Sentry API calls.
 
 ## Limitations
 
 1. **No direct Hono integration**: OAuth Provider expects specific handler signatures
-2. **URL rewriting**: Requires header-based constraint passing
-3. **Props architecture mismatch**: OAuth passes props per-request, agents library expects them in constructor
+2. **Constraint extraction**: Must parse URL segments to extract organization/project constraints
+3. **AsyncLocalStorage dependency**: Requires Node.js compatibility mode in Cloudflare Workers
 
 ## Why Use Two OAuth Systems?
 

@@ -110,7 +110,7 @@ Defines the specific purpose and content for each documentation file.
 **Must Include**:
 - Wrangler configuration
 - Environment variables
-- Durable Objects setup
+- MCP handler setup
 - OAuth flow
 - Deployment commands
 
