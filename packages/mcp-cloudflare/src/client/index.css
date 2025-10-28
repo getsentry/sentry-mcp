@@ -183,7 +183,41 @@
   color: white;
 }
 
-/* globals.css */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+/* remove background from terminal container */
+.ap-player .ap-terminal {
+  background: transparent !important;
+}
+
+/* optional: also remove outer container bg */
+.ap-wrapper {
+  background: transparent !important;
+}
+
+/* --- background patterns --- */
+.bg-grid {
+  background-size: var(--size, 40px) var(--size, 40px);
+  background-position: calc(-1 * var(--size, 40px) / 2)
+    calc(-1 * var(--size, 40px) / 2);
+  background-image: linear-gradient(
+      to right,
+      var(--grid-color, #fff2) 1px,
+      transparent 1px
+    ), linear-gradient(to bottom, var(--grid-color, #fff2) 1px, transparent 1px);
+}
+
+.bg-dots {
+  background-image: radial-gradient(#fff4 1px, transparent 0);
+  background-size: var(--size, 40px) var(--size, 40px);
+}
+
+/* --- keyframes --- */
 @keyframes keycapPulse {
   0% {
     opacity: 0;
@@ -209,7 +243,6 @@
 
   /* fade-out (~120ms) */
 }
-
 .animate-keycap {
   animation: keycapPulse var(--dur, 950ms) ease-out both;
   animation-delay: var(--delay, 0s);
@@ -231,7 +264,6 @@
     transform: translateY(0.5rem) scale(1);
   }
 }
-
 @keyframes metaKeyPress {
   0% {
     filter: brightness(0.95);
@@ -248,12 +280,10 @@
     transform: translateY(2rem) scale(0.95);
   }
 }
-
 .animate-keycap-inner {
   animation: keyPress var(--dur, 500ms) ease both;
   animation-delay: var(--delay, 0s);
 }
-
 .animate-keycap-inner-meta {
   animation: metaKeyPress var(--dur, 500ms) ease both;
   animation-delay: var(--delay, 0s);
@@ -267,43 +297,8 @@
     transform: translateX(0%);
   }
 }
-
 .animate-select {
   animation: urlSelect 500ms steps(20) both;
-  animation-delay: var(--delay, 0s);
-}
-
-@keyframes urlHoverClick {
-  /* base */
-  0% {
-    background-color: transparent;
-  }
-
-  /* hover (≈200ms) */
-  50% {
-    background-color: #fff2;
-  }
-
-  /* active press (≈75ms) */
-  68% {
-    background-color: #f22;
-    /* color: var(--background); */
-  }
-
-  /* release back to hover quickly, then fade out */
-  85% {
-    background-color: #fff2;
-  }
-
-  100% {
-    background-color: #f22;
-    /* color: var(--background); */
-  }
-}
-
-.animate-url {
-  /* total ≈ 400ms (200 hover + 75 active + ~125 release) */
-  animation: urlHoverClick 400ms ease-out forwards;
   animation-delay: var(--delay, 0s);
 }
 
@@ -329,30 +324,8 @@
     opacity: 0.5;
   }
 }
-
 .speed-animate {
   animation: popSpeed var(--speed-pop-dur, 500ms) ease-out;
-}
-
-.bg-grid {
-  background-size: var(--size, 40px) var(--size, 40px);
-  background-position: calc(-1 * var(--size, 40px) / 2)
-    calc(-1 * var(--size, 40px) / 2);
-  background-image: linear-gradient(
-      to right,
-      var(--grid-color, #fff2) 1px,
-      transparent 1px
-    ), linear-gradient(to bottom, var(--grid-color, #fff2) 1px, transparent 1px);
-}
-
-.bg-dots {
-  background-image: radial-gradient(#fff4 1px, transparent 0);
-  background-size: var(--size, 40px) var(--size, 40px);
-}
-
-.animate-issue-context {
-  animation: issueFlyover 1s 1 forwards;
-  animation-delay: var(--delay, 0s);
 }
 
 @keyframes issueFlyover {
@@ -368,9 +341,9 @@
     scale: 50%;
   }
 }
-
-.animate-cursor-blink {
-  animation: blink 1s step-end infinite;
+.animate-issue-context {
+  animation: issueFlyover 1s 1 forwards;
+  animation-delay: var(--delay, 0s);
 }
 
 @keyframes blink {
@@ -383,17 +356,11 @@
     opacity: 0;
   }
 }
-
-/* remove background from terminal container */
-.ap-player .ap-terminal {
-  background: transparent !important;
+.animate-cursor-blink {
+  animation: blink 1s step-end infinite;
 }
 
-/* optional: also remove outer container bg */
-.ap-wrapper {
-  background: transparent !important;
-}
-
+/* datawire animation between terminal and browser/ide side for hero demo */
 @layer utilities {
   .wire {
     position: relative;
@@ -448,13 +415,6 @@
       transform: translate3d(0, 0, 0) translateX(-120%);
     }
   }
-}
-
-.hide-scrollbar {
-  scrollbar-width: none; /* Firefox */
-}
-.hide-scrollbar::-webkit-scrollbar {
-  display: none; /* Safari and Chrome */
 }
 
 /* two-step: original -> underscore -> original */
