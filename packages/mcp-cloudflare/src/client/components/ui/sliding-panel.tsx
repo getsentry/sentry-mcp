@@ -42,7 +42,7 @@ export function SlidingPanel({
 
       {/* Panel */}
       <div
-        className={`fixed xl:hidden inset-y-0 right-0 w-full max-w-2xl bg-background border-l border-slate-800 z-50 shadow-2xl flex flex-col ease-out duration-300 ${
+        className={`fixed xl:hidden inset-y-0 right-0 w-full max-w-2xl bg-background border-l border-slate-800 z-50 shadow-2xl flex flex-col ease-out motion-safe:duration-300 ${
           isOpen
             ? "translate-x-0 pointer-events-auto"
             : "translate-x-full pointer-events-none"
@@ -53,7 +53,7 @@ export function SlidingPanel({
       <div
         className={`fixed hidden xl:flex inset-y-0 right-0 w-full max-w-[50vw] bg-[#201633] flex-col ease-out ${
           isOpen
-            ? "translate-x-0 blur-none scale-100 opacity-100 pointer-events-auto duration-300 delay-150 transition-[opacity,filter,scale]"
+            ? "translate-x-0 blur-none scale-100 opacity-100 pointer-events-auto motion-safe:duration-300 delay-150 transition-[opacity,filter,scale]"
             : "translate-x-full blur-xl scale-90 opacity-0 pointer-events-none duration-0"
         } ${className}`}
       >

@@ -1,6 +1,6 @@
 import type React from "react";
 import { SentryIcon } from "./icons/sentry";
-import { Github, PanelLeftOpen, } from "lucide-react";
+import { Github, PanelLeftOpen } from "lucide-react";
 import { Button } from "./button";
 import { Badge } from "./badge";
 
@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
           </div>
         </div>
         <div
-          className={`flex items-center gap-4 duration-300 [--x:0] xl:[--x:30rem] 2xl:[--x:38rem] ${
+          className={`flex items-center gap-4 motion-safe:duration-300 [--x:0] xl:[--x:30rem] 2xl:[--x:38rem] ${
             isChatOpen ? "-translate-x-[var(--x)]" : ""
           }`}
         >
