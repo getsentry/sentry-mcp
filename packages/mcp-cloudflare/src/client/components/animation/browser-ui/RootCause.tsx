@@ -38,7 +38,7 @@ export default function RootCause({ step }: { step: number }) {
   const originX = cols / 2;
   const originY = 0;
   const sweepMs = 900;
-  const globalDelayMs = 600;
+  const globalDelayMs = 900;
 
   // globe depth
   const centerX = (cols - 1) / 2;
@@ -124,7 +124,7 @@ export default function RootCause({ step }: { step: number }) {
         if (outsideCircle) {
           opacity = 0;
         } else if (centerHighlighted) {
-          opacity = isCenter ? 1 : 0.06;
+          opacity = isCenter ? 1 : 0.25;
         } else {
           opacity = scanning ? opacityActive : opacityInactive;
         }
@@ -146,7 +146,7 @@ export default function RootCause({ step }: { step: number }) {
           ? `scannerPulse ${cellPulseMs}ms linear ${effectiveSweepDelay}ms 1 forwards`
           : "none";
 
-        const startColor = isCenter ? "#fff1" : randomBaseColor;
+        const startColor = isCenter ? "#fff3" : randomBaseColor;
         const endColor = isCenter ? orange : randomBaseColor;
 
         const animationValue = scannerAnim + flickerAnim;
