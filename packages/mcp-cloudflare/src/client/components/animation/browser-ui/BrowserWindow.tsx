@@ -10,7 +10,7 @@ export default function BrowserWindow({ step }: { step: number }) {
       // isometric option: rotate-x-60 -rotate-z-45 scale-75 perspective-distant
       className={`${
         step >= 3
-          ? "pointer-events-none translate-x-32 scale-75 opacity-0 blur-xl"
+          ? "pointer-events-none motion-safe:translate-x-32 motion-safe:scale-75 opacity-0 blur-xl"
           : step === 1
             ? "border-orange-400/50"
             : step === 2

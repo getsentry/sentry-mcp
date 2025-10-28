@@ -8,7 +8,7 @@ export default function IDEWindow({ step }: { step: number }) {
       className={`${
         step >= 4 && step < 5
           ? "translate-x-0 scale-100 blur-none"
-          : "-translate-x-32 scale-75 opacity-0 blur-xl"
+          : "motion-safe:-translate-x-32 motion-safe:scale-75 opacity-0 blur-xl"
       } ${
         step === 4 ? "border-lime-200/50" : "border-white/10"
       } absolute inset-0 flex h-full w-full origin-bottom flex-col overflow-hidden rounded-3xl border bg-white/5 pb-1 backdrop-blur duration-300`}
@@ -22,7 +22,7 @@ export default function IDEWindow({ step }: { step: number }) {
             className={`${
               step === 4
                 ? "bg-black/20 opacity-100 translate-y-0"
-                : "opacity-0 translate-y-2"
+                : "opacity-0 motion-safe:translate-y-2"
             } flex items-center justify-between gap-2 truncate duration-300 border-white/10 border-r px-2 py-2`}
           >
             schema.ts
@@ -32,7 +32,7 @@ export default function IDEWindow({ step }: { step: number }) {
             className={`${
               step === 4
                 ? "bg-black/20 opacity-100 delay-1250 translate-y-0"
-                : "opacity-0 translate-y-2"
+                : "opacity-0 motion-safe:translate-y-2"
             } flex items-center justify-between gap-2 truncate duration-300 border-white/10 border-r px-4 py-2`}
           >
             types.ts
@@ -43,7 +43,7 @@ export default function IDEWindow({ step }: { step: number }) {
             className={`${
               step === 4
                 ? "bg-black/20 opacity-100 delay-2000 translate-y-0"
-                : "opacity-0 translate-y-2"
+                : "opacity-0 motion-safe:translate-y-2"
             } flex items-center justify-between gap-2 truncate duration-300 border-white/10 border-r px-4 py-2`}
           >
             get-trace-details.ts

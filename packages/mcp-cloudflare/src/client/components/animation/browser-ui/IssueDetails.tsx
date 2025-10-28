@@ -21,7 +21,9 @@ export default function IssueDetails({ step }: { step: number }) {
         <div className="relative w-[calc(100%-1rem)] m-2 border border-white/10 bg-white/5 rounded-xl">
           <div
             className={`${
-              step === 1 ? "animate-issue-context opacity-30" : "opacity-0"
+              step === 1
+                ? "motion-reduce:opacity-0 motion-reduce:duration-1000 motion-reduce:delay-800 motion-reduce:!animate-none animate-issue-context opacity-30"
+                : "opacity-0"
             } pb-4 rounded-xl absolute inset-0 border border-white/20 bg-pink-900 text-pink100`}
             style={{ ["--delay" as any]: "0.8s" }}
           >
@@ -29,7 +31,9 @@ export default function IssueDetails({ step }: { step: number }) {
           </div>
           <div
             className={`${
-              step === 1 ? "animate-issue-context opacity-30" : "opacity-0"
+              step === 1
+                ? "motion-reduce:opacity-0 motion-reduce:duration-1000 motion-reduce:delay-1000 motion-reduce:!animate-none animate-issue-context opacity-30"
+                : "opacity-0"
             } pb-4 rounded-xl absolute inset-0 border border-white/20 bg-pink-900 text-pink100`}
             style={{ ["--delay" as any]: "1s" }}
           >
@@ -37,7 +41,9 @@ export default function IssueDetails({ step }: { step: number }) {
           </div>
           <div
             className={`${
-              step === 1 ? "animate-issue-context opacity-30" : "opacity-0"
+              step === 1
+                ? "motion-reduce:opacity-0 motion-reduce:duration-1000 motion-reduce:delay-1200 motion-reduce:!animate-none animate-issue-context opacity-30"
+                : "opacity-0"
             } pb-4 rounded-xl absolute inset-0 border border-white/20 bg-pink-900 text-pink100`}
             style={{ ["--delay" as any]: "1.2s" }}
           >
@@ -46,7 +52,7 @@ export default function IssueDetails({ step }: { step: number }) {
           <div
             className={`${
               step === 1
-                ? "animate-issue-context"
+                ? "motion-reduce:opacity-0 motion-reduce:duration-1000 motion-reduce:delay-675 motion-reduce:!animate-none animate-issue-context"
                 : step > 1
                   ? "opacity-0"
                   : "opacity-100"

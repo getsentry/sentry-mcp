@@ -20,7 +20,9 @@ export default function ValidationSummary({ step }: { step?: number }) {
         />
         <div
           className={`rounded-lg relative bg-gradient-to-br from-lime-900 to-lime-950 p-3 ${
-            step === 5 ? "scale-100 delay-1000 duration-500" : "scale-200"
+            step === 5
+              ? "scale-100 delay-1000 duration-500"
+              : "motion-safe:scale-200"
           } origin-top-left`}
         >
           <Maximize
@@ -42,7 +44,7 @@ export default function ValidationSummary({ step }: { step?: number }) {
           className={`${
             step === 5
               ? "opacity-100 translate-x-0 duration-300 delay-1250"
-              : "opacity-0 -translate-x-4"
+              : "opacity-0 motion-safe-translate-x-4"
           } transition-all`}
         >
           <span className="opacity-50">pnpm run</span> tsc
@@ -80,7 +82,7 @@ export default function ValidationSummary({ step }: { step?: number }) {
           className={`${
             step === 5
               ? "opacity-100 translate-x-0 duration-300 delay-1450"
-              : "opacity-0 -translate-x-4"
+              : "opacity-0 motion-safe:-translate-x-4"
           } transition-all`}
         >
           <span className="opacity-50">pnpm run</span> lint
@@ -118,7 +120,7 @@ export default function ValidationSummary({ step }: { step?: number }) {
           className={`${
             step === 5
               ? "opacity-100 translate-x-0 duration-300 delay-1750"
-              : "opacity-0 -translate-x-4"
+              : "opacity-0 motion-safe:-translate-x-4"
           } transition-all`}
         >
           <span className="opacity-50">pnpm run</span> tests

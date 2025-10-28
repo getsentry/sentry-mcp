@@ -15,7 +15,7 @@ export default function Seer({ step }: { step: number }) {
         className={`inset-0 absolute bg-[#160f24] rounded-tl-xl rounded-br-3xl border-t border-l border-white/20 ${
           step === 2
             ? "duration-300 opacity-80 translate-x-0 blur-none"
-            : "duration-0 opacity-0 translate-x-1/2 blur-xl"
+            : "duration-0 opacity-0 motion-safe:translate-x-1/2 blur-xl"
         }`}
       />
       {/*<!-- Seer's triangles scalable clipPath mask -->*/}
