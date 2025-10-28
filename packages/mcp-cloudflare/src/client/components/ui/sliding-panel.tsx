@@ -23,7 +23,7 @@ export function SlidingPanel({
   useScrollLock(isOpen && window.innerWidth < 768);
 
   return (
-    <div className="fixed inset-0 bg-transparent max-w-none max-h-none w-full h-full z-40 pointer-events-none">
+    <div className="fixed inset-0 bg-transparent max-w-none max-h-none w-full h-full z-50 pointer-events-none">
       {/* Backdrop */}
       <div
         className={`fixed xl:hidden inset-0 bg-black/50 backdrop-blur-sm transition-opacity ${
