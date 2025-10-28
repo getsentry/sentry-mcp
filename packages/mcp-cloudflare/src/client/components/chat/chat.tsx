@@ -4,7 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef, useCallback } from "react";
 import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
-import { Loader2, LogOut, PanelLeftOpen, } from "lucide-react";
+import { Loader2, LogOut, PanelLeftOpen } from "lucide-react";
 import type { ChatProps } from "./types";
 import { usePersistedChat } from "../../hooks/use-persisted-chat";
 import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
@@ -356,7 +356,6 @@ Try asking me things like:
         }`}
         style={{
           visibility: !isAuthenticated ? "visible" : "hidden",
-          transitionProperty: "opacity, transform",
           transform: !isAuthenticated ? "scale(1)" : "scale(0.95)",
         }}
       >

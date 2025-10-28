@@ -128,14 +128,14 @@ export default function Home({ onChatClick }: HomeProps) {
               {!stdio ? (
                 <div
                   key="cloud"
-                  className="animate-in fade-in slide-in-from-left-4 duration-300"
+                  className="animate-in fade-in motion-safe:slide-in-from-left-4 duration-300"
                 >
                   <RemoteSetup />
                 </div>
               ) : (
                 <div
                   key="stdio-self-hosted"
-                  className="animate-in fade-in slide-in-from-right-4 duration-300"
+                  className="animate-in fade-in motion-safe:slide-in-from-right-4 duration-300"
                 >
                   <StdioSetup />
                 </div>
