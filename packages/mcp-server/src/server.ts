@@ -25,6 +25,7 @@ import type {
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
 import tools from "./tools/index";
+import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
 import {
   setTag,
@@ -33,7 +34,7 @@ import {
   startSpan,
   wrapMcpServerWithSentry,
 } from "@sentry/core";
-import { getLogger, logIssue, type LogIssueOptions } from "./telem/logging";
+import { logIssue, type LogIssueOptions } from "./telem/logging";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
@@ -43,8 +44,6 @@ import {
   getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
 import { requireServerContext } from "./internal/context-storage";
-
-const toolLogger = getLogger(["server", "tools"]);
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -104,16 +103,18 @@ function extractMcpParameters(args: Record<string, unknown>) {
 export function buildServer({
   context,
   onToolComplete,
+  tools: customTools,
 }: {
   context: ServerContext;
   onToolComplete?: () => void;
+  tools?: Record<string, ToolConfig<any>>;
 }): McpServer {
   const server = new McpServer({
     name: MCP_SERVER_NAME,
     version: LIB_VERSION,
   });
 
-  configureServer({ server, context, onToolComplete });
+  configureServer({ server, context, onToolComplete, tools: customTools });
 
   return wrapMcpServerWithSentry(server);
 }
@@ -129,11 +130,16 @@ function configureServer({
   server,
   context,
   onToolComplete,
+  tools: customTools,
 }: {
   server: McpServer;
   context: ServerContext;
   onToolComplete?: () => void;
+  tools?: Record<string, ToolConfig<any>>;
 }) {
+  // Use custom tools if provided, otherwise use default tools
+  const toolsToRegister = customTools ?? tools;
+
   // Get granted scopes from context for tool filtering
   const grantedScopes: Set<Scope> = context.grantedScopes
     ? new Set<Scope>(context.grantedScopes)
@@ -152,21 +158,9 @@ function configureServer({
     logIssue(error, transportLogOptions);
   };
 
-  for (const [toolKey, tool] of Object.entries(tools)) {
+  for (const [toolKey, tool] of Object.entries(toolsToRegister)) {
     // Filter tools BEFORE registration based on granted scopes
     if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-      toolLogger.debug(
-        "Tool {tool} excluded from server - missing required scopes",
-        () => ({
-          tool: tool.name,
-          requiredScopes: Array.isArray(tool.requiredScopes)
-            ? tool.requiredScopes
-            : tool.requiredScopes
-              ? Array.from(tool.requiredScopes)
-              : [],
-          grantedScopes: [...grantedScopes],
-        }),
-      );
       continue; // Skip this tool entirely
     }
 
@@ -180,7 +174,7 @@ function configureServer({
       Object.entries(tool.inputSchema).filter(
         ([key]) => !constraintKeysToFilter.has(key),
       ),
-    );
+    ) as typeof tool.inputSchema;
 
     server.tool(
       tool.name,

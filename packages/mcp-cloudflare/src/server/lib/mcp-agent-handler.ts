@@ -1,5 +1,8 @@
 /**
- * MCP Handler using experimental_createMcpHandler from Cloudflare agents library.
+ * MCP Agent Handler - Specialized MCP server for AI agent operations.
+ *
+ * This handler exposes only the use_sentry tool, designed for AI agents
+ * that need high-level Sentry operations via natural language.
  *
  * Stateless request handling approach:
  * - Uses experimental_createMcpHandler to wrap the MCP server
@@ -19,10 +22,10 @@ import {
 } from "@sentry/mcp-server/permissions";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
 import type { ServerContext } from "@sentry/mcp-server/types";
+import agentTools from "@sentry/mcp-server/tools/agent-tools";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
 import type { ExportedHandler } from "@cloudflare/workers-types";
-import agentTools from "@sentry/mcp-server/tools/agent-tools";
 
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
@@ -32,15 +35,15 @@ type OAuthExecutionContext = ExecutionContext & {
 };
 
 /**
- * Main request handler that:
+ * Main request handler for the agent MCP server that:
  * 1. Extracts auth props from ExecutionContext
  * 2. Parses org/project constraints from URL
  * 3. Verifies user has access to the constraints
  * 4. Builds complete ServerContext
- * 5. Creates and configures MCP server per-request
+ * 5. Creates and configures MCP server with agent tools only
  * 6. Runs MCP handler within ServerContext (AsyncLocalStorage)
  */
-const mcpHandler: ExportedHandler<Env> = {
+const mcpAgentHandler: ExportedHandler<Env> = {
   async fetch(
     request: Request,
     env: Env,
@@ -48,8 +51,8 @@ const mcpHandler: ExportedHandler<Env> = {
   ): Promise<Response> {
     const url = new URL(request.url);
 
-    // Parse constraints from URL pattern /mcp/:org?/:project?
-    const pattern = new URLPattern({ pathname: "/mcp/:org?/:project?" });
+    // Parse constraints from URL pattern /mcp-agent/:org?/:project?
+    const pattern = new URLPattern({ pathname: "/mcp-agent/:org?/:project?" });
     const result = pattern.exec(url);
 
     if (!result) {
@@ -59,9 +62,6 @@ const mcpHandler: ExportedHandler<Env> = {
     const { groups } = result.pathname;
     const organizationSlug = groups?.org || null;
     const projectSlug = groups?.project || null;
-
-    // Check for agent mode query parameter
-    const isAgentMode = url.searchParams.get("agent") === "1";
 
     // Extract OAuth props from ExecutionContext (set by OAuth provider)
     const oauthCtx = ctx as OAuthExecutionContext;
@@ -94,7 +94,7 @@ const mcpHandler: ExportedHandler<Env> = {
       );
       if (invalid.length > 0) {
         logWarn("Ignoring invalid scopes from OAuth provider", {
-          loggerScope: ["cloudflare", "mcp-handler"],
+          loggerScope: ["cloudflare", "mcp-agent-handler"],
           extra: {
             invalidScopes: invalid,
           },
@@ -114,10 +114,10 @@ const mcpHandler: ExportedHandler<Env> = {
       mcpUrl: env.MCP_URL,
     };
 
-    // Create and configure MCP server with tools filtered by context
+    // Create and configure MCP server with ONLY agent tools
     const server = buildServer({
       context: serverContext,
-      tools: isAgentMode ? agentTools : undefined,
+      tools: agentTools,
       onToolComplete: () => {
         // Flush Sentry events after tool execution
         Sentry.flush(2000);
@@ -134,4 +134,4 @@ const mcpHandler: ExportedHandler<Env> = {
   },
 };
 
-export default mcpHandler;
+export default mcpAgentHandler;

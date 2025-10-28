@@ -12,12 +12,16 @@ import { useMcpMetadata } from "../../hooks/use-mcp-metadata";
 import { useStreamingSimulation } from "../../hooks/use-streaming-simulation";
 import { SlidingPanel } from "../ui/sliding-panel";
 import { isAuthError } from "../../utils/chat-error-handler";
+import { useEndpointMode } from "../../hooks/use-endpoint-mode";
 
 // We don't need user info since we're using MCP tokens
 // The MCP server handles all Sentry authentication internally
 
 export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
   const { isLoading, isAuthenticated, authError, handleOAuthLogin } = useAuth();
+
+  // Use endpoint mode hook to manage MCP endpoint preference
+  const { endpointMode, toggleEndpointMode } = useEndpointMode();
 
   // Use persisted chat to save/load messages from localStorage
   const { initialMessages, saveMessages, clearPersistedMessages } =
@@ -57,6 +61,10 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     initialMessages,
     // Enable sending the data field with messages for custom message types
     sendExtraMessageFields: true,
+    // Pass endpoint mode to the API
+    body: {
+      endpointMode,
+    },
   });
 
   // No need for custom scroll handling - react-scroll-to-bottom handles it
@@ -376,6 +384,7 @@ Try asking me things like:
           isMessageStreaming={isMessageStreaming}
           isOpen={isOpen}
           showControls
+          endpointMode={endpointMode}
           onInputChange={handleInputChange}
           onSubmit={handleFormSubmit}
           onStop={stop}
@@ -384,6 +393,7 @@ Try asking me things like:
           onLogout={onLogout}
           onSlashCommand={handleSlashCommand}
           onSendPrompt={handleSendPrompt}
+          onToggleEndpointMode={toggleEndpointMode}
         />
       </div>
     </SlidingPanel>

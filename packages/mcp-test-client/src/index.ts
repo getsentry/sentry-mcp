@@ -37,9 +37,13 @@ program
   .option(
     "--mcp-host <host>",
     "MCP server host",
-    process.env.MCP_URL || "https://mcp.sentry.dev",
+    process.env.MCP_URL || "http://localhost:5173",
   )
   .option("--sentry-dsn <dsn>", "Sentry DSN for error reporting")
+  .option(
+    "--agent",
+    "Use the /mcp-agent endpoint instead of /mcp (for use_sentry tool)",
+  )
   .action(async (prompt, options) => {
     try {
       // Initialize Sentry with CLI-provided DSN if available
@@ -126,12 +130,14 @@ program
           accessToken,
           host: sentryHost || process.env.SENTRY_HOST,
           sentryDsn: sentryDsn,
+          useAgentEndpoint: options.agent,
         });
       } else {
         // Use remote SSE transport when no access token
         connection = await connectToRemoteMCPServer({
           mcpHost: options.mcpHost,
           accessToken: accessToken,
+          useAgentEndpoint: options.agent,
         });
       }
 

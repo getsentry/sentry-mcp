@@ -14,6 +14,7 @@ Common optional flags:
   --host <host>           Change Sentry host (self-hosted)
   --sentry-dsn <dsn>      Override DSN used for telemetry reporting
   --openai-base-url <url> Override OpenAI API base URL for embedded agents
+  --agent                 Agent mode: only expose use_sentry tool (for AI agents)
 
 Session constraints:
   --organization-slug <slug>  Force all calls to an organization

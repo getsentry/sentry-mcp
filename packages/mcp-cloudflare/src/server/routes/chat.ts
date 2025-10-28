@@ -193,7 +193,9 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   let mcpClient: MCPClient | null = null;
 
   try {
-    const { messages } = await c.req.json<ChatRequest>();
+    const { messages, endpointMode } = await c.req.json<
+      ChatRequest & { endpointMode?: "standard" | "agent" }
+    >();
 
     // Validate messages array
     if (!Array.isArray(messages)) {
@@ -212,10 +214,14 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
     try {
       // Get the current request URL to construct the MCP endpoint URL
+      // Use ?agent=1 query parameter to activate agent mode
       const requestUrl = new URL(c.req.url);
-      const mcpUrl = `${requestUrl.protocol}//${requestUrl.host}/mcp`;
+      const mcpUrl = new URL(`${requestUrl.protocol}//${requestUrl.host}/mcp`);
+      if (endpointMode === "agent") {
+        mcpUrl.searchParams.set("agent", "1");
+      }
 
-      const httpTransport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+      const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
         requestInit: {
           headers: {
             Authorization: `Bearer ${currentAccessToken}`,
@@ -248,18 +254,20 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             // Retry with new token
             currentAccessToken = refreshResult.token;
             const requestUrl = new URL(c.req.url);
-            const mcpUrl = `${requestUrl.protocol}//${requestUrl.host}/mcp`;
+            const mcpUrl = new URL(
+              `${requestUrl.protocol}//${requestUrl.host}/mcp`,
+            );
+            if (endpointMode === "agent") {
+              mcpUrl.searchParams.set("agent", "1");
+            }
 
-            const httpTransport = new StreamableHTTPClientTransport(
-              new URL(mcpUrl),
-              {
-                requestInit: {
-                  headers: {
-                    Authorization: `Bearer ${currentAccessToken}`,
-                  },
+            const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
+              requestInit: {
+                headers: {
+                  Authorization: `Bearer ${currentAccessToken}`,
                 },
               },
-            );
+            });
 
             mcpClient = await experimental_createMCPClient({
               name: "mcp.sentry.dev (web)",

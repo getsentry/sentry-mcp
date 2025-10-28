@@ -2,6 +2,7 @@ import type React from "react";
 import { SentryIcon } from "./icons/sentry";
 import { Github, LogOut } from "lucide-react";
 import { Button } from "./button";
+import { Badge } from "./badge";
 
 interface HeaderProps {
   isAuthenticated?: boolean;
@@ -17,8 +18,14 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 flex-shrink-0">
           <SentryIcon className="h-8 w-8 text-violet-400" />
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold whitespace-nowrap">Sentry MCP</h1>
+            <Badge
+              variant="outline"
+              className="text-xs text-muted-foreground font-normal"
+            >
+              Beta
+            </Badge>
           </div>
         </div>
         <div className="flex items-center gap-2">

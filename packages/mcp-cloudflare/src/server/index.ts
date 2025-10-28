@@ -6,6 +6,7 @@ import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
 import { tokenExchangeCallback } from "./oauth";
 import sentryMcpHandler from "./lib/mcp-handler";
+import sentryMcpAgentHandler from "./lib/mcp-agent-handler";
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
@@ -33,9 +34,28 @@ const addCorsHeaders = (response: Response): Response => {
 // We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
 const corsWrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
+    const url = new URL(request.url);
+
+    // Handle /mcp-agent route separately (same OAuth flow, different tools)
+    if (url.pathname.startsWith("/mcp-agent")) {
+      const oAuthProvider = new OAuthProvider({
+        apiRoute: "/mcp-agent",
+        // @ts-expect-error - OAuthProvider types don't support specific Env types
+        apiHandler: sentryMcpAgentHandler,
+        // @ts-expect-error - OAuthProvider types don't support specific Env types
+        defaultHandler: app,
+        // must match the routes registered in `app.ts`
+        authorizeEndpoint: "/oauth/authorize",
+        tokenEndpoint: "/oauth/token",
+        clientRegistrationEndpoint: "/oauth/register",
+        tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
+        scopesSupported: Object.keys(SCOPES),
+      });
+      return oAuthProvider.fetch(request, env, ctx);
+    }
+
     // Handle CORS preflight for public metadata endpoints
     if (request.method === "OPTIONS") {
-      const url = new URL(request.url);
       if (isPublicMetadataEndpoint(url.pathname)) {
         return addCorsHeaders(new Response(null, { status: 204 }));
       }
@@ -58,7 +78,6 @@ const corsWrappedOAuthProvider = {
     const response = await oAuthProvider.fetch(request, env, ctx);
 
     // Add CORS headers to public metadata endpoints
-    const url = new URL(request.url);
     if (isPublicMetadataEndpoint(url.pathname)) {
       return addCorsHeaders(response);
     }

@@ -56,8 +56,10 @@ export async function connectToRemoteMCPServer(
           }
 
           // Create HTTP streaming client with authentication
+          // Use /mcp-agent endpoint if requested, otherwise use /mcp
+          const endpoint = config.useAgentEndpoint ? "/mcp-agent" : "/mcp";
           const httpTransport = new StreamableHTTPClientTransport(
-            new URL(`${mcpHost}/mcp`),
+            new URL(`${mcpHost}${endpoint}`),
             {
               requestInit: {
                 headers: {

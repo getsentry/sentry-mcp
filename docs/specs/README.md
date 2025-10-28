@@ -38,7 +38,7 @@ When adding a new feature specification:
 ## Current Specifications
 
 ### search-events
-A unified event search tool that uses OpenAI GPT-4o to translate natural language queries into Sentry's search syntax. Replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
+A unified event search tool that uses OpenAI GPT-5 to translate natural language queries into Sentry's search syntax. Replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
 
 - **Status**: ✅ Complete
 - **Key Benefits**: Reduces tool count (20→19), improves UX, accessible to non-technical users

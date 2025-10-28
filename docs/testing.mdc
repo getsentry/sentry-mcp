@@ -81,6 +81,32 @@ Real-world scenarios with LLM:
 - Verify end-to-end functionality
 - Test complete workflows
 
+### 3. Manual Testing
+Interactive testing with the MCP test client (preferred for testing MCP changes):
+
+```bash
+# Test with local dev server (default: http://localhost:5173)
+pnpm -w run cli "who am I?"
+
+# Test agent mode (use_sentry tool only)
+pnpm -w run cli --agent "who am I?"
+
+# Test against production
+pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
+
+# Test with local stdio mode (requires SENTRY_ACCESS_TOKEN)
+pnpm -w run cli --access-token=TOKEN "query"
+```
+
+**When to use manual testing:**
+- Verifying end-to-end MCP server behavior
+- Testing OAuth flows
+- Debugging tool interactions
+- Validating real API responses
+- Testing AI-powered tools (search_events, search_issues, use_sentry)
+
+**Note:** The CLI defaults to `http://localhost:5173` for easier local development. Override with `--mcp-host` or set `MCP_URL` environment variable to test against different servers.
+
 ## Functional Testing Patterns
 
 See `adding-tools.mdc#step-3-add-tests` for the complete tool testing workflow.

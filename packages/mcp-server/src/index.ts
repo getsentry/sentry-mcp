@@ -25,6 +25,7 @@ import { sentryBeforeSend } from "./telem/sentry";
 import { ALL_SCOPES } from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
 import { configureOpenAIProvider } from "./internal/agents/openai-provider";
+import agentTools from "./tools/agent-tools";
 
 const packageName = "@sentry/mcp-server";
 const usageText = buildUsage(packageName, DEFAULT_SCOPES, ALL_SCOPES);
@@ -81,6 +82,7 @@ Sentry.init({
     tags: {
       "mcp.server_version": LIB_VERSION,
       "mcp.transport": "stdio",
+      "mcp.agent_mode": cli.agent ? "true" : "false",
       "sentry.host": cfg.sentryHost,
       "mcp.mcp-url": cfg.mcpUrl,
     },
@@ -99,6 +101,15 @@ Sentry.init({
     (process.env.NODE_ENV !== "production" ? "development" : "production"),
 });
 
+// Log agent mode status
+if (cli.agent) {
+  console.warn("Agent mode enabled: Only use_sentry tool is available.");
+  console.warn(
+    "The use_sentry tool provides access to all Sentry operations through natural language.",
+  );
+  console.warn("");
+}
+
 const SENTRY_TIMEOUT = 5000; // 5 seconds
 
 // Build context once for server configuration and runtime
@@ -115,7 +126,11 @@ const context = {
 };
 
 // Build server with context to filter tools based on granted scopes
-const server = buildServer({ context });
+// Use agentTools when --agent flag is set (only exposes use_sentry tool)
+const server = buildServer({
+  context,
+  tools: cli.agent ? agentTools : undefined,
+});
 
 startStdio(server, context).catch((err) => {
   console.error("Server error:", err);

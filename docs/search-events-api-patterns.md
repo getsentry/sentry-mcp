@@ -452,9 +452,8 @@ This graceful degradation ensures queries still work even if custom attributes c
 The search_events tool handles the complexity of multiple API patterns:
 
 1. **AI Translation Layer**
-   - Uses OpenAI GPT-4o to translate natural language to Sentry query syntax
+   - Uses OpenAI GPT-5 to translate natural language to Sentry query syntax
    - Maintains dataset-specific system prompts with examples
-   - Temperature set to 0.1 for consistent translations
    - Aggregate functions and groupBy fields are derived from the fields array
 
 2. **Field Handling**
