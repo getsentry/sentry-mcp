@@ -10,7 +10,7 @@ export default function IDEWindow({ step }: { step: number }) {
           ? "translate-x-0 scale-100 blur-none"
           : "-translate-x-32 scale-75 opacity-0 blur-xl"
       } ${
-        step === 4 ? "border-lime-400/50" : "border-white/10"
+        step === 4 ? "border-lime-200/50" : "border-white/10"
       } absolute inset-0 flex h-full w-full origin-bottom flex-col overflow-hidden rounded-3xl border bg-white/5 pb-1 backdrop-blur duration-300`}
       id="window2-ide"
     >
