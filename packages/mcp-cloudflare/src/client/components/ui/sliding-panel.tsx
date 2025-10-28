@@ -54,7 +54,7 @@ export function SlidingPanel({
         className={`fixed hidden xl:flex inset-y-0 right-0 w-full max-w-[50vw] bg-[#201633] flex-col ease-out ${
           isOpen
             ? "translate-x-0 blur-none scale-100 opacity-100 pointer-events-auto motion-safe:duration-300 delay-150 transition-[opacity,filter,scale]"
-            : "translate-x-full blur-xl scale-90 opacity-0 pointer-events-none duration-0"
+            : "translate-x-full blur-xl motion-safe:scale-90 opacity-0 pointer-events-none duration-0"
         } ${className}`}
       >
         {children}
