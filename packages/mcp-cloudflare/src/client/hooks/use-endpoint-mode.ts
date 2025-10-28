@@ -6,7 +6,7 @@ const STORAGE_KEY = "sentry-mcp-endpoint-mode";
 
 /**
  * Hook to manage MCP endpoint mode preference.
- * Toggles between "/mcp" (standard) and "/mcp-agent" (agent) endpoints.
+ * Toggles between "/mcp" (standard) and "/mcp?agent=1" (agent mode).
  *
  * The preference is persisted in localStorage.
  */

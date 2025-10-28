@@ -42,7 +42,7 @@ program
   .option("--sentry-dsn <dsn>", "Sentry DSN for error reporting")
   .option(
     "--agent",
-    "Use the /mcp-agent endpoint instead of /mcp (for use_sentry tool)",
+    "Use agent mode (/mcp?agent=1) instead of standard mode (for use_sentry tool)",
   )
   .action(async (prompt, options) => {
     try {
