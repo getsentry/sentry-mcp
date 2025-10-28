@@ -79,18 +79,30 @@ export default defineTool({
       setTag("project.slug", params.projectSlug);
     }
 
+    // Create context with updated constraints from user parameters
+    // This ensures the embedded agent respects org/project constraints
+    const contextWithConstraints: ServerContext = {
+      ...context,
+      constraints: {
+        organizationSlug:
+          params.organizationSlug || context.constraints.organizationSlug,
+        projectSlug: params.projectSlug || context.constraints.projectSlug,
+        regionUrl: params.regionUrl || context.constraints.regionUrl,
+      },
+    };
+
     // Create linked pair of in-memory transports for client-server communication
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
 
-    // Build internal MCP server with all tools (use_sentry is already excluded from tools/index)
+    // Build internal MCP server with constrained context
     const server = buildServer({
-      context,
+      context: contextWithConstraints,
       tools,
     });
 
-    // Connect server to its transport within the server context
-    await serverContextStorage.run(context, async () => {
+    // Connect server to its transport within the constrained context
+    await serverContextStorage.run(contextWithConstraints, async () => {
       await server.server.connect(serverTransport);
     });
 
