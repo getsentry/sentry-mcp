@@ -16,7 +16,7 @@ export default function LoadingSquares({
   step,
   cellSize = 12,
   baseAlpha = 0.04,
-  peakAlpha = 0.55,
+  peakAlpha = 0.25,
   sweepMs = 1000,
   decayMs = 300,
   fadeInMs = 300,

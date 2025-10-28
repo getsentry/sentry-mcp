@@ -1,4 +1,3 @@
-
 import { useId } from "react";
 import RootCause from "./RootCause";
 
@@ -10,9 +9,15 @@ export default function Seer({ step }: { step: number }) {
         step === 2
           ? "scale-100 opacity-100 duration-300"
           : "scale-90 opacity-0 pointer-events-none"
-      } absolute top-0 right-0 z-10 h-full w-full bg-600 flex flex-col justify-center p-4 pr-16 pb-16 ease-out`}
+      } absolute overflow-hidden top-0 right-0 z-10 h-full w-full bg-600 flex flex-col justify-center p-4 pr-16 pb-16 ease-out`}
     >
-      {/* <div className="-z-10 absolute inset-0 bg-grid opacity-50 [mask-image:linear-gradient(to_bottom,transparent,red,transparent),linear-gradient(to_right,transparent,red,transparent)] [mask-composite:intersect]" /> */}
+      <div
+        className={`inset-0 absolute bg-[#160f24] rounded-tl-xl rounded-br-3xl border-t border-l border-white/20 ${
+          step === 2
+            ? "duration-300 opacity-80 translate-x-0 blur-none"
+            : "duration-0 opacity-0 translate-x-1/2 blur-xl"
+        }`}
+      />
       {/*<!-- Seer's triangles scalable clipPath mask -->*/}
       <svg className="absolute" height="0" width="0">
         <title>Seer's Triangle</title>
@@ -35,8 +40,10 @@ export default function Seer({ step }: { step: number }) {
           <div className="bg-amber-100 [mask-image:radial-gradient(ellipse_at_bottom,red_50%,transparent_50%)]">
             {/* 👁️ Eye of the Seer */}
             <div
-              className={`mx-auto h-8 w-8 translate-y-1/2 rounded-full bg-blue-700 delay-900 duration-1500 ${
-                step === 2 ? "translate-x-6" : "-translate-x-6"
+              className={`mx-auto h-8 w-8 translate-y-1/2 rounded-full bg-blue-700 ${
+                step === 2
+                  ? "translate-x-6 delay-1200 duration-1500"
+                  : "-translate-x-6"
               }`}
             />
           </div>
