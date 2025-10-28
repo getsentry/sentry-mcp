@@ -25,12 +25,15 @@ function formatToolCallTrace(toolCalls: ToolCall[]): string {
     const call = toolCalls[i];
     trace += `### ${i + 1}. ${call.toolName}\n\n`;
 
+    // Type assertion is safe: AI SDK guarantees args is always a JSON-serializable object
+    const args = call.args as Record<string, unknown>;
+
     // Format arguments
-    if (Object.keys(call.args).length === 0) {
+    if (Object.keys(args).length === 0) {
       trace += "_No arguments_\n\n";
     } else {
       trace += "**Arguments:**\n```json\n";
-      trace += JSON.stringify(call.args, null, 2);
+      trace += JSON.stringify(args, null, 2);
       trace += "\n```\n\n";
     }
   }
