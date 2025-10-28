@@ -56,7 +56,10 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": [],
+      "new_sqlite_classes": ["SentryMCP"]
+    },
+    {
+      "tag": "v2",
       "deleted_classes": ["SentryMCP"]
     }
   ],
