@@ -88,7 +88,7 @@ export default function App() {
           <TableOfContents />
         </aside>
         <main
-          className={`max-w-3xl px-4 sm:px-8 xl:max-w-1/2 mx-auto duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${
+          className={`max-w-3xl px-4 sm:px-8 xl:max-w-1/2 mx-auto motion-safe:duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${
             isChatOpen ? "xl:-translate-x-1/2" : ""
           }`}
         >

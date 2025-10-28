@@ -10,10 +10,10 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
       <aside className="group hidden sm:block fixed left-0 inset-y-0 h-full sm:w-[calc((100vw-40rem)/2)] md:w-[calc((100vw-48rem)/2)] lg:w-[calc((100vw-64rem)/2)] xl:w-[calc((100vw-80rem)/2)] 2xl:w-[calc((100vw-96rem)/2)] bg-fixed bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)] z-10 border-r opacity-50 bg-clip-padding border-white/20" />
       {/* right sidebar */}
       <button
-        className={`group hidden sm:grid fixed right-0 inset-y-0 h-full w-[50vw] cursor-pointer place-items-center z-40 border-l ${
+        className={`group hidden sm:grid fixed right-0 inset-y-0 h-full w-[50vw] duration-300 cursor-pointer place-items-center z-40 border-l sm:[--x:20rem] md:[--x:24rem] lg:[--x:32rem] xl:[--x:40rem] 2xl:[--x:48rem] transition-colors ${
           isChatOpen
-            ? "bg-[#201633] -translate-x-[1px] opacity-100 border-white/10 duration-300"
-            : "sm:translate-x-[20rem] md:translate-x-[24rem] lg:translate-x-[32rem] xl:translate-x-[40rem] 2xl:translate-x-[48rem] opacity-50 hover:bg-[#201633] bg-clip-padding border-white/20 bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)]"
+            ? "bg-[#201633] -translate-x-[1px] opacity-100 border-white/10 motion-safe:transition-all"
+            : "translate-x-[var(--x)] opacity-50 hover:bg-[#201633] bg-clip-padding border-white/20 bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)]"
         }`}
         onClick={() => toggleChat(true)}
         onKeyDown={(e) => {

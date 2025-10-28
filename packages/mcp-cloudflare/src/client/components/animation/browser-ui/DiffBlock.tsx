@@ -22,7 +22,7 @@ export default function DiffBlock({
             className={`${
               step === 4
                 ? "translate-x-0 opacity-100 blur-none duration-300"
-                : "-translate-x-8 opacity-0 blur-xl"
+                : "motion-safe:-translate-x-8 opacity-0 blur-xl"
             } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
               line.includes("+")
                 ? "bg-lime-300/30 text-lime-400"

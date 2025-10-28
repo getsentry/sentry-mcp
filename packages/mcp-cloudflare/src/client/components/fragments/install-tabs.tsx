@@ -195,8 +195,10 @@ export default function InstallTabs({
               className={`duration-400 ${
                 selected
                   ? "visible opacity-100 blur-none"
-                  : `invisible opacity-0 blur-xl scale-x-110 scale-y-90 absolute top-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] ${
-                      i < active ? "-translate-x-1/4" : "translate-x-1/4"
+                  : `invisible opacity-0 blur-xl motion-safe:scale-x-110 motion-safe:scale-y-90 absolute top-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] ${
+                      i < active
+                        ? "motion-safe:-translate-x-1/4"
+                        : "motion-safe:translate-x-1/4"
                     }`
               }`}
             >
