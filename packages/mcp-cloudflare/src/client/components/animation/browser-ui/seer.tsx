@@ -1,5 +1,7 @@
 import { useId } from "react";
 import RootCause from "./RootCause";
+import SeerNoiseFilter from "./seer-noisefilter";
+import SeerClipMask from "./seer-clipmask";
 
 export default function Seer({ step }: { step: number }) {
   const id = useId().replace(/:/g, "");
@@ -18,15 +20,8 @@ export default function Seer({ step }: { step: number }) {
             : "duration-0 opacity-0 motion-safe:translate-x-1/2 blur-xl"
         }`}
       />
-      {/*<!-- Seer's triangles scalable clipPath mask -->*/}
-      <svg className="absolute" height="0" width="0">
-        <title>Seer's Triangle</title>
-        <defs>
-          <clipPath clipPathUnits="objectBoundingBox" id={id}>
-            <path d="M0.5 0 A2.5 2.5 0 0 1 1 0.866025 A2.5 2.5 0 0 1 0 0.866025 A2.5 2.5 0 0 1 0.5 0 Z" />
-          </clipPath>
-        </defs>
-      </svg>
+      <SeerNoiseFilter />
+      <SeerClipMask id={id} />
       {/* ⚠️ Seer */}
       <div
         className="relative z-10 mx-auto aspect-square w-36 overflow-hidden bg-gradient-to-b from-pink-600 to-pink-400"

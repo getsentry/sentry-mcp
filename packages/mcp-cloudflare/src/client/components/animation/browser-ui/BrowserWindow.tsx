@@ -1,5 +1,5 @@
 import BrowserWindowIconSidebar from "./BrowserWindowIconSidebar";
-import Copy from "./Copy";
+import KeysCopy from "./keys-copy";
 import IssueDetails from "./IssueDetails";
 import Seer from "./seer";
 import WindowHeader from "./WindowHeader";
@@ -19,7 +19,7 @@ export default function BrowserWindow({ step }: { step: number }) {
       } absolute inset-0 flex h-full w-full flex-col rounded-3xl border bg-white/5 duration-300 backdrop-blur-3xl`}
       id="window"
     >
-      <Copy step={step} />
+      <KeysCopy step={step} />
       <WindowHeader step={step} />
       <div className={`flex h-full w-full ${step > 1 && "overflow-hidden"}`}>
         <BrowserWindowIconSidebar />
