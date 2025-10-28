@@ -6,10 +6,6 @@ import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
 import { tokenExchangeCallback } from "./oauth";
 import sentryMcpHandler from "./lib/mcp-handler";
-import { SentryMCP as SentryMCPStub } from "./lib/mcp-agent-stub";
-
-// SentryMCP stub exported ONLY for Durable Object migration purposes.
-// This will be removed after the deleted_classes migration completes.
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
@@ -75,8 +71,3 @@ export default Sentry.withSentry(
   getSentryConfig,
   corsWrappedOAuthProvider,
 ) satisfies ExportedHandler<Env>;
-
-// Export SentryMCP Durable Object class for migration
-// TEMPORARY: This export is required for Cloudflare to apply the deleted_classes migration.
-// Once all Durable Object instances are deleted, this export should be removed.
-export { SentryMCPStub as SentryMCP };

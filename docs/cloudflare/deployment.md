@@ -5,8 +5,7 @@ Cloudflare Workers deployment configuration and patterns.
 ## Architecture Overview
 
 The deployment consists of:
-- **Worker**: Main HTTP server with OAuth flow
-- **Durable Object**: MCP transport handling WebSocket connections
+- **Worker**: Stateless HTTP server with OAuth flow and MCP handler
 - **KV Storage**: OAuth token storage
 - **Static Assets**: React UI for setup instructions
 
@@ -16,30 +15,30 @@ The deployment consists of:
 
 ```jsonc
 {
-  "name": "sentry-mcp-oauth",
+  "name": "sentry-mcp",
   "main": "./src/server/index.ts",
   "compatibility_date": "2025-03-21",
   "compatibility_flags": [
     "nodejs_compat",
-    "nodejs_compat_populate_process_env"
+    "nodejs_compat_populate_process_env",
+    "global_fetch_strictly_public"
   ],
   "keep_vars": true,
-  
+
   // Bindings
-  "durable_objects": {
-    "bindings": [{
-      "name": "SENTRY_MCP",
-      "class_name": "SentryMCP"
-    }]
-  },
   "kv_namespaces": [{
-    "binding": "KV",
-    "id": "your-kv-namespace-id"
+    "binding": "OAUTH_KV",
+    "id": "8dd5e9bafe1945298e2d5ca3b408a553"
   }],
-  
-  // SPA configuration
-  "site": {
-    "bucket": "./dist/client"
+  "ai": {
+    "binding": "AI"
+  },
+
+  // Static assets configuration
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
   }
 }
 ```
@@ -51,7 +50,12 @@ Required in production:
 SENTRY_CLIENT_ID=your_oauth_app_id
 SENTRY_CLIENT_SECRET=your_oauth_app_secret
 COOKIE_SECRET=32_char_random_string
-SENTRY_HOST=sentry.io  # Optional for self-hosted
+```
+
+Optional overrides for self-hosted deployments:
+```bash
+# Leave unset to target the SaaS host
+SENTRY_HOST=sentry.example.com     # Hostname only (self-hosted only)
 ```
 
 Development (.dev.vars):
@@ -61,27 +65,36 @@ SENTRY_CLIENT_SECRET=dev_secret
 COOKIE_SECRET=dev-cookie-secret
 ```
 
-## Durable Object Setup
+## MCP Handler Setup
 
-The MCP transport runs as a Durable Object:
+The MCP handler uses a stateless architecture with AsyncLocalStorage:
 
 ```typescript
-export class SentryMCP extends DurableObject {
-  async fetch(request: Request): Promise<Response> {
-    // Handle WebSocket upgrade
-    if (request.headers.get("Upgrade") === "websocket") {
-      const [client, server] = Object.values(new WebSocketPair());
-      
-      await this.handleWebSocket(server);
-      return new Response(null, { 
-        status: 101, 
-        webSocket: client 
-      });
-    }
-    
-    return new Response("Not found", { status: 404 });
-  }
-}
+import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
+import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
+
+const mcpHandler: ExportedHandler<Env> = {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Extract auth props from ExecutionContext (set by OAuth provider)
+    const oauthCtx = ctx as OAuthExecutionContext;
+
+    // Build complete ServerContext from OAuth props + constraints
+    const serverContext: ServerContext = {
+      userId: oauthCtx.props.userId,
+      clientId: oauthCtx.props.clientId,
+      accessToken: oauthCtx.props.accessToken,
+      grantedScopes: expandedScopes,
+      constraints: verification.constraints,
+      sentryHost,
+      mcpUrl: oauthCtx.props.mcpUrl,
+    };
+
+    // Run MCP handler within ServerContext (AsyncLocalStorage)
+    return serverContextStorage.run(serverContext, () => {
+      return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
+    });
+  },
+};
 ```
 
 ## OAuth Provider Setup
@@ -212,19 +225,16 @@ Tests validate (using Vitest):
 
 First-time setup:
 ```bash
-# Create KV namespace
-npx wrangler kv:namespace create KV
+# Create KV namespace for OAuth token storage
+npx wrangler kv:namespace create OAUTH_KV
 
-# Create Durable Object namespace
-npx wrangler durable-objects namespace create SENTRY_MCP
-
-# Update wrangler.jsonc with IDs
+# Update wrangler.jsonc with the namespace ID
 ```
 
 ## Multi-Region Considerations
 
 Cloudflare Workers run globally, but consider:
-- Durable Objects have a home region
+- Workers are stateless and edge-deployed
 - KV is eventually consistent globally
 - Use regional hints for performance
 
@@ -275,7 +285,7 @@ export default {
 Monitor via Cloudflare dashboard:
 - Request rates
 - Error rates
-- Durable Object usage
+- CPU time and memory usage
 - KV operations
 
 ## Troubleshooting
@@ -286,9 +296,9 @@ Monitor via Cloudflare dashboard:
    - Ensure callback URL matches Sentry app config
    - Check protocol (http vs https)
 
-2. **Durable Object not found**
-   - Verify namespace binding in wrangler.jsonc
-   - Check class export in main file
+2. **AsyncLocalStorage context missing**
+   - Verify serverContextStorage.run() wraps MCP handler
+   - Check ExecutionContext.props contains OAuth data
 
 3. **Environment variables missing**
    - Use `wrangler secret put` for production

@@ -137,8 +137,8 @@ const result = streamText({
 
 - **Workers**: Serverless compute for API routes
 - **Pages**: Static asset hosting for React app
-- **KV Namespace**: Token storage
-- **Durable Objects**: State management (future)
+- **KV Namespace**: OAuth token storage
+- **AI Binding**: Access to Cloudflare AI models (AutoRAG for docs search)
 - **R2**: File storage (future)
 
 ### Environment Variables
