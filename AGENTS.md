@@ -105,11 +105,17 @@ grep -r "TODO\|FIXME" src/     # Find tech debt
 
 - Infrastructure and Operations
   - @docs/architecture.mdc — System design
-  - @docs/deployment.mdc — Deploy (Cloudflare)
+  - @docs/releases/cloudflare.mdc — Cloudflare Workers release
+  - @docs/releases/stdio.mdc — npm package release
   - @docs/monitoring.mdc — Monitoring/telemetry
   - @docs/security.mdc — Security and authentication
   - @docs/token-cost-tracking.mdc — Track MCP tool definition overhead
   - @docs/cursor.mdc — Cursor IDE integration
+
+- Testing
+  - @docs/testing.mdc — Testing strategies and patterns
+  - @docs/testing-stdio.md — Stdio testing playbook (build, run, test)
+  - @docs/testing-remote.md — Remote testing playbook (OAuth, web UI, CLI)
 
 - LLM-Specific
   - @docs/llms/documentation-style-guide.mdc — How to write LLM docs

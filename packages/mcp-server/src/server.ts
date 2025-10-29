@@ -43,7 +43,6 @@ import {
   getConstraintParametersToInject,
   getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
-import { serverContextStorage } from "./internal/context-storage";
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -67,7 +66,7 @@ function extractMcpParameters(args: Record<string, unknown>) {
  * Creates and configures a complete MCP server with Sentry instrumentation.
  *
  * The server is built with tools filtered based on the granted scopes in the context.
- * AsyncLocalStorage is still used for runtime context propagation during tool execution.
+ * Context is captured in tool handler closures and passed directly to handlers.
  *
  * @example Usage with stdio transport
  * ```typescript
@@ -88,16 +87,15 @@ function extractMcpParameters(args: Record<string, unknown>) {
  *
  * @example Usage with Cloudflare Workers
  * ```typescript
- * import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
  * import { buildServer } from "@sentry/mcp-server/server";
+ * import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
  *
  * const serverContext = buildContextFromOAuth();
+ * // Context is captured in closures during buildServer()
  * const server = buildServer({ context: serverContext });
  *
- * // Context is bound per-request for runtime operations
- * return serverContextStorage.run(serverContext, () => {
- *   return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
- * });
+ * // Context already available to tool handlers via closures
+ * return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
  * ```
  */
 export function buildServer({
@@ -124,7 +122,7 @@ export function buildServer({
  *
  * Internal function used by buildServer(). Use buildServer() instead for most cases.
  * Tools are filtered at registration time based on grantedScopes, and context is
- * also resolved from AsyncLocalStorage at runtime for execution.
+ * captured in closures for tool handler execution.
  */
 function configureServer({
   server,
@@ -198,38 +196,33 @@ function configureServer({
                 },
               },
               async (span) => {
-                // Resolve context per-request for runtime operations
-                // Try AsyncLocalStorage first (for Cloudflare Workers), fallback to closure context (for stdio)
-                const contextFromStorage = serverContextStorage.getStore();
-                const effectiveContext = contextFromStorage ?? context;
-
                 // Add constraint attributes to span
-                if (effectiveContext.constraints.organizationSlug) {
+                if (context.constraints.organizationSlug) {
                   span.setAttribute(
                     "sentry-mcp.constraint-organization",
-                    effectiveContext.constraints.organizationSlug,
+                    context.constraints.organizationSlug,
                   );
                 }
-                if (effectiveContext.constraints.projectSlug) {
+                if (context.constraints.projectSlug) {
                   span.setAttribute(
                     "sentry-mcp.constraint-project",
-                    effectiveContext.constraints.projectSlug,
+                    context.constraints.projectSlug,
                   );
                 }
 
-                if (effectiveContext.userId) {
+                if (context.userId) {
                   setUser({
-                    id: effectiveContext.userId,
+                    id: context.userId,
                   });
                 }
-                if (effectiveContext.clientId) {
-                  setTag("client.id", effectiveContext.clientId);
+                if (context.clientId) {
+                  setTag("client.id", context.clientId);
                 }
 
                 try {
                   // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
                   const applicableConstraints = getConstraintParametersToInject(
-                    effectiveContext.constraints,
+                    context.constraints,
                     tool.inputSchema,
                   );
 
@@ -238,9 +231,11 @@ function configureServer({
                     ...applicableConstraints,
                   };
 
+                  // Execute tool handler with context passed directly
+                  // Context is available via the closure and as a parameter
                   const output = await tool.handler(
                     paramsWithConstraints,
-                    effectiveContext,
+                    context,
                   );
                   span.setStatus({
                     code: 1, // ok

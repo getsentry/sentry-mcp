@@ -5,7 +5,6 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import type { ServerContext } from "../../types";
 import { useSentryAgent } from "./agent";
 import { buildServer } from "../../server";
-import { serverContextStorage } from "../../internal/context-storage";
 import tools from "../index";
 import type { ToolCall } from "../../internal/agents/callEmbeddedAgent";
 
@@ -73,47 +72,44 @@ export default defineTool({
     const { use_sentry, ...toolsForAgent } = tools;
 
     // Build internal MCP server with the provided context
+    // Context is captured in tool handler closures during buildServer()
     const server = buildServer({
       context,
       tools: toolsForAgent,
     });
 
-    // Run all MCP operations within the ServerContext
-    // This ensures tools invoked through the MCP protocol have access to the context
-    return await serverContextStorage.run(context, async () => {
-      // Connect server to its transport
-      await server.server.connect(serverTransport);
+    // Connect server to its transport
+    await server.server.connect(serverTransport);
 
-      // Create MCP client with the other end of the transport
-      const mcpClient = await experimental_createMCPClient({
-        name: "mcp.sentry.dev (use-sentry)",
-        transport: clientTransport,
+    // Create MCP client with the other end of the transport
+    const mcpClient = await experimental_createMCPClient({
+      name: "mcp.sentry.dev (use-sentry)",
+      transport: clientTransport,
+    });
+
+    try {
+      // Get tools from MCP server (returns Vercel AI SDK compatible tools)
+      const mcpTools = await mcpClient.tools();
+
+      // Call the embedded agent with MCP tools and the user's request
+      const agentResult = await useSentryAgent({
+        request: params.request,
+        tools: mcpTools,
       });
 
-      try {
-        // Get tools from MCP server (returns Vercel AI SDK compatible tools)
-        const mcpTools = await mcpClient.tools();
+      let output = agentResult.result.result;
 
-        // Call the embedded agent with MCP tools and the user's request
-        const agentResult = await useSentryAgent({
-          request: params.request,
-          tools: mcpTools,
-        });
-
-        let output = agentResult.result.result;
-
-        // If tracing is enabled, append the tool call trace
-        if (params.trace && agentResult.toolCalls.length > 0) {
-          output += "\n\n---\n\n## Tool Call Trace\n\n";
-          output += formatToolCallTrace(agentResult.toolCalls);
-        }
-
-        return output;
-      } finally {
-        // Clean up connections
-        await mcpClient.close();
-        await server.server.close();
+      // If tracing is enabled, append the tool call trace
+      if (params.trace && agentResult.toolCalls.length > 0) {
+        output += "\n\n---\n\n## Tool Call Trace\n\n";
+        output += formatToolCallTrace(agentResult.toolCalls);
       }
-    });
+
+      return output;
+    } finally {
+      // Clean up connections
+      await mcpClient.close();
+      await server.server.close();
+    }
   },
 });

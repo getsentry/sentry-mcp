@@ -4,14 +4,13 @@
  * Stateless request handling approach:
  * - Uses experimental_createMcpHandler to wrap the MCP server
  * - Extracts auth props directly from ExecutionContext (set by OAuth provider)
- * - Uses AsyncLocalStorage for per-request ServerContext storage
+ * - Context captured in tool handler closures during buildServer()
  * - No session state required - each request is independent
  */
 
 import * as Sentry from "@sentry/cloudflare";
 import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
 import { buildServer } from "@sentry/mcp-server/server";
-import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
 import {
   expandScopes,
   parseScopes,
@@ -37,8 +36,8 @@ type OAuthExecutionContext = ExecutionContext & {
  * 2. Parses org/project constraints from URL
  * 3. Verifies user has access to the constraints
  * 4. Builds complete ServerContext
- * 5. Creates and configures MCP server per-request
- * 6. Runs MCP handler within ServerContext (AsyncLocalStorage)
+ * 5. Creates and configures MCP server per-request (context captured in closures)
+ * 6. Runs MCP handler
  */
 const mcpHandler: ExportedHandler<Env> = {
   async fetch(
@@ -115,6 +114,7 @@ const mcpHandler: ExportedHandler<Env> = {
     };
 
     // Create and configure MCP server with tools filtered by context
+    // Context is captured in tool handler closures during buildServer()
     const server = buildServer({
       context: serverContext,
       tools: isAgentMode ? agentTools : undefined,
@@ -124,13 +124,10 @@ const mcpHandler: ExportedHandler<Env> = {
       },
     });
 
-    // Run MCP handler within ServerContext (AsyncLocalStorage)
-    // Use the validated URL path directly instead of rewriting
-    return serverContextStorage.run(serverContext, () => {
-      return createMcpHandler(server, {
-        route: url.pathname,
-      })(request, env, ctx);
-    });
+    // Run MCP handler - context already captured in closures
+    return createMcpHandler(server, {
+      route: url.pathname,
+    })(request, env, ctx);
   },
 };
 

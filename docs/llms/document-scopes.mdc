@@ -104,20 +104,38 @@ Defines the specific purpose and content for each documentation file.
 
 ## Operations Guides
 
-### deployment.mdc
-**Purpose**: Cloudflare deployment specifics
+### releases/cloudflare.mdc
+**Purpose**: Cloudflare Workers release process
 
 **Must Include**:
 - Wrangler configuration
 - Environment variables
 - MCP handler setup
-- OAuth flow
-- Deployment commands
+- OAuth provider configuration
+- Deployment commands (manual and automated)
+- Version uploads and gradual rollouts
+- Monitoring and troubleshooting
 
 **Must Exclude**:
 - Cloudflare Workers concepts
 - General deployment best practices
-- Duplicate security content
+- npm package release process (see stdio.mdc)
+
+### releases/stdio.mdc
+**Purpose**: npm package release process
+
+**Must Include**:
+- Version management
+- npm publishing workflow
+- User installation instructions (Claude Desktop, Cursor)
+- Environment variable configuration
+- Testing releases locally
+- Beta releases
+
+**Must Exclude**:
+- Cloudflare deployment (see cloudflare.mdc)
+- General npm documentation
+- IDE-specific setup details
 
 ### monitoring.mdc
 **Purpose**: Observability and instrumentation
@@ -199,7 +217,7 @@ Focus on clarity and usefulness, not arbitrary line counts.
 Key improvements needed:
 - **security.mdc**: Too much OAuth theory → focus on implementation
 - **api-patterns.mdc**: Redundant examples → consolidate patterns
-- **deployment.mdc**: Too much CloudFlare docs → focus on config
+- **releases/cloudflare.mdc**: Focus on MCP-specific config, not generic Cloudflare docs
 - **monitoring.mdc**: Verbose explanations → code examples
 
 The goal: Each document should be focused enough to be useful in a single context window while remaining comprehensive for its topic.

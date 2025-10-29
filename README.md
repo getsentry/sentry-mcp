@@ -147,6 +147,10 @@ pnpm -w run cli --access-token=TOKEN "query"
 
 Note: The CLI defaults to `http://localhost:5173`. Override with `--mcp-host` or set `MCP_URL` environment variable.
 
+**Comprehensive testing playbooks:**
+- **Stdio testing:** See `docs/testing-stdio.md` for complete guide on building, running, and testing the stdio implementation (IDEs, MCP Inspector)
+- **Remote testing:** See `docs/testing-remote.md` for complete guide on testing the remote server (OAuth, web UI, CLI client)
+
 ## Development Notes
 
 ### Automated Code Review

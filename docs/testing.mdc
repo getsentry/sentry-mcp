@@ -17,7 +17,7 @@ Our testing approach prioritizes **functional coverage** over implementation det
    - **Only mock external network APIs** (Sentry API, OpenAI, etc.) using MSW
    - **Don't mock internal code** - use real implementations
    - **Don't test third-party library behavior** - trust that Node.js, npm packages, etc. work correctly
-   - Example: Don't test that AsyncLocalStorage isolates contexts - that's Node.js's job
+   - Example: Don't test that Promise.all handles concurrent operations - that's Node.js's job
 
 3. **Test What Matters**
    - Test the functionality users/integrators interact with
@@ -40,26 +40,28 @@ Our testing approach prioritizes **functional coverage** over implementation det
 - Configuration: "Can the server be configured for different deployment modes?"
 
 ❌ **DON'T test:**
-- Standard library behavior (AsyncLocalStorage, Promise.all, etc.)
+- Standard library behavior (Promise.all, Array.map, etc.)
 - Third-party package internals (Zod validation, MSW mocking, etc.)
 - Implementation details (private methods, internal state)
 - Obvious behavior that will break immediately if wrong
 
-### Example: Context Storage
+### Example: Context Passing
 
-**Bad approach** (testing Node.js internals):
+**Bad approach** (testing language features):
 ```typescript
-// ❌ Don't test that AsyncLocalStorage works
-it("isolates context between concurrent requests", async () => {
-  await Promise.all([/* test AsyncLocalStorage isolation */]);
+// ❌ Don't test that closures capture variables
+it("closures capture context", async () => {
+  const context = { value: 42 };
+  const fn = () => context;
+  expect(fn().value).toBe(42);
 });
 ```
 
 **Good approach** (testing our functionality):
 ```typescript
 // ✅ Test that server configuration works
-it("accepts getContext callback for dynamic resolution", async () => {
-  await configureServer({ server, getContext });
+it("builds server with context for tool handlers", async () => {
+  const server = buildServer({ context });
   expect(server).toBeDefined();
 });
 ```

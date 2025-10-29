@@ -97,10 +97,6 @@
     "./internal/agents/callEmbeddedAgent": {
       "types": "./dist/internal/agents/callEmbeddedAgent.ts",
       "default": "./dist/internal/agents/callEmbeddedAgent.js"
-    },
-    "./internal/context-storage": {
-      "types": "./dist/internal/context-storage.ts",
-      "default": "./dist/internal/context-storage.js"
     }
   },
   "scripts": {
