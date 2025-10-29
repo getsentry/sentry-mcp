@@ -111,7 +111,7 @@ export function createDatasetAttributesTool(options: {
       } = await import("./config");
 
       // Get custom attributes for this dataset
-      // IMPORTANT: Let ALL errors bubble up to wrapAgentToolExecute
+      // IMPORTANT: Let ALL errors bubble up to agentTool wrapper
       // UserInputError will be converted to error string for the AI agent
       // Other errors will bubble up to be captured by Sentry
       const { attributes: customAttributes, fieldTypes } =

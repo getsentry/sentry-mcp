@@ -4,36 +4,36 @@ This tool embeds an AI agent (GPT-5) that can call all Sentry MCP tools to fulfi
 
 ## Architecture Overview
 
-The `use_sentry` tool uses an "agent-in-tool" pattern with **in-memory MCP protocol**:
+The `use_sentry` tool uses an "agent-in-tool" pattern with **direct tool binding**:
 
 1. **MCP Tool Handler** (`handler.ts`) - Receives natural language request from calling agent
-2. **In-Memory MCP Server** - Creates internal MCP server with InMemoryTransport from MCP SDK
-3. **MCP Client** - Embedded agent accesses tools through MCP protocol (zero network overhead)
-4. **Embedded AI Agent** (`agent.ts`) - Calls tools via MCP client to fulfill request
-5. **Result Return** - Returns final results directly to calling agent
+2. **Tool Preparation** (`prepare-tools.ts`) - Filters and wraps tools based on scopes and constraints
+3. **Embedded AI Agent** (`agent.ts`) - Directly calls prepared tools to fulfill request
+4. **Result Return** - Returns final results directly to calling agent
 
-**Key Innovation**: Uses `InMemoryTransport.createLinkedPair()` from `@modelcontextprotocol/sdk` for full MCP protocol compliance without network overhead.
+**Key Innovation**: Uses the same filtering and wrapping logic as `buildServer` but returns tools directly without MCP protocol overhead. This provides significant performance improvements by eliminating the client-server round-trips.
 
 ## Key Components
 
-### Tool Wrapper (`tool-wrapper.ts`)
+### Tool Preparation (`prepare-tools.ts`)
 
-The `wrapToolForAgent()` function is a **generic wrapper** that can wrap ANY MCP tool:
+The `prepareToolsForAgent()` function prepares all tools for direct use by the agent:
 
 ```typescript
-wrapToolForAgent(toolDefinition, { context })
+prepareToolsForAgent(tools, context)
 ```
 
 **What it does:**
-- Takes any MCP tool definition (from `defineTool`)
-- Pre-binds the ServerContext so the agent doesn't need it
-- Applies session constraints automatically (org, project, region)
-- Uses `agentTool()` for automatic error handling
-- Returns structured `{error?, result?}` responses
+1. Filters tools by granted scopes (same as buildServer)
+2. Filters out constraint parameters from schemas
+3. Wraps each tool with `agentTool` for error handling
+4. Pre-binds ServerContext and injects constraints
+5. Returns Vercel AI SDK compatible tools
 
 **Benefits:**
-- Single implementation works for all tools
-- DRY principle - no duplication per tool
+- No MCP protocol overhead
+- Same security and constraint logic as buildServer
+- Direct tool execution - much faster
 - Consistent error handling across all tools
 - Type-safe parameter handling
 
@@ -209,37 +209,36 @@ Note: The CLI defaults to `http://localhost:5173`. Override with `--mcp-host` or
 
 ## Implementation Notes
 
-### Generic Wrapper Pattern
+### Direct Tool Binding Pattern
 
-The key innovation is using ONE wrapper for ALL tools:
+The key innovation is preparing all tools at once with the same logic as `buildServer`:
 
 ```typescript
-// Instead of 18 separate factory functions:
-createWhoamiTool()
-createFindOrgsTool()
-createFindProjectsTool()
-// ...
+// In handler.ts:
+const { use_sentry, ...toolsForAgent } = tools;
+const preparedTools = prepareToolsForAgent(toolsForAgent, context);
 
-// We use a single generic wrapper:
-wrapToolForAgent(whoamiTool, { context })
-wrapToolForAgent(findOrganizationsTool, { context })
-wrapToolForAgent(findProjectsTool, { context })
-// ...
+// preparedTools now contains filtered and wrapped tools ready for agent
+await useSentryAgent({ request: params.request, tools: preparedTools });
 ```
 
 This makes the code:
-- Easier to maintain (one implementation)
-- More consistent (same behavior for all tools)
-- Easier to extend (add new tools without new wrapper functions)
+- Much faster (no MCP protocol overhead)
+- Easier to maintain (reuses buildServer logic)
+- More consistent (same filtering as buildServer)
+- Easier to extend (just add to tools list)
 
 ### Constraint Injection
 
-Session constraints are automatically injected by `wrapToolForAgent()`:
+Session constraints are automatically handled by `prepareToolsForAgent()`:
+
+1. **Schema Filtering**: Constrained parameters are removed from tool schemas
+2. **Parameter Injection**: Constraint values are injected when tools are called
 
 ```typescript
 // If context.constraints.organizationSlug = "my-org"
-// Agent calls: find_projects()
-// Actual tool call: find_projects({ organizationSlug: "my-org" })
+// Agent sees: find_projects() (no organizationSlug parameter)
+// Actual call: find_projects({ organizationSlug: "my-org" })
 ```
 
 This ensures the agent respects session scope without needing to know about it.

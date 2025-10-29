@@ -14,7 +14,7 @@ export interface WhoamiResult {
 export async function getCurrentUser(
   apiService: SentryApiService,
 ): Promise<WhoamiResult> {
-  // API client throws ApiClientError/ApiServerError which wrapAgentToolExecute handles
+  // API client throws ApiClientError/ApiServerError which agentTool wrapper handles
   const user = await apiService.getAuthenticatedUser();
   return {
     id: user.id,

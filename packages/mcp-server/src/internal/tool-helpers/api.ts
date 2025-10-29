@@ -69,22 +69,3 @@ export function handleApiError(
   // All other errors bubble up (including ApiServerError for 5xx)
   throw error;
 }
-
-/**
- * Wraps an async API call with automatic error handling
- * @param fn - The async function to execute
- * @param params - The parameters that were used in the API call
- * @returns The result of the function
- * @throws {UserInputError} For user input errors
- * @throws {Error} For other errors
- */
-export async function withApiErrorHandling<T>(
-  fn: () => Promise<T>,
-  params?: Record<string, unknown>,
-): Promise<T> {
-  try {
-    return await fn();
-  } catch (error) {
-    handleApiError(error, params);
-  }
-}

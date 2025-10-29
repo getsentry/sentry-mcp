@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ApiNotFoundError, createApiError } from "../../api-client";
 import { UserInputError } from "../../errors";
-import { handleApiError, withApiErrorHandling } from "./api";
+import { handleApiError } from "./api";
 
 describe("handleApiError", () => {
   it("converts 404 errors with params to list all parameters", () => {
@@ -69,34 +69,5 @@ describe("handleApiError", () => {
     const error = new Error("Network error");
 
     expect(() => handleApiError(error)).toThrow(error);
-  });
-});
-
-describe("withApiErrorHandling", () => {
-  it("returns successful results unchanged", async () => {
-    const result = await withApiErrorHandling(
-      async () => ({ id: "123", title: "Test Issue" }),
-      { issueId: "PROJ-123" },
-    );
-
-    expect(result).toEqual({ id: "123", title: "Test Issue" });
-  });
-
-  it("handles errors through handleApiError", async () => {
-    const error = new ApiNotFoundError("Not Found");
-
-    await expect(
-      withApiErrorHandling(
-        async () => {
-          throw error;
-        },
-        {
-          organizationSlug: "my-org",
-          issueId: "PROJ-123",
-        },
-      ),
-    ).rejects.toThrow(
-      "Resource not found (404): Not Found\nPlease verify these parameters are correct:\n  - organizationSlug: 'my-org'\n  - issueId: 'PROJ-123'",
-    );
   });
 });

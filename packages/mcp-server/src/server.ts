@@ -37,13 +37,12 @@ import {
 import { logIssue, type LogIssueOptions } from "./telem/logging";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
-import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
-import { isToolAllowed, type Scope } from "./permissions";
-import {
-  getConstraintParametersToInject,
-  getConstraintKeysToFilter,
-} from "./internal/constraint-helpers";
+import { MCP_SERVER_NAME } from "./constants";
 import { serverContextStorage } from "./internal/context-storage";
+import {
+  prepareToolsForContext,
+  applyConstraints,
+} from "./internal/tool-preparation";
 
 /**
  * Extracts MCP request parameters for OpenTelemetry attributes.
@@ -140,10 +139,8 @@ function configureServer({
   // Use custom tools if provided, otherwise use default tools
   const toolsToRegister = customTools ?? tools;
 
-  // Get granted scopes from context for tool filtering
-  const grantedScopes: Set<Scope> = context.grantedScopes
-    ? new Set<Scope>(context.grantedScopes)
-    : new Set<Scope>(DEFAULT_SCOPES);
+  // Use shared preparation logic to filter by scopes and constraints
+  const preparedTools = prepareToolsForContext(toolsToRegister, context);
 
   server.server.onerror = (error) => {
     const transportLogOptions: LogIssueOptions = {
@@ -158,28 +155,13 @@ function configureServer({
     logIssue(error, transportLogOptions);
   };
 
-  for (const [toolKey, tool] of Object.entries(toolsToRegister)) {
-    // Filter tools BEFORE registration based on granted scopes
-    if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-      continue; // Skip this tool entirely
-    }
-
-    // Filter out constraint parameters from schema that will be auto-injected
-    // Only filter parameters that are ACTUALLY constrained in the current context
-    // to avoid breaking tools when constraints are not set
-    const constraintKeysToFilter = new Set(
-      getConstraintKeysToFilter(context.constraints, tool.inputSchema),
-    );
-    const filteredInputSchema = Object.fromEntries(
-      Object.entries(tool.inputSchema).filter(
-        ([key]) => !constraintKeysToFilter.has(key),
-      ),
-    ) as typeof tool.inputSchema;
-
+  for (const { key: toolKey, tool, filteredInputSchema } of preparedTools) {
     server.tool(
       tool.name,
       tool.description,
-      filteredInputSchema,
+      // Cast needed: filteredInputSchema is Record<string, z.ZodType> (subset of tool.inputSchema)
+      // This is safe: MCP validates params at runtime, and we inject constrained fields in handler
+      filteredInputSchema as typeof tool.inputSchema,
       tool.annotations,
       async (
         params: any,
@@ -227,16 +209,13 @@ function configureServer({
                 }
 
                 try {
-                  // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
-                  const applicableConstraints = getConstraintParametersToInject(
+                  // Use shared constraint application logic
+                  // Constraints overwrite user params (security requirement)
+                  const paramsWithConstraints = applyConstraints(
+                    params,
                     effectiveContext.constraints,
                     tool.inputSchema,
                   );
-
-                  const paramsWithConstraints = {
-                    ...params,
-                    ...applicableConstraints,
-                  };
 
                   const output = await tool.handler(
                     paramsWithConstraints,
