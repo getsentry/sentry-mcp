@@ -21,19 +21,6 @@
     ],
     "deny": []
   },
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'MANDATORY: If something is unclear, you MUST ask me. ALWAYS reference our docs when they are available for a task, and make a note when they arent.'"
-          }
-        ]
-      }
-    ]
-  },
   "enableAllProjectMcpServers": true,
   "includeCoAuthoredBy": true,
   "enabledMcpjsonServers": ["sentry"]

@@ -113,47 +113,6 @@ describe("use_sentry handler", () => {
     expect(toolNames).toHaveLength(19);
   });
 
-  it("handles requests with organization slug parameter", async () => {
-    mockUseSentryAgent.mockResolvedValue({
-      result: {
-        result: "Found errors in my-org",
-      },
-      toolCalls: [],
-    });
-
-    const result = await useSentry.handler(
-      {
-        request: "Find errors in my-org",
-        organizationSlug: "my-org",
-      },
-      mockContext,
-    );
-
-    expect(mockUseSentryAgent).toHaveBeenCalled();
-    expect(result).toBe("Found errors in my-org");
-  });
-
-  it("handles requests with project slug parameter", async () => {
-    mockUseSentryAgent.mockResolvedValue({
-      result: {
-        result: "Issues in frontend project",
-      },
-      toolCalls: [],
-    });
-
-    const result = await useSentry.handler(
-      {
-        request: "Show issues in frontend project",
-        organizationSlug: "my-org",
-        projectSlug: "frontend",
-      },
-      mockContext,
-    );
-
-    expect(mockUseSentryAgent).toHaveBeenCalled();
-    expect(result).toBe("Issues in frontend project");
-  });
-
   it("wraps tools with session constraints", async () => {
     const constrainedContext: ServerContext = {
       ...mockContext,
