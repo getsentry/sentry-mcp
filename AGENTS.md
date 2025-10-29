@@ -74,6 +74,9 @@ pnpm -w run cli --access-token=TOKEN "query"   # Test with local stdio mode
 # Quality checks (combine for speed)
 pnpm run tsc && pnpm run lint && pnpm run test
 
+# Token cost monitoring
+pnpm run measure-tokens  # Check tool definition overhead
+
 # Common workflows
 pnpm run build && pnpm run test  # Before PR
 grep -r "TODO\|FIXME" src/     # Find tech debt
@@ -105,6 +108,7 @@ grep -r "TODO\|FIXME" src/     # Find tech debt
   - @docs/deployment.mdc — Deploy (Cloudflare)
   - @docs/monitoring.mdc — Monitoring/telemetry
   - @docs/security.mdc — Security and authentication
+  - @docs/token-cost-tracking.mdc — Track MCP tool definition overhead
   - @docs/cursor.mdc — Cursor IDE integration
 
 - LLM-Specific

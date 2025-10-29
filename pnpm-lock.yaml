@@ -377,6 +377,9 @@ importers:
       msw:
         specifier: 'catalog:'
         version: 2.10.2(@types/node@24.0.10)(typescript@5.8.3)
+      tiktoken:
+        specifier: ^1.0.18
+        version: 1.0.22
       yaml:
         specifier: ^2.6.1
         version: 2.8.0
@@ -4334,6 +4337,9 @@ packages:
   throttleit@2.1.0:
     resolution: {integrity: sha512-nt6AMGKW1p/70DF/hGBdJB57B8Tspmbp5gfJ8ilhLnt7kkr2ye7hzD6NVG8GGErk2HWF34igrL2CXmNIkzKqKw==}
     engines: {node: '>=18'}
+
+  tiktoken@1.0.22:
+    resolution: {integrity: sha512-PKvy1rVF1RibfF3JlXBSP0Jrcw2uq3yXdgcEXtKTYn3QJ/cBRBHDnrJ5jHky+MENZ6DIPwNUGWpkVx+7joCpNA==}
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -8957,6 +8963,8 @@ snapshots:
       minimatch: 9.0.5
 
   throttleit@2.1.0: {}
+
+  tiktoken@1.0.22: {}
 
   tinybench@2.9.0: {}
 
