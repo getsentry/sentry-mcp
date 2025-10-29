@@ -101,7 +101,15 @@ echo "  Max:     ${agent_max}s"
 echo "  Average: ${agent_avg}s"
 echo ""
 echo "Difference:"
-echo "  +${diff}s (${percent}% slower)"
+if (( $(echo "$diff > 0" | bc -l) )); then
+  echo "  +${diff}s (${percent}% slower)"
+elif (( $(echo "$diff < 0" | bc -l) )); then
+  abs_diff=$(echo "scale=2; -1 * $diff" | bc)
+  abs_percent=$(echo "scale=1; -1 * $percent" | bc)
+  echo "  -${abs_diff}s (${abs_percent}% faster)"
+else
+  echo "  No difference (0%)"
+fi
 echo ""
 
 # Show all individual results
