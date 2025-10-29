@@ -1,6 +1,6 @@
-# Deployment
+# Cloudflare Release
 
-Cloudflare Workers deployment configuration and patterns.
+Cloudflare Workers deployment configuration and release process.
 
 ## Architecture Overview
 
@@ -15,30 +15,24 @@ The deployment consists of:
 
 ```jsonc
 {
-  "name": "sentry-mcp",
+  "name": "sentry-mcp-oauth",
   "main": "./src/server/index.ts",
   "compatibility_date": "2025-03-21",
   "compatibility_flags": [
     "nodejs_compat",
-    "nodejs_compat_populate_process_env",
-    "global_fetch_strictly_public"
+    "nodejs_compat_populate_process_env"
   ],
   "keep_vars": true,
 
   // Bindings
   "kv_namespaces": [{
     "binding": "OAUTH_KV",
-    "id": "8dd5e9bafe1945298e2d5ca3b408a553"
+    "id": "your-kv-namespace-id"
   }],
-  "ai": {
-    "binding": "AI"
-  },
 
-  // Static assets configuration
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
+  // SPA configuration
+  "site": {
+    "bucket": "./dist/client"
   }
 }
 ```
@@ -58,6 +52,10 @@ Optional overrides for self-hosted deployments:
 SENTRY_HOST=sentry.example.com     # Hostname only (self-hosted only)
 ```
 
+Configure these overrides only when your Cloudflare deployment connects to a
+self-hosted Sentry instance; no additional host variables are required for the
+SaaS service.
+
 Development (.dev.vars):
 ```bash
 SENTRY_CLIENT_ID=dev_client_id
@@ -67,11 +65,11 @@ COOKIE_SECRET=dev-cookie-secret
 
 ## MCP Handler Setup
 
-The MCP handler uses a stateless architecture with AsyncLocalStorage:
+The MCP handler uses a stateless architecture with closure-captured context:
 
 ```typescript
 import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
-import { serverContextStorage } from "@sentry/mcp-server/internal/context-storage";
+import { buildServer } from "@sentry/mcp-server/server";
 
 const mcpHandler: ExportedHandler<Env> = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -89,10 +87,11 @@ const mcpHandler: ExportedHandler<Env> = {
       mcpUrl: oauthCtx.props.mcpUrl,
     };
 
-    // Run MCP handler within ServerContext (AsyncLocalStorage)
-    return serverContextStorage.run(serverContext, () => {
-      return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
-    });
+    // Build server with context - context is captured in tool handler closures
+    const server = buildServer({ context: serverContext });
+
+    // Run MCP handler - context already available via closures
+    return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
   },
 };
 ```
@@ -139,7 +138,6 @@ Production deployments happen automatically when changes are pushed to the main 
 Required secrets in GitHub repository settings:
 - `CLOUDFLARE_API_TOKEN` - API token with Workers deployment permissions
 - `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
-- `SENTRY_AUTH_TOKEN` - For source map uploads during build
 
 See `github-actions.mdc` for detailed setup instructions.
 
@@ -156,70 +154,19 @@ pnpm deploy
 pnpm deploy --env production
 ```
 
-#### Preview Deployments
+#### Version Uploads (Gradual Rollouts)
 
-For pull requests, GitHub Actions automatically creates isolated preview deployments:
+For feature branches, GitHub Actions automatically uploads new versions without deploying:
 
-1. Open or update a pull request
+1. Push to any branch (except main)
 2. Tests run automatically
-3. If tests pass, deploys to a separate worker instance
-4. Preview worker is **completely isolated** from production
-5. Smoke tests run against the preview URL
-6. Results are posted as a PR comment
-7. Preview is accessible via: `https://sentry-mcp-preview-{branch}.getsentry.workers.dev`
+3. If tests pass, version is uploaded to Cloudflare
+4. Use Cloudflare dashboard to gradually roll out the version
 
-Manual preview deployment:
+Manual version upload:
 ```bash
-# Deploy to a preview worker
-npx wrangler deploy --name sentry-mcp-preview-feature-branch
-# Creates: sentry-mcp-preview-feature-branch.getsentry.workers.dev
+pnpm cf:versions:upload
 ```
-
-To deploy a specific version to production:
-```bash
-# After validation, deploy to production
-npx wrangler versions deploy VERSION_ID@100 --message "Production deployment"
-```
-
-Gradual rollout example:
-```bash
-# Start with 10% of traffic
-npx wrangler versions deploy abc123@10 --message "Testing rollout"
-
-# Increase to 50%
-npx wrangler versions deploy abc123@50 --message "Expanding rollout"
-
-# Full deployment
-npx wrangler versions deploy abc123@100 --message "Full deployment"
-```
-
-The preview deployment approach ensures:
-- Complete isolation from production
-- Separate Worker instance for each branch
-- Safe testing of potentially breaking changes
-- Clean URLs based on branch names (e.g., `sentry-mcp-preview-feat-oauth.getsentry.workers.dev`)
-- Branch names are sanitized: lowercase, alphanumeric with hyphens, max 20 chars
-- Automatic cleanup when PR is closed
-
-### Smoke Tests
-
-Pull request deployments automatically run smoke tests to validate the deployment:
-
-```bash
-# Run smoke tests manually
-cd packages/smoke-tests
-PREVIEW_URL=https://sentry-mcp.workers.dev pnpm test
-```
-
-Tests validate (using Vitest):
-- Root endpoint availability (200 response)
-- MCP endpoint exists (returns auth error, not 404)
-- Metadata API endpoint (401 without auth)
-- Chat API endpoint (accepts POST requests)
-- OAuth endpoint accessibility
-- Static assets (robots.txt, llms.txt)
-- Response time performance (<2 seconds)
-- Security headers configuration
 
 ### Creating Resources
 
@@ -234,8 +181,8 @@ npx wrangler kv:namespace create OAUTH_KV
 ## Multi-Region Considerations
 
 Cloudflare Workers run globally, but consider:
-- Workers are stateless and edge-deployed
 - KV is eventually consistent globally
+- Workers are stateless and edge-deployed
 - Use regional hints for performance
 
 ## Security Configuration
@@ -296,9 +243,10 @@ Monitor via Cloudflare dashboard:
    - Ensure callback URL matches Sentry app config
    - Check protocol (http vs https)
 
-2. **AsyncLocalStorage context missing**
-   - Verify serverContextStorage.run() wraps MCP handler
+2. **Context not available in tool handlers**
+   - Verify buildServer() is called with context before createMcpHandler()
    - Check ExecutionContext.props contains OAuth data
+   - Ensure context is passed correctly during server build
 
 3. **Environment variables missing**
    - Use `wrangler secret put` for production

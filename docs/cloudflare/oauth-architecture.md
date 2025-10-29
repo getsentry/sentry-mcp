@@ -206,41 +206,14 @@ The MCP server needs to support URL-based constraints like `/mcp/sentry/javascri
 
 #### The Solution
 
-We use HTTP headers to preserve constraints through the URL rewriting:
+The MCP handler parses URL path segments to extract organization and project constraints:
 
-```typescript
-// The MCP handler extracts constraints from URL path segments
-// Example URLs:
-//   /mcp - No constraints
-//   /mcp/sentry - Organization constraint
-//   /mcp/sentry/javascript - Organization + project constraints
+**Example URLs:**
+- `/mcp` - No constraints (full access within granted scopes)
+- `/mcp/sentry` - Organization constraint (limited to "sentry" org)
+- `/mcp/sentry/javascript` - Organization + project constraints
 
-const mcpHandler: ExportedHandler<Env> = {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // Extract auth props from ExecutionContext (set by OAuth provider)
-    const oauthCtx = ctx as OAuthExecutionContext;
-
-    // Parse constraints from URL path
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/').filter(Boolean);
-    const constraints = {
-      organizationSlug: pathSegments[1] || null,
-      projectSlug: pathSegments[2] || null,
-    };
-
-    // Build complete ServerContext
-    const serverContext: ServerContext = {
-      ...oauthCtx.props,
-      constraints,
-    };
-
-    // Run MCP handler within ServerContext (AsyncLocalStorage)
-    return serverContextStorage.run(serverContext, () => {
-      return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
-    });
-  },
-};
-```
+The handler extracts these constraints, combines them with authentication data from the OAuth provider (via ExecutionContext), and builds the complete ServerContext. This context determines which resources tools can access.
 
 ## Storage (KV Namespace)
 
@@ -379,11 +352,11 @@ Note: These describe the MCP OAuth server, not Sentry's OAuth endpoints.
 
 ## Integration Between MCP OAuth and MCP Server
 
-The MCP Server (stateless handler) receives context via AsyncLocalStorage:
+The MCP Server (stateless handler) receives context via closure capture:
 
 1. **Props via ExecutionContext**: Decrypted data from MCP token (includes Sentry tokens)
 2. **Constraints from URL**: Organization/project limits parsed from URL path
-3. **Context storage**: AsyncLocalStorage provides per-request isolation
+3. **Context capture**: Server built with context, captured in tool handler closures
 
 The MCP Server then uses the Sentry access token from context to make Sentry API calls.
 
@@ -391,7 +364,6 @@ The MCP Server then uses the Sentry access token from context to make Sentry API
 
 1. **No direct Hono integration**: OAuth Provider expects specific handler signatures
 2. **Constraint extraction**: Must parse URL segments to extract organization/project constraints
-3. **AsyncLocalStorage dependency**: Requires Node.js compatibility mode in Cloudflare Workers
 
 ## Why Use Two OAuth Systems?
 

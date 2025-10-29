@@ -65,7 +65,8 @@ All documentation is in the `docs/` directory:
 ### Technical References
 - `api-patterns.mdc` - Sentry API client usage
 - `testing.mdc` - Testing strategies
-- `deployment.mdc` - Cloudflare deployment
+- `releases/cloudflare.mdc` - Cloudflare Workers release
+- `releases/stdio.mdc` - npm package release
 - `monitoring.mdc` - Observability patterns
 - `security.mdc` - Authentication and security
 
@@ -152,7 +153,8 @@ When using Cursor's MCP integration:
 ## Environment Variables
 
 See specific guides for required environment variables:
-- Cloudflare: `deployment.mdc`
+- Cloudflare: `releases/cloudflare.mdc`
+- stdio: `releases/stdio.mdc`
 - Evaluation tests: `.env.example`
 - Local development: Use command-line args
 

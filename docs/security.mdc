@@ -64,9 +64,9 @@ interface ServerContext {
 }
 ```
 
-Context stored in AsyncLocalStorage per-request and propagated through:
+Context captured in closures during server build and propagated through:
 
-- Tool handlers
+- Tool handlers (via closure capture and direct parameter passing)
 - API client initialization
 - Error messages (sanitized)
 
