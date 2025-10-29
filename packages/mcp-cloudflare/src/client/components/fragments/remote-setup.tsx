@@ -49,24 +49,31 @@ export default function RemoteSetup() {
   return (
     <>
       <Prose className="mb-6">
-        <p>
-          If you've got a client that natively supports the current MCP
-          specification, including OAuth, you can connect directly.
-        </p>
+        <p>Connect directly using the base endpoint:</p>
         <CodeSnippet snippet={endpoint} />
         <p>
-          <strong>Organization and Project Constraints:</strong> You can
-          optionally constrain your MCP session to a specific organization and
-          project by including them in the URL path:
+          <strong>Path Constraints:</strong> Restrict the session to a specific
+          organization or project by adding them to the URL path. This ensures
+          all tools operate within the specified scope.
         </p>
         <ul>
           <li>
-            <code>{endpoint}/:organization</code> — Restricts the session to a
-            specific organization
+            <code>/:organization</code> — Limit to one organization
           </li>
           <li>
-            <code>{endpoint}/:organization/:project</code> — Restricts the
-            session to a specific organization and project
+            <code>/:organization/:project</code> — Limit to a specific project
+          </li>
+        </ul>
+        <p>
+          <strong>Agent Mode:</strong> Reduce context by exposing a single{" "}
+          <code>use_sentry</code> tool instead of individual tools. The embedded
+          AI agent handles natural language requests and automatically chains
+          tool calls as needed.
+        </p>
+        <ul>
+          <li>
+            <code>?agent=1</code> — Enable agent mode (works with path
+            constraints)
           </li>
         </ul>
       </Prose>
