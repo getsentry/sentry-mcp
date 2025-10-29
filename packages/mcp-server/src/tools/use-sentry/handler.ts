@@ -1,14 +1,8 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { experimental_createMCPClient } from "ai";
 import { defineTool } from "../../internal/tool-helpers/define";
 import type { ServerContext } from "../../types";
-import {
-  ParamOrganizationSlug,
-  ParamRegionUrl,
-  ParamProjectSlug,
-} from "../../schema";
 import { useSentryAgent } from "./agent";
 import { buildServer } from "../../server";
 import { serverContextStorage } from "../../internal/context-storage";
@@ -58,9 +52,6 @@ export default defineTool({
       .describe(
         "The user's raw input. Do not interpret the prompt in any way. Do not add any additional information to the prompt.",
       ),
-    organizationSlug: ParamOrganizationSlug.optional(),
-    projectSlug: ParamProjectSlug.optional(),
-    regionUrl: ParamRegionUrl.optional(),
     trace: z
       .boolean()
       .optional()
@@ -73,26 +64,6 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    // Set tags for monitoring
-    if (params.organizationSlug) {
-      setTag("organization.slug", params.organizationSlug);
-    }
-    if (params.projectSlug) {
-      setTag("project.slug", params.projectSlug);
-    }
-
-    // Create context with updated constraints from user parameters
-    // This ensures the embedded agent respects org/project constraints
-    const contextWithConstraints: ServerContext = {
-      ...context,
-      constraints: {
-        organizationSlug:
-          params.organizationSlug || context.constraints.organizationSlug,
-        projectSlug: params.projectSlug || context.constraints.projectSlug,
-        regionUrl: params.regionUrl || context.constraints.regionUrl,
-      },
-    };
-
     // Create linked pair of in-memory transports for client-server communication
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
@@ -101,15 +72,15 @@ export default defineTool({
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { use_sentry, ...toolsForAgent } = tools;
 
-    // Build internal MCP server with constrained context
+    // Build internal MCP server with the provided context
     const server = buildServer({
-      context: contextWithConstraints,
+      context,
       tools: toolsForAgent,
     });
 
     // Run all MCP operations within the ServerContext
     // This ensures tools invoked through the MCP protocol have access to the context
-    return await serverContextStorage.run(contextWithConstraints, async () => {
+    return await serverContextStorage.run(context, async () => {
       // Connect server to its transport
       await server.server.connect(serverTransport);
 

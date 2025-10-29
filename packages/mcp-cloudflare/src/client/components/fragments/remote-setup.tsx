@@ -68,7 +68,8 @@ export default function RemoteSetup() {
           <strong>Agent Mode:</strong> Reduce context by exposing a single{" "}
           <code>use_sentry</code> tool instead of individual tools. The embedded
           AI agent handles natural language requests and automatically chains
-          tool calls as needed.
+          tool calls as needed. Note: Agent mode approximately doubles response
+          time due to the embedded AI layer.
         </p>
         <ul>
           <li>
