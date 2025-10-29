@@ -715,6 +715,15 @@ export function renderApprovalDialog(
                   </label>
 
                   <label class="optional-permission-item">
+                    <input type="checkbox" name="permission" value="docs" checked>
+                    <span class="permission-checkbox"></span>
+                    <div class="optional-permission-content">
+                      <span class="optional-permission-name">Documentation</span>
+                      <div class="optional-permission-description">Search and read Sentry documentation for SDK setup and configuration</div>
+                    </div>
+                  </label>
+
+                  <label class="optional-permission-item">
                     <input type="checkbox" name="permission" value="issue_triage">
                     <span class="permission-checkbox"></span>
                     <div class="optional-permission-content">

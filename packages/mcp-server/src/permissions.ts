@@ -26,7 +26,8 @@ export type Scope =
   | "event:write" // Update issues (includes read)
   | "event:admin" // Delete issues (includes write and read)
   | "project:releases" // Access release endpoints
-  | "seer"; // Virtual scope: Use Seer analysis (not respected by upstream Sentry API)
+  | "seer" // Virtual scope: Use Seer analysis (not respected by upstream Sentry API)
+  | "docs"; // Virtual scope: Access Sentry documentation (not respected by upstream Sentry API)
 
 /**
  * Scope hierarchy - higher scopes include lower ones
@@ -62,6 +63,7 @@ const SCOPE_HIERARCHY: Record<Scope, Set<Scope>> = {
 
   // Virtual scopes (not respected by upstream Sentry API)
   seer: new Set(["seer"]),
+  docs: new Set(["docs"]),
 };
 
 /**
@@ -118,6 +120,7 @@ export const SCOPE_DESCRIPTIONS: Record<Scope, string> = {
   "event:admin": "Delete issues",
   "project:releases": "Access release information",
   seer: "Use Seer for issue analysis (may incur costs)",
+  docs: "Access Sentry documentation",
 };
 
 /**

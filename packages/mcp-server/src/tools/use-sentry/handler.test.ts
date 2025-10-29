@@ -24,6 +24,7 @@ const ALL_SCOPES: Scope[] = [
   "event:write",
   "project:releases",
   "seer",
+  "docs",
 ];
 
 const mockContext: ServerContext = {
