@@ -9,7 +9,6 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
-  statuses: write
 
 jobs:
   measure-tokens:
@@ -162,31 +161,97 @@ jobs:
           # Update job summary with new report
           cat token-report.md >> $GITHUB_STEP_SUMMARY
 
-      - name: Set commit status
+      - name: Create check run
         uses: actions/github-script@v7
         if: always()
         with:
           script: |
+            const measureSucceeded = '${{ steps.measure.outcome }}' === 'success';
             const totalTokens = '${{ steps.measure.outputs.total_tokens }}';
+            const toolCount = '${{ steps.measure.outputs.tool_count }}';
+            const avgTokens = '${{ steps.measure.outputs.avg_tokens }}';
             const hasComparison = '${{ steps.compare.outputs.has_comparison }}' === 'true';
             const delta = '${{ steps.compare.outputs.delta }}';
             const deltaSymbol = '${{ steps.compare.outputs.delta_symbol }}' || '📊';
 
-            let description = `${totalTokens} tokens`;
-            if (hasComparison && delta) {
-              const deltaPrefix = parseInt(delta) >= 0 ? '+' : '';
-              description += ` (${deltaPrefix}${delta} from main) ${deltaSymbol}`;
+            let title;
+            let summary;
+            let conclusion;
+
+            if (measureSucceeded && totalTokens && toolCount && avgTokens) {
+              // Build title
+              title = `${totalTokens} tokens (${toolCount} tools, avg ${avgTokens})`;
+
+              // Build summary
+              summary = `**Total Tokens:** ${totalTokens}\n`;
+              summary += `**Tool Count:** ${toolCount}\n`;
+              summary += `**Average:** ${avgTokens} tokens/tool\n`;
+
+              if (hasComparison && delta) {
+                const deltaPrefix = parseInt(delta) >= 0 ? '+' : '';
+                title += ` ${deltaSymbol}`;
+                summary += `\n**Change from main:** ${deltaPrefix}${delta} tokens ${deltaSymbol}`;
+              }
+
+              conclusion = 'success';
+            } else {
+              // Measurement step failed or outputs are missing
+              title = 'Token cost measurement failed';
+              summary = 'The token cost measurement step failed. Check the workflow logs for details.';
+              conclusion = 'failure';
             }
 
-            await github.rest.repos.createCommitStatus({
+            await github.rest.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: context.sha,
-              state: 'success',
-              context: 'Token Cost',
-              description: description,
-              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              name: 'Token Cost',
+              head_sha: context.sha,
+              status: 'completed',
+              conclusion: conclusion,
+              output: {
+                title: title,
+                summary: summary,
+                text: measureSucceeded ? 'See job summary for detailed per-tool breakdown' : 'Token measurement failed - check workflow logs'
+              },
+              details_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
+
+      - name: Comment on PR if token count changed
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && steps.compare.outputs.has_comparison == 'true' && steps.compare.outputs.delta != '0'
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('packages/mcp-server/token-report.md', 'utf8');
+
+            // Find existing comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.data.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('📊 MCP Server Token Cost Report')
+            );
+
+            // Update or create comment
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: report
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: report
+              });
+            }
 
       - name: Upload token stats artifact
         uses: actions/upload-artifact@v4
