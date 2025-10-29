@@ -718,7 +718,7 @@ export function renderApprovalDialog(
                     <input type="checkbox" name="permission" value="issue_triage">
                     <span class="permission-checkbox"></span>
                     <div class="optional-permission-content">
-                      <span class="optional-permission-name">Issue Triage (event:write)</span>
+                      <span class="optional-permission-name">Issue Triage</span>
                       <div class="optional-permission-description">Update and manage issues - resolve, assign, and triage problems</div>
                     </div>
                   </label>
@@ -727,7 +727,7 @@ export function renderApprovalDialog(
                     <input type="checkbox" name="permission" value="project_management">
                     <span class="permission-checkbox"></span>
                     <div class="optional-permission-content">
-                      <span class="optional-permission-name">Project Management (project:write, team:write)</span>
+                      <span class="optional-permission-name">Project Management</span>
                       <div class="optional-permission-description">Create and modify projects, teams, and DSNs</div>
                     </div>
                   </label>
