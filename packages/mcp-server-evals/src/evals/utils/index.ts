@@ -4,3 +4,6 @@ export {
   ToolPredictionScorer,
   type ExpectedToolCall,
 } from "./toolPredictionScorer";
+export { AgentModeTaskRunner } from "./agentModeRunner";
+export { SemanticSimilarityScorer } from "./semanticSimilarityScorer";
+export { ErrorHandlingScorer } from "./errorHandlingScorer";
