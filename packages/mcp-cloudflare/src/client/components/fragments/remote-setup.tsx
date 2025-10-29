@@ -140,7 +140,7 @@ export default function RemoteSetup() {
             </li>
             <li>
               You may need to manually authenticate if it doesnt happen
-              automatically, which can be doe via <code>/mcp</code>.
+              automatically, which can be done via <code>/mcp</code>.
             </li>
           </ol>
           <p>
