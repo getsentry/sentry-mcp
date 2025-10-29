@@ -35,6 +35,9 @@ export async function connectToMCPServer(
           if (config.sentryDsn) {
             args.push(`--sentry-dsn=${config.sentryDsn}`);
           }
+          if (config.useAgentEndpoint) {
+            args.push("--agent");
+          }
 
           // Resolve the path to the mcp-server binary
           const __dirname = dirname(fileURLToPath(import.meta.url));
