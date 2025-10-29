@@ -67,7 +67,7 @@ pnpm run generate-otel-namespaces  # Update OpenTelemetry docs
 
 # Manual Testing (preferred for testing MCP changes)
 pnpm -w run cli "who am I?"                    # Test with local dev server (default)
-pnpm -w run cli --agent "who am I?"            # Test agent mode (use_sentry tool)
+pnpm -w run cli --agent "who am I?"            # Test agent mode (use_sentry tool) - approximately 2x slower
 pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"  # Test against production
 pnpm -w run cli --access-token=TOKEN "query"   # Test with local stdio mode
 
