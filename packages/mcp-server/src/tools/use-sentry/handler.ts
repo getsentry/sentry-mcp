@@ -97,10 +97,14 @@ export default defineTool({
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
 
+    // Filter out use_sentry from tools to prevent recursion and circular dependency
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { use_sentry, ...toolsForAgent } = tools;
+
     // Build internal MCP server with constrained context
     const server = buildServer({
       context: contextWithConstraints,
-      tools,
+      tools: toolsForAgent,
     });
 
     // Run all MCP operations within the ServerContext
