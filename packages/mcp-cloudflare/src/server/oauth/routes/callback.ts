@@ -21,6 +21,7 @@ interface AuthRequestWithPermissions extends AuthRequest {
  * Permissions are additive:
  * - Base (always included): org:read, project:read, team:read, event:read
  * - Seer adds: seer (virtual scope)
+ * - Docs adds: docs (virtual scope)
  * - Issue Triage adds: event:write
  * - Project Management adds: project:write, team:write
  * @param permissions Array of permission strings
@@ -40,6 +41,10 @@ function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
   // Add scopes based on selected permissions
   if (perms.includes("seer")) {
     scopes.add("seer");
+  }
+
+  if (perms.includes("docs")) {
+    scopes.add("docs");
   }
 
   if (perms.includes("issue_triage")) {
