@@ -58,13 +58,11 @@ jobs:
           TOTAL_TOKENS=$(jq -r '.total_tokens' token-stats.json)
           TOOL_COUNT=$(jq -r '.tool_count' token-stats.json)
           AVG_TOKENS=$(jq -r '.avg_tokens_per_tool' token-stats.json)
-          COST=$(jq -r '.estimated_cost_per_1k_requests' token-stats.json)
 
           # Save for later steps
           echo "total_tokens=$TOTAL_TOKENS" >> $GITHUB_OUTPUT
           echo "tool_count=$TOOL_COUNT" >> $GITHUB_OUTPUT
           echo "avg_tokens=$AVG_TOKENS" >> $GITHUB_OUTPUT
-          echo "cost=$COST" >> $GITHUB_OUTPUT
 
       - name: Generate detailed report
         id: report
@@ -78,7 +76,6 @@ jobs:
           - **Total Tokens:** ${{ steps.measure.outputs.total_tokens }} tokens
           - **Tool Count:** ${{ steps.measure.outputs.tool_count }} tools
           - **Average:** ${{ steps.measure.outputs.avg_tokens }} tokens/tool
-          - **Estimated Cost:** \$${{ steps.measure.outputs.cost }} per 1,000 requests (Claude 3.5 Sonnet @ \$3/1M input tokens)
 
           ### Per-Tool Breakdown
 
@@ -91,17 +88,9 @@ jobs:
 
           cat >> token-report.md <<REPORT_EOF
 
-          ### Top 5 Most Expensive Tools
-
-          REPORT_EOF
-
-          jq -r '.tools[0:5] | to_entries[] | "\(.key + 1). **\(.value.name)**: \(.value.tokens) tokens (\(.value.percentage)%)"' token-stats.json >> token-report.md
-
-          cat >> token-report.md <<REPORT_EOF
-
           ---
 
-          **Note:** This measures the static overhead of tool definitions sent to LLM clients with every request. Lower is better.
+          **Note:** This measures the static overhead of tool definitions sent to LLM clients with every request. Lower is better. The \`use_sentry\` tool is excluded as it's only available in agent mode.
           REPORT_EOF
 
           # Display report

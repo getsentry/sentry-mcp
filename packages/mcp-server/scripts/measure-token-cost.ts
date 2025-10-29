@@ -99,22 +99,12 @@ function countTokens(text: string, encoder: Tiktoken): number {
 }
 
 /**
- * Calculate cost per 1,000 requests based on Claude 3.5 Sonnet pricing.
- * Input tokens: $3.00 per 1M tokens
- */
-function calculateCost(totalTokens: number): number {
-  const INPUT_COST_PER_MILLION = 3.0;
-  return (totalTokens * 1000 * INPUT_COST_PER_MILLION) / 1_000_000;
-}
-
-/**
  * Format table output for console display
  */
 function formatTable(
   totalTokens: number,
   toolCount: number,
   avgTokensPerTool: number,
-  cost: number,
   tools: Array<{ name: string; tokens: number; percentage: number }>,
 ): string {
   const lines: string[] = [];
@@ -127,8 +117,6 @@ function formatTable(
   lines.push(`Total Tokens:     ${totalTokens.toLocaleString()}`);
   lines.push(`Tool Count:       ${toolCount}`);
   lines.push(`Average/Tool:     ${avgTokensPerTool}`);
-  lines.push(`Estimated Cost:   $${cost.toFixed(4)} per 1,000 requests`);
-  lines.push(`                  (Claude 3.5 Sonnet @ $3/1M input tokens)`);
   lines.push("━".repeat(60));
 
   // Table header
@@ -166,8 +154,12 @@ async function main() {
       throw new Error("Failed to import tools from src/tools/index.ts");
     }
 
+    // Filter out use_sentry - it's agent-mode only, not part of normal MCP server
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { use_sentry, ...toolsToMeasure } = toolsDefault;
+
     // Format as MCP would send them (as a complete tools array)
-    const mcpTools = formatToolsForMCP(toolsDefault);
+    const mcpTools = formatToolsForMCP(toolsToMeasure);
 
     // Wrap in tools array like MCP protocol does
     const toolsPayload = { tools: mcpTools };
@@ -208,9 +200,6 @@ async function main() {
       total_tokens: totalTokens,
       tool_count: toolCount,
       avg_tokens_per_tool: avgTokensPerTool,
-      estimated_cost_per_1k_requests: Number(
-        calculateCost(totalTokens).toFixed(6),
-      ),
       tools: toolsWithPercentage,
     };
 
@@ -222,9 +211,6 @@ async function main() {
       console.log(
         `   Total: ${totalTokens.toLocaleString()} tokens across ${toolCount} tools`,
       );
-      console.log(
-        `   Estimated cost: $${calculateCost(totalTokens).toFixed(4)} per 1,000 requests`,
-      );
     } else {
       // Display table
       console.log(
@@ -232,7 +218,6 @@ async function main() {
           totalTokens,
           toolCount,
           avgTokensPerTool,
-          calculateCost(totalTokens),
           toolsWithPercentage,
         ),
       );
