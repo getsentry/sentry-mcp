@@ -306,3 +306,64 @@ export async function tokenExchangeCallback(
     });
   }
 }
+
+/**
+ * Validates resource parameter per RFC 8707.
+ */
+export function validateResourceParameter(
+  resource: string | undefined,
+  requestUrl: string,
+): boolean {
+  if (resource === "") {
+    return false;
+  }
+
+  if (!resource) {
+    return true;
+  }
+
+  try {
+    const resourceUrl = new URL(resource);
+    const requestUrlObj = new URL(requestUrl);
+
+    if (resourceUrl.hostname !== requestUrlObj.hostname) {
+      return false;
+    }
+
+    if (resourceUrl.port !== requestUrlObj.port) {
+      return false;
+    }
+
+    const validPath = "/mcp";
+    return resourceUrl.pathname.startsWith(validPath);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Creates RFC 8707 error response for invalid resource parameter.
+ */
+export function createResourceValidationError(
+  redirectUri: string,
+  state?: string,
+): Response {
+  const redirectUrl = new URL(redirectUri);
+
+  redirectUrl.searchParams.set("error", "invalid_target");
+  redirectUrl.searchParams.set(
+    "error_description",
+    "The resource parameter does not match this authorization server",
+  );
+
+  if (state) {
+    redirectUrl.searchParams.set("state", state);
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: redirectUrl.href,
+    },
+  });
+}

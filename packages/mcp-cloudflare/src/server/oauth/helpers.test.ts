@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
-import { tokenExchangeCallback, refreshAccessToken } from "./helpers";
+import {
+  tokenExchangeCallback,
+  refreshAccessToken,
+  validateResourceParameter,
+  createResourceValidationError,
+} from "./helpers";
 import type { WorkerProps } from "../types";
 
 // Mock fetch globally
@@ -286,5 +291,255 @@ describe("refreshAccessToken", () => {
     expect(error?.status).toBe(400);
     const text = await error?.text();
     expect(text).toContain("issue refreshing your access token");
+  });
+});
+
+describe("validateResourceParameter", () => {
+  describe("valid resources", () => {
+    it("should allow undefined resource (optional parameter)", () => {
+      const result = validateResourceParameter(
+        undefined,
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should allow same hostname with /mcp path", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should allow same hostname with nested /mcp path", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp/org/project",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should allow localhost with /mcp path", () => {
+      const result = validateResourceParameter(
+        "http://localhost:8787/mcp",
+        "http://localhost:8787/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should allow resource with query parameters", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp?foo=bar",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should allow resource with different port when both match", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev:8443/mcp",
+        "https://mcp.sentry.dev:8443/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should allow 127.0.0.1 with /mcp path", () => {
+      const result = validateResourceParameter(
+        "http://127.0.0.1:3000/mcp",
+        "http://127.0.0.1:3000/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("invalid resources", () => {
+    it("should reject different hostname", () => {
+      const result = validateResourceParameter(
+        "https://attacker.com/mcp",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject different subdomain", () => {
+      const result = validateResourceParameter(
+        "https://evil.sentry.dev/mcp",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject invalid path (not /mcp)", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/api",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject path without /mcp prefix", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/oauth",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject malformed URL", () => {
+      const result = validateResourceParameter(
+        "not-a-url",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject relative path", () => {
+      const result = validateResourceParameter(
+        "/mcp",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject empty string", () => {
+      const result = validateResourceParameter(
+        "",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject different port", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev:8080/mcp",
+        "https://mcp.sentry.dev:443/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject javascript: scheme", () => {
+      const result = validateResourceParameter(
+        "javascript:alert(1)",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject data: scheme", () => {
+      const result = validateResourceParameter(
+        "data:text/html,<script>alert(1)</script>",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle URL with fragment", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp#fragment",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should handle URL with trailing slash", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp/",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should handle case sensitivity in hostname", () => {
+      // URLs are case-insensitive for hostname
+      const result = validateResourceParameter(
+        "https://MCP.SENTRY.DEV/mcp",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      // This should work because URL constructor normalizes hostnames
+      expect(result).toBe(true);
+    });
+
+    it("should be case-sensitive for path", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/MCP",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      // Paths are case-sensitive
+      expect(result).toBe(false);
+    });
+
+    it("should handle URL encoding in path", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp%2Forg",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      // URL encoding should be preserved
+      expect(result).toBe(true);
+    });
+  });
+});
+
+describe("createResourceValidationError", () => {
+  it("should create redirect response with invalid_target error", () => {
+    const response = createResourceValidationError(
+      "https://client.example.com/callback",
+      "state123",
+    );
+
+    expect(response.status).toBe(302);
+
+    const location = response.headers.get("Location");
+    expect(location).toBeDefined();
+
+    const locationUrl = new URL(location!);
+    expect(locationUrl.origin).toBe("https://client.example.com");
+    expect(locationUrl.pathname).toBe("/callback");
+    expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+    expect(locationUrl.searchParams.get("error_description")).toContain(
+      "resource parameter",
+    );
+    expect(locationUrl.searchParams.get("state")).toBe("state123");
+  });
+
+  it("should create redirect without state parameter if not provided", () => {
+    const response = createResourceValidationError(
+      "https://client.example.com/callback",
+    );
+
+    const location = response.headers.get("Location");
+    expect(location).toBeDefined();
+
+    const locationUrl = new URL(location!);
+    expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+    expect(locationUrl.searchParams.get("state")).toBeNull();
+  });
+
+  it("should preserve existing query parameters in redirect URI", () => {
+    const response = createResourceValidationError(
+      "https://client.example.com/callback?existing=param",
+      "state456",
+    );
+
+    const location = response.headers.get("Location");
+    const locationUrl = new URL(location!);
+
+    expect(locationUrl.searchParams.get("existing")).toBe("param");
+    expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+    expect(locationUrl.searchParams.get("state")).toBe("state456");
+  });
+
+  it("should have proper error description per RFC 8707", () => {
+    const response = createResourceValidationError(
+      "https://client.example.com/callback",
+    );
+
+    const location = response.headers.get("Location");
+    const locationUrl = new URL(location!);
+
+    const errorDescription = locationUrl.searchParams.get("error_description");
+    expect(errorDescription).toContain("authorization server");
   });
 });

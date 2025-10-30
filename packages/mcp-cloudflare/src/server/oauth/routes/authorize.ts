@@ -6,16 +6,21 @@ import {
 } from "../../lib/approval-dialog";
 import type { Env } from "../../types";
 import { SENTRY_AUTH_URL } from "../constants";
-import { getUpstreamAuthorizeUrl } from "../helpers";
+import {
+  getUpstreamAuthorizeUrl,
+  validateResourceParameter,
+  createResourceValidationError,
+} from "../helpers";
 import { SCOPES } from "../../../constants";
 import { signState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-core/telem/logging";
+import { logWarn } from "@sentry/mcp-server/telem/logging";
 
 /**
- * Extended AuthRequest that includes skills
+ * Extended AuthRequest that includes skills and resource parameter
  */
 interface AuthRequestWithSkills extends AuthRequest {
   skills?: unknown;
+  resource?: string;
 }
 
 async function redirectToUpstream(
@@ -73,6 +78,39 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid request", 400);
     }
 
+    // Validate resource parameter per RFC 8707
+    const requestUrl = new URL(c.req.url);
+    const resourceParam = requestUrl.searchParams.get("resource");
+
+    if (
+      resourceParam !== null &&
+      !validateResourceParameter(resourceParam, c.req.url)
+    ) {
+      logWarn("Invalid resource parameter in authorization request", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: {
+          resource: resourceParam,
+          requestUrl: c.req.url,
+          clientId,
+        },
+      });
+
+      const redirectUri = requestUrl.searchParams.get("redirect_uri");
+      const state = requestUrl.searchParams.get("state");
+
+      if (redirectUri) {
+        return createResourceValidationError(redirectUri, state ?? undefined);
+      }
+
+      return c.text("Invalid resource parameter", 400);
+    }
+
+    // Preserve resource in state, not exported upstream
+    const oauthReqInfoWithResource: AuthRequestWithSkills = {
+      ...oauthReqInfo,
+      ...(resourceParam ? { resource: resourceParam } : {}),
+    };
+
     // XXX(dcramer): we want to confirm permissions on each time
     // so you can always choose new ones
     // This shouldn't be highly visible to users, as clients should use refresh tokens
@@ -90,13 +128,12 @@ export default new Hono<{ Bindings: Env }>()
     //   return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
     // }
 
-    return await renderApprovalDialog(c.req.raw, {
+    return renderApprovalDialog(c.req.raw, {
       client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
       server: {
         name: "Sentry MCP",
       },
-      state: { oauthReqInfo }, // arbitrary data that flows through the form submission below
-      cookieSecret: c.env.COOKIE_SECRET,
+      state: { oauthReqInfo: oauthReqInfoWithResource },
     });
   })
 
@@ -131,7 +168,7 @@ export default new Hono<{ Bindings: Env }>()
       skills,
     };
 
-    // Validate redirectUri is registered for this client before proceeding
+    // Validate redirectUri first to prevent open redirects from error responses
     try {
       const client = await c.env.OAUTH_PROVIDER.lookupClient(
         oauthReqWithSkills.clientId,
@@ -155,6 +192,26 @@ export default new Hono<{ Bindings: Env }>()
         extra: { error: String(lookupErr) },
       });
       return c.text("Invalid request", 400);
+    }
+
+    // Validate resource parameter (RFC 8707)
+    const resourceFromState = oauthReqWithSkills.resource;
+    if (
+      resourceFromState !== undefined &&
+      !validateResourceParameter(resourceFromState, c.req.url)
+    ) {
+      logWarn("Invalid resource parameter in authorization approval", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: {
+          resource: resourceFromState,
+          clientId: oauthReqWithSkills.clientId,
+        },
+      });
+
+      return createResourceValidationError(
+        oauthReqWithSkills.redirectUri,
+        oauthReqWithSkills.state,
+      );
     }
 
     // Build signed state for redirect to Sentry (10 minute validity)

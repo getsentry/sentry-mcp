@@ -3,16 +3,20 @@ import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
-import { exchangeCodeForAccessToken } from "../helpers";
+import {
+  exchangeCodeForAccessToken,
+  validateResourceParameter,
+} from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-core/telem/logging";
-import { parseSkills } from "@sentry/mcp-core/skills";
+import { logWarn } from "@sentry/mcp-server/telem/logging";
+import { parseSkills, getScopesForSkills } from "@sentry/mcp-server/skills";
 
 /**
- * Extended AuthRequest that includes skills
+ * Extended AuthRequest that includes skills and resource parameter
  */
 interface AuthRequestWithSkills extends AuthRequest {
   skills?: unknown; // Skill-based authorization system
+  resource?: string;
 }
 
 /**
@@ -64,6 +68,23 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       extra: { error: String(err) },
     });
     return c.text("Authorization failed: Invalid redirect URL", 400);
+  }
+
+  // Validate resource parameter per RFC 8707
+  const resourceFromState = oauthReqInfo.resource;
+  if (
+    resourceFromState !== undefined &&
+    !validateResourceParameter(resourceFromState, c.req.url)
+  ) {
+    logWarn("Invalid resource parameter in callback", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: {
+        resource: resourceFromState,
+        clientId: oauthReqInfo.clientId,
+      },
+    });
+
+    return c.text("Authorization failed: Invalid resource parameter", 400);
   }
 
   // because we share a clientId with the upstream provider, we need to ensure that the
@@ -151,12 +172,15 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     );
   }
 
+  // Calculate Sentry API scopes from validated skills
+  const grantedScopes = await getScopesForSkills(validSkills);
+
   // Convert valid skills Set to array for OAuth props
   const grantedSkills = Array.from(validSkills);
 
   // Return back to the MCP client a new token
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
-    request: oauthReqInfo,
+    request: oauthReqInfo as AuthRequest,
     userId: payload.user.id,
     metadata: {
       label: payload.user.name,
@@ -175,6 +199,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
+      // Scopes derived from skills - for backward compatibility with old MCP clients
+      // that don't support grantedSkills and only understand grantedScopes
+      grantedScopes: Array.from(grantedScopes),
       grantedSkills, // Primary authorization method
 
       // Note: constraints are NOT included here - they're extracted per-request from URL
