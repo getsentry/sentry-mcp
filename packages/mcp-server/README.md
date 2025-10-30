@@ -87,8 +87,6 @@ npx @sentry/mcp-server --access-token=TOKEN --scopes=org:read,event:write
 npx @sentry/mcp-server --access-token=TOKEN --skills=inspect,triage
 ```
 
-See the [Authorization Guide](../../docs/authorization.md) for detailed migration instructions.
-
 The host configuration accepts two distinct formats:
 
 - **`SENTRY_HOST`**: Hostname only (no protocol)
