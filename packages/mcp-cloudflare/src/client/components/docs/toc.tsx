@@ -5,11 +5,11 @@ type TocSection = { name: string; id: string; active: boolean };
 
 export default function TableOfContents() {
   const [sections, setSections] = useState<TocSection[]>([
-    { name: "Getting Started", id: "getting-started", active: false },
-    { name: "Integration Guides", id: "integration-guides", active: false },
+    // { name: "Getting Started", id: "getting-started", active: false },
+    // { name: "Integration Guides", id: "integration-guides", active: false },
     { name: "Available Tools", id: "tools", active: false },
-    { name: "Available Prompts", id: "prompts", active: false },
-    { name: "Available Resources", id: "resources", active: false },
+    // { name: "Available Prompts", id: "prompts", active: false },
+    // { name: "Available Resources", id: "resources", active: false },
     { name: "More Information", id: "more-information", active: false },
   ]);
 

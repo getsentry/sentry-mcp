@@ -43,7 +43,7 @@ export default function CodeSnippet({
   };
 
   return (
-    <div className={`relative text-white ${noMargin ? "" : "mb-6"}`}>
+    <div className={`relative text-white max-w-full ${noMargin ? "" : "mb-6"}`}>
       <div className="absolute top-2.5 right-2.5 flex items-center justify-end">
         <Button
           variant="ghost"

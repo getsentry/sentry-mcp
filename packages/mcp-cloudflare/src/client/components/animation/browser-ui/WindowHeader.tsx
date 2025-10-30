@@ -23,7 +23,11 @@ export default function WindowHeader({
   ide?: boolean;
 }) {
   return (
-    <div className={`flex items-center gap-2 p-2 pr-2 pl-4 ${ide && "pr-1"}`}>
+    <div
+      className={`flex items-center gap-2 max-w-full p-2 pr-2 pl-4 ${
+        ide && "pr-1"
+      }`}
+    >
       <div className="size-3 flex-shrink-0 rounded-full border border-white/20 bg-pink-300/50" />
       <div className="size-3 flex-shrink-0 rounded-full border border-white/20 bg-amber-300/50" />
       <div className="mr-4 size-3 flex-shrink-0 rounded-full border border-white/20 bg-emerald-300/50" />

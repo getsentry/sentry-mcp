@@ -50,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
               onClick={() => toggleChat(!isChatOpen)}
               className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-violet-300 text-background hover:bg-white/90 transition font-bold font-sans border border-background"
             >
-              Live Demo
+              Live <span className="max-sm:sr-only">Demo</span>
               <PanelLeftOpen className="size-5" />
             </Button>
           )}
