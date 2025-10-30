@@ -28,6 +28,7 @@ import {
 
 export default defineTool({
   name: "get_issue_details",
+  requiredSkills: ["inspect", "triage", "seer"], // Available in inspect, triage, and seer skills
   requiredScopes: ["event:read"],
   description: [
     "Get detailed information about a specific Sentry issue by ID.",

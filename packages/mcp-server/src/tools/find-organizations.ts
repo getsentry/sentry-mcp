@@ -2,11 +2,13 @@ import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
 import { ParamSearchQuery } from "../schema";
+import { ALL_SKILLS } from "../skills";
 
 const RESULT_LIMIT = 25;
 
 export default defineTool({
   name: "find_organizations",
+  requiredSkills: ALL_SKILLS, // Foundational tool - available to all skills
   requiredScopes: ["org:read"],
   description: [
     "Find organizations that the user has access to in Sentry.",

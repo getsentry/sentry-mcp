@@ -90,7 +90,7 @@ export default new Hono<{ Bindings: Env }>()
     //   return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
     // }
 
-    return renderApprovalDialog(c.req.raw, {
+    return await renderApprovalDialog(c.req.raw, {
       client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
       server: {
         name: "Sentry MCP",
@@ -117,17 +117,18 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid request", 400);
     }
 
-    const { state, headers, permissions } = result;
+    const { state, headers, permissions, skills } = result;
 
     if (!state.oauthReqInfo) {
       return c.text("Invalid request", 400);
     }
 
-    // Store the selected permissions in the OAuth request info
+    // Store the selected permissions and skills in the OAuth request info
     // This will be passed through to the callback via the state parameter
     const oauthReqWithPermissions = {
       ...state.oauthReqInfo,
-      permissions,
+      permissions, // Legacy - for backward compatibility
+      skills, // New skill-based system
     };
 
     // Validate redirectUri is registered for this client before proceeding

@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { ServerContext } from "../types";
 import type { Scope } from "../permissions";
+import type { Skill } from "../skills";
 import type {
   TextContent,
   ImageContent,
@@ -13,7 +14,8 @@ export interface ToolConfig<
   name: string;
   description: string;
   inputSchema: TSchema;
-  requiredScopes: Scope[];
+  requiredSkills: Skill[]; // NEW: Which skills enable this tool
+  requiredScopes: Scope[]; // LEGACY: Which API scopes needed (deprecated, for backward compatibility)
   annotations: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;

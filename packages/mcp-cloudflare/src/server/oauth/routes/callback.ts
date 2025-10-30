@@ -8,16 +8,61 @@ import { SENTRY_TOKEN_URL } from "../constants";
 import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
+import tools from "@sentry/mcp-server/tools";
+import type { Skill } from "@sentry/mcp-server/skills";
 
 /**
- * Extended AuthRequest that includes permissions
+ * Extended AuthRequest that includes permissions and skills
  */
 interface AuthRequestWithPermissions extends AuthRequest {
-  permissions?: unknown;
+  permissions?: unknown; // Legacy - for backward compatibility
+  skills?: unknown; // New skill-based system
 }
 
 /**
- * Convert selected permissions to granted scopes
+ * Calculate required scopes from granted skills by examining tool requirements.
+ * For each granted skill, collects the scopes needed by all tools that require that skill.
+ *
+ * @example
+ * // User grants "inspect" and "triage" skills
+ * getScopesFromSkills(["inspect", "triage"])
+ * // Returns: Set(["org:read", "project:read", "team:read", "event:read", "event:write"])
+ *
+ * @param skills Array of granted skill IDs
+ * @returns Set of required Sentry API scopes
+ */
+function getScopesFromSkills(skills?: unknown): Set<Scope> {
+  // Start with base read-only scopes (always granted via DEFAULT_SCOPES)
+  const scopes = new Set<Scope>(DEFAULT_SCOPES);
+
+  // Validate skills is an array of strings
+  if (!Array.isArray(skills) || skills.length === 0) {
+    return scopes;
+  }
+  const grantedSkills = new Set<Skill>(
+    (skills as unknown[]).filter((s): s is Skill => typeof s === "string"),
+  );
+
+  // Iterate through all tools and collect required scopes for tools enabled by granted skills
+  for (const tool of Object.values(tools)) {
+    // Check if any of the tool's required skills are granted
+    const toolEnabled = tool.requiredSkills.some((reqSkill) =>
+      grantedSkills.has(reqSkill),
+    );
+
+    // If tool is enabled by granted skills, add its required scopes
+    if (toolEnabled) {
+      for (const scope of tool.requiredScopes) {
+        scopes.add(scope);
+      }
+    }
+  }
+
+  return scopes;
+}
+
+/**
+ * Convert selected permissions to granted scopes (LEGACY - for backward compatibility)
  * Permissions are additive:
  * - Base (always included): org:read, project:read, team:read, event:read
  * - Seer adds: seer (virtual scope)
@@ -25,6 +70,7 @@ interface AuthRequestWithPermissions extends AuthRequest {
  * - Issue Triage adds: event:write
  * - Project Management adds: project:write, team:write
  * @param permissions Array of permission strings
+ * @deprecated Use getScopesFromSkills instead
  */
 function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
   // Start with base read-only scopes (always granted via DEFAULT_SCOPES)
@@ -38,14 +84,22 @@ function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
     (p): p is string => typeof p === "string",
   );
 
-  // Add scopes based on selected permissions
-  if (perms.includes("seer")) {
-    scopes.add("seer");
+  // Log deprecation warning if permissions are used
+  if (perms.length > 0) {
+    logWarn(
+      "Legacy permissions system used (deprecated - use skills instead)",
+      {
+        loggerScope: ["cloudflare", "oauth", "callback"],
+        extra: {
+          permissions: perms,
+        },
+      },
+    );
   }
 
-  if (perms.includes("docs")) {
-    scopes.add("docs");
-  }
+  // Add scopes based on selected permissions
+  // Note: "seer" and "docs" are skill names, not OAuth scopes - they don't map to actual API permissions
+  // The new skills system (getScopesFromSkills) handles this properly by mapping skills to required OAuth scopes
 
   if (perms.includes("issue_triage")) {
     scopes.add("event:write");
@@ -164,8 +218,39 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   });
   if (errResponse) return errResponse;
 
-  // Get scopes based on selected permissions
-  const grantedScopes = getScopesFromPermissions(oauthReqInfo.permissions);
+  // Calculate scopes from both skills and legacy permissions (for backward compatibility)
+  // Skills system is the primary method, permissions are deprecated
+  const scopesFromSkills = getScopesFromSkills(oauthReqInfo.skills);
+  const scopesFromPermissions = getScopesFromPermissions(
+    oauthReqInfo.permissions,
+  );
+
+  // Merge scopes from both systems (union)
+  const grantedScopes = new Set<Scope>([
+    ...scopesFromSkills,
+    ...scopesFromPermissions,
+  ]);
+
+  // Extract and validate granted skills
+  const grantedSkills: string[] = Array.isArray(oauthReqInfo.skills)
+    ? (oauthReqInfo.skills as unknown[]).filter(
+        (s): s is string => typeof s === "string",
+      )
+    : [];
+
+  // Validate that at least one skill is granted
+  if (grantedSkills.length === 0) {
+    logWarn("OAuth authorization rejected: No skills selected", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: {
+        clientId: oauthReqInfo.clientId,
+      },
+    });
+    return c.text(
+      "Authorization failed: You must select at least one permission to continue.",
+      400,
+    );
+  }
 
   // Return back to the MCP client a new token
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
@@ -188,7 +273,8 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
-      grantedScopes: Array.from(grantedScopes),
+      grantedScopes: Array.from(grantedScopes), // LEGACY - for backward compatibility
+      grantedSkills, // NEW - primary authorization method
 
       // Note: constraints are NOT included here - they're extracted per-request from URL
       // Note: sentryHost and mcpUrl come from env, not OAuth props

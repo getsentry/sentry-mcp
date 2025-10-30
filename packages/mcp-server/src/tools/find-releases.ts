@@ -11,6 +11,7 @@ import {
 
 export default defineTool({
   name: "find_releases",
+  requiredSkills: ["inspect"], // Only available in inspect skill
   requiredScopes: ["project:read"],
   description: [
     "Find releases in Sentry.",

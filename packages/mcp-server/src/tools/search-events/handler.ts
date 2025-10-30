@@ -19,6 +19,7 @@ import { UserInputError } from "../../errors";
 
 export default defineTool({
   name: "search_events",
+  requiredSkills: ["inspect", "triage", "seer"], // Available in inspect, triage, and seer skills
   requiredScopes: ["event:read"],
   description: [
     "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.",

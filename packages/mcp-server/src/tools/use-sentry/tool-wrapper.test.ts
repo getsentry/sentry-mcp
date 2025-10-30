@@ -17,6 +17,7 @@ const mockTool: ToolConfig<{
     projectSlug: z.string().optional(),
     someParam: z.string(),
   },
+  requiredSkills: [], // Required by ToolConfig
   requiredScopes: [],
   annotations: {
     readOnlyHint: true,
@@ -158,6 +159,7 @@ describe("wrapToolForAgent", () => {
       inputSchema: {
         param: z.string(),
       },
+      requiredSkills: [], // Required by ToolConfig
       requiredScopes: [],
       annotations: {
         readOnlyHint: true,

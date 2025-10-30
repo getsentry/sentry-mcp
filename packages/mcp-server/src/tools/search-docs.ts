@@ -8,7 +8,8 @@ import { ParamSentryGuide } from "../schema";
 
 export default defineTool({
   name: "search_docs",
-  requiredScopes: ["docs"], // Documentation search requires docs permission
+  requiredSkills: ["docs"], // Only available in docs skill
+  requiredScopes: [], // No Sentry API scopes required - authorization via 'docs' skill
   description: [
     "Search Sentry documentation for SDK setup, instrumentation, and configuration guidance.",
     "",

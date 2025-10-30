@@ -23,12 +23,22 @@ import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
 import { sentryBeforeSend } from "./telem/sentry";
 import { ALL_SCOPES } from "./permissions";
-import { DEFAULT_SCOPES } from "./constants";
+import { DEFAULT_SCOPES, DEFAULT_SKILLS } from "./constants";
+import { SKILLS } from "./skills";
 import { configureOpenAIProvider } from "./internal/agents/openai-provider";
 import agentTools from "./tools/agent-tools";
 
 const packageName = "@sentry/mcp-server";
-const usageText = buildUsage(packageName, DEFAULT_SCOPES, ALL_SCOPES);
+const allSkills = Object.keys(SKILLS) as ReadonlyArray<
+  (typeof SKILLS)[keyof typeof SKILLS]["id"]
+>;
+const usageText = buildUsage(
+  packageName,
+  DEFAULT_SCOPES,
+  ALL_SCOPES,
+  DEFAULT_SKILLS,
+  allSkills,
+);
 
 function die(message: string): never {
   console.error(message);
@@ -116,6 +126,7 @@ const SENTRY_TIMEOUT = 5000; // 5 seconds
 const context = {
   accessToken: cfg.accessToken,
   grantedScopes: cfg.finalScopes,
+  grantedSkills: cfg.finalSkills,
   constraints: {
     organizationSlug: cfg.organizationSlug ?? null,
     projectSlug: cfg.projectSlug ?? null,

@@ -81,4 +81,62 @@ describe("cli/finalize", () => {
       finalize({ accessToken: "tok", url: "http://bad", unknownArgs: [] }),
     ).toThrow(/must be a full HTTPS URL/);
   });
+
+  // Skills tests
+  it("throws on invalid skills", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        skills: "invalid-skill",
+        unknownArgs: [],
+      }),
+    ).toThrow(/Invalid skills provided: invalid-skill/);
+  });
+
+  it("validates multiple skills and reports all invalid ones", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        skills: "inspect,invalid1,triage,invalid2",
+        unknownArgs: [],
+      }),
+    ).toThrow(/Invalid skills provided: invalid1, invalid2/);
+  });
+
+  it("resolves valid skills in override mode (--skills)", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      skills: "inspect,triage",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills?.has("inspect")).toBe(true);
+    expect(cfg.finalSkills?.has("triage")).toBe(true);
+    expect(cfg.finalSkills?.size).toBe(2);
+    // Should not include defaults
+    expect(cfg.finalSkills?.has("docs")).toBe(false);
+  });
+
+  it("throws on empty skills after validation", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        skills: "invalid1,invalid2",
+        unknownArgs: [],
+      }),
+    ).toThrow(/Invalid skills provided/);
+  });
+
+  it("grants all skills when no skills specified", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      unknownArgs: [],
+    });
+    expect(cfg.finalSkills).toBeDefined();
+    expect(cfg.finalSkills?.size).toBe(5); // All skills: inspect, triage, project-management, seer, docs
+    expect(cfg.finalSkills?.has("inspect")).toBe(true);
+    expect(cfg.finalSkills?.has("triage")).toBe(true);
+    expect(cfg.finalSkills?.has("project-management")).toBe(true);
+    expect(cfg.finalSkills?.has("seer")).toBe(true);
+    expect(cfg.finalSkills?.has("docs")).toBe(true);
+  });
 });

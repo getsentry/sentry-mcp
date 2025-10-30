@@ -10,6 +10,7 @@ import {
 
 export default defineTool({
   name: "find_dsns",
+  requiredSkills: ["project-management"], // DSN management is part of project setup
   requiredScopes: ["project:read"],
   description: [
     "List all Sentry DSNs for a specific project.",

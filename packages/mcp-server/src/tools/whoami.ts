@@ -11,6 +11,7 @@ export default defineTool({
     "- Get the user's name and email address.",
   ].join("\n"),
   inputSchema: {},
+  requiredSkills: [], // Not exposed via standard MCP - excluded from skills system
   requiredScopes: [], // No specific scopes required - uses authentication token
   annotations: {
     readOnlyHint: true,

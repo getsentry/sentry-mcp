@@ -30,13 +30,40 @@ describe("cli/parseArgv", () => {
     expect(parsed.unknownArgs).toEqual([]);
   });
 
+  it("parses skills flags", () => {
+    const parsed = parseArgv(["--access-token=tok", "--skills=inspect,triage"]);
+    expect(parsed.accessToken).toBe("tok");
+    expect(parsed.skills).toBe("inspect,triage");
+  });
+
   it("collects unknown args", () => {
     const parsed = parseArgv(["--unknown", "--another=1"]);
     expect(parsed.unknownArgs.length).toBeGreaterThan(0);
   });
 });
 
-describe("cli/parseEnv + merge", () => {
+describe("cli/parseEnv", () => {
+  it("parses environment variables including skills", () => {
+    const env = parseEnv({
+      SENTRY_ACCESS_TOKEN: "envtok",
+      SENTRY_HOST: "envhost",
+      MCP_URL: "envmcp",
+      SENTRY_DSN: "envdsn",
+      MCP_SCOPES: "org:read",
+      MCP_ADD_SCOPES: "event:write",
+      MCP_SKILLS: "inspect,triage",
+    } as any);
+    expect(env.accessToken).toBe("envtok");
+    expect(env.host).toBe("envhost");
+    expect(env.mcpUrl).toBe("envmcp");
+    expect(env.sentryDsn).toBe("envdsn");
+    expect(env.scopes).toBe("org:read");
+    expect(env.addScopes).toBe("event:write");
+    expect(env.skills).toBe("inspect,triage");
+  });
+});
+
+describe("cli/merge", () => {
   it("applies precedence: CLI over env", () => {
     const env = parseEnv({
       SENTRY_ACCESS_TOKEN: "envtok",
@@ -63,5 +90,25 @@ describe("cli/parseEnv + merge", () => {
     expect(merged.openaiBaseUrl).toBe("https://api.cli/v1");
     expect(merged.scopes).toBe("org:admin");
     expect(merged.addScopes).toBe("project:write");
+  });
+
+  it("applies precedence for skills: CLI over env", () => {
+    const env = parseEnv({
+      SENTRY_ACCESS_TOKEN: "envtok",
+      MCP_SKILLS: "inspect",
+    } as any);
+    const cli = parseArgv(["--access-token=clitok", "--skills=inspect,triage"]);
+    const merged = merge(cli, env);
+    expect(merged.skills).toBe("inspect,triage");
+  });
+
+  it("falls back to env when CLI skills not provided", () => {
+    const env = parseEnv({
+      SENTRY_ACCESS_TOKEN: "envtok",
+      MCP_SKILLS: "inspect,triage",
+    } as any);
+    const cli = parseArgv(["--access-token=clitok"]);
+    const merged = merge(cli, env);
+    expect(merged.skills).toBe("inspect,triage");
   });
 });

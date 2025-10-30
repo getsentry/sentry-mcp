@@ -37,8 +37,9 @@ import {
 import { logIssue, type LogIssueOptions } from "./telem/logging";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
-import { DEFAULT_SCOPES, MCP_SERVER_NAME } from "./constants";
+import { MCP_SERVER_NAME } from "./constants";
 import { isToolAllowed, type Scope } from "./permissions";
+import { hasRequiredSkills, type Skill } from "./skills";
 import {
   getConstraintParametersToInject,
   getConstraintKeysToFilter,
@@ -118,11 +119,11 @@ export function buildServer({
 }
 
 /**
- * Configures an MCP server with tools filtered by granted scopes.
+ * Configures an MCP server with tools filtered by granted skills or scopes.
  *
  * Internal function used by buildServer(). Use buildServer() instead for most cases.
- * Tools are filtered at registration time based on grantedScopes, and context is
- * captured in closures for tool handler execution.
+ * Tools are filtered at registration time based on grantedSkills OR grantedScopes
+ * (either system can grant access), and context is captured in closures for tool handler execution.
  */
 function configureServer({
   server,
@@ -138,10 +139,14 @@ function configureServer({
   // Use custom tools if provided, otherwise use default tools
   const toolsToRegister = customTools ?? tools;
 
-  // Get granted scopes from context for tool filtering
-  const grantedScopes: Set<Scope> = context.grantedScopes
+  // Get granted skills and scopes from context for tool filtering
+  const grantedSkills: Set<Skill> | undefined = context.grantedSkills
+    ? new Set<Skill>(context.grantedSkills)
+    : undefined;
+
+  const grantedScopes: Set<Scope> | undefined = context.grantedScopes
     ? new Set<Scope>(context.grantedScopes)
-    : new Set<Scope>(DEFAULT_SCOPES);
+    : undefined;
 
   server.server.onerror = (error) => {
     const transportLogOptions: LogIssueOptions = {
@@ -157,9 +162,30 @@ function configureServer({
   };
 
   for (const [toolKey, tool] of Object.entries(toolsToRegister)) {
-    // Filter tools BEFORE registration based on granted scopes
-    if (!isToolAllowed(tool.requiredScopes, grantedScopes)) {
-      continue; // Skip this tool entirely
+    // Filter tools BEFORE registration based on authorization system
+    // Skills system (new) and scopes (legacy) are mutually exclusive
+    let allowed = false;
+
+    // If using skills system (new), ONLY check skills
+    if (grantedSkills) {
+      // Tool must have requiredSkills to be exposed in skills mode
+      if (tool.requiredSkills && tool.requiredSkills.length > 0) {
+        allowed = hasRequiredSkills(grantedSkills, tool.requiredSkills);
+      }
+      // else: Empty requiredSkills means NOT exposed via skills system
+    }
+    // Legacy: If not using skills, check scopes
+    else if (
+      grantedScopes &&
+      tool.requiredScopes &&
+      tool.requiredScopes.length > 0
+    ) {
+      allowed = isToolAllowed(tool.requiredScopes, grantedScopes);
+    }
+
+    // Skip tool if not allowed by authorization system
+    if (!allowed) {
+      continue;
     }
 
     // Filter out constraint parameters from schema that will be auto-injected

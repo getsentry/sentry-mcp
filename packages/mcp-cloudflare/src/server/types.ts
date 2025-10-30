@@ -20,7 +20,8 @@ export type WorkerProps = {
   accessTokenExpiresAt?: number; // Timestamp when the upstream access token expires
   clientId: string;
   scope: string;
-  grantedScopes?: string[]; // Array of scope strings
+  grantedScopes?: string[]; // Array of scope strings (LEGACY - for backward compatibility)
+  grantedSkills?: string[]; // Array of skill strings (NEW - primary authorization method)
 
   // Note: constraints are NOT included - they're extracted per-request from URL
   // Note: sentryHost and mcpUrl come from env, not OAuth props

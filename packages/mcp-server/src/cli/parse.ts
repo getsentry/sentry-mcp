@@ -14,6 +14,7 @@ export function parseArgv(argv: string[]): CliArgs {
     scopes: { type: "string" as const },
     "add-scopes": { type: "string" as const },
     "all-scopes": { type: "boolean" as const },
+    skills: { type: "string" as const },
     agent: { type: "boolean" as const },
     help: { type: "boolean" as const, short: "h" as const },
     version: { type: "boolean" as const, short: "v" as const },
@@ -58,6 +59,7 @@ export function parseArgv(argv: string[]): CliArgs {
     scopes: values.scopes as string | undefined,
     addScopes: values["add-scopes"] as string | undefined,
     allScopes: (values["all-scopes"] as boolean | undefined) === true,
+    skills: values.skills as string | undefined,
     agent: (values.agent as boolean | undefined) === true,
     help: (values.help as boolean | undefined) === true,
     version: (values.version as boolean | undefined) === true,
@@ -74,8 +76,25 @@ export function parseEnv(env: NodeJS.ProcessEnv): EnvArgs {
   if (env.MCP_URL) fromEnv.mcpUrl = env.MCP_URL;
   if (env.SENTRY_DSN || env.DEFAULT_SENTRY_DSN)
     fromEnv.sentryDsn = env.SENTRY_DSN || env.DEFAULT_SENTRY_DSN;
-  if (env.MCP_SCOPES) fromEnv.scopes = env.MCP_SCOPES;
-  if (env.MCP_ADD_SCOPES) fromEnv.addScopes = env.MCP_ADD_SCOPES;
+
+  // LEGACY - deprecated environment variables
+  if (env.MCP_SCOPES) {
+    fromEnv.scopes = env.MCP_SCOPES;
+    console.warn("⚠️  Warning: MCP_SCOPES environment variable is deprecated.");
+    console.warn("   Consider using MCP_SKILLS instead.");
+    console.warn("");
+  }
+  if (env.MCP_ADD_SCOPES) {
+    fromEnv.addScopes = env.MCP_ADD_SCOPES;
+    console.warn(
+      "⚠️  Warning: MCP_ADD_SCOPES environment variable is deprecated.",
+    );
+    console.warn("   Consider using MCP_SKILLS instead.");
+    console.warn("");
+  }
+
+  // NEW - primary authorization method
+  if (env.MCP_SKILLS) fromEnv.skills = env.MCP_SKILLS;
   return fromEnv;
 }
 
@@ -93,6 +112,8 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     scopes: cli.scopes ?? env.scopes,
     addScopes: cli.addScopes ?? env.addScopes,
     allScopes: cli.allScopes === true,
+    // Skills precedence: CLI skills override env
+    skills: cli.skills ?? env.skills,
     agent: cli.agent === true,
     organizationSlug: cli.organizationSlug,
     projectSlug: cli.projectSlug,
@@ -105,5 +126,6 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
   if (cli.scopes) merged.addScopes = cli.addScopes;
   // If CLI provided add-scopes, ensure scopes override isn't pulled from env
   if (cli.addScopes) merged.scopes = cli.scopes;
+
   return merged;
 }

@@ -16,6 +16,7 @@ import {
   parseScopes,
   type Scope,
 } from "@sentry/mcp-server/permissions";
+import { parseSkills, type Skill } from "@sentry/mcp-server/skills";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
 import type { ServerContext } from "@sentry/mcp-server/types";
 import type { Env } from "../types";
@@ -85,7 +86,7 @@ const mcpHandler: ExportedHandler<Env> = {
       });
     }
 
-    // Parse and expand granted scopes
+    // Parse and expand granted scopes (LEGACY - for backward compatibility)
     let expandedScopes: Set<Scope> | undefined;
     if (oauthCtx.props.grantedScopes) {
       const { valid, invalid } = parseScopes(
@@ -102,12 +103,30 @@ const mcpHandler: ExportedHandler<Env> = {
       expandedScopes = expandScopes(new Set(valid));
     }
 
+    // Parse and validate granted skills (NEW - primary authorization method)
+    let grantedSkills: Set<Skill> | undefined;
+    if (oauthCtx.props.grantedSkills) {
+      const { valid, invalid } = parseSkills(
+        oauthCtx.props.grantedSkills as string[],
+      );
+      if (invalid.length > 0) {
+        logWarn("Ignoring invalid skills from OAuth provider", {
+          loggerScope: ["cloudflare", "mcp-handler"],
+          extra: {
+            invalidSkills: invalid,
+          },
+        });
+      }
+      grantedSkills = new Set(valid);
+    }
+
     // Build complete ServerContext from OAuth props + verified constraints
     const serverContext: ServerContext = {
       userId: oauthCtx.props.id as string | undefined,
       clientId: oauthCtx.props.clientId as string,
       accessToken: oauthCtx.props.accessToken as string,
-      grantedScopes: expandedScopes,
+      grantedScopes: expandedScopes, // LEGACY - for backward compatibility
+      grantedSkills, // NEW - primary authorization method
       constraints: verification.constraints,
       sentryHost,
       mcpUrl: env.MCP_URL,

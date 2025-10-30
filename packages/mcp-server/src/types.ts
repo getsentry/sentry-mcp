@@ -6,6 +6,7 @@
  * extraction and handler registration.
  */
 import type { Scope } from "./permissions";
+import type { Skill } from "./skills";
 
 /**
  * Constraints that restrict the MCP session scope
@@ -34,7 +35,9 @@ export type ServerContext = {
   openaiBaseUrl?: string;
   userId?: string | null;
   clientId?: string;
-  // Granted scopes for tool access control
+  // NEW: Granted skills for tool access control (user-facing capabilities)
+  grantedSkills?: Set<Skill> | ReadonlySet<Skill>;
+  // LEGACY: Granted scopes for tool access control (deprecated, for backward compatibility)
   grantedScopes?: Set<Scope> | ReadonlySet<Scope>;
   // URL-based session constraints
   constraints: Constraints;
