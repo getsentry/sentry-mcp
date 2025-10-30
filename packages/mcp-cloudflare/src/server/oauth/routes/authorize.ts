@@ -105,10 +105,10 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid resource parameter", 400);
     }
 
-    // Preserve resource in state, not exported upstream
-    const oauthReqInfoWithResource: AuthRequestWithSkills = {
-      ...oauthReqInfo,
-      ...(resourceParam ? { resource: resourceParam } : {}),
+      // Preserve resource in state (library's AuthRequest doesn't include it)
+      const oauthReqInfoWithResource: AuthRequestWithSkills = {
+        ...oauthReqInfo,
+        ...(resourceParam ? { resource: resourceParam } : {}),
     };
 
     // XXX(dcramer): we want to confirm permissions on each time
