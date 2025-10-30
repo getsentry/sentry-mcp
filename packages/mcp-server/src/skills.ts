@@ -5,8 +5,6 @@
  * They coexist with traditional Sentry API scopes during the transition period.
  */
 
-import { logIssue } from "./telem/logging";
-
 // Skill type
 export type Skill =
   | "inspect"
@@ -64,115 +62,38 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
   },
 };
 
-// Sorted array for UI ordering (without tool counts yet)
-const SKILLS_ARRAY_BASE = Object.values(SKILLS).sort(
+// Sorted array for UI ordering
+export const SKILLS_ARRAY: SkillDefinition[] = Object.values(SKILLS).sort(
   (a, b) => a.order - b.order,
 );
 
-// Calculate tool counts per skill (lazy-loaded to avoid circular dependency)
-let cachedToolCounts: Map<Skill, number> | null = null;
-let toolCountsPromise: Promise<Map<Skill, number>> | null = null;
-
-async function getToolCounts(): Promise<Map<Skill, number>> {
-  // Return cached result if available
-  if (cachedToolCounts) return cachedToolCounts;
-
-  // If already computing, wait for that computation to complete (prevents race condition)
-  if (toolCountsPromise) return toolCountsPromise;
-
-  // Start computation and cache the promise
-  toolCountsPromise = (async () => {
-    try {
-      // Dynamically import tools to count them
-      const toolsModule = await import("./tools");
-      const tools = toolsModule.default;
-
-      const counts = new Map<Skill, number>();
-
-      // Initialize counts
-      for (const skill of Object.keys(SKILLS)) {
-        counts.set(skill as Skill, 0);
-      }
-
-      // Count tools for each skill
-      for (const tool of Object.values(tools)) {
-        // Type guard: verify this is a valid tool with requiredSkills
-        if (
-          typeof tool === "object" &&
-          tool !== null &&
-          "requiredSkills" in tool &&
-          Array.isArray(tool.requiredSkills)
-        ) {
-          for (const skill of tool.requiredSkills) {
-            if (counts.has(skill as Skill)) {
-              counts.set(skill as Skill, (counts.get(skill as Skill) || 0) + 1);
-            }
-          }
-        }
-      }
-
-      cachedToolCounts = counts;
-      return counts;
-    } catch (error) {
-      // Log error for debugging
-      logIssue(error, {
-        loggerScope: ["skills", "tool-counts"],
-        extra: {
-          context: "Failed to calculate tool counts for skills",
-        },
-      });
-
-      // Clear promise cache on error so next call will retry
-      toolCountsPromise = null;
-      throw error;
-    }
-  })();
-
-  return toolCountsPromise;
-}
-
-// Helper function to get SKILLS_ARRAY with tool counts
-let skillsArrayWithCounts: SkillDefinition[] | null = null;
-let skillsArrayPromise: Promise<SkillDefinition[]> | null = null;
-
+// Get skills with tool counts (used by build script only)
 export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
-  // Return cached result if available
-  if (skillsArrayWithCounts) return skillsArrayWithCounts;
+  // Dynamically import to avoid circular dependency
+  const toolsModule = await import("./tools");
+  const tools = toolsModule.default;
 
-  // If already computing, wait for that computation to complete (prevents race condition)
-  if (skillsArrayPromise) return skillsArrayPromise;
+  const counts = new Map<Skill, number>();
 
-  // Start computation and cache the promise
-  skillsArrayPromise = (async () => {
-    try {
-      const toolCounts = await getToolCounts();
-      skillsArrayWithCounts = SKILLS_ARRAY_BASE.map((skill) => ({
-        ...skill,
-        toolCount: toolCounts.get(skill.id) || 0,
-      }));
+  // Initialize counts
+  for (const skill of Object.keys(SKILLS)) {
+    counts.set(skill as Skill, 0);
+  }
 
-      return skillsArrayWithCounts;
-    } catch (error) {
-      // Log error for debugging
-      logIssue(error, {
-        loggerScope: ["skills", "skills-array"],
-        extra: {
-          context: "Failed to build skills array with tool counts",
-        },
-      });
-
-      // Clear promise cache on error so next call will retry
-      skillsArrayPromise = null;
-      throw error;
+  // Count tools for each skill
+  for (const tool of Object.values(tools)) {
+    if (Array.isArray(tool.requiredSkills)) {
+      for (const skill of tool.requiredSkills) {
+        counts.set(skill as Skill, (counts.get(skill as Skill) || 0) + 1);
+      }
     }
-  })();
+  }
 
-  return skillsArrayPromise;
+  return SKILLS_ARRAY.map((skill) => ({
+    ...skill,
+    toolCount: counts.get(skill.id) || 0,
+  }));
 }
-
-// Export SKILLS_ARRAY without tool counts (for synchronous access)
-// Use getSkillsArrayWithCounts() when you need tool counts
-export const SKILLS_ARRAY: SkillDefinition[] = SKILLS_ARRAY_BASE;
 
 // All skills (for foundational tools that should be available to all skills)
 export const ALL_SKILLS: Skill[] = Object.keys(SKILLS) as Skill[];
