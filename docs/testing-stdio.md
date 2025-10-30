@@ -449,17 +449,17 @@ node dist/index.js \
   --host=sentry.local.dev
 ```
 
-### 3. Test Scope Permissions
+### 3. Test Skills
 
 ```bash
-# Test read-only (default)
+# Test with all skills (default)
 pnpm start --access-token=TOKEN
 
-# Test with write permissions
-pnpm start --access-token=TOKEN --add-scopes=event:write,project:write
+# Test with specific skills only
+pnpm start --access-token=TOKEN --skills=inspect,docs
 
-# Test minimal permissions
-pnpm start --access-token=TOKEN --scopes=org:read,project:read
+# Test read-only skills
+pnpm start --access-token=TOKEN --skills=inspect,seer,docs
 ```
 
 ### 4. Test AI-Powered Tools
