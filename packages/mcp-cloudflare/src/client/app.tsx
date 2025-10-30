@@ -8,7 +8,8 @@ import { Sidebars } from "./components/home-layout/sidebars";
 import Footer from "./components/home-layout/footer";
 import TableOfContents from "./components/docs/toc";
 import HeroBlock from "./components/hero/hero-block";
-// import Ghost from "./components/ghost";
+import Integration from "./components/Integration";
+import UseCases from "./components/usecases";
 
 export default function App() {
   const { isAuthenticated, handleLogout } = useAuth();
@@ -79,6 +80,8 @@ export default function App() {
       <Header toggleChat={toggleChat} isChatOpen={isChatOpen} />
       <HeaderDivider />
       <HeroBlock />
+      <UseCases />
+      <Integration />
 
       {/* main content */}
       <div className="relative container mx-auto">

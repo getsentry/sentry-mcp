@@ -448,3 +448,38 @@
 .group:hover .animate-openchat .underscore {
   animation: mcp_openchat_underscore 550ms steps(3) var(--delay, 0ms) 1 both;
 }
+
+@keyframes wave {
+  0%,
+  100% {
+    color: rgb(249 115 22); /* orange-500 */
+  }
+  50% {
+    color: rgb(253 186 116); /* orange-300 */
+  }
+}
+
+@keyframes spinStar {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.pop {
+  animation: pop 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

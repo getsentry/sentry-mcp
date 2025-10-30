@@ -9,7 +9,7 @@ export default function BrowserAnimation({
   globalIndex: number;
 }) {
   return (
-    <div className="relative h-full w-full hidden md:block bg-dots">
+    <div className="relative h-full w-full hidden md:block bg-dots bg-fixed">
       <IDEWindow step={globalIndex} />
       <BrowserWindow step={globalIndex} />
       <LoadingSquares step={globalIndex} />
