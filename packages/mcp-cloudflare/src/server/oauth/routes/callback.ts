@@ -9,7 +9,7 @@ import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
 import tools from "@sentry/mcp-server/tools";
-import type { Skill } from "@sentry/mcp-server/skills";
+import { parseSkills, type Skill } from "@sentry/mcp-server/skills";
 
 /**
  * Extended AuthRequest that includes permissions and skills
@@ -232,25 +232,38 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   ]);
 
   // Extract and validate granted skills
-  const grantedSkills: string[] = Array.isArray(oauthReqInfo.skills)
-    ? (oauthReqInfo.skills as unknown[]).filter(
-        (s): s is string => typeof s === "string",
-      )
-    : [];
+  const { valid: validSkills, invalid: invalidSkills } = parseSkills(
+    oauthReqInfo.skills,
+  );
 
-  // Validate that at least one skill is granted
-  if (grantedSkills.length === 0) {
-    logWarn("OAuth authorization rejected: No skills selected", {
+  // Log warning for any invalid skill names
+  if (invalidSkills.length > 0) {
+    logWarn("OAuth callback received invalid skill names", {
       loggerScope: ["cloudflare", "oauth", "callback"],
       extra: {
         clientId: oauthReqInfo.clientId,
+        invalidSkills,
+      },
+    });
+  }
+
+  // Validate that at least one valid skill is granted
+  if (validSkills.size === 0) {
+    logWarn("OAuth authorization rejected: No valid skills selected", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: {
+        clientId: oauthReqInfo.clientId,
+        receivedSkills: oauthReqInfo.skills,
       },
     });
     return c.text(
-      "Authorization failed: You must select at least one permission to continue.",
+      "Authorization failed: You must select at least one valid permission to continue.",
       400,
     );
   }
+
+  // Convert valid skills Set to array for OAuth props
+  const grantedSkills = Array.from(validSkills);
 
   // Return back to the MCP client a new token
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({

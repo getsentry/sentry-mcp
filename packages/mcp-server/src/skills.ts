@@ -5,6 +5,8 @@
  * They coexist with traditional Sentry API scopes during the transition period.
  */
 
+import { logIssue } from "./telem/logging";
+
 // Skill type
 export type Skill =
   | "inspect"
@@ -93,11 +95,18 @@ async function getToolCounts(): Promise<Map<Skill, number>> {
       }
 
       // Count tools for each skill
-      for (const tool of Object.values(tools) as any[]) {
-        const requiredSkills = tool.requiredSkills || [];
-        for (const skill of requiredSkills) {
-          if (counts.has(skill)) {
-            counts.set(skill, (counts.get(skill) || 0) + 1);
+      for (const tool of Object.values(tools)) {
+        // Type guard: verify this is a valid tool with requiredSkills
+        if (
+          typeof tool === "object" &&
+          tool !== null &&
+          "requiredSkills" in tool &&
+          Array.isArray(tool.requiredSkills)
+        ) {
+          for (const skill of tool.requiredSkills) {
+            if (counts.has(skill as Skill)) {
+              counts.set(skill as Skill, (counts.get(skill as Skill) || 0) + 1);
+            }
           }
         }
       }
@@ -105,6 +114,14 @@ async function getToolCounts(): Promise<Map<Skill, number>> {
       cachedToolCounts = counts;
       return counts;
     } catch (error) {
+      // Log error for debugging
+      logIssue(error, {
+        loggerScope: ["skills", "tool-counts"],
+        extra: {
+          context: "Failed to calculate tool counts for skills",
+        },
+      });
+
       // Clear promise cache on error so next call will retry
       toolCountsPromise = null;
       throw error;
@@ -136,6 +153,14 @@ export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
 
       return skillsArrayWithCounts;
     } catch (error) {
+      // Log error for debugging
+      logIssue(error, {
+        loggerScope: ["skills", "skills-array"],
+        extra: {
+          context: "Failed to build skills array with tool counts",
+        },
+      });
+
       // Clear promise cache on error so next call will retry
       skillsArrayPromise = null;
       throw error;
@@ -181,8 +206,13 @@ export function parseSkills(input: unknown): {
 
   if (!input) return { valid, invalid };
 
-  const skills =
-    typeof input === "string" ? input.split(",") : Array.from(input as any);
+  // Parse skills from string (comma-separated) or array (from JSON)
+  let skills: string[] = [];
+  if (typeof input === "string") {
+    skills = input.split(",");
+  } else if (Array.isArray(input)) {
+    skills = input.map((v) => (typeof v === "string" ? v : ""));
+  }
 
   for (const skill of skills) {
     const trimmed = String(skill).trim();

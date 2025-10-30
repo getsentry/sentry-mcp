@@ -5,7 +5,7 @@
     "description": "Search for errors, analyze traces, and explore event details",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 9
+    "toolCount": 10
   },
   {
     "id": "seer",
@@ -13,7 +13,7 @@
     "description": "Sentry's AI debugger that helps you analyze, root cause, and fix issues",
     "defaultEnabled": true,
     "order": 2,
-    "toolCount": 6
+    "toolCount": 7
   },
   {
     "id": "docs",
@@ -21,7 +21,7 @@
     "description": "Search and read Sentry SDK documentation",
     "defaultEnabled": false,
     "order": 3,
-    "toolCount": 4
+    "toolCount": 5
   },
   {
     "id": "triage",
@@ -29,7 +29,7 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 7
+    "toolCount": 8
   },
   {
     "id": "project-management",
@@ -37,6 +37,6 @@
     "description": "Create and modify projects, teams, and DSNs",
     "defaultEnabled": false,
     "order": 5,
-    "toolCount": 8
+    "toolCount": 9
   }
 ]

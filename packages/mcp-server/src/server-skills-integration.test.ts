@@ -115,7 +115,7 @@ describe("server skills integration", () => {
 
       // Expected behavior (verified manually via MCP tools/list):
       // - find_dsns should NOT be available (requires "project-management" skill)
-      // - whoami should NOT be available (requires no skills - not exposed via skills system)
+      // - whoami SHOULD be available (available to ALL_SKILLS)
       // - get_issue_details SHOULD be available (requires "inspect" or "triage" or "seer")
       // - analyze_issue_with_seer SHOULD be available (requires "seer")
     });
