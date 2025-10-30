@@ -348,8 +348,11 @@ export function validateResourceParameter(
       return false;
     }
 
-    const validPath = "/mcp";
-    return resourceUrl.pathname.startsWith(validPath);
+    // Validate path is exactly /mcp or starts with /mcp/
+    return (
+      resourceUrl.pathname === "/mcp" ||
+      resourceUrl.pathname.startsWith("/mcp/")
+    );
   } catch {
     return false;
   }

@@ -109,7 +109,7 @@ export default new Hono<{ Bindings: Env }>()
       const oauthReqInfoWithResource: AuthRequestWithSkills = {
         ...oauthReqInfo,
         ...(resourceParam ? { resource: resourceParam } : {}),
-    };
+      };
 
     // XXX(dcramer): we want to confirm permissions on each time
     // so you can always choose new ones

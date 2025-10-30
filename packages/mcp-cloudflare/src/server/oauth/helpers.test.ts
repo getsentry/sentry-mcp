@@ -402,6 +402,22 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(false);
     });
 
+    it("should reject path with /mcp prefix but no separator", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcpadmin",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject path with /mcp- prefix", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp-evil",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
     it("should reject malformed URL", () => {
       const result = validateResourceParameter(
         "not-a-url",
@@ -495,13 +511,13 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(false);
     });
 
-    it("should handle URL encoding in path", () => {
+    it("should reject URL-encoded slashes in path", () => {
       const result = validateResourceParameter(
         "https://mcp.sentry.dev/mcp%2Forg",
         "https://mcp.sentry.dev/oauth/authorize",
       );
-      // URL encoding should be preserved
-      expect(result).toBe(true);
+      // Encoded slashes could bypass path validation
+      expect(result).toBe(false);
     });
   });
 });
