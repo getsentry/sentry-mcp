@@ -9,9 +9,7 @@ import {
 import Note from "../components/ui/note";
 import { Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
-import RemoteSetup from "../components/fragments/remote-setup";
 import { useState } from "react";
-import StdioSetup from "../components/fragments/stdio-setup";
 import Section from "../components/ui/section";
 import { Prose } from "../components/ui/prose";
 import JsonSchemaParams from "../components/ui/json-schema-params";
@@ -66,14 +64,6 @@ export default function Home({ onChatClick }: HomeProps) {
 
           <Section>
             <Prose>
-              <p className="sm:hidden">
-                Simply put, it's a way to plug Sentry's API into an LLM, letting
-                you ask questions about your data in context of the LLM itself.
-                This lets you take a coding agent that you already use, like
-                Cursor or Claude Code, and pull in additional information from
-                Sentry to help with tasks like debugging, fixing production
-                errors, and understanding your application's behavior.
-              </p>
               <p>
                 This project is still in its infancy as development of the MCP
                 specification is ongoing. If you find any problems, or have an
@@ -98,7 +88,7 @@ export default function Home({ onChatClick }: HomeProps) {
             </Prose>
           </Section>
 
-          <Section
+          {/* <Section
             id="getting-started"
             heading={
               <>
@@ -141,7 +131,7 @@ export default function Home({ onChatClick }: HomeProps) {
                 </div>
               )}
             </div>
-          </Section>
+          </Section> */}
         </Section>
 
         <Section heading="Available Tools" id="tools">

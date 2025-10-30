@@ -6,9 +6,9 @@ export default function HeroBlock() {
   const endpoint = new URL("/mcp", window.location.href).href;
 
   return (
-    <div className="flex-1 flex flex-col container mx-auto max-h-[80rem] h-[calc(100svh-69px)]">
+    <div className="flex-1 flex flex-col container mx-auto sm:max-h-[80rem] min-h-[calc(100svh-69px)] sm:h-[calc(100svh-69px)]">
       <div className="grid xl:grid-cols-2 gap-8 sm:px-8 sm:py-6 px-4 py-3">
-        <p className="text-white/70 max-w-[69ch] max-sm:hidden">
+        <p className="text-white/70 max-w-[69ch]">
           Simply put, it's a way to plug Sentry's API into an LLM, letting you
           ask questions about your data in context of the LLM itself. This lets
           you take a coding agent that you already use, like Cursor or Claude
@@ -16,11 +16,13 @@ export default function HeroBlock() {
           tasks like debugging, fixing production errors, and understanding your
           application's behavior.
         </p>
-        <div className="flex h-full items-center xl:justify-end gap-6 flex-wrap">
-          <CodeSnippet noMargin snippet={endpoint} />
+        <div className="flex h-full items-center xl:justify-end sm:gap-6 gap-2 flex-wrap">
+          <div className="w-full sm:contents">
+            <CodeSnippet noMargin snippet={endpoint} />
+          </div>
           <a
             href="cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9"
-            className="relative size-fit my-2 group cursor-pointer"
+            className="relative hidden md:block size-fit my-2 group cursor-pointer"
           >
             <div className="absolute inset-0 size-full rounded-xl bg-violet-400/80 bg-[repeating-linear-gradient(-45deg,var(--background),var(--background)_0.5px,#fff0_0.5px,#fff0_12px)]" />
             <div className="bg-grid absolute inset-0 size-full duration-200 delay-50 opacity-100 [--size:10px] [--grid-color:#0002] bg-pink-400 group-hover:rotate-x-15 group-hover:translate-1 group-hover:-rotate-y-2 !px-6 transform-3d perspective-distant rounded-xl ease-[cubic-bezier(0.175,0.885,0.32,1.275)] origin-bottom-right group-active:rotate-y-1 group-active:translate-0.5 group-active:rotate-x-3" />
@@ -53,7 +55,7 @@ export default function HeroBlock() {
       </div>
       {/* demo */}
       <div
-        className="overflow-wrap p-4 sm:p-8 overflow-visible relative grid h-full flex-1 w-full gap-8 rounded-2xl xl:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 xl:grid-rows-1"
+        className="overflow-wrap p-4 sm:p-8 max-sm:min-h-[40rem] overflow-visible relative grid h-full flex-1 w-full gap-8 rounded-2xl xl:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 xl:grid-rows-1"
         id="demo"
       >
         <TerminalAnimation />

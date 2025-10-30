@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Prose } from "../ui/prose";
+import { cn } from "@/client/lib/utils";
 
 export type TabProps = {
   id: string;
@@ -18,11 +19,13 @@ export default function InstallTabs({
   initialIndex = 0,
   current,
   onChange,
+  className = "",
 }: {
   children: React.ReactNode;
   initialIndex?: number;
   current?: number;
   onChange?: (next: number) => void;
+  className?: string;
 }) {
   const items = React.Children.toArray(children).filter(
     React.isValidElement,
@@ -97,7 +100,7 @@ export default function InstallTabs({
   }, [active]);
 
   return (
-    <div className="relative bg-[#201633] mb-6 mt-4 rounded-2xl">
+    <div className={cn("relative bg-[#201633] rounded-2xl", className)}>
       <div
         className="flex"
         role="tablist"
