@@ -182,7 +182,7 @@ This opens the MCP Inspector at `http://localhost:6274`
 ### 3. Test Tools Interactively
 
 **Basic workflow:**
-1. **List Tools** - Verify all expected tools appear (should see 19-20 tools)
+1. **List Tools** - Verify expected tools appear
 2. **Call a tool** - Start with `whoami` (no parameters required)
 3. **Test with parameters** - Try `find_organizations()`
 4. **Test complex operations** - Try `search_events(naturalLanguageQuery="errors in the last hour")`
