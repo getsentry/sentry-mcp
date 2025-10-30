@@ -326,11 +326,25 @@ export function validateResourceParameter(
     const resourceUrl = new URL(resource);
     const requestUrlObj = new URL(requestUrl);
 
+    // RFC 8707: resource URI must not include fragment
+    if (resourceUrl.hash) {
+      return false;
+    }
+
+    // Must use same protocol
+    if (resourceUrl.protocol !== requestUrlObj.protocol) {
+      return false;
+    }
+
     if (resourceUrl.hostname !== requestUrlObj.hostname) {
       return false;
     }
 
-    if (resourceUrl.port !== requestUrlObj.port) {
+    // Normalize default ports for comparison
+    const getPort = (url: URL) =>
+      url.port || (url.protocol === "https:" ? "443" : "80");
+
+    if (getPort(resourceUrl) !== getPort(requestUrlObj)) {
       return false;
     }
 

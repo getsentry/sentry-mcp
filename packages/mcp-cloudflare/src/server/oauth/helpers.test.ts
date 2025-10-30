@@ -344,6 +344,22 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(true);
     });
 
+    it("should allow explicit default port 443 for https", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev:443/mcp",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should allow explicit default port 80 for http", () => {
+      const result = validateResourceParameter(
+        "http://localhost:80/mcp",
+        "http://localhost/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
     it("should allow 127.0.0.1 with /mcp path", () => {
       const result = validateResourceParameter(
         "http://127.0.0.1:3000/mcp",
@@ -418,6 +434,14 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(false);
     });
 
+    it("should reject different protocol (http vs https)", () => {
+      const result = validateResourceParameter(
+        "http://mcp.sentry.dev/mcp",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
     it("should reject javascript: scheme", () => {
       const result = validateResourceParameter(
         "javascript:alert(1)",
@@ -436,12 +460,12 @@ describe("validateResourceParameter", () => {
   });
 
   describe("edge cases", () => {
-    it("should handle URL with fragment", () => {
+    it("should reject URL with fragment (RFC 8707)", () => {
       const result = validateResourceParameter(
         "https://mcp.sentry.dev/mcp#fragment",
         "https://mcp.sentry.dev/oauth/authorize",
       );
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
     it("should handle URL with trailing slash", () => {
