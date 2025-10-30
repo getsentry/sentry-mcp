@@ -9,9 +9,8 @@
  * 4. The mapping is consistent with the design document
  */
 
-import { SKILLS, type Skill } from "../src/skills.js";
+import { SKILLS, getScopesForSkills, type Skill } from "../src/skills.js";
 import type { Scope } from "../src/permissions.js";
-import { DEFAULT_SCOPES } from "../src/constants.js";
 import tools from "../src/tools/index.js";
 
 // Color codes for terminal output
@@ -46,37 +45,14 @@ function getToolsForSkill(skill: Skill): string[] {
 }
 
 /**
- * Calculate which scopes are required by a set of skills
- */
-function getScopesForSkills(skills: Skill[]): Set<Scope> {
-  const scopes = new Set<Scope>(DEFAULT_SCOPES);
-  const grantedSkills = new Set(skills);
-
-  for (const tool of Object.values(tools)) {
-    // Check if any of the tool's required skills are granted
-    const toolEnabled = tool.requiredSkills.some((reqSkill) =>
-      grantedSkills.has(reqSkill),
-    );
-
-    if (toolEnabled) {
-      for (const scope of tool.requiredScopes) {
-        scopes.add(scope);
-      }
-    }
-  }
-
-  return scopes;
-}
-
-/**
  * Validate skills-to-tools-to-scopes mapping
  */
-function validateMapping(): ValidationResult[] {
+async function validateMapping(): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
 
   for (const skillId of Object.keys(SKILLS) as Skill[]) {
     const enabledTools = getToolsForSkill(skillId);
-    const requiredScopes = getScopesForSkills([skillId]);
+    const requiredScopes = await getScopesForSkills(new Set([skillId]));
 
     results.push({
       skill: skillId,
@@ -230,9 +206,9 @@ function displaySummary(results: ValidationResult[]): void {
 }
 
 // Main execution
-function main(): void {
+async function main(): Promise<void> {
   try {
-    const results = validateMapping();
+    const results = await validateMapping();
     displayResults(results);
 
     const orphanedTools = findOrphanedTools();

@@ -225,3 +225,32 @@ export function parseSkills(input: unknown): {
 
   return { valid, invalid };
 }
+
+// Calculate required scopes from granted skills
+export async function getScopesForSkills(
+  grantedSkills: Set<Skill>,
+): Promise<Set<string>> {
+  // Import here to avoid circular dependency at module load time
+  const { DEFAULT_SCOPES } = await import("./constants.js");
+  const toolsModule = await import("./tools/index.js");
+  const tools = toolsModule.default;
+
+  const scopes = new Set<string>(DEFAULT_SCOPES);
+
+  // Iterate through all tools and collect required scopes for tools enabled by granted skills
+  for (const tool of Object.values(tools)) {
+    // Check if any of the tool's required skills are granted
+    const toolEnabled = tool.requiredSkills.some((reqSkill) =>
+      grantedSkills.has(reqSkill),
+    );
+
+    // If tool is enabled by granted skills, add its required scopes
+    if (toolEnabled) {
+      for (const scope of tool.requiredScopes) {
+        scopes.add(scope);
+      }
+    }
+  }
+
+  return scopes;
+}

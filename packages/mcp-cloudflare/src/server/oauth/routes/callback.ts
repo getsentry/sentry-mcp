@@ -2,62 +2,17 @@ import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import type { Env, WorkerProps } from "../../types";
-import type { Scope } from "@sentry/mcp-server/permissions";
-import { DEFAULT_SCOPES } from "@sentry/mcp-server/constants";
 import { SENTRY_TOKEN_URL } from "../constants";
 import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
-import tools from "@sentry/mcp-server/tools";
-import { parseSkills, type Skill } from "@sentry/mcp-server/skills";
+import { parseSkills, getScopesForSkills } from "@sentry/mcp-server/skills";
 
 /**
  * Extended AuthRequest that includes skills
  */
 interface AuthRequestWithSkills extends AuthRequest {
   skills?: unknown; // Skill-based authorization system
-}
-
-/**
- * Calculate required scopes from granted skills by examining tool requirements.
- * For each granted skill, collects the scopes needed by all tools that require that skill.
- *
- * @example
- * // User grants "inspect" and "triage" skills
- * getScopesFromSkills(["inspect", "triage"])
- * // Returns: Set(["org:read", "project:read", "team:read", "event:read", "event:write"])
- *
- * @param skills Array of granted skill IDs
- * @returns Set of required Sentry API scopes
- */
-function getScopesFromSkills(skills?: unknown): Set<Scope> {
-  // Start with base read-only scopes (always granted via DEFAULT_SCOPES)
-  const scopes = new Set<Scope>(DEFAULT_SCOPES);
-
-  // Validate skills is an array of strings
-  if (!Array.isArray(skills) || skills.length === 0) {
-    return scopes;
-  }
-  const grantedSkills = new Set<Skill>(
-    (skills as unknown[]).filter((s): s is Skill => typeof s === "string"),
-  );
-
-  // Iterate through all tools and collect required scopes for tools enabled by granted skills
-  for (const tool of Object.values(tools)) {
-    // Check if any of the tool's required skills are granted
-    const toolEnabled = tool.requiredSkills.some((reqSkill) =>
-      grantedSkills.has(reqSkill),
-    );
-
-    // If tool is enabled by granted skills, add its required scopes
-    if (toolEnabled) {
-      for (const scope of tool.requiredScopes) {
-        scopes.add(scope);
-      }
-    }
-  }
-
-  return scopes;
 }
 
 /**
@@ -165,10 +120,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   });
   if (errResponse) return errResponse;
 
-  // Calculate Sentry API scopes from granted skills
-  const grantedScopes = getScopesFromSkills(oauthReqInfo.skills);
-
-  // Extract and validate granted skills
+  // Parse and validate granted skills first
   const { valid: validSkills, invalid: invalidSkills } = parseSkills(
     oauthReqInfo.skills,
   );
@@ -198,6 +150,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       400,
     );
   }
+
+  // Calculate Sentry API scopes from validated skills
+  const grantedScopes = await getScopesForSkills(validSkills);
 
   // Convert valid skills Set to array for OAuth props
   const grantedSkills = Array.from(validSkills);
