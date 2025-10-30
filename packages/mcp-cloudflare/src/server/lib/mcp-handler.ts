@@ -17,7 +17,7 @@ import {
   type Scope,
 } from "@sentry/mcp-server/permissions";
 import { parseSkills, type Skill } from "@sentry/mcp-server/skills";
-import { logWarn } from "@sentry/mcp-server/telem/logging";
+import { logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
 import type { ServerContext } from "@sentry/mcp-server/types";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
@@ -118,6 +118,36 @@ const mcpHandler: ExportedHandler<Env> = {
         });
       }
       grantedSkills = new Set(valid);
+
+      // Validate that at least one valid skill was granted
+      if (grantedSkills.size === 0) {
+        return new Response(
+          "Authorization failed: No valid skills were granted. Please re-authorize and select at least one permission.",
+          { status: 400 },
+        );
+      }
+    }
+
+    // Validate that at least one authorization system is active
+    // This should never happen in practice - indicates a bug in OAuth flow
+    if (!grantedSkills && !expandedScopes) {
+      logIssue(
+        new Error(
+          "No authorization grants found - server would expose no tools",
+        ),
+        {
+          loggerScope: ["cloudflare", "mcp-handler"],
+          extra: {
+            clientId: oauthCtx.props.clientId,
+            hasGrantedSkills: !!oauthCtx.props.grantedSkills,
+            hasGrantedScopes: !!oauthCtx.props.grantedScopes,
+          },
+        },
+      );
+      return new Response(
+        "Authorization failed: No valid permissions were granted. Please re-authorize and select at least one permission.",
+        { status: 400 },
+      );
     }
 
     // Build complete ServerContext from OAuth props + verified constraints
@@ -125,8 +155,10 @@ const mcpHandler: ExportedHandler<Env> = {
       userId: oauthCtx.props.id as string | undefined,
       clientId: oauthCtx.props.clientId as string,
       accessToken: oauthCtx.props.accessToken as string,
-      grantedScopes: expandedScopes, // LEGACY - for backward compatibility
-      grantedSkills, // NEW - primary authorization method
+      // Scopes derived from skills - for backward compatibility with old MCP clients
+      // that don't support grantedSkills and only understand grantedScopes
+      grantedScopes: expandedScopes,
+      grantedSkills, // Primary authorization method
       constraints: verification.constraints,
       sentryHost,
       mcpUrl: env.MCP_URL,

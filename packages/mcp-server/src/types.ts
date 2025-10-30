@@ -35,9 +35,10 @@ export type ServerContext = {
   openaiBaseUrl?: string;
   userId?: string | null;
   clientId?: string;
-  // NEW: Granted skills for tool access control (user-facing capabilities)
+  // Granted skills for tool access control (user-facing capabilities, primary authorization method)
   grantedSkills?: Set<Skill> | ReadonlySet<Skill>;
-  // LEGACY: Granted scopes for tool access control (deprecated, for backward compatibility)
+  // Granted scopes derived from skills - for backward compatibility with old MCP clients
+  // that don't support grantedSkills and only understand grantedScopes
   grantedScopes?: Set<Scope> | ReadonlySet<Scope>;
   // URL-based session constraints
   constraints: Constraints;

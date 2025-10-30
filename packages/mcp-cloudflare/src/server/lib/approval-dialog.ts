@@ -840,8 +840,6 @@ export interface ParsedApprovalResult {
   state: any;
   /** Headers to set on the redirect response, including the Set-Cookie header. */
   headers: Record<string, string>;
-  /** Selected permission levels (legacy - for backward compatibility) */
-  permissions: string[];
   /** Selected skills */
   skills: string[];
 }
@@ -865,7 +863,6 @@ export async function parseRedirectApproval(
 
   let state: any;
   let clientId: string | undefined;
-  let permissions: string[];
   let skills: string[];
 
   try {
@@ -887,11 +884,6 @@ export async function parseRedirectApproval(
     skills = formData
       .getAll("skill")
       .filter((s): s is string => typeof s === "string");
-
-    // Extract legacy permission selections for backward compatibility
-    permissions = formData
-      .getAll("permission")
-      .filter((p): p is string => typeof p === "string");
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],
@@ -925,7 +917,7 @@ export async function parseRedirectApproval(
     "Set-Cookie": `${COOKIE_NAME}=${newCookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`,
   };
 
-  return { state, headers, permissions, skills };
+  return { state, headers, skills };
 }
 
 // sanitizeHtml function is now imported from "./html-utils"

@@ -12,16 +12,16 @@ import { signState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
 
 /**
- * Extended AuthRequest that includes permissions
+ * Extended AuthRequest that includes skills
  */
-interface AuthRequestWithPermissions extends AuthRequest {
-  permissions?: unknown;
+interface AuthRequestWithSkills extends AuthRequest {
+  skills?: unknown;
 }
 
 async function redirectToUpstream(
   env: Env,
   request: Request,
-  oauthReqInfo: AuthRequest | AuthRequestWithPermissions,
+  oauthReqInfo: AuthRequest | AuthRequestWithSkills,
   headers: Record<string, string> = {},
   stateOverride?: string,
 ) {
@@ -117,34 +117,33 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid request", 400);
     }
 
-    const { state, headers, permissions, skills } = result;
+    const { state, headers, skills } = result;
 
     if (!state.oauthReqInfo) {
       return c.text("Invalid request", 400);
     }
 
-    // Store the selected permissions and skills in the OAuth request info
+    // Store the selected skills in the OAuth request info
     // This will be passed through to the callback via the state parameter
-    const oauthReqWithPermissions = {
+    const oauthReqWithSkills = {
       ...state.oauthReqInfo,
-      permissions, // Legacy - for backward compatibility
-      skills, // New skill-based system
+      skills,
     };
 
     // Validate redirectUri is registered for this client before proceeding
     try {
       const client = await c.env.OAUTH_PROVIDER.lookupClient(
-        oauthReqWithPermissions.clientId,
+        oauthReqWithSkills.clientId,
       );
       const uriIsAllowed =
         Array.isArray(client?.redirectUris) &&
-        client.redirectUris.includes(oauthReqWithPermissions.redirectUri);
+        client.redirectUris.includes(oauthReqWithSkills.redirectUri);
       if (!uriIsAllowed) {
         logWarn("Redirect URI not registered for client", {
           loggerScope: ["cloudflare", "oauth", "authorize"],
           extra: {
-            clientId: oauthReqWithPermissions.clientId,
-            redirectUri: oauthReqWithPermissions.redirectUri,
+            clientId: oauthReqWithSkills.clientId,
+            redirectUri: oauthReqWithSkills.redirectUri,
           },
         });
         return c.text("Invalid redirect URI", 400);
@@ -160,7 +159,7 @@ export default new Hono<{ Bindings: Env }>()
     // Build signed state for redirect to Sentry (10 minute validity)
     const now = Date.now();
     const payload: OAuthState = {
-      req: oauthReqWithPermissions as unknown as Record<string, unknown>,
+      req: oauthReqWithSkills as unknown as Record<string, unknown>,
       iat: now,
       exp: now + 10 * 60 * 1000,
     };
@@ -169,7 +168,7 @@ export default new Hono<{ Bindings: Env }>()
     return redirectToUpstream(
       c.env,
       c.req.raw,
-      oauthReqWithPermissions,
+      oauthReqWithSkills,
       headers,
       signedState,
     );

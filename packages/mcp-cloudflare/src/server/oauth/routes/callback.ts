@@ -12,11 +12,10 @@ import tools from "@sentry/mcp-server/tools";
 import { parseSkills, type Skill } from "@sentry/mcp-server/skills";
 
 /**
- * Extended AuthRequest that includes permissions and skills
+ * Extended AuthRequest that includes skills
  */
-interface AuthRequestWithPermissions extends AuthRequest {
-  permissions?: unknown; // Legacy - for backward compatibility
-  skills?: unknown; // New skill-based system
+interface AuthRequestWithSkills extends AuthRequest {
+  skills?: unknown; // Skill-based authorization system
 }
 
 /**
@@ -62,58 +61,6 @@ function getScopesFromSkills(skills?: unknown): Set<Scope> {
 }
 
 /**
- * Convert selected permissions to granted scopes (LEGACY - for backward compatibility)
- * Permissions are additive:
- * - Base (always included): org:read, project:read, team:read, event:read
- * - Seer adds: seer (virtual scope)
- * - Docs adds: docs (virtual scope)
- * - Issue Triage adds: event:write
- * - Project Management adds: project:write, team:write
- * @param permissions Array of permission strings
- * @deprecated Use getScopesFromSkills instead
- */
-function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
-  // Start with base read-only scopes (always granted via DEFAULT_SCOPES)
-  const scopes = new Set<Scope>(DEFAULT_SCOPES);
-
-  // Validate permissions is an array of strings
-  if (!Array.isArray(permissions) || permissions.length === 0) {
-    return scopes;
-  }
-  const perms = (permissions as unknown[]).filter(
-    (p): p is string => typeof p === "string",
-  );
-
-  // Log deprecation warning if permissions are used
-  if (perms.length > 0) {
-    logWarn(
-      "Legacy permissions system used (deprecated - use skills instead)",
-      {
-        loggerScope: ["cloudflare", "oauth", "callback"],
-        extra: {
-          permissions: perms,
-        },
-      },
-    );
-  }
-
-  // Add scopes based on selected permissions
-  // Note: "seer" and "docs" are skill names, not OAuth scopes - they don't map to actual API permissions
-  // The new skills system (getScopesFromSkills) handles this properly by mapping skills to required OAuth scopes
-
-  if (perms.includes("issue_triage")) {
-    scopes.add("event:write");
-  }
-
-  if (perms.includes("project_management")) {
-    scopes.add("project:write");
-    scopes.add("team:write");
-  }
-
-  return scopes;
-}
-
-/**
  * OAuth Callback Endpoint (GET /oauth/callback)
  *
  * This route handles the callback from Sentry after user authentication.
@@ -137,7 +84,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   }
 
   // Reconstruct oauth request info exactly as provided by downstream client
-  const oauthReqInfo = parsedState.req as unknown as AuthRequestWithPermissions;
+  const oauthReqInfo = parsedState.req as unknown as AuthRequestWithSkills;
 
   if (!oauthReqInfo.clientId) {
     logWarn("Missing clientId in OAuth state", {
@@ -218,18 +165,8 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   });
   if (errResponse) return errResponse;
 
-  // Calculate scopes from both skills and legacy permissions (for backward compatibility)
-  // Skills system is the primary method, permissions are deprecated
-  const scopesFromSkills = getScopesFromSkills(oauthReqInfo.skills);
-  const scopesFromPermissions = getScopesFromPermissions(
-    oauthReqInfo.permissions,
-  );
-
-  // Merge scopes from both systems (union)
-  const grantedScopes = new Set<Scope>([
-    ...scopesFromSkills,
-    ...scopesFromPermissions,
-  ]);
+  // Calculate Sentry API scopes from granted skills
+  const grantedScopes = getScopesFromSkills(oauthReqInfo.skills);
 
   // Extract and validate granted skills
   const { valid: validSkills, invalid: invalidSkills } = parseSkills(
@@ -286,8 +223,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
-      grantedScopes: Array.from(grantedScopes), // LEGACY - for backward compatibility
-      grantedSkills, // NEW - primary authorization method
+      // Scopes derived from skills - for backward compatibility with old MCP clients
+      // that don't support grantedSkills and only understand grantedScopes
+      grantedScopes: Array.from(grantedScopes),
+      grantedSkills, // Primary authorization method
 
       // Note: constraints are NOT included here - they're extracted per-request from URL
       // Note: sentryHost and mcpUrl come from env, not OAuth props

@@ -69,7 +69,7 @@ describe("oauth authorize routes", () => {
         tokenEndpointAuthMethod: "client_secret_basic",
       });
     });
-    it("should encode permissions in the redirect state", async () => {
+    it("should encode skills in the redirect state", async () => {
       const oauthReqInfo = {
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
@@ -78,8 +78,8 @@ describe("oauth authorize routes", () => {
       };
       const formData = new FormData();
       formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
-      formData.append("permission", "issue_triage");
-      formData.append("permission", "project_management");
+      formData.append("skill", "triage");
+      formData.append("skill", "project-management");
       const request = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: formData,
@@ -97,9 +97,9 @@ describe("oauth authorize routes", () => {
         stateParam!,
         testEnv.COOKIE_SECRET as string,
       );
-      expect((decodedState.req as any).permissions).toEqual([
-        "issue_triage",
-        "project_management",
+      expect((decodedState.req as any).skills).toEqual([
+        "triage",
+        "project-management",
       ]);
       expect((decodedState.req as any).clientId).toBe("test-client");
       expect((decodedState.req as any).redirectUri).toBe(
@@ -108,7 +108,7 @@ describe("oauth authorize routes", () => {
       expect((decodedState.req as any).scope).toEqual(["read", "write"]);
     });
 
-    it("should handle no permissions selected (read-only default)", async () => {
+    it("should handle no skills selected", async () => {
       const oauthReqInfo = {
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
@@ -131,10 +131,10 @@ describe("oauth authorize routes", () => {
         stateParam!,
         testEnv.COOKIE_SECRET as string,
       );
-      expect((decodedState.req as any).permissions).toEqual([]);
+      expect((decodedState.req as any).skills).toEqual([]);
     });
 
-    it("should handle only issue triage permission", async () => {
+    it("should handle only triage skill", async () => {
       const oauthReqInfo = {
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
@@ -143,7 +143,7 @@ describe("oauth authorize routes", () => {
       };
       const formData = new FormData();
       formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
-      formData.append("permission", "issue_triage");
+      formData.append("skill", "triage");
       const request = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: formData,
@@ -157,7 +157,7 @@ describe("oauth authorize routes", () => {
         stateParam!,
         testEnv.COOKIE_SECRET as string,
       );
-      expect((decodedState.req as any).permissions).toEqual(["issue_triage"]);
+      expect((decodedState.req as any).skills).toEqual(["triage"]);
     });
 
     it("should include Set-Cookie header for approval", async () => {
