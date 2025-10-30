@@ -53,7 +53,7 @@ export default function Ghost() {
     <svg
       id="cursorthing"
       xmlns="http://www.w3.org/2000/svg"
-      className="pointer-events-none fixed z-50 h-16 w-16 translate-y-24 translate-x-16 overflow-hidden fill-current opacity-50 blur-[1px]"
+      className="pointer-events-none fixed z-50 size-12 translate-y-20 translate-x-12 overflow-hidden fill-current opacity-50 blur-[1px]"
       style={{
         verticalAlign: "middle",
         willChange: "transform",
