@@ -27,7 +27,7 @@ export default function FixBugs() {
           </span>
           <br />
           <span className="group-hover:delay-1200 duration-300 translate-y-8 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 ease-[cubic-bezier(0.175,0.885,0.32,1.275)]">
-            <span className="[animation:spinStar_2s_steps(6)_infinite] group-hover:[animation-play-state:running] [animation-play-state:paused] inline-block origin-center text-orange-400">
+            <span className="[animation:spinStar_2s_steps(12)_infinite] group-hover:[animation-play-state:running] [animation-play-state:paused] inline-block origin-center text-orange-400">
               *
             </span>
             &nbsp;
