@@ -6,6 +6,9 @@ const DEFAULT_TIMEOUT_MS = 1000;
 const IS_LOCAL_DEV =
   PREVIEW_URL?.includes("localhost") || PREVIEW_URL?.includes("127.0.0.1");
 
+// User-Agent for smoke tests - identifies these as automated smoke tests
+const SMOKE_TEST_USER_AGENT = "sentry-mcp-smoke-tests/0.20.0";
+
 // Skip all smoke tests if PREVIEW_URL is not set
 const describeIfPreviewUrl = PREVIEW_URL ? describe : describe.skip;
 
@@ -51,6 +54,10 @@ async function safeFetch(
   try {
     response = await fetch(url, {
       ...fetchOptions,
+      headers: {
+        "User-Agent": SMOKE_TEST_USER_AGENT,
+        ...fetchOptions.headers,
+      },
       signal,
     });
 
