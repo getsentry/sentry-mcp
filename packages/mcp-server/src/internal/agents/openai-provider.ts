@@ -22,17 +22,19 @@ export function setOpenAIBaseUrl(baseUrl: string | undefined): void {
  *
  * Configuration:
  * - OPENAI_MODEL: Model to use (default: "gpt-5") - env var OK
- * - OPENAI_REASONING_EFFORT: Reasoning effort for o1 models: "low", "medium", "high" (default: "low") - env var OK
+ * - OPENAI_REASONING_EFFORT: Reasoning effort for o1 models: "low", "medium", "high", or "" to disable (default: "low") - env var OK
  * - Base URL: Must be set via setOpenAIBaseUrl() - NOT from env vars (security risk)
  */
 export function getOpenAIModel(model?: string): LanguageModelV1 {
   const defaultModel = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
-  const reasoningEffort =
-    (process.env.OPENAI_REASONING_EFFORT as
-      | "low"
-      | "medium"
-      | "high"
-      | undefined) || DEFAULT_REASONING_EFFORT;
+
+  // Handle reasoning effort: empty string explicitly disables it, undefined uses default
+  const envReasoningEffort = process.env.OPENAI_REASONING_EFFORT;
+  const reasoningEffort: "low" | "medium" | "high" | undefined =
+    envReasoningEffort === ""
+      ? undefined
+      : ((envReasoningEffort as "low" | "medium" | "high" | undefined) ??
+        DEFAULT_REASONING_EFFORT);
 
   const factory = createOpenAI({
     ...(configuredBaseUrl && { baseURL: configuredBaseUrl }),
