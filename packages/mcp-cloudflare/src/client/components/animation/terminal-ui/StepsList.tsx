@@ -117,32 +117,6 @@ export default function StepsList({
           </button>
         );
       })}
-      {/* <div
-        className={
-          "group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-yellow-500 bg-gradient-to-r from-yellow300 to-yellow300/30 p-3 mt-8 pb-0 text-left font-bold text-black duration-500 hover:duration-75"
-        }
-      >
-        <div className="flex items-center gap-3 pb-3">
-          <div className="-ml-3 mr-1.5 h-8 w-2 rounded-r-3xl bg-black/50" />
-          Try The Live Demo
-          <ArrowRight className="ml-auto text-yellow-500 duration-200 ease-[cubic-bezier(0.64,0.57,0.67,1.53)] group-hover:translate-x-1 group-hover:duration-75" />
-        </div>
-        <div
-          className={
-            "-mt-2 grid grid-rows-[1fr] opacity-100 transition-all duration-500 ease-out-expo"
-          }
-        >
-          <div className="overflow-hidden">
-            <p
-              className={
-                "translate-y-0 scale-100 px-4 pb-3.5 font-medium text-black/50 text-copy-lg opacity-100 transition-all duration-500 ease-out-cubic"
-              }
-            >
-              Connect with your Sentry account to see it in action
-            </p>
-          </div>
-        </div>
-      </div> */}
     </div>
   );
 }

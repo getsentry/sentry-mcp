@@ -12,8 +12,8 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
       <button
         className={`group hidden sm:grid fixed right-0 inset-y-0 h-full w-[50vw] duration-300 cursor-pointer place-items-center z-40 border-l sm:[--x:20rem] md:[--x:24rem] lg:[--x:32rem] xl:[--x:40rem] 2xl:[--x:48rem] transition-colors ${
           isChatOpen
-            ? "bg-[#201633] -translate-x-[1px] opacity-100 border-white/10 motion-safe:transition-all"
-            : "translate-x-[var(--x)] opacity-50 hover:bg-[#201633] bg-clip-padding border-white/20 bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)]"
+            ? "bg-background-2 -translate-x-[1px] opacity-100 border-white/10 motion-safe:transition-all"
+            : "translate-x-[var(--x)] opacity-50 hover:bg-background-2 bg-clip-padding border-white/20 bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)]"
         }`}
         onClick={() => toggleChat(true)}
         onKeyDown={(e) => {
