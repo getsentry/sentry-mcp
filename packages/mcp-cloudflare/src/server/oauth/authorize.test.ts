@@ -196,4 +196,224 @@ describe("oauth authorize routes", () => {
       expect(text).toBe("Invalid request");
     });
   });
+
+  describe("Resource parameter validation (RFC 8707)", () => {
+    describe("GET /oauth/authorize", () => {
+      it("should allow request without resource parameter (backward compatibility)", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+        });
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId: "test-client",
+          clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+        });
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "GET",
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should proceed normally (render approval dialog)
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain("<form");
+      });
+
+      it("should allow request with valid resource parameter", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp",
+        });
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId: "test-client",
+          clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+        });
+
+        const request = new Request(
+          "http://localhost/oauth/authorize?resource=http://localhost/mcp",
+          { method: "GET" },
+        );
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should proceed normally
+        expect(response.status).toBe(200);
+      });
+
+      it("should reject request with invalid resource hostname", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          state: "test-state",
+        });
+
+        const request = new Request(
+          "http://localhost/oauth/authorize?resource=https://attacker.com/mcp&redirect_uri=https://example.com/callback&state=test-state",
+          { method: "GET" },
+        );
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should redirect with error
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toBeTruthy();
+
+        const locationUrl = new URL(location!);
+        expect(locationUrl.origin).toBe("https://example.com");
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+        expect(locationUrl.searchParams.get("error_description")).toContain(
+          "resource parameter",
+        );
+        expect(locationUrl.searchParams.get("state")).toBe("test-state");
+      });
+
+      it("should reject request with invalid resource path", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+        });
+
+        const request = new Request(
+          "http://localhost/oauth/authorize?resource=http://localhost/api&redirect_uri=https://example.com/callback",
+          { method: "GET" },
+        );
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should redirect with error
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+      });
+
+      it("should return 400 if invalid resource but no redirect_uri", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          scope: ["read"],
+        });
+
+        const request = new Request(
+          "http://localhost/oauth/authorize?resource=https://attacker.com/mcp",
+          { method: "GET" },
+        );
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should return direct error
+        expect(response.status).toBe(400);
+        const text = await response.text();
+        expect(text).toContain("Invalid resource parameter");
+      });
+    });
+
+    describe("POST /oauth/authorize", () => {
+      beforeEach(() => {
+        mockOAuthProvider.lookupClient.mockResolvedValue({
+          clientId: "test-client",
+          clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+        });
+      });
+
+      it("should allow request without resource parameter", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+        };
+        const formData = new FormData();
+        formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should proceed normally (redirect to Sentry)
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toContain("sentry.io");
+      });
+
+      it("should allow request with valid resource parameter", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp",
+        };
+        const formData = new FormData();
+        formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should proceed normally
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toContain("sentry.io");
+      });
+
+      it("should reject request with invalid resource hostname", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "https://attacker.com/mcp",
+          state: "test-state",
+        };
+        const formData = new FormData();
+        formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should redirect with error
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toBeTruthy();
+
+        const locationUrl = new URL(location!);
+        expect(locationUrl.origin).toBe("https://example.com");
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+        expect(locationUrl.searchParams.get("state")).toBe("test-state");
+      });
+
+      it("should reject request with invalid resource path", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/oauth",
+        };
+        const formData = new FormData();
+        formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        // Should redirect with error
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+      });
+    });
+  });
 });

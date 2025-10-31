@@ -5,15 +5,19 @@ import type { Env, WorkerProps } from "../../types";
 import type { Scope } from "@sentry/mcp-server/permissions";
 import { DEFAULT_SCOPES } from "@sentry/mcp-server/constants";
 import { SENTRY_TOKEN_URL } from "../constants";
-import { exchangeCodeForAccessToken } from "../helpers";
+import {
+  exchangeCodeForAccessToken,
+  validateResourceParameter,
+} from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
 
 /**
- * Extended AuthRequest that includes permissions
+ * Extended AuthRequest that includes permissions and resource parameter
  */
 interface AuthRequestWithPermissions extends AuthRequest {
   permissions?: unknown;
+  resource?: string;
 }
 
 /**
@@ -110,6 +114,24 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     return c.text("Authorization failed: Invalid redirect URL", 400);
   }
 
+  // Validate resource parameter per RFC 8707
+  const resourceFromState = oauthReqInfo.resource;
+
+  if (
+    resourceFromState &&
+    !validateResourceParameter(resourceFromState, c.req.url)
+  ) {
+    logWarn("Invalid resource parameter in callback", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: {
+        resource: resourceFromState,
+        clientId: oauthReqInfo.clientId,
+      },
+    });
+
+    return c.text("Authorization failed: Invalid resource parameter", 400);
+  }
+
   // because we share a clientId with the upstream provider, we need to ensure that the
   // downstream client has been approved by the end-user (e.g. for a new client)
   // https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/265
@@ -169,7 +191,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
   // Return back to the MCP client a new token
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
-    request: oauthReqInfo,
+    request: oauthReqInfo as AuthRequest,
     userId: payload.user.id,
     metadata: {
       label: payload.user.name,

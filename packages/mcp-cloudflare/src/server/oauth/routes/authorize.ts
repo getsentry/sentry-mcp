@@ -6,16 +6,21 @@ import {
 } from "../../lib/approval-dialog";
 import type { Env } from "../../types";
 import { SENTRY_AUTH_URL } from "../constants";
-import { getUpstreamAuthorizeUrl } from "../helpers";
+import {
+  getUpstreamAuthorizeUrl,
+  validateResourceParameter,
+  createResourceValidationError,
+} from "../helpers";
 import { SCOPES } from "../../../constants";
 import { signState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
 
 /**
- * Extended AuthRequest that includes permissions
+ * Extended AuthRequest that includes permissions and resource parameter
  */
 interface AuthRequestWithPermissions extends AuthRequest {
   permissions?: unknown;
+  resource?: string;
 }
 
 async function redirectToUpstream(
@@ -73,6 +78,36 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid request", 400);
     }
 
+    // Validate resource parameter per RFC 8707
+    const requestUrl = new URL(c.req.url);
+    const resourceParam = requestUrl.searchParams.get("resource");
+
+    if (resourceParam && !validateResourceParameter(resourceParam, c.req.url)) {
+      logWarn("Invalid resource parameter in authorization request", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: {
+          resource: resourceParam,
+          requestUrl: c.req.url,
+          clientId,
+        },
+      });
+
+      const redirectUri = requestUrl.searchParams.get("redirect_uri");
+      const state = requestUrl.searchParams.get("state");
+
+      if (redirectUri) {
+        return createResourceValidationError(redirectUri, state ?? undefined);
+      }
+
+      return c.text("Invalid resource parameter", 400);
+    }
+
+    // Preserve resource in state, not exported upstream
+    const oauthReqInfoWithResource: AuthRequestWithPermissions = {
+      ...oauthReqInfo,
+      ...(resourceParam ? { resource: resourceParam } : {}),
+    };
+
     // XXX(dcramer): we want to confirm permissions on each time
     // so you can always choose new ones
     // This shouldn't be highly visible to users, as clients should use refresh tokens
@@ -95,7 +130,7 @@ export default new Hono<{ Bindings: Env }>()
       server: {
         name: "Sentry MCP",
       },
-      state: { oauthReqInfo }, // arbitrary data that flows through the form submission below
+      state: { oauthReqInfo: oauthReqInfoWithResource },
     });
   })
 
@@ -129,6 +164,27 @@ export default new Hono<{ Bindings: Env }>()
       ...state.oauthReqInfo,
       permissions,
     };
+
+    // Validate resource parameter per RFC 8707
+    const resourceFromState = oauthReqWithPermissions.resource;
+
+    if (
+      resourceFromState &&
+      !validateResourceParameter(resourceFromState, c.req.url)
+    ) {
+      logWarn("Invalid resource parameter in authorization approval", {
+        loggerScope: ["cloudflare", "oauth", "authorize"],
+        extra: {
+          resource: resourceFromState,
+          clientId: oauthReqWithPermissions.clientId,
+        },
+      });
+
+      return createResourceValidationError(
+        oauthReqWithPermissions.redirectUri,
+        oauthReqWithPermissions.state,
+      );
+    }
 
     // Validate redirectUri is registered for this client before proceeding
     try {
