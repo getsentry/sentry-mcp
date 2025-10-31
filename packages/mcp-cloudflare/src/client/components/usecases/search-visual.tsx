@@ -102,21 +102,21 @@ export default function ErrorListWithCursorFollower() {
       <div
         onMouseEnter={onEnterRow(0)}
         onMouseLeave={onLeaveRow}
-        className="border-y-[0.5px] border-x h-12 w-full border-white/10 bg-[#201633] duration-300 hover:bg-background delay-150 translate-y-4 group-hover:translate-y-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] p-4 pb-10 hover:delay-0 hover:duration-0 items-center rounded-t-xl"
+        className="border-y-[0.5px] border-x h-12 w-full border-white/10 bg-background-2 duration-300 hover:bg-background-3 delay-150 translate-y-4 group-hover:translate-y-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] p-4 pb-10 hover:delay-0 hover:duration-0 items-center rounded-t-xl"
       >
         Error&nbsp;<span className="opacity-50">call(components/Checkout)</span>
       </div>
       <div
         onMouseEnter={onEnterRow(1)}
         onMouseLeave={onLeaveRow}
-        className="border-y-[0.5px] border-x h-12 w-full border-white/10 bg-[#201633] duration-300 hover:bg-background delay-100 translate-y-4 group-hover:translate-y-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] p-4 pb-10 hover:delay-0 hover:duration-0 items-center"
+        className="border-y-[0.5px] border-x h-12 w-full border-white/10 bg-background-2 duration-300 hover:bg-background-3 delay-100 translate-y-4 group-hover:translate-y-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] p-4 pb-10 hover:delay-0 hover:duration-0 items-center"
       >
         SyntaxError&nbsp;<span className="opacity-50">json([native code])</span>
       </div>
       <div
         onMouseEnter={onEnterRow(2)}
         onMouseLeave={onLeaveRow}
-        className="border-y-[0.5px] border-x h-12 w-full border-white/10 bg-[#201633] duration-300 hover:bg-background delay-50 translate-y-4 group-hover:translate-y-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] p-4 pb-10 hover:delay-0 hover:duration-0 items-center"
+        className="border-y-[0.5px] border-x h-12 w-full border-white/10 bg-background-2 duration-300 hover:bg-background-3 delay-50 translate-y-4 group-hover:translate-y-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] p-4 pb-10 hover:delay-0 hover:duration-0 items-center"
       >
         TypeError&nbsp;
         <span className="opacity-50">notAFunctionError(utils/errors)</span>
@@ -124,7 +124,7 @@ export default function ErrorListWithCursorFollower() {
       <div
         onMouseEnter={onEnterRow(3)}
         onMouseLeave={onLeaveRow}
-        className="border-y-[0.5px] border-x h-12 w-full border-white/10 bg-[#201633] duration-300 hover:bg-background delay-0 translate-y-4 group-hover:translate-y-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] p-4 pb-10 hover:delay-0 hover:duration-0 items-center"
+        className="border-y-[0.5px] border-x h-12 w-full border-white/10 bg-background-2 duration-300 hover:bg-background-3 delay-0 translate-y-4 group-hover:translate-y-0 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] p-4 pb-10 hover:delay-0 hover:duration-0 items-center"
       >
         ReferenceError&nbsp;
         <span className="opacity-50">referenceError(utils/errors)</span>

@@ -14,7 +14,7 @@ export default function Seer({ step }: { step: number }) {
       } absolute overflow-hidden top-0 right-0 z-10 h-full w-full bg-600 flex flex-col justify-center p-4 pr-16 pb-16 ease-out`}
     >
       <div
-        className={`inset-0 absolute bg-[#160f24] rounded-tl-xl rounded-br-3xl border-t border-l border-white/20 ${
+        className={`inset-0 absolute bg-background rounded-tl-xl rounded-br-3xl border-t border-l border-white/20 ${
           step === 2
             ? "duration-300 opacity-80 translate-x-0 blur-none"
             : "duration-0 opacity-0 motion-safe:translate-x-1/2 blur-xl"

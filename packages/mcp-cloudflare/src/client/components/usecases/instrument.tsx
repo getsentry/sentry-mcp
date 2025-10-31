@@ -10,8 +10,8 @@ export default function Instrument() {
       <div className="absolute inset-0 pointer-events-none bg-grid [--size:1rem] [mask-image:linear-gradient(to_bottom,red,transparent,red)] group-hover:opacity-50 opacity-30 duration-300 -z-20 group-hover:-translate-y-4 -bottom-4" />
       <div className="px-12 p-6 mb-auto">
         <div className="flex w-full">
-          <div className="rounded-full size-12 my-auto border border-white/20 group-hover:border-white/20 duration-300 border-dashed bg-[#201633] group-hover:bg-white relative">
-            <div className="absolute top-1/2 left-1/2 -translate-1/2 size-24 scale-50 group-hover:scale-100 duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] bg-pink-300/20 rounded-full opacity-0 group-hover:opacity-100 -z-10 border border-[#e1567c]/40" />
+          <div className="rounded-full size-12 my-auto border border-white/20 group-hover:border-white/20 duration-300 border-dashed bg-background-2 group-hover:bg-white relative">
+            <div className="absolute top-1/2 left-1/2 -translate-1/2 size-24 scale-50 group-hover:scale-100 duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] bg-pink-300/20 rounded-full opacity-0 group-hover:opacity-100 -z-10 border border-select/40" />
             <div className="absolute top-1/2 left-1/2 -translate-1/2 size-36 scale-50 group-hover:scale-100 duration-500 group-hover:delay-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] bg-purple-400/20 rounded-full opacity-0 group-hover:opacity-100 -z-10 border border-dashed border-purple-400/40" />
           </div>
 
@@ -29,7 +29,7 @@ export default function Instrument() {
                 },
                 {
                   endY: 50,
-                  color: "text-fuchsia-200/40 group-hover:text-[#e1567c]/80",
+                  color: "text-fuchsia-200/40 group-hover:text-select/80",
                 },
                 {
                   endY: 75,
@@ -78,17 +78,17 @@ export default function Instrument() {
 
           <div className="flex flex-col gap-6 justify-center">
             <div className="size-12 rounded-xl bg-white relative">
-              <div className="inset-0 size-full absolute grid place-items-center border border-white/20 border-dashed bg-[#201633] rounded-xl duration-300 group-hover:border-white/80 group-hover:-translate-y-1 group-hover:ease-[cubic-bezier(0.175,0.885,0.32,1.275)]">
+              <div className="inset-0 size-full absolute grid place-items-center border border-white/20 border-dashed bg-background-2 rounded-xl duration-300 group-hover:border-white/80 group-hover:-translate-y-1 group-hover:ease-[cubic-bezier(0.175,0.885,0.32,1.275)]">
                 <SentryIcon className="h-8 w-8 duration-150 group-hover:opacity-100 opacity-50" />
               </div>
             </div>
-            <div className="size-12 rounded-xl bg-[#e1567c] relative">
-              <div className="inset-0 size-full absolute border border-white/20 border-dashed bg-[#201633] rounded-xl duration-300 group-hover:-translate-y-1 group-hover:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] grid place-items-center group-hover:delay-200 group-hover:border-[#e1567c]/80">
-                <ChartSpline className="h-8 w-8 duration-150 group-hover:delay-200 group-hover:opacity-100 group-hover:text-[#e1567c]/80 opacity-50" />
+            <div className="size-12 rounded-xl bg-select relative">
+              <div className="inset-0 size-full absolute border border-white/20 border-dashed bg-background-2 rounded-xl duration-300 group-hover:-translate-y-1 group-hover:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] grid place-items-center group-hover:delay-200 group-hover:border-select/80">
+                <ChartSpline className="h-8 w-8 duration-150 group-hover:delay-200 group-hover:opacity-100 group-hover:text-select/80 opacity-50" />
               </div>
             </div>
             <div className="size-12 rounded-xl relative bg-purple-400">
-              <div className="inset-0 size-full absolute border border-white/20 border-dashed bg-[#201633] rounded-xl group-hover:-translate-y-1 group-hover:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] grid place-items-center group-hover:delay-400 duration-300 group-hover:border-purple-400/80">
+              <div className="inset-0 size-full absolute border border-white/20 border-dashed bg-background-2 rounded-xl group-hover:-translate-y-1 group-hover:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] grid place-items-center group-hover:delay-400 duration-300 group-hover:border-purple-400/80">
                 <Shield className="h-8 w-8 duration-150 group-hover:delay-400 group-hover:opacity-100 group-hover:text-purple-400/80 opacity-50" />
               </div>
             </div>
