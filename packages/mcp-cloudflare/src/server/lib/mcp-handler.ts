@@ -146,7 +146,7 @@ const mcpHandler: ExportedHandler<Env> = {
       );
       return new Response(
         "Authorization failed: No valid permissions were granted. Please re-authorize and select at least one permission.",
-        { status: 400 },
+        { status: 401 },
       );
     }
 
