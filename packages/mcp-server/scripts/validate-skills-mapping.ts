@@ -171,11 +171,13 @@ function displaySummary(results: ValidationResult[]): void {
     }
   }
 
-  // Total accessible = tools with skills + foundational tools + agent-mode-only tools
-  const totalAccessibleTools =
-    toolsWithSkills.size +
-    FOUNDATIONAL_TOOLS.length +
-    AGENT_MODE_ONLY_TOOLS.length;
+  // Total accessible = union of all accessible tool categories
+  const allAccessibleTools = new Set<string>([
+    ...toolsWithSkills,
+    ...FOUNDATIONAL_TOOLS,
+    ...AGENT_MODE_ONLY_TOOLS,
+  ]);
+  const totalAccessibleTools = allAccessibleTools.size;
 
   const defaultSkills = Object.values(SKILLS).filter(
     (s) => s.defaultEnabled,
