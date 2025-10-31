@@ -14,6 +14,7 @@ Common optional flags:
   --host <host>           Change Sentry host (self-hosted)
   --sentry-dsn <dsn>      Override DSN used for telemetry reporting
   --openai-base-url <url> Override OpenAI API base URL for embedded agents
+  --openai-model <model>  Override OpenAI model (default: gpt-5, reasoning effort: low)
   --agent                 Agent mode: only expose use_sentry tool (for AI agents)
 
 Session constraints:
@@ -31,5 +32,6 @@ All scopes: ${all.join(", ")}
 Examples:
   ${packageName} --access-token=TOKEN
   ${packageName} --access-token=TOKEN --host=sentry.example.com
+  ${packageName} --access-token=TOKEN --openai-model=o1-mini
   ${packageName} --access-token=TOKEN --openai-base-url=https://proxy.example.com/v1`;
 }

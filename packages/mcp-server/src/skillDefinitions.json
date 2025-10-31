@@ -1,0 +1,42 @@
+[
+  {
+    "id": "inspect",
+    "name": "Inspect Issues & Events",
+    "description": "Search for errors, analyze traces, and explore event details",
+    "defaultEnabled": true,
+    "order": 1,
+    "toolCount": 10
+  },
+  {
+    "id": "seer",
+    "name": "Seer",
+    "description": "Sentry's AI debugger that helps you analyze, root cause, and fix issues",
+    "defaultEnabled": true,
+    "order": 2,
+    "toolCount": 7
+  },
+  {
+    "id": "docs",
+    "name": "Documentation",
+    "description": "Search and read Sentry SDK documentation",
+    "defaultEnabled": false,
+    "order": 3,
+    "toolCount": 5
+  },
+  {
+    "id": "triage",
+    "name": "Triage Issues",
+    "description": "Resolve, assign, and update issues",
+    "defaultEnabled": false,
+    "order": 4,
+    "toolCount": 8
+  },
+  {
+    "id": "project-management",
+    "name": "Manage Projects & Teams",
+    "description": "Create and modify projects, teams, and DSNs",
+    "defaultEnabled": false,
+    "order": 5,
+    "toolCount": 9
+  }
+]

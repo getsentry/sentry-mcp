@@ -9,6 +9,7 @@ export function parseArgv(argv: string[]): CliArgs {
     "mcp-url": { type: "string" as const },
     "sentry-dsn": { type: "string" as const },
     "openai-base-url": { type: "string" as const },
+    "openai-model": { type: "string" as const },
     "organization-slug": { type: "string" as const },
     "project-slug": { type: "string" as const },
     scopes: { type: "string" as const },
@@ -53,6 +54,7 @@ export function parseArgv(argv: string[]): CliArgs {
     mcpUrl: values["mcp-url"] as string | undefined,
     sentryDsn: values["sentry-dsn"] as string | undefined,
     openaiBaseUrl: values["openai-base-url"] as string | undefined,
+    openaiModel: values["openai-model"] as string | undefined,
     organizationSlug: values["organization-slug"] as string | undefined,
     projectSlug: values["project-slug"] as string | undefined,
     scopes: values.scopes as string | undefined,
@@ -74,6 +76,7 @@ export function parseEnv(env: NodeJS.ProcessEnv): EnvArgs {
   if (env.MCP_URL) fromEnv.mcpUrl = env.MCP_URL;
   if (env.SENTRY_DSN || env.DEFAULT_SENTRY_DSN)
     fromEnv.sentryDsn = env.SENTRY_DSN || env.DEFAULT_SENTRY_DSN;
+  if (env.OPENAI_MODEL) fromEnv.openaiModel = env.OPENAI_MODEL;
   if (env.MCP_SCOPES) fromEnv.scopes = env.MCP_SCOPES;
   if (env.MCP_ADD_SCOPES) fromEnv.addScopes = env.MCP_ADD_SCOPES;
   return fromEnv;
@@ -89,6 +92,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     mcpUrl: cli.mcpUrl ?? env.mcpUrl,
     sentryDsn: cli.sentryDsn ?? env.sentryDsn,
     openaiBaseUrl: cli.openaiBaseUrl,
+    openaiModel: cli.openaiModel ?? env.openaiModel,
     // Scopes precedence: CLI scopes/add-scopes override their env counterparts
     scopes: cli.scopes ?? env.scopes,
     addScopes: cli.addScopes ?? env.addScopes,
