@@ -44,7 +44,7 @@ export default function Integration() {
     2,
   );
   return (
-    <div className="flex flex-col lg:grid lg:grid-cols-2 lg:container mx-auto relative mb-12 border-b border-dashed border-white/20 max-w-full">
+    <div className="flex flex-col lg:grid lg:grid-cols-2 md:container mx-auto relative mb-12 border-b border-dashed border-white/20 max-w-full">
       <div className="lg:border-r border-dashed border-white/10 p-4 sm:p-12 max-lg:border-b">
         <h2 className="text-3xl font-bold mb-4">Getting Started</h2>
         {/* <p className="text-white/70 mt-2">

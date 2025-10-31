@@ -108,7 +108,7 @@ export function ChatInput({
   }, [input]);
 
   return (
-    <form onSubmit={handleSubmit} className="relative flex-1">
+    <form onSubmit={handleSubmit} className="relative flex-1 h-full">
       <div className="relative">
         <textarea
           ref={inputRef}
@@ -118,7 +118,7 @@ export function ChatInput({
           placeholder="Ask me anything about your Sentry data..."
           disabled={isLoading}
           rows={1}
-          className="w-full p-4 pr-12 rounded duration-150 bg-slate-800/50 xl:bg-background/50 xl:rounded-xl text-white placeholder-slate-400 xl:placeholder-white/50 focus:outline-none focus:ring-2 focus:border-transparent focus:ring-violet-300 disabled:opacity-50"
+          className="w-full p-4 pr-12 rounded duration-150 bg-slate-800/50 xl:bg-background/50 xl:rounded-xl min-h-14 text-white placeholder-slate-400 xl:placeholder-white/50 focus:outline-none focus:ring-2 focus:border-transparent focus:ring-violet-300 disabled:opacity-50"
         />
         <Button
           type={isLoading ? "button" : "submit"}

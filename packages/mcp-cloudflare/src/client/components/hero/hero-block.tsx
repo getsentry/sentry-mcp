@@ -6,7 +6,7 @@ export default function HeroBlock() {
   const endpoint = new URL("/mcp", window.location.href).href;
 
   return (
-    <div className="flex-1 flex flex-col container mx-auto sm:max-h-[80rem] min-h-[calc(100svh-69px)] sm:h-[calc(100svh-69px)]">
+    <div className="flex-1 flex flex-col container mx-auto min-h-[min(80rem,calc(100svh-69px))]">
       <div className="grid xl:grid-cols-2 gap-8 sm:px-8 sm:py-6 px-4 py-3">
         <p className="text-white/70 max-w-[69ch]">
           Simply put, it's a way to plug Sentry's API into an LLM, letting you
