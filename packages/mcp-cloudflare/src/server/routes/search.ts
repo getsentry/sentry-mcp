@@ -11,6 +11,7 @@ import type {
   AutoRagSearchRequest,
 } from "@cloudflare/workers-types";
 import { logger } from "@sentry/cloudflare";
+import { getClientIp } from "../utils/client-ip";
 
 // Request schema matching the MCP tool parameters
 const SearchRequestSchema = z.object({
@@ -21,14 +22,16 @@ const SearchRequestSchema = z.object({
 
 export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
   try {
-    // Get client IP address from Cloudflare header
-    const clientIP = c.req.header("CF-Connecting-IP") || "unknown";
+    // Get client IP address
+    const clientIP = getClientIp(c.req.raw);
 
     // Rate limiting check - use client IP as the key
+    // In local development or when IP can't be extracted, skip rate limiting
+    // Rate limiter is optional and primarily for production abuse prevention
     // Note: Rate limiting bindings are "unsafe" (beta) and may not be available in development
     // so we check if the binding exists before using it
     // https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
-    if (c.env.SEARCH_RATE_LIMITER) {
+    if (c.env.SEARCH_RATE_LIMITER && clientIP) {
       try {
         // Hash the IP for privacy and consistent key format
         const encoder = new TextEncoder();

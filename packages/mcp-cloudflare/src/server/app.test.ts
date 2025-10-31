@@ -4,7 +4,11 @@ import app from "./app";
 describe("app", () => {
   describe("GET /robots.txt", () => {
     it("should return correct robots.txt content", async () => {
-      const res = await app.request("/robots.txt");
+      const res = await app.request("/robots.txt", {
+        headers: {
+          "CF-Connecting-IP": "192.0.2.1",
+        },
+      });
 
       expect(res.status).toBe(200);
 
@@ -17,7 +21,11 @@ describe("app", () => {
 
   describe("GET /llms.txt", () => {
     it("should return correct llms.txt content", async () => {
-      const res = await app.request("/llms.txt");
+      const res = await app.request("/llms.txt", {
+        headers: {
+          "CF-Connecting-IP": "192.0.2.1",
+        },
+      });
 
       expect(res.status).toBe(200);
 
@@ -29,7 +37,11 @@ describe("app", () => {
 
   describe("GET /sse", () => {
     it("should return deprecation message with 410 status", async () => {
-      const res = await app.request("/sse");
+      const res = await app.request("/sse", {
+        headers: {
+          "CF-Connecting-IP": "192.0.2.1",
+        },
+      });
 
       expect(res.status).toBe(410);
 
