@@ -24,7 +24,7 @@ import { finalize } from "./cli/resolve";
 import { sentryBeforeSend } from "./telem/sentry";
 import { ALL_SCOPES } from "./permissions";
 import { DEFAULT_SCOPES } from "./constants";
-import { configureOpenAIProvider } from "./internal/agents/openai-provider";
+import { setOpenAIBaseUrl } from "./internal/agents/openai-provider";
 import agentTools from "./tools/agent-tools";
 
 const packageName = "@sentry/mcp-server";
@@ -71,7 +71,12 @@ if (!process.env.OPENAI_API_KEY) {
   console.warn("");
 }
 
-configureOpenAIProvider({ baseUrl: cfg.openaiBaseUrl });
+// Configure OpenAI settings from CLI flags
+// Note: baseUrl can only be set via CLI flag, not env var (security: prevents credential theft)
+setOpenAIBaseUrl(cfg.openaiBaseUrl);
+if (cfg.openaiModel) {
+  process.env.OPENAI_MODEL = cfg.openaiModel;
+}
 
 Sentry.init({
   dsn: cfg.sentryDsn,
