@@ -1,6 +1,6 @@
 import type React from "react";
 import { SentryIcon } from "./icons/sentry";
-import { Github, PanelLeftOpen } from "lucide-react";
+import { Github, PanelLeftClose, } from "lucide-react";
 import { Button } from "./button";
 import { Badge } from "./badge";
 
@@ -23,7 +23,7 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
             </h1>
             <Badge
               variant="outline"
-              className="text-xs text-muted-foreground font-normal"
+              className="text-xs border border-violet-300/50 bg-background font-normal"
             >
               Beta
             </Badge>
@@ -34,7 +34,11 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
             isChatOpen ? "-translate-x-[var(--x)]" : ""
           }`}
         >
-          <Button className="rounded-xl" variant="secondary" asChild>
+          <Button
+            className="rounded-xl max-md:!py-3 max-md:!px-2.25"
+            variant="secondary"
+            asChild
+          >
             <a
               href="https://github.com/getsentry/sentry-mcp"
               target="_blank"
@@ -48,10 +52,10 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
             <Button
               type="button"
               onClick={() => toggleChat(!isChatOpen)}
-              className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl flex items-center bg-violet-300 text-background hover:bg-white/90 transition font-bold font-sans border border-background"
+              className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl max-md:!py-3 max-md:!px-2.25 flex items-center bg-violet-300 text-background hover:bg-white/90 transition font-bold font-sans border border-background"
             >
-              Live <span className="max-sm:sr-only">Demo</span>
-              <PanelLeftOpen className="size-5" />
+              <PanelLeftClose className="size-4" />
+              <span className="max-sm:sr-only">Live Demo</span>
             </Button>
           )}
         </div>
