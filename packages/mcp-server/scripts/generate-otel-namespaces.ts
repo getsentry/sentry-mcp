@@ -196,6 +196,11 @@ async function fetchYamlContent(namespace: string): Promise<string | null> {
   try {
     const response = await fetch(
       `${GITHUB_BASE_URL}/${namespace}/registry.yaml`,
+      {
+        headers: {
+          "User-Agent": "Sentry MCP Server",
+        },
+      },
     );
     if (!response.ok) {
       console.log(`⚠️  No registry.yaml found for namespace: ${namespace}`);

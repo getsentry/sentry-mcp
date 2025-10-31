@@ -1,5 +1,12 @@
-import { createOpenAI, openai as defaultOpenAI } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModelV1 } from "ai";
+
+// Create a default factory with User-Agent header
+const defaultFactory = createOpenAI({
+  headers: {
+    "User-Agent": "Sentry MCP Server",
+  },
+});
 
 let customFactory: ReturnType<typeof createOpenAI> | null = null;
 let defaultModel = "gpt-5";
@@ -24,6 +31,9 @@ export function configureOpenAIProvider({
   if (baseUrl) {
     customFactory = createOpenAI({
       baseURL: baseUrl,
+      headers: {
+        "User-Agent": "Sentry MCP Server",
+      },
     });
   } else {
     customFactory = null;
@@ -39,6 +49,6 @@ export function configureOpenAIProvider({
  * If no model is specified, uses the configured default model (gpt-5).
  */
 export function getOpenAIModel(model?: string): LanguageModelV1 {
-  const factory = customFactory ?? defaultOpenAI;
+  const factory = customFactory ?? defaultFactory;
   return factory(model ?? defaultModel);
 }
