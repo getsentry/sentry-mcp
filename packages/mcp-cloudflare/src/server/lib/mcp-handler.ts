@@ -171,7 +171,7 @@ const mcpHandler: ExportedHandler<Env> = {
       tools: isAgentMode ? agentTools : undefined,
       onToolComplete: () => {
         // Flush Sentry events after tool execution
-        Sentry.flush(2000);
+        ctx.waitUntil(Sentry.flush(2000));
       },
     });
 
