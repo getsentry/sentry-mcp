@@ -4,7 +4,11 @@ import { USER_AGENT } from "../../version";
 
 // Default configuration constants
 const DEFAULT_OPENAI_MODEL = "gpt-5";
-const DEFAULT_REASONING_EFFORT = "low" as const;
+const VALID_REASONING_EFFORTS = ["low", "medium", "high"] as const;
+const DEFAULT_REASONING_EFFORT: (typeof VALID_REASONING_EFFORTS)[number] =
+  "low";
+
+type ReasoningEffort = (typeof VALID_REASONING_EFFORTS)[number];
 
 // Module-level state for baseURL (set only via explicit configuration, not env vars)
 let configuredBaseUrl: string | undefined;
@@ -30,11 +34,26 @@ export function getOpenAIModel(model?: string): LanguageModelV1 {
 
   // Handle reasoning effort: empty string explicitly disables it, undefined uses default
   const envReasoningEffort = process.env.OPENAI_REASONING_EFFORT;
-  const reasoningEffort: "low" | "medium" | "high" | undefined =
-    envReasoningEffort === ""
-      ? undefined
-      : ((envReasoningEffort as "low" | "medium" | "high" | undefined) ??
-        DEFAULT_REASONING_EFFORT);
+  let reasoningEffort: ReasoningEffort | undefined;
+
+  if (envReasoningEffort === "") {
+    // Empty string explicitly disables reasoning effort
+    reasoningEffort = undefined;
+  } else if (envReasoningEffort === undefined) {
+    // Not set - use default
+    reasoningEffort = DEFAULT_REASONING_EFFORT;
+  } else if (
+    VALID_REASONING_EFFORTS.includes(envReasoningEffort as ReasoningEffort)
+  ) {
+    // Valid value
+    reasoningEffort = envReasoningEffort as ReasoningEffort;
+  } else {
+    // Invalid value - provide helpful error with all valid options
+    const validValues = VALID_REASONING_EFFORTS.map((v) => `"${v}"`).join(", ");
+    throw new Error(
+      `Invalid OPENAI_REASONING_EFFORT value: "${envReasoningEffort}". Must be one of: ${validValues}, or "" (empty string to disable). Default is "${DEFAULT_REASONING_EFFORT}".`,
+    );
+  }
 
   const factory = createOpenAI({
     ...(configuredBaseUrl && { baseURL: configuredBaseUrl }),
