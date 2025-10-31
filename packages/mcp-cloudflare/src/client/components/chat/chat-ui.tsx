@@ -80,7 +80,7 @@ export const ChatUI = ({
 
       {/* Chat Input - Always pinned at bottom */}
       <div className="py-4 px-6 bottom-0 left-0 right-0 absolute min-h-34 z-10">
-        <div className="w-full [mask-image:linear-gradient(to_bottom,transparent,red_4.5rem)] pointer-events-none absolute bottom-0 left-0 h-full -z-10 backdrop-blur-md bg-gradient-to-t from-background/80 xl:from-[#160f24] to-background/20 xl:to-[#160f2433]" />
+        <div className="w-full [mask-image:linear-gradient(to_bottom,transparent,red_4.5rem)] pointer-events-none absolute bottom-0 left-0 h-full -z-10 backdrop-blur-md bg-gradient-to-t from-background/80 xl:from-background to-background/20 xl:to-[#160f2433]" />
         {/* Sample Prompt Buttons - Always visible above input */}
         {onSendPrompt && (
           <div className="mb-4 flex flex-wrap gap-2 justify-center xl:justify-end">

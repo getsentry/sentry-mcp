@@ -100,7 +100,7 @@ export default function InstallTabs({
   }, [active]);
 
   return (
-    <div className={cn("relative bg-[#201633] rounded-2xl", className)}>
+    <div className={cn("relative bg-background-2 rounded-2xl", className)}>
       <div
         className="flex"
         role="tablist"
@@ -129,8 +129,8 @@ export default function InstallTabs({
               >
                 {i > 0 && !selected && (
                   <>
-                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-1 -translate-x-full -top-2 size-3 bg-[#201633] origin-bottom-right" />
-                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-0 -translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-[#160f24] origin-bottom-right" />
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-1 -translate-x-full -top-2 size-3 bg-background-2 origin-bottom-right" />
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute left-0 -translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-background origin-bottom-right" />
                   </>
                 )}
                 <div className="absolute inset-[0.5px] bottom-3 bg-orange-300 bg-[repeating-linear-gradient(-45deg,#f97316,#f97316_12px,#f9731600_12px,#f9731600_24px)] rounded-xl z-0 group-active/tab:duration-75 group-active/tab:opacity-0 duration-300 group-active/tab:translate-y-2 group-active/tab:scale-90" />
@@ -142,7 +142,7 @@ export default function InstallTabs({
                   }`}
                 />
                 <div
-                  className={`bg-[#201633] relative rounded-xl py-4 pr-5 pl-6 duration-300 perspective-distant text-nowrap flex items-center overflow-hidden gap-2 group-active/tab:duration-100 group-active/tab:rotate-x-5 group-active/tab:translate-y-1.5 group-active/tab:text-violet-500 z-10 ${
+                  className={`bg-background-2 relative rounded-xl py-4 pr-5 pl-6 duration-300 perspective-distant text-nowrap flex items-center overflow-hidden gap-2 group-active/tab:duration-100 group-active/tab:rotate-x-5 group-active/tab:translate-y-1.5 group-active/tab:text-violet-500 z-10 ${
                     selected
                       ? "text-violet-300 underline"
                       : "group-hover/tab:text-violet-300 group-hover/tab:underline group-hover/tab:-rotate-x-45 group-hover/tab:-translate-y-6.5 group-hover/tab:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] group-active/tab:scale-[0.95]"
@@ -161,15 +161,15 @@ export default function InstallTabs({
                 </div>
                 {i < lastIdx && !selected && (
                   <>
-                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-1 translate-x-full -top-2 size-3 bg-[#201633] origin-bottom-left" />
-                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-0 translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-[#160f24] origin-bottom-left" />
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-1 translate-x-full -top-2 size-3 bg-background-2 origin-bottom-left" />
+                    <div className="group-hover/tab:scale-100 group-active/tab:duration-75 group-active/tab:scale-0 group-hover/tab:duration-200 duration-0 scale-0 absolute right-0 translate-x-full -top-0 -translate-y-full size-4 rounded-full bg-background origin-bottom-left" />
                   </>
                 )}
               </button>
             );
           })}
         </div>
-        <div className="absolute top-0 right-0 h-14 w-20 bg-gradient-to-l from-[#201633] to-transparent rounded-tr-2xl z-10" />
+        <div className="absolute top-0 right-0 h-14 w-20 bg-gradient-to-l from-background-2 to-transparent rounded-tr-2xl z-10" />
       </div>
 
       <div
