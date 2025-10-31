@@ -172,29 +172,28 @@ function configureServer({
      *
      * IMPORTANT: These systems are **MUTUALLY EXCLUSIVE** - only one is active per session:
      *
-     * ## Skills Mode (when grantedSkills is present):
+     * ## Skills Mode (when grantedSkills is set):
      *    - ONLY skills are checked (scopes are ignored)
      *    - Tool must have non-empty `requiredSkills` array to be exposed
      *    - Empty `requiredSkills: []` means intentionally excluded from skills system
-     *    - Tools are filtered based on whether granted skills match requiredSkills
+     *    - Authorization: `allowed = hasRequiredSkills(grantedSkills, tool.requiredSkills)`
      *
-     * ## Scopes Mode (when grantedSkills is NOT present):
+     * ## Scopes Mode (when grantedSkills is NOT set, but grantedScopes is set):
      *    - Falls back to legacy scope checking
-     *    - Tool must have non-empty `requiredScopes` array to be exposed
      *    - Empty `requiredScopes: []` means no scopes required (always allowed)
+     *    - Authorization: `allowed = isToolAllowed(tool.requiredScopes, grantedScopes)`
      *
-     * ## Tool Visibility Rules:
-     *    - Skills mode: `allowed = hasRequiredSkills(grantedSkills, tool.requiredSkills)`
-     *    - Scopes mode: `allowed = isToolAllowed(tool.requiredScopes, grantedScopes)`
-     *    - If not allowed: tool is NOT registered and NOT visible to MCP client
+     * ## Tool Visibility:
+     *    - If not allowed by active authorization system: tool is NOT registered
+     *    - Only registered tools are visible to MCP clients
      *
      * ## Examples:
      *    ```typescript
      *    // Tool available in "triage" skill only:
      *    { requiredSkills: ["triage"], requiredScopes: ["event:write"] }
      *
-     *    // Tool available to ALL skills (foundational tool):
-     *    { requiredSkills: ALL_SKILLS, requiredScopes: ["org:read"] }
+     *    // Tool available to ALL skills (foundational tool like whoami):
+     *    { requiredSkills: ALL_SKILLS, requiredScopes: [] }
      *
      *    // Tool excluded from skills system (like use_sentry in agent mode):
      *    { requiredSkills: [], requiredScopes: [] }
@@ -202,20 +201,17 @@ function configureServer({
      */
     let allowed = false;
 
-    // Skills system takes precedence when present
+    // Skills system takes precedence when set
     if (grantedSkills) {
-      // Tool must have requiredSkills to be exposed in skills mode
+      // Tool must have non-empty requiredSkills to be exposed in skills mode
       if (tool.requiredSkills && tool.requiredSkills.length > 0) {
         allowed = hasRequiredSkills(grantedSkills, tool.requiredSkills);
       }
       // Empty requiredSkills means NOT exposed via skills system
     }
     // Legacy fallback: Check scopes if not using skills
-    else if (
-      grantedScopes &&
-      tool.requiredScopes &&
-      tool.requiredScopes.length > 0
-    ) {
+    else if (grantedScopes) {
+      // isToolAllowed handles empty requiredScopes correctly (returns true)
       allowed = isToolAllowed(tool.requiredScopes, grantedScopes);
     }
 
