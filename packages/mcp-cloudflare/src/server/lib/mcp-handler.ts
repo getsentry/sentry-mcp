@@ -176,9 +176,14 @@ const mcpHandler: ExportedHandler<Env> = {
     });
 
     // Run MCP handler - context already captured in closures
-    return createMcpHandler(server, {
+    const response = await createMcpHandler(server, {
       route: url.pathname,
     })(request, env, ctx);
+
+    // Flush buffered logs before Worker terminates
+    ctx.waitUntil(Sentry.flush(2000));
+
+    return response;
   },
 };
 

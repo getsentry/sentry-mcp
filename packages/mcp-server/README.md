@@ -50,7 +50,14 @@ SENTRY_ACCESS_TOKEN=your-token
 # Optional overrides. Leave unset to use the default SaaS host
 SENTRY_HOST=sentry.example.com         # Self-hosted Sentry hostname
 MCP_SKILLS=inspect,docs,triage         # Limit to specific skills
+MCP_SCOPES=org:read,event:read         # Override default scopes (replaces defaults) - DEPRECATED, use MCP_SKILLS
+MCP_ADD_SCOPES=event:write             # Add to default scopes (keeps defaults) - DEPRECATED, use MCP_SKILLS
+
+# OpenAI configuration for AI-powered search tools
 OPENAI_API_KEY=your-openai-key         # Required for AI-powered search tools (search_events, search_issues)
+OPENAI_MODEL=gpt-5                     # OpenAI model to use (default: "gpt-5")
+OPENAI_REASONING_EFFORT=low            # Reasoning effort for o1 models: "low", "medium", "high", or "" to disable (default: "low")
+
 # No environment variable exists for the OpenAI base URL override; use --openai-base-url instead.
 # This restriction prevents unexpected environment overrides that could silently reroute requests to a
 # malicious proxy capable of harvesting the OpenAI API key provided at runtime.

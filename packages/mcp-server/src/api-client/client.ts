@@ -31,6 +31,7 @@ import {
 } from "./schema";
 import { ConfigurationError } from "../errors";
 import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
+import { USER_AGENT } from "../version";
 import type {
   AutofixRun,
   AutofixRunState,
@@ -212,7 +213,7 @@ export class SentryApiService {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "User-Agent": "Sentry MCP Server",
+      "User-Agent": USER_AGENT,
     };
     if (this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;

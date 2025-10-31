@@ -5,6 +5,7 @@ import { fetchWithTimeout } from "../internal/fetch-utils";
 import { UserInputError } from "../errors";
 import { ApiError } from "../api-client/index";
 import type { ServerContext } from "../types";
+import { USER_AGENT } from "../version";
 
 export default defineTool({
   name: "get_doc",
@@ -76,7 +77,7 @@ export default defineTool({
       {
         headers: {
           Accept: "text/plain, text/markdown",
-          "User-Agent": "Sentry-MCP/1.0",
+          "User-Agent": USER_AGENT,
         },
       },
       15000, // 15 second timeout

@@ -149,6 +149,7 @@ export function finalize(input: MergedArgs): ResolvedConfig {
     mcpUrl: input.mcpUrl,
     sentryDsn: input.sentryDsn,
     openaiBaseUrl: resolvedOpenAiBaseUrl,
+    openaiModel: input.openaiModel,
     finalScopes,
     finalSkills,
     organizationSlug: input.organizationSlug,

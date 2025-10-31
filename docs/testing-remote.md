@@ -232,7 +232,7 @@ The web UI provides a chat interface for testing the MCP server.
 **1. Authentication:**
 - Click "Connect to Sentry"
 - Authorize the application
-- Grant permissions (select scopes)
+- Grant permissions (select skills)
 
 **2. Basic Queries:**
 - "Who am I?" - Test authentication

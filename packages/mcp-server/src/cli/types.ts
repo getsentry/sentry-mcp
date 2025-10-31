@@ -8,6 +8,7 @@ export type CliArgs = {
   mcpUrl?: string;
   sentryDsn?: string;
   openaiBaseUrl?: string;
+  openaiModel?: string;
   scopes?: string; // LEGACY - for backward compatibility
   addScopes?: string; // LEGACY - for backward compatibility
   allScopes?: boolean; // LEGACY - for backward compatibility
@@ -26,6 +27,7 @@ export type EnvArgs = {
   url?: string; // raw URL if provided (SENTRY_URL)
   mcpUrl?: string;
   sentryDsn?: string;
+  openaiModel?: string;
   scopes?: string; // LEGACY - for backward compatibility
   addScopes?: string; // LEGACY - for backward compatibility
   skills?: string; // NEW - primary authorization method
@@ -38,6 +40,7 @@ export type MergedArgs = {
   mcpUrl?: string;
   sentryDsn?: string;
   openaiBaseUrl?: string;
+  openaiModel?: string;
   scopes?: string; // LEGACY - for backward compatibility
   addScopes?: string; // LEGACY - for backward compatibility
   allScopes?: boolean; // LEGACY - for backward compatibility
@@ -56,6 +59,7 @@ export type ResolvedConfig = {
   mcpUrl?: string;
   sentryDsn?: string;
   openaiBaseUrl?: string;
+  openaiModel?: string;
   finalScopes?: Set<Scope>; // LEGACY - for backward compatibility
   finalSkills?: Set<Skill>; // NEW - primary authorization method
   organizationSlug?: string;

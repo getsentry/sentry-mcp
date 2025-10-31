@@ -379,9 +379,8 @@ Add to `.vscode/settings.json`:
 # Host configuration
 --host=sentry.example.com         # Self-hosted Sentry (hostname only)
 
-# Scope management
---scopes=org:read,event:read      # Override default scopes (replaces all)
---add-scopes=event:write          # Add to default scopes (keeps defaults)
+# Skills management
+--skills=inspect,docs,triage      # Limit to specific skills (default: all available)
 
 # AI features (optional)
 --openai-base-url=URL             # Custom OpenAI endpoint
@@ -407,9 +406,8 @@ SENTRY_ACCESS_TOKEN=your-token
 # Host (self-hosted only)
 SENTRY_HOST=sentry.example.com
 
-# Scopes
-MCP_SCOPES=org:read,event:read           # Override (replaces defaults)
-MCP_ADD_SCOPES=event:write               # Add (keeps defaults)
+# Skills
+MCP_SKILLS=inspect,docs,triage           # Limit to specific skills
 
 # AI features
 OPENAI_API_KEY=your-key                  # For search_events/search_issues
