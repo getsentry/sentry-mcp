@@ -11,21 +11,21 @@ import metadata from "./routes/metadata";
 import { logIssue } from "@sentry/mcp-server/telem/logging";
 import { createRequestLogger } from "./logging";
 import mcpRoutes from "./routes/mcp";
+import { getClientIp } from "./utils/client-ip";
 
 const app = new Hono<{
   Bindings: Env;
 }>()
   .use("*", createRequestLogger())
-  // Set user IP address from X-Real-IP header for Sentry
+  // Set user IP address for Sentry (optional in local dev)
   .use("*", async (c, next) => {
-    const clientIP =
-      c.req.header("X-Real-IP") ||
-      c.req.header("CF-Connecting-IP") ||
-      c.req.header("X-Forwarded-For")?.split(",")[0]?.trim();
+    const clientIP = getClientIp(c.req.raw);
 
     if (clientIP) {
       Sentry.setUser({ ip_address: clientIP });
     }
+    // In local development, IP extraction may fail - this is expected and safe to ignore
+    // as it's only used for Sentry telemetry context
 
     await next();
   })

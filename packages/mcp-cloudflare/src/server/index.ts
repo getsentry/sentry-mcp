@@ -6,6 +6,8 @@ import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
 import { tokenExchangeCallback } from "./oauth";
 import sentryMcpHandler from "./lib/mcp-handler";
+import { checkRateLimit } from "./utils/rate-limiter";
+import { getClientIp } from "./utils/client-ip";
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
@@ -40,6 +42,31 @@ const corsWrappedOAuthProvider = {
       if (isPublicMetadataEndpoint(url.pathname)) {
         return addCorsHeaders(new Response(null, { status: 204 }));
       }
+    }
+
+    // Apply rate limiting to MCP and OAuth routes
+    // This protects against abuse at the earliest possible point
+    if (url.pathname.startsWith("/mcp") || url.pathname.startsWith("/oauth")) {
+      const clientIP = getClientIp(request);
+
+      // In local development or when IP can't be extracted, skip rate limiting
+      // Rate limiter is optional and primarily for production abuse prevention
+      if (clientIP) {
+        const rateLimitResult = await checkRateLimit(
+          clientIP,
+          env.MCP_RATE_LIMITER,
+          {
+            keyPrefix: "mcp",
+            errorMessage:
+              "Rate limit exceeded. Please wait before trying again.",
+          },
+        );
+
+        if (!rateLimitResult.allowed) {
+          return new Response(rateLimitResult.errorMessage, { status: 429 });
+        }
+      }
+      // If no clientIP, allow the request (likely local dev)
     }
 
     const oAuthProvider = new OAuthProvider({
