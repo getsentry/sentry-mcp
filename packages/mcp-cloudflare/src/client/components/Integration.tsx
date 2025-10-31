@@ -56,7 +56,7 @@ export default function Integration() {
             If you've got a client that natively supports the current MCP
             specification, including OAuth, you can connect directly.
           </p>
-          <div className="bg-background p-1 mb-6">
+          <div className="bg-background-3 p-1 mb-6">
             <CodeSnippet noMargin snippet={endpoint} />
           </div>
           <p>
@@ -112,15 +112,15 @@ export default function Integration() {
               <li>
                 Or manually:{" "}
                 <strong>
-                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
                     ⌘
                   </div>{" "}
                   +{" "}
-                  <div className="h-8 pl-1.5 pr-2 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                  <div className="h-8 pl-1.5 pr-2 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
                     Shift
                   </div>{" "}
                   +{" "}
-                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
                     J
                   </div>
                 </strong>{" "}
@@ -300,7 +300,7 @@ export default function Integration() {
                 className="fill-current"
               >
                 <title>Visual Studio Code</title>
-                <g clip-path="url(#clip0)">
+                <g clipPath="url(#clip0)">
                   <g filter="url(#filter0_d)">
                     <g mask="url(#mask0)">
                       <path d="M96.4614 10.593L75.8567 0.62085C73.4717 -0.533437 70.6215 -0.0465506 68.7498 1.83492L1.29834 63.6535C-0.515935 65.3164 -0.513852 68.1875 1.30281 69.8476L6.8125 74.8823C8.29771 76.2395 10.5345 76.339 12.1335 75.1201L93.3604 13.18C96.0854 11.102 100 13.0557 100 16.4939V16.2535C100 13.84 98.6239 11.64 96.4614 10.593Z" />
@@ -313,8 +313,8 @@ export default function Integration() {
                       <g>
                         <path
                           opacity="0.25"
-                          fill-rule="evenodd"
-                          clip-rule="evenodd"
+                          fillRule="evenodd"
+                          clipRule="evenodd"
                           d="M70.8508 99.5723C72.4258 100.189 74.2218 100.15 75.8115 99.3807L96.4 89.4231C98.5635 88.3771 99.9386 86.1762 99.9386 83.7616V16.2391C99.9386 13.8247 98.5635 11.6239 96.4 10.5774L75.8115 0.618974C73.7252 -0.390085 71.2835 -0.142871 69.4525 1.19518C69.1909 1.38637 68.9418 1.59976 68.7079 1.83493L29.2941 37.9795L12.1261 24.88C10.528 23.6606 8.2926 23.7605 6.80833 25.1177L1.30198 30.1524C-0.51354 31.8126 -0.515625 34.6837 1.2975 36.3465L16.186 50L1.2975 63.6536C-0.515625 65.3164 -0.51354 68.1875 1.30198 69.8476L6.80833 74.8824C8.2926 76.2395 10.528 76.339 12.1261 75.1201L29.2941 62.0207L68.7079 98.1651C69.3315 98.7923 70.0635 99.2645 70.8508 99.5723ZM74.9542 27.1812L45.0481 50L74.9542 72.8188V27.1812Z"
                           fill="url(#paint0_linear)"
                         />
@@ -343,11 +343,11 @@ export default function Integration() {
               <li>
                 <strong>
                   {" "}
-                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
                     ⌘
                   </div>{" "}
                   +{" "}
-                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
                     P
                   </div>
                 </strong>{" "}
@@ -471,11 +471,11 @@ export default function Integration() {
             <ol>
               <li>
                 <strong>
-                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
                     ⌘
                   </div>{" "}
                   +{" "}
-                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background">
+                  <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
                     ,
                   </div>
                 </strong>{" "}

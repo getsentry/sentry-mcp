@@ -60,7 +60,7 @@ export default function CodeSnippet({
         </Button>
       </div>
       <pre
-        className="p-4 border border-violet-300/25 pr-12 overflow-x-auto text-slate-200 text-sm bg-[#160f24] rounded-xl"
+        className="p-4 border border-violet-300/25 pr-12 overflow-x-auto text-slate-200 text-sm bg-background rounded-xl"
         style={{ margin: 0 }}
       >
         {snippet}

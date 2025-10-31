@@ -278,7 +278,7 @@ export default function TerminalAnimation() {
               : currentIndex === 4
                 ? "xl:border-lime-200/50"
                 : "border-white/10"
-        } relative w-full col-span-2 max-xl:row-span-6 border bg-[#160f24]/50 backdrop-blur-3xl rounded-3xl overflow-hidden`}
+        } relative w-full col-span-2 max-xl:row-span-6 border bg-background/50 backdrop-blur-3xl rounded-3xl overflow-hidden`}
       >
         <div className="w-full h-full [mask-image:linear-gradient(190deg,red_31%,transparent_50%)]">
           <div

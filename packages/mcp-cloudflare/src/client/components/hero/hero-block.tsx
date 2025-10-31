@@ -24,7 +24,7 @@ export default function HeroBlock() {
             href="cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9"
             className="relative hidden md:block size-fit my-2 group cursor-pointer"
           >
-            <div className="absolute inset-0 size-full rounded-xl bg-violet-400/80 bg-[repeating-linear-gradient(-45deg,var(--background),var(--background)_0.5px,#fff0_0.5px,#fff0_12px)]" />
+            <div className="absolute inset-0 size-full rounded-xl bg-violet-400/80 bg-[repeating-linear-gradient(-45deg,var(--bg1),var(--bg1)_0.5px,#fff0_0.5px,#fff0_12px)]" />
             <div className="bg-grid absolute inset-0 size-full duration-200 delay-50 opacity-100 [--size:10px] [--grid-color:#0002] bg-pink-400 group-hover:rotate-x-15 group-hover:translate-1 group-hover:-rotate-y-2 !px-6 transform-3d perspective-distant rounded-xl ease-[cubic-bezier(0.175,0.885,0.32,1.275)] origin-bottom-right group-active:rotate-y-1 group-active:translate-0.5 group-active:rotate-x-3" />
             <Button
               variant="secondary"
