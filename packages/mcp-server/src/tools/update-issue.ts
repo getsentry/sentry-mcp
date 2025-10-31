@@ -16,6 +16,7 @@ import {
 
 export default defineTool({
   name: "update_issue",
+  requiredSkills: ["triage"], // Only available in triage skill
   requiredScopes: ["event:write"],
   description: [
     "Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.",

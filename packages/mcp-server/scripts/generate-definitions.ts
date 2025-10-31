@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Generate tool definitions JSON for external consumption.
+ * Generate tool and skill definitions JSON for external consumption.
  *
  * Outputs to src/ so they can be bundled and imported by clients and the Cloudflare app.
  */
@@ -15,6 +15,7 @@ const __dirname = path.dirname(__filename);
 
 // Lazy imports of server modules to avoid type bleed
 const toolsModule = await import("../src/tools/index.ts");
+const skillsModule = await import("../src/skills.ts");
 
 function writeJson(file: string, data: unknown) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
@@ -84,17 +85,47 @@ function generateToolDefinitions() {
   return defs.sort(byName);
 }
 
+// Skills
+async function generateSkillDefinitions() {
+  const getSkillsArrayWithCounts =
+    skillsModule.getSkillsArrayWithCounts as () => Promise<
+      Array<{
+        id: string;
+        name: string;
+        description: string;
+        defaultEnabled: boolean;
+        order: number;
+        toolCount?: number;
+      }>
+    >;
+
+  if (typeof getSkillsArrayWithCounts !== "function") {
+    throw new Error(
+      "Failed to import getSkillsArrayWithCounts from src/skills.ts",
+    );
+  }
+
+  const skills = await getSkillsArrayWithCounts();
+
+  // Return sorted by order (already sorted but being explicit)
+  return skills.sort((a, b) => a.order - b.order);
+}
+
 async function main() {
   try {
-    console.log("Generating tool definitions...");
+    console.log("Generating tool and skill definitions...");
     const outDir = path.join(__dirname, "../src");
     ensureDirExists(outDir);
 
     const tools = generateToolDefinitions();
+    const skills = await generateSkillDefinitions();
 
     writeJson(path.join(outDir, "toolDefinitions.json"), tools);
+    writeJson(path.join(outDir, "skillDefinitions.json"), skills);
 
-    console.log(`✅ Generated: tools(${tools.length})`);
+    console.log(
+      `✅ Generated: tools(${tools.length}), skills(${skills.length})`,
+    );
   } catch (error) {
     const err = error as Error;
     console.error("[ERROR]", err.message, err.stack);

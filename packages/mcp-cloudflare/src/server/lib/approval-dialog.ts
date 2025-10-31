@@ -4,6 +4,9 @@ import type {
 } from "@cloudflare/workers-oauth-provider";
 import { logError, logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
 import { sanitizeHtml } from "./html-utils";
+import skillDefinitions, {
+  type SkillDefinition,
+} from "@sentry/mcp-server/skillDefinitions";
 
 const COOKIE_NAME = "mcp-approved-clients";
 const ONE_YEAR_IN_SECONDS = 31536000;
@@ -242,11 +245,33 @@ function decodeState<T = any>(encoded: string): T {
  * @param options - Configuration for the approval dialog
  * @returns A Response containing the HTML approval dialog
  */
-export function renderApprovalDialog(
+export async function renderApprovalDialog(
   request: Request,
   options: ApprovalDialogOptions,
-): Response {
+): Promise<Response> {
   const { client, server, state } = options;
+
+  // Use static skill definitions bundled at build time
+  const skills: SkillDefinition[] = skillDefinitions as SkillDefinition[];
+
+  // Generate HTML for all skills (checked if defaultEnabled)
+  const skillsHtml = skills
+    .map(
+      (skill) => `
+    <label class="permission-item">
+      <input type="checkbox" name="skill" value="${sanitizeHtml(skill.id)}"${skill.defaultEnabled ? " checked" : ""}>
+      <span class="permission-checkbox"></span>
+      <div class="permission-content">
+        <div class="permission-header">
+          <span class="permission-name">${sanitizeHtml(skill.name)}</span>
+          ${skill.toolCount !== undefined ? `<span class="permission-tool-count">${sanitizeHtml(String(skill.toolCount))} ${skill.toolCount === 1 ? "tool" : "tools"}</span>` : ""}
+        </div>
+        <div class="permission-description">${sanitizeHtml(skill.description)}</div>
+      </div>
+    </label>
+  `,
+    )
+    .join("");
 
   // Encode state for form submission
   const encodedState = encodeState(state);
@@ -289,466 +314,512 @@ export function renderApprovalDialog(
         <style>
           /* Modern, responsive styling with system fonts */
           :root {
-            --primary-color: oklch(0.205 0 0);
-            --highlight-color: oklch(0.811 0.111 293.571);
-            --border-color: oklch(0.278 0.033 256.848);
-            --error-color: #f44336;
-            --border-color: oklch(0.269 0 0);
-            --text-color: oklch(0.872 0.01 258.338);
-            --background-color: oklab(0 0 0 / 0.3);
+            /* Color palette */
+            --bg-gradient-start: oklch(0.13 0.028 261.692);
+            --bg-gradient-mid: oklch(0.18 0.034 264.665);
+            --bg-gradient-end: oklch(0.13 0.028 261.692);
+
+            --card-bg: oklch(0.18 0.02 264);
+            --card-bg-hover: oklch(0.20 0.02 264);
+
+            --purple-primary: oklch(0.72 0.14 293);
+            --purple-hover: oklch(0.76 0.14 293);
+            --purple-light: oklch(0.82 0.11 293);
+
+            --border-default: oklch(0.28 0.02 264);
+            --border-hover: oklch(0.35 0.05 264);
+
+            --text-primary: oklch(0.95 0 0);
+            --text-secondary: oklch(0.75 0.01 264);
+            --text-tertiary: oklch(0.60 0.01 264);
+
+            /* Spacing scale */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2rem;
+            --space-2xl: 3rem;
+
+            /* Border radius */
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.4);
+
+            /* Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
           }
-          
+
+          * {
+            box-sizing: border-box;
+          }
+
           body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, 
-                         Helvetica, Arial, sans-serif, "Apple Color Emoji", 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                         Helvetica, Arial, sans-serif, "Apple Color Emoji",
                          "Segoe UI Emoji", "Segoe UI Symbol";
             line-height: 1.6;
-            color: var(--text-color);
-            background: linear-gradient(oklch(0.13 0.028 261.692) 0%, oklch(0.21 0.034 264.665) 50%, oklch(0.13 0.028 261.692) 100%);
+            color: var(--text-secondary);
+            background: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 50%, var(--bg-gradient-end) 100%);
             min-height: 100vh;
             margin: 0;
             padding: 0;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
           }
-          
+
           .container {
             max-width: 600px;
-            margin: 1rem auto;
-            padding: 1rem;
+            margin: var(--space-xl) auto;
+            padding: var(--space-md);
           }
-          
+
+          /* Wider container for two-column layout */
+          @media (min-width: 1024px) {
+            .container {
+              max-width: 1100px;
+            }
+          }
+
           .precard {
             text-align: center;
+            margin-bottom: var(--space-lg);
           }
-          
+
           .card {
-            background-color: var(--background-color);
-            padding: 2rem;
+            background: var(--card-bg);
+            padding: var(--space-2xl);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-default);
           }
-          
+
           .header {
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 1.5rem;
+            gap: var(--space-md);
+            margin-bottom: var(--space-sm);
           }
-          
+
           .logo {
-            width: 36px;
-            height: 36px;
-            margin-right: 1rem;
-            color: var(--highlight-color);
+            width: 40px;
+            height: 40px;
+            color: var(--purple-light);
+            flex-shrink: 0;
           }
-          
+
           .title {
             margin: 0;
-            font-size: 26px;
-            font-weight: 400;
-            color: white;
-          }
-          
-          .alert {
-            margin: 0;
-            font-size: 1.5rem;
-            font-weight: 400;
-            margin: 1rem 0;
-            text-align: center;
-            color: white;
-          }
-          
-          .client-info {
-            border: 1px solid var(--border-color);
-            padding: 1rem 1rem 0.5rem;
-            margin-bottom: 1.5rem;
-          }
-          
-          .client-name {
+            font-size: 1.75rem;
             font-weight: 600;
-            font-size: 1.2rem;
-            margin: 0 0 0.5rem 0;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
           }
-          
-          .client-detail {
+
+          .alert {
+            margin: 0 0 var(--space-xl) 0;
+            font-size: 1.375rem;
+            font-weight: 500;
+            text-align: center;
+            color: var(--text-primary);
+            line-height: 1.4;
+          }
+
+          .client-info {
+            background: rgba(0, 0, 0, 0.25);
+            padding: var(--space-md);
+            gap: var(--space-md);
             display: flex;
-            margin-bottom: 0.5rem;
-            align-items: baseline;
+            flex-direction: column;
           }
-          
+
           .detail-label {
             font-weight: 500;
-            min-width: 120px;
+            color: var(--text-tertiary);
+            font-size: 0.875rem;
+            margin-bottom: var(--space-xs);
           }
-          
+
           .detail-value {
-            font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             word-break: break-all;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
           }
-          
+
           .detail-value.small {
-            font-size: 0.8em;
+            font-size: 0.8125rem;
           }
-          
-          .external-link-icon {
-            font-size: 0.75em;
-            margin-left: 0.25rem;
-            vertical-align: super;
-          }
-          
+
           .actions {
             display: flex;
             justify-content: flex-end;
-            gap: 1rem;
-            margin-top: 2rem;
+            gap: var(--space-md);
           }
 
           a {
-            color: var(--highlight-color);
+            color: var(--purple-primary);
+            text-decoration: none;
+            transition: color var(--transition-fast);
+          }
+
+          a:hover {
+            color: var(--purple-hover);
             text-decoration: underline;
           }
-          
+
           .button {
-            padding: 0.75rem 1.5rem;
+            padding: 0.75rem 1.75rem;
             font-weight: 600;
             cursor: pointer;
             border: none;
-            font-size: 1rem;
+            font-size: 0.9375rem;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-base);
+            font-family: inherit;
+            min-height: 44px;
           }
-          
+
+          .button:focus-visible {
+            outline: 2px solid var(--purple-primary);
+            outline-offset: 2px;
+          }
+
           .button-primary {
-            background-color: var(--highlight-color);
-            color: black;
+            background: var(--purple-primary);
+            color: oklch(0.1 0 0);
+            box-shadow: var(--shadow-sm);
           }
-          
+
+          .button-primary:hover {
+            background: var(--purple-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+          }
+
+          .button-primary:active {
+            transform: translateY(0);
+            box-shadow: var(--shadow-sm);
+          }
+
           .button-secondary {
-            background-color: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
+            background: transparent;
+            border: 1.5px solid var(--border-default);
+            color: var(--text-secondary);
           }
-          
-          /* Permission selection styles */
-          .permission-section {
-            margin: 2rem 0;
-            border: 1px solid var(--border-color);
-            padding: 1.5rem;
+
+          .button-secondary:hover {
+            border-color: var(--border-hover);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
           }
-          
-          .permission-title {
-            margin: 0 0 0.5rem 0;
-            font-size: 1.3rem;
+
+          .button-secondary:active {
+            background: rgba(255, 255, 255, 0.05);
+          }
+
+          /* Section header (for Client, Skills, etc.) */
+          .section-header {
+            font-size: 1.125rem;
             font-weight: 600;
-            color: white;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+            margin: 0;
           }
-          
-          /* Default permissions section */
-          .default-permissions {
-            margin-bottom: 2rem;
-            background-color: oklab(0 0 0 / 0.15);
-            border: 1px solid var(--highlight-color);
-            padding: 1.5rem;
-            border-radius: 4px;
-          }
-          
-          .default-permissions-title {
-            margin: 0 0 1rem 0;
-            font-size: 1rem;
-            font-weight: 500;
-            color: white;
-          }
-          
-          .default-permission-item {
+
+          /* Permission items */
+          .permission-item {
             display: flex;
             align-items: flex-start;
-            gap: 0.75rem;
-          }
-          
-          .permission-check {
-            font-size: 1.2rem;
-            color: var(--highlight-color);
-            flex-shrink: 0;
-            margin-top: 0.1rem;
-          }
-          
-          .default-permission-content {
-            flex: 1;
-          }
-          
-          .default-permission-name {
-            font-weight: 600;
-            color: white;
-            font-size: 1rem;
-          }
-          
-          .default-permission-description {
-            color: var(--text-color);
-            font-size: 0.9rem;
-            margin-top: 0.25rem;
-          }
-          
-          /* Optional permissions section */
-          .optional-permissions {
-            margin-bottom: 1.5rem;
-          }
-          
-          .optional-permissions-title {
-            margin: 0 0 1rem 0;
-            font-size: 1rem;
-            font-weight: 500;
-            color: white;
-          }
-          
-          .optional-permission-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            padding: 1rem;
-            border: 1px solid var(--border-color);
-            margin-bottom: 0.75rem;
+            gap: var(--space-md);
+            padding: var(--space-sm) var(--space-md);
+            background: transparent;
+            border: none;
+            border-left: 3px solid transparent;
+            margin-bottom: var(--space-sm);
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all var(--transition-base);
+            position: relative;
           }
-          
-          .optional-permission-item:hover {
-            border-color: var(--highlight-color);
-            background-color: oklab(0 0 0 / 0.1);
+
+          .permission-item:last-child {
+            margin-bottom: 0;
           }
-          
-          .optional-permission-item input[type="checkbox"] {
+
+          .permission-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+          }
+
+          .permission-item input[type="checkbox"] {
             position: absolute;
             opacity: 0;
             pointer-events: none;
           }
-          
+
           .permission-checkbox {
-            font-size: 1.2rem;
-            color: var(--text-color);
-            transition: color 0.2s ease;
+            font-size: 1.5rem;
+            color: var(--text-tertiary);
+            transition: all var(--transition-fast);
             flex-shrink: 0;
             cursor: pointer;
-            margin-top: 0.1rem;
-          }
-          
-          /* CSS-only checkbox interactions using :checked pseudo-class */
-          .optional-permission-item input[type="checkbox"]:checked + .permission-checkbox {
-            color: var(--highlight-color);
-          }
-          
-          .optional-permission-item input[type="checkbox"]:checked + .permission-checkbox::before {
-            content: "☑";
-          }
-          
-          .optional-permission-item input[type="checkbox"]:not(:checked) + .permission-checkbox::before {
-            content: "☐";
-          }
-          
-          .optional-permission-item:has(input[type="checkbox"]:checked) {
-          border-color: var(--highlight-color);
-            background-color: oklab(0 0 0 / 0.1);
-          }
-          
-          .optional-permission-content {
-            flex: 1;
-          }
-          
-          .optional-permission-name {
-            font-weight: 600;
-            color: white;
-            font-size: 1rem;
-          }
-          
-          .optional-permission-description {
-            color: var(--text-color);
-            font-size: 0.9rem;
-            margin-top: 0.25rem;
+            line-height: 1;
+            user-select: none;
           }
 
-          
+          /* Checkbox states */
+          .permission-item input[type="checkbox"]:checked + .permission-checkbox {
+            color: var(--purple-primary);
+            transform: scale(1.1);
+          }
+
+          .permission-item input[type="checkbox"]:checked + .permission-checkbox::before {
+            content: "☑";
+          }
+
+          .permission-item input[type="checkbox"]:not(:checked) + .permission-checkbox::before {
+            content: "☐";
+          }
+
+          .permission-item:has(input[type="checkbox"]:checked) {
+            border-left-color: var(--purple-primary);
+            background: rgba(171, 99, 232, 0.05);
+          }
+
+          .permission-content {
+            flex: 1;
+            min-width: 0;
+          }
+
+          .permission-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: var(--space-md);
+            margin-bottom: var(--space-xs);
+          }
+
+          .permission-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1rem;
+            letter-spacing: -0.01em;
+          }
+
+          .permission-tool-count {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+            font-weight: 500;
+            white-space: nowrap;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.125rem 0.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-default);
+          }
+
+          .permission-description {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.5;
+          }
+
+          /* Two-column layout for wider screens */
+          .approval-grid {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-xl);
+            align-items: start;
+          }
+
+          .approval-column {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+          }
+
+          .authorization-text {
+            color: var(--text-secondary);
+            line-height: 1.6;
+          }
+
+          /* Large screens and up: Two-column layout */
+          @media (min-width: 1024px) {
+            .approval-grid {
+              flex-direction: row;
+              gap: var(--space-2xl);
+            }
+
+            .approval-column {
+              flex: 1 1 50%;
+            }
+          }
+
           /* Responsive adjustments */
           @media (max-width: 640px) {
             .container {
-              margin: 1rem auto;
-              padding: 0.5rem;
+              margin: var(--space-md) auto;
+              padding: var(--space-sm);
             }
-            
+
             .card {
-              padding: 1.5rem;
+              padding: var(--space-lg);
+              border-radius: var(--radius-md);
             }
-            
-            .client-detail {
-              flex-direction: column;
+
+            .title {
+              font-size: 1.5rem;
             }
-            
-            .detail-label {
-              min-width: unset;
-              margin-bottom: 0.25rem;
+
+            .alert {
+              font-size: 1.125rem;
             }
-            
+
             .actions {
-              flex-direction: column;
+              flex-direction: column-reverse;
+              gap: var(--space-sm);
             }
-            
+
             .button {
               width: 100%;
+            }
+
+            .permission-item {
+              padding: var(--space-sm);
+            }
+
+            .permission-header {
+              flex-direction: column;
+              align-items: flex-start;
+              gap: var(--space-xs);
             }
           }
         </style>
       </head>
       <body>
         <div class="container">
-          <div class="precard">
+          <header class="precard">
             <div class="header">
-              <svg class="logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-labelledby="icon-title"><title id="icon-title">Sentry Logo</title><path d="M17.48 1.996c.45.26.823.633 1.082 1.083l13.043 22.622a2.962 2.962 0 0 1-2.562 4.44h-3.062c.043-.823.039-1.647 0-2.472h3.052a.488.488 0 0 0 .43-.734L16.418 4.315a.489.489 0 0 0-.845 0L12.582 9.51a23.16 23.16 0 0 1 7.703 8.362 23.19 23.19 0 0 1 2.8 11.024v1.234h-7.882v-1.236a15.284 15.284 0 0 0-6.571-12.543l-1.48 2.567a12.301 12.301 0 0 1 5.105 9.987v1.233h-9.3a2.954 2.954 0 0 1-2.56-1.48A2.963 2.963 0 0 1 .395 25.7l1.864-3.26a6.854 6.854 0 0 1 2.15 1.23l-1.883 3.266a.49.49 0 0 0 .43.734h6.758a9.985 9.985 0 0 0-4.83-7.272l-1.075-.618 3.927-6.835 1.075.615a17.728 17.728 0 0 1 6.164 5.956 17.752 17.752 0 0 1 2.653 8.154h2.959a20.714 20.714 0 0 0-3.05-9.627 20.686 20.686 0 0 0-7.236-7.036l-1.075-.618 4.215-7.309a2.958 2.958 0 0 1 4.038-1.083Z" fill="currentColor"></path></svg>
-              <h1 class="title"><strong>${serverName}</strong></h1>
+              <svg class="logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M17.48 1.996c.45.26.823.633 1.082 1.083l13.043 22.622a2.962 2.962 0 0 1-2.562 4.44h-3.062c.043-.823.039-1.647 0-2.472h3.052a.488.488 0 0 0 .43-.734L16.418 4.315a.489.489 0 0 0-.845 0L12.582 9.51a23.16 23.16 0 0 1 7.703 8.362 23.19 23.19 0 0 1 2.8 11.024v1.234h-7.882v-1.236a15.284 15.284 0 0 0-6.571-12.543l-1.48 2.567a12.301 12.301 0 0 1 5.105 9.987v1.233h-9.3a2.954 2.954 0 0 1-2.56-1.48A2.963 2.963 0 0 1 .395 25.7l1.864-3.26a6.854 6.854 0 0 1 2.15 1.23l-1.883 3.266a.49.49 0 0 0 .43.734h6.758a9.985 9.985 0 0 0-4.83-7.272l-1.075-.618 3.927-6.835 1.075.615a17.728 17.728 0 0 1 6.164 5.956 17.752 17.752 0 0 1 2.653 8.154h2.959a20.714 20.714 0 0 0-3.05-9.627 20.686 20.686 0 0 0-7.236-7.036l-1.075-.618 4.215-7.309a2.958 2.958 0 0 1 4.038-1.083Z" fill="currentColor"></path></svg>
+              <h1 class="title">${serverName}</h1>
             </div>
-          </div>
-            
-          <div class="card">
-            
-            <h2 class="alert"><strong>${clientName || "A new MCP Client"}</strong> is requesting access</h1>
-            
-            <div class="client-info">
-              <div class="client-detail">
-                <div class="detail-label">Name:</div>
-                <div class="detail-value">
-                  ${clientName}
-                </div>
-              </div>
-              
-              ${
-                clientUri
-                  ? `
-                <div class="client-detail">
-                  <div class="detail-label">Website:</div>
-                  <div class="detail-value small">
-                    <a href="${clientUri}" target="_blank" rel="noopener noreferrer">
-                      ${clientUri}
-                    </a>
-                  </div>
-                </div>
-              `
-                  : ""
-              }
-              
-              ${
-                policyUri
-                  ? `
-                <div class="client-detail">
-                  <div class="detail-label">Privacy Policy:</div>
-                  <div class="detail-value">
-                    <a href="${policyUri}" target="_blank" rel="noopener noreferrer">
-                      ${policyUri}
-                    </a>
-                  </div>
-                </div>
-              `
-                  : ""
-              }
-              
-              ${
-                tosUri
-                  ? `
-                <div class="client-detail">
-                  <div class="detail-label">Terms of Service:</div>
-                  <div class="detail-value">
-                    <a href="${tosUri}" target="_blank" rel="noopener noreferrer">
-                      ${tosUri}
-                    </a>
-                  </div>
-                </div>
-              `
-                  : ""
-              }
-              
-              ${
-                redirectUris.length > 0
-                  ? `
-                <div class="client-detail">
-                  <div class="detail-label">Redirect URIs:</div>
-                  <div class="detail-value small">
-                    ${redirectUris.map((uri) => `<div>${uri}</div>`).join("")}
-                  </div>
-                </div>
-              `
-                  : ""
-              }
-              
-              ${
-                contacts
-                  ? `
-                <div class="client-detail">
-                  <div class="detail-label">Contact:</div>
-                  <div class="detail-value">${contacts}</div>
-                </div>
-              `
-                  : ""
-              }
-            </div>
-            
-            <p>This MCP Client is requesting authorization to ${serverName}. If you approve, you will be redirected to complete authentication.</p>            
+          </header>
 
-            <form method="post" action="${new URL(request.url).pathname}">
+          <main class="card">
+
+            <p class="alert"><strong>${clientName || "A new MCP Client"}</strong> is requesting access</p>
+
+            <form method="post" action="${new URL(request.url).pathname}" aria-label="Authorization form">
               <input type="hidden" name="state" value="${encodedState}">
-              
-              <div class="permission-section">
-                <h3 class="permission-title">Permissions</h3>
-                
-                <!-- Default permissions section -->
-                <div class="default-permissions">
-                  <div class="default-permission-item">
-                    <span class="permission-check">✓</span>
-                    <div class="default-permission-content">
-                      <span class="default-permission-name">Read-only access to your Sentry data</span>
-                      <div class="default-permission-description">View organizations, projects, teams, issues, and releases</div>
+
+              <div class="approval-grid">
+                <!-- Left column: Skills selection -->
+                <div class="approval-column">
+                  <h2 class="section-header" id="skills-heading">Skills</h2>
+                  <section class="permission-section" aria-labelledby="skills-heading">
+                    <div role="group" aria-label="Select skills to grant access">
+                      ${skillsHtml}
                     </div>
+                  </section>
+                </div>
+
+                <!-- Right column: Client info and actions -->
+                <div class="approval-column">
+                  <h2 class="section-header">Client</h2>
+                  <section class="client-info" aria-label="Client Information">
+                    <div class="client-detail">
+                      <div class="detail-label">Name:</div>
+                      <div class="detail-value">
+                        ${clientName}
+                      </div>
+                    </div>
+
+                    ${
+                      clientUri
+                        ? `
+                      <div class="client-detail">
+                        <div class="detail-label">Website:</div>
+                        <div class="detail-value small">
+                          <a href="${clientUri}" target="_blank" rel="noopener noreferrer">
+                            ${clientUri}
+                          </a>
+                        </div>
+                      </div>
+                    `
+                        : ""
+                    }
+
+                    ${
+                      policyUri
+                        ? `
+                      <div class="client-detail">
+                        <div class="detail-label">Privacy Policy:</div>
+                        <div class="detail-value">
+                          <a href="${policyUri}" target="_blank" rel="noopener noreferrer">
+                            ${policyUri}
+                          </a>
+                        </div>
+                      </div>
+                    `
+                        : ""
+                    }
+
+                    ${
+                      tosUri
+                        ? `
+                      <div class="client-detail">
+                        <div class="detail-label">Terms of Service:</div>
+                        <div class="detail-value">
+                          <a href="${tosUri}" target="_blank" rel="noopener noreferrer">
+                            ${tosUri}
+                          </a>
+                        </div>
+                      </div>
+                    `
+                        : ""
+                    }
+
+                    ${
+                      redirectUris.length > 0
+                        ? `
+                      <div class="client-detail">
+                        <div class="detail-label">Redirect URIs:</div>
+                        <div class="detail-value small">
+                          ${redirectUris.map((uri) => `<div>${uri}</div>`).join("")}
+                        </div>
+                      </div>
+                    `
+                        : ""
+                    }
+
+                    ${
+                      contacts
+                        ? `
+                      <div class="client-detail">
+                        <div class="detail-label">Contact:</div>
+                        <div class="detail-value">${contacts}</div>
+                      </div>
+                    `
+                        : ""
+                    }
+                  </section>
+
+                  <p class="authorization-text">This MCP Client is requesting authorization to Sentry. If you approve, you will be redirected to complete authentication.</p>
+
+                  <div class="actions">
+                    <button type="button" class="button button-secondary" onclick="window.history.back()" aria-label="Cancel authorization">Cancel</button>
+                    <button type="submit" class="button button-primary" aria-label="Approve authorization request">Approve</button>
                   </div>
                 </div>
-                
-                <!-- Optional permissions section -->
-                <div class="optional-permissions">
-                  <h4 class="optional-permissions-title">Optional additional access:</h4>
-
-                  <label class="optional-permission-item">
-                    <input type="checkbox" name="permission" value="seer" checked>
-                    <span class="permission-checkbox"></span>
-                    <div class="optional-permission-content">
-                      <span class="optional-permission-name">Seer</span>
-                      <div class="optional-permission-description">Use Seer to analyze issues and generate fix recommendations (may incur costs)</div>
-                    </div>
-                  </label>
-
-                  <label class="optional-permission-item">
-                    <input type="checkbox" name="permission" value="docs" checked>
-                    <span class="permission-checkbox"></span>
-                    <div class="optional-permission-content">
-                      <span class="optional-permission-name">Documentation</span>
-                      <div class="optional-permission-description">Search and read Sentry documentation for SDK setup and configuration</div>
-                    </div>
-                  </label>
-
-                  <label class="optional-permission-item">
-                    <input type="checkbox" name="permission" value="issue_triage">
-                    <span class="permission-checkbox"></span>
-                    <div class="optional-permission-content">
-                      <span class="optional-permission-name">Issue Triage</span>
-                      <div class="optional-permission-description">Update and manage issues - resolve, assign, and triage problems</div>
-                    </div>
-                  </label>
-
-                  <label class="optional-permission-item">
-                    <input type="checkbox" name="permission" value="project_management">
-                    <span class="permission-checkbox"></span>
-                    <div class="optional-permission-content">
-                      <span class="optional-permission-name">Project Management</span>
-                      <div class="optional-permission-description">Create and modify projects, teams, and DSNs</div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-              
-              <div class="actions">
-                <button type="button" class="button button-secondary" onclick="window.history.back()">Cancel</button>
-                <button type="submit" class="button button-primary">Approve</button>
               </div>
             </form>
-          </div>
+          </main>
         </div>
       </body>
     </html>
@@ -769,8 +840,8 @@ export interface ParsedApprovalResult {
   state: any;
   /** Headers to set on the redirect response, including the Set-Cookie header. */
   headers: Record<string, string>;
-  /** Selected permission levels */
-  permissions: string[];
+  /** Selected skills */
+  skills: string[];
 }
 
 /**
@@ -792,7 +863,7 @@ export async function parseRedirectApproval(
 
   let state: any;
   let clientId: string | undefined;
-  let permissions: string[];
+  let skills: string[];
 
   try {
     const formData = await request.formData();
@@ -809,10 +880,10 @@ export async function parseRedirectApproval(
       throw new Error("Could not extract clientId from state object.");
     }
 
-    // Extract permission selections from checkboxes - collect all 'permission' field values
-    permissions = formData
-      .getAll("permission")
-      .filter((p): p is string => typeof p === "string");
+    // Extract skill selections from checkboxes - collect all 'skill' field values
+    skills = formData
+      .getAll("skill")
+      .filter((s): s is string => typeof s === "string");
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],
@@ -846,7 +917,7 @@ export async function parseRedirectApproval(
     "Set-Cookie": `${COOKIE_NAME}=${newCookieValue}; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=${ONE_YEAR_IN_SECONDS}`,
   };
 
-  return { state, headers, permissions };
+  return { state, headers, skills };
 }
 
 // sanitizeHtml function is now imported from "./html-utils"

@@ -179,5 +179,9 @@ export const DEFAULT_SCOPES = [
   "event:read",
 ] as const;
 
+// Re-export DEFAULT_SKILLS from skills.ts for convenience
+// (Skills are the new user-facing authorization system)
+export { DEFAULT_SKILLS } from "./skills";
+
 // Note: All scopes are now exported from permissions.ts to avoid pulling this
 // heavy constants module into scope-only consumers.

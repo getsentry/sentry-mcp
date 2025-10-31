@@ -10,6 +10,7 @@ import { formatIssueResults, formatExplanation } from "./formatters";
 
 export default defineTool({
   name: "search_issues",
+  requiredSkills: ["inspect", "triage", "seer"], // Available in inspect, triage, and seer skills
   requiredScopes: ["event:read"],
   description: [
     "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.",

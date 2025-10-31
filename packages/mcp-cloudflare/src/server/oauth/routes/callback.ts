@@ -2,61 +2,17 @@ import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import type { Env, WorkerProps } from "../../types";
-import type { Scope } from "@sentry/mcp-server/permissions";
-import { DEFAULT_SCOPES } from "@sentry/mcp-server/constants";
 import { SENTRY_TOKEN_URL } from "../constants";
 import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-server/telem/logging";
+import { parseSkills, getScopesForSkills } from "@sentry/mcp-server/skills";
 
 /**
- * Extended AuthRequest that includes permissions
+ * Extended AuthRequest that includes skills
  */
-interface AuthRequestWithPermissions extends AuthRequest {
-  permissions?: unknown;
-}
-
-/**
- * Convert selected permissions to granted scopes
- * Permissions are additive:
- * - Base (always included): org:read, project:read, team:read, event:read
- * - Seer adds: seer (virtual scope)
- * - Docs adds: docs (virtual scope)
- * - Issue Triage adds: event:write
- * - Project Management adds: project:write, team:write
- * @param permissions Array of permission strings
- */
-function getScopesFromPermissions(permissions?: unknown): Set<Scope> {
-  // Start with base read-only scopes (always granted via DEFAULT_SCOPES)
-  const scopes = new Set<Scope>(DEFAULT_SCOPES);
-
-  // Validate permissions is an array of strings
-  if (!Array.isArray(permissions) || permissions.length === 0) {
-    return scopes;
-  }
-  const perms = (permissions as unknown[]).filter(
-    (p): p is string => typeof p === "string",
-  );
-
-  // Add scopes based on selected permissions
-  if (perms.includes("seer")) {
-    scopes.add("seer");
-  }
-
-  if (perms.includes("docs")) {
-    scopes.add("docs");
-  }
-
-  if (perms.includes("issue_triage")) {
-    scopes.add("event:write");
-  }
-
-  if (perms.includes("project_management")) {
-    scopes.add("project:write");
-    scopes.add("team:write");
-  }
-
-  return scopes;
+interface AuthRequestWithSkills extends AuthRequest {
+  skills?: unknown; // Skill-based authorization system
 }
 
 /**
@@ -83,7 +39,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   }
 
   // Reconstruct oauth request info exactly as provided by downstream client
-  const oauthReqInfo = parsedState.req as unknown as AuthRequestWithPermissions;
+  const oauthReqInfo = parsedState.req as unknown as AuthRequestWithSkills;
 
   if (!oauthReqInfo.clientId) {
     logWarn("Missing clientId in OAuth state", {
@@ -164,8 +120,42 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   });
   if (errResponse) return errResponse;
 
-  // Get scopes based on selected permissions
-  const grantedScopes = getScopesFromPermissions(oauthReqInfo.permissions);
+  // Parse and validate granted skills first
+  const { valid: validSkills, invalid: invalidSkills } = parseSkills(
+    oauthReqInfo.skills,
+  );
+
+  // Log warning for any invalid skill names
+  if (invalidSkills.length > 0) {
+    logWarn("OAuth callback received invalid skill names", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: {
+        clientId: oauthReqInfo.clientId,
+        invalidSkills,
+      },
+    });
+  }
+
+  // Validate that at least one valid skill is granted
+  if (validSkills.size === 0) {
+    logWarn("OAuth authorization rejected: No valid skills selected", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: {
+        clientId: oauthReqInfo.clientId,
+        receivedSkills: oauthReqInfo.skills,
+      },
+    });
+    return c.text(
+      "Authorization failed: You must select at least one valid permission to continue.",
+      400,
+    );
+  }
+
+  // Calculate Sentry API scopes from validated skills
+  const grantedScopes = await getScopesForSkills(validSkills);
+
+  // Convert valid skills Set to array for OAuth props
+  const grantedSkills = Array.from(validSkills);
 
   // Return back to the MCP client a new token
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
@@ -188,7 +178,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
+      // Scopes derived from skills - for backward compatibility with old MCP clients
+      // that don't support grantedSkills and only understand grantedScopes
       grantedScopes: Array.from(grantedScopes),
+      grantedSkills, // Primary authorization method
 
       // Note: constraints are NOT included here - they're extracted per-request from URL
       // Note: sentryHost and mcpUrl come from env, not OAuth props

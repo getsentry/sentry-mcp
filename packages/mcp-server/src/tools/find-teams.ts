@@ -13,6 +13,7 @@ const RESULT_LIMIT = 25;
 
 export default defineTool({
   name: "find_teams",
+  requiredSkills: ["inspect", "triage", "project-management"], // Team viewing and management
   requiredScopes: ["team:read"],
   description: [
     "Find teams in an organization in Sentry.",

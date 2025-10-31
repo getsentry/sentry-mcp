@@ -232,7 +232,7 @@ The web UI provides a chat interface for testing the MCP server.
 **1. Authentication:**
 - Click "Connect to Sentry"
 - Authorize the application
-- Grant permissions (select scopes)
+- Grant permissions (select skills)
 
 **2. Basic Queries:**
 - "Who am I?" - Test authentication
@@ -292,14 +292,14 @@ Opens at `http://localhost:6274`
 - Redirected back to Inspector
 
 **3. Test Tools:**
-- Click "List Tools" - Verify 19-20 tools appear
+- Click "List Tools" - Verify tools appear
 - Test individual tools with parameters
 - View responses and errors
 
 ### Inspector Testing Patterns
 
 **Basic verification:**
-1. List tools → Verify count and names
+1. List tools → Verify expected tools available
 2. Call `whoami` → Verify authentication
 3. Call `find_organizations` → Verify data access
 
@@ -348,19 +348,19 @@ ls -la ~/.sentry-mcp-tokens.json
 pnpm -w run cli "list organizations"
 ```
 
-### 2. Test Scope Permissions
+### 2. Test Skills Permissions
 
-**In Sentry OAuth approval screen, test:**
-- Minimal scopes (org:read only)
-- Standard scopes (org:read, project:read, event:read)
-- Write scopes (add event:write, project:write)
+**In OAuth approval screen, test:**
+- Minimal skills (inspect, docs only)
+- Default skills (inspect, seer, docs)
+- All skills (inspect, seer, docs, triage, project-management)
 
-**Verify tools filtered by scopes:**
+**Verify tools filtered by skills:**
 ```bash
-# Read-only: should have ~15 tools
+# With inspect, docs only: no write tools
 pnpm -w run cli "list tools" | grep "create_"
 
-# With write: should have 19-20 tools
+# With all skills: includes write tools
 # Should see: create_project, create_team, update_issue, etc.
 ```
 
@@ -470,21 +470,21 @@ cat packages/mcp-cloudflare/.env | grep SENTRY_CLIENT
 
 ### "Permission denied" errors
 
-**Cause:** Insufficient scopes granted during OAuth.
+**Cause:** Insufficient skills granted during OAuth.
 
 **Solution:**
 ```bash
-# Force re-authorization with more scopes
+# Force re-authorization with more skills
 rm ~/.sentry-mcp-tokens.json
 pnpm -w run cli "who am I?"
 
-# In OAuth approval screen, select all needed permissions
+# In OAuth approval screen, select all needed skills
 ```
 
 ### "Tool not found" errors
 
 **Causes:**
-1. Tool filtered by scopes
+1. Tool filtered by skills
 2. Build issue
 3. Server version mismatch
 
@@ -493,8 +493,8 @@ pnpm -w run cli "who am I?"
 # Check tool list
 pnpm -w run cli "list tools" | jq '.tools[] | .name'
 
-# Verify scopes include required permissions
-# Example: create_project requires project:write scope
+# Verify skills include required permissions
+# Example: create_project requires project-management skill
 
 # Rebuild and restart
 pnpm -w run build && pnpm dev

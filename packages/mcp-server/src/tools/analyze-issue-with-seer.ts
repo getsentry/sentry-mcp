@@ -25,7 +25,8 @@ import {
 
 export default defineTool({
   name: "analyze_issue_with_seer",
-  requiredScopes: ["seer"],
+  requiredSkills: ["seer"], // Only available in seer skill
+  requiredScopes: [], // No Sentry API scopes required - authorization via 'seer' skill
   description: [
     "Use Seer to analyze production errors and get detailed root cause analysis with specific code fixes.",
     "",

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import useSentry from "./handler";
 import type { ServerContext } from "../../types";
 import type { Scope } from "../../permissions";
+import type { Skill } from "../../skills";
 
 // Mock the embedded agent
 vi.mock("./agent", () => ({
@@ -23,8 +24,15 @@ const ALL_SCOPES: Scope[] = [
   "event:read",
   "event:write",
   "project:releases",
-  "seer",
+];
+
+// Use all skills for testing to ensure all tools are available
+const ALL_SKILLS: Skill[] = [
+  "inspect",
   "docs",
+  "seer",
+  "triage",
+  "project-management",
 ];
 
 const mockContext: ServerContext = {
@@ -34,6 +42,7 @@ const mockContext: ServerContext = {
   clientId: "test-client",
   constraints: {},
   grantedScopes: new Set(ALL_SCOPES),
+  grantedSkills: new Set(ALL_SKILLS),
 };
 
 describe("use_sentry handler", () => {

@@ -182,7 +182,7 @@ This opens the MCP Inspector at `http://localhost:6274`
 ### 3. Test Tools Interactively
 
 **Basic workflow:**
-1. **List Tools** - Verify all expected tools appear (should see 19-20 tools)
+1. **List Tools** - Verify expected tools appear
 2. **Call a tool** - Start with `whoami` (no parameters required)
 3. **Test with parameters** - Try `find_organizations()`
 4. **Test complex operations** - Try `search_events(naturalLanguageQuery="errors in the last hour")`
@@ -379,9 +379,8 @@ Add to `.vscode/settings.json`:
 # Host configuration
 --host=sentry.example.com         # Self-hosted Sentry (hostname only)
 
-# Scope management
---scopes=org:read,event:read      # Override default scopes (replaces all)
---add-scopes=event:write          # Add to default scopes (keeps defaults)
+# Skills management
+--skills=inspect,docs,triage      # Limit to specific skills (default: all available)
 
 # AI features (optional)
 --openai-base-url=URL             # Custom OpenAI endpoint
@@ -407,9 +406,8 @@ SENTRY_ACCESS_TOKEN=your-token
 # Host (self-hosted only)
 SENTRY_HOST=sentry.example.com
 
-# Scopes
-MCP_SCOPES=org:read,event:read           # Override (replaces defaults)
-MCP_ADD_SCOPES=event:write               # Add (keeps defaults)
+# Skills
+MCP_SKILLS=inspect,docs,triage           # Limit to specific skills
 
 # AI features
 OPENAI_API_KEY=your-key                  # For search_events/search_issues
@@ -449,17 +447,17 @@ node dist/index.js \
   --host=sentry.local.dev
 ```
 
-### 3. Test Scope Permissions
+### 3. Test Skills
 
 ```bash
-# Test read-only (default)
+# Test with all skills (default)
 pnpm start --access-token=TOKEN
 
-# Test with write permissions
-pnpm start --access-token=TOKEN --add-scopes=event:write,project:write
+# Test with specific skills only
+pnpm start --access-token=TOKEN --skills=inspect,docs
 
-# Test minimal permissions
-pnpm start --access-token=TOKEN --scopes=org:read,project:read
+# Test read-only skills
+pnpm start --access-token=TOKEN --skills=inspect,seer,docs
 ```
 
 ### 4. Test AI-Powered Tools

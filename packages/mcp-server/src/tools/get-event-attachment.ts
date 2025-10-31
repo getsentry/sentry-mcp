@@ -17,6 +17,7 @@ import { setTag } from "@sentry/core";
 
 export default defineTool({
   name: "get_event_attachment",
+  requiredSkills: ["inspect"], // Only available in inspect skill
   requiredScopes: ["event:read"],
   description: [
     "Download attachments from a Sentry event.",

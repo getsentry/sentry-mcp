@@ -8,11 +8,13 @@ import {
   ParamRegionUrl,
   ParamSearchQuery,
 } from "../schema";
+import { ALL_SKILLS } from "../skills";
 
 const RESULT_LIMIT = 25;
 
 export default defineTool({
   name: "find_projects",
+  requiredSkills: ALL_SKILLS, // Foundational tool - available to all skills
   requiredScopes: ["project:read"],
   description: [
     "Find projects in Sentry.",
