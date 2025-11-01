@@ -8,7 +8,6 @@
  * - No session state required - each request is independent
  */
 
-import * as Sentry from "@sentry/cloudflare";
 import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
 import { buildServer } from "@sentry/mcp-server/server";
 import {
@@ -169,21 +168,12 @@ const mcpHandler: ExportedHandler<Env> = {
     const server = buildServer({
       context: serverContext,
       tools: isAgentMode ? agentTools : undefined,
-      onToolComplete: () => {
-        // Flush Sentry events after tool execution
-        ctx.waitUntil(Sentry.flush(2000));
-      },
     });
 
     // Run MCP handler - context already captured in closures
-    const response = await createMcpHandler(server, {
+    return createMcpHandler(server, {
       route: url.pathname,
     })(request, env, ctx);
-
-    // Flush buffered logs before Worker terminates
-    ctx.waitUntil(Sentry.flush(2000));
-
-    return response;
   },
 };
 

@@ -33,7 +33,7 @@ const addCorsHeaders = (response: Response): Response => {
 // Wrap OAuth Provider to restrict CORS headers on public metadata endpoints
 // OAuth Provider v0.0.12 adds overly permissive CORS (allows all methods/headers).
 // We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
-const corsWrappedOAuthProvider = {
+const wrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     const url = new URL(request.url);
 
@@ -85,6 +85,9 @@ const corsWrappedOAuthProvider = {
 
     const response = await oAuthProvider.fetch(request, env, ctx);
 
+    // Flush buffered logs before Worker terminates
+    ctx.waitUntil(Sentry.flush(2000));
+
     // Add CORS headers to public metadata endpoints
     if (isPublicMetadataEndpoint(url.pathname)) {
       return addCorsHeaders(response);
@@ -96,5 +99,5 @@ const corsWrappedOAuthProvider = {
 
 export default Sentry.withSentry(
   getSentryConfig,
-  corsWrappedOAuthProvider,
+  wrappedOAuthProvider,
 ) satisfies ExportedHandler<Env>;
