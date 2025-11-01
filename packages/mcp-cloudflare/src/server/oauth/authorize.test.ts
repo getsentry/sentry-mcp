@@ -447,6 +447,29 @@ describe("oauth authorize routes", () => {
         const locationUrl = new URL(location!);
         expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
       });
+
+      it("should prevent open redirect with unregistered redirectUri and invalid resource", async () => {
+        // Validates redirectUri before resource to prevent open redirects
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://attacker.com/malicious",
+          scope: ["read"],
+          resource: "https://attacker.com/mcp",
+          state: "test-state",
+        };
+        const formData = new FormData();
+        formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(400);
+        const text = await response.text();
+        expect(text).toContain("Invalid redirect URI");
+      });
     });
   });
 });
