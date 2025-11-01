@@ -306,3 +306,86 @@ export async function tokenExchangeCallback(
     });
   }
 }
+
+/**
+ * Validates resource parameter per RFC 8707.
+ */
+export function validateResourceParameter(
+  resource: string | undefined,
+  requestUrl: string,
+): boolean {
+  if (resource === "") {
+    return false;
+  }
+
+  if (!resource) {
+    return true;
+  }
+
+  try {
+    const resourceUrl = new URL(resource);
+    const requestUrlObj = new URL(requestUrl);
+
+    // RFC 8707: resource URI must not include fragment
+    if (resourceUrl.hash) {
+      return false;
+    }
+
+    // Must use same protocol
+    if (resourceUrl.protocol !== requestUrlObj.protocol) {
+      return false;
+    }
+
+    if (resourceUrl.hostname !== requestUrlObj.hostname) {
+      return false;
+    }
+
+    // Normalize default ports for comparison
+    const getPort = (url: URL) =>
+      url.port || (url.protocol === "https:" ? "443" : "80");
+
+    if (getPort(resourceUrl) !== getPort(requestUrlObj)) {
+      return false;
+    }
+
+    // Reject url-encoded characters in pathname
+    if (resourceUrl.pathname.includes("%")) {
+      return false;
+    }
+
+    // Validate path is exactly /mcp or starts with /mcp/
+    return (
+      resourceUrl.pathname === "/mcp" ||
+      resourceUrl.pathname.startsWith("/mcp/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Creates RFC 8707 error response for invalid resource parameter.
+ */
+export function createResourceValidationError(
+  redirectUri: string,
+  state?: string,
+): Response {
+  const redirectUrl = new URL(redirectUri);
+
+  redirectUrl.searchParams.set("error", "invalid_target");
+  redirectUrl.searchParams.set(
+    "error_description",
+    "The resource parameter does not match this authorization server",
+  );
+
+  if (state) {
+    redirectUrl.searchParams.set("state", state);
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: redirectUrl.href,
+    },
+  });
+}
