@@ -348,6 +348,11 @@ export function validateResourceParameter(
       return false;
     }
 
+    // Reject url-encoded characters in pathname
+    if (resourceUrl.pathname.includes("%")) {
+      return false;
+    }
+
     // Validate path is exactly /mcp or starts with /mcp/
     return (
       resourceUrl.pathname === "/mcp" ||

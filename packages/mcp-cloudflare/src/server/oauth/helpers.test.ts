@@ -519,6 +519,23 @@ describe("validateResourceParameter", () => {
       // Encoded slashes could bypass path validation
       expect(result).toBe(false);
     });
+
+    it("should reject any percent-encoded characters in path", () => {
+      const testCases = [
+        "https://mcp.sentry.dev/mcp%2Forg", // encoded slash
+        "https://mcp.sentry.dev/mcp/%2e%2e", // encoded dots
+        "https://mcp.sentry.dev/mcp%20", // encoded space
+        "https://mcp.sentry.dev/mcp/test%00", // encoded null byte
+      ];
+
+      for (const testCase of testCases) {
+        const result = validateResourceParameter(
+          testCase,
+          "https://mcp.sentry.dev/oauth/authorize",
+        );
+        expect(result).toBe(false);
+      }
+    });
   });
 });
 
