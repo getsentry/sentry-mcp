@@ -58,7 +58,7 @@ export default function RootCause({ step }: { step: number }) {
   return (
     <div
       key={runId}
-      className="grid gap-0 w-full font-mono aspect-square -translate-y-3.5"
+      className="grid absolute left-1/2 -translate-x-[calc(50%)] gap-0 w-full font-mono aspect-square translate-y-10"
       style={{
         gridTemplateColumns: `repeat(${cols}, 1fr)`,
         gridTemplateRows: `repeat(${rows}, 1fr)`,
