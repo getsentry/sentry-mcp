@@ -56,31 +56,29 @@ export default function Home({ onChatClick }: HomeProps) {
             </div>
           </div>
 
-          <Section>
-            <Prose>
-              <p>
-                This project is still in its infancy as development of the MCP
-                specification is ongoing. If you find any problems, or have an
-                idea for how we can improve it, please let us know on{" "}
-                <Link href="https://github.com/getsentry/sentry-mcp/issues">
-                  GitHub
+          <Prose>
+            <p>
+              This project is still in its infancy as development of the MCP
+              specification is ongoing. If you find any problems, or have an
+              idea for how we can improve it, please let us know on{" "}
+              <Link href="https://github.com/getsentry/sentry-mcp/issues">
+                GitHub
+              </Link>
+            </p>
+            <h3>Interested in learning more?</h3>
+            <ul>
+              <li>
+                <Link href="https://www.youtube.com/watch?v=n4v0fR6mVTU">
+                  Using Sentry's Seer via MCP
                 </Link>
-              </p>
-              <h3>Interested in learning more?</h3>
-              <ul>
-                <li>
-                  <Link href="https://www.youtube.com/watch?v=n4v0fR6mVTU">
-                    Using Sentry's Seer via MCP
-                  </Link>
-                </li>
-                <li>
-                  <Link href="https://www.youtube.com/watch?v=m3IE6JygT1o">
-                    Building Sentry's MCP on Cloudflare
-                  </Link>
-                </li>
-              </ul>
-            </Prose>
-          </Section>
+              </li>
+              <li>
+                <Link href="https://www.youtube.com/watch?v=m3IE6JygT1o">
+                  Building Sentry's MCP on Cloudflare
+                </Link>
+              </li>
+            </ul>
+          </Prose>
         </Section>
 
         <Section heading="Available Tools" id="tools">
