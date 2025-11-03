@@ -11,20 +11,20 @@ export default function Seer({ step }: { step: number }) {
         step === 2
           ? "scale-100 opacity-100 duration-300"
           : "scale-90 opacity-0 pointer-events-none"
-      } absolute overflow-hidden top-0 right-0 z-10 h-full w-full bg-600 flex flex-col justify-center p-4 pr-16 pb-0 ease-out`}
+      } absolute overflow-hidden top-0 right-0 z-10 h-full w-full bg-600 flex flex-col justify-center p-4 pb-0 ease-out`}
     >
       <div
         className={`inset-0 absolute bg-background rounded-tl-xl rounded-br-3xl border-t border-l border-white/20 ${
           step === 2
-            ? "duration-300 opacity-80 translate-x-0 blur-none"
-            : "duration-0 opacity-0 motion-safe:translate-x-1/2 blur-xl"
+            ? "duration-300 opacity-80 translate-x-0"
+            : "duration-0 opacity-0 motion-safe:translate-x-1/2"
         }`}
       />
       <SeerNoiseFilter />
       <SeerClipMask id={id} />
       {/* ⚠️ Seer */}
       <div
-        className="relative z-10 mx-auto aspect-square w-36 overflow-hidden bg-gradient-to-b from-pink-600 to-pink-400"
+        className="relative z-10 mx-auto aspect-square w-36 overflow-hidden bg-gradient-to-b from-pink-600 to-pink-400 -translate-y-64"
         style={{
           clipPath: `url(#${id})`,
         }}

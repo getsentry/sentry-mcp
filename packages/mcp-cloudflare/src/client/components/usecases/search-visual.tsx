@@ -17,7 +17,7 @@ export default function ErrorListWithCursorFollower() {
     const update = () => {
       const { x, y, visible } = mousePosRef.current;
       follower.style.opacity = visible ? "1" : "0";
-      follower.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      follower.style.transform = `translate(${x}px, ${y}px)`;
       rafRef.current = requestAnimationFrame(update);
     };
     rafRef.current = requestAnimationFrame(update);

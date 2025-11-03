@@ -19,7 +19,7 @@ export default function DiffBlock({
       {Array.isArray(diff) &&
         diff.map((line, idx) => (
           <div
-            className={`${
+            className={`text-nowrap ${
               step === 4
                 ? "translate-x-0 opacity-100 duration-300"
                 : "motion-safe:-translate-x-8 opacity-0"
