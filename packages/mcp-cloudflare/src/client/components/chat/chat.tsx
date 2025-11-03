@@ -360,7 +360,7 @@ Try asking me things like:
 
       {/* {showControls && ( */}
       <div className="w-full [mask-image:linear-gradient(to_bottom,red,transparent)] pointer-events-none absolute top-0 left-0 h-20 z-10 backdrop-blur-md bg-gradient-to-b from-background to-background/20 xl:from-background-2 xl:to-[#20163333]" />
-      <div className="flex xl:flex-row-reverse justify-between items-center absolute left-4 right-6 top-4 gap-4 z-20">
+      <div className="grid grid-cols-3 xl:flex xl:flex-row-reverse justify-between items-center absolute left-4 right-6 top-4 gap-4 z-20">
         {toggleEndpointMode ? (
           <Button
             type="button"
@@ -397,15 +397,16 @@ Try asking me things like:
             onClick={onClose}
             size="icon"
             title="Close"
-            className="rounded-xl max-xl:order-3 hover:scale-110 active:scale-90 active:duration-75 bg-background-2 xl:bg-background-3 hover:bg-violet-300 duration-300 transition-[color_ease,background-color_ease,scale_cubic-bezier(0.175,0.885,0.32,1.275)]"
+            className="rounded-xl max-xl:order-3 max-xl:ml-auto hover:scale-110 active:scale-90 active:duration-75 bg-background-2 xl:bg-background-3 hover:bg-violet-300 duration-300 transition-[color_ease,background-color_ease,scale_cubic-bezier(0.175,0.885,0.32,1.275)]"
           >
+            <span className="sr-only">Logout</span>
             <PanelLeftOpen className="size-4" />
           </Button>
           {isAuthenticated && onLogout && (
             <Button
               variant="secondary"
               onClick={onLogout}
-              className="cursor-pointer max-xl:order-1 rounded-xl bg-background-2 xl:bg-background-3"
+              className="cursor-pointer max-xl:order-1 max-xl:mr-auto rounded-xl bg-background-2 xl:bg-background-3"
             >
               <LogOut className="size-4" />
               <span className="max-sm:sr-only">Logout</span>
