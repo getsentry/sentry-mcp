@@ -5,7 +5,7 @@ type TocSection = { name: string; id: string; active: boolean };
 
 export default function TableOfContents() {
   const [sections, setSections] = useState<TocSection[]>([
-    // { name: "Getting Started", id: "getting-started", active: false },
+    { name: "Getting Started", id: "getting-started", active: true },
     // { name: "Integration Guides", id: "integration-guides", active: false },
     { name: "Available Tools", id: "tools", active: false },
     // { name: "Available Prompts", id: "prompts", active: false },
@@ -113,7 +113,21 @@ export default function TableOfContents() {
         {sections.map((section) => (
           <a
             key={section.id}
-            href={`/#${section.id}`}
+            href={`#${section.id}`}
+            onClick={(e) => {
+              e.preventDefault();
+              document
+                .getElementById(section.id)
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              // preserve current query string, only change the hash
+              const url = new URL(window.location.href);
+              url.hash = section.id;
+              window.history.pushState(
+                window.history.state,
+                "",
+                url.toString(),
+              );
+            }}
             className={`-ml-[calc(1rem+1px)] border-l py-1.5 pl-3 duration-75 max-xl:lg:opacity-20 max-xl:lg:group-hover:opacity-100 ${
               section.active
                 ? "border-violet-300 text-violet-300"
