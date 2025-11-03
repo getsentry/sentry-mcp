@@ -1,15 +1,19 @@
-import { Header } from "./components/ui/header";
-import { useState, useEffect } from "react";
 import { Chat } from "./components/chat";
 import { useAuth } from "./contexts/auth-context";
-import Home from "./pages/home";
+import { useState, useEffect } from "react";
+
+import { Header } from "./components/ui/header";
 import { HeaderDivider } from "./components/hero/header-divider";
 import { Sidebars } from "./components/home-layout/sidebars";
-import Footer from "./components/home-layout/footer";
-import TableOfContents from "./components/docs/toc";
+
 import HeroBlock from "./components/hero/hero-block";
-import Integration from "./components/Integration";
 import UseCases from "./components/usecases";
+import GettingStarted from "./components/getting-started";
+
+import TableOfContents from "./components/docs/toc";
+import Home from "./pages/home";
+
+import Footer from "./components/home-layout/footer";
 
 export default function App() {
   const { isAuthenticated, handleLogout } = useAuth();
@@ -74,14 +78,14 @@ export default function App() {
 
   return (
     <div className="overflow-x-clip max-w-screen relative">
+      {/* //!NOTE: order matters for z- */}
       <Sidebars isChatOpen={isChatOpen} toggleChat={toggleChat} />
-      {/* <Ghost /> */}
-
       <Header toggleChat={toggleChat} isChatOpen={isChatOpen} />
       <HeaderDivider />
+
       <HeroBlock />
       <UseCases />
-      <Integration />
+      <GettingStarted />
 
       {/* main content */}
       <div className="relative container mx-auto">
