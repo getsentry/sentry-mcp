@@ -21,8 +21,8 @@ export default function DiffBlock({
           <div
             className={`${
               step === 4
-                ? "translate-x-0 opacity-100 blur-none duration-300"
-                : "motion-safe:-translate-x-8 opacity-0 blur-xl"
+                ? "translate-x-0 opacity-100 duration-300"
+                : "motion-safe:-translate-x-8 opacity-0"
             } ease-[cubic-bezier(0.64,0.57,0.67,1.53) ${
               line.includes("+")
                 ? "bg-lime-300/30 text-lime-400"
