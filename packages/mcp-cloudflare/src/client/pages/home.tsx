@@ -9,7 +9,6 @@ import {
 import Note from "../components/ui/note";
 import { Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
-import { useState } from "react";
 import Section from "../components/ui/section";
 import { Prose } from "../components/ui/prose";
 import JsonSchemaParams from "../components/ui/json-schema-params";
@@ -19,13 +18,8 @@ interface HomeProps {
 }
 
 export default function Home({ onChatClick }: HomeProps) {
-  const [stdio, setStdio] = useState(false);
-
   return (
     <main className="flex gap-4 relative">
-      <aside className="max-xl:hidden absolute h-full right-0 inset-y-0 translate-x-[150%]">
-        {/* <TableOfContents /> */}
-      </aside>
       <article className="max-w-full overflow-x-clip">
         <div id="top" />
         <Section className="space-y-4 mb-10">
@@ -87,51 +81,6 @@ export default function Home({ onChatClick }: HomeProps) {
               </ul>
             </Prose>
           </Section>
-
-          {/* <Section
-            id="getting-started"
-            heading={
-              <>
-                <div className="flex-1">Getting Started</div>
-                <div className="flex items-center gap-2 text-xs">
-                  <Button
-                    variant={!stdio ? "default" : "secondary"}
-                    size="xs"
-                    onClick={() => setStdio(false)}
-                    className={!stdio ? "shadow-sm" : undefined}
-                  >
-                    Cloud
-                  </Button>
-                  <Button
-                    variant={stdio ? "default" : "secondary"}
-                    size="xs"
-                    onClick={() => setStdio(true)}
-                    className={stdio ? "shadow-sm" : undefined}
-                  >
-                    Stdio
-                  </Button>
-                </div>
-              </>
-            }
-          >
-            <div className="relative min-h-0">
-              {!stdio ? (
-                <div
-                  key="cloud"
-                  className="animate-in fade-in motion-safe:slide-in-from-left-4 duration-300"
-                >
-                  <RemoteSetup />
-                </div>
-              ) : (
-                <div
-                  key="stdio-self-hosted"
-                  className="animate-in fade-in motion-safe:slide-in-from-right-4 duration-300"
-                >
-                  <StdioSetup />
-                </div>
-              )}
-            </div>
-          </Section> */}
         </Section>
 
         <Section heading="Available Tools" id="tools">
