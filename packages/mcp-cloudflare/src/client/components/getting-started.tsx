@@ -61,7 +61,7 @@ export default function Integration() {
         </div>
       </div>
 
-      <div className="lg:border-r border-dashed border-white/10 p-4 sm:p-12 max-lg:border-b">
+      <div className="lg:border-r border-dashed border-white/10 p-4 sm:p-8 max-lg:border-b">
         <div className="flex items-start">
           <h2 className="flex-1 text-3xl font-bold mb-4">Getting Started</h2>
         </div>
