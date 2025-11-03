@@ -4,7 +4,7 @@ import ErrorListWithCursorFollower from "./search-visual";
 export default function SearchThings() {
   return (
     <div className="p-4 sm:p-8 overflow-hidden justify-end flex flex-col group relative">
-      <div className="absolute inset-0 bg-grid [--size:1rem] [mask-image:linear-gradient(to_bottom,red,transparent,red)] group-hover:opacity-50 opacity-30 duration-300 -z-20 group-hover:-translate-y-4 -bottom-4" />
+      <div className="absolute inset-0 bg-grid [--size:1rem] [mask-image:linear-gradient(to_bottom,red,transparent,red)] group-hover:opacity-50 opacity-30 duration-300 -z-20" />
       <ErrorListWithCursorFollower />
       <div className="flex">
         <div className="flex flex-col">
