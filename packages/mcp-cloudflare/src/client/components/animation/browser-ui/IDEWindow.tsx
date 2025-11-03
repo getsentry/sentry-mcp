@@ -7,8 +7,8 @@ export default function IDEWindow({ step }: { step: number }) {
     <div
       className={`${
         step >= 4 && step < 5
-          ? "translate-x-0 scale-100 blur-none"
-          : "motion-safe:-translate-x-32 motion-safe:scale-75 opacity-0 blur-xl"
+          ? "translate-x-0 scale-100"
+          : "motion-safe:-translate-x-32 motion-safe:scale-75 opacity-0"
       } ${
         step === 4 ? "border-lime-200/50" : "border-white/10"
       } absolute inset-0 flex h-full w-full origin-bottom flex-col overflow-hidden rounded-3xl border bg-white/5 pb-1 backdrop-blur duration-300`}
