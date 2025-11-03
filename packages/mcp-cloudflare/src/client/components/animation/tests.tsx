@@ -6,8 +6,8 @@ export default function ValidationSummary({ step }: { step?: number }) {
     <div
       className={`flex flex-col h-full mx-auto w-fit justify-center ${
         step === 5
-          ? "scale-100 opacity-100 blur-none delay-200 duration-500"
-          : "scale-0 opacity-0 blur-xl"
+          ? "scale-100 opacity-100 delay-200 duration-500"
+          : "scale-0 opacity-0"
       } pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 transition-all gap-8`}
     >
       <div className="flex items-center gap-6 text-2xl font-bold font-mono relative">
@@ -35,8 +35,8 @@ export default function ValidationSummary({ step }: { step?: number }) {
           <CheckCheck
             className={`size-10 text-lime-200 ${
               step === 5
-                ? "scale-100 opacity-100 blur-none delay-200 duration-500"
-                : "scale-0 opacity-0 blur-xl"
+                ? "scale-100 opacity-100 delay-200 duration-500"
+                : "scale-0 opacity-0"
             }`}
           />
         </div>
@@ -73,8 +73,8 @@ export default function ValidationSummary({ step }: { step?: number }) {
           <CheckCheck
             className={`size-10 text-lime-200 ${
               step === 5
-                ? "scale-100 opacity-100 blur-none delay-200 duration-500"
-                : "scale-0 opacity-0 blur-xl"
+                ? "scale-100 opacity-100 delay-200 duration-500"
+                : "scale-0 opacity-0"
             }`}
           />
         </div>
@@ -111,8 +111,8 @@ export default function ValidationSummary({ step }: { step?: number }) {
           <CheckCheck
             className={`size-10 text-lime-200 ${
               step === 5
-                ? "scale-100 opacity-100 blur-none delay-200 duration-500"
-                : "scale-0 opacity-0 blur-xl"
+                ? "scale-100 opacity-100 delay-200 duration-500"
+                : "scale-0 opacity-0"
             }`}
           />
         </div>

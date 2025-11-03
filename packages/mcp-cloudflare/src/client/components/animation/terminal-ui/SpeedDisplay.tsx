@@ -32,7 +32,7 @@ export default function SpeedDisplay({
       } ${className}`}
       style={{ ["--speed-pop-dur" as any]: `${durationMs}ms` }}
     >
-      <ChevronsRight className="size-10" />
+      <ChevronsRight className="size-10 stroke-3" />
       {speed}x
     </div>
   );
