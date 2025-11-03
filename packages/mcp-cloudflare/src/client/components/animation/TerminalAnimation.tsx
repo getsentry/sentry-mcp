@@ -21,7 +21,85 @@ export type Step = {
   lines: number;
 };
 
+const steps: Step[] = [
+  {
+    label: "Copypaste Sentry Issue URL",
+    description: "Copy the Sentry issue url directly from your browser",
+    startTime: 31.6,
+    startSpeed: 5,
+    autoContinueMs: 2500,
+    autoPlay: false,
+    lines: 5,
+  },
+  {
+    type: "[toolcall]",
+    label: "get_issue_details()",
+    description: "MCP performs a toolcall to fetch issue details",
+    startTime: 40,
+    startSpeed: 3,
+    autoContinueMs: 1750,
+    autoPlay: false,
+    lines: 10,
+  },
+  {
+    type: "[toolcall]",
+    label: "analyze_issue_with_seer()",
+    description:
+      "A toolcall to Seer to analyze the stack trace and pinpoint the root cause",
+    startTime: 46,
+    startSpeed: 2,
+    autoContinueMs: 2000,
+    autoPlay: false,
+    lines: 9,
+  },
+  {
+    type: "[LLM]",
+    label: "Finding solution",
+    description: "LLM analyzes the context and comes up with a solution",
+    startTime: 48.5,
+    startSpeed: 50,
+    autoContinueMs: 50,
+    autoPlay: false,
+    lines: 8,
+  },
+  {
+    type: "[LLM]",
+    label: "Applying Edits",
+    description: "LLM adds the suggested solution to the codebase",
+    startTime: 146,
+    startSpeed: 26,
+    autoContinueMs: 50,
+    autoPlay: false,
+    lines: 8,
+  },
+  {
+    label: "Validation",
+    description: "Automaticall running tests to verify the solution works",
+    startTime: 242,
+    startSpeed: 26,
+    autoContinueMs: 50,
+    autoPlay: false,
+    // 32
+    lines: 7,
+  },
+];
+
 type ActivationSource = "marker" | "manual";
+
+let __cachedCastData: any[] | null = null;
+
+async function loadCastOnce(url: string): Promise<any[]> {
+  if (__cachedCastData) return __cachedCastData;
+
+  const res = await fetch(url);
+  const text = await res.text(); // asciicast v2 is ndjson
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  const parsed = lines.map((ln, i) =>
+    i === 0 ? JSON.parse(ln) : JSON.parse(ln),
+  );
+  __cachedCastData = parsed; // cache in module scope
+  return parsed;
+}
 
 export default function TerminalAnimation() {
   const playerRef = useRef<any>(null);
@@ -36,69 +114,6 @@ export default function TerminalAnimation() {
   const [speed, setSpeed] = useState<number>(0.5);
   const EPS = 0.01;
 
-  const steps: Step[] = [
-    {
-      label: "Copypaste Sentry Issue URL",
-      description: "Copy the Sentry issue url directly from your browser",
-      startTime: 31.6,
-      startSpeed: 5,
-      autoContinueMs: 2500,
-      autoPlay: false,
-      lines: 5,
-    },
-    {
-      type: "[toolcall]",
-      label: "get_issue_details()",
-      description: "MCP performs a toolcall to fetch issue details",
-      startTime: 40,
-      startSpeed: 3,
-      autoContinueMs: 1750,
-      autoPlay: false,
-      lines: 10,
-    },
-    {
-      type: "[toolcall]",
-      label: "analyze_issue_with_seer()",
-      description:
-        "A toolcall to Seer to analyze the stack trace and pinpoint the root cause",
-      startTime: 46,
-      startSpeed: 2,
-      autoContinueMs: 2000,
-      autoPlay: false,
-      lines: 9,
-    },
-    {
-      type: "[LLM]",
-      label: "Finding solution",
-      description: "LLM analyzes the context and comes up with a solution",
-      startTime: 48.5,
-      startSpeed: 50,
-      autoContinueMs: 50,
-      autoPlay: false,
-      lines: 8,
-    },
-    {
-      type: "[LLM]",
-      label: "Applying Edits",
-      description: "LLM adds the suggested solution to the codebase",
-      startTime: 146,
-      startSpeed: 26,
-      autoContinueMs: 50,
-      autoPlay: false,
-      lines: 8,
-    },
-    {
-      label: "Validation",
-      description: "Automaticall running tests to verify the solution works",
-      startTime: 242,
-      startSpeed: 26,
-      autoContinueMs: 50,
-      autoPlay: false,
-      // 32
-      lines: 7,
-    },
-  ];
-
   const mountPlayer = useCallback(
     async (
       resumeAtSec: number,
@@ -110,20 +125,34 @@ export default function TerminalAnimation() {
       const AsciinemaPlayerLibrary = await import("asciinema-player" as any);
       if (!cliDemoRef.current) return;
 
+      const castData = await loadCastOnce("demo.cast"); // fetch+parse only once
+
+      // Clean up any stale player listener before creating a new one
+      try {
+        if (playerRef.current?.__onMarker) {
+          playerRef.current.removeEventListener?.(
+            "marker",
+            playerRef.current.__onMarker,
+          );
+        }
+        playerRef.current?.dispose?.();
+      } catch {}
+
       const target = resumeAtSec;
 
       const player = AsciinemaPlayerLibrary.create(
-        "demo.cast",
+        { data: castData },
         cliDemoRef.current,
         {
           rows: lines || 10,
-          fit: window.innerWidth > 1024 ? "none" : "none",
+          fit: "none",
           theme: "dracula",
           controls: false,
           autoPlay: true,
           loop: false,
           idleTimeLimit: 0.1,
           speed: newSpeed,
+          preload: true,
           // fixes first step
           startAt: Math.max(target - EPS, 0),
           ...(marker
@@ -261,8 +290,19 @@ export default function TerminalAnimation() {
     mountPlayer(31, 0.5, steps[0].lines, steps[0].startTime);
     return () => {
       try {
+        if (playerRef.current?.__onMarker) {
+          playerRef.current.removeEventListener?.(
+            "marker",
+            playerRef.current.__onMarker,
+          );
+        }
+      } catch {}
+      try {
         playerRef.current?.dispose?.();
       } catch {}
+      if (autoContinueTimerRef.current)
+        clearTimeout(autoContinueTimerRef.current);
+      if (postSeekTimerRef.current) clearTimeout(postSeekTimerRef.current);
     };
   }, [mountPlayer]);
 

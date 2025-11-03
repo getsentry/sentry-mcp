@@ -117,6 +117,21 @@ export default function StepsList({
           </button>
         );
       })}
+      {/* <button
+        className="border group/next my-auto bg-[#201633] border-white/10 size-12 rounded-full grid place-items-center text-left text-white/50 opacity-50 active:duration-75 cursor-pointer active:bg-background hover:opacity-100 active:scale-90 duration-300"
+        tabIndex={0}
+        type="button"
+        onClick={() =>
+          onSelectAction(Math.min(globalIndex + 1, steps.length - 1))
+        }
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            onSelectAction(Math.min(globalIndex + 1, steps.length - 1));
+          }
+        }}
+      >
+        <ChevronRight className="size-6 group-active/next:scale-y-75 group-active/next:translate-x-2 group-active/next:duration-75 duration-300" />
+      </button> */}
     </div>
   );
 }
