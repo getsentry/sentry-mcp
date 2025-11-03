@@ -10,13 +10,13 @@ export default function BrowserWindow({ step }: { step: number }) {
       // isometric option: rotate-x-60 -rotate-z-45 scale-75 perspective-distant
       className={`${
         step >= 3
-          ? "pointer-events-none motion-safe:translate-x-32 motion-safe:scale-75 opacity-0 blur-xl"
+          ? "pointer-events-none motion-safe:translate-x-32 motion-safe:scale-75 opacity-0"
           : step === 1
             ? "border-orange-400/50"
             : step === 2
               ? "border-pink-400/50"
               : "border-white/10"
-      } absolute inset-0 flex h-full w-full flex-col rounded-3xl border bg-white/5 duration-300 backdrop-blur-3xl`}
+      } absolute inset-0 flex h-full w-full flex-col rounded-3xl border bg-white/5 duration-300 backdrop-blur`}
       id="window"
     >
       <KeysCopy step={step} />
