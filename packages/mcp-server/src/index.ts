@@ -26,7 +26,6 @@ import { ALL_SCOPES } from "./permissions";
 import { DEFAULT_SCOPES, DEFAULT_SKILLS } from "./constants";
 import { SKILLS } from "./skills";
 import { setOpenAIBaseUrl } from "./internal/agents/openai-provider";
-import agentTools from "./tools/agent-tools";
 
 const packageName = "@sentry/mcp-server";
 const allSkills = Object.keys(SKILLS) as ReadonlyArray<
@@ -142,10 +141,10 @@ const context = {
 };
 
 // Build server with context to filter tools based on granted scopes
-// Use agentTools when --agent flag is set (only exposes use_sentry tool)
+// Use agentMode when --agent flag is set (only exposes use_sentry tool)
 const server = buildServer({
   context,
-  tools: cli.agent ? agentTools : undefined,
+  agentMode: cli.agent,
 });
 
 startStdio(server, context).catch((err) => {

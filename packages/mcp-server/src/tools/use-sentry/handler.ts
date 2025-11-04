@@ -36,7 +36,7 @@ function formatToolCallTrace(toolCalls: ToolCall[]): string {
 
 export default defineTool({
   name: "use_sentry",
-  requiredSkills: [], // Not exposed via standard MCP - accessed via agent mode
+  requiredSkills: [], // Only available in agent mode - bypasses authorization
   requiredScopes: [], // No specific scopes - uses authentication token
   description: [
     "Use Sentry's MCP Agent to answer questions related to Sentry (sentry.io).",
@@ -68,7 +68,7 @@ export default defineTool({
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
 
-    // Filter out use_sentry from tools to prevent recursion and circular dependency
+    // Exclude use_sentry from tools to prevent recursion
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { use_sentry, ...toolsForAgent } = tools;
 

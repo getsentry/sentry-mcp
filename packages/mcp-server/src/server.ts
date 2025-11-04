@@ -102,10 +102,12 @@ function extractMcpParameters(args: Record<string, unknown>) {
 export function buildServer({
   context,
   onToolComplete,
+  agentMode = false,
   tools: customTools,
 }: {
   context: ServerContext;
   onToolComplete?: () => void;
+  agentMode?: boolean;
   tools?: Record<string, ToolConfig<any>>;
 }): McpServer {
   const server = new McpServer({
@@ -113,7 +115,13 @@ export function buildServer({
     version: LIB_VERSION,
   });
 
-  configureServer({ server, context, onToolComplete, tools: customTools });
+  configureServer({
+    server,
+    context,
+    onToolComplete,
+    agentMode,
+    tools: customTools,
+  });
 
   return wrapMcpServerWithSentry(server);
 }
@@ -124,20 +132,29 @@ export function buildServer({
  * Internal function used by buildServer(). Use buildServer() instead for most cases.
  * Tools are filtered at registration time based on grantedSkills OR grantedScopes
  * (either system can grant access), and context is captured in closures for tool handler execution.
+ *
+ * In agent mode, only the use_sentry tool is registered, bypassing authorization checks.
  */
 function configureServer({
   server,
   context,
   onToolComplete,
+  agentMode = false,
   tools: customTools,
 }: {
   server: McpServer;
   context: ServerContext;
   onToolComplete?: () => void;
+  agentMode?: boolean;
   tools?: Record<string, ToolConfig<any>>;
 }) {
-  // Use custom tools if provided, otherwise use default tools
-  const toolsToRegister = customTools ?? tools;
+  // Determine which tools to register:
+  // - Agent mode: only use_sentry
+  // - Custom tools provided: use those
+  // - Default: all standard tools
+  const toolsToRegister = agentMode
+    ? { use_sentry: tools.use_sentry }
+    : (customTools ?? tools);
 
   // Get granted skills and scopes from context for tool filtering
   const grantedSkills: Set<Skill> | undefined = context.grantedSkills
@@ -201,8 +218,12 @@ function configureServer({
      */
     let allowed = false;
 
+    // In agent mode, skip authorization - use_sentry handles it internally
+    if (agentMode) {
+      allowed = true;
+    }
     // Skills system takes precedence when set
-    if (grantedSkills) {
+    else if (grantedSkills) {
       // Tool must have non-empty requiredSkills to be exposed in skills mode
       if (tool.requiredSkills && tool.requiredSkills.length > 0) {
         allowed = hasRequiredSkills(grantedSkills, tool.requiredSkills);
