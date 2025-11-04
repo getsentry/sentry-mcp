@@ -8,12 +8,6 @@ const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
 export default function RemoteSetup() {
   const endpoint = new URL("/mcp", window.location.href).href;
-  // the shared configuration for all clients
-  const coreConfig = {
-    command: "npx",
-    args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
-  };
-
   return (
     <>
       <Prose className="mb-6">
