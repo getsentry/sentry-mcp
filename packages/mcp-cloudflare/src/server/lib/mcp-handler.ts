@@ -21,7 +21,6 @@ import type { ServerContext } from "@sentry/mcp-server/types";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
 import type { ExportedHandler } from "@cloudflare/workers-types";
-import agentTools from "@sentry/mcp-server/tools/agent-tools";
 
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
@@ -64,6 +63,7 @@ const mcpHandler: ExportedHandler<Env> = {
 
     // Extract OAuth props from ExecutionContext (set by OAuth provider)
     const oauthCtx = ctx as OAuthExecutionContext;
+
     if (!oauthCtx.props) {
       throw new Error("No authentication context available");
     }
@@ -167,7 +167,7 @@ const mcpHandler: ExportedHandler<Env> = {
     // Context is captured in tool handler closures during buildServer()
     const server = buildServer({
       context: serverContext,
-      tools: isAgentMode ? agentTools : undefined,
+      agentMode: isAgentMode,
     });
 
     // Run MCP handler - context already captured in closures
