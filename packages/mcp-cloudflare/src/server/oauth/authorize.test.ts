@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import oauthRoute from "./index";
 import type { Env } from "../types";
-import { verifyAndParseState } from "./state";
+import { verifyAndParseState, signState } from "./state";
 
 // Mock the OAuth provider
 const mockOAuthProvider = {
@@ -26,7 +26,7 @@ describe("oauth authorize routes", () => {
     vi.clearAllMocks();
     testEnv = {
       OAUTH_PROVIDER: mockOAuthProvider as unknown as Env["OAUTH_PROVIDER"],
-      COOKIE_SECRET: "test-secret-key",
+      COOKIE_SECRET: "test-cookie-secret-key-for-hmac",
       SENTRY_CLIENT_ID: "test-client-id",
       SENTRY_CLIENT_SECRET: "test-client-secret",
       SENTRY_HOST: "sentry.io",
@@ -77,7 +77,16 @@ describe("oauth authorize routes", () => {
         state: "original-state",
       };
       const formData = new FormData();
-      formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+      // Use HMAC-signed state matching what the app will verify
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
       formData.append("skill", "triage");
       formData.append("skill", "project-management");
       const request = new Request("http://localhost/oauth/authorize", {
@@ -95,7 +104,7 @@ describe("oauth authorize routes", () => {
       expect(stateParam).toBeTruthy();
       const decodedState = await verifyAndParseState(
         stateParam!,
-        testEnv.COOKIE_SECRET as string,
+        testEnv.COOKIE_SECRET!,
       );
       expect((decodedState.req as any).skills).toEqual([
         "triage",
@@ -116,7 +125,15 @@ describe("oauth authorize routes", () => {
         state: "original-state",
       };
       const formData = new FormData();
-      formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
       const request = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: formData,
@@ -129,7 +146,7 @@ describe("oauth authorize routes", () => {
       const stateParam = redirectUrl.searchParams.get("state");
       const decodedState = await verifyAndParseState(
         stateParam!,
-        testEnv.COOKIE_SECRET as string,
+        testEnv.COOKIE_SECRET!,
       );
       expect((decodedState.req as any).skills).toEqual([]);
     });
@@ -142,7 +159,15 @@ describe("oauth authorize routes", () => {
         state: "original-state",
       };
       const formData = new FormData();
-      formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
       formData.append("skill", "triage");
       const request = new Request("http://localhost/oauth/authorize", {
         method: "POST",
@@ -155,7 +180,7 @@ describe("oauth authorize routes", () => {
       const stateParam = redirectUrl.searchParams.get("state");
       const decodedState = await verifyAndParseState(
         stateParam!,
-        testEnv.COOKIE_SECRET as string,
+        testEnv.COOKIE_SECRET!,
       );
       expect((decodedState.req as any).skills).toEqual(["triage"]);
     });
@@ -167,7 +192,15 @@ describe("oauth authorize routes", () => {
         scope: ["read"],
       };
       const formData = new FormData();
-      formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+      const signedState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      formData.append("state", signedState);
       const request = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: formData,
