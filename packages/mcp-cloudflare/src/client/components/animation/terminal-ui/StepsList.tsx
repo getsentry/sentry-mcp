@@ -95,7 +95,7 @@ export default function StepsList({
       <button
         className={`absolute right-4 bottom-4 border ${
           globalIndex === 5 ? "group/replay" : "group/next"
-        } my-auto bg-background-2 border-white/10 size-12 z-20 rounded-full grid place-items-center text-left text-white/50 active:duration-75 cursor-pointer active:bg-background hover:bg-background-3 active:scale-90 duration-300`}
+        } my-auto bg-background-2 border-white/10 size-12 z-20 rounded-full grid place-items-center text-left text-white/50 active:duration-75 cursor-pointer active:bg-white/40 hover:bg-background-3 active:scale-90 duration-300`}
         tabIndex={0}
         type="button"
         onClick={() => {
@@ -117,7 +117,7 @@ export default function StepsList({
         }}
       >
         {globalIndex === 5 ? (
-          <RotateCcw className="inline-block size-4 group-hover/replay:-rotate-360 group-hover/replay:ease-out group-hover/replay:duration-1000" />
+          <RotateCcw className="inline-block size-4 group-hover/replay:-rotate-360 group-hover/replay:ease-out group-hover/replay:duration-1000 group-active/replay:duration-75 group-active/replay:-rotate-360 group-active/replay:scale-150" />
         ) : (
           <ChevronRight className="size-6 group-active/next:scale-y-75 group-active/next:translate-x-2 group-active/next:duration-75 duration-300" />
         )}
