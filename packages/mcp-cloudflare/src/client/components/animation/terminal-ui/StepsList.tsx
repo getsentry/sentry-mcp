@@ -1,5 +1,5 @@
 "use client";
-import { BookCheck, User } from "lucide-react";
+import { BookCheck, ChevronRight, RotateCcw, User } from "lucide-react";
 import type { Step } from "../TerminalAnimation";
 
 export default function StepsList({
@@ -7,85 +7,60 @@ export default function StepsList({
   globalIndex,
   onSelectAction,
   className = "",
+  restart,
 }: {
   steps: Step[];
   globalIndex: number;
   onSelectAction: (index: number) => void;
   className?: string;
+  restart: () => void;
 }) {
   return (
     <div
-      className={`flex flex-col justify-center group-hover/griditem:!transform-none gap-1 max-md:!transform-none duration-500 ${className}`}
-      style={
-        {
-          // transform: `translateY(${17.5 * (3.5 - globalIndex - 1)}%)`,
-        }
-      }
+      className={`flex flex-row-reverse h-full w-full relative ${className}`}
     >
+      <div className="absolute -translate-y-5 inset-x-5 w-full top-0 flex">
+        {steps.map((step, idx) => {
+          return (
+            <div
+              key={step.label}
+              className={`h-1.5 rounded-full mx-1 my-2.5 duration-300 ease-out-cubic
+              ${
+                idx < globalIndex
+                  ? "bg-lime-300 w-12"
+                  : idx === globalIndex
+                    ? "bg-violet-300 w-12"
+                    : "bg-background-3 w-12"
+              }
+              `}
+            />
+          );
+        })}
+      </div>
       {/* 3.5 = 7/2 (center of 7 steps) */}
       {/* 17.5 is what each step is transitioned by below for stacking */}
       {steps.map((step, idx) => {
         const isActive = idx === globalIndex;
         return (
-          <button
+          <div
             aria-current={isActive ? "step" : undefined}
-            className={`group flex cursor-pointer flex-col group-hover/griditem:!transform-none group-hover/griditem:!z-0 group-hover/griditem:!opacity-100  max-md:!transform-none max-md:!z-0 max-md:!opacity-100 overflow-hidden rounded-xl border p-2 pb-0 text-left duration-500 hover:duration-75 backdrop-blur-xl
+            className={`group flex flex-col overflow-hidden rounded-xl p-2 text-left duration-300 w-full bg-background-1 h-[6.525rem] sm:h-[5.125rem]
             ${
-              isActive
-                ? "border-violet-300/30 bg-gradient-to-r from-transparent to-violet-500/50 text-white"
-                : "border-white/15 bg-white/5 hover:bg-white/15"
+              !isActive &&
+              "absolute !opacity-0 !pointer-events-none translate-y-full !bg-transparent"
             }`}
-            style={{
-              opacity:
-                globalIndex !== idx ? 1 - 0.3 * Math.abs(globalIndex - idx) : 1,
-              transform:
-                globalIndex !== idx
-                  ? `scale(${
-                      1 - 0.05 * Math.abs(globalIndex - idx)
-                    }) translateY(${
-                      (globalIndex > idx ? 1 : -1) *
-                      17.5 *
-                      (globalIndex - idx) *
-                      (globalIndex - idx)
-                    }%)`
-                  : "translateY(0) scale(1)",
-              zIndex: isActive ? 10 : Math.abs(globalIndex - idx) * -1,
-            }}
             key={step.label}
-            onClick={() => onSelectAction(idx)}
-            type="button"
           >
             <div className="flex items-center gap-3 pb-2">
-              {isActive ? (
-                <>
-                  <div className="-ml-3 h-6 w-2 animate-ping rounded-r-3xl bg-lime-300" />
-                  <div className="-ml-5 mr-1.5 h-8 w-2 rounded-r-3xl bg-lime-500" />
-                  <span className="font-mono h-8 flex items-center text-sm opacity-50">
-                    {idx === 0 ? (
-                      <User className="size-4" />
-                    ) : idx > 4 ? (
-                      <BookCheck className="size-4" />
-                    ) : (
-                      step.type
-                    )}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="font-mono flex items-center h-8 text-sm opacity-50 ml-3.5">
-                    {idx === 0 ? (
-                      <User className="size-4" />
-                    ) : idx > 4 ? (
-                      <BookCheck className="size-4" />
-                    ) : (
-                      step.type
-                    )}
-                  </span>
-                  <span className="float-left opacity-0 duration-200 ease-[cubic-bezier(0.64,0.57,0.67,1.53)] group-hover:translate-x-4 group-hover:opacity-100 -ml-4 group-hover:duration-75 max-sm:hidden">
-                    →
-                  </span>
-                </>
-              )}
+              <span className="font-mono flex items-center h-8 text-sm opacity-50 ml-3.5">
+                {idx === 0 ? (
+                  <User className="size-4" />
+                ) : idx > 4 ? (
+                  <BookCheck className="size-4" />
+                ) : (
+                  step.type
+                )}
+              </span>
               <span
                 className={`inline-block duration-200 ease-[cubic-bezier(0.64,0.57,0.67,1.53)] ${
                   !isActive &&
@@ -114,24 +89,39 @@ export default function StepsList({
                 </p>
               </div>
             </div>
-          </button>
+          </div>
         );
       })}
-      {/* <button
-        className="border group/next my-auto bg-[#201633] border-white/10 size-12 rounded-full grid place-items-center text-left text-white/50 opacity-50 active:duration-75 cursor-pointer active:bg-background hover:opacity-100 active:scale-90 duration-300"
+      <button
+        className={`absolute right-4 bottom-4 border ${
+          globalIndex === 5 ? "group/replay" : "group/next"
+        } my-auto bg-background-2 border-white/10 size-12 z-20 rounded-full grid place-items-center text-left text-white/50 active:duration-75 cursor-pointer active:bg-background hover:bg-background-3 active:scale-90 duration-300`}
         tabIndex={0}
         type="button"
-        onClick={() =>
-          onSelectAction(Math.min(globalIndex + 1, steps.length - 1))
-        }
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
+        onClick={() => {
+          if (globalIndex === 5) {
+            restart();
+          } else {
             onSelectAction(Math.min(globalIndex + 1, steps.length - 1));
           }
         }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (globalIndex === 6) {
+              typeof restart === "function" && restart();
+            } else {
+              onSelectAction(Math.min(globalIndex + 1, steps.length - 1));
+            }
+          }
+        }}
       >
-        <ChevronRight className="size-6 group-active/next:scale-y-75 group-active/next:translate-x-2 group-active/next:duration-75 duration-300" />
-      </button> */}
+        {globalIndex === 5 ? (
+          <RotateCcw className="inline-block size-4 group-hover/replay:-rotate-360 group-hover/replay:ease-out group-hover/replay:duration-1000" />
+        ) : (
+          <ChevronRight className="size-6 group-active/next:scale-y-75 group-active/next:translate-x-2 group-active/next:duration-75 duration-300" />
+        )}
+      </button>
     </div>
   );
 }

@@ -402,7 +402,7 @@ Try asking me things like:
             <span className="sr-only">Logout</span>
             <PanelLeftOpen className="size-4" />
           </Button>
-          {isAuthenticated && onLogout && (
+          {isAuthenticated && onLogout ? (
             <Button
               variant="secondary"
               onClick={onLogout}
@@ -411,6 +411,8 @@ Try asking me things like:
               <LogOut className="size-4" />
               <span className="max-sm:sr-only">Logout</span>
             </Button>
+          ) : (
+            <div />
           )}
         </div>
       </div>

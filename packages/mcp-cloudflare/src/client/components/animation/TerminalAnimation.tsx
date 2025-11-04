@@ -7,7 +7,6 @@ import BrowserAnimation from "./BrowserAnimation";
 import KeysPaste from "./terminal-ui/keys-paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
 import StepsList from "./terminal-ui/StepsList";
-import { RotateCcw } from "lucide-react";
 import DataWire from "./DataWire";
 
 export type Step = {
@@ -330,30 +329,14 @@ export default function TerminalAnimation() {
         <SpeedDisplay speed={speed} />
         <KeysPaste step={currentIndex} />
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 text-shadow-md h-full flex flex-col justify-end">
-          <div className="relative">
-            <button
-              type="button"
-              className={`border group/replay border-white/20 bg-white/15 hover:bg-white/30 active:bg-white/50 active:duration-75 duration-300 absolute -top-14 rounded-full px-3 py-1 left-0 z-20 cursor-pointer hover:duration-300 hover:delay-0 text-nowrap ${
-                currentIndex === 5
-                  ? "opacity-100 translate-y-0 delay-3000 duration-500 pointer-events-auto"
-                  : "opacity-0 translate-y-1/2 pointer-events-none"
-              }`}
-              onClick={() => restart()}
-            >
-              Missed a step? Replay
-              <RotateCcw className="inline-block size-4 ml-2 group-hover/replay:-rotate-360 group-hover/replay:ease-out group-hover/replay:duration-1000" />
-            </button>
-          </div>
-          <div className="flex flex-col-reverse sm:flex-col gap-4">
-            <div className="xl:mt-0 group/griditem overflow-clip">
-              <StepsList
-                onSelectAction={(i) => (i === 0 ? restart() : activateStep(i))}
-                globalIndex={Math.max(currentIndex, 0)}
-                steps={steps}
-              />
-            </div>
-          </div>
+        <div className="absolute bottom-0 inset-x-0">
+          <StepsList
+            onSelectAction={(i) => (i === 0 ? restart() : activateStep(i))}
+            globalIndex={Math.max(currentIndex, 0)}
+            className=""
+            restart={restart}
+            steps={steps}
+          />
         </div>
       </div>
 

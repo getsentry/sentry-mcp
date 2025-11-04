@@ -55,7 +55,7 @@ export default function HeroBlock() {
       </div>
       {/* demo */}
       <div
-        className="overflow-wrap p-4 sm:p-8 max-sm:min-h-[40rem] overflow-visible relative grid h-full flex-1 w-full gap-8 rounded-2xl xl:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 xl:grid-rows-1"
+        className="overflow-wrap p-4 sm:p-8 overflow-visible relative grid h-full flex-1 w-full gap-8 rounded-2xl xl:grid-cols-4 bg-gradient-to-r from-400/50 to-500 text-white/70 grid-cols-1 grid-rows-6 xl:grid-rows-1"
         id="demo"
       >
         <TerminalAnimation />
