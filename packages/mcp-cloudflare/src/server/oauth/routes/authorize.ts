@@ -96,6 +96,7 @@ export default new Hono<{ Bindings: Env }>()
         name: "Sentry MCP",
       },
       state: { oauthReqInfo }, // arbitrary data that flows through the form submission below
+      cookieSecret: c.env.COOKIE_SECRET,
     });
   })
 

@@ -25,7 +25,7 @@ describe("oauth callback routes", () => {
     vi.clearAllMocks();
     testEnv = {
       OAUTH_PROVIDER: mockOAuthProvider as unknown as Env["OAUTH_PROVIDER"],
-      COOKIE_SECRET: "test-secret-key",
+      COOKIE_SECRET: "test-cookie-secret-key-for-hmac",
       SENTRY_CLIENT_ID: "test-client-id",
       SENTRY_CLIENT_SECRET: "test-client-secret",
       SENTRY_HOST: "sentry.io",
@@ -110,18 +110,21 @@ describe("oauth callback routes", () => {
       });
 
       const approvalFormData = new FormData();
-      approvalFormData.append(
-        "state",
-        btoa(
-          JSON.stringify({
+      const approvalState = await signState(
+        {
+          req: {
             oauthReqInfo: {
               clientId: "different-client",
               redirectUri: "https://example.com/callback",
               scope: ["read"],
             },
-          }),
-        ),
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
       );
+      approvalFormData.append("state", approvalState);
       const approvalRequest = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: approvalFormData,
@@ -175,14 +178,15 @@ describe("oauth callback routes", () => {
         scope: ["read"],
       };
       const approvalFormData = new FormData();
-      approvalFormData.append(
-        "state",
-        btoa(
-          JSON.stringify({
-            oauthReqInfo,
-          }),
-        ),
+      const approvalState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
       );
+      approvalFormData.append("state", approvalState);
       const approvalRequest = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: approvalFormData,
