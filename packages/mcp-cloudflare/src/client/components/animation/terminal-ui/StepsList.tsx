@@ -27,10 +27,10 @@ export default function StepsList({
               className={`h-1.5 rounded-full mx-1 my-2.5 duration-300 ease-out-cubic
               ${
                 idx < globalIndex
-                  ? "bg-lime-300 w-12"
+                  ? "bg-lime-300 w-10 sm:w-12"
                   : idx === globalIndex
-                    ? "bg-violet-300 w-12"
-                    : "bg-background-3 w-12"
+                    ? "bg-violet-300 w-10 sm:w-12"
+                    : "bg-background-3 w-10 sm:w-12"
               }
               `}
             />
