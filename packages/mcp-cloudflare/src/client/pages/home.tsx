@@ -81,10 +81,10 @@ export default function Home({ onChatClick }: HomeProps) {
           </Prose>
         </Section>
 
-        <Section heading="Available Tools" id="tools">
+        <Section heading="Available Skills" id="skills">
           <Prose>
             <p>
-              Tools are pre-configured functions that can be used to help with
+              Skills are pre-configured functions that can be used to help with
               common tasks.
             </p>
           </Prose>

@@ -16,7 +16,7 @@ export function ToolActions({ tools }: ToolActionsProps) {
 
   return (
     <div className="mt-4 space-y-3">
-      <h4 className="text-sm font-medium text-slate-300 mb-2">Tools</h4>
+      <h4 className="text-sm font-medium text-slate-300 mb-2">Skills</h4>
       <div className="space-y-4">
         {tools.map((tool) => (
           <div key={tool.name} className="space-y-2">
