@@ -13,7 +13,7 @@ export default function Integration() {
       className="flex flex-col lg:grid lg:grid-cols-2 md:container mx-auto relative mb-12 -scroll-mt-8 border-b border-dashed border-white/20 max-w-full duration-300 will-change-contents"
     >
       <div className="absolute inset-0 h-full w-full flex justify-end flex-col p-8">
-        <div className="flex items-center text-xs bg-background-3 rounded-full p-1 sticky bottom-4 size-fit -translate-x-[1.5px] mx-auto z-40 border-[0.5px] border-violet-300/50">
+        <div className="flex items-center text-xs bg-background-3 rounded-full p-1 sticky bottom-4 size-fit -translate-x-[1.5px] mx-auto z-20 border-[0.5px] border-violet-300/50">
           <Button
             variant={!stdio ? "default" : "secondary"}
             size="xs"
