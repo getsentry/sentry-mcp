@@ -18,7 +18,7 @@ export default function RemoteSetup() {
         <p>
           <strong>Path Constraints:</strong> Restrict the session to a specific
           organization or project by adding them to the URL path. This ensures
-          all tools operate within the specified scope.
+          all skills operate within the specified scope.
         </p>
         <ul>
           <li>
@@ -30,10 +30,10 @@ export default function RemoteSetup() {
         </ul>
         <p>
           <strong>Agent Mode:</strong> Reduce context by exposing a single{" "}
-          <code>use_sentry</code> tool instead of individual tools. The embedded
-          AI agent handles natural language requests and automatically chains
-          tool calls as needed. Note: Agent mode approximately doubles response
-          time due to the embedded AI layer.
+          <code>use_sentry</code> tool instead of individual skills. The
+          embedded AI agent handles natural language requests and automatically
+          chains tool calls as needed. Note: Agent mode approximately doubles
+          response time due to the embedded AI layer.
         </p>
         <ul>
           <li>
@@ -117,7 +117,7 @@ export function RemoteSetupTabs() {
             to open Cursor Settings.
           </li>
           <li>
-            Select <strong>Tools and Integrations</strong>.
+            Select <strong>Skills and Integrations</strong>.
           </li>
           <li>
             Select <strong>New MCP Server</strong>.

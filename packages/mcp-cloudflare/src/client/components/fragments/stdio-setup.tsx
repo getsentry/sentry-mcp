@@ -128,14 +128,14 @@ export default function StdioSetup() {
                 <code>--organization-slug</code>
               </dt>
               <dd className="text-slate-300">
-                Scope all tools to a single organization (CLI only).
+                Scope all skills to a single organization (CLI only).
               </dd>
 
               <dt className="font-medium text-slate-100">
                 <code>--project-slug</code>
               </dt>
               <dd className="text-slate-300">
-                Scope all tools to a specific project within that organization
+                Scope all skills to a specific project within that organization
                 (CLI only).
               </dd>
             </dl>
@@ -209,7 +209,7 @@ export function StdioSetupTabs() {
             Settings.
           </li>
           <li>
-            Select <strong>MCP Tools</strong>.
+            Select <strong>MCP Skills</strong>.
           </li>
           <li>
             Select <strong>New MCP Server</strong>.
