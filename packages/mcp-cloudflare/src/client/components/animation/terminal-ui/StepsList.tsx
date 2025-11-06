@@ -51,7 +51,7 @@ export default function StepsList({
             }`}
             key={step.label}
           >
-            <div className="flex items-center gap-3 pb-2">
+            <div className="flex items-center gap-3 pb-2 max-sm:text-sm">
               <span className="font-mono flex items-center h-8 text-sm opacity-50 ml-3.5">
                 {idx === 0 ? (
                   <User className="size-4" />
@@ -83,7 +83,7 @@ export default function StepsList({
                     isActive
                       ? "translate-y-0 scale-100 opacity-100"
                       : "translate-y-10 scale-96 opacity-0"
-                  } px-4 pb-3 text-copy-lg text-white/50 transition-all duration-500 ease-out-cubic`}
+                  } px-4 max-sm:pr-16 pb-3 text-copy-lg max-sm:text-sm text-white/50 transition-all duration-500 ease-out-cubic`}
                 >
                   {step.description}
                 </p>
