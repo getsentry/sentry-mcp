@@ -2,7 +2,7 @@
 
 import "asciinema-player/dist/bundle/asciinema-player.css";
 import "./dracula.css";
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import BrowserAnimation from "./BrowserAnimation";
 import KeysPaste from "./terminal-ui/keys-paste";
 import SpeedDisplay from "./terminal-ui/SpeedDisplay";
@@ -160,7 +160,7 @@ export default function TerminalAnimation() {
       cliDemoRef.current,
       {
         rows: fixedRows,
-        fit: "none",
+        fit: isMobileRef.current ? "width" : "none",
         theme: "dracula",
         controls: false,
         autoPlay: true,
@@ -395,13 +395,6 @@ export default function TerminalAnimation() {
     };
   }, [mountOnce, activateStep, bumpGen, clearAllTimers, hardDispose]);
 
-  const linesDiffRem = useMemo(() => {
-    const lines =
-      currentIndex >= 0 ? (steps[currentIndex]?.lines ?? fixedRows) : fixedRows;
-    const diff = Math.max(0, fixedRows - lines);
-    return `translateY(-${diff * 20}px)`;
-  }, [currentIndex]);
-
   return (
     <>
       <div
@@ -415,11 +408,10 @@ export default function TerminalAnimation() {
                 : "border-white/10"
         } relative w-full flex flex-col justify-between col-span-2 max-xl:row-span-6 border bg-background/50 rounded-3xl overflow-hidden`}
       >
-        <div className="w-full [mask-image:linear-gradient(180deg,red_14rem,transparent_14rem)] max-h-56">
+        <div className="w-full relative overflow-hidden min-h-56 h-full">
           <div
-            className="relative flex h-full w-full overflow-hidden rounded-3xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)] duration-300"
+            className="absolute bottom-0 right-0 left-1 flex h-full w-full max-sm:w-[250vw] overflow-hidden rounded-3xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)]"
             ref={cliDemoRef}
-            style={{ transform: linesDiffRem, willChange: "transform" }}
           />
         </div>
 
