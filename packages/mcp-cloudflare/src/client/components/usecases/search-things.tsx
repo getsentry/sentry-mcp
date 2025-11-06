@@ -10,8 +10,8 @@ export default function SearchThings() {
         <div className="flex flex-col">
           <h3 className="md:text-xl font-bold">Search Things</h3>
           <p className="text-balance text-white/70">
-            Lorem ipsum dolor sit amet consectetur adipisicing elit.
-            Perspiciatis, fugit.
+            Because “I swear it worked locally” isn&apos;t observability. Find
+            anything, anywhere, instantly.
           </p>
         </div>
         <SearchX className="size-16 ml-auto text-white/20 group-hover:text-white/40 stroke-[0.5px] duration-300 mt-auto" />

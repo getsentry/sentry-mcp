@@ -48,8 +48,9 @@ export default function FixBugs() {
         <div className="flex flex-col">
           <h3 className="md:text-xl font-bold">Fix Bugs</h3>
           <p className="text-balance text-white/70">
-            Lorem ipsum dolor sit amet consectetur adipisicing elit.
-            Perspiciatis, fugit.
+            Ship fast, break things—then unbreak them. Sentry MCP makes
+            debugging less <span className="text-[#fd918f]">“wtf”</span> and
+            more <span className="text-lime-300">“ah, got it.”</span>
           </p>
         </div>
         <BugOff className="size-16 ml-auto text-white/20 group-hover:text-white/40 stroke-[0.5px] duration-300 mt-auto" />
