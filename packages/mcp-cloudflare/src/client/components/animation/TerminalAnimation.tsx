@@ -245,12 +245,16 @@ export default function TerminalAnimation() {
       } catch {}
 
       const mobile = isMobileRef.current;
-      const shouldPause = mobile ? false : (opts?.forcePause ?? !step.autoPlay);
-      const entryDelay = mobile
-        ? 0
-        : step.autoContinueMs && shouldPause
-          ? step.autoContinueMs
-          : 0;
+      const MOBILE_PAUSE_MS = 1000;
+      const baseShouldPause = opts?.forcePause ?? !step.autoPlay;
+      const shouldPause = mobile
+        ? !!(step.autoContinueMs || !step.autoPlay)
+        : baseShouldPause;
+      const entryDelay = shouldPause
+        ? mobile
+          ? MOBILE_PAUSE_MS
+          : (step.autoContinueMs ?? 0)
+        : 0;
 
       if (shouldPause) {
         try {
@@ -279,7 +283,6 @@ export default function TerminalAnimation() {
               p.seek?.(seekTo);
               p.play?.();
             } catch {}
-
             boundaryTimerRef.current = setTimeout(() => {
               if (genRef.current !== myGen) return;
               if (!isMobileRef.current) {
@@ -408,9 +411,9 @@ export default function TerminalAnimation() {
                 : "border-white/10"
         } relative w-full flex flex-col justify-between col-span-2 max-xl:row-span-6 border bg-background/50 rounded-3xl overflow-hidden`}
       >
-        <div className="w-full relative overflow-hidden min-h-56 h-full">
+        <div className="w-full relative overflow-hidden min-h-56 h-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)]">
           <div
-            className="absolute bottom-0 right-0 left-1 flex h-full w-full max-sm:w-[250vw] overflow-hidden rounded-3xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)]"
+            className="absolute bottom-0 right-0 left-1 flex h-full w-full max-sm:w-[250vw] overflow-hidden rounded-3xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full"
             ref={cliDemoRef}
           />
         </div>
