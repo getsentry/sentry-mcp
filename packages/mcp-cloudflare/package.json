@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -38,7 +36,6 @@
     "@types/react-dom": "catalog:",
     "@types/react-scroll-to-bottom": "^4.2.5",
     "@vitejs/plugin-react": "catalog:",
-    "asciinema-player": "^3.10.0",
     "tailwindcss": "catalog:",
     "urlpattern-polyfill": "^10.1.0",
     "vite": "catalog:",
@@ -56,6 +53,7 @@
     "@sentry/react": "catalog:",
     "agents": "catalog:",
     "ai": "catalog:",
+    "asciinema-player": "^3.10.0",
     "better-sqlite3": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
