@@ -2,10 +2,12 @@ import { Accordion } from "../ui/accordion";
 import { Heading, Link } from "../ui/base";
 import CodeSnippet from "../ui/code-snippet";
 import SetupGuide from "./setup-guide";
+import skillDefinitions from "@sentry/mcp-server/skillDefinitions";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
 import { Prose } from "../ui/prose";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
+const orderedSkills = [...skillDefinitions].sort((a, b) => a.order - b.order);
 
 export default function StdioSetup() {
   const mcpStdioSnippet = `npx ${NPM_PACKAGE_NAME}@latest`;
@@ -63,6 +65,14 @@ export default function StdioSetup() {
           Create a User Auth Token in your account settings with the following
           scopes:
         </p>
+        <p>
+          <strong>AI-powered search:</strong> If you want the
+          <code>search_events</code> and <code>search_issues</code> tools to
+          translate natural language queries, add an
+          <code>OPENAI_API_KEY</code> next to your Sentry token. The rest of the
+          MCP server works without it, so you can skip this step if you do not
+          need those tools.
+        </p>
         <ul>
           {Object.entries(SCOPES).map(([scope, description]) => (
             <li key={scope}>
@@ -117,6 +127,16 @@ export default function StdioSetup() {
                 Send telemetry elsewhere or disable it by passing an empty
                 value.
               </dd>
+
+              <dt className="font-medium text-slate-100">
+                <code>OPENAI_API_KEY</code>
+              </dt>
+              <dd className="text-slate-300">
+                Optional for the standard tools, but required for the AI-powered
+                search tools (<code>search_events</code> /
+                <code>search_issues</code>). When unset, those tools stay hidden
+                but everything else works as usual.
+              </dd>
             </dl>
           </section>
 
@@ -146,26 +166,26 @@ export default function StdioSetup() {
             <h5 className="font-semibold uppercase tracking-wide text-slate-300 text-xs">
               Permissions
             </h5>
+            <p className="mt-3 text-slate-400">
+              Use <code>--skills</code> (or <code>MCP_SKILLS</code>) to pick the
+              tool bundles you want to expose. Separate skill ids with commas.
+            </p>
             <dl className="mt-3 space-y-2">
               <dt className="font-medium text-slate-100">
-                <code>--all-scopes</code>
+                <code>--skills</code> / <code>MCP_SKILLS</code>
               </dt>
               <dd className="text-slate-300">
-                Expand the token to the full permission set for every tool.
-              </dd>
-
-              <dt className="font-medium text-slate-100">
-                <code>--scopes</code> / <code>MCP_SCOPES</code>
-              </dt>
-              <dd className="text-slate-300">
-                Replace the default read-only scopes with an explicit list.
-              </dd>
-
-              <dt className="font-medium text-slate-100">
-                <code>--add-scopes</code> / <code>MCP_ADD_SCOPES</code>
-              </dt>
-              <dd className="text-slate-300">
-                Keep the read-only defaults and layer on additional scopes.
+                Skills automatically grant the minimum scopes required by the
+                selected tools. You can combine any of the following ids:
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-slate-400">
+                  {orderedSkills.map((skill) => (
+                    <li key={skill.id}>
+                      <code>{skill.id}</code> – {skill.name}
+                      {skill.defaultEnabled ? " (default)" : ""}
+                      {skill.description ? `: ${skill.description}` : ""}
+                    </li>
+                  ))}
+                </ul>
               </dd>
             </dl>
           </section>
@@ -432,32 +452,6 @@ export default function StdioSetup() {
           </ol>
         </SetupGuide>
       </Accordion>
-
-      <Heading as="h3">Troubleshooting Connectivity</Heading>
-      <Prose>
-        <p>
-          <strong>Having trouble connecting via the stdio client?</strong>
-          Start with these checks:
-        </p>
-        <ul>
-          <li>
-            <strong>401/403 errors:</strong> Verify your User Auth Token still
-            exists and includes the required scopes. Reissue the token if it was
-            rotated or downgraded.
-          </li>
-          <li>
-            <strong>404s for organizations or issues:</strong> Confirm the
-            <code>--organization-slug</code> / <code>--project-slug</code>
-            values and make sure the host matches your self-hosted Sentry
-            endpoint (e.g. <code>--host=sentry.example.com</code>).
-          </li>
-          <li>
-            <strong>TLS or network failures:</strong> Ensure you are using HTTPS
-            endpoints and that firewalls allow outbound traffic to your Sentry
-            instance.
-          </li>
-        </ul>
-      </Prose>
     </>
   );
 }
