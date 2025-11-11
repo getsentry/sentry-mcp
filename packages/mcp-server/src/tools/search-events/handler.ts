@@ -72,7 +72,6 @@ export default defineTool({
       .number()
       .min(1)
       .max(100)
-      .optional()
       .default(10)
       .describe("Maximum number of results to return"),
     includeExplanation: z
