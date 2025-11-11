@@ -123,6 +123,16 @@ pnpm deploy --env production
 
 The CLI client (`mcp-test-client`) provides a command-line interface for testing the remote server.
 
+**IMPORTANT: For local testing, you must have the dev server running first:**
+
+```bash
+# Start dev server in background (required for local testing)
+pnpm dev
+
+# Then in another terminal, run CLI tests
+pnpm -w run cli "your query"
+```
+
 ### Basic Usage
 
 **Test against local dev server (default):**
