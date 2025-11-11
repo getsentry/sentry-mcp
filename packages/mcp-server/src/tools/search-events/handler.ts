@@ -76,7 +76,6 @@ export default defineTool({
       .describe("Maximum number of results to return"),
     includeExplanation: z
       .boolean()
-      .optional()
       .default(false)
       .describe("Include explanation of how the query was translated"),
   },
