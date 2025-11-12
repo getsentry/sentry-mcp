@@ -1,6 +1,5 @@
 import { Link } from "../ui/base";
 import CodeSnippet from "../ui/code-snippet";
-// import SetupGuide from "./setup-guide";
 import skillDefinitions from "@sentry/mcp-server/skillDefinitions";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
 import { Prose } from "../ui/prose";
@@ -229,7 +228,7 @@ export function StdioSetupTabs() {
                   },
                 },
                 undefined,
-                2
+                2,
               )}
             />
           </li>
@@ -309,7 +308,7 @@ export function StdioSetupTabs() {
                   },
                 },
                 undefined,
-                2
+                2,
               )}
             />
           </li>
@@ -347,7 +346,7 @@ export function StdioSetupTabs() {
                   },
                 },
                 undefined,
-                2
+                2,
               )}
             />
           </li>
@@ -408,7 +407,7 @@ export function StdioSetupTabs() {
                   },
                 },
                 undefined,
-                2
+                2,
               )}
             />
           </li>
@@ -449,7 +448,7 @@ export function StdioSetupTabs() {
                   },
                 },
                 undefined,
-                2
+                2,
               )}
             />
           </li>
