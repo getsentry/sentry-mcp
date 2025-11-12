@@ -360,7 +360,7 @@ Try asking me things like:
 
       {/* {showControls && ( */}
       <div className="w-full [mask-image:linear-gradient(to_bottom,red,transparent)] pointer-events-none absolute top-0 left-0 h-20 z-10 backdrop-blur-md bg-gradient-to-b from-background to-background/20 xl:from-background-2 xl:to-[#20163333]" />
-      <div className="grid grid-cols-3 xl:flex xl:flex-row-reverse justify-between items-center absolute left-4 right-6 top-4 gap-4 z-20">
+      <div className="flex flex-row sm:grid sm:grid-cols-3 xl:flex xl:flex-row-reverse justify-between items-center absolute left-4 right-6 top-4 gap-4 z-20">
         {toggleEndpointMode ? (
           <Button
             type="button"
