@@ -115,8 +115,8 @@ export default defineTool({
 
     const parsed = agentResult.result;
 
-    // Get the dataset chosen by the agent (should be defined when no error)
-    const dataset = parsed.dataset!;
+    // Get the dataset chosen by the agent
+    const dataset = parsed.dataset;
 
     // Get recommended fields for this dataset (for fallback when no fields are provided)
     const recommendedFields = RECOMMENDED_FIELDS[dataset];

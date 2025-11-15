@@ -58,7 +58,8 @@ describe("search_events", () => {
           query,
           fields: fields || defaultFields[dataset],
           sort: sort || defaultSorts[dataset],
-          ...(timeRange && { timeRange }),
+          timeRange: timeRange ?? null,
+          explanation: "Test query translation",
         };
 
     return {
@@ -240,23 +241,24 @@ describe("search_events", () => {
       mockAIResponse("errors", "", [], "Cannot parse this query"),
     );
 
-    await expect(
-      searchEvents.handler(
-        {
-          organizationSlug: "test-org",
-          naturalLanguageQuery: "some impossible query !@#$%",
-          limit: 10,
-          includeExplanation: false,
+    const promise = searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        naturalLanguageQuery: "some impossible query !@#$%",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
         },
-        {
-          constraints: {
-            organizationSlug: null,
-          },
-          accessToken: "test-token",
-          userId: "1",
-        },
-      ),
-    ).rejects.toThrow(UserInputError);
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    await expect(promise).rejects.toThrow(UserInputError);
+    await expect(promise).rejects.toThrow("Cannot parse this query");
   });
 
   it("should return UserInputError for time series queries", async () => {
@@ -331,7 +333,7 @@ describe("search_events", () => {
   });
 
   it("should handle missing sort parameter", async () => {
-    // Mock AI response missing sort parameter
+    // Mock AI response missing sort parameter - schema.parse() will catch this
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify({
         dataset: "errors",
@@ -342,6 +344,7 @@ describe("search_events", () => {
         dataset: "errors",
         query: "test",
         fields: ["title"],
+        timeRange: null,
       },
     } as any);
 
@@ -361,7 +364,7 @@ describe("search_events", () => {
           userId: "1",
         },
       ),
-    ).rejects.toThrow("missing required 'sort' parameter");
+    ).rejects.toThrow(UserInputError);
   });
 
   it("should handle agent self-correction when sort field not in fields array", async () => {
@@ -379,6 +382,7 @@ describe("search_events", () => {
         query: "test",
         fields: ["title", "timestamp"],
         sort: "-timestamp",
+        timeRange: null,
         explanation: "Self-corrected to include sort field in fields array",
       },
     } as any);

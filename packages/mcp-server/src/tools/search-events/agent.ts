@@ -7,16 +7,15 @@ import { createWhoamiTool } from "../../internal/agents/tools/whoami";
 import { createDatasetAttributesTool } from "./utils";
 import { systemPrompt } from "./config";
 
-const outputSchema = z
+// OpenAI structured outputs (used by GPT-5) require all properties to be in the 'required' array.
+// Avoid .optional()/.default() so the generated JSON Schema keeps every field required.
+// Tracking: https://github.com/getsentry/sentry-mcp/issues/623
+export const searchEventsAgentOutputSchema = z
   .object({
     dataset: z
       .enum(["spans", "errors", "logs"])
       .describe("Which dataset to use for the query"),
-    query: z
-      .string()
-      .default("")
-      .nullish()
-      .describe("The Sentry query string for filtering results"),
+    query: z.string().describe("The Sentry query string for filtering results"),
     fields: z
       .array(z.string())
       .describe("Array of field names to return in results."),
@@ -32,8 +31,8 @@ const outputSchema = z
           start: z.string().describe("ISO 8601 start time"),
           end: z.string().describe("ISO 8601 end time"),
         }),
+        z.null(),
       ])
-      .nullish()
       .describe(
         "Time range for filtering events. Use either statsPeriod for relative time or start/end for absolute time.",
       ),
@@ -76,7 +75,7 @@ export interface SearchEventsAgentOptions {
 export async function searchEventsAgent(
   options: SearchEventsAgentOptions,
 ): Promise<{
-  result: z.infer<typeof outputSchema>;
+  result: z.output<typeof searchEventsAgentOutputSchema>;
   toolCalls: any[];
 }> {
   if (!process.env.OPENAI_API_KEY) {
@@ -99,7 +98,10 @@ export async function searchEventsAgent(
   const whoamiTool = createWhoamiTool({ apiService: options.apiService });
 
   // Use callEmbeddedAgent to translate the query with tool call capture
-  return await callEmbeddedAgent({
+  return await callEmbeddedAgent<
+    z.output<typeof searchEventsAgentOutputSchema>,
+    typeof searchEventsAgentOutputSchema
+  >({
     system: systemPrompt,
     prompt: options.query,
     tools: {
@@ -107,6 +109,6 @@ export async function searchEventsAgent(
       otelSemantics: otelLookupTool,
       whoami: whoamiTool,
     },
-    schema: outputSchema,
+    schema: searchEventsAgentOutputSchema,
   });
 }
