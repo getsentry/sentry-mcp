@@ -99,7 +99,7 @@ export default function TerminalAnimation() {
   const currentStepRef = useRef<number>(-1);
 
   const [speed] = useState<number>(3.0);
-  const fixedRows = 10;
+  const fixedRows = 32;
   const EPS = 0.01;
 
   const didInitRef = useRef(false);
@@ -159,8 +159,13 @@ export default function TerminalAnimation() {
       "demo.cast",
       cliDemoRef.current,
       {
-        rows: fixedRows,
-        fit: isMobileRef.current ? "width" : "none",
+        // NOTE: defaults to 80cols x 24rows until .cast loads, pulls size of terminal recondinf from .cast on load, unless below specified
+        rows: isMobileRef.current ? 10 : fixedRows,
+        // NOTE: fits cols to container width (which is extended to 200% on mobile for optimal font-size result), or rows (specified above) to container height by decreasing the font size (note below)
+        fit: isMobileRef.current ? "width" : "height",
+        // NOTE: only works when fit: false
+        // terimnalFontSize: 14,
+        // NOTE: customized above in dracula.css
         theme: "dracula",
         controls: false,
         autoPlay: true,
@@ -409,11 +414,11 @@ export default function TerminalAnimation() {
               : currentIndex === 4
                 ? "xl:border-lime-200/50"
                 : "border-white/10"
-        } relative w-full flex flex-col justify-between col-span-2 max-xl:row-span-6 border bg-background/50 rounded-3xl overflow-hidden`}
+        } relative w-full flex flex-col justify-between col-span-2 gap-8 max-xl:row-span-6 border bg-background/50 rounded-3xl overflow-hidden`}
       >
         <div className="w-full relative overflow-hidden min-h-56 h-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)]">
           <div
-            className="absolute bottom-0 right-0 left-1 flex h-full w-full max-sm:w-[250vw] overflow-hidden rounded-3xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full"
+            className="absolute bottom-0 right-0 left-1 flex justify-start h-full w-full max-sm:w-[250vw] overflow-hidden rounded-3xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [&>.ap-wrapper]:flex [&>.ap-wrapper]:!justify-start [&>.ap-wrapper>.ap-player>.ap-terminal]:absolute [&>.ap-wrapper>.ap-player>.ap-terminal]:bottom-0"
             ref={cliDemoRef}
           />
         </div>
