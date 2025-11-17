@@ -29,12 +29,12 @@
       "cache": true
     },
     "lint": {
-      "dependsOn": [],
+      "dependsOn": ["generate-definitions"],
       "inputs": ["**/*.{ts,tsx,js,jsx}", "biome.json", "package.json"],
       "cache": true
     },
     "test": {
-      "dependsOn": [],
+      "dependsOn": ["generate-definitions"],
       "inputs": [
         "src/**/*.ts",
         "**/*.test.ts",
@@ -46,7 +46,7 @@
       "cache": true
     },
     "tsc": {
-      "dependsOn": [],
+      "dependsOn": ["generate-definitions"],
       "inputs": ["src/**/*.{ts,tsx}", "tsconfig*.json"],
       "outputs": [],
       "cache": true
