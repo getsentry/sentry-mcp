@@ -13,9 +13,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Server",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -26,9 +24,7 @@
   "bin": {
     "sentry-mcp": "./dist/index.js"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -118,7 +114,8 @@
   "scripts": {
     "prebuild": "pnpm run generate-definitions",
     "build": "tsdown",
-    "dev": "pnpm run generate-definitions && tsdown -w",
+    "predev": "pnpm run generate-definitions",
+    "dev": "tsdown -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
     "pretest": "pnpm run generate-definitions",
