@@ -134,7 +134,11 @@ function isUpToDate(outDir: string): boolean {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
           if (!checkDir(fullPath)) return false;
-        } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+        } else if (
+          entry.isFile() &&
+          entry.name.endsWith(".ts") &&
+          !entry.name.endsWith(".test.ts")
+        ) {
           const mtime = fs.statSync(fullPath).mtimeMs;
           if (mtime > oldestOutputMtime) return false;
         }
