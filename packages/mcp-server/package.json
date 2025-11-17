@@ -114,6 +114,7 @@
   "scripts": {
     "prebuild": "pnpm run generate-definitions",
     "build": "tsdown",
+    "predev": "pnpm run generate-definitions",
     "dev": "tsdown -w",
     "start": "tsx src/index.ts",
     "prepare": "pnpm run build",
