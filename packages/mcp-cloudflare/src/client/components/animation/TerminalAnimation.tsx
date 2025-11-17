@@ -99,7 +99,6 @@ export default function TerminalAnimation() {
   const currentStepRef = useRef<number>(-1);
 
   const [speed] = useState<number>(3.0);
-  const fixedRows = 32;
   const EPS = 0.01;
 
   const didInitRef = useRef(false);
@@ -160,9 +159,15 @@ export default function TerminalAnimation() {
       cliDemoRef.current,
       {
         // NOTE: defaults to 80cols x 24rows until .cast loads, pulls size of terminal recondinf from .cast on load, unless below specified
-        rows: isMobileRef.current ? 10 : fixedRows,
+        rows: Math.max(
+          1,
+          Math.floor(
+            ((cliDemoRef.current?.getBoundingClientRect().height ?? 0) - 18) /
+              16.82, // line-height
+          ),
+        ), // -18 for 9px border on <pre> for terminal output
         // NOTE: fits cols to container width (which is extended to 200% on mobile for optimal font-size result), or rows (specified above) to container height by decreasing the font size (note below)
-        fit: isMobileRef.current ? "width" : "height",
+        fit: "width",
         // NOTE: only works when fit: false
         // terimnalFontSize: 14,
         // NOTE: customized above in dracula.css
@@ -418,7 +423,7 @@ export default function TerminalAnimation() {
       >
         <div className="w-full relative overflow-hidden min-h-56 h-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)]">
           <div
-            className="absolute bottom-0 right-0 left-1 flex justify-start h-full w-full max-sm:w-[250vw] overflow-hidden rounded-3xl [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [&>.ap-wrapper]:flex [&>.ap-wrapper]:!justify-start [&>.ap-wrapper>.ap-player>.ap-terminal]:absolute [&>.ap-wrapper>.ap-player>.ap-terminal]:bottom-0"
+            className="absolute bottom-0 right-0 left-1 flex justify-start h-full w-[60rem] overflow-hidden rounded-3xl [mask-image:linear-gradient(to_bottom,transparent,red_0.5rem,red_calc(100%-0.5rem),transparent)] [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [&>.ap-wrapper]:flex [&>.ap-wrapper]:!justify-start [&>.ap-wrapper>.ap-player>.ap-terminal]:absolute [&>.ap-wrapper>.ap-player>.ap-terminal]:bottom-0"
             ref={cliDemoRef}
           />
         </div>
