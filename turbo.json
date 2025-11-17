@@ -7,6 +7,17 @@
       "dependsOn": ["build"],
       "cache": false
     },
+    "generate-definitions": {
+      "dependsOn": [],
+      "inputs": [
+        "src/tools/**/*.ts",
+        "src/skills.ts",
+        "scripts/generate-definitions.ts",
+        "!src/**/*.test.ts"
+      ],
+      "outputs": ["src/toolDefinitions.json", "src/skillDefinitions.json"],
+      "cache": true
+    },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
@@ -19,15 +30,24 @@
     },
     "lint": {
       "dependsOn": ["^build"],
+      "inputs": ["**/*.{ts,tsx,js,jsx}", "biome.json", "package.json"],
       "cache": true
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": [],
+      "inputs": [
+        "src/**/*.ts",
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "vitest.config.ts",
+        "package.json"
+      ],
+      "outputs": ["coverage/**", "*.junit.xml"],
       "cache": true
     },
     "tsc": {
       "dependsOn": ["^build"],
+      "inputs": ["src/**/*.{ts,tsx}", "tsconfig*.json"],
       "outputs": [],
       "cache": true
     },
@@ -38,6 +58,16 @@
     },
     "build": {
       "dependsOn": ["^build"],
+      "inputs": [
+        "src/**/*.{ts,tsx,js,jsx,json}",
+        "package.json",
+        "tsconfig*.json",
+        "tsdown.config.ts",
+        "vite.config.ts",
+        "wrangler.jsonc",
+        "!**/*.test.{ts,tsx}",
+        "!**/*.spec.{ts,tsx}"
+      ],
       "outputs": [".next/**", "!.next/cache/**", "dist/**", "*.tsbuildinfo"],
       "cache": true
     },

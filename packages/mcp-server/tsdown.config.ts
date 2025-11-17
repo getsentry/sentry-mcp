@@ -11,6 +11,10 @@ export default defineConfig({
   dts: true, // Generate declaration file (.d.ts)
   sourcemap: true,
   clean: true,
+  external: [
+    // Keep workspace dependencies external (don't bundle them)
+    "@sentry/mcp-server-mocks",
+  ],
   env: {
     DEFAULT_SENTRY_DSN:
       "https://d0805acebb937435abcb5958da99cdab@o1.ingest.us.sentry.io/4509062593708032",

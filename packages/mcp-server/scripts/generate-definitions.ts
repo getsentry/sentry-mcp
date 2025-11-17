@@ -111,11 +111,70 @@ async function generateSkillDefinitions() {
   return skills.sort((a, b) => a.order - b.order);
 }
 
+function isUpToDate(outDir: string): boolean {
+  const toolDefsPath = path.join(outDir, "toolDefinitions.json");
+  const skillDefsPath = path.join(outDir, "skillDefinitions.json");
+
+  // Check if output files exist
+  if (!fs.existsSync(toolDefsPath) || !fs.existsSync(skillDefsPath)) {
+    return false;
+  }
+
+  // Get oldest output modification time
+  const toolDefsMtime = fs.statSync(toolDefsPath).mtimeMs;
+  const skillDefsMtime = fs.statSync(skillDefsPath).mtimeMs;
+  const oldestOutputMtime = Math.min(toolDefsMtime, skillDefsMtime);
+
+  // Check if any input files are newer than outputs
+  const toolsDir = path.join(__dirname, "../src/tools");
+  if (fs.existsSync(toolsDir)) {
+    const checkDir = (dir: string): boolean => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!checkDir(fullPath)) return false;
+        } else if (
+          entry.isFile() &&
+          entry.name.endsWith(".ts") &&
+          !entry.name.endsWith(".test.ts")
+        ) {
+          const mtime = fs.statSync(fullPath).mtimeMs;
+          if (mtime > oldestOutputMtime) return false;
+        }
+      }
+      return true;
+    };
+    if (!checkDir(toolsDir)) return false;
+  }
+
+  // Check other input files
+  const otherInputs = [
+    path.join(__dirname, "../src/skills.ts"),
+    path.join(__dirname, "generate-definitions.ts"),
+  ];
+  for (const inputPath of otherInputs) {
+    if (fs.existsSync(inputPath)) {
+      const mtime = fs.statSync(inputPath).mtimeMs;
+      if (mtime > oldestOutputMtime) return false;
+    }
+  }
+
+  return true;
+}
+
 async function main() {
   try {
-    console.log("Generating tool and skill definitions...");
     const outDir = path.join(__dirname, "../src");
     ensureDirExists(outDir);
+
+    // Skip if outputs are up-to-date
+    if (isUpToDate(outDir)) {
+      console.log("✅ Definitions are up-to-date, skipping generation");
+      return;
+    }
+
+    console.log("Generating tool and skill definitions...");
 
     const tools = generateToolDefinitions();
     const skills = await generateSkillDefinitions();
