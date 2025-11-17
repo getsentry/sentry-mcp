@@ -19,7 +19,7 @@
       "cache": true
     },
     "dev": {
-      "dependsOn": ["^build", "generate-definitions"],
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
@@ -29,12 +29,12 @@
       "cache": true
     },
     "lint": {
-      "dependsOn": ["generate-definitions"],
+      "dependsOn": ["^build"],
       "inputs": ["**/*.{ts,tsx,js,jsx}", "biome.json", "package.json"],
       "cache": true
     },
     "test": {
-      "dependsOn": ["generate-definitions"],
+      "dependsOn": ["^build"],
       "inputs": [
         "src/**/*.ts",
         "**/*.test.ts",
@@ -46,7 +46,7 @@
       "cache": true
     },
     "tsc": {
-      "dependsOn": ["generate-definitions"],
+      "dependsOn": ["^build"],
       "inputs": ["src/**/*.{ts,tsx}", "tsconfig*.json"],
       "outputs": [],
       "cache": true
@@ -57,7 +57,7 @@
       "cache": true
     },
     "build": {
-      "dependsOn": ["^build", "generate-definitions"],
+      "dependsOn": ["^build"],
       "inputs": [
         "src/**/*.{ts,tsx,js,jsx,json}",
         "package.json",
