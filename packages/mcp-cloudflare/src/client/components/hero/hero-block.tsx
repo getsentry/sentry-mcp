@@ -9,12 +9,11 @@ export default function HeroBlock() {
     <div className="flex-1 flex flex-col container mx-auto min-h-[min(80rem,calc(100svh-69px))]">
       <div className="grid xl:grid-cols-2 gap-4 sm:gap-8 sm:px-8 sm:py-6 px-4 pt-3 max-sm:text-sm">
         <p className="text-white/70 max-w-[69ch]">
-          Simply put, it's a way to plug Sentry's API into an LLM, letting you
-          ask questions about your data in context of the LLM itself. This lets
-          you take a coding agent that you already use, like Cursor or Claude
-          Code, and pull in additional information from Sentry to help with
-          tasks like debugging, fixing production errors, and understanding your
-          application's behavior.
+          Sentry MCP plugs Sentry's API directly into your LLM, letting you ask
+          questions about your data in natural language. Take a coding agent you
+          already use - like Cursor or Claude Code - and pull in information
+          from Sentry to help with debugging, fixing production errors, and
+          understanding your application's behavior.
         </p>
         <div className="flex h-full items-center xl:justify-end sm:gap-6 gap-2 flex-wrap">
           <div className="w-full sm:contents">

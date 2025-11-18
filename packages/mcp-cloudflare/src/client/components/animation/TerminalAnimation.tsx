@@ -88,12 +88,9 @@ export default function TerminalAnimation() {
   const playerRef = useRef<any>(null);
   const cliDemoRef = useRef<HTMLDivElement | null>(null);
 
-  const boundaryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoContinueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const microSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const skipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const currentStepRef = useRef<number>(-1);
@@ -104,25 +101,12 @@ export default function TerminalAnimation() {
   const didInitRef = useRef(false);
   const isMobileRef = useRef(false);
 
-  const genRef = useRef(0);
-  const bumpGen = useCallback(() => ++genRef.current, []);
+  const isManualSeekRef = useRef(false);
 
   const clearAllTimers = useCallback(() => {
-    if (boundaryTimerRef.current) {
-      clearTimeout(boundaryTimerRef.current);
-      boundaryTimerRef.current = null;
-    }
     if (autoContinueTimerRef.current) {
       clearTimeout(autoContinueTimerRef.current);
       autoContinueTimerRef.current = null;
-    }
-    if (microSeekTimerRef.current) {
-      clearTimeout(microSeekTimerRef.current);
-      microSeekTimerRef.current = null;
-    }
-    if (skipTimerRef.current) {
-      clearTimeout(skipTimerRef.current);
-      skipTimerRef.current = null;
     }
   }, []);
 
@@ -139,6 +123,60 @@ export default function TerminalAnimation() {
     } catch {}
   }, [clearAllTimers]);
 
+  const handleMarkerReached = useCallback(
+    (markerIndex: number) => {
+      const step = steps[markerIndex];
+      if (!step) return;
+
+      currentStepRef.current = markerIndex;
+      setCurrentIndex(markerIndex);
+
+      const p = playerRef.current;
+      if (!p) return;
+
+      const mobile = isMobileRef.current;
+      const MOBILE_PAUSE_MS = 1000;
+
+      // Determine if we should pause at this marker
+      const shouldPause = mobile
+        ? !!(step.autoContinueMs || !step.autoPlay)
+        : !step.autoPlay;
+
+      const continueDelay = shouldPause
+        ? mobile
+          ? MOBILE_PAUSE_MS
+          : (step.autoContinueMs ?? 0)
+        : 0;
+
+      // Update player speed for this step
+      try {
+        if (step.startSpeed !== speed) {
+          p.setSpeed?.(step.startSpeed);
+        }
+      } catch {}
+
+      if (shouldPause) {
+        try {
+          p.pause?.();
+        } catch {}
+
+        if (continueDelay > 0) {
+          clearAllTimers();
+          autoContinueTimerRef.current = setTimeout(() => {
+            try {
+              p.play?.();
+            } catch {}
+          }, continueDelay);
+        }
+      } else {
+        try {
+          p.play?.();
+        } catch {}
+      }
+    },
+    [speed, clearAllTimers],
+  );
+
   const mountOnce = useCallback(async () => {
     if (playerRef.current) return;
 
@@ -153,6 +191,9 @@ export default function TerminalAnimation() {
 
     const AsciinemaPlayerLibrary = await import("asciinema-player" as any);
     if (!cliDemoRef.current) return;
+
+    // Convert steps to markers format: [time, label]
+    const markers = steps.map((step) => [step.startTime, step.label]);
 
     const player = AsciinemaPlayerLibrary.create(
       "demo.cast",
@@ -173,224 +214,104 @@ export default function TerminalAnimation() {
         // NOTE: customized above in dracula.css
         theme: "dracula",
         controls: false,
-        autoPlay: true,
+        autoPlay: false,
         loop: false,
         idleTimeLimit: 0.1,
         speed,
-        startAt: 0,
+        startAt: steps[0].startTime,
         preload: true,
         pauseOnMarkers: false,
+        markers: markers,
       },
     );
 
     playerRef.current = player;
 
-    microSeekTimerRef.current = setTimeout(() => {
-      try {
-        player.seek?.(steps[0].startTime + EPS);
-      } catch {}
-    }, 0);
-  }, [speed]);
+    // Listen to marker events from the player
+    player.addEventListener("marker", (event: any) => {
+      const { index } = event;
+      if (!isManualSeekRef.current) {
+        handleMarkerReached(index);
+      }
+    });
 
-  const realMsForCastSec = useCallback(
-    (castSec: number) => (castSec / speed) * 1000,
-    [speed],
-  );
-
-  const getDurationSec = useCallback(() => {
-    const p = playerRef.current;
-    try {
-      const d = p?.getDuration?.() ?? p?.duration ?? null;
-      if (typeof d === "number" && Number.isFinite(d) && d > 0)
-        return d as number;
-    } catch {}
-    return (steps[steps.length - 1]?.startTime ?? 0) + 120;
-  }, []);
-
-  const planFastStep = useCallback(
-    (segmentSec: number, effectiveSpeed: number) => {
-      const eff = Math.max(1, effectiveSpeed);
-      const need = segmentSec * (speed / eff);
-      const front = Math.min(segmentSec * 0.15, need * 0.5);
-      const wf = Math.max(0, Math.min(front, need));
-      const wt = Math.max(0, need - wf);
-      const skip = Math.max(0, segmentSec - (wf + wt));
-      return { wf, wt, skip };
-    },
-    [speed],
-  );
+    // Listen for playback end to mark last step as complete
+    player.addEventListener("ended", () => {
+      // Mark the last step as completed by moving index beyond it
+      currentStepRef.current = steps.length;
+      setCurrentIndex(steps.length);
+    });
+  }, [speed, handleMarkerReached]);
 
   const gotoStep = useCallback(
-    (idx: number, opts?: { forcePause?: boolean }) => {
+    (idx: number) => {
       const p = playerRef.current;
       if (!p) return;
 
       const step = steps[idx];
       if (!step) return;
 
-      const myGen = bumpGen();
       clearAllTimers();
-      currentStepRef.current = idx;
-      setCurrentIndex(idx);
-
-      const next = steps[idx + 1];
-      const isLast = !next;
-
-      const duration = getDurationSec();
-      const endTime = isLast ? duration : next.startTime;
-      const segmentSec = Math.max(0, endTime - step.startTime);
-
-      if (isLast) {
-        try {
-          p.pause?.();
-          p.seek?.(step.startTime + EPS);
-          p.play?.();
-        } catch {}
-        return;
-      }
+      isManualSeekRef.current = true;
 
       try {
         p.pause?.();
         p.seek?.(step.startTime + EPS);
+        // Reset speed to step's speed
+        if (step.startSpeed !== speed) {
+          p.setSpeed?.(step.startSpeed);
+        }
       } catch {}
 
+      currentStepRef.current = idx;
+      setCurrentIndex(idx);
+
+      // Resume manual seek flag after a brief delay
+      setTimeout(() => {
+        isManualSeekRef.current = false;
+      }, 100);
+
       const mobile = isMobileRef.current;
-      const MOBILE_PAUSE_MS = 1000;
-      const baseShouldPause = opts?.forcePause ?? !step.autoPlay;
-      const shouldPause = mobile
-        ? !!(step.autoContinueMs || !step.autoPlay)
-        : baseShouldPause;
-      const entryDelay = shouldPause
-        ? mobile
-          ? MOBILE_PAUSE_MS
-          : (step.autoContinueMs ?? 0)
-        : 0;
-
-      if (shouldPause) {
-        try {
-          p.pause?.();
-        } catch {}
-      }
-
-      const startPlayback = () => {
-        if (genRef.current !== myGen) return;
-        try {
-          p.play?.();
-        } catch {}
-
-        if (step.startSpeed > speed) {
-          const { wf, wt, skip } = planFastStep(segmentSec, step.startSpeed);
-          const frontMs = Math.max(34, Math.floor(realMsForCastSec(wf)));
-          const tailMs = Math.max(34, Math.floor(realMsForCastSec(wt)));
-
-          const doTail = () => {
-            if (genRef.current !== myGen) return;
-            try {
-              const seekTo = Math.min(
-                step.startTime + wf + skip,
-                endTime - 0.2,
-              );
-              p.seek?.(seekTo);
-              p.play?.();
-            } catch {}
-            boundaryTimerRef.current = setTimeout(() => {
-              if (genRef.current !== myGen) return;
-              if (!isMobileRef.current) {
-                try {
-                  p.pause?.();
-                } catch {}
-              }
-              activateStep(idx + 1, "marker");
-            }, tailMs);
-          };
-
-          skipTimerRef.current = setTimeout(doTail, frontMs);
-          return;
-        }
-
-        let ms = Math.floor(realMsForCastSec(segmentSec));
-        if (ms < 34) ms = 34;
-
-        boundaryTimerRef.current = setTimeout(() => {
-          if (genRef.current !== myGen) return;
-          if (!isMobileRef.current) {
-            try {
-              p.pause?.();
-            } catch {}
-          }
-          activateStep(idx + 1, "marker");
-        }, ms);
-      };
-
-      if (entryDelay > 0) {
+      if (!mobile && step.autoContinueMs) {
         autoContinueTimerRef.current = setTimeout(() => {
-          if (genRef.current !== myGen) return;
-          startPlayback();
-        }, entryDelay);
-      } else {
-        startPlayback();
-      }
-    },
-    [
-      realMsForCastSec,
-      bumpGen,
-      clearAllTimers,
-      getDurationSec,
-      planFastStep,
-      speed,
-    ],
-  );
-
-  const activateStep = useCallback(
-    async (stepIndex: number, source: ActivationSource = "manual") => {
-      bumpGen();
-      clearAllTimers();
-
-      if (source === "manual") {
-        gotoStep(stepIndex, { forcePause: !isMobileRef.current });
-        const step = steps[stepIndex];
-        if (!isMobileRef.current && step?.autoContinueMs) {
-          const myGen = genRef.current;
-          autoContinueTimerRef.current = setTimeout(() => {
-            if (genRef.current !== myGen) return;
-            try {
-              playerRef.current?.play?.();
-            } catch {}
-          }, step.autoContinueMs);
-        }
-        return;
-      }
-
-      gotoStep(stepIndex, { forcePause: !isMobileRef.current });
-      const step = steps[stepIndex];
-      if (!isMobileRef.current && step?.autoContinueMs) {
-        const myGen = genRef.current;
-        autoContinueTimerRef.current = setTimeout(() => {
-          if (genRef.current !== myGen) return;
           try {
-            playerRef.current?.play?.();
+            p.play?.();
           } catch {}
         }, step.autoContinueMs);
       }
     },
-    [gotoStep, clearAllTimers, bumpGen],
+    [speed, clearAllTimers],
+  );
+
+  const activateStep = useCallback(
+    (stepIndex: number) => {
+      gotoStep(stepIndex);
+    },
+    [gotoStep],
   );
 
   const restart = useCallback(() => {
-    bumpGen();
     clearAllTimers();
     const p = playerRef.current;
     if (!p) return;
 
+    currentStepRef.current = -1;
+    setCurrentIndex(-1);
+
     try {
       p.pause?.();
       p.seek?.(steps[0].startTime + EPS);
+      // Reset to initial speed
+      p.setSpeed?.(speed);
     } catch {}
 
-    currentStepRef.current = -1;
-    setCurrentIndex(-1);
-    activateStep(0, "marker");
-  }, [activateStep, bumpGen, clearAllTimers]);
+    // Start from the first marker
+    setTimeout(() => {
+      try {
+        p.play?.();
+      } catch {}
+    }, 100);
+  }, [clearAllTimers, speed]);
 
   useEffect(() => {
     if (didInitRef.current) return;
@@ -398,15 +319,20 @@ export default function TerminalAnimation() {
 
     (async () => {
       await mountOnce();
-      setTimeout(() => activateStep(0, "marker"), 0);
+      // Start playing from the first marker
+      setTimeout(() => {
+        const p = playerRef.current;
+        try {
+          p?.play?.();
+        } catch {}
+      }, 100);
     })();
 
     return () => {
-      bumpGen();
       clearAllTimers();
       hardDispose();
     };
-  }, [mountOnce, activateStep, bumpGen, clearAllTimers, hardDispose]);
+  }, [mountOnce, clearAllTimers, hardDispose]);
 
   return (
     <>
