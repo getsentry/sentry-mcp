@@ -6,16 +6,14 @@ import { createDatasetFieldsTool } from "../../internal/agents/tools/dataset-fie
 import { createWhoamiTool } from "../../internal/agents/tools/whoami";
 import { systemPrompt } from "./config";
 
-const outputSchema = z.object({
-  query: z
-    .string()
-    .default("")
-    .nullish()
-    .describe("The Sentry issue search query"),
+// OpenAI structured outputs (used by GPT-5) require all properties to be in the 'required' array.
+// Avoid .optional()/.default() so the generated JSON Schema keeps every field required.
+// Tracking: https://github.com/getsentry/sentry-mcp/issues/623
+export const searchIssuesAgentOutputSchema = z.object({
+  query: z.string().describe("The Sentry issue search query"),
   sort: z
     .enum(["date", "freq", "new", "user"])
-    .default("date")
-    .nullish()
+    .nullable()
     .describe("How to sort the results"),
   explanation: z
     .string()
@@ -36,7 +34,7 @@ export interface SearchIssuesAgentOptions {
 export async function searchIssuesAgent(
   options: SearchIssuesAgentOptions,
 ): Promise<{
-  result: z.infer<typeof outputSchema>;
+  result: z.output<typeof searchIssuesAgentOutputSchema>;
   toolCalls: any[];
 }> {
   if (!process.env.OPENAI_API_KEY) {
@@ -46,7 +44,10 @@ export async function searchIssuesAgent(
   }
 
   // Create tools pre-bound with the provided API service and organization
-  return await callEmbeddedAgent({
+  return await callEmbeddedAgent<
+    z.output<typeof searchIssuesAgentOutputSchema>,
+    typeof searchIssuesAgentOutputSchema
+  >({
     system: systemPrompt,
     prompt: options.query,
     tools: {
@@ -58,6 +59,6 @@ export async function searchIssuesAgent(
       }),
       whoami: createWhoamiTool({ apiService: options.apiService }),
     },
-    schema: outputSchema,
+    schema: searchIssuesAgentOutputSchema,
   });
 }

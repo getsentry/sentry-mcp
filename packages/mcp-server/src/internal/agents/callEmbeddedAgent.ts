@@ -1,5 +1,6 @@
 import { generateText, Output, type Tool } from "ai";
 import { getOpenAIModel } from "./openai-provider";
+import { UserInputError } from "../../errors";
 import type { z } from "zod";
 
 export type ToolCall = {
@@ -20,7 +21,10 @@ interface EmbeddedAgentResult<T> {
  * - Errors are re-thrown for the calling agent to handle
  * - Each agent can implement its own error handling strategy
  */
-export async function callEmbeddedAgent<T>({
+export async function callEmbeddedAgent<
+  TOutput,
+  TSchema extends z.ZodType<TOutput, z.ZodTypeDef, unknown>,
+>({
   system,
   prompt,
   tools,
@@ -29,8 +33,8 @@ export async function callEmbeddedAgent<T>({
   system: string;
   prompt: string;
   tools: Record<string, Tool>;
-  schema: z.ZodSchema<T>;
-}): Promise<EmbeddedAgentResult<T>> {
+  schema: TSchema;
+}): Promise<EmbeddedAgentResult<TOutput>> {
   const capturedToolCalls: ToolCall[] = [];
 
   const result = await generateText({
@@ -57,8 +61,27 @@ export async function callEmbeddedAgent<T>({
     throw new Error("Failed to generate output");
   }
 
+  const rawOutput = result.experimental_output;
+
+  if (
+    typeof rawOutput === "object" &&
+    rawOutput !== null &&
+    "error" in rawOutput &&
+    typeof (rawOutput as { error?: unknown }).error === "string"
+  ) {
+    throw new UserInputError((rawOutput as { error: string }).error);
+  }
+
+  const parsedResult = schema.safeParse(rawOutput);
+
+  if (!parsedResult.success) {
+    throw new UserInputError(
+      `Invalid agent response: ${parsedResult.error.message}`,
+    );
+  }
+
   return {
-    result: result.experimental_output as T,
+    result: parsedResult.data,
     toolCalls: capturedToolCalls,
   };
 }
