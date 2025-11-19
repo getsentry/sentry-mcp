@@ -164,6 +164,12 @@
   display: none; /* Safari and Chrome */
 }
 
+/* hide asciinema-player's built-in play button on mount */
+.ap-wrapper .ap-player .ap-overlay-start {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* remove background from terminal container */
 .ap-player .ap-terminal {
   background: transparent !important;
