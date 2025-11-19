@@ -1,0 +1,44 @@
+{
+  "id": "ffffffffffffffffffffffffffffffff",
+  "groupID": "7777777777",
+  "eventID": "ffffffffffffffffffffffffffffffff",
+  "projectID": "4509062593708032",
+  "size": 200,
+  "entries": [],
+  "dist": null,
+  "message": null,
+  "title": "Future Event Type Issue",
+  "location": null,
+  "user": null,
+  "contexts": {},
+  "sdk": null,
+  "context": {},
+  "packages": {},
+  "type": "future_ai_agent_trace",
+  "metadata": {
+    "title": "Future Event Type Issue"
+  },
+  "tags": [
+    {
+      "key": "level",
+      "value": "error"
+    }
+  ],
+  "platform": "python",
+  "dateReceived": "2025-01-01T01:00:00Z",
+  "dateCreated": "2025-01-01T01:00:00Z",
+  "errors": [],
+  "crashFile": null,
+  "culprit": "some.module",
+  "fingerprints": ["abc123"],
+  "groupingConfig": {
+    "id": "newstyle:2023-01-11",
+    "enhancements": "test"
+  },
+  "release": null,
+  "userReport": null,
+  "sdkUpdates": [],
+  "resolvedWith": [],
+  "nextEventID": null,
+  "previousEventID": null
+}

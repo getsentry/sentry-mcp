@@ -3,7 +3,7 @@ import {
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
 } from "../utils/url-utils";
-import { logWarn } from "../telem/logging";
+import { logIssue, logWarn } from "../telem/logging";
 import {
   OrganizationListSchema,
   OrganizationSchema,
@@ -1559,23 +1559,68 @@ export class SentryApiService {
       undefined,
       opts,
     );
-    const rawEvent = EventSchema.parse(body);
 
-    // Filter out unknown events - only return known error/default/transaction types
-    // "default" type represents error events without exception data
-    if (rawEvent.type === "error" || rawEvent.type === "default") {
-      return rawEvent as Event;
-    }
-    if (rawEvent.type === "transaction") {
-      return rawEvent as Event;
+    // Try to parse with known event schemas first
+    const parseResult = EventSchema.safeParse(body);
+
+    if (parseResult.success) {
+      const rawEvent = parseResult.data;
+
+      // Return known event types with proper type discrimination
+      // "default" type represents error events without exception data
+      if (rawEvent.type === "error" || rawEvent.type === "default") {
+        return rawEvent;
+      }
+      if (rawEvent.type === "transaction") {
+        return rawEvent;
+      }
+      // "generic" type represents performance regression events and other metric-based issues
+      if (rawEvent.type === "generic") {
+        return rawEvent;
+      }
+      // "csp" type represents Content Security Policy violations
+      if (rawEvent.type === "csp") {
+        return rawEvent;
+      }
+
+      // Unknown event type that passed schema validation
+      // This means Sentry added a new event type we don't support yet
+      const eventType =
+        typeof rawEvent.type === "string"
+          ? rawEvent.type
+          : String(rawEvent.type);
+
+      // Log to Sentry so we can track new event types and add support
+      logIssue(`Unsupported event type: ${eventType}`, {
+        extra: {
+          eventType,
+          eventId: rawEvent.id,
+        },
+      });
+
+      return rawEvent; // Return as UnknownEvent
     }
 
+    // Schema validation failed - this is a serious problem
+    // The API response doesn't match our expected structure at all
+    const bodyObj = body as Record<string, unknown>;
     const eventType =
-      typeof rawEvent.type === "string" ? rawEvent.type : String(rawEvent.type);
+      typeof bodyObj.type === "string" ? bodyObj.type : String(bodyObj.type);
+
+    logIssue(`Event failed schema validation: ${eventType}`, {
+      extra: {
+        eventType,
+        eventId: bodyObj.id,
+        validationError: parseResult.error.message,
+        validationIssues: parseResult.error.errors,
+      },
+    });
+
+    // Throw error - schema failures mean broken API contract
     throw new ApiValidationError(
-      `Unknown event type: ${eventType}`,
-      400,
-      `Only error, default, and transaction events are supported, got: ${eventType}`,
+      `Event failed schema validation: ${parseResult.error.message}`,
+      undefined,
+      undefined,
       body,
     );
   }
@@ -1918,7 +1963,7 @@ export class SentryApiService {
     fields: string[];
     limit: number;
     projectId?: string;
-    dataset: "spans" | "ourlogs";
+    dataset: "spans" | "logs";
     statsPeriod?: string;
     start?: string;
     end?: string;
@@ -2013,7 +2058,7 @@ export class SentryApiService {
       fields: string[];
       limit?: number;
       projectId?: string;
-      dataset?: "spans" | "errors" | "ourlogs";
+      dataset?: "spans" | "errors" | "logs";
       statsPeriod?: string;
       start?: string;
       end?: string;

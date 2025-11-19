@@ -960,6 +960,36 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
     fetch: () => HttpResponse.json({ run_id: 123 }),
   },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/DEFAULT-001/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/CONTEXT-001/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/FUTURE-TYPE-001/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/issues/BLOG-CSP-4XC/autofix/",
+    fetch: () => HttpResponse.json({ autofix: null }),
+  },
 
   {
     method: "get",
@@ -1376,6 +1406,19 @@ export {
   traceMixedFixture,
   traceEventFixture,
 };
+
+// Export fixture factories
+export {
+  createDefaultEvent,
+  createGenericEvent,
+  createUnknownEvent,
+  createPerformanceEvent,
+  createPerformanceIssue,
+  createRegressedIssue,
+  createUnsupportedIssue,
+  createCspIssue,
+  createCspEvent,
+} from "./fixtures";
 
 // Export utilities for creating mock servers
 export { setupMockServer, startMockServer } from "./utils";

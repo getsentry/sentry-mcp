@@ -199,7 +199,7 @@ describe("search_events", () => {
         "https://sentry.io/api/0/organizations/test-org/events/",
         ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("dataset")).toBe("ourlogs"); // API converts logs -> ourlogs
+          expect(url.searchParams.get("dataset")).toBe("logs"); // API now accepts "logs" directly
           return HttpResponse.json({
             data: [
               {

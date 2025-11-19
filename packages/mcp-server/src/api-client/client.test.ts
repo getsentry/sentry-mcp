@@ -883,12 +883,12 @@ describe("API query builders", () => {
         query: "severity:error",
         fields: ["timestamp", "message", "severity"],
         limit: 30,
-        dataset: "ourlogs",
+        dataset: "logs",
         sort: "-timestamp",
       });
 
       expect(params.toString()).toMatchInlineSnapshot(
-        `"per_page=30&query=severity%3Aerror&dataset=ourlogs&sort=-timestamp&field=timestamp&field=message&field=severity"`,
+        `"per_page=30&query=severity%3Aerror&dataset=logs&sort=-timestamp&field=timestamp&field=message&field=severity"`,
       );
 
       // Verify sampling is not added for logs

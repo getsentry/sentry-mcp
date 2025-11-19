@@ -1,0 +1,136 @@
+{
+  "id": "bf5b6c7fd49f4f8da94085a43393051d",
+  "groupID": "4256774711",
+  "eventID": "bf5b6c7fd49f4f8da94085a43393051d",
+  "projectID": "1297621",
+  "size": 3367,
+  "type": "csp",
+  "title": "Blocked 'image' from 'blob:'",
+  "message": "Blocked 'image' from 'blob:'",
+  "platform": "other",
+  "datetime": "2025-11-19T19:24:12.491000Z",
+  "dateCreated": "2025-11-19T19:24:12.491000Z",
+  "dateReceived": "2025-11-19T19:24:12.491707Z",
+  "culprit": "img-src",
+  "location": "blob:",
+  "metadata": {
+    "directive": "img-src",
+    "message": "Blocked 'image' from 'blob:'",
+    "uri": "blob:"
+  },
+  "entries": [
+    {
+      "type": "message",
+      "data": {
+        "formatted": "Blocked 'image' from 'blob:'"
+      }
+    },
+    {
+      "type": "csp",
+      "data": {
+        "effective_directive": "img-src",
+        "blocked_uri": "blob",
+        "document_uri": "https://blog.sentry.io/how-to-reduce-ttfb/?utm_source=devto&utm_medium=paid-community&utm_campaign=perf-fy25q4-vitalsblog&utm_content=static-ad-ttfbblogshot-learnmore&bb=211800",
+        "original_policy": "upgrade-insecure-requests; default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' www.googletagmanager.com plausible.io player.vimeo.com; style-src 'unsafe-inline'; font-src 'self' fonts.gstatic.com; img-src 'self' i.vimeocdn.com www.googletagmanager.com images.ctfassets.net downloads.ctfassets.net data:; connect-src 'self' reload.getsentry.net sentry.io plausible.io *.algolia.net *.algolianet.com *.algolia.io vimeo.com; media-src videos.ctfassets.net downloads.ctfassets.net; frame-src demo.arcade.software player.vimeo.com; manifest-src 'self'; report-uri https://o1.ingest.sentry.io/api/1297621/security/?sentry_key=43a56609e7f7437f866fc944cb39695e",
+        "referrer": "",
+        "status_code": 200,
+        "violated_directive": "img-src",
+        "source_file": "https://blog.sentry.io/how-to-reduce-ttfb/",
+        "line_number": 61,
+        "script_sample": "",
+        "disposition": "enforce"
+      }
+    },
+    {
+      "type": "request",
+      "data": {
+        "apiTarget": null,
+        "method": null,
+        "url": "https://blog.sentry.io/how-to-reduce-ttfb/",
+        "query": [
+          ["utm_source", "devto"],
+          ["utm_medium", "paid-community"],
+          ["utm_campaign", "perf-fy25q4-vitalsblog"],
+          ["utm_content", "static-ad-ttfbblogshot-learnmore"],
+          ["bb", "211800"]
+        ],
+        "fragment": null,
+        "data": null,
+        "headers": [
+          ["Origin", "https://blog.sentry.io/"],
+          ["User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"],
+          ["SEC-CH-UA-Platform", "\"Windows\""],
+          ["SEC-CH-UA", "\"Chromium\";v=\"142\", \"Brave\";v=\"142\", \"Not_A Brand\";v=\"99\""]
+        ],
+        "cookies": [],
+        "env": null,
+        "inferredContentType": null
+      }
+    }
+  ],
+  "user": {
+    "id": null,
+    "email": null,
+    "username": null,
+    "ip_address": "149.88.18.199",
+    "name": null,
+    "geo": {
+      "country_code": "US",
+      "city": "New York",
+      "region": "United States"
+    },
+    "data": null
+  },
+  "contexts": {
+    "browser": {
+      "browser": "Brave 142",
+      "name": "Brave",
+      "version": "142",
+      "type": "browser"
+    },
+    "client_os": {
+      "os": "Windows",
+      "name": "Windows",
+      "type": "os"
+    }
+  },
+  "tags": [
+    { "key": "blocked-uri", "value": "blob" },
+    { "key": "browser", "value": "Brave 142" },
+    { "key": "browser.name", "value": "Brave" },
+    { "key": "client_os", "value": "Windows" },
+    { "key": "client_os.name", "value": "Windows" },
+    { "key": "effective-directive", "value": "img-src" },
+    { "key": "level", "value": "error" },
+    { "key": "logger", "value": "csp" },
+    { "key": "url", "value": "https://blog.sentry.io/how-to-reduce-ttfb/" }
+  ],
+  "fingerprints": ["4c033cd4adb1ad6075f1702f5843b0c8"],
+  "groupingConfig": {
+    "enhancements": "KLUv_SAd6QAAkwORuGFsbC1wbGF0Zm9ybXM6MjAyMy0wMS0xMZA#KLUv_SAd6QAAkwORuGFsbC1wbGF0Zm9ybXM6MjAyMy0wMS0xMZA#KLUv_SAd6QAAkwORuGFsbC1wbGF0Zm9ybXM6MjAyMy0wMS0xMZA",
+    "id": "newstyle:2023-01-11"
+  },
+  "dist": null,
+  "sdk": null,
+  "context": {},
+  "packages": {},
+  "release": null,
+  "errors": [],
+  "occurrence": null,
+  "_meta": {
+    "entries": {},
+    "message": null,
+    "user": null,
+    "contexts": null,
+    "sdk": null,
+    "context": null,
+    "packages": null,
+    "tags": {}
+  },
+  "crashFile": null,
+  "userReport": null,
+  "sdkUpdates": [],
+  "resolvedWith": [],
+  "nextEventID": null,
+  "previousEventID": "c56a7f075f8e4fd78f454a676efc746d"
+}

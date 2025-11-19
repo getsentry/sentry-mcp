@@ -1,0 +1,58 @@
+{
+  "id": "abc123def456",
+  "groupID": "1234567890",
+  "eventID": "abc123def456",
+  "projectID": "4509062593708032",
+  "size": 300,
+  "title": "Error without exception data",
+  "message": "Something went wrong",
+  "platform": "python",
+  "type": "default",
+  "dateCreated": "2025-10-02T12:00:00.000Z",
+  "dateReceived": "2025-10-02T12:00:01.000Z",
+  "culprit": "unknown",
+  "dist": null,
+  "location": null,
+  "user": null,
+  "contexts": {},
+  "sdk": null,
+  "context": {},
+  "packages": {},
+  "errors": [],
+  "crashFile": null,
+  "fingerprints": ["default-event-fingerprint"],
+  "groupingConfig": {
+    "id": "newstyle:2023-01-11",
+    "enhancements": "test"
+  },
+  "release": null,
+  "userReport": null,
+  "sdkUpdates": [],
+  "resolvedWith": [],
+  "nextEventID": null,
+  "previousEventID": null,
+  "entries": [
+    {
+      "type": "message",
+      "data": {
+        "formatted": "Something went wrong",
+        "message": "Something went wrong"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "key": "level",
+      "value": "error"
+    },
+    {
+      "key": "environment",
+      "value": "production"
+    }
+  ],
+  "metadata": {
+    "title": "Error without exception data",
+    "type": "default",
+    "value": "Something went wrong"
+  }
+}

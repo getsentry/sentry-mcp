@@ -183,7 +183,7 @@ export default defineTool({
       fields,
       limit: params.limit,
       projectId, // API requires numeric project ID, not slug
-      dataset: dataset === "logs" ? "ourlogs" : dataset,
+      dataset, // API now accepts "logs" directly (no longer needs "ourlogs")
       sort: sortParam,
       ...timeParams, // Spread the time parameters
     });
