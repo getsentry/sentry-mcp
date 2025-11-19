@@ -17,8 +17,8 @@ export default function LoadingSquares({
   cellSize = 12,
   baseAlpha = 0.04,
   peakAlpha = 0.25,
-  sweepMs = 6767,
-  decayMs = 1000,
+  sweepMs = 3000,
+  decayMs = 300,
   fadeInMs = 300,
   transparentRatio = 0.5,
 }: Props) {

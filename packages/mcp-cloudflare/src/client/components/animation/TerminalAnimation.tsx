@@ -73,7 +73,7 @@ export default function TerminalAnimation() {
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const currentStepRef = useRef<number>(-1);
 
-  const [speed] = useState<number>(3.0);
+  const [speed, setSpeed] = useState<number>(3.0);
   const OFFSET = 0.01;
 
   const didInitRef = useRef(false);
@@ -101,40 +101,9 @@ export default function TerminalAnimation() {
     } catch {}
   }, [clearAllTimers]);
 
-  const handleMarkerReached = useCallback(
-    (markerIndex: number) => {
-      const step = steps[markerIndex];
-      if (!step) return;
-
-      currentStepRef.current = markerIndex;
-      setCurrentIndex(markerIndex);
-
-      const p = playerRef.current;
-      if (!p) return;
-
-      const mobile = isMobileRef.current;
-      const MOBILE_PAUSE_MS = 1000;
-      const continueDelay = mobile ? MOBILE_PAUSE_MS : (step.pauseMs ?? 0);
-
-      try {
-        p.pause?.();
-      } catch {}
-
-      if (continueDelay > 0) {
-        clearAllTimers();
-        autoContinueTimerRef.current = setTimeout(() => {
-          try {
-            p.play?.();
-          } catch {}
-        }, continueDelay);
-      }
-
-      try {
-        p.play?.();
-      } catch {}
-    },
-    [clearAllTimers],
-  );
+  const handleMarkerReached = useCallback((markerIndex: number) => {
+    gotoStep(markerIndex);
+  }, []);
 
   const mountOnce = useCallback(async () => {
     if (playerRef.current) return;
@@ -206,19 +175,23 @@ export default function TerminalAnimation() {
       clearAllTimers();
       isManualSeekRef.current = true;
 
+      const isFastStep = idx === 3 || idx === 4;
+      const newSpeed = isFastStep ? 30 : 3;
+      setSpeed(newSpeed);
+
       try {
         p.pause?.();
-        p.seek?.(step.startTime + OFFSET);
+        p.setSpeed?.(newSpeed);
+        p.seek?.(step.startTime + (isFastStep ? 87 : OFFSET)); // skip 87 seconds fakes a 30x speedup
       } catch {}
 
       currentStepRef.current = idx;
       setCurrentIndex(idx);
 
-      // Resume manual seek flag after a brief delay
       setTimeout(() => {
         isManualSeekRef.current = false;
       }, 100);
-
+      // NOTE (for self): 1s delay on mobile got left out during handleMarkerReached consolidantion into gotoStep, bring back gotoStep(markerIndex, source: "marker" | "manual") if needed to add back
       const mobile = isMobileRef.current;
 
       if (mobile) {
@@ -254,8 +227,8 @@ export default function TerminalAnimation() {
     try {
       p.pause?.();
       p.seek?.(steps[0].startTime - OFFSET);
-      // Reset to initial speed
-      p.setSpeed?.(speed);
+      p.setSpeed?.(3);
+      setSpeed(3);
     } catch {}
 
     // Start from the first marker
@@ -264,7 +237,7 @@ export default function TerminalAnimation() {
         p.play?.();
       } catch {}
     }, 100);
-  }, [clearAllTimers, speed]);
+  }, [clearAllTimers]);
 
   useEffect(() => {
     if (didInitRef.current) return;
