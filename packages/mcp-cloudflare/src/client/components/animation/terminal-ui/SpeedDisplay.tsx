@@ -32,7 +32,7 @@ export default function SpeedDisplay({
       } ${className}`}
       style={{ ["--speed-pop-dur" as any]: `${durationMs}ms` }}
     >
-      <div className="absolute right-0 top-0 -translate-y-full font-mono text-xs opacity-50">
+      <div className="absolute right-0 top-0 -translate-y-full font-mono text-xs opacity-50 text-nowrap">
         sped up
       </div>
       <ChevronsRight className="size-6 sm:size-10 stroke-3" />
