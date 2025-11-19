@@ -1,8 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
-import { mswServer } from "@sentry/mcp-server-mocks";
+import {
+  mswServer,
+  createDefaultEvent,
+  createGenericEvent,
+  createUnknownEvent,
+  createPerformanceEvent,
+  createPerformanceIssue,
+  createRegressedIssue,
+  createUnsupportedIssue,
+  createCspIssue,
+  createCspEvent,
+} from "@sentry/mcp-server-mocks";
 import getIssueDetails from "./get-issue-details.js";
-import { performanceEventFixture } from "@sentry/mcp-server-mocks";
 
 const baseContext = {
   constraints: {
@@ -12,88 +22,9 @@ const baseContext = {
   userId: "1",
 };
 
-function createPerformanceIssueFixture() {
-  return {
-    id: "7890123456",
-    shareId: null,
-    shortId: "PERF-N1-001",
-    title: "N+1 Query: SELECT * FROM users WHERE id = %s",
-    culprit: "GET /api/users",
-    permalink: "https://sentry-mcp-evals.sentry.io/issues/7890123456/",
-    logger: null,
-    level: "warning",
-    status: "unresolved",
-    statusDetails: {},
-    substatus: "ongoing",
-    isPublic: false,
-    platform: "python",
-    project: {
-      id: "4509062593708032",
-      name: "CLOUDFLARE-MCP",
-      slug: "CLOUDFLARE-MCP",
-      platform: "python",
-    },
-    type: "performance_n_plus_one_db_queries",
-    metadata: {
-      title: "N+1 Query: SELECT * FROM users WHERE id = %s",
-      location: "GET /api/users",
-      value: "SELECT * FROM users WHERE id = %s",
-    },
-    numComments: 0,
-    assignedTo: null,
-    isBookmarked: false,
-    isSubscribed: false,
-    subscriptionDetails: null,
-    hasSeen: true,
-    annotations: [],
-    issueType: "performance_n_plus_one_db_queries",
-    issueCategory: "performance",
-    priority: "medium",
-    priorityLockedAt: null,
-    isUnhandled: false,
-    count: "25",
-    userCount: 5,
-    firstSeen: "2025-08-05T12:00:00.000Z",
-    lastSeen: "2025-08-06T12:00:00.000Z",
-    firstRelease: null,
-    lastRelease: null,
-    activity: [],
-    openPeriods: [],
-    seenBy: [],
-    pluginActions: [],
-    pluginIssues: [],
-    pluginContexts: [],
-    userReportCount: 0,
-    stats: {},
-    participants: [],
-  };
-}
+// Removed - now using createPerformanceIssue() factory from mocks
 
-function createPerformanceEventFixture() {
-  const cloned = JSON.parse(JSON.stringify(performanceEventFixture));
-  const offenderSpanIds = cloned.occurrence.evidenceData.offenderSpanIds.slice(
-    0,
-    3,
-  );
-  cloned.occurrence.evidenceData.offenderSpanIds = offenderSpanIds;
-  cloned.occurrence.evidenceData.numberRepeatingSpans = String(
-    offenderSpanIds.length,
-  );
-  cloned.occurrence.evidenceData.repeatingSpansCompact = undefined;
-  cloned.occurrence.evidenceData.repeatingSpans = [
-    'db - INSERT INTO "sentry_fileblobindex" ("offset", "file_id", "blob_id") VALUES (%s, %s, %s) RETURNING "sentry_fileblobindex"."id"',
-    "function - sentry.models.files.abstractfileblob.AbstractFileBlob.from_file",
-    'db - SELECT "sentry_fileblob"."id", "sentry_fileblob"."path", "sentry_fileblob"."size", "sentry_fileblob"."checksum", "sentry_fileblob"."timestamp" FROM "sentry_fileblob" WHERE "sentry_fileblob"."checksum" = %s LIMIT 21',
-  ];
-
-  const spansEntry = cloned.entries.find(
-    (entry: { type: string }) => entry.type === "spans",
-  );
-  if (spansEntry?.data) {
-    spansEntry.data = spansEntry.data.slice(0, 4);
-  }
-  return cloned;
-}
+// Removed - now using createPerformanceEvent() factory from mocks with overrides
 
 function createTraceResponseFixture() {
   return [
@@ -255,6 +186,9 @@ describe("get_issue_details", () => {
       **Occurrences**: 25
       **Users Impacted**: 1
       **Status**: unresolved
+      **Substatus**: ongoing
+      **Issue Type**: error
+      **Issue Category**: error
       **Platform**: javascript
       **Project**: CLOUDFLARE-MCP
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
@@ -262,6 +196,7 @@ describe("get_issue_details", () => {
       ## Event Details
 
       **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
+      **Type**: error
       **Occurred At**: 2025-04-08T21:15:04.000Z
 
       ### Error
@@ -347,6 +282,9 @@ describe("get_issue_details", () => {
       **Occurrences**: 25
       **Users Impacted**: 1
       **Status**: unresolved
+      **Substatus**: ongoing
+      **Issue Type**: error
+      **Issue Category**: error
       **Platform**: javascript
       **Project**: CLOUDFLARE-MCP
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
@@ -354,6 +292,7 @@ describe("get_issue_details", () => {
       ## Event Details
 
       **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
+      **Type**: error
       **Occurred At**: 2025-04-08T21:15:04.000Z
 
       ### Error
@@ -415,12 +354,34 @@ describe("get_issue_details", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/",
-        () => HttpResponse.json(createPerformanceIssueFixture()),
+        () => HttpResponse.json(createPerformanceIssue()),
         { once: true },
       ),
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
-        () => HttpResponse.json(createPerformanceEventFixture()),
+        () => {
+          // Create event with specific evidence data for this test
+          const event = createPerformanceEvent();
+          const offenderSpanIds =
+            event.occurrence.evidenceData.offenderSpanIds.slice(0, 3);
+          event.occurrence.evidenceData.offenderSpanIds = offenderSpanIds;
+          event.occurrence.evidenceData.numberRepeatingSpans = String(
+            offenderSpanIds.length,
+          );
+          event.occurrence.evidenceData.repeatingSpansCompact = undefined;
+          event.occurrence.evidenceData.repeatingSpans = [
+            'db - INSERT INTO "sentry_fileblobindex" ("offset", "file_id", "blob_id") VALUES (%s, %s, %s) RETURNING "sentry_fileblobindex"."id"',
+            "function - sentry.models.files.abstractfileblob.AbstractFileBlob.from_file",
+            'db - SELECT "sentry_fileblob"."id", "sentry_fileblob"."path", "sentry_fileblob"."size", "sentry_fileblob"."checksum", "sentry_fileblob"."timestamp" FROM "sentry_fileblob" WHERE "sentry_fileblob"."checksum" = %s LIMIT 21',
+          ];
+          const spansEntry = event.entries.find(
+            (entry) => entry.type === "spans",
+          );
+          if (spansEntry?.data) {
+            spansEntry.data = spansEntry.data.slice(0, 4);
+          }
+          return HttpResponse.json(event);
+        },
         { once: true },
       ),
       http.get(
@@ -455,9 +416,9 @@ describe("get_issue_details", () => {
 
       **Query executed 3 times:**
       **Repeated operations:**
-      - db - INSERT INTO \"sentry_fileblobindex\" (\"offset\", \"file_id\", \"blob_id\") VALUES (%s, %s, %s) RETURNING \"sentry_fileblobindex\".\"id\"
+      - db - INSERT INTO "sentry_fileblobindex" ("offset", "file_id", "blob_id") VALUES (%s, %s, %s) RETURNING "sentry_fileblobindex"."id"
       - function - sentry.models.files.abstractfileblob.AbstractFileBlob.from_file
-      - db - SELECT \"sentry_fileblob\".\"id\", \"sentry_fileblob\".\"path\", \"sentry_fileblob\".\"size\", \"sentry_fileblob\".\"checksum\", \"sentry_fileblob\".\"timestamp\" FROM \"sentry_fileblob\" WHERE \"sentry_fileblob\".\"checksum\" = %s LIMIT 21
+      - db - SELECT "sentry_fileblob"."id", "sentry_fileblob"."path", "sentry_fileblob"."size", "sentry_fileblob"."checksum", "sentry_fileblob"."timestamp" FROM "sentry_fileblob" WHERE "sentry_fileblob"."checksum" = %s LIMIT 21
 
       ### Span Tree (Limited to 10 spans)
 
@@ -475,7 +436,7 @@ describe("get_issue_details", () => {
       SELECT * FROM users WHERE id = %s
 
       **Repeated:**
-      25 times"
+      3 times"
     `);
   });
 
@@ -483,12 +444,34 @@ describe("get_issue_details", () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/",
-        () => HttpResponse.json(createPerformanceIssueFixture()),
+        () => HttpResponse.json(createPerformanceIssue()),
         { once: true },
       ),
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
-        () => HttpResponse.json(createPerformanceEventFixture()),
+        () => {
+          // Create event with specific evidence data for this test
+          const event = createPerformanceEvent();
+          const offenderSpanIds =
+            event.occurrence.evidenceData.offenderSpanIds.slice(0, 3);
+          event.occurrence.evidenceData.offenderSpanIds = offenderSpanIds;
+          event.occurrence.evidenceData.numberRepeatingSpans = String(
+            offenderSpanIds.length,
+          );
+          event.occurrence.evidenceData.repeatingSpansCompact = undefined;
+          event.occurrence.evidenceData.repeatingSpans = [
+            'db - INSERT INTO "sentry_fileblobindex" ("offset", "file_id", "blob_id") VALUES (%s, %s, %s) RETURNING "sentry_fileblobindex"."id"',
+            "function - sentry.models.files.abstractfileblob.AbstractFileBlob.from_file",
+            'db - SELECT "sentry_fileblob"."id", "sentry_fileblob"."path", "sentry_fileblob"."size", "sentry_fileblob"."checksum", "sentry_fileblob"."timestamp" FROM "sentry_fileblob" WHERE "sentry_fileblob"."checksum" = %s LIMIT 21',
+          ];
+          const spansEntry = event.entries.find(
+            (entry) => entry.type === "spans",
+          );
+          if (spansEntry?.data) {
+            spansEntry.data = spansEntry.data.slice(0, 4);
+          }
+          return HttpResponse.json(event);
+        },
         { once: true },
       ),
       http.get(
@@ -523,9 +506,9 @@ describe("get_issue_details", () => {
 
       **Query executed 3 times:**
       **Repeated operations:**
-      - db - INSERT INTO \"sentry_fileblobindex\" (\"offset\", \"file_id\", \"blob_id\") VALUES (%s, %s, %s) RETURNING \"sentry_fileblobindex\".\"id\"
+      - db - INSERT INTO "sentry_fileblobindex" ("offset", "file_id", "blob_id") VALUES (%s, %s, %s) RETURNING "sentry_fileblobindex"."id"
       - function - sentry.models.files.abstractfileblob.AbstractFileBlob.from_file
-      - db - SELECT \"sentry_fileblob\".\"id\", \"sentry_fileblob\".\"path\", \"sentry_fileblob\".\"size\", \"sentry_fileblob\".\"checksum\", \"sentry_fileblob\".\"timestamp\" FROM \"sentry_fileblob\" WHERE \"sentry_fileblob\".\"checksum\" = %s LIMIT 21
+      - db - SELECT "sentry_fileblob"."id", "sentry_fileblob"."path", "sentry_fileblob"."size", "sentry_fileblob"."checksum", "sentry_fileblob"."timestamp" FROM "sentry_fileblob" WHERE "sentry_fileblob"."checksum" = %s LIMIT 21
 
       ### Span Tree (Limited to 10 spans)
 
@@ -543,7 +526,7 @@ describe("get_issue_details", () => {
       SELECT * FROM users WHERE id = %s
 
       **Repeated:**
-      25 times"
+      3 times"
     `);
   });
 
@@ -574,6 +557,9 @@ describe("get_issue_details", () => {
       **Occurrences**: 25
       **Users Impacted**: 1
       **Status**: unresolved
+      **Substatus**: ongoing
+      **Issue Type**: error
+      **Issue Category**: error
       **Platform**: javascript
       **Project**: CLOUDFLARE-MCP
       **URL**: https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41
@@ -581,6 +567,7 @@ describe("get_issue_details", () => {
       ## Event Details
 
       **Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51
+      **Type**: error
       **Occurred At**: 2025-04-08T21:15:04.000Z
 
       ### Error
@@ -930,34 +917,12 @@ describe("get_issue_details", () => {
 
   it("handles default event type (error without exception data)", async () => {
     // Mock a "default" event type - represents errors without exception data
+    const defaultEvent = createDefaultEvent();
+
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/DEFAULT-001/events/latest/",
-        () => {
-          return HttpResponse.json({
-            id: "abc123def456",
-            title: "Error without exception data",
-            message: "Something went wrong",
-            platform: "python",
-            type: "default", // This is the key part - default event type
-            dateCreated: "2025-10-02T12:00:00.000Z",
-            culprit: "unknown",
-            entries: [
-              {
-                type: "message",
-                data: {
-                  formatted: "Something went wrong",
-                  message: "Something went wrong",
-                },
-              },
-            ],
-            tags: [
-              { key: "level", value: "error" },
-              { key: "environment", value: "production" },
-            ],
-            contexts: {},
-          });
-        },
+        () => HttpResponse.json(defaultEvent),
       ),
       http.get(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/DEFAULT-001/",
@@ -1011,6 +976,45 @@ describe("get_issue_details", () => {
     expect(result).toContain("**Occurred At**: 2025-10-02T12:00:00.000Z");
     expect(result).toContain("### Error");
     expect(result).toContain("Something went wrong");
+  });
+
+  it("handles CSP (Content Security Policy) violation events", async () => {
+    // Mock a CSP violation event and issue
+    const cspEvent = createCspEvent();
+    const cspIssue = createCspIssue();
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/BLOG-CSP-4XC/events/latest/",
+        () => HttpResponse.json(cspEvent),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/BLOG-CSP-4XC/",
+        () => HttpResponse.json(cspIssue),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "BLOG-CSP-4XC",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+      baseContext,
+    );
+
+    // Verify CSP-specific content is included
+    expect(result).toContain("# Issue BLOG-CSP-4XC in **sentry-mcp-evals**");
+    expect(result).toContain("Blocked 'image' from 'blob:'");
+    expect(result).toContain("**Event ID**: bf5b6c7fd49f4f8da94085a43393051d");
+    expect(result).toContain("**Type**: csp");
+    // Should show the CSP entry data
+    expect(result).toContain("### CSP Violation");
+    expect(result).toContain("**Blocked URI**: blob");
+    expect(result).toContain("**Violated Directive**: img-src");
+    expect(result).toContain("**Document URI**: https://blog.sentry.io");
   });
 
   it("displays context (extra) data when present", async () => {
@@ -1114,5 +1118,167 @@ describe("get_issue_details", () => {
     expect(result).toContain('**environment_info**: "production"');
     // Verify contexts are still displayed
     expect(result).toContain("### Additional Context");
+  });
+
+  it("handles regressed performance issues (generic type with empty entries)", async () => {
+    // This tests the actual structure from issue #633
+    // Regressed performance issues have:
+    // - type: "generic"
+    // - entries: [] (empty array)
+    // - occurrence field with evidenceData
+
+    const regressedIssueFixture = createRegressedIssue();
+
+    // Use the generic event fixture factory (baseline already matches this test's needs)
+    const regressedEventFixture = createGenericEvent();
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/",
+        () => HttpResponse.json(regressedIssueFixture),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MCP-SERVER-EQE/events/latest/",
+        () => HttpResponse.json(regressedEventFixture),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "MCP-SERVER-EQE",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: undefined,
+      },
+      baseContext,
+    );
+
+    expect(result).toMatchInlineSnapshot(`
+      "# Issue MCP-SERVER-EQE in **sentry-mcp-evals**
+
+      **Description**: Endpoint Regression
+      **Query Pattern**: \`Increased from 909.77ms to 1711.36ms (P95)\`
+      **First Seen**: 2025-09-24T03:02:10.919Z
+      **Last Seen**: 2025-11-18T06:01:20.000Z
+      **Occurrences**: 3
+      **Users Impacted**: 0
+      **Status**: unresolved
+      **Substatus**: regressed
+      **Issue Type**: performance_p95_endpoint_regression
+      **Issue Category**: metric
+      **Platform**: python
+      **Project**: mcp-server
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/MCP-SERVER-EQE
+
+      ## Event Details
+
+      **Event ID**: a6251c18f0194b8e8158518b8ee99545
+      **Type**: generic
+      **Occurred At**: 2025-11-18T06:01:20.000Z
+
+      ### Performance Regression Details
+
+      **Regression:**
+      POST /oauth/token duration increased from 909.77ms to 1711.36ms (P95)
+
+      **Transaction:**
+      POST /oauth/token
+
+      ### Tags
+
+      **level**: info
+      **transaction**: POST /oauth/token
+
+      # Using this information
+
+      - You can reference the IssueID in commit messages (e.g. \`Fixes MCP-SERVER-EQE\`) to automatically close the issue when the commit is merged.
+      - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
+      "
+    `);
+  });
+
+  it("handles unsupported event types gracefully", async () => {
+    // This tests that unknown event types don't crash the tool
+    // Instead, we should show the issue info and a warning about the unsupported event type
+
+    const unsupportedIssueFixture = createUnsupportedIssue();
+
+    // Event with a type that doesn't exist yet (would never be returned by Sentry API)
+    // Use the unknown event fixture factory (baseline already has future_ai_agent_trace type)
+    const unsupportedEventFixture = createUnknownEvent();
+
+    mswServer.use(
+      // More specific pattern for events (must come first to match before the issue pattern)
+      http.get(
+        "*/api/0/organizations/*/issues/FUTURE-TYPE-001/events/latest/",
+        () => {
+          return HttpResponse.json(unsupportedEventFixture);
+        },
+      ),
+      http.get("*/api/0/organizations/*/issues/FUTURE-TYPE-001", () => {
+        return HttpResponse.json(unsupportedIssueFixture);
+      }),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "FUTURE-TYPE-001",
+        issueUrl: undefined,
+        eventId: undefined,
+        regionUrl: undefined,
+      },
+      baseContext,
+    );
+
+    if (typeof result !== "string") {
+      throw new Error("Expected string result");
+    }
+
+    // Extract the Sentry Event ID from the result (it varies per run)
+    const sentryEventIdMatch = result.match(
+      /Sentry Event ID \*\*([a-f0-9]{32})\*\*/,
+    );
+    const sentryEventId = sentryEventIdMatch
+      ? sentryEventIdMatch[1]
+      : "SENTRY_EVENT_ID";
+
+    // Replace the dynamic Sentry Event ID with a placeholder for snapshot testing
+    const normalizedResult = result.replace(
+      /Sentry Event ID \*\*[a-f0-9]{32}\*\*/,
+      "Sentry Event ID **<SENTRY_EVENT_ID>**",
+    );
+
+    expect(normalizedResult).toMatchInlineSnapshot(`
+      "# Issue FUTURE-TYPE-001 in **sentry-mcp-evals**
+
+      **Description**: Future Event Type Issue
+      **Culprit**: some.module
+      **First Seen**: 2025-01-01T00:00:00.000Z
+      **Last Seen**: 2025-01-01T01:00:00.000Z
+      **Occurrences**: 1
+      **Users Impacted**: 1
+      **Status**: unresolved
+      **Issue Type**: error
+      **Issue Category**: error
+      **Platform**: python
+      **Project**: mcp-server
+      **URL**: https://sentry-mcp-evals.sentry.io/issues/FUTURE-TYPE-001
+
+      ## Event Details
+
+      ⚠️  **Warning**: Unsupported event type "future_ai_agent_trace"
+
+      This event type is not yet fully supported by the MCP server. Only basic issue information is shown above.
+
+      **Please report this**: Open a GitHub issue at https://github.com/getsentry/sentry-mcp/issues/new and include Event ID **ffffffffffffffffffffffffffffffff** and Sentry Event ID **<SENTRY_EVENT_ID>** to help us add support for this event type.
+      "
+    `);
+
+    // Verify we actually got a Sentry Event ID
+    expect(sentryEventId).toMatch(/^[a-f0-9]{32}$/);
   });
 });

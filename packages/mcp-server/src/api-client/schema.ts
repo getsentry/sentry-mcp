@@ -190,8 +190,14 @@ export const IssueSchema = z.object({
   project: ProjectSchema,
   platform: z.string().nullable().optional(),
   status: z.string(),
+  substatus: z.string().optional(),
   culprit: z.string(),
-  type: z.union([z.literal("error"), z.literal("transaction"), z.unknown()]),
+  type: z.union([
+    z.literal("error"),
+    z.literal("transaction"),
+    z.literal("generic"),
+    z.unknown(),
+  ]),
   assignedTo: AssignedToSchema.optional(),
   issueType: z.string().optional(),
   issueCategory: z.string().optional(),
@@ -425,6 +431,49 @@ export const TransactionEventSchema = BaseEventSchema.omit({
     .nullish(), // Allow both null and undefined
 });
 
+/**
+ * Schema for evidence display items in occurrence data.
+ * These show regression details, metric changes, and other evidence.
+ */
+export const EvidenceDisplaySchema = z.object({
+  name: z.string(),
+  value: z.string(),
+  important: z.boolean(),
+});
+
+/**
+ * Schema for occurrence data in generic events.
+ * Occurrences represent performance regressions and metric-based issues.
+ */
+export const OccurrenceSchema = z
+  .object({
+    id: z.string(),
+    projectId: z.number(),
+    eventId: z.string(),
+    fingerprint: z.array(z.string()),
+    issueTitle: z.string(),
+    subtitle: z.string().optional(),
+    resourceId: z.string().nullable().optional(),
+    evidenceData: z.record(z.string(), z.unknown()).optional(),
+    evidenceDisplay: z.array(EvidenceDisplaySchema).optional(),
+    type: z.number(),
+    detectionTime: z.number().optional(),
+    level: z.string().optional(),
+    culprit: z.string().optional(),
+    priority: z.number().optional(),
+    assignee: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const GenericEventSchema = BaseEventSchema.omit({
+  type: true,
+}).extend({
+  type: z.literal("generic"),
+  culprit: z.string().nullable().optional(),
+  dateCreated: z.string().datetime(),
+  occurrence: OccurrenceSchema.optional(),
+});
+
 export const UnknownEventSchema = BaseEventSchema.omit({
   type: true,
 }).extend({
@@ -438,6 +487,7 @@ export const EventSchema = z.union([
   ErrorEventSchema,
   DefaultEventSchema,
   TransactionEventSchema,
+  GenericEventSchema,
   UnknownEventSchema,
 ]);
 

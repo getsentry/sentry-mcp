@@ -12,10 +12,13 @@ import type {
   AutofixRunState,
   Trace,
   TraceSpan,
+  GenericEvent,
 } from "../api-client/types";
 import type {
   ErrorEntrySchema,
   ErrorEventSchema,
+  DefaultEventSchema,
+  GenericEventSchema,
   EventSchema,
   FrameInterface,
   RequestEntrySchema,
@@ -29,6 +32,7 @@ import {
   isTerminalStatus,
   getStatusDisplayName,
 } from "./tool-helpers/seer";
+import { logIssue } from "../telem/logging";
 
 // Language detection mappings
 const LANGUAGE_EXTENSIONS: Record<string, string> = {
@@ -166,12 +170,22 @@ export function formatEventOutput(
 ) {
   let output = "";
 
+  // Check if entries exist (may be undefined for unsupported event types)
+  if (!event.entries || !Array.isArray(event.entries)) {
+    // For unsupported event types, just show tags and contexts
+    output += formatTags(event.tags);
+    output += formatContext(event.context);
+    output += formatContexts(event.contexts);
+    return output;
+  }
+
   // Look for the primary error information
   const messageEntry = event.entries.find((e) => e.type === "message");
   const exceptionEntry = event.entries.find((e) => e.type === "exception");
   const threadsEntry = event.entries.find((e) => e.type === "threads");
   const requestEntry = event.entries.find((e) => e.type === "request");
   const spansEntry = event.entries.find((e) => e.type === "spans");
+  const cspEntry = event.entries.find((e) => e.type === "csp");
 
   // Error message (if present)
   if (messageEntry) {
@@ -202,10 +216,21 @@ export function formatEventOutput(
     );
   }
 
+  // CSP violation details
+  if (cspEntry) {
+    output += formatCspInterfaceOutput(event, cspEntry.data);
+  }
+
   // Performance issue details (N+1 queries, etc.)
   // Pass spans data for additional context even if we have evidence
   if (event.type === "transaction") {
     output += formatPerformanceIssueOutput(event, spansEntry?.data, options);
+  }
+
+  // Generic events (performance regressions, metric-based issues)
+  // These have occurrence data with evidenceDisplay that needs formatting
+  if (event.type === "generic") {
+    output += formatGenericEventOutput(event);
   }
 
   output += formatTags(event.tags);
@@ -405,6 +430,56 @@ function getExceptionChainMessage(
     default:
       return defaultMessage;
   }
+}
+
+function formatCspInterfaceOutput(event: Event, data: any) {
+  if (!data) {
+    return "";
+  }
+
+  const parts: string[] = [];
+  parts.push("### CSP Violation");
+  parts.push("");
+
+  if (data.blocked_uri) {
+    parts.push(`**Blocked URI**: ${data.blocked_uri}`);
+  }
+
+  if (data.violated_directive) {
+    parts.push(`**Violated Directive**: ${data.violated_directive}`);
+  }
+
+  if (data.effective_directive) {
+    parts.push(`**Effective Directive**: ${data.effective_directive}`);
+  }
+
+  if (data.document_uri) {
+    parts.push(`**Document URI**: ${data.document_uri}`);
+  }
+
+  if (data.source_file) {
+    parts.push(`**Source File**: ${data.source_file}`);
+    if (data.line_number) {
+      parts.push(`**Line Number**: ${data.line_number}`);
+    }
+  }
+
+  if (data.disposition) {
+    parts.push(`**Disposition**: ${data.disposition}`);
+  }
+
+  if (data.original_policy) {
+    parts.push("");
+    parts.push("**Original Policy:**");
+    parts.push("```");
+    parts.push(data.original_policy);
+    parts.push("```");
+  }
+
+  parts.push("");
+  parts.push("");
+
+  return parts.join("\n");
 }
 
 function formatRequestInterfaceOutput(
@@ -1371,6 +1446,47 @@ function formatPerformanceIssueOutput(
   return parts.length > 0 ? `${parts.join("\n")}\n` : "";
 }
 
+/**
+ * Formats generic event output (performance regressions, metric-based issues).
+ * Generic events don't have traditional error entries, but have occurrence data
+ * with evidenceDisplay showing regression details, metric changes, etc.
+ */
+function formatGenericEventOutput(event: Event): string {
+  const parts: string[] = [];
+
+  // Only generic events have occurrence data
+  if (event.type !== "generic") {
+    return "";
+  }
+
+  // Type assertion after guard - we know it's a GenericEvent
+  const genericEvent = event as GenericEvent;
+  const occurrence = genericEvent.occurrence;
+  if (!occurrence) {
+    return "";
+  }
+
+  // Add a section header for performance regression details
+  const evidenceData = occurrence.evidenceData;
+  if (evidenceData) {
+    parts.push("### Performance Regression Details");
+    parts.push("");
+  }
+
+  // Show evidence display items (regression details, metric changes, etc.)
+  if (occurrence.evidenceDisplay && occurrence.evidenceDisplay.length > 0) {
+    for (const display of occurrence.evidenceDisplay) {
+      if (display.important) {
+        parts.push(`**${display.name}:**`);
+        parts.push(`${display.value}`);
+        parts.push("");
+      }
+    }
+  }
+
+  return parts.length > 0 ? `${parts.join("\n")}\n` : "";
+}
+
 function formatTags(tags: z.infer<typeof EventSchema>["tags"]) {
   if (!tags || tags.length === 0) {
     return "";
@@ -1604,15 +1720,89 @@ export function formatIssueOutput({
   output += `**Occurrences**: ${issue.count}\n`;
   output += `**Users Impacted**: ${issue.userCount}\n`;
   output += `**Status**: ${issue.status}\n`;
+
+  // Add substatus if present (e.g., "regressed" for performance regressions)
+  if (issue.substatus) {
+    output += `**Substatus**: ${issue.substatus}\n`;
+  }
+
+  // Add issue type and category for performance/metric issues
+  if (issue.issueType) {
+    output += `**Issue Type**: ${issue.issueType}\n`;
+  }
+  if (issue.issueCategory) {
+    output += `**Issue Category**: ${issue.issueCategory}\n`;
+  }
+
   output += `**Platform**: ${issue.platform}\n`;
   output += `**Project**: ${issue.project.name}\n`;
   output += `**URL**: ${apiService.getIssueUrl(organizationSlug, issue.shortId)}\n`;
   output += "\n";
   output += "## Event Details\n\n";
+
+  // Check if this is an unsupported event type
+  // Event type union is: ErrorEvent | DefaultEvent | TransactionEvent | GenericEvent | CspEvent
+  // But in practice we may have other types returned as UnknownEvent
+  const eventType = event.type;
+  const isUnsupportedType =
+    eventType !== "error" &&
+    eventType !== "default" &&
+    eventType !== "transaction" &&
+    eventType !== "generic" &&
+    eventType !== "csp";
+
+  if (isUnsupportedType) {
+    // Log to Sentry for tracking new/unknown event types
+    const sentryEventId = logIssue(
+      `Unsupported event type encountered: ${String(eventType)}`,
+      {
+        contexts: {
+          event: {
+            event_id: event.id,
+            event_type: eventType,
+            issue_id: issue.id,
+            issue_short_id: issue.shortId,
+            organization_slug: organizationSlug,
+            project_slug: issue.project.slug,
+          },
+        },
+      },
+    );
+
+    output += `⚠️  **Warning**: Unsupported event type "${String(eventType)}"\n\n`;
+    output += "This event type is not yet fully supported by the MCP server. ";
+    output += "Only basic issue information is shown above.\n\n";
+    output +=
+      "**Please report this**: Open a GitHub issue at https://github.com/getsentry/sentry-mcp/issues/new ";
+    output += `and include Event ID **${event.id}**`;
+    if (sentryEventId) {
+      output += ` and Sentry Event ID **${sentryEventId}**`;
+    }
+    output += " to help us add support for this event type.\n";
+
+    // For unsupported event types, return early without trying to render event details
+    return output;
+  }
+
   output += `**Event ID**: ${event.id}\n`;
+  output += `**Type**: ${event.type}\n`;
   // "default" type represents error events without exception data
-  if (event.type === "error" || event.type === "default") {
-    output += `**Occurred At**: ${new Date((event as z.infer<typeof ErrorEventSchema>).dateCreated).toISOString()}\n`;
+  // "generic" type represents performance regressions and metric-based issues
+  // "csp" type represents Content Security Policy violations
+  if (
+    event.type === "error" ||
+    event.type === "default" ||
+    event.type === "generic" ||
+    event.type === "csp"
+  ) {
+    const typedEvent = event as
+      | z.infer<typeof ErrorEventSchema>
+      | z.infer<typeof DefaultEventSchema>
+      | z.infer<typeof GenericEventSchema>
+      | any; // CSP events don't have a schema yet
+    if (typedEvent.dateCreated) {
+      output += `**Occurred At**: ${new Date(typedEvent.dateCreated).toISOString()}\n`;
+    }
   }
   if (event.message) {
     output += `**Message**:\n${event.message}\n`;
