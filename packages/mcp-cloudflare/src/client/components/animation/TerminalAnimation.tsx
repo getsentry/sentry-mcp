@@ -14,33 +14,23 @@ export type Step = {
   label: string;
   description: string;
   startTime: number;
-  startSpeed: number;
-  autoContinueMs: number | null;
-  autoPlay: boolean;
-  lines: number;
+  // NOTE: hardcoded to 1000ms on mobile
+  pauseMs: number | null;
 };
-
-type ActivationSource = "marker" | "manual";
 
 const steps: Step[] = [
   {
     label: "Copypaste Sentry Issue URL",
     description: "Copy the Sentry issue url directly from your browser",
     startTime: 31.6,
-    startSpeed: 5,
-    autoContinueMs: 2500,
-    autoPlay: false,
-    lines: 7,
+    pauseMs: 2500,
   },
   {
     type: "[toolcall]",
     label: "get_issue_details()",
     description: "MCP performs a toolcall to fetch issue details",
     startTime: 40,
-    startSpeed: 3,
-    autoContinueMs: 1750,
-    autoPlay: false,
-    lines: 10,
+    pauseMs: 1750,
   },
   {
     type: "[toolcall]",
@@ -48,39 +38,27 @@ const steps: Step[] = [
     description:
       "A toolcall to Seer to analyze the stack trace and pinpoint the root cause",
     startTime: 46,
-    startSpeed: 3,
-    autoContinueMs: 2000,
-    autoPlay: false,
-    lines: 9,
+    pauseMs: 2000,
   },
   {
     type: "[LLM]",
     label: "Finding solution",
     description: "LLM analyzes the context and comes up with a solution",
     startTime: 48.5,
-    startSpeed: 48,
-    autoContinueMs: 50,
-    autoPlay: false,
-    lines: 8,
+    pauseMs: 50,
   },
   {
     type: "[LLM]",
     label: "Applying Edits",
     description: "LLM adds the suggested solution to the codebase",
     startTime: 146,
-    startSpeed: 24,
-    autoContinueMs: 50,
-    autoPlay: false,
-    lines: 8,
+    pauseMs: 50,
   },
   {
     label: "Validation",
     description: "Automatically running tests to verify the solution works",
     startTime: 242,
-    startSpeed: 3,
-    autoContinueMs: 50,
-    autoPlay: false,
-    lines: 7,
+    pauseMs: 50,
   },
 ];
 
@@ -96,7 +74,7 @@ export default function TerminalAnimation() {
   const currentStepRef = useRef<number>(-1);
 
   const [speed] = useState<number>(3.0);
-  const EPS = 0.01;
+  const OFFSET = 0.01;
 
   const didInitRef = useRef(false);
   const isMobileRef = useRef(false);
@@ -136,45 +114,26 @@ export default function TerminalAnimation() {
 
       const mobile = isMobileRef.current;
       const MOBILE_PAUSE_MS = 1000;
+      const continueDelay = mobile ? MOBILE_PAUSE_MS : (step.pauseMs ?? 0);
 
-      // Determine if we should pause at this marker
-      const shouldPause = mobile
-        ? !!(step.autoContinueMs || !step.autoPlay)
-        : !step.autoPlay;
-
-      const continueDelay = shouldPause
-        ? mobile
-          ? MOBILE_PAUSE_MS
-          : (step.autoContinueMs ?? 0)
-        : 0;
-
-      // Update player speed for this step
       try {
-        if (step.startSpeed !== speed) {
-          p.setSpeed?.(step.startSpeed);
-        }
+        p.pause?.();
       } catch {}
 
-      if (shouldPause) {
-        try {
-          p.pause?.();
-        } catch {}
-
-        if (continueDelay > 0) {
-          clearAllTimers();
-          autoContinueTimerRef.current = setTimeout(() => {
-            try {
-              p.play?.();
-            } catch {}
-          }, continueDelay);
-        }
-      } else {
-        try {
-          p.play?.();
-        } catch {}
+      if (continueDelay > 0) {
+        clearAllTimers();
+        autoContinueTimerRef.current = setTimeout(() => {
+          try {
+            p.play?.();
+          } catch {}
+        }, continueDelay);
       }
+
+      try {
+        p.play?.();
+      } catch {}
     },
-    [speed, clearAllTimers],
+    [clearAllTimers],
   );
 
   const mountOnce = useCallback(async () => {
@@ -234,13 +193,6 @@ export default function TerminalAnimation() {
         handleMarkerReached(index);
       }
     });
-
-    // Listen for playback end to mark last step as complete
-    player.addEventListener("ended", () => {
-      // Mark the last step as completed by moving index beyond it
-      currentStepRef.current = steps.length;
-      setCurrentIndex(steps.length);
-    });
   }, [speed, handleMarkerReached]);
 
   const gotoStep = useCallback(
@@ -256,11 +208,7 @@ export default function TerminalAnimation() {
 
       try {
         p.pause?.();
-        p.seek?.(step.startTime + EPS);
-        // Reset speed to step's speed
-        if (step.startSpeed !== speed) {
-          p.setSpeed?.(step.startSpeed);
-        }
+        p.seek?.(step.startTime + OFFSET);
       } catch {}
 
       currentStepRef.current = idx;
@@ -272,15 +220,20 @@ export default function TerminalAnimation() {
       }, 100);
 
       const mobile = isMobileRef.current;
-      if (!mobile && step.autoContinueMs) {
+
+      if (mobile) {
+        try {
+          p.play?.();
+        } catch {}
+      } else if (step.pauseMs) {
         autoContinueTimerRef.current = setTimeout(() => {
           try {
             p.play?.();
           } catch {}
-        }, step.autoContinueMs);
+        }, step.pauseMs);
       }
     },
-    [speed, clearAllTimers],
+    [clearAllTimers],
   );
 
   const activateStep = useCallback(
@@ -300,7 +253,7 @@ export default function TerminalAnimation() {
 
     try {
       p.pause?.();
-      p.seek?.(steps[0].startTime + EPS);
+      p.seek?.(steps[0].startTime - OFFSET);
       // Reset to initial speed
       p.setSpeed?.(speed);
     } catch {}
@@ -345,22 +298,16 @@ export default function TerminalAnimation() {
               : currentIndex === 4
                 ? "xl:border-lime-200/50"
                 : "border-white/10"
-        } relative w-full flex flex-col justify-between col-span-2 gap-8 max-xl:row-span-6 border bg-background/50 rounded-3xl overflow-hidden`}
+        } relative w-full flex flex-col justify-between col-span-2 gap-8 max-xl:row-span-6 border bg-background/50 rounded-xl sm:rounded-3xl overflow-hidden`}
       >
-        <div className="w-full relative overflow-hidden min-h-56 h-full [mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)]">
+        <div className="w-full relative overflow-hidden min-h-56 h-full sm:[mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)] [mask-image:radial-gradient(circle_at_top_right,transparent_20%,red_30%)]">
           <div
-            className="absolute bottom-0 right-0 left-1 flex justify-start h-full w-[60rem] overflow-hidden rounded-3xl [mask-image:linear-gradient(to_bottom,transparent,red_0.5rem,red_calc(100%-0.5rem),transparent)] [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [&>.ap-wrapper]:flex [&>.ap-wrapper]:!justify-start [&>.ap-wrapper>.ap-player>.ap-terminal]:absolute [&>.ap-wrapper>.ap-player>.ap-terminal]:bottom-0"
+            className="absolute bottom-0 right-0 left-1 flex justify-start h-full w-[60rem] overflow-hidden rounded-xl sm:rounded-3xl [mask-image:linear-gradient(to_bottom,transparent,red_0.5rem,red_calc(100%-0.5rem),transparent)] [&>.ap-wrapper>.ap-player]:w-full [&>.ap-wrapper]:w-full [&>.ap-wrapper]:flex [&>.ap-wrapper]:!justify-start [&>.ap-wrapper>.ap-player>.ap-terminal]:absolute [&>.ap-wrapper>.ap-player>.ap-terminal]:bottom-0"
             ref={cliDemoRef}
           />
         </div>
 
-        <SpeedDisplay
-          speed={
-            currentIndex >= 0
-              ? (steps[currentIndex]?.startSpeed ?? speed)
-              : speed
-          }
-        />
+        <SpeedDisplay speed={speed} />
         <KeysPaste step={currentIndex} />
 
         <div className="relative bottom-0 inset-x-0">

@@ -10,7 +10,9 @@ export default function DiffBlock({
   return (
     <pre
       className={`${
-        step === 4 ? "opacity-100 duration-300" : "opacity-0"
+        step === 4
+          ? "opacity-100 duration-300 pointer-events-auto"
+          : "opacity-0 pointer-events-none"
       } absolute inset-0 top-10 z-50 h-full bg-background ![color:unset] text-sm`}
       style={{
         transitionDelay: step === 4 ? `${delay}s` : "0s",
