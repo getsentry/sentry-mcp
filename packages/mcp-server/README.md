@@ -41,6 +41,15 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com
 npx @sentry/mcp-server@latest --access-token=TOKEN --openai-base-url=https://proxy.example.com/v1
 ```
 
+### Constraint-Based Tool Exclusion
+
+When a session is scoped to a specific organization or project (tenant-bound context), certain list tools are automatically excluded since they cannot query other resources:
+
+- **`find_organizations`** is hidden when the session is constrained to a specific organization (`organizationSlug` constraint)
+- **`find_projects`** is hidden when the session is constrained to a specific project (`projectSlug` constraint)
+
+This ensures that only relevant tools are available in constrained contexts. When constraints are not set, all tools are available based on your granted skills.
+
 ### Environment Variables
 
 You can also use environment variables:

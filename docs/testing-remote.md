@@ -222,6 +222,10 @@ pnpm -w run cli --mcp-host=http://localhost:5173/mcp/sentry "find_projects()"
 pnpm -w run cli --mcp-host=http://localhost:5173/mcp/sentry "find_projects(organizationSlug='other-org')"
 ```
 
+**Note:** When testing with constraints, some tools are automatically filtered:
+- With org constraint: `find_organizations` is not available (18 tools instead of 19)
+- With org + project constraints: both `find_organizations` and `find_projects` are not available (17 tools instead of 19)
+
 ## Testing with Web Chat Interface
 
 The web UI provides a chat interface for testing the MCP server.

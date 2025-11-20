@@ -375,7 +375,7 @@ describe("get_issue_details", () => {
             'db - SELECT "sentry_fileblob"."id", "sentry_fileblob"."path", "sentry_fileblob"."size", "sentry_fileblob"."checksum", "sentry_fileblob"."timestamp" FROM "sentry_fileblob" WHERE "sentry_fileblob"."checksum" = %s LIMIT 21',
           ];
           const spansEntry = event.entries.find(
-            (entry) => entry.type === "spans",
+            (entry: { type: string; data?: unknown }) => entry.type === "spans",
           );
           if (spansEntry?.data) {
             spansEntry.data = spansEntry.data.slice(0, 4);
@@ -465,7 +465,7 @@ describe("get_issue_details", () => {
             'db - SELECT "sentry_fileblob"."id", "sentry_fileblob"."path", "sentry_fileblob"."size", "sentry_fileblob"."checksum", "sentry_fileblob"."timestamp" FROM "sentry_fileblob" WHERE "sentry_fileblob"."checksum" = %s LIMIT 21',
           ];
           const spansEntry = event.entries.find(
-            (entry) => entry.type === "spans",
+            (entry: { type: string; data?: unknown }) => entry.type === "spans",
           );
           if (spansEntry?.data) {
             spansEntry.data = spansEntry.data.slice(0, 4);

@@ -123,8 +123,39 @@ describe("use_sentry handler", () => {
     expect(toolNames).toHaveLength(19);
   });
 
-  it("wraps tools with session constraints", async () => {
-    const constrainedContext: ServerContext = {
+  it("filters find_organizations when organizationSlug constraint is set", async () => {
+    const orgConstrainedContext: ServerContext = {
+      ...mockContext,
+      constraints: {
+        organizationSlug: "constrained-org",
+      },
+    };
+
+    mockUseSentryAgent.mockResolvedValue({
+      result: {
+        result: "Success with org constraint",
+      },
+      toolCalls: [],
+    });
+
+    await useSentry.handler(
+      { request: "test with org constraint" },
+      orgConstrainedContext,
+    );
+
+    const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
+    expect(toolsArg).toBeDefined();
+
+    // With only org constraint, find_organizations is filtered (19 - 1 = 18)
+    expect(Object.keys(toolsArg)).toHaveLength(18);
+
+    // Verify find_organizations is filtered but find_projects remains
+    expect(toolsArg.find_organizations).toBeUndefined();
+    expect(toolsArg.find_projects).toBeDefined();
+  });
+
+  it("filters both find tools when org and project constraints are set", async () => {
+    const fullyConstrainedContext: ServerContext = {
       ...mockContext,
       constraints: {
         organizationSlug: "constrained-org",
@@ -134,20 +165,25 @@ describe("use_sentry handler", () => {
 
     mockUseSentryAgent.mockResolvedValue({
       result: {
-        result: "Success with constraints",
+        result: "Success with both constraints",
       },
       toolCalls: [],
     });
 
     await useSentry.handler(
-      { request: "test with constraints" },
-      constrainedContext,
+      { request: "test with both constraints" },
+      fullyConstrainedContext,
     );
 
-    // Verify agent was called with tools
-    expect(mockUseSentryAgent).toHaveBeenCalled();
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
     expect(toolsArg).toBeDefined();
-    expect(Object.keys(toolsArg)).toHaveLength(19);
+
+    // When both org and project constraints are present,
+    // find_organizations and find_projects are filtered out (19 - 2 = 17)
+    expect(Object.keys(toolsArg)).toHaveLength(17);
+
+    // Verify both find tools are filtered
+    expect(toolsArg.find_organizations).toBeUndefined();
+    expect(toolsArg.find_projects).toBeUndefined();
   });
 });
