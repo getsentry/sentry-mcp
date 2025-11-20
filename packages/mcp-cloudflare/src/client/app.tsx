@@ -66,6 +66,9 @@ export default function App() {
 
       if (hasQueryParam) {
         setIsChatOpen(urlParams.get("chat") !== "0");
+      } else {
+        // default to closed on both desktop and mobile
+        setIsChatOpen(false);
       }
     };
 
