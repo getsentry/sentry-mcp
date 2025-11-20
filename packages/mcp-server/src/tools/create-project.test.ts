@@ -9,7 +9,7 @@ describe("create_project", () => {
         teamSlug: "the-goats",
         name: "cloudflare-mcp",
         platform: "node",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {

@@ -10,11 +10,11 @@ describe("update_issue", () => {
         status: "resolved",
         assignedTo: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -52,11 +52,11 @@ describe("update_issue", () => {
         status: undefined,
         assignedTo: "john.doe",
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -93,11 +93,11 @@ describe("update_issue", () => {
         status: "resolved",
         assignedTo: "me",
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -137,11 +137,11 @@ describe("update_issue", () => {
           status: undefined,
           assignedTo: undefined,
           issueUrl: undefined,
-          regionUrl: undefined,
+          regionUrl: null,
         },
         {
           constraints: {
-            organizationSlug: null,
+            organizationSlug: undefined,
           },
           accessToken: "access-token",
           userId: "1",
@@ -159,11 +159,11 @@ describe("update_issue", () => {
           status: "resolved",
           assignedTo: undefined,
           issueUrl: undefined,
-          regionUrl: undefined,
+          regionUrl: null,
         },
         {
           constraints: {
-            organizationSlug: null,
+            organizationSlug: undefined,
           },
           accessToken: "access-token",
           userId: "1",
@@ -183,11 +183,11 @@ describe("update_issue", () => {
           status: undefined,
           assignedTo: undefined,
           issueUrl: undefined,
-          regionUrl: undefined,
+          regionUrl: null,
         },
         {
           constraints: {
-            organizationSlug: null,
+            organizationSlug: undefined,
           },
           accessToken: "access-token",
           userId: "1",

@@ -6,9 +6,9 @@ describe("find_releases", () => {
     const result = await findReleases.handler(
       {
         organizationSlug: "sentry-mcp-evals",
-        projectSlug: undefined,
-        regionUrl: undefined,
-        query: undefined,
+        projectSlug: null,
+        regionUrl: null,
+        query: null,
       },
       {
         constraints: {
@@ -42,8 +42,8 @@ describe("find_releases", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
-        regionUrl: undefined,
-        query: undefined,
+        regionUrl: null,
+        query: null,
       },
       {
         constraints: {

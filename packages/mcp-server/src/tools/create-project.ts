@@ -43,7 +43,7 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
     teamSlug: ParamTeamSlug,
     name: z
       .string()
@@ -51,7 +51,7 @@ export default defineTool({
       .describe(
         "The name of the project to create. Typically this is commonly the name of the repository or service. It is only used as a visual label in Sentry.",
       ),
-    platform: ParamPlatform.optional(),
+    platform: ParamPlatform.nullable().default(null),
   },
   annotations: {
     readOnlyHint: false,

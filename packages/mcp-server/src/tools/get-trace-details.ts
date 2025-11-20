@@ -46,7 +46,7 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
     traceId: ParamTraceId,
   },
   annotations: {

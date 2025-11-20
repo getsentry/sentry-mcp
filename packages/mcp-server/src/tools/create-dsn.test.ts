@@ -8,7 +8,7 @@ describe("create_dsn", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
         name: "Default",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {

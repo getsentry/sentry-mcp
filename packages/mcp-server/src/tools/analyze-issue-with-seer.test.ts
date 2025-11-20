@@ -20,14 +20,14 @@ describe("analyze_issue_with_seer", () => {
     const result = await analyzeIssueWithSeer.handler(
       {
         organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        instruction: undefined,
         issueId: "CLOUDFLARE-MCP-45",
         issueUrl: undefined,
-        regionUrl: undefined,
-        instruction: undefined,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -61,11 +61,13 @@ describe("analyze_issue_with_seer", () => {
     const promise = analyzeIssueWithSeer.handler(
       {
         organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        instruction: undefined,
         issueId: "CLOUDFLARE-MCP-99",
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -105,11 +107,13 @@ describe("analyze_issue_with_seer", () => {
     const promise = analyzeIssueWithSeer.handler(
       {
         organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        instruction: undefined,
         issueId: "CLOUDFLARE-MCP-500",
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -159,11 +163,13 @@ describe("analyze_issue_with_seer", () => {
     const promise = analyzeIssueWithSeer.handler(
       {
         organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        instruction: undefined,
         issueId: "CLOUDFLARE-MCP-TIMEOUT",
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -210,11 +216,13 @@ describe("analyze_issue_with_seer", () => {
     const promise = analyzeIssueWithSeer.handler(
       {
         organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        instruction: undefined,
         issueId: "CLOUDFLARE-MCP-ERRORS",
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -271,12 +279,13 @@ describe("analyze_issue_with_seer", () => {
     const promise = analyzeIssueWithSeer.handler(
       {
         organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
         issueId: "CLOUDFLARE-MCP-NEW",
         instruction: "Focus on memory leaks",
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",

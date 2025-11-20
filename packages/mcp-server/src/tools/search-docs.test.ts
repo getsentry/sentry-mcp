@@ -10,7 +10,7 @@ describe("search_docs", () => {
       {
         query: "How do I configure rate limiting?",
         maxResults: 5,
-        guide: undefined,
+        guide: null,
       },
       {
         constraints: {
@@ -62,8 +62,8 @@ describe("search_docs", () => {
       searchDocs.handler(
         {
           query: "test query",
-          maxResults: undefined,
-          guide: undefined,
+          maxResults: 3,
+          guide: null,
         },
         {
           constraints: {
@@ -88,8 +88,8 @@ describe("search_docs", () => {
       searchDocs.handler(
         {
           query: "test query",
-          maxResults: undefined,
-          guide: undefined,
+          maxResults: 3,
+          guide: null,
         },
         {
           constraints: {

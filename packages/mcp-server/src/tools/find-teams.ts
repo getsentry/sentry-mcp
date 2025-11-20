@@ -27,8 +27,8 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.optional(),
-    query: ParamSearchQuery.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
+    query: ParamSearchQuery.nullable().default(null),
   },
   annotations: {
     readOnlyHint: true,

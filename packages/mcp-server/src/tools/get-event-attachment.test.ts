@@ -8,8 +8,8 @@ describe("get_event_attachment", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
         eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
-        attachmentId: undefined,
-        regionUrl: undefined,
+        attachmentId: null,
+        regionUrl: null,
       },
       {
         constraints: {
@@ -52,7 +52,7 @@ describe("get_event_attachment", () => {
         projectSlug: "cloudflare-mcp",
         eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
         attachmentId: "123",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
@@ -107,7 +107,7 @@ describe("get_event_attachment", () => {
           organizationSlug: "sentry-mcp-evals",
           projectSlug: "cloudflare-mcp",
           eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
-          attachmentId: undefined,
+          attachmentId: null,
           regionUrl: "https",
         },
         {

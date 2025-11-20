@@ -58,19 +58,27 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
     projectSlug: ParamProjectSlug,
-    name: z.string().trim().describe("The new name for the project").optional(),
+    name: z
+      .string()
+      .trim()
+      .describe("The new name for the project")
+      .nullable()
+      .default(null),
     slug: z
       .string()
       .toLowerCase()
       .trim()
       .describe("The new slug for the project (must be unique)")
-      .optional(),
-    platform: ParamPlatform.optional(),
-    teamSlug: ParamTeamSlug.optional().describe(
-      "The team to assign this project to. Note: this will replace the current team assignment.",
-    ),
+      .nullable()
+      .default(null),
+    platform: ParamPlatform.nullable().default(null),
+    teamSlug: ParamTeamSlug.nullable()
+      .default(null)
+      .describe(
+        "The team to assign this project to. Note: this will replace the current team assignment.",
+      ),
   },
   annotations: {
     readOnlyHint: false,

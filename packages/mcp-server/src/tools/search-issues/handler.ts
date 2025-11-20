@@ -60,9 +60,10 @@ export default defineTool({
       .toLowerCase()
       .trim()
       .superRefine(validateSlugOrId)
-      .optional()
+      .nullable()
+      .default(null)
       .describe("The project's slug or numeric ID (optional)"),
-    regionUrl: ParamRegionUrl.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
     limit: z
       .number()
       .min(1)

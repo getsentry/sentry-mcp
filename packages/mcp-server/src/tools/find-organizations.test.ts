@@ -4,7 +4,7 @@ import findOrganizations from "./find-organizations.js";
 describe("find_organizations", () => {
   it("serializes", async () => {
     const result = await findOrganizations.handler(
-      {},
+      { query: null },
       {
         constraints: {
           organizationSlug: null,
@@ -32,7 +32,7 @@ describe("find_organizations", () => {
 
   it("handles empty regionUrl parameter", async () => {
     const result = await findOrganizations.handler(
-      {},
+      { query: null },
       {
         constraints: {
           organizationSlug: null,
@@ -46,7 +46,7 @@ describe("find_organizations", () => {
 
   it("handles undefined regionUrl parameter", async () => {
     const result = await findOrganizations.handler(
-      {},
+      { query: null },
       {
         constraints: {
           organizationSlug: null,

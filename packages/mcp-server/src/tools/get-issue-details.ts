@@ -73,7 +73,7 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug.optional(),
-    regionUrl: ParamRegionUrl.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
     issueId: ParamIssueShortId.optional(),
     eventId: z.string().trim().describe("The ID of the event.").optional(),
     issueUrl: ParamIssueUrl.optional(),
