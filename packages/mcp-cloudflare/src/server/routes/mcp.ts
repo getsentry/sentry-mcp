@@ -1,11 +1,11 @@
 /**
  * Public MCP metadata endpoints under `/.mcp/*` for external documentation sites.
  *
- * Responds with pre-generated JSON payloads from @sentry/mcp-server.
+ * Responds with pre-generated JSON payloads from @sentry/mcp-core.
  * Adds permissive CORS for easy cross-origin consumption.
  */
 import { Hono } from "hono";
-import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
+import TOOL_DEFINITIONS from "@sentry/mcp-core/toolDefinitions";
 
 function withCors(json: unknown, status = 200) {
   const body = JSON.stringify(json);

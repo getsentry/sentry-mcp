@@ -17,16 +17,17 @@ The project is a pnpm monorepo with clear separation of concerns:
 
 ```
 packages/
-├── mcp-server/          # Core MCP server (npm package)
+├── mcp-core/            # Core MCP implementation (private package)
+├── mcp-server/           # stdio transport (published as @sentry/mcp-server)
 ├── mcp-cloudflare/      # Cloudflare Workers deployment
 ├── mcp-server-evals/    # Evaluation test suite
 ├── mcp-server-mocks/    # Shared mock data
 └── mcp-test-client/     # Interactive CLI client
 ```
 
-### packages/mcp-server
+### packages/mcp-core
 
-The core MCP implementation and npm-publishable package.
+The core MCP implementation. This is a **private package** shared between transports.
 
 **Structure:**
 
@@ -34,10 +35,9 @@ The core MCP implementation and npm-publishable package.
 src/
 ├── api-client/         # Sentry API client
 ├── internal/           # Utilities (not exposed)
-├── transports/         # Transport implementations
 ├── tools/              # Tool implementations
 ├── toolDefinitions.ts  # Tool schemas and metadata
-├── server.ts           # MCP server configuration
+├── server.ts           # buildServer() function
 ├── errors.ts           # Custom error types
 └── types.ts            # TypeScript definitions
 ```
@@ -48,6 +48,30 @@ src/
 - Provides tools for Sentry operations (issues, projects, etc.)
 - Handles authentication and API communication
 - Formats responses for LLM consumption
+
+**Note:** This package is **not published to npm**. It's a workspace-only package.
+
+### packages/mcp-server
+
+Published stdio transport package (as `@sentry/mcp-server`).
+
+**Structure:**
+
+```
+src/
+├── cli/                # CLI argument parsing
+├── transports/         # stdio transport
+└── index.ts            # Main entry point
+```
+
+**Key responsibilities:**
+
+- CLI entry point for the MCP server
+- stdio transport implementation
+- Bundles all mcp-core code at build time
+- Published to npm for end users
+
+**Build:** Uses tsdown to bundle mcp-core code, resulting in a self-contained package.
 
 ### packages/mcp-cloudflare
 
@@ -349,4 +373,5 @@ Three levels of testing:
 - MCP SDK: `@modelcontextprotocol/sdk`
 - Build config: `turbo.json`
 - TypeScript config: `packages/mcp-server-tsconfig/`
-- API client: `packages/mcp-server/src/api-client/`
+- API client: `packages/mcp-core/src/api-client/`
+- stdio package: `packages/mcp-server/`

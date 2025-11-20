@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { logInfo } from "@sentry/mcp-server/telem/logging";
+import { logInfo } from "@sentry/mcp-core/telem/logging";
 
 /**
  * Hono middleware that logs every request once the response is ready.

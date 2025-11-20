@@ -1,7 +1,7 @@
 import type { Env } from "./types";
-import { LIB_VERSION } from "@sentry/mcp-server/version";
+import { LIB_VERSION } from "@sentry/mcp-core/version";
 import * as Sentry from "@sentry/cloudflare";
-import { sentryBeforeSend } from "@sentry/mcp-server/telem/sentry";
+import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
 
 type SentryConfig = ReturnType<Parameters<typeof Sentry.withSentry>[0]>;
 

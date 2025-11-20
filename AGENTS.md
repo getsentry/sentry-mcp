@@ -29,13 +29,18 @@ pnpm run tsc && pnpm run lint && pnpm run test  # ALL must pass
 ```
 sentry-mcp/
 ├── packages/
-│   ├── mcp-server/          # Main MCP server
+│   ├── mcp-core/            # Core MCP implementation (private package)
 │   │   ├── src/
 │   │   │   ├── tools/       # 19 tool modules
-│   │   │   ├── server.ts    # MCP protocol
+│   │   │   ├── server.ts    # buildServer() function
 │   │   │   ├── api-client/  # Sentry API
 │   │   │   └── internal/    # Shared utils
 │   │   └── scripts/         # Build scripts
+│   ├── mcp-server/          # stdio transport (published as @sentry/mcp-server)
+│   │   └── src/
+│   │       ├── cli/         # CLI argument parsing
+│   │       ├── transports/  # stdio transport
+│   │       └── index.ts     # Main entry point
 │   ├── mcp-cloudflare/      # Web app
 │   ├── mcp-server-evals/    # AI tests
 │   ├── mcp-server-mocks/    # MSW mocks
@@ -45,13 +50,13 @@ sentry-mcp/
 
 ## AI-Powered Search Tools
 
-**search_events** (`packages/mcp-server/src/tools/search-events/`):
+**search_events** (`packages/mcp-core/src/tools/search-events/`):
 - Natural language → DiscoverQL queries
 - GPT-4o agent with structured outputs
 - Tools: `datasetAttributes`, `otelSemantics`, `whoami`
 - Requires: `OPENAI_API_KEY`
 
-**search_issues** (`packages/mcp-server/src/tools/search-issues/`):
+**search_issues** (`packages/mcp-core/src/tools/search-issues/`):
 - Natural language → issue search syntax
 - GPT-4o agent with structured outputs
 - Tools: `issueFields`, `whoami`

@@ -21,8 +21,8 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as Sentry from "@sentry/node";
-import { LIB_VERSION } from "../version";
-import type { ServerContext } from "../types";
+import { LIB_VERSION } from "@sentry/mcp-core/version";
+import type { ServerContext } from "@sentry/mcp-core/types";
 
 /**
  * Starts the MCP server with stdio transport and telemetry.

@@ -163,13 +163,18 @@ See specific guides for required environment variables:
 ```
 sentry-mcp/
 ├── packages/
-│   ├── mcp-server/           # Main MCP server (tools)
+│   ├── mcp-core/             # Core MCP implementation (private package)
 │   │   ├── src/
 │   │   │   ├── tools/        # 19 individual tool modules + utils
-│   │   │   ├── server.ts     # MCP server configuration
+│   │   │   ├── server.ts     # buildServer() function
 │   │   │   ├── api-client/   # Sentry API client
 │   │   │   └── internal/     # Shared utilities
 │   │   └── scripts/          # Build scripts (tool definitions generation)
+│   ├── mcp-server/            # stdio transport (published as @sentry/mcp-server)
+│   │   └── src/
+│   │       ├── cli/          # CLI argument parsing
+│   │       ├── transports/   # stdio transport
+│   │       └── index.ts      # Main entry point
 │   ├── mcp-cloudflare/       # Cloudflare Worker chat application
 │   │   ├── src/
 │   │   │   ├── client/       # React frontend
@@ -188,7 +193,7 @@ sentry-mcp/
 
 When making changes, consider these component interactions:
 
-### MCP Server (`packages/mcp-server/`)
+### MCP Server (`packages/mcp-core/`)
 - **Tools** (19 modules): Query, create, update Sentry resources
 - **API Client**: Sentry API integration layer
 - **Server**: MCP protocol handler and error formatting

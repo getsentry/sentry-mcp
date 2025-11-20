@@ -1,0 +1,141 @@
+{
+  "name": "@sentry/mcp-core",
+  "version": "0.22.0",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@10.8.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "FSL-1.1-ALv2",
+  "author": "Sentry",
+  "description": "Sentry MCP Core - Shared code for MCP transports",
+  "homepage": "https://github.com/getsentry/sentry-mcp",
+  "keywords": ["sentry"],
+  "bugs": {
+    "url": "https://github.com/getsentry/sentry-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:getsentry/sentry-mcp.git"
+  },
+  "files": ["./dist/*"],
+  "exports": {
+    "./api-client": {
+      "types": "./dist/api-client/index.ts",
+      "default": "./dist/api-client/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants.ts",
+      "default": "./dist/constants.js"
+    },
+    "./telem": {
+      "types": "./dist/telem/index.ts",
+      "default": "./dist/telem/index.js"
+    },
+    "./telem/logging": {
+      "types": "./dist/telem/logging.ts",
+      "default": "./dist/telem/logging.js"
+    },
+    "./telem/sentry": {
+      "types": "./dist/telem/sentry.ts",
+      "default": "./dist/telem/sentry.js"
+    },
+    "./permissions": {
+      "types": "./dist/permissions.ts",
+      "default": "./dist/permissions.js"
+    },
+    "./skills": {
+      "types": "./dist/skills.ts",
+      "default": "./dist/skills.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.ts",
+      "default": "./dist/tools/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.ts",
+      "default": "./dist/server.js"
+    },
+    "./toolDefinitions": {
+      "types": "./dist/toolDefinitions.ts",
+      "default": "./dist/toolDefinitions.js"
+    },
+    "./skillDefinitions": {
+      "types": "./dist/skillDefinitions.ts",
+      "default": "./dist/skillDefinitions.js"
+    },
+    "./types": {
+      "types": "./dist/types.ts",
+      "default": "./dist/types.js"
+    },
+    "./version": {
+      "types": "./dist/version.ts",
+      "default": "./dist/version.js"
+    },
+    "./tools/search-events": {
+      "types": "./dist/tools/search-events/index.ts",
+      "default": "./dist/tools/search-events/index.js"
+    },
+    "./tools/search-issues": {
+      "types": "./dist/tools/search-issues/index.ts",
+      "default": "./dist/tools/search-issues/index.js"
+    },
+    "./tools/search-events/agent": {
+      "types": "./dist/tools/search-events/agent.ts",
+      "default": "./dist/tools/search-events/agent.js"
+    },
+    "./tools/search-issues/agent": {
+      "types": "./dist/tools/search-issues/agent.ts",
+      "default": "./dist/tools/search-issues/agent.js"
+    },
+    "./tools/agent-tools": {
+      "types": "./dist/tools/agent-tools.ts",
+      "default": "./dist/tools/agent-tools.js"
+    },
+    "./internal/agents/callEmbeddedAgent": {
+      "types": "./dist/internal/agents/callEmbeddedAgent.ts",
+      "default": "./dist/internal/agents/callEmbeddedAgent.js"
+    },
+    "./internal/agents/openai-provider": {
+      "types": "./dist/internal/agents/openai-provider.ts",
+      "default": "./dist/internal/agents/openai-provider.js"
+    },
+    "./utils/url-utils": {
+      "types": "./dist/utils/url-utils.ts",
+      "default": "./dist/utils/url-utils.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "pnpm run generate-definitions",
+    "build": "tsdown",
+    "pretest": "pnpm run generate-definitions",
+    "test": "vitest run",
+    "test:ci": "pnpm run generate-definitions && vitest run --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "pnpm run generate-definitions && vitest",
+    "tsc": "tsc --noEmit",
+    "generate-definitions": "tsx scripts/generate-definitions.ts",
+    "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts",
+    "measure-tokens": "tsx scripts/measure-token-cost.ts",
+    "validate-skills": "tsx scripts/validate-skills-mapping.ts"
+  },
+  "devDependencies": {
+    "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "msw": "catalog:",
+    "tiktoken": "^1.0.18",
+    "yaml": "^2.6.1",
+    "zod-to-json-schema": "catalog:"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "catalog:",
+    "@logtape/logtape": "^1.1.1",
+    "@logtape/sentry": "^1.1.1",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@sentry/core": "catalog:",
+    "@sentry/node": "catalog:",
+    "ai": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  }
+}

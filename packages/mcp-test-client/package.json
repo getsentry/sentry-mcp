@@ -20,7 +20,7 @@
     "@ai-sdk/openai": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@sentry/core": "catalog:",
-    "@sentry/mcp-server": "workspace:*",
+    "@sentry/mcp-core": "workspace:*",
     "@sentry/node": "catalog:",
     "ai": "catalog:",
     "chalk": "catalog:",

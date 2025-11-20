@@ -5,7 +5,7 @@ import { experimental_createMCPClient } from "ai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
 import type { Env } from "../types";
-import { logInfo, logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
+import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import type {
   ErrorResponse,
   ChatRequest,

@@ -3,14 +3,14 @@ import {
   parseScopes,
   resolveScopes,
   type Scope,
-} from "../permissions";
-import { parseSkills, SKILLS, type Skill } from "../skills";
-import { DEFAULT_SCOPES } from "../constants";
+} from "@sentry/mcp-core/permissions";
+import { parseSkills, SKILLS, type Skill } from "@sentry/mcp-core/skills";
+import { DEFAULT_SCOPES } from "@sentry/mcp-core/constants";
 import {
   validateAndParseSentryUrlThrows,
   validateOpenAiBaseUrlThrows,
   validateSentryHostThrows,
-} from "../utils/url-utils";
+} from "@sentry/mcp-core/utils/url-utils";
 import type { MergedArgs, ResolvedConfig } from "./types";
 
 export function formatInvalid(invalid: string[], envName?: string): string {

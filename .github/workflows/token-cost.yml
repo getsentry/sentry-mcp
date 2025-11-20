@@ -48,7 +48,7 @@ jobs:
 
       - name: Measure token cost
         id: measure
-        working-directory: packages/mcp-server
+        working-directory: packages/mcp-core
         run: |
           # Run token counter with JSON output to file
           pnpm run measure-tokens -- -o token-stats.json
@@ -65,7 +65,7 @@ jobs:
 
       - name: Generate detailed report
         id: report
-        working-directory: packages/mcp-server
+        working-directory: packages/mcp-core
         run: |
           # Build markdown table from JSON
           cat > token-report.md <<REPORT_EOF
@@ -113,7 +113,7 @@ jobs:
       - name: Compare with main branch
         id: compare
         if: github.event_name == 'pull_request'
-        working-directory: packages/mcp-server
+        working-directory: packages/mcp-core
         run: |
           # Check if we got main's stats
           if [ -f ../../main-stats/token-stats.json ]; then
@@ -141,7 +141,7 @@ jobs:
 
       - name: Add comparison to report
         if: github.event_name == 'pull_request' && steps.compare.outputs.has_comparison == 'true'
-        working-directory: packages/mcp-server
+        working-directory: packages/mcp-core
         run: |
           # Add comparison section at the top of the report
           cat > comparison-header.md <<COMPARISON_EOF
@@ -222,7 +222,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const report = fs.readFileSync('packages/mcp-server/token-report.md', 'utf8');
+            const report = fs.readFileSync('packages/mcp-core/token-report.md', 'utf8');
 
             // Find existing comment
             const comments = await github.rest.issues.listComments({
@@ -258,5 +258,5 @@ jobs:
         if: always()
         with:
           name: token-stats-${{ github.sha }}
-          path: packages/mcp-server/token-stats.json
+          path: packages/mcp-core/token-stats.json
           retention-days: 90

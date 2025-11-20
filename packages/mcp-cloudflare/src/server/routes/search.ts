@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { logIssue } from "@sentry/mcp-server/telem/logging";
-import { SENTRY_GUIDES } from "@sentry/mcp-server/constants";
+import { logIssue } from "@sentry/mcp-core/telem/logging";
+import { SENTRY_GUIDES } from "@sentry/mcp-core/constants";
 import { z } from "zod";
 import type { RateLimitResult } from "../types/chat";
 import type {

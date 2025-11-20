@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { finalize } from "./resolve";
-import { ALL_SCOPES } from "../permissions";
+import { ALL_SCOPES } from "@sentry/mcp-core/permissions";
 
 describe("cli/finalize", () => {
   it("throws on missing access token", () => {
