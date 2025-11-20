@@ -107,8 +107,60 @@ async function generateSkillDefinitions() {
 
   const skills = await getSkillsArrayWithCounts();
 
+  // Get tools to build tool arrays for each skill
+  const toolsDefault = toolsModule.default as
+    | Record<string, unknown>
+    | undefined;
+  if (!toolsDefault || typeof toolsDefault !== "object") {
+    throw new Error("Failed to import tools from src/tools/index.ts");
+  }
+
+  // Build tools array for each skill
+  const skillsWithTools = skills.map((skill) => {
+    const skillTools: Array<{
+      name: string;
+      description: string;
+      requiredScopes: string[];
+    }> = [];
+
+    for (const [toolName, tool] of Object.entries(toolsDefault)) {
+      if (!tool || typeof tool !== "object") {
+        continue;
+      }
+
+      const t = tool as {
+        name: string;
+        description: string;
+        requiredSkills: string[];
+        requiredScopes: string[];
+      };
+
+      // Check if this tool is enabled by this skill
+      if (
+        Array.isArray(t.requiredSkills) &&
+        t.requiredSkills.includes(skill.id)
+      ) {
+        skillTools.push({
+          name: t.name,
+          description: t.description,
+          requiredScopes: Array.isArray(t.requiredScopes)
+            ? t.requiredScopes
+            : [],
+        });
+      }
+    }
+
+    // Sort tools alphabetically by name
+    skillTools.sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      ...skill,
+      tools: skillTools,
+    };
+  });
+
   // Return sorted by order (already sorted but being explicit)
-  return skills.sort((a, b) => a.order - b.order);
+  return skillsWithTools.sort((a, b) => a.order - b.order);
 }
 
 function isUpToDate(outDir: string): boolean {

@@ -1,4 +1,4 @@
-import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
+import SKILL_DEFINITIONS from "@sentry/mcp-server/skillDefinitions";
 import { Link } from "../components/ui/base";
 import {
   Accordion,
@@ -11,7 +11,6 @@ import { Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
 import Section from "../components/ui/section";
 import { Prose } from "../components/ui/prose";
-import JsonSchemaParams from "../components/ui/json-schema-params";
 
 interface HomeProps {
   onChatClick: () => void;
@@ -94,44 +93,69 @@ export default function Home({ onChatClick }: HomeProps) {
             organization, otherwise you should mention it in the prompt.
           </Note>
           <Accordion type="single" collapsible className="w-full space-y-1">
-            {TOOL_DEFINITIONS.sort((a, b) => a.name.localeCompare(b.name)).map(
-              (tool) => (
-                <AccordionItem value={tool.name} key={tool.name}>
-                  <AccordionTrigger className="text-base text-white hover:text-violet-300 cursor-pointer font-mono font-semibold">
-                    {tool.name}
-                  </AccordionTrigger>
-                  <AccordionContent className="py-4">
-                    <Prose>
-                      <p className="mb-0">{tool.description.split("\n")[0]}</p>
-                    </Prose>
-                    <div className="mt-4 space-y-4">
-                      {/* Authorization / Scopes */}
-                      <section className="rounded-md border border-slate-700/60 bg-black/30 p-3">
-                        <div className="text-xs uppercase tracking-wide text-slate-300/80 mb-2">
-                          Authorization
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {tool.requiredScopes &&
-                          tool.requiredScopes.length > 0 ? (
-                            tool.requiredScopes.map((s) => (
-                              <span
-                                key={s}
-                                className="inline-flex items-center rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-xs font-mono text-violet-200"
-                              >
-                                {s}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-sm text-slate-400">None</span>
-                          )}
-                        </div>
-                      </section>
-                      <JsonSchemaParams schema={tool.inputSchema as unknown} />
+            {SKILL_DEFINITIONS.map((skill) => (
+              <AccordionItem value={skill.id} key={skill.id}>
+                <AccordionTrigger className="text-base text-white hover:text-violet-300 hover:no-underline cursor-pointer">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <span>{skill.name}</span>
+                    {skill.tools && skill.tools.length > 0 && (
+                      <span className="text-sm text-slate-400 font-normal">
+                        {skill.tools.length}{" "}
+                        {skill.tools.length === 1 ? "tool" : "tools"}
+                      </span>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="py-4">
+                  <Prose>
+                    <p className="mb-4">{skill.description}</p>
+                  </Prose>
+                  {skill.tools && skill.tools.length > 0 && (
+                    <div className="mt-6 space-y-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <h4 className="text-base font-semibold text-slate-200">
+                          Included Tools
+                        </h4>
+                        <span className="text-sm text-slate-400">
+                          ({skill.tools.length}{" "}
+                          {skill.tools.length === 1 ? "tool" : "tools"})
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {skill.tools.map((tool) => (
+                          <div
+                            key={tool.name}
+                            className="rounded-md border border-slate-700/60 bg-black/30 p-4 hover:border-slate-600/60 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                              <code className="text-base font-mono font-semibold text-violet-300">
+                                {tool.name}
+                              </code>
+                              {tool.requiredScopes &&
+                                tool.requiredScopes.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {tool.requiredScopes.map((scope) => (
+                                      <span
+                                        key={scope}
+                                        className="inline-flex items-center rounded-full border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-xs font-mono text-violet-200"
+                                      >
+                                        {scope}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                            </div>
+                            <p className="text-sm text-slate-300">
+                              {tool.description.split("\n")[0]}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ),
-            )}
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
           </Accordion>
         </Section>
 

@@ -12,7 +12,7 @@ export default defineTool({
   description: [
     "Create a new team in Sentry.",
     "",
-    "🔍 USE THIS TOOL WHEN USERS WANT TO:",
+    "USE THIS TOOL WHEN USERS WANT TO:",
     "- 'Create a new team'",
     "- 'Set up a team called [X]'",
     "- 'I need a team for my project'",

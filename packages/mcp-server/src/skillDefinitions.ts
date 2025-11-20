@@ -8,6 +8,11 @@ export interface SkillDefinition {
   defaultEnabled: boolean;
   order: number;
   toolCount?: number;
+  tools?: Array<{
+    name: string;
+    description: string;
+    requiredScopes: string[];
+  }>;
 }
 
 const skillDefinitions = skillDefinitionsData as SkillDefinition[];
