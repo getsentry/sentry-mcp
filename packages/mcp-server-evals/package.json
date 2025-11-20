@@ -12,7 +12,7 @@
     "dev": "tsc -w",
     "start": "tsx src/bin/start-mock-stdio.ts",
     "eval": "vitest --config=vitest.config.ts",
-    "eval:ci": "vitest run --coverage --reporter=vitest-evals/reporter --reporter=junit --outputFile=eval.junit.xml"
+    "eval:ci": "vitest run --coverage --reporter=vitest-evals/reporter --reporter=junit --reporter=json --outputFile.json=eval-results.json --outputFile.junit=eval.junit.xml"
   },
   "dependencies": {
     "@ai-sdk/openai": "catalog:",

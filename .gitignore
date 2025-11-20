@@ -65,3 +65,4 @@ coverage
 # Generated files
 packages/mcp-server/src/toolDefinitions.json
 packages/mcp-server/src/skillDefinitions.json
+packages/mcp-server-evals/eval-results.json
