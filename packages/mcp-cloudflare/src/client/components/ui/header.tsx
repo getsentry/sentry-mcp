@@ -17,13 +17,13 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 flex-shrink-0">
           <SentryIcon className="h-8 w-8" />
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold whitespace-nowrap">
               Sentry MCP
             </h1>
             <Badge
               variant="outline"
-              className="text-xs border border-violet-300/50 bg-background-3 font-normal"
+              className="text-xs bg-background-3 font-normal"
             >
               Beta
             </Badge>
