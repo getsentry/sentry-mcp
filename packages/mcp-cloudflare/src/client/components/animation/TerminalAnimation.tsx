@@ -162,12 +162,6 @@ export default function TerminalAnimation() {
         handleMarkerReached(index);
       }
     });
-    player.addEventListener("ended", () => {
-      console.log("player ended", {
-        currentTime: player.getCurrentTime?.(),
-        duration: player.getDuration?.(),
-      });
-    });
   }, [handleMarkerReached]);
 
   const gotoStep = useCallback(
