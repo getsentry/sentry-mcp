@@ -1019,18 +1019,21 @@ export class SentryApiService {
       organizationSlug: string;
       teamSlug: string;
       name: string;
-      platform?: string;
+      platform?: string | null;
     },
     opts?: RequestOptions,
   ): Promise<Project> {
+    const createData: Record<string, any> = { name };
+    // Only include platform if it has a meaningful value (not null, undefined, or empty)
+    if (platform) {
+      createData.platform = platform;
+    }
+
     const body = await this.requestJSON(
       `/teams/${organizationSlug}/${teamSlug}/projects/`,
       {
         method: "POST",
-        body: JSON.stringify({
-          name,
-          platform,
-        }),
+        body: JSON.stringify(createData),
       },
       opts,
     );
@@ -1059,16 +1062,17 @@ export class SentryApiService {
     }: {
       organizationSlug: string;
       projectSlug: string;
-      name?: string;
-      slug?: string;
-      platform?: string;
+      name?: string | null;
+      slug?: string | null;
+      platform?: string | null;
     },
     opts?: RequestOptions,
   ): Promise<Project> {
     const updateData: Record<string, any> = {};
-    if (name !== undefined) updateData.name = name;
-    if (slug !== undefined) updateData.slug = slug;
-    if (platform !== undefined) updateData.platform = platform;
+    // Only include fields that have meaningful values (truthy strings)
+    if (name) updateData.name = name;
+    if (slug) updateData.slug = slug;
+    if (platform) updateData.platform = platform;
 
     const body = await this.requestJSON(
       `/projects/${organizationSlug}/${projectSlug}/`,

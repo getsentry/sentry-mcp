@@ -7,7 +7,7 @@ describe("create_team", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         name: "the-goats",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {

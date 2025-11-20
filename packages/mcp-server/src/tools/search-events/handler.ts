@@ -66,8 +66,8 @@ export default defineTool({
       .trim()
       .min(1)
       .describe("Natural language description of what you want to search for"),
-    projectSlug: ParamProjectSlug.optional(),
-    regionUrl: ParamRegionUrl.optional(),
+    projectSlug: ParamProjectSlug.nullable().default(null),
+    regionUrl: ParamRegionUrl.nullable().default(null),
     limit: z
       .number()
       .min(1)

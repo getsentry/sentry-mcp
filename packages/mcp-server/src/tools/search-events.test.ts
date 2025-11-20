@@ -111,6 +111,8 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
         naturalLanguageQuery: "database queries",
         limit: 10,
         includeExplanation: false,
@@ -118,6 +120,8 @@ describe("search_events", () => {
       {
         constraints: {
           organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
         },
         accessToken: "test-token",
         userId: "1",
@@ -165,6 +169,8 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
         naturalLanguageQuery: "database errors",
         limit: 10,
         includeExplanation: false,
@@ -172,6 +178,8 @@ describe("search_events", () => {
       {
         constraints: {
           organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
         },
         accessToken: "test-token",
         userId: "1",
@@ -217,6 +225,8 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
         naturalLanguageQuery: "error logs",
         limit: 10,
         includeExplanation: false,
@@ -224,6 +234,8 @@ describe("search_events", () => {
       {
         constraints: {
           organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
         },
         accessToken: "test-token",
         userId: "1",
@@ -244,6 +256,8 @@ describe("search_events", () => {
     const promise = searchEvents.handler(
       {
         organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
         naturalLanguageQuery: "some impossible query !@#$%",
         limit: 10,
         includeExplanation: false,
@@ -251,6 +265,8 @@ describe("search_events", () => {
       {
         constraints: {
           organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
         },
         accessToken: "test-token",
         userId: "1",
@@ -275,6 +291,8 @@ describe("search_events", () => {
     const promise = searchEvents.handler(
       {
         organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
         naturalLanguageQuery: "show me errors over time",
         limit: 10,
         includeExplanation: false,
@@ -282,6 +300,8 @@ describe("search_events", () => {
       {
         constraints: {
           organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
         },
         accessToken: "test-token",
         userId: "1",
@@ -317,6 +337,8 @@ describe("search_events", () => {
       searchEvents.handler(
         {
           organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
           naturalLanguageQuery: "any query",
           limit: 10,
           includeExplanation: false,
@@ -324,6 +346,8 @@ describe("search_events", () => {
         {
           constraints: {
             organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
           },
           accessToken: "test-token",
           userId: "1",
@@ -352,6 +376,8 @@ describe("search_events", () => {
       searchEvents.handler(
         {
           organizationSlug: "test-org",
+          regionUrl: null,
+          projectSlug: null,
           naturalLanguageQuery: "any query",
           limit: 10,
           includeExplanation: false,
@@ -359,6 +385,8 @@ describe("search_events", () => {
         {
           constraints: {
             organizationSlug: null,
+            regionUrl: null,
+            projectSlug: null,
           },
           accessToken: "test-token",
           userId: "1",
@@ -405,6 +433,8 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
         naturalLanguageQuery: "recent errors",
         limit: 10,
         includeExplanation: false,
@@ -412,6 +442,8 @@ describe("search_events", () => {
       {
         constraints: {
           organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
         },
         accessToken: "test-token",
         userId: "1",
@@ -474,6 +506,8 @@ describe("search_events", () => {
     const result = await searchEvents.handler(
       {
         organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
         naturalLanguageQuery:
           "which user agents have the most tool calls yesterday",
         limit: 10,
@@ -482,6 +516,8 @@ describe("search_events", () => {
       {
         constraints: {
           organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
         },
         accessToken: "test-token",
         userId: "1",

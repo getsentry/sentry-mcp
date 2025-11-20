@@ -6,7 +6,8 @@ describe("find_teams", () => {
     const result = await findTeams.handler(
       {
         organizationSlug: "sentry-mcp-evals",
-        regionUrl: undefined,
+        query: null,
+        regionUrl: null,
       },
       {
         constraints: {

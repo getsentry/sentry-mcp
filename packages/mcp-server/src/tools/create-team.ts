@@ -32,7 +32,7 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
     name: z.string().trim().describe("The name of the team to create."),
   },
   annotations: {

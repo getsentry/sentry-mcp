@@ -7,7 +7,7 @@ describe("find_dsns", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {

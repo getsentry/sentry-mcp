@@ -8,10 +8,10 @@ describe("update_project", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
         name: "New Project Name",
-        slug: undefined,
+        slug: null,
         platform: "python",
-        teamSlug: undefined,
-        regionUrl: undefined,
+        teamSlug: null,
+        regionUrl: null,
       },
       {
         constraints: {
@@ -45,11 +45,11 @@ describe("update_project", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
-        name: undefined,
-        slug: undefined,
-        platform: undefined,
+        name: null,
+        slug: null,
+        platform: null,
         teamSlug: "backend-team",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {

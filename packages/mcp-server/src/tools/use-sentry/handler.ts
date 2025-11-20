@@ -77,7 +77,8 @@ export default defineTool({
       ),
     trace: z
       .boolean()
-      .optional()
+      .nullable()
+      .default(null)
       .describe(
         "Enable tracing to see all tool calls made by the agent. Useful for debugging.",
       ),

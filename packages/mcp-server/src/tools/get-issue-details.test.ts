@@ -16,7 +16,7 @@ import getIssueDetails from "./get-issue-details.js";
 
 const baseContext = {
   constraints: {
-    organizationSlug: null,
+    organizationSlug: undefined,
   },
   accessToken: "access-token",
   userId: "1",
@@ -166,11 +166,11 @@ describe("get_issue_details", () => {
         issueId: "CLOUDFLARE-MCP-41",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -261,11 +261,11 @@ describe("get_issue_details", () => {
         issueId: undefined,
         eventId: undefined,
         issueUrl: "https://sentry-mcp-evals.sentry.io/issues/6507376925",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -397,7 +397,7 @@ describe("get_issue_details", () => {
         issueId: "PERF-N1-001",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       baseContext,
     );
@@ -487,7 +487,7 @@ describe("get_issue_details", () => {
         issueId: "PERF-N1-001",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       baseContext,
     );
@@ -537,11 +537,11 @@ describe("get_issue_details", () => {
         issueId: undefined,
         issueUrl: undefined,
         eventId: "7ca573c0f4814912aaa9bdc77d1a7d51",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -637,7 +637,7 @@ describe("get_issue_details", () => {
         },
         {
           constraints: {
-            organizationSlug: null,
+            organizationSlug: undefined,
           },
           accessToken: "access-token",
           userId: "1",
@@ -674,11 +674,11 @@ describe("get_issue_details", () => {
           issueId: "NONEXISTENT-ISSUE-123",
           eventId: undefined,
           issueUrl: undefined,
-          regionUrl: undefined,
+          regionUrl: null,
         },
         {
           constraints: {
-            organizationSlug: null,
+            organizationSlug: undefined,
           },
           accessToken: "access-token",
           userId: "1",
@@ -705,11 +705,11 @@ describe("get_issue_details", () => {
         issueId: "CLOUDFLARE-MCP-41",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -782,11 +782,11 @@ describe("get_issue_details", () => {
         issueId: "CLOUDFLARE-MCP-41",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -829,11 +829,11 @@ describe("get_issue_details", () => {
         issueId: "CLOUDFLARE-MCP-41",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -891,11 +891,11 @@ describe("get_issue_details", () => {
         issueId: "CLOUDFLARE-MCP-41",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -957,11 +957,11 @@ describe("get_issue_details", () => {
         issueId: "DEFAULT-001",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -1000,7 +1000,7 @@ describe("get_issue_details", () => {
         issueId: "BLOG-CSP-4XC",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       baseContext,
     );
@@ -1096,11 +1096,11 @@ describe("get_issue_details", () => {
         issueId: "CONTEXT-001",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
-          organizationSlug: null,
+          organizationSlug: undefined,
         },
         accessToken: "access-token",
         userId: "1",
@@ -1151,7 +1151,7 @@ describe("get_issue_details", () => {
         issueId: "MCP-SERVER-EQE",
         eventId: undefined,
         issueUrl: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       baseContext,
     );
@@ -1229,7 +1229,7 @@ describe("get_issue_details", () => {
         issueId: "FUTURE-TYPE-001",
         issueUrl: undefined,
         eventId: undefined,
-        regionUrl: undefined,
+        regionUrl: null,
       },
       baseContext,
     );

@@ -21,7 +21,7 @@ export default defineTool({
     `Returns up to ${RESULT_LIMIT} results. If you hit this limit, use the query parameter to narrow down results.`,
   ].join("\n"),
   inputSchema: {
-    query: ParamSearchQuery.optional(),
+    query: ParamSearchQuery.nullable().default(null),
   },
   annotations: {
     readOnlyHint: true,

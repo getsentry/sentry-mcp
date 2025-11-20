@@ -54,9 +54,8 @@ export default defineTool({
       .min(1)
       .max(10)
       .default(3)
-      .describe("Maximum number of results to return (1-10)")
-      .optional(),
-    guide: ParamSentryGuide.optional(),
+      .describe("Maximum number of results to return (1-10)"),
+    guide: ParamSentryGuide.nullable().default(null),
   },
   annotations: {
     readOnlyHint: true,

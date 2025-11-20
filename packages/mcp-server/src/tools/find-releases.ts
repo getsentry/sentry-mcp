@@ -41,13 +41,14 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
-    regionUrl: ParamRegionUrl.optional(),
-    projectSlug: ParamProjectSlugOrAll.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
+    projectSlug: ParamProjectSlugOrAll.nullable().default(null),
     query: z
       .string()
       .trim()
       .describe("Search for versions which contain the provided string.")
-      .optional(),
+      .nullable()
+      .default(null),
   },
   annotations: {
     readOnlyHint: true,

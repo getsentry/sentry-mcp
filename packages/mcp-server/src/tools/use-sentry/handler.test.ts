@@ -59,7 +59,7 @@ describe("use_sentry handler", () => {
     });
 
     const result = await useSentry.handler(
-      { request: "Show me unresolved issues" },
+      { request: "Show me unresolved issues", trace: null },
       mockContext,
     );
 
@@ -89,7 +89,10 @@ describe("use_sentry handler", () => {
       toolCalls: [],
     });
 
-    await useSentry.handler({ request: "test request" }, mockContext);
+    await useSentry.handler(
+      { request: "test request", trace: null },
+      mockContext,
+    );
 
     // Verify tools were provided to agent
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
@@ -111,7 +114,7 @@ describe("use_sentry handler", () => {
       toolCalls: [],
     });
 
-    await useSentry.handler({ request: "test" }, mockContext);
+    await useSentry.handler({ request: "test", trace: null }, mockContext);
 
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
     const toolNames = Object.keys(toolsArg);
@@ -139,7 +142,7 @@ describe("use_sentry handler", () => {
     });
 
     await useSentry.handler(
-      { request: "test with org constraint" },
+      { request: "test with org constraint", trace: null },
       orgConstrainedContext,
     );
 
@@ -171,7 +174,7 @@ describe("use_sentry handler", () => {
     });
 
     await useSentry.handler(
-      { request: "test with both constraints" },
+      { request: "test with both constraints", trace: null },
       fullyConstrainedContext,
     );
 

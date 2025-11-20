@@ -52,8 +52,8 @@ export default defineTool({
     organizationSlug: ParamOrganizationSlug,
     projectSlug: ParamProjectSlug,
     eventId: ParamEventId,
-    attachmentId: ParamAttachmentId.optional(),
-    regionUrl: ParamRegionUrl.optional(),
+    attachmentId: ParamAttachmentId.nullable().default(null),
+    regionUrl: ParamRegionUrl.nullable().default(null),
   },
   annotations: {
     readOnlyHint: true,

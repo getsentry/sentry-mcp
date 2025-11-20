@@ -7,7 +7,8 @@ describe("find_projects", () => {
     const result = await findProjects.handler(
       {
         organizationSlug: "sentry-mcp-evals",
-        regionUrl: undefined,
+        regionUrl: null,
+        query: null,
       },
       getServerContext(),
     );

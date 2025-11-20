@@ -15,7 +15,7 @@ describe("get_trace_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
@@ -73,7 +73,7 @@ describe("get_trace_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
@@ -105,7 +105,7 @@ describe("get_trace_details", () => {
         {
           organizationSlug: "sentry",
           traceId: "nonexistent",
-          regionUrl: undefined,
+          regionUrl: null,
         },
         {
           constraints: {
@@ -124,7 +124,7 @@ describe("get_trace_details", () => {
         {
           organizationSlug: "sentry-mcp-evals",
           traceId: "invalid-trace-id", // Too short, not hex
-          regionUrl: undefined,
+          regionUrl: null,
         },
         {
           constraints: {
@@ -164,7 +164,7 @@ describe("get_trace_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
@@ -200,7 +200,7 @@ describe("get_trace_details", () => {
         {
           organizationSlug: "sentry-mcp-evals",
           traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-          regionUrl: undefined,
+          regionUrl: null,
         },
         {
           constraints: {
@@ -270,7 +270,7 @@ describe("get_trace_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {
@@ -319,7 +319,7 @@ describe("get_trace_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         traceId: "b4d1aae7216b47ff8117cf4e09ce9d0b",
-        regionUrl: undefined,
+        regionUrl: null,
       },
       {
         constraints: {

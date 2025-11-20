@@ -70,7 +70,7 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug.optional(),
-    regionUrl: ParamRegionUrl.optional(),
+    regionUrl: ParamRegionUrl.nullable().default(null),
     issueId: ParamIssueShortId.optional(),
     issueUrl: ParamIssueUrl.optional(),
     instruction: z
