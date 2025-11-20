@@ -49,11 +49,13 @@ export const ApiErrorSchema = z
   })
   .passthrough();
 
-export const UserSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  name: z.string().nullable(),
-  email: z.string(),
-});
+export const UserSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string().nullable(),
+    email: z.string(),
+  })
+  .passthrough();
 
 export const UserRegionsSchema = z.object({
   regions: z.array(
@@ -71,55 +73,63 @@ export const UserRegionsSchema = z.object({
  * The links object and regionUrl field are optional to support self-hosted Sentry
  * instances that may not include these fields or return empty values.
  */
-export const OrganizationSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  slug: z.string(),
-  name: z.string(),
-  links: z
-    .object({
-      regionUrl: z
-        .string()
-        .refine(
-          (value) => !value || z.string().url().safeParse(value).success,
-          {
-            message:
-              "Must be a valid URL or empty string (for self-hosted Sentry)",
-          },
-        )
-        .optional(),
-      organizationUrl: z.string().url(),
-    })
-    .optional(),
-});
+export const OrganizationSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    slug: z.string(),
+    name: z.string(),
+    links: z
+      .object({
+        regionUrl: z
+          .string()
+          .refine(
+            (value) => !value || z.string().url().safeParse(value).success,
+            {
+              message:
+                "Must be a valid URL or empty string (for self-hosted Sentry)",
+            },
+          )
+          .optional(),
+        organizationUrl: z.string().url(),
+      })
+      .optional(),
+  })
+  .passthrough();
 
 export const OrganizationListSchema = z.array(OrganizationSchema);
 
-export const TeamSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  slug: z.string(),
-  name: z.string(),
-});
+export const TeamSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    slug: z.string(),
+    name: z.string(),
+  })
+  .passthrough();
 
 export const TeamListSchema = z.array(TeamSchema);
 
-export const ProjectSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  slug: z.string(),
-  name: z.string(),
-  platform: z.string().nullable().optional(),
-});
+export const ProjectSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    slug: z.string(),
+    name: z.string(),
+    platform: z.string().nullable().optional(),
+  })
+  .passthrough();
 
 export const ProjectListSchema = z.array(ProjectSchema);
 
-export const ClientKeySchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  name: z.string(),
-  dsn: z.object({
-    public: z.string(),
-  }),
-  isActive: z.boolean(),
-  dateCreated: z.string().datetime(),
-});
+export const ClientKeySchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    dsn: z.object({
+      public: z.string(),
+    }),
+    isActive: z.boolean(),
+    dateCreated: z.string().datetime(),
+  })
+  .passthrough();
 
 export const ClientKeyListSchema = z.array(ClientKeySchema);
 
@@ -178,37 +188,39 @@ export const AssignedToSchema = z.union([
     .passthrough(), // Allow additional fields we might not know about
 ]);
 
-export const IssueSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  shortId: z.string(),
-  title: z.string(),
-  firstSeen: z.string().datetime(),
-  lastSeen: z.string().datetime(),
-  count: z.union([z.string(), z.number()]),
-  userCount: z.union([z.string(), z.number()]),
-  permalink: z.string().url(),
-  project: ProjectSchema,
-  platform: z.string().nullable().optional(),
-  status: z.string(),
-  substatus: z.string().optional(),
-  culprit: z.string(),
-  type: z.union([
-    z.literal("error"),
-    z.literal("transaction"),
-    z.literal("generic"),
-    z.unknown(),
-  ]),
-  assignedTo: AssignedToSchema.optional(),
-  issueType: z.string().optional(),
-  issueCategory: z.string().optional(),
-  metadata: z
-    .object({
-      title: z.string().nullable().optional(),
-      location: z.string().nullable().optional(),
-      value: z.string().nullable().optional(),
-    })
-    .optional(),
-});
+export const IssueSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    shortId: z.string(),
+    title: z.string(),
+    firstSeen: z.string().datetime(),
+    lastSeen: z.string().datetime(),
+    count: z.union([z.string(), z.number()]),
+    userCount: z.union([z.string(), z.number()]),
+    permalink: z.string().url(),
+    project: ProjectSchema,
+    platform: z.string().nullable().optional(),
+    status: z.string(),
+    substatus: z.string().nullable().optional(),
+    culprit: z.string(),
+    type: z.union([
+      z.literal("error"),
+      z.literal("transaction"),
+      z.literal("generic"),
+      z.unknown(),
+    ]),
+    assignedTo: AssignedToSchema.optional(),
+    issueType: z.string().optional(),
+    issueCategory: z.string().optional(),
+    metadata: z
+      .object({
+        title: z.string().nullable().optional(),
+        location: z.string().nullable().optional(),
+        value: z.string().nullable().optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
 
 export const IssueListSchema = z.array(IssueSchema);
 
