@@ -21,11 +21,12 @@ Examples:
 /sse/sentry/my-project
 ```
 
-## What you’ll experience
+## What you'll experience
 
 - Tools automatically use the constrained organization/project as defaults
 - You can still pass explicit `organizationSlug`/`projectSlug` to override defaults per call
-- If you don’t provide a scope, tools work across your accessible organizations when supported
+- If you don't provide a scope, tools work across your accessible organizations when supported
+- Some tools are filtered when not useful: `find_organizations` is hidden when scoped to an org, and `find_projects` is hidden when scoped to a project
 
 ## Access verification
 

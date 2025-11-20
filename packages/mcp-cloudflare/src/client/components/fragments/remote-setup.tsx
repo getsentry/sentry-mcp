@@ -29,6 +29,14 @@ export default function RemoteSetup() {
           </li>
         </ul>
         <p>
+          <small>
+            Note: When using path constraints, some tools are automatically
+            hidden: <code>find_organizations</code> is excluded with org
+            constraints, and <code>find_projects</code> is excluded with project
+            constraints.
+          </small>
+        </p>
+        <p>
           <strong>Agent Mode:</strong> Reduce context by exposing a single{" "}
           <code>use_sentry</code> tool instead of individual skills. The
           embedded AI agent handles natural language requests and automatically

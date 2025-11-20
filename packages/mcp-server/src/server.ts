@@ -241,6 +241,17 @@ function configureServer({
       continue;
     }
 
+    // Skip list tools when context is constrained to a specific tenant/project
+    // When organizationSlug is constrained, find_organizations is not useful
+    // When projectSlug is constrained, find_projects is not useful
+    if (
+      (toolKey === "find_organizations" &&
+        context.constraints.organizationSlug) ||
+      (toolKey === "find_projects" && context.constraints.projectSlug)
+    ) {
+      continue;
+    }
+
     // Filter out constraint parameters from schema that will be auto-injected
     // Only filter parameters that are ACTUALLY constrained in the current context
     // to avoid breaking tools when constraints are not set
