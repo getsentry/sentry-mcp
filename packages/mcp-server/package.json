@@ -1,7 +1,6 @@
 {
   "name": "@sentry/mcp-server",
-  "version": "0.22.0",
-  "description": "Sentry MCP server for stdio transport",
+  "version": "0.23.0",
   "type": "module",
   "packageManager": "pnpm@10.8.1",
   "engines": {
