@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -55,6 +53,7 @@
     "@sentry/react": "catalog:",
     "agents": "catalog:",
     "ai": "catalog:",
+    "asciinema-player": "^3.10.0",
     "better-sqlite3": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",

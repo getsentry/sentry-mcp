@@ -9,9 +9,6 @@ import {
 import Note from "../components/ui/note";
 import { Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
-import RemoteSetup from "../components/fragments/remote-setup";
-import { useState } from "react";
-import StdioSetup from "../components/fragments/stdio-setup";
 import Section from "../components/ui/section";
 import { Prose } from "../components/ui/prose";
 import JsonSchemaParams from "../components/ui/json-schema-params";
@@ -21,11 +18,9 @@ interface HomeProps {
 }
 
 export default function Home({ onChatClick }: HomeProps) {
-  const [stdio, setStdio] = useState(false);
-
   return (
-    <main className="flex gap-4 max-w-3xl">
-      <article>
+    <main className="flex gap-4 relative">
+      <article className="max-w-full overflow-x-clip">
         <div id="top" />
         <Section className="space-y-4 mb-10">
           <Prose>
@@ -61,89 +56,35 @@ export default function Home({ onChatClick }: HomeProps) {
             </div>
           </div>
 
-          <Section>
-            <Prose>
-              <p>
-                Simply put, it's a way to plug Sentry's API into an LLM, letting
-                you ask questions about your data in context of the LLM itself.
-                This lets you take a coding agent that you already use, like
-                Cursor or Claude Code, and pull in additional information from
-                Sentry to help with tasks like debugging, fixing production
-                errors, and understanding your application's behavior.
-              </p>
-              <p>
-                This project is still in its infancy as development of the MCP
-                specification is ongoing. If you find any problems, or have an
-                idea for how we can improve it, please let us know on{" "}
-                <Link href="https://github.com/getsentry/sentry-mcp/issues">
-                  GitHub
-                </Link>
-              </p>
-              <h3>Interested in learning more?</h3>
-              <ul>
-                <li>
-                  <Link href="https://www.youtube.com/watch?v=n4v0fR6mVTU">
-                    Using Sentry's Seer via MCP
-                  </Link>
-                </li>
-                <li>
-                  <Link href="https://www.youtube.com/watch?v=m3IE6JygT1o">
-                    Building Sentry's MCP on Cloudflare
-                  </Link>
-                </li>
-              </ul>
-            </Prose>
-          </Section>
-
-          <Section
-            heading={
-              <>
-                <div className="flex-1">Getting Started</div>
-                <div className="flex items-center gap-2 text-xs">
-                  <Button
-                    variant={!stdio ? "default" : "secondary"}
-                    size="xs"
-                    onClick={() => setStdio(false)}
-                    className={!stdio ? "shadow-sm" : undefined}
-                  >
-                    Cloud
-                  </Button>
-                  <Button
-                    variant={stdio ? "default" : "secondary"}
-                    size="xs"
-                    onClick={() => setStdio(true)}
-                    className={stdio ? "shadow-sm" : undefined}
-                  >
-                    Stdio
-                  </Button>
-                </div>
-              </>
-            }
-          >
-            <div className="relative min-h-0">
-              {!stdio ? (
-                <div
-                  key="cloud"
-                  className="animate-in fade-in slide-in-from-left-4 duration-300"
-                >
-                  <RemoteSetup />
-                </div>
-              ) : (
-                <div
-                  key="stdio-self-hosted"
-                  className="animate-in fade-in slide-in-from-right-4 duration-300"
-                >
-                  <StdioSetup />
-                </div>
-              )}
-            </div>
-          </Section>
-        </Section>
-
-        <Section heading="Available Tools" id="tools">
           <Prose>
             <p>
-              Tools are pre-configured functions that can be used to help with
+              This project is still in its infancy as development of the MCP
+              specification is ongoing. If you find any problems, or have an
+              idea for how we can improve it, please let us know on{" "}
+              <Link href="https://github.com/getsentry/sentry-mcp/issues">
+                GitHub
+              </Link>
+            </p>
+            <h3>Interested in learning more?</h3>
+            <ul>
+              <li>
+                <Link href="https://www.youtube.com/watch?v=n4v0fR6mVTU">
+                  Using Sentry's Seer via MCP
+                </Link>
+              </li>
+              <li>
+                <Link href="https://www.youtube.com/watch?v=m3IE6JygT1o">
+                  Building Sentry's MCP on Cloudflare
+                </Link>
+              </li>
+            </ul>
+          </Prose>
+        </Section>
+
+        <Section heading="Available Skills" id="skills">
+          <Prose>
+            <p>
+              Skills are pre-configured functions that can be used to help with
               common tasks.
             </p>
           </Prose>

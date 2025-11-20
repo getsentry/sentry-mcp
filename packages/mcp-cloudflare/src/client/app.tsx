@@ -1,8 +1,19 @@
-import { Header } from "./components/ui/header";
-import { useState, useEffect } from "react";
 import { Chat } from "./components/chat";
 import { useAuth } from "./contexts/auth-context";
+import { useState, useEffect } from "react";
+
+import { Header } from "./components/ui/header";
+import { HeaderDivider } from "./components/hero/header-divider";
+import { Sidebars } from "./components/home-layout/sidebars";
+
+import HeroBlock from "./components/hero/hero-block";
+import UseCases from "./components/usecases";
+import GettingStarted from "./components/getting-started";
+
+import TableOfContents from "./components/docs/toc";
 import Home from "./pages/home";
+
+import Footer from "./components/home-layout/footer";
 
 export default function App() {
   const { isAuthenticated, handleLogout } = useAuth();
@@ -16,14 +27,8 @@ export default function App() {
       return urlParams.get("chat") !== "0";
     }
 
-    // Default based on screen size to avoid flash on mobile
-    // Note: This is safe for SSR since we handle the correction in useEffect
-    if (typeof window !== "undefined") {
-      return window.innerWidth >= 768; // Desktop: open, Mobile: closed
-    }
-
-    // SSR fallback - default to true for desktop-first approach
-    return true;
+    // default to false for mobile and to avoid scroll lock on desktop
+    return false;
   });
 
   // Adjust initial state for mobile after component mounts
@@ -71,56 +76,38 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Handle window resize to adjust chat state appropriately
-  useEffect(() => {
-    const handleResize = () => {
-      // If no explicit URL state, adjust based on screen size
-      const urlParams = new URLSearchParams(window.location.search);
-      if (!urlParams.has("chat")) {
-        const isDesktop = window.innerWidth >= 768;
-        setIsChatOpen(isDesktop); // Open on desktop, closed on mobile
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   return (
-    <div className="min-h-screen text-white">
-      {/* Mobile layout: Single column with overlay chat */}
-      <div className="md:hidden h-screen flex flex-col">
-        <div className="flex-1 overflow-y-auto sm:p-8 p-4">
-          <div className="max-w-3xl mx-auto">
-            <Header isAuthenticated={isAuthenticated} onLogout={handleLogout} />
-            <Home onChatClick={() => toggleChat(true)} />
-          </div>
-        </div>
-      </div>
+    <div className="overflow-x-clip max-w-screen relative">
+      {/* //!NOTE: order matters for z- */}
+      <Sidebars isChatOpen={isChatOpen} toggleChat={toggleChat} />
+      <Header toggleChat={toggleChat} isChatOpen={isChatOpen} />
+      <HeaderDivider />
 
-      {/* Desktop layout: Main content adjusts width based on chat state */}
-      <div className="hidden md:flex h-screen">
-        <div
-          className={`flex flex-col ${isChatOpen ? "w-1/2" : "flex-1"} md:transition-all md:duration-300`}
+      <HeroBlock />
+      <UseCases />
+      <GettingStarted />
+
+      {/* main content */}
+      <div className="relative container mx-auto">
+        <aside className="max-xl:hidden absolute h-full right-15 inset-y-0">
+          <TableOfContents />
+        </aside>
+        <main
+          className={`max-w-3xl px-4 sm:px-8 xl:max-w-1/2 mx-auto motion-safe:duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${
+            isChatOpen ? "xl:-translate-x-1/2" : ""
+          }`}
         >
-          <div className="flex-1 overflow-y-auto sm:p-8 p-4">
-            <div className="max-w-3xl mx-auto">
-              <Header
-                isAuthenticated={isAuthenticated}
-                onLogout={handleLogout}
-              />
-              <Home onChatClick={() => toggleChat(true)} />
-            </div>
-          </div>
-        </div>
+          <Home onChatClick={() => toggleChat(true)} />
+        </main>
       </div>
 
-      {/* Single Chat component - handles both mobile and desktop layouts */}
       <Chat
         isOpen={isChatOpen}
         onClose={() => toggleChat(false)}
         onLogout={handleLogout}
       />
+
+      <Footer isChatOpen={isChatOpen} />
     </div>
   );
 }

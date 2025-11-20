@@ -4,7 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { useEffect, useRef, useCallback } from "react";
 import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
-import { Loader2 } from "lucide-react";
+import { Bot, Loader2, LogOut, PanelLeftOpen, Sparkles } from "lucide-react";
 import type { ChatProps } from "./types";
 import { usePersistedChat } from "../../hooks/use-persisted-chat";
 import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
@@ -13,6 +13,7 @@ import { useStreamingSimulation } from "../../hooks/use-streaming-simulation";
 import { SlidingPanel } from "../ui/sliding-panel";
 import { isAuthError } from "../../utils/chat-error-handler";
 import { useEndpointMode } from "../../hooks/use-endpoint-mode";
+import { Button } from "../ui/button";
 
 // We don't need user info since we're using MCP tokens
 // The MCP server handles all Sentry authentication internally
@@ -348,18 +349,72 @@ Try asking me things like:
     <SlidingPanel isOpen={isOpen} onClose={onClose}>
       {/* Auth form with fade transition */}
       <div
-        className={`absolute inset-0 h-full flex flex-col items-center justify-center transition-all duration-500 ease-in-out ${
+        className={`absolute inset-0 h-full flex flex-col items-center justify-center duration-500 ease-in-out ${
           !isAuthenticated
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+            ? "visible scale-100 opacity-100 pointer-events-auto"
+            : "hidden motion-safe:scale-95 opacity-0 pointer-events-none"
         }`}
-        style={{
-          visibility: !isAuthenticated ? "visible" : "hidden",
-          transitionProperty: "opacity, transform",
-          transform: !isAuthenticated ? "scale(1)" : "scale(0.95)",
-        }}
       >
         <AuthForm authError={authError} onOAuthLogin={handleOAuthLogin} />
+      </div>
+
+      {/* {showControls && ( */}
+      <div className="w-full [mask-image:linear-gradient(to_bottom,red,transparent)] pointer-events-none absolute top-0 left-0 h-20 z-10 backdrop-blur-md bg-gradient-to-b from-background to-background/20 xl:from-background-2 xl:to-[#20163333]" />
+      <div className="flex flex-row sm:grid sm:grid-cols-3 xl:flex xl:flex-row-reverse justify-between items-center absolute left-4 right-6 top-4 gap-4 z-20">
+        {isAuthenticated && toggleEndpointMode ? (
+          <Button
+            type="button"
+            onClick={toggleEndpointMode}
+            variant={endpointMode === "agent" ? "default" : "outline"}
+            title={
+              endpointMode === "agent"
+                ? "Agent mode: Only use_sentry tool (click to switch to standard)"
+                : "Standard mode: All 19 tools available (click to switch to agent)"
+            }
+            className={`shadow-lg max-xl:order-2 rounded-xl backdrop-blur ${
+              endpointMode === "agent" ? "ring-4 ring-violet-300/50" : "ring-0"
+            }`}
+          >
+            {endpointMode === "agent" ? (
+              <>
+                <Sparkles className="size-4" />
+                Agent Mode
+              </>
+            ) : (
+              <>
+                <Bot className="size-4" />
+                Standard Mode
+              </>
+            )}
+          </Button>
+        ) : (
+          <div />
+        )}
+        <div className="contents xl:flex gap-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            size="icon"
+            title="Close"
+            className="rounded-xl max-xl:order-3 max-xl:ml-auto hover:scale-110 active:scale-90 active:duration-75 bg-background-2 xl:bg-background-3 hover:bg-violet-300 duration-300 transition-[color_ease,background-color_ease,scale_cubic-bezier(0.175,0.885,0.32,1.275)]"
+          >
+            <span className="sr-only">Logout</span>
+            <PanelLeftOpen className="size-4" />
+          </Button>
+          {isAuthenticated && onLogout ? (
+            <Button
+              variant="secondary"
+              onClick={onLogout}
+              className="cursor-pointer max-xl:order-1 max-xl:mr-auto rounded-xl bg-background-2 xl:bg-background-3"
+            >
+              <LogOut className="size-4" />
+              <span className="max-sm:sr-only">Logout</span>
+            </Button>
+          ) : (
+            <div />
+          )}
+        </div>
       </div>
 
       {/* Chat UI with fade transition */}
@@ -383,17 +438,12 @@ Try asking me things like:
           isLocalStreaming={isLocalStreaming}
           isMessageStreaming={isMessageStreaming}
           isOpen={isOpen}
-          showControls
-          endpointMode={endpointMode}
           onInputChange={handleInputChange}
           onSubmit={handleFormSubmit}
           onStop={stop}
           onRetry={reload}
-          onClose={onClose}
-          onLogout={onLogout}
           onSlashCommand={handleSlashCommand}
           onSendPrompt={handleSendPrompt}
-          onToggleEndpointMode={toggleEndpointMode}
         />
       </div>
     </SlidingPanel>
