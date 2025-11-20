@@ -2,11 +2,11 @@ import type {
   AuthRequest,
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
-import { logError, logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
+import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { sanitizeHtml } from "./html-utils";
 import skillDefinitions, {
   type SkillDefinition,
-} from "@sentry/mcp-server/skillDefinitions";
+} from "@sentry/mcp-core/skillDefinitions";
 import {
   signState,
   verifyAndParseState,

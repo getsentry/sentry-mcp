@@ -9,15 +9,15 @@
  */
 
 import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
-import { buildServer } from "@sentry/mcp-server/server";
+import { buildServer } from "@sentry/mcp-core/server";
 import {
   expandScopes,
   parseScopes,
   type Scope,
-} from "@sentry/mcp-server/permissions";
-import { parseSkills, type Skill } from "@sentry/mcp-server/skills";
-import { logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
-import type { ServerContext } from "@sentry/mcp-server/types";
+} from "@sentry/mcp-core/permissions";
+import { parseSkills, type Skill } from "@sentry/mcp-core/skills";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import type { ServerContext } from "@sentry/mcp-core/types";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
 import type { ExportedHandler } from "@cloudflare/workers-types";

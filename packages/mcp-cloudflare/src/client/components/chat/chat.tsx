@@ -7,7 +7,7 @@ import { useAuth } from "../../contexts/auth-context";
 import { Bot, Loader2, LogOut, PanelLeftOpen, Sparkles } from "lucide-react";
 import type { ChatProps } from "./types";
 import { usePersistedChat } from "../../hooks/use-persisted-chat";
-import TOOL_DEFINITIONS from "@sentry/mcp-server/toolDefinitions";
+import TOOL_DEFINITIONS from "@sentry/mcp-core/toolDefinitions";
 import { useMcpMetadata } from "../../hooks/use-mcp-metadata";
 import { useStreamingSimulation } from "../../hooks/use-streaming-simulation";
 import { SlidingPanel } from "../ui/sliding-panel";

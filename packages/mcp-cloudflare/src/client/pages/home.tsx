@@ -1,4 +1,4 @@
-import SKILL_DEFINITIONS from "@sentry/mcp-server/skillDefinitions";
+import SKILL_DEFINITIONS from "@sentry/mcp-core/skillDefinitions";
 import { Link } from "../components/ui/base";
 import {
   Accordion,

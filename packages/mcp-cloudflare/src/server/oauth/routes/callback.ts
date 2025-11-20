@@ -5,8 +5,8 @@ import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
 import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-server/telem/logging";
-import { parseSkills, getScopesForSkills } from "@sentry/mcp-server/skills";
+import { logWarn } from "@sentry/mcp-core/telem/logging";
+import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
 
 /**
  * Extended AuthRequest that includes skills

@@ -71,7 +71,7 @@ function extractMcpParameters(args: Record<string, unknown>) {
  *
  * @example Usage with stdio transport
  * ```typescript
- * import { buildServer } from "@sentry/mcp-server/server";
+ * import { buildServer } from "@sentry/mcp-core/server";
  * import { startStdio } from "@sentry/mcp-server/transports/stdio";
  *
  * const context = {
@@ -88,7 +88,7 @@ function extractMcpParameters(args: Record<string, unknown>) {
  *
  * @example Usage with Cloudflare Workers
  * ```typescript
- * import { buildServer } from "@sentry/mcp-server/server";
+ * import { buildServer } from "@sentry/mcp-core/server";
  * import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
  *
  * const serverContext = buildContextFromOAuth();

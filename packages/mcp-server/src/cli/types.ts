@@ -1,5 +1,5 @@
-import type { Scope } from "../permissions";
-import type { Skill } from "../skills";
+import type { Scope } from "@sentry/mcp-core/permissions";
+import type { Skill } from "@sentry/mcp-core/skills";
 
 export type CliArgs = {
   accessToken?: string;

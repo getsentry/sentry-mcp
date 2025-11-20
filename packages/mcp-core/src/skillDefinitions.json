@@ -10,65 +10,47 @@
       {
         "name": "find_organizations",
         "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "org:read"
-        ]
+        "requiredScopes": ["org:read"]
       },
       {
         "name": "find_projects",
         "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "project:read"
-        ]
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "find_releases",
         "description": "Find releases in Sentry.\n\nUse this tool when you need to:\n- Find recent releases in a Sentry organization\n- Find the most recent version released of a specific project\n- Determine when a release was deployed to an environment\n\n<examples>\n### Find the most recent releases in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization')\n```\n\n### Find releases matching '2ce6a27' in the 'my-organization' organization\n\n```\nfind_releases(organizationSlug='my-organization', query='2ce6a27')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n</hints>",
-        "requiredScopes": [
-          "project:read"
-        ]
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "find_teams",
         "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "team:read"
-        ]
+        "requiredScopes": ["team:read"]
       },
       {
         "name": "get_event_attachment",
         "description": "Download attachments from a Sentry event.\n\nUse this tool when you need to:\n- Download files attached to a specific event\n- Access screenshots, log files, or other attachments uploaded with an error report\n- Retrieve attachment metadata and download URLs\n\n<examples>\n### Download a specific attachment by ID\n\n```\nget_event_attachment(organizationSlug='my-organization', projectSlug='my-project', eventId='c49541c747cb4d8aa3efb70ca5aba243', attachmentId='12345')\n```\n\n### List all attachments for an event\n\n```\nget_event_attachment(organizationSlug='my-organization', projectSlug='my-project', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n\n</examples>\n\n<hints>\n- If `attachmentId` is provided, the specific attachment will be downloaded as an embedded resource\n- If `attachmentId` is omitted, all attachments for the event will be listed with download information\n- The `projectSlug` is required to identify which project the event belongs to\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "get_issue_details",
         "description": "Get detailed information about a specific Sentry issue by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')\n- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'\n- Want details/stacktrace/analysis for a known issue\n- Provide a Sentry issue URL\n\nDO NOT USE for:\n- General searching or listing issues (use search_issues)\n- Root cause analysis (use analyze_issue_with_seer)\n\nTRIGGER PATTERNS:\n- 'Explain ISSUE-123' → use get_issue_details\n- 'Tell me about PROJECT-456' → use get_issue_details\n- 'What happened in [issue URL]' → use get_issue_details\n\n<examples>\n### With Sentry URL (recommended - simplest approach)\n```\nget_issue_details(issueUrl='https://sentry.sentry.io/issues/6916805731/?project=4509062593708032&query=is%3Aunresolved')\n```\n\n### With issue ID and organization\n```\nget_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')\n```\n\n### With event ID and organization\n```\nget_issue_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n</examples>\n\n<hints>\n- **IMPORTANT**: If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- When using issueUrl, all other parameters are automatically extracted - don't provide them separately\n- If using issueId (not URL), then organizationSlug is required\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "get_trace_details",
         "description": "Get detailed information about a specific Sentry trace by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific trace ID (e.g., 'a4d1aae7216b47ff8117cf4e09ce9d0a')\n- Ask to 'show me trace [TRACE-ID]', 'explain trace [TRACE-ID]'\n- Want high-level overview and link to view trace details in Sentry\n- Need trace statistics and span breakdown\n\nDO NOT USE for:\n- General searching for traces (use search_events with trace queries)\n- Individual span details (this shows trace overview)\n\nTRIGGER PATTERNS:\n- 'Show me trace abc123' → use get_trace_details\n- 'Explain trace a4d1aae7216b47ff8117cf4e09ce9d0a' → use get_trace_details\n- 'What is trace [trace-id]' → use get_trace_details\n\n<examples>\n### Get trace overview\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\n```\n</examples>\n\n<hints>\n- Trace IDs are 32-character hexadecimal strings\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "search_events",
         "description": "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'\n2. Individual events with timestamps: 'show me error logs from last hour'\n\nUSE THIS FOR ALL COUNTS/STATISTICS:\n- 'how many errors today' → returns count\n- 'count of database failures' → returns count\n- 'total number of issues' → returns count\n- 'average response time' → returns avg()\n- 'sum of tokens used' → returns sum()\n\nALSO USE FOR INDIVIDUAL EVENTS:\n- 'error logs from last hour' → returns event list\n- 'database errors with timestamps' → returns event list\n- 'trace spans for slow API calls' → returns span list\n\nDataset Selection (AI automatically chooses):\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, AI/LLM calls, token usage\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "search_issues",
         "description": "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.\n\nUses AI to translate natural language queries into Sentry issue search syntax.\nReturns grouped issues with metadata like title, status, and user count.\n\nUSE THIS TOOL WHEN USERS WANT:\n- A LIST of issues: 'show me issues', 'what problems do we have'\n- Filtered issue lists: 'unresolved issues', 'critical bugs'\n- Issues by impact: 'errors affecting more than 100 users'\n- Issues by assignment: 'issues assigned to me'\n\nDO NOT USE FOR COUNTS/AGGREGATIONS:\n- 'how many errors' → use search_events\n- 'count of issues' → use search_events\n- 'total number of errors today' → use search_events\n- 'sum/average/statistics' → use search_events\n\nALSO DO NOT USE FOR:\n- Individual error events with timestamps → use search_events\n- Details about a specific issue ID → use get_issue_details\n\nREMEMBER: This tool returns a LIST of issues, not counts or statistics!\n\n<examples>\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='critical bugs from last week')\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='unhandled errors affecting 100+ users')\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='issues assigned to me')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "whoami",
@@ -93,37 +75,27 @@
       {
         "name": "find_organizations",
         "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "org:read"
-        ]
+        "requiredScopes": ["org:read"]
       },
       {
         "name": "find_projects",
         "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "project:read"
-        ]
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "get_issue_details",
         "description": "Get detailed information about a specific Sentry issue by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')\n- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'\n- Want details/stacktrace/analysis for a known issue\n- Provide a Sentry issue URL\n\nDO NOT USE for:\n- General searching or listing issues (use search_issues)\n- Root cause analysis (use analyze_issue_with_seer)\n\nTRIGGER PATTERNS:\n- 'Explain ISSUE-123' → use get_issue_details\n- 'Tell me about PROJECT-456' → use get_issue_details\n- 'What happened in [issue URL]' → use get_issue_details\n\n<examples>\n### With Sentry URL (recommended - simplest approach)\n```\nget_issue_details(issueUrl='https://sentry.sentry.io/issues/6916805731/?project=4509062593708032&query=is%3Aunresolved')\n```\n\n### With issue ID and organization\n```\nget_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')\n```\n\n### With event ID and organization\n```\nget_issue_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n</examples>\n\n<hints>\n- **IMPORTANT**: If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- When using issueUrl, all other parameters are automatically extracted - don't provide them separately\n- If using issueId (not URL), then organizationSlug is required\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "search_events",
         "description": "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'\n2. Individual events with timestamps: 'show me error logs from last hour'\n\nUSE THIS FOR ALL COUNTS/STATISTICS:\n- 'how many errors today' → returns count\n- 'count of database failures' → returns count\n- 'total number of issues' → returns count\n- 'average response time' → returns avg()\n- 'sum of tokens used' → returns sum()\n\nALSO USE FOR INDIVIDUAL EVENTS:\n- 'error logs from last hour' → returns event list\n- 'database errors with timestamps' → returns event list\n- 'trace spans for slow API calls' → returns span list\n\nDataset Selection (AI automatically chooses):\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, AI/LLM calls, token usage\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "search_issues",
         "description": "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.\n\nUses AI to translate natural language queries into Sentry issue search syntax.\nReturns grouped issues with metadata like title, status, and user count.\n\nUSE THIS TOOL WHEN USERS WANT:\n- A LIST of issues: 'show me issues', 'what problems do we have'\n- Filtered issue lists: 'unresolved issues', 'critical bugs'\n- Issues by impact: 'errors affecting more than 100 users'\n- Issues by assignment: 'issues assigned to me'\n\nDO NOT USE FOR COUNTS/AGGREGATIONS:\n- 'how many errors' → use search_events\n- 'count of issues' → use search_events\n- 'total number of errors today' → use search_events\n- 'sum/average/statistics' → use search_events\n\nALSO DO NOT USE FOR:\n- Individual error events with timestamps → use search_events\n- Details about a specific issue ID → use get_issue_details\n\nREMEMBER: This tool returns a LIST of issues, not counts or statistics!\n\n<examples>\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='critical bugs from last week')\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='unhandled errors affecting 100+ users')\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='issues assigned to me')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "whoami",
@@ -143,16 +115,12 @@
       {
         "name": "find_organizations",
         "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "org:read"
-        ]
+        "requiredScopes": ["org:read"]
       },
       {
         "name": "find_projects",
         "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "project:read"
-        ]
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "get_doc",
@@ -182,51 +150,37 @@
       {
         "name": "find_organizations",
         "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "org:read"
-        ]
+        "requiredScopes": ["org:read"]
       },
       {
         "name": "find_projects",
         "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "project:read"
-        ]
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "find_teams",
         "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "team:read"
-        ]
+        "requiredScopes": ["team:read"]
       },
       {
         "name": "get_issue_details",
         "description": "Get detailed information about a specific Sentry issue by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')\n- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'\n- Want details/stacktrace/analysis for a known issue\n- Provide a Sentry issue URL\n\nDO NOT USE for:\n- General searching or listing issues (use search_issues)\n- Root cause analysis (use analyze_issue_with_seer)\n\nTRIGGER PATTERNS:\n- 'Explain ISSUE-123' → use get_issue_details\n- 'Tell me about PROJECT-456' → use get_issue_details\n- 'What happened in [issue URL]' → use get_issue_details\n\n<examples>\n### With Sentry URL (recommended - simplest approach)\n```\nget_issue_details(issueUrl='https://sentry.sentry.io/issues/6916805731/?project=4509062593708032&query=is%3Aunresolved')\n```\n\n### With issue ID and organization\n```\nget_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')\n```\n\n### With event ID and organization\n```\nget_issue_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n</examples>\n\n<hints>\n- **IMPORTANT**: If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- When using issueUrl, all other parameters are automatically extracted - don't provide them separately\n- If using issueId (not URL), then organizationSlug is required\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "search_events",
         "description": "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'\n2. Individual events with timestamps: 'show me error logs from last hour'\n\nUSE THIS FOR ALL COUNTS/STATISTICS:\n- 'how many errors today' → returns count\n- 'count of database failures' → returns count\n- 'total number of issues' → returns count\n- 'average response time' → returns avg()\n- 'sum of tokens used' → returns sum()\n\nALSO USE FOR INDIVIDUAL EVENTS:\n- 'error logs from last hour' → returns event list\n- 'database errors with timestamps' → returns event list\n- 'trace spans for slow API calls' → returns span list\n\nDataset Selection (AI automatically chooses):\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, AI/LLM calls, token usage\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "search_issues",
         "description": "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.\n\nUses AI to translate natural language queries into Sentry issue search syntax.\nReturns grouped issues with metadata like title, status, and user count.\n\nUSE THIS TOOL WHEN USERS WANT:\n- A LIST of issues: 'show me issues', 'what problems do we have'\n- Filtered issue lists: 'unresolved issues', 'critical bugs'\n- Issues by impact: 'errors affecting more than 100 users'\n- Issues by assignment: 'issues assigned to me'\n\nDO NOT USE FOR COUNTS/AGGREGATIONS:\n- 'how many errors' → use search_events\n- 'count of issues' → use search_events\n- 'total number of errors today' → use search_events\n- 'sum/average/statistics' → use search_events\n\nALSO DO NOT USE FOR:\n- Individual error events with timestamps → use search_events\n- Details about a specific issue ID → use get_issue_details\n\nREMEMBER: This tool returns a LIST of issues, not counts or statistics!\n\n<examples>\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='critical bugs from last week')\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='unhandled errors affecting 100+ users')\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='issues assigned to me')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
-        "requiredScopes": [
-          "event:read"
-        ]
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "update_issue",
         "description": "Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.\n\nUse this tool when you need to:\n- Resolve an issue that has been fixed\n- Assign an issue to a team member or team for investigation\n- Mark an issue as ignored to reduce noise\n- Reopen a resolved issue by setting status to 'unresolved'\n\n<examples>\n### Resolve an issue\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='resolved')\n```\n\n### Assign an issue to a user (use whoami to get your user ID)\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='user:123456')\n```\n\n### Assign an issue to a team\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='team:789')\n```\n\n### Mark an issue as ignored\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='ignored')\n```\n\n</examples>\n\n<hints>\n- If the user provides the `issueUrl`, you can ignore the other required parameters and extract them from the URL.\n- At least one of `status` or `assignedTo` must be provided to update the issue.\n- assignedTo format: Use 'user:ID' for users (e.g., 'user:123456') or 'team:ID' for teams (e.g., 'team:789')\n- To find your user ID, first use the whoami tool which returns your numeric user ID\n- Valid status values are: 'resolved', 'resolvedInNextRelease', 'unresolved', 'ignored'.\n</hints>",
-        "requiredScopes": [
-          "event:write"
-        ]
+        "requiredScopes": ["event:write"]
       },
       {
         "name": "whoami",
@@ -246,59 +200,42 @@
       {
         "name": "create_dsn",
         "description": "Create an additional DSN for an EXISTING project.\n\nUSE THIS TOOL WHEN:\n- Project already exists and needs additional DSN\n- 'Create another DSN for project X'\n- 'I need a production DSN for existing project'\n\nDO NOT USE for new projects (use create_project instead)\n\nBe careful when using this tool!\n\n<examples>\n### Create additional DSN for existing project\n```\ncreate_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
-        "requiredScopes": [
-          "project:write"
-        ]
+        "requiredScopes": ["project:write"]
       },
       {
         "name": "create_project",
         "description": "Create a new project in Sentry (includes DSN automatically).\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new project'\n- 'Set up a project for [app/service] with team [X]'\n- 'I need a new Sentry project'\n- Create project AND need DSN in one step\n\nDO NOT USE create_dsn after this - DSN is included in output.\n\nBe careful when using this tool!\n\n<examples>\n### Create new project with team\n```\ncreate_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<teamSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
-        "requiredScopes": [
-          "project:write",
-          "team:read"
-        ]
+        "requiredScopes": ["project:write", "team:read"]
       },
       {
         "name": "create_team",
         "description": "Create a new team in Sentry.\n\nUSE THIS TOOL WHEN USERS WANT TO:\n- 'Create a new team'\n- 'Set up a team called [X]'\n- 'I need a team for my project'\n\nBe careful when using this tool!\n\n<examples>\n### Create a new team\n```\ncreate_team(organizationSlug='my-organization', name='the-goats')\n```\n</examples>\n\n<hints>\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
-        "requiredScopes": [
-          "team:write"
-        ]
+        "requiredScopes": ["team:write"]
       },
       {
         "name": "find_dsns",
         "description": "List all Sentry DSNs for a specific project.\n\nUse this tool when you need to:\n- Retrieve a SENTRY_DSN for a specific project\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If only one parameter is provided, and it could be either `organizationSlug` or `projectSlug`, its probably `organizationSlug`, but if you're really uncertain you might want to call `find_organizations()` first.\n</hints>",
-        "requiredScopes": [
-          "project:read"
-        ]
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "find_organizations",
         "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "org:read"
-        ]
+        "requiredScopes": ["org:read"]
       },
       {
         "name": "find_projects",
         "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "project:read"
-        ]
+        "requiredScopes": ["project:read"]
       },
       {
         "name": "find_teams",
         "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
-        "requiredScopes": [
-          "team:read"
-        ]
+        "requiredScopes": ["team:read"]
       },
       {
         "name": "update_project",
         "description": "Update project settings in Sentry, such as name, slug, platform, and team assignment.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n- Update team assignment for a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Assign a project to a different team\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team assignment is handled separately from other project settings\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n</hints>",
-        "requiredScopes": [
-          "project:write"
-        ]
+        "requiredScopes": ["project:write"]
       },
       {
         "name": "whoami",

@@ -3,8 +3,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "@sentry/mcp-server/transports/stdio";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import type { Scope } from "@sentry/mcp-server/permissions";
-import { ALL_SCOPES } from "@sentry/mcp-server/permissions";
+import type { Scope } from "@sentry/mcp-core/permissions";
+import { ALL_SCOPES } from "@sentry/mcp-core/permissions";
 
 mswServer.listen({
   onUnhandledRequest: (req, print) => {

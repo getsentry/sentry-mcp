@@ -14,18 +14,18 @@
  * ```
  */
 
-import { buildServer } from "./server";
+import { buildServer } from "@sentry/mcp-core/server";
 import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
-import { LIB_VERSION } from "./version";
+import { LIB_VERSION } from "@sentry/mcp-core/version";
 import { buildUsage } from "./cli/usage";
 import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
-import { sentryBeforeSend } from "./telem/sentry";
-import { ALL_SCOPES } from "./permissions";
-import { DEFAULT_SCOPES, DEFAULT_SKILLS } from "./constants";
-import { SKILLS } from "./skills";
-import { setOpenAIBaseUrl } from "./internal/agents/openai-provider";
+import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
+import { ALL_SCOPES } from "@sentry/mcp-core/permissions";
+import { DEFAULT_SCOPES, DEFAULT_SKILLS } from "@sentry/mcp-core/constants";
+import { SKILLS } from "@sentry/mcp-core/skills";
+import { setOpenAIBaseUrl } from "@sentry/mcp-core/internal/agents/openai-provider";
 
 const packageName = "@sentry/mcp-server";
 const allSkills = Object.keys(SKILLS) as ReadonlyArray<

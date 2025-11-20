@@ -8,7 +8,7 @@ import { Hono } from "hono";
 import { experimental_createMCPClient } from "ai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Env } from "../types";
-import { logIssue, logWarn } from "@sentry/mcp-server/telem/logging";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ErrorResponse } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 import { z } from "zod";

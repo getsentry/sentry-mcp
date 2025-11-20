@@ -8,7 +8,7 @@ import chatOauth from "./routes/chat-oauth";
 import chat from "./routes/chat";
 import search from "./routes/search";
 import metadata from "./routes/metadata";
-import { logIssue } from "@sentry/mcp-server/telem/logging";
+import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { createRequestLogger } from "./logging";
 import mcpRoutes from "./routes/mcp";
 import { getClientIp } from "./utils/client-ip";

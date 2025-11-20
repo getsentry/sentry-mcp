@@ -1,6 +1,6 @@
 import { Link } from "../ui/base";
 import CodeSnippet from "../ui/code-snippet";
-import skillDefinitions from "@sentry/mcp-server/skillDefinitions";
+import skillDefinitions from "@sentry/mcp-core/skillDefinitions";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
 import { Prose } from "../ui/prose";
 import InstallTabs, { Tab } from "./install-tabs";

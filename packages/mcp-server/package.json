@@ -1,6 +1,7 @@
 {
   "name": "@sentry/mcp-server",
   "version": "0.22.0",
+  "description": "Sentry MCP server for stdio transport",
   "type": "module",
   "packageManager": "pnpm@10.8.1",
   "engines": {
@@ -11,11 +12,8 @@
   },
   "license": "FSL-1.1-ALv2",
   "author": "Sentry",
-  "description": "Sentry MCP Server",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry", "mcp", "model-context-protocol"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -26,129 +24,40 @@
   "bin": {
     "sentry-mcp": "./dist/index.js"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
       "default": "./dist/index.js"
     },
-    "./api-client": {
-      "types": "./dist/api-client/index.ts",
-      "default": "./dist/api-client/index.js"
-    },
-    "./constants": {
-      "types": "./dist/constants.ts",
-      "default": "./dist/constants.js"
-    },
-    "./telem": {
-      "types": "./dist/telem/index.ts",
-      "default": "./dist/telem/index.js"
-    },
-    "./telem/logging": {
-      "types": "./dist/telem/logging.ts",
-      "default": "./dist/telem/logging.js"
-    },
-    "./telem/sentry": {
-      "types": "./dist/telem/sentry.ts",
-      "default": "./dist/telem/sentry.js"
-    },
-    "./permissions": {
-      "types": "./dist/permissions.ts",
-      "default": "./dist/permissions.js"
-    },
-    "./skills": {
-      "types": "./dist/skills.ts",
-      "default": "./dist/skills.js"
-    },
-    "./tools": {
-      "types": "./dist/tools/index.ts",
-      "default": "./dist/tools/index.js"
-    },
     "./transports/stdio": {
       "types": "./dist/transports/stdio.ts",
       "default": "./dist/transports/stdio.js"
-    },
-    "./server": {
-      "types": "./dist/server.ts",
-      "default": "./dist/server.js"
-    },
-    "./toolDefinitions": {
-      "types": "./dist/toolDefinitions.ts",
-      "default": "./dist/toolDefinitions.js"
-    },
-    "./skillDefinitions": {
-      "types": "./dist/skillDefinitions.ts",
-      "default": "./dist/skillDefinitions.js"
-    },
-    "./types": {
-      "types": "./dist/types.ts",
-      "default": "./dist/types.js"
-    },
-    "./version": {
-      "types": "./dist/version.ts",
-      "default": "./dist/version.js"
-    },
-    "./tools/search-events": {
-      "types": "./dist/tools/search-events/index.ts",
-      "default": "./dist/tools/search-events/index.js"
-    },
-    "./tools/search-issues": {
-      "types": "./dist/tools/search-issues/index.ts",
-      "default": "./dist/tools/search-issues/index.js"
-    },
-    "./tools/search-events/agent": {
-      "types": "./dist/tools/search-events/agent.ts",
-      "default": "./dist/tools/search-events/agent.js"
-    },
-    "./tools/search-issues/agent": {
-      "types": "./dist/tools/search-issues/agent.ts",
-      "default": "./dist/tools/search-issues/agent.js"
-    },
-    "./tools/agent-tools": {
-      "types": "./dist/tools/agent-tools.ts",
-      "default": "./dist/tools/agent-tools.js"
-    },
-    "./internal/agents/callEmbeddedAgent": {
-      "types": "./dist/internal/agents/callEmbeddedAgent.ts",
-      "default": "./dist/internal/agents/callEmbeddedAgent.js"
     }
   },
   "scripts": {
-    "prebuild": "pnpm run generate-definitions",
     "build": "tsdown",
-    "predev": "pnpm run generate-definitions",
-    "dev": "tsdown -w",
+    "dev": "tsdown --watch",
     "start": "tsx src/index.ts",
-    "prepare": "pnpm run build",
-    "pretest": "pnpm run generate-definitions",
     "test": "vitest run",
-    "test:ci": "pnpm run generate-definitions && vitest run --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
-    "test:watch": "pnpm run generate-definitions && vitest",
-    "tsc": "tsc --noEmit",
-    "generate-definitions": "tsx scripts/generate-definitions.ts",
-    "generate-otel-namespaces": "tsx scripts/generate-otel-namespaces.ts",
-    "measure-tokens": "tsx scripts/measure-token-cost.ts",
-    "validate-skills": "tsx scripts/validate-skills-mapping.ts"
-  },
-  "devDependencies": {
-    "@sentry/mcp-server-mocks": "workspace:*",
-    "@sentry/mcp-server-tsconfig": "workspace:*",
-    "msw": "catalog:",
-    "tiktoken": "^1.0.18",
-    "yaml": "^2.6.1",
-    "zod-to-json-schema": "catalog:"
+    "test:watch": "vitest",
+    "tsc": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/openai": "catalog:",
-    "@logtape/logtape": "^1.1.1",
-    "@logtape/sentry": "^1.1.1",
     "@modelcontextprotocol/sdk": "catalog:",
-    "@sentry/core": "catalog:",
     "@sentry/node": "catalog:",
-    "ai": "catalog:",
+    "@sentry/core": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@sentry/mcp-core": "workspace:*",
+    "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
