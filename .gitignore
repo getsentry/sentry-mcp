@@ -65,3 +65,5 @@ coverage
 # Generated files
 packages/mcp-server/src/toolDefinitions.json
 packages/mcp-server/src/skillDefinitions.json
+
+__pycache__
