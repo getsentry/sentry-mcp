@@ -19,19 +19,34 @@ export default function HeroBlock() {
           <div className="w-full sm:contents">
             <CodeSnippet noMargin snippet={endpoint} />
           </div>
-          <a
-            href="cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9"
+          <button
+            type="button"
+            onClick={() => {
+              const clickedTime = +new Date();
+              const deepLink =
+                "cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9";
+              window.location.href = deepLink;
+              // fallback if cursor is not installed
+              const timeout = setTimeout(() => {
+                if (document.hasFocus() && +new Date() - clickedTime < 2000)
+                  window.location.href = "#getting-started";
+              }, 123);
+              document.addEventListener(
+                "visibilitychange",
+                () => {
+                  if (document.visibilityState === "hidden") {
+                    clearTimeout(timeout);
+                  }
+                },
+                { once: true },
+              );
+            }}
             className="relative hidden md:block size-fit my-2 group cursor-pointer"
           >
             <div className="absolute inset-0 size-full rounded-xl bg-violet-400/80 bg-[repeating-linear-gradient(-45deg,var(--bg1),var(--bg1)_0.5px,#fff0_0.5px,#fff0_12px)]" />
             <div className="bg-grid absolute inset-0 size-full duration-200 delay-50 opacity-100 [--size:10px] [--grid-color:#0002] bg-pink-400 group-hover:rotate-x-15 group-hover:translate-1 group-hover:-rotate-y-2 !px-6 transform-3d perspective-distant rounded-xl ease-[cubic-bezier(0.175,0.885,0.32,1.275)] origin-bottom-right group-active:rotate-y-1 group-active:translate-0.5 group-active:rotate-x-3" />
             <Button
               variant="secondary"
-              onClick={() => {
-                const deepLink =
-                  "cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9";
-                window.location.href = deepLink;
-              }}
               className="h-13 group-hover:rotate-x-30 group-hover:translate-2 group-hover:-rotate-y-4 group-active:rotate-x-6 group-active:translate-1 group-active:rotate-y-2 !px-6 relative rounded-xl bg-white text-black duration-200 hover:bg-white transform-3d perspective-distant backface-hidden ease-[cubic-bezier(0.175,0.885,0.32,1.275)] origin-bottom-right "
             >
               <div className="bg-grid absolute inset-0 opacity-0 duration-300 group-hover:opacity-30 [--size:10px] [--grid-color:#44130644] [mask-image:radial-gradient(ellipse_at_center,transparent,red)]" />
@@ -49,7 +64,7 @@ export default function HeroBlock() {
               </svg>
               Install in Cursor
             </Button>
-          </a>
+          </button>
         </div>
       </div>
       {/* demo */}
