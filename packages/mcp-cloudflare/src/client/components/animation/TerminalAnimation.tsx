@@ -145,7 +145,7 @@ export default function TerminalAnimation() {
         autoPlay: false,
         loop: false,
         idleTimeLimit: 0.1,
-        speed,
+        speed: 3.0,
         startAt: steps[0].startTime,
         preload: true,
         pauseOnMarkers: false,
@@ -162,7 +162,7 @@ export default function TerminalAnimation() {
         handleMarkerReached(index);
       }
     });
-  }, [speed, handleMarkerReached]);
+  }, [handleMarkerReached]);
 
   const gotoStep = useCallback(
     (idx: number) => {
@@ -181,9 +181,14 @@ export default function TerminalAnimation() {
 
       try {
         p.pause?.();
-        p.setSpeed?.(newSpeed);
         p.seek?.(step.startTime + (isFastStep ? 87 : OFFSET)); // skip 87 seconds fakes a 30x speedup
-      } catch {}
+      } catch (err) {
+        console.error("[TerminalAnimation] gotoStep seek failed", {
+          stepIndex: idx,
+          label: step.label,
+          err,
+        });
+      }
 
       currentStepRef.current = idx;
       setCurrentIndex(idx);
@@ -227,7 +232,6 @@ export default function TerminalAnimation() {
     try {
       p.pause?.();
       p.seek?.(steps[0].startTime - OFFSET);
-      p.setSpeed?.(3);
       setSpeed(3);
     } catch {}
 
