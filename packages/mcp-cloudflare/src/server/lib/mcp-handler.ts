@@ -21,6 +21,7 @@ import type { ServerContext } from "@sentry/mcp-core/types";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
 import type { ExportedHandler } from "@cloudflare/workers-types";
+import * as Sentry from "@sentry/cloudflare";
 
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
@@ -168,6 +169,10 @@ const mcpHandler: ExportedHandler<Env> = {
     const server = buildServer({
       context: serverContext,
       agentMode: isAgentMode,
+      onToolComplete: () => {
+        // Flush Sentry events after tool execution
+        ctx.waitUntil(Sentry.flush(2000));
+      },
     });
 
     // Run MCP handler - context already captured in closures
