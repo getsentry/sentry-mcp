@@ -30,8 +30,7 @@ import type { ServerContext } from "./types";
 import {
   setTag,
   setUser,
-  startNewTrace,
-  startSpan,
+  getActiveSpan,
   wrapMcpServerWithSentry,
 } from "@sentry/core";
 import { logIssue, type LogIssueOptions } from "./telem/logging";
@@ -44,24 +43,6 @@ import {
   getConstraintParametersToInject,
   getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
-
-/**
- * Extracts MCP request parameters for OpenTelemetry attributes.
- *
- * @example Parameter Transformation
- * ```typescript
- * const input = { organizationSlug: "my-org", query: "is:unresolved" };
- * const output = extractMcpParameters(input);
- * // { "mcp.request.argument.organizationSlug": "\"my-org\"", "mcp.request.argument.query": "\"is:unresolved\"" }
- * ```
- */
-function extractMcpParameters(args: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(args).map(([key, value]) => {
-      return [`mcp.request.argument.${key}`, JSON.stringify(value)];
-    }),
-  );
-}
 
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
@@ -274,110 +255,101 @@ function configureServer({
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
       ) => {
         try {
-          return await startNewTrace(async () => {
-            return await startSpan(
-              {
-                name: `tools/call ${tool.name}`,
-                attributes: {
-                  "mcp.tool.name": tool.name,
-                  "mcp.server.name": MCP_SERVER_NAME,
-                  "mcp.server.version": LIB_VERSION,
-                  ...extractMcpParameters(params || {}),
-                },
-              },
-              async (span) => {
-                // Add constraint attributes to span
-                if (context.constraints.organizationSlug) {
-                  span.setAttribute(
-                    "sentry-mcp.constraint-organization",
-                    context.constraints.organizationSlug,
-                  );
-                }
-                if (context.constraints.projectSlug) {
-                  span.setAttribute(
-                    "sentry-mcp.constraint-project",
-                    context.constraints.projectSlug,
-                  );
-                }
+          // Get active span (mcp.server span) and attach more attributes to it
+          const activeSpan = getActiveSpan();
 
-                if (context.userId) {
-                  setUser({
-                    id: context.userId,
-                  });
-                }
-                if (context.clientId) {
-                  setTag("client.id", context.clientId);
-                }
+          if (activeSpan) {
+            if (context.constraints.organizationSlug) {
+              activeSpan.setAttribute(
+                "sentry-mcp.constraint-organization",
+                context.constraints.organizationSlug,
+              );
+            }
+            if (context.constraints.projectSlug) {
+              activeSpan.setAttribute(
+                "sentry-mcp.constraint-project",
+                context.constraints.projectSlug,
+              );
+            }
+          }
 
-                try {
-                  // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
-                  const applicableConstraints = getConstraintParametersToInject(
-                    context.constraints,
-                    tool.inputSchema,
-                  );
+          if (context.userId) {
+            setUser({
+              id: context.userId,
+            });
+          }
+          if (context.clientId) {
+            setTag("client.id", context.clientId);
+          }
 
-                  const paramsWithConstraints = {
-                    ...params,
-                    ...applicableConstraints,
-                  };
-
-                  // Execute tool handler with context passed directly
-                  // Context is available via the closure and as a parameter
-                  const output = await tool.handler(
-                    paramsWithConstraints,
-                    context,
-                  );
-                  span.setStatus({
-                    code: 1, // ok
-                  });
-                  // if the tool returns a string, assume it's a message
-                  if (typeof output === "string") {
-                    return {
-                      content: [
-                        {
-                          type: "text" as const,
-                          text: output,
-                        },
-                      ],
-                    };
-                  }
-                  // if the tool returns a list, assume it's a content list
-                  if (Array.isArray(output)) {
-                    return {
-                      content: output,
-                    };
-                  }
-                  throw new Error(`Invalid tool output: ${output}`);
-                } catch (error) {
-                  span.setStatus({
-                    code: 2, // error
-                  });
-
-                  // CRITICAL: Tool errors MUST be returned as formatted text responses,
-                  // NOT thrown as exceptions. This ensures consistent error handling
-                  // and prevents the MCP client from receiving raw error objects.
-                  //
-                  // The logAndFormatError function provides user-friendly error messages
-                  // with appropriate formatting for different error types:
-                  // - UserInputError: Clear guidance for fixing input problems
-                  // - ConfigurationError: Clear guidance for fixing configuration issues
-                  // - ApiError: HTTP status context with helpful messaging
-                  // - System errors: Sentry event IDs for debugging
-                  //
-                  // DO NOT change this to throw error - it breaks error handling!
-                  return {
-                    content: [
-                      {
-                        type: "text" as const,
-                        text: await formatErrorForUser(error),
-                      },
-                    ],
-                    isError: true,
-                  };
-                }
-              },
+          try {
+            // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
+            const applicableConstraints = getConstraintParametersToInject(
+              context.constraints,
+              tool.inputSchema,
             );
-          });
+
+            const paramsWithConstraints = {
+              ...params,
+              ...applicableConstraints,
+            };
+
+            const output = await tool.handler(paramsWithConstraints, context);
+
+            if (activeSpan) {
+              activeSpan.setStatus({
+                code: 1, // ok
+              });
+            }
+
+            // if the tool returns a string, assume it's a message
+            if (typeof output === "string") {
+              return {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: output,
+                  },
+                ],
+              };
+            }
+            // if the tool returns a list, assume it's a content list
+            if (Array.isArray(output)) {
+              return {
+                content: output,
+              };
+            }
+            throw new Error(`Invalid tool output: ${output}`);
+          } catch (error) {
+            if (activeSpan) {
+              activeSpan.setStatus({
+                code: 2, // error
+              });
+              activeSpan.recordException(error);
+            }
+
+            // CRITICAL: Tool errors MUST be returned as formatted text responses,
+            // NOT thrown as exceptions. This ensures consistent error handling
+            // and prevents the MCP client from receiving raw error objects.
+            //
+            // The logAndFormatError function provides user-friendly error messages
+            // with appropriate formatting for different error types:
+            // - UserInputError: Clear guidance for fixing input problems
+            // - ConfigurationError: Clear guidance for fixing configuration issues
+            // - ApiError: HTTP status context with helpful messaging
+            // - System errors: Sentry event IDs for debugging
+            //
+            // DO NOT change this to throw error - it breaks error handling!
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: await formatErrorForUser(error),
+                },
+              ],
+              isError: true,
+            };
+          }
         } finally {
           onToolComplete?.();
         }
