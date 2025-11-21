@@ -1,14 +1,14 @@
 /**
- * MCP Handler using experimental_createMcpHandler from Cloudflare agents library.
+ * MCP Handler using createMcpHandler from Cloudflare agents library.
  *
  * Stateless request handling approach:
- * - Uses experimental_createMcpHandler to wrap the MCP server
+ * - Uses createMcpHandler to wrap the MCP server
  * - Extracts auth props directly from ExecutionContext (set by OAuth provider)
  * - Context captured in tool handler closures during buildServer()
  * - No session state required - each request is independent
  */
 
-import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
+import { createMcpHandler } from "agents/mcp";
 import { buildServer } from "@sentry/mcp-core/server";
 import {
   expandScopes,

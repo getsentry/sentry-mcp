@@ -70,7 +70,7 @@ import {
  * @example Usage with Cloudflare Workers
  * ```typescript
  * import { buildServer } from "@sentry/mcp-core/server";
- * import { experimental_createMcpHandler as createMcpHandler } from "agents/mcp";
+ * import { createMcpHandler } from "agents/mcp";
  *
  * const serverContext = buildContextFromOAuth();
  * // Context is captured in closures during buildServer()
