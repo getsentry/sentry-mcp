@@ -11,7 +11,7 @@ vi.mock("@sentry/cloudflare", () => ({
 
 // Mock the MCP handler creation - we're testing the wrapper logic, not the MCP protocol
 vi.mock("agents/mcp", () => ({
-  experimental_createMcpHandler: vi.fn(() => {
+  createMcpHandler: vi.fn(() => {
     return vi.fn(() => {
       return Promise.resolve(new Response("OK", { status: 200 }));
     });
