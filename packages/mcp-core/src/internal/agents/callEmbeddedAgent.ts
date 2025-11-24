@@ -45,18 +45,24 @@ export async function callEmbeddedAgent<
     maxSteps: 5,
     temperature: 1, // GPT-5 only supports temperature of 1
     experimental_output: Output.object({ schema }),
-    // Disable strict JSON schema validation to allow .optional() in Zod schemas.
-    // When strictJsonSchema: true, OpenAI requires ALL properties to be in the "required" array,
-    // which breaks Zod's .optional() (removes fields from "required").
-    // Setting strictJsonSchema: false still gives us structured outputs (guaranteed valid JSON),
-    // but allows optional fields to work properly.
+    // Disable strict schema validation for both output and tool parameter schemas.
+    //
+    // OpenAI's structured outputs have limitations:
+    // - structuredOutputs: true (default) enforces strict mode for BOTH output and tool schemas
+    // - This requires ALL properties to be in the "required" array, breaking .optional()/.nullable()
+    //
+    // By setting both to false:
+    // - structuredOutputs: false - Disables strict mode for tool parameter schemas
+    // - strictJsonSchema: false - Disables strict mode for output schema
+    // - We still get valid JSON, just without the strict "all fields required" constraint
     //
     // See:
     // - Issue: https://github.com/getsentry/sentry-mcp/issues/623
-    // - AI SDK docs: https://ai-sdk.dev/providers/ai-sdk-providers/openai#strictjsonschema
+    // - AI SDK docs: https://ai-sdk.dev/providers/ai-sdk-providers/openai#structuredoutputs
     // - OpenAI docs: https://platform.openai.com/docs/guides/structured-outputs
     providerOptions: {
       openai: {
+        structuredOutputs: false,
         strictJsonSchema: false,
       },
     },
