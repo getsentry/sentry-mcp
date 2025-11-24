@@ -14,7 +14,7 @@ catalog:
   "@radix-ui/react-slot": ^1.2.3
   "@sentry/cloudflare": 10.22.0
   "@sentry/core": 10.22.0
-  "@sentry/node": 10.22.0
+  "@sentry/node": 10.27.0
   "@sentry/react": 10.22.0
   "@sentry/vite-plugin": ^3.5.0
   "@tailwindcss/typography": ^0.5.16
