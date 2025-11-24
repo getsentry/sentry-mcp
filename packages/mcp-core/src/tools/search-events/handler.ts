@@ -85,7 +85,7 @@ export default defineTool({
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
+      regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
 

@@ -78,7 +78,7 @@ export default defineTool({
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
+      regionUrl: params.regionUrl ?? undefined,
     });
 
     // Validate that we have the minimum required parameters

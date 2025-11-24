@@ -31,17 +31,17 @@ catalogs:
       specifier: ^1.2.3
       version: 1.2.3
     '@sentry/cloudflare':
-      specifier: 10.22.0
-      version: 10.22.0
+      specifier: 10.27.0
+      version: 10.27.0
     '@sentry/core':
-      specifier: 10.22.0
-      version: 10.22.0
+      specifier: 10.27.0
+      version: 10.27.0
     '@sentry/node':
       specifier: 10.27.0
       version: 10.27.0
     '@sentry/react':
-      specifier: 10.22.0
-      version: 10.22.0
+      specifier: 10.27.0
+      version: 10.27.0
     '@sentry/vite-plugin':
       specifier: ^3.5.0
       version: 3.5.0
@@ -233,10 +233,10 @@ importers:
         version: 1.2.3(@types/react@19.1.8)(react@19.1.0)
       '@sentry/cloudflare':
         specifier: 'catalog:'
-        version: 10.22.0(@cloudflare/workers-types@4.20251014.0)
+        version: 10.27.0(@cloudflare/workers-types@4.20251014.0)
       '@sentry/react':
         specifier: 'catalog:'
-        version: 10.22.0(react@19.1.0)
+        version: 10.27.0(react@19.1.0)
       agents:
         specifier: 'catalog:'
         version: 0.2.23(@cloudflare/workers-types@4.20251014.0)(react@19.1.0)(typescript@5.8.3)
@@ -357,7 +357,7 @@ importers:
         version: 1.22.0(@cfworker/json-schema@4.1.1)
       '@sentry/core':
         specifier: 'catalog:'
-        version: 10.22.0
+        version: 10.27.0
       '@sentry/node':
         specifier: 'catalog:'
         version: 10.27.0
@@ -397,7 +397,7 @@ importers:
         version: 1.22.0(@cfworker/json-schema@4.1.1)
       '@sentry/core':
         specifier: 'catalog:'
-        version: 10.22.0
+        version: 10.27.0
       '@sentry/node':
         specifier: 'catalog:'
         version: 10.27.0
@@ -500,7 +500,7 @@ importers:
         version: 1.22.0(@cfworker/json-schema@4.1.1)
       '@sentry/core':
         specifier: 'catalog:'
-        version: 10.22.0
+        version: 10.27.0
       '@sentry/mcp-core':
         specifier: workspace:*
         version: link:../mcp-core
@@ -1926,28 +1926,28 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@sentry-internal/browser-utils@10.22.0':
-    resolution: {integrity: sha512-BpJoLZEyJr7ORzkCrIjxRTnFWwO1mJNICVh3B9g5d9245niGT4OJvRozmLz89WgJkZFHWu84ls6Xfq5b/3tGFQ==}
+  '@sentry-internal/browser-utils@10.27.0':
+    resolution: {integrity: sha512-17tO6AXP+rmVQtLJ3ROQJF2UlFmvMWp7/8RDT5x9VM0w0tY31z8Twc0gw2KA7tcDxa5AaHDUbf9heOf+R6G6ow==}
     engines: {node: '>=18'}
 
-  '@sentry-internal/feedback@10.22.0':
-    resolution: {integrity: sha512-zXySOin/gGHPV+yKaHqjN9YZ7psEJwzLn8PzCLeo+4REzF1eQwbYZIgOxJFD32z8s3nZiABSWFM/n1CvVfMEsQ==}
+  '@sentry-internal/feedback@10.27.0':
+    resolution: {integrity: sha512-UecsIDJcv7VBwycge/MDvgSRxzevDdcItE1i0KSwlPz00rVVxLY9kV28PJ4I2E7r6/cIaP9BkbWegCEcv09NuA==}
     engines: {node: '>=18'}
 
-  '@sentry-internal/replay-canvas@10.22.0':
-    resolution: {integrity: sha512-DE4JNUskJg+O+wFq42W5gAa/99aD5k7TfGOwABxvnzFv8vkKA7pqXwPbFFPzypdKIkln+df7RmbnDwQRNg6/lA==}
+  '@sentry-internal/replay-canvas@10.27.0':
+    resolution: {integrity: sha512-inhsRYSVBpu3BI1kZphXj6uB59baJpYdyHeIPCiTfdFNBE5tngNH0HS/aedZ1g9zICw290lwvpuyrWJqp4VBng==}
     engines: {node: '>=18'}
 
-  '@sentry-internal/replay@10.22.0':
-    resolution: {integrity: sha512-JNE4kHAQSG4/V+J+Zog3vKBWgOe9H33ol/MEU1RuLM/4I+uLf4mTetwnS9ilpnnW/Z/gQYfA+R3CiMrZtqTivw==}
+  '@sentry-internal/replay@10.27.0':
+    resolution: {integrity: sha512-tKSzHq1hNzB619Ssrqo25cqdQJ84R3xSSLsUWEnkGO/wcXJvpZy94gwdoS+KmH18BB1iRRRGtnMxZcUkiPSesw==}
     engines: {node: '>=18'}
 
   '@sentry/babel-plugin-component-annotate@3.5.0':
     resolution: {integrity: sha512-s2go8w03CDHbF9luFGtBHKJp4cSpsQzNVqgIa9Pfa4wnjipvrK6CxVT4icpLA3YO6kg5u622Yoa5GF3cJdippw==}
     engines: {node: '>= 14'}
 
-  '@sentry/browser@10.22.0':
-    resolution: {integrity: sha512-wD2XqN+yeBpQFfdPo6+wlKDMyyuDctVGzZWE4qTPntICKQuwMdAfeq5Ma89ad0Dw+bzG9UijGeyuJQlswF87Mw==}
+  '@sentry/browser@10.27.0':
+    resolution: {integrity: sha512-G8q362DdKp9y1b5qkQEmhTFzyWTOVB0ps1rflok0N6bVA75IEmSDX1pqJsNuY3qy14VsVHYVwQBJQsNltQLS0g==}
     engines: {node: '>=18'}
 
   '@sentry/bundler-plugin-core@3.5.0':
@@ -2000,18 +2000,14 @@ packages:
     engines: {node: '>= 10'}
     hasBin: true
 
-  '@sentry/cloudflare@10.22.0':
-    resolution: {integrity: sha512-uyONKTs5chatOnHC1xoEN7Dy4QhdQop9CB0IYVQ1K4EVpCskKKtoqWglB2NxkDNN7B8UerRuCHFiFHrKuHodPQ==}
+  '@sentry/cloudflare@10.27.0':
+    resolution: {integrity: sha512-DMdXMvKzSdaGZplSVdT7Ae6zhcgRw8CG23ceOkGe9mwZjwgpq4lgnSoDLxjNDcJsnoSeODqFgE2+UtCsl3Y/AQ==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cloudflare/workers-types': ^4.x
     peerDependenciesMeta:
       '@cloudflare/workers-types':
         optional: true
-
-  '@sentry/core@10.22.0':
-    resolution: {integrity: sha512-V1oeHbrOKzxadsCmgtPku3v3Emo/Bpb3VSuKmlLrQefiHX98MWtjJ3XDGfduzD5/dCdh0r/OOLwjcmrO/PZ2aw==}
-    engines: {node: '>=18'}
 
   '@sentry/core@10.27.0':
     resolution: {integrity: sha512-Zc68kdH7tWTDtDbV1zWIbo3Jv0fHAU2NsF5aD2qamypKgfSIMSbWVxd22qZyDBkaX8gWIPm/0Sgx6aRXRBXrYQ==}
@@ -2047,8 +2043,8 @@ packages:
       '@opentelemetry/sdk-trace-base': ^1.30.1 || ^2.1.0 || ^2.2.0
       '@opentelemetry/semantic-conventions': ^1.37.0
 
-  '@sentry/react@10.22.0':
-    resolution: {integrity: sha512-XByOjtW30LMNibmCPJF5LNYFmETNOUmWByECADox8GYV4BEX18WGXl4K1fpPDTSk+y4vUCHbltHa4GkyTRwG8Q==}
+  '@sentry/react@10.27.0':
+    resolution: {integrity: sha512-xoIRBlO1IhLX/O9aQgVYW1F3Qhw8TdkOiZjh6mrPsnCpBLufsQ4aS1nDQi9miZuWeslW0s2zNy0ACBpICZR/sw==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^16.14.0 || 17.x || 18.x || 19.x
@@ -6221,33 +6217,33 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.44.1':
     optional: true
 
-  '@sentry-internal/browser-utils@10.22.0':
+  '@sentry-internal/browser-utils@10.27.0':
     dependencies:
-      '@sentry/core': 10.22.0
+      '@sentry/core': 10.27.0
 
-  '@sentry-internal/feedback@10.22.0':
+  '@sentry-internal/feedback@10.27.0':
     dependencies:
-      '@sentry/core': 10.22.0
+      '@sentry/core': 10.27.0
 
-  '@sentry-internal/replay-canvas@10.22.0':
+  '@sentry-internal/replay-canvas@10.27.0':
     dependencies:
-      '@sentry-internal/replay': 10.22.0
-      '@sentry/core': 10.22.0
+      '@sentry-internal/replay': 10.27.0
+      '@sentry/core': 10.27.0
 
-  '@sentry-internal/replay@10.22.0':
+  '@sentry-internal/replay@10.27.0':
     dependencies:
-      '@sentry-internal/browser-utils': 10.22.0
-      '@sentry/core': 10.22.0
+      '@sentry-internal/browser-utils': 10.27.0
+      '@sentry/core': 10.27.0
 
   '@sentry/babel-plugin-component-annotate@3.5.0': {}
 
-  '@sentry/browser@10.22.0':
+  '@sentry/browser@10.27.0':
     dependencies:
-      '@sentry-internal/browser-utils': 10.22.0
-      '@sentry-internal/feedback': 10.22.0
-      '@sentry-internal/replay': 10.22.0
-      '@sentry-internal/replay-canvas': 10.22.0
-      '@sentry/core': 10.22.0
+      '@sentry-internal/browser-utils': 10.27.0
+      '@sentry-internal/feedback': 10.27.0
+      '@sentry-internal/replay': 10.27.0
+      '@sentry-internal/replay-canvas': 10.27.0
+      '@sentry/core': 10.27.0
 
   '@sentry/bundler-plugin-core@3.5.0':
     dependencies:
@@ -6303,14 +6299,12 @@ snapshots:
       - encoding
       - supports-color
 
-  '@sentry/cloudflare@10.22.0(@cloudflare/workers-types@4.20251014.0)':
+  '@sentry/cloudflare@10.27.0(@cloudflare/workers-types@4.20251014.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@sentry/core': 10.22.0
+      '@sentry/core': 10.27.0
     optionalDependencies:
       '@cloudflare/workers-types': 4.20251014.0
-
-  '@sentry/core@10.22.0': {}
 
   '@sentry/core@10.27.0': {}
 
@@ -6381,10 +6375,10 @@ snapshots:
       '@opentelemetry/semantic-conventions': 1.37.0
       '@sentry/core': 10.27.0
 
-  '@sentry/react@10.22.0(react@19.1.0)':
+  '@sentry/react@10.27.0(react@19.1.0)':
     dependencies:
-      '@sentry/browser': 10.22.0
-      '@sentry/core': 10.22.0
+      '@sentry/browser': 10.27.0
+      '@sentry/core': 10.27.0
       hoist-non-react-statics: 3.3.2
       react: 19.1.0
 
