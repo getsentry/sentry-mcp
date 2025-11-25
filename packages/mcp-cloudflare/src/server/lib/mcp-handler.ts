@@ -1,10 +1,15 @@
 /**
  * MCP Handler - Routes requests to stateful McpSession Agents.
  *
- *  Stateful request handler:
+ * Stateful request handler:
  * - Extracts or generates session ID from mcp-session-id header
  * - Uses getAgentByName to get the Agent instance
  * - Calls agent.onMcpRequest(request) with context in ExecutionContext.props
+ *
+ * Note: We use string[] instead of Set<Scope>/Set<Skill> because JS
+ * Sets don't serialize over Cloudflare's RPC transport to Durable Objects.
+ * The McpSession Agent receives SerializableServerContext via ExecutionContext.props
+ * and converts arrays back to Sets for use by tools. See SerializableServerContext intypes.ts for details.
  */
 
 import { getAgentByName } from "agents";
