@@ -56,7 +56,7 @@ export default defineTool({
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
+      regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
 
@@ -64,8 +64,8 @@ export default defineTool({
 
     const releases = await apiService.listReleases({
       organizationSlug,
-      projectSlug: params.projectSlug,
-      query: params.query,
+      projectSlug: params.projectSlug ?? undefined,
+      query: params.query ?? undefined,
     });
     let output = `# Releases in **${organizationSlug}${params.projectSlug ? `/${params.projectSlug}` : ""}**\n\n`;
     if (releases.length === 0) {

@@ -41,6 +41,9 @@ jobs:
       - name: Run build
         run: pnpm build
 
+      - name: Run type checking
+        run: pnpm -w run tsc
+
       - name: Run linter
         run: pnpm lint
 

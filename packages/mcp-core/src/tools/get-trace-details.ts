@@ -62,7 +62,7 @@ export default defineTool({
     }
 
     const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
+      regionUrl: params.regionUrl ?? undefined,
     });
 
     setTag("organization.slug", params.organizationSlug);
