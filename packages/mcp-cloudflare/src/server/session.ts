@@ -100,17 +100,14 @@ export class McpSession extends Agent<Env> {
       this.sessionContext.sentryHost = contextData.sentryHost;
       this.sessionContext.mcpUrl = contextData.mcpUrl;
 
-      if (contextData.grantedScopes) {
-        this.sessionContext.grantedScopes = new Set<Scope>(
-          contextData.grantedScopes as Scope[],
-        );
-      }
+      // Always set to current request's authorization state (clear if not present)
+      this.sessionContext.grantedScopes = contextData.grantedScopes
+        ? new Set<Scope>(contextData.grantedScopes as Scope[])
+        : undefined;
 
-      if (contextData.grantedSkills) {
-        this.sessionContext.grantedSkills = new Set<Skill>(
-          contextData.grantedSkills as Skill[],
-        );
-      }
+      this.sessionContext.grantedSkills = contextData.grantedSkills
+        ? new Set<Skill>(contextData.grantedSkills as Skill[])
+        : undefined;
 
       this.sessionContext.constraints = {
         organizationSlug: contextData.organizationSlug,
