@@ -3,6 +3,8 @@ import type {
   RateLimit,
   WorkerVersionMetadata,
 } from "@cloudflare/workers-types";
+import type { AgentNamespace } from "agents";
+import type { McpSession } from "./session";
 
 /**
  * Props passed through OAuth and available via ExecutionContext.props
@@ -29,6 +31,32 @@ export type WorkerProps = {
   // Note: sentryHost and mcpUrl come from env, not OAuth props
 };
 
+/**
+ * Serializable version of ServerContext for RPC transport.
+ *
+ * This type is used to pass authentication and authorization context
+ * from the router to the McpSession Agent via ExecutionContext.props.
+ *
+ * Key differences from ServerContext (mcp-core/types):
+ * - Uses string[] instead of Set<Scope>/Set<Skill> (Sets don't serialize over RPC)
+ * - Uses flat organizationSlug/projectSlug instead of nested Constraints object
+ * - Includes isAgentMode flag for dynamic server configuration
+ *
+ * The Agent converts this back to ServerContext format for use by tools.
+ */
+export interface SerializableServerContext {
+  userId?: string;
+  clientId: string;
+  accessToken: string;
+  grantedScopes?: string[];
+  grantedSkills?: string[];
+  organizationSlug?: string | null;
+  projectSlug?: string | null;
+  sentryHost: string;
+  mcpUrl?: string;
+  isAgentMode?: boolean;
+}
+
 export interface Env {
   NODE_ENV: string;
   ASSETS: Fetcher;
@@ -48,4 +76,5 @@ export interface Env {
   SEARCH_RATE_LIMITER: RateLimit;
   MCP_RATE_LIMITER: RateLimit;
   AUTORAG_INDEX_NAME?: string;
+  MCP_SESSION: AgentNamespace<McpSession>;
 }

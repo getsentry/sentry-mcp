@@ -65,12 +65,24 @@
   "ai": {
     "binding": "AI"
   },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MCP_SESSION",
+        "class_name": "McpSession"
+      }
+    ]
+  },
   "migrations": [
     {
       "tag": "v1"
     },
     {
       "tag": "v2"
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["McpSession"]
     }
   ],
   "observability": {

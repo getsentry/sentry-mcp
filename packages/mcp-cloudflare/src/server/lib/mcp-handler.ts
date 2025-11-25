@@ -1,27 +1,19 @@
 /**
- * MCP Handler using createMcpHandler from Cloudflare agents library.
+ * MCP Handler - Routes requests to stateful McpSession Agents.
  *
- * Stateless request handling approach:
- * - Uses createMcpHandler to wrap the MCP server
- * - Extracts auth props directly from ExecutionContext (set by OAuth provider)
- * - Context captured in tool handler closures during buildServer()
- * - No session state required - each request is independent
+ *  Stateful request handler:
+ * - Extracts or generates session ID from mcp-session-id header
+ * - Uses getAgentByName to get the Agent instance
+ * - Calls agent.onMcpRequest(request) with context in ExecutionContext.props
  */
 
-import { createMcpHandler } from "agents/mcp";
-import { buildServer } from "@sentry/mcp-core/server";
-import {
-  expandScopes,
-  parseScopes,
-  type Scope,
-} from "@sentry/mcp-core/permissions";
-import { parseSkills, type Skill } from "@sentry/mcp-core/skills";
+import { getAgentByName } from "agents";
+import { expandScopes, parseScopes } from "@sentry/mcp-core/permissions";
+import { parseSkills } from "@sentry/mcp-core/skills";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import type { ServerContext } from "@sentry/mcp-core/types";
-import type { Env } from "../types";
+import type { Env, SerializableServerContext } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
 import type { ExportedHandler } from "@cloudflare/workers-types";
-import * as Sentry from "@sentry/cloudflare";
 
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
@@ -32,12 +24,11 @@ type OAuthExecutionContext = ExecutionContext & {
 
 /**
  * Main request handler that:
- * 1. Extracts auth props from ExecutionContext
- * 2. Parses org/project constraints from URL
- * 3. Verifies user has access to the constraints
- * 4. Builds complete ServerContext
- * 5. Creates and configures MCP server per-request (context captured in closures)
- * 6. Runs MCP handler
+ * 1. Extracts or generates session ID
+ * 2. Extracts auth props from ExecutionContext
+ * 3. Parses org/project constraints from URL
+ * 4. Verifies user has access to the constraints
+ * 5. Routes request to McpSession Durable Object with context
  */
 const mcpHandler: ExportedHandler<Env> = {
   async fetch(
@@ -66,7 +57,12 @@ const mcpHandler: ExportedHandler<Env> = {
     const oauthCtx = ctx as OAuthExecutionContext;
 
     if (!oauthCtx.props) {
-      throw new Error("No authentication context available");
+      logIssue(new Error("No authentication context available"), {
+        loggerScope: ["cloudflare", "mcp-handler"],
+      });
+      return new Response("No authentication context available", {
+        status: 401,
+      });
     }
 
     const sentryHost = env.SENTRY_HOST || "sentry.io";
@@ -87,7 +83,7 @@ const mcpHandler: ExportedHandler<Env> = {
     }
 
     // Parse and expand granted scopes (LEGACY - for backward compatibility)
-    let expandedScopes: Set<Scope> | undefined;
+    let expandedScopes: string[] | undefined;
     if (oauthCtx.props.grantedScopes) {
       const { valid, invalid } = parseScopes(
         oauthCtx.props.grantedScopes as string[],
@@ -100,11 +96,11 @@ const mcpHandler: ExportedHandler<Env> = {
           },
         });
       }
-      expandedScopes = expandScopes(new Set(valid));
+      expandedScopes = Array.from(expandScopes(new Set(valid)));
     }
 
     // Parse and validate granted skills (NEW - primary authorization method)
-    let grantedSkills: Set<Skill> | undefined;
+    let grantedSkills: string[] | undefined;
     if (oauthCtx.props.grantedSkills) {
       const { valid, invalid } = parseSkills(
         oauthCtx.props.grantedSkills as string[],
@@ -117,10 +113,10 @@ const mcpHandler: ExportedHandler<Env> = {
           },
         });
       }
-      grantedSkills = new Set(valid);
+      grantedSkills = Array.from(valid);
 
       // Validate that at least one valid skill was granted
-      if (grantedSkills.size === 0) {
+      if (valid.size === 0) {
         return new Response(
           "Authorization failed: No valid skills were granted. Please re-authorize and select at least one permission.",
           { status: 400 },
@@ -150,8 +146,12 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
-    // Build complete ServerContext from OAuth props + verified constraints
-    const serverContext: ServerContext = {
+    const sessionId =
+      request.headers.get("mcp-session-id") ?? crypto.randomUUID();
+
+    const agent = await getAgentByName(env.MCP_SESSION, sessionId);
+
+    const serverContext: SerializableServerContext = {
       userId: oauthCtx.props.id as string | undefined,
       clientId: oauthCtx.props.clientId as string,
       accessToken: oauthCtx.props.accessToken as string,
@@ -159,26 +159,21 @@ const mcpHandler: ExportedHandler<Env> = {
       // that don't support grantedSkills and only understand grantedScopes
       grantedScopes: expandedScopes,
       grantedSkills, // Primary authorization method
-      constraints: verification.constraints,
+      organizationSlug: verification.constraints.organizationSlug,
+      projectSlug: verification.constraints.projectSlug,
       sentryHost,
       mcpUrl: env.MCP_URL,
+      isAgentMode,
     };
 
-    // Create and configure MCP server with tools filtered by context
-    // Context is captured in tool handler closures during buildServer()
-    const server = buildServer({
-      context: serverContext,
-      agentMode: isAgentMode,
-      onToolComplete: () => {
-        // Flush Sentry events after tool execution
-        ctx.waitUntil(Sentry.flush(2000));
-      },
-    });
+    // Create ExecutionContext with props - this is how we pass context to the Agent
+    const contextWithProps = {
+      ...ctx,
+      props: serverContext,
+    } as ExecutionContext;
 
-    // Run MCP handler - context already captured in closures
-    return createMcpHandler(server, {
-      route: url.pathname,
-    })(request, env, ctx);
+    // Call the Agent's onMcpRequest method
+    return await agent.onMcpRequest(request, contextWithProps);
   },
 };
 

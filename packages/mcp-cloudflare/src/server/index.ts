@@ -9,6 +9,8 @@ import sentryMcpHandler from "./lib/mcp-handler";
 import { checkRateLimit } from "./utils/rate-limiter";
 import { getClientIp } from "./utils/client-ip";
 
+export { McpSession } from "./session";
+
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
   "/.well-known/", // OAuth discovery endpoints
