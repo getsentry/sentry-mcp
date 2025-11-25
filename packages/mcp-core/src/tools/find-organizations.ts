@@ -32,7 +32,7 @@ export default defineTool({
     // as they must always query the main API server, not region-specific servers
     const apiService = apiServiceFromContext(context);
     const organizations = await apiService.listOrganizations({
-      query: params.query,
+      query: params.query ?? undefined,
     });
 
     let output = "# Organizations\n\n";

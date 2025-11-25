@@ -61,7 +61,7 @@ export default defineTool({
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
+      regionUrl: params.regionUrl ?? undefined,
     });
 
     setTag("organization.slug", params.organizationSlug);
@@ -97,7 +97,6 @@ export default defineTool({
           contentParts.push(image);
         } else {
           const resource: EmbeddedResource = {
-            id: params.attachmentId,
             type: "resource",
             resource: {
               uri: `file://${attachment.filename}`,

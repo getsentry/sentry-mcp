@@ -81,7 +81,7 @@ export default defineTool({
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
+      regionUrl: params.regionUrl ?? undefined,
     });
 
     setTag("organization.slug", params.organizationSlug);
@@ -123,8 +123,8 @@ export default defineTool({
     // Execute the search - listIssues accepts projectSlug directly
     const issues = await apiService.listIssues({
       organizationSlug: params.organizationSlug,
-      projectSlug: params.projectSlugOrId,
-      query: translatedQuery.query,
+      projectSlug: params.projectSlugOrId ?? undefined,
+      query: translatedQuery.query ?? undefined,
       sortBy: translatedQuery.sort || "date",
       limit: params.limit,
     });
@@ -155,9 +155,9 @@ export default defineTool({
       output += formatIssueResults({
         issues,
         organizationSlug: params.organizationSlug,
-        projectSlugOrId: params.projectSlugOrId,
+        projectSlugOrId: params.projectSlugOrId ?? undefined,
         query: translatedQuery.query,
-        regionUrl: params.regionUrl,
+        regionUrl: params.regionUrl ?? undefined,
         naturalLanguageQuery: params.naturalLanguageQuery,
         skipHeader: true,
       });
@@ -166,9 +166,9 @@ export default defineTool({
       output = formatIssueResults({
         issues,
         organizationSlug: params.organizationSlug,
-        projectSlugOrId: params.projectSlugOrId,
+        projectSlugOrId: params.projectSlugOrId ?? undefined,
         query: translatedQuery.query,
-        regionUrl: params.regionUrl,
+        regionUrl: params.regionUrl ?? undefined,
         naturalLanguageQuery: params.naturalLanguageQuery,
         skipHeader: false,
       });

@@ -36,7 +36,7 @@ export default defineTool({
   },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl,
+      regionUrl: params.regionUrl ?? undefined,
     });
     const organizationSlug = params.organizationSlug;
 
@@ -49,7 +49,7 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
 
     const teams = await apiService.listTeams(organizationSlug, {
-      query: params.query,
+      query: params.query ?? undefined,
     });
 
     let output = `# Teams in **${organizationSlug}**\n\n`;
