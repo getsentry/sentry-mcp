@@ -2,21 +2,24 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import "urlpattern-polyfill";
 import type { Env } from "../types";
 import type { ExecutionContext } from "@cloudflare/workers-types";
-import handler from "./mcp-handler.js";
 
 // Mock Sentry to avoid actual telemetry
 vi.mock("@sentry/cloudflare", () => ({
   flush: vi.fn(() => Promise.resolve(true)),
 }));
 
-// Mock the MCP handler creation - we're testing the wrapper logic, not the MCP protocol
-vi.mock("agents/mcp", () => ({
-  createMcpHandler: vi.fn(() => {
-    return vi.fn(() => {
-      return Promise.resolve(new Response("OK", { status: 200 }));
-    });
-  }),
+// Mock agents module - uses cloudflare:* imports that don't work in Node.js
+// We're testing the routing/validation logic, not the Agent behavior
+vi.mock("agents", () => ({
+  getAgentByName: vi.fn(() => ({
+    onMcpRequest: vi.fn(() =>
+      Promise.resolve(new Response("OK", { status: 200 })),
+    ),
+  })),
 }));
+
+// Import handler AFTER mocks are set up
+import handler from "./mcp-handler.js";
 
 describe("mcp-handler", () => {
   let env: Env;
@@ -76,7 +79,7 @@ describe("mcp-handler", () => {
     expect(await response.text()).toContain("not found");
   });
 
-  it("returns error when authentication context is missing", async () => {
+  it("returns 401 when authentication context is missing", async () => {
     const ctxWithoutAuth = {
       waitUntil: vi.fn(),
       passThroughOnException: vi.fn(),
@@ -85,9 +88,14 @@ describe("mcp-handler", () => {
 
     const request = new Request("https://test.mcp.sentry.io/mcp");
 
-    await expect(
-      handler.fetch!(request as any, env, ctxWithoutAuth as any),
-    ).rejects.toThrow("No authentication context");
+    const response = await handler.fetch!(
+      request as any,
+      env,
+      ctxWithoutAuth as any,
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain("No authentication context");
   });
 
   it("successfully handles request with org and project constraints", async () => {
