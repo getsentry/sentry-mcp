@@ -34,7 +34,7 @@ export class McpSession extends Agent<Env> {
         return this.ctx.storage.kv.get<TransportState>(STATE_KEY);
       },
       set: (state: TransportState) => {
-        this.ctx.storage.kv.put<TransportState>(STATE_KEY, state);
+        return this.ctx.storage.kv.put<TransportState>(STATE_KEY, state);
       },
     },
   });
