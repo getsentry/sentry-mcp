@@ -17,6 +17,7 @@ export function parseArgv(argv: string[]): CliArgs {
     "all-scopes": { type: "boolean" as const },
     skills: { type: "string" as const },
     agent: { type: "boolean" as const },
+    reauth: { type: "boolean" as const },
     help: { type: "boolean" as const, short: "h" as const },
     version: { type: "boolean" as const, short: "v" as const },
   };
@@ -63,6 +64,7 @@ export function parseArgv(argv: string[]): CliArgs {
     allScopes: (values["all-scopes"] as boolean | undefined) === true,
     skills: values.skills as string | undefined,
     agent: (values.agent as boolean | undefined) === true,
+    reauth: (values.reauth as boolean | undefined) === true,
     help: (values.help as boolean | undefined) === true,
     version: (values.version as boolean | undefined) === true,
     unknownArgs:
@@ -122,6 +124,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     agent: cli.agent === true,
     organizationSlug: cli.organizationSlug,
     projectSlug: cli.projectSlug,
+    reauth: cli.reauth === true,
     help: cli.help === true,
     version: cli.version === true,
     unknownArgs: cli.unknownArgs,

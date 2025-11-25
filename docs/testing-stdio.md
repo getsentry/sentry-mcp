@@ -140,7 +140,19 @@ This opens the MCP Inspector at `http://localhost:6274`
 2. Select "Stdio" transport type
 3. Configure the command:
 
-**For development (TypeScript):**
+**Recommended: Using bin/mcp-server wrapper (avoids stdout pollution):**
+```json
+{
+  "command": "/absolute/path/to/sentry-mcp/bin/mcp-server",
+  "args": [
+    "--access-token=YOUR_TOKEN"
+  ]
+}
+```
+
+The `bin/mcp-server` wrapper script uses `tsx` directly, avoiding pnpm's stdout pollution that breaks the MCP JSON-RPC protocol.
+
+**Alternative: For development with pnpm (may have stdout issues):**
 ```json
 {
   "command": "pnpm",
@@ -153,7 +165,7 @@ This opens the MCP Inspector at `http://localhost:6274`
 }
 ```
 
-**For built package:**
+**Alternative: For built package:**
 ```json
 {
   "command": "node",
@@ -164,7 +176,7 @@ This opens the MCP Inspector at `http://localhost:6274`
 }
 ```
 
-**For self-hosted Sentry:**
+**Alternative: For self-hosted Sentry:**
 ```json
 {
   "command": "npx",
@@ -568,6 +580,28 @@ pwd         # Get absolute path to project
   "args": ["/absolute/path/to/sentry-mcp/packages/mcp-server/dist/index.js"]
 }
 ```
+
+### "JSON parse error" or "Unexpected token" in MCP Inspector
+
+**Cause:** Stdout pollution - pnpm outputs messages like `"> @sentry/mcp-server"` or `"> tsx src/index.ts"` to stdout, which breaks the MCP JSON-RPC protocol that requires clean JSON on stdout.
+
+**Solution:**
+Use the `bin/mcp-server` wrapper script instead of pnpm:
+
+```json
+{
+  "command": "/absolute/path/to/sentry-mcp/bin/mcp-server",
+  "args": [
+    "--access-token=YOUR_TOKEN"
+  ]
+}
+```
+
+The wrapper script uses `tsx` directly via `npx`, avoiding pnpm's stdout pollution.
+
+**Alternative solutions:**
+- Use the built package: `node dist/index.js --access-token=TOKEN`
+- Use npx directly: `npx tsx packages/mcp-server/src/index.ts --access-token=TOKEN`
 
 ### "Permission denied" errors
 

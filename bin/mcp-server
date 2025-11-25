@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+# Simple wrapper to run the MCP server with tsx directly
+# This avoids pnpm's stdout pollution that breaks the MCP protocol
+
+exec npx tsx "$(dirname "$0")/../packages/mcp-server/src/index.ts" "$@"

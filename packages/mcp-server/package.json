@@ -47,6 +47,7 @@
     "@sentry/node": "catalog:",
     "@sentry/core": "catalog:",
     "dotenv": "catalog:",
+    "open": "^10.1.0",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -3,11 +3,8 @@ import { finalize } from "./resolve";
 import { ALL_SCOPES } from "@sentry/mcp-core/permissions";
 
 describe("cli/finalize", () => {
-  it("throws on missing access token", () => {
-    expect(() => finalize({ unknownArgs: [] } as any)).toThrow(
-      /No access token was provided/,
-    );
-  });
+  // Note: accessToken validation removed - now handled in index.ts after OAuth flow
+  // Access token may be provided via CLI/env OR obtained through OAuth
 
   it("throws on invalid scopes", () => {
     expect(() =>

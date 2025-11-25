@@ -16,6 +16,7 @@ export type CliArgs = {
   agent?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
+  reauth?: boolean; // Force re-authentication via OAuth
   help?: boolean;
   version?: boolean;
   unknownArgs: string[];
@@ -48,13 +49,14 @@ export type MergedArgs = {
   agent?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
+  reauth?: boolean; // Force re-authentication via OAuth
   help?: boolean;
   version?: boolean;
   unknownArgs: string[];
 };
 
 export type ResolvedConfig = {
-  accessToken: string;
+  accessToken?: string; // Optional - may be provided later via OAuth flow
   sentryHost: string;
   mcpUrl?: string;
   sentryDsn?: string;
