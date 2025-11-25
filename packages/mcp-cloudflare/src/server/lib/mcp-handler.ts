@@ -102,6 +102,14 @@ const mcpHandler: ExportedHandler<Env> = {
         });
       }
       expandedScopes = Array.from(expandScopes(new Set(valid)));
+
+      // Validate that at least one valid scope was granted (matches skills validation)
+      if (valid.size === 0) {
+        return new Response(
+          "Authorization failed: No valid scopes were granted. Please re-authorize and select at least one permission.",
+          { status: 400 },
+        );
+      }
     }
 
     // Parse and validate granted skills (NEW - primary authorization method)
