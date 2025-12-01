@@ -1726,6 +1726,17 @@ export function formatIssueOutput({
     output += `**Substatus**: ${issue.substatus}\n`;
   }
 
+  // Add assignee information if assigned
+  if (issue.assignedTo) {
+    if (typeof issue.assignedTo === "string") {
+      output += `**Assigned To**: ${issue.assignedTo}\n`;
+    } else {
+      const assignee = issue.assignedTo;
+      const type = assignee.type === "team" ? "Team" : "User";
+      output += `**Assigned To**: ${assignee.name} (${type})\n`;
+    }
+  }
+
   // Add issue type and category for performance/metric issues
   if (issue.issueType) {
     output += `**Issue Type**: ${issue.issueType}\n`;

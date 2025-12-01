@@ -35,7 +35,12 @@
     "title": "Error: Tool list_organizations is already registered"
   },
   "numComments": 0,
-  "assignedTo": null,
+  "assignedTo": {
+    "type": "user",
+    "id": "12345",
+    "name": "Jane Developer",
+    "email": "jane@example.com"
+  },
   "isBookmarked": false,
   "isSubscribed": false,
   "subscriptionDetails": null,
