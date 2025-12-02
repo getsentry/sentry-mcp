@@ -85,9 +85,6 @@ const wrappedOAuthProvider = {
 
     const response = await oAuthProvider.fetch(request, env, ctx);
 
-    // Flush buffered logs before Worker terminates
-    ctx.waitUntil(Sentry.flush(2000));
-
     // Add CORS headers to public metadata endpoints
     if (isPublicMetadataEndpoint(url.pathname)) {
       return addCorsHeaders(response);
