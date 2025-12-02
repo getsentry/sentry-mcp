@@ -33,7 +33,7 @@ describe("update_issue", () => {
       ## Current Status
 
       **Status**: resolved
-      **Assigned To**: Unassigned
+      **Assigned To**: Jane Developer
 
       # Using this information
 
@@ -70,7 +70,7 @@ describe("update_issue", () => {
 
       ## Changes Made
 
-      **Assigned To**: Unassigned → **john.doe**
+      **Assigned To**: Jane Developer → **john.doe**
 
       ## Current Status
 
@@ -112,7 +112,7 @@ describe("update_issue", () => {
       ## Changes Made
 
       **Status**: unresolved → **resolved**
-      **Assigned To**: Unassigned → **You**
+      **Assigned To**: Jane Developer → **You**
 
       ## Current Status
 

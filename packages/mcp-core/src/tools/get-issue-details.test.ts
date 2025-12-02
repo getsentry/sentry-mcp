@@ -187,6 +187,7 @@ describe("get_issue_details", () => {
       **Users Impacted**: 1
       **Status**: unresolved
       **Substatus**: ongoing
+      **Assigned To**: Jane Developer (User)
       **Issue Type**: error
       **Issue Category**: error
       **Platform**: javascript
@@ -254,6 +255,64 @@ describe("get_issue_details", () => {
     `);
   });
 
+  it("displays team assignment correctly", async () => {
+    // Override the issue fixture with a team assignment
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/TEAM-ISSUE-001/",
+        () =>
+          HttpResponse.json({
+            id: "123456789",
+            shortId: "TEAM-ISSUE-001",
+            title: "Test issue with team assignment",
+            firstSeen: "2025-04-03T22:51:19.403Z",
+            lastSeen: "2025-04-12T11:34:11Z",
+            count: "10",
+            userCount: 5,
+            permalink:
+              "https://sentry-mcp-evals.sentry.io/issues/TEAM-ISSUE-001",
+            project: {
+              id: "4509062593708032",
+              slug: "test-project",
+              name: "Test Project",
+            },
+            platform: "javascript",
+            status: "unresolved",
+            substatus: "ongoing",
+            culprit: "app.main",
+            type: "error",
+            issueType: "error",
+            issueCategory: "error",
+            assignedTo: {
+              type: "team",
+              id: "99999",
+              name: "Platform Team",
+            },
+          }),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/TEAM-ISSUE-001/events/latest/",
+        () => HttpResponse.json(createDefaultEvent()),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "TEAM-ISSUE-001",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    // Verify that team assignment is displayed with "(Team)" suffix
+    expect(result).toContain("**Assigned To**: Platform Team (Team)");
+  });
+
   it("serializes with issueUrl", async () => {
     const result = await getIssueDetails.handler(
       {
@@ -283,6 +342,7 @@ describe("get_issue_details", () => {
       **Users Impacted**: 1
       **Status**: unresolved
       **Substatus**: ongoing
+      **Assigned To**: Jane Developer (User)
       **Issue Type**: error
       **Issue Category**: error
       **Platform**: javascript
@@ -558,6 +618,7 @@ describe("get_issue_details", () => {
       **Users Impacted**: 1
       **Status**: unresolved
       **Substatus**: ongoing
+      **Assigned To**: Jane Developer (User)
       **Issue Type**: error
       **Issue Category**: error
       **Platform**: javascript
