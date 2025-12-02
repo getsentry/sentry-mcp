@@ -82,12 +82,10 @@ import {
  */
 export function buildServer({
   context,
-  onToolComplete,
   agentMode = false,
   tools: customTools,
 }: {
   context: ServerContext;
-  onToolComplete?: () => void;
   agentMode?: boolean;
   tools?: Record<string, ToolConfig<any>>;
 }): McpServer {
@@ -99,7 +97,6 @@ export function buildServer({
   configureServer({
     server,
     context,
-    onToolComplete,
     agentMode,
     tools: customTools,
   });
@@ -119,13 +116,11 @@ export function buildServer({
 function configureServer({
   server,
   context,
-  onToolComplete,
   agentMode = false,
   tools: customTools,
 }: {
   server: McpServer;
   context: ServerContext;
-  onToolComplete?: () => void;
   agentMode?: boolean;
   tools?: Record<string, ToolConfig<any>>;
 }) {
@@ -254,104 +249,100 @@ function configureServer({
         params: any,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
       ) => {
+        // Get active span (mcp.server span) and attach more attributes to it
+        const activeSpan = getActiveSpan();
+
+        if (activeSpan) {
+          if (context.constraints.organizationSlug) {
+            activeSpan.setAttribute(
+              "sentry-mcp.constraint-organization",
+              context.constraints.organizationSlug,
+            );
+          }
+          if (context.constraints.projectSlug) {
+            activeSpan.setAttribute(
+              "sentry-mcp.constraint-project",
+              context.constraints.projectSlug,
+            );
+          }
+        }
+
+        if (context.userId) {
+          setUser({
+            id: context.userId,
+          });
+        }
+        if (context.clientId) {
+          setTag("client.id", context.clientId);
+        }
+
         try {
-          // Get active span (mcp.server span) and attach more attributes to it
-          const activeSpan = getActiveSpan();
+          // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
+          const applicableConstraints = getConstraintParametersToInject(
+            context.constraints,
+            tool.inputSchema,
+          );
+
+          const paramsWithConstraints = {
+            ...params,
+            ...applicableConstraints,
+          };
+
+          const output = await tool.handler(paramsWithConstraints, context);
 
           if (activeSpan) {
-            if (context.constraints.organizationSlug) {
-              activeSpan.setAttribute(
-                "sentry-mcp.constraint-organization",
-                context.constraints.organizationSlug,
-              );
-            }
-            if (context.constraints.projectSlug) {
-              activeSpan.setAttribute(
-                "sentry-mcp.constraint-project",
-                context.constraints.projectSlug,
-              );
-            }
-          }
-
-          if (context.userId) {
-            setUser({
-              id: context.userId,
+            activeSpan.setStatus({
+              code: 1, // ok
             });
           }
-          if (context.clientId) {
-            setTag("client.id", context.clientId);
-          }
 
-          try {
-            // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)
-            const applicableConstraints = getConstraintParametersToInject(
-              context.constraints,
-              tool.inputSchema,
-            );
-
-            const paramsWithConstraints = {
-              ...params,
-              ...applicableConstraints,
-            };
-
-            const output = await tool.handler(paramsWithConstraints, context);
-
-            if (activeSpan) {
-              activeSpan.setStatus({
-                code: 1, // ok
-              });
-            }
-
-            // if the tool returns a string, assume it's a message
-            if (typeof output === "string") {
-              return {
-                content: [
-                  {
-                    type: "text" as const,
-                    text: output,
-                  },
-                ],
-              };
-            }
-            // if the tool returns a list, assume it's a content list
-            if (Array.isArray(output)) {
-              return {
-                content: output,
-              };
-            }
-            throw new Error(`Invalid tool output: ${output}`);
-          } catch (error) {
-            if (activeSpan) {
-              activeSpan.setStatus({
-                code: 2, // error
-              });
-              activeSpan.recordException(error);
-            }
-
-            // CRITICAL: Tool errors MUST be returned as formatted text responses,
-            // NOT thrown as exceptions. This ensures consistent error handling
-            // and prevents the MCP client from receiving raw error objects.
-            //
-            // The logAndFormatError function provides user-friendly error messages
-            // with appropriate formatting for different error types:
-            // - UserInputError: Clear guidance for fixing input problems
-            // - ConfigurationError: Clear guidance for fixing configuration issues
-            // - ApiError: HTTP status context with helpful messaging
-            // - System errors: Sentry event IDs for debugging
-            //
-            // DO NOT change this to throw error - it breaks error handling!
+          // if the tool returns a string, assume it's a message
+          if (typeof output === "string") {
             return {
               content: [
                 {
                   type: "text" as const,
-                  text: await formatErrorForUser(error),
+                  text: output,
                 },
               ],
-              isError: true,
             };
           }
-        } finally {
-          onToolComplete?.();
+          // if the tool returns a list, assume it's a content list
+          if (Array.isArray(output)) {
+            return {
+              content: output,
+            };
+          }
+          throw new Error(`Invalid tool output: ${output}`);
+        } catch (error) {
+          if (activeSpan) {
+            activeSpan.setStatus({
+              code: 2, // error
+            });
+            activeSpan.recordException(error);
+          }
+
+          // CRITICAL: Tool errors MUST be returned as formatted text responses,
+          // NOT thrown as exceptions. This ensures consistent error handling
+          // and prevents the MCP client from receiving raw error objects.
+          //
+          // The logAndFormatError function provides user-friendly error messages
+          // with appropriate formatting for different error types:
+          // - UserInputError: Clear guidance for fixing input problems
+          // - ConfigurationError: Clear guidance for fixing configuration issues
+          // - ApiError: HTTP status context with helpful messaging
+          // - System errors: Sentry event IDs for debugging
+          //
+          // DO NOT change this to throw error - it breaks error handling!
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: await formatErrorForUser(error),
+              },
+            ],
+            isError: true,
+          };
         }
       },
     );
