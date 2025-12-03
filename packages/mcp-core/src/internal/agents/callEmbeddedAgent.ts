@@ -45,6 +45,10 @@ export async function callEmbeddedAgent<
     maxSteps: 5,
     temperature: 1, // GPT-5 only supports temperature of 1
     experimental_output: Output.object({ schema }),
+    experimental_telemetry: {
+      isEnabled: true,
+      functionId: "callEmbeddedAgent",
+    },
     // Disable strict schema validation for both output and tool parameter schemas.
     //
     // OpenAI's structured outputs have limitations:
