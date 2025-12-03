@@ -8,6 +8,7 @@ import { tokenExchangeCallback } from "./oauth";
 import sentryMcpHandler from "./lib/mcp-handler";
 import { checkRateLimit } from "./utils/rate-limiter";
 import { getClientIp } from "./utils/client-ip";
+import { withGrantWriteRetry } from "./utils/kv-write-retry";
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
@@ -83,7 +84,14 @@ const wrappedOAuthProvider = {
       scopesSupported: Object.keys(SCOPES),
     });
 
-    const response = await oAuthProvider.fetch(request, env, ctx);
+    const response = await oAuthProvider.fetch(
+      request,
+      {
+        ...env,
+        OAUTH_KV: withGrantWriteRetry(env.OAUTH_KV),
+      },
+      ctx,
+    );
 
     // Add CORS headers to public metadata endpoints
     if (isPublicMetadataEndpoint(url.pathname)) {
