@@ -200,12 +200,11 @@ export function StdioSetupTabs() {
   const selfHostedEnvLine =
     'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", SENTRY_HOST = "sentry.example.com", OPENAI_API_KEY = "your-openai-key" }';
   return (
-    <InstallTabs className="w-fit max-w-full sticky top-28">
+    <InstallTabs className="w-full sticky top-28">
       <Tab id="cursor" title="Cursor">
         <ol>
           <li>
-            Or manually: <strong>Cmd + Shift + J</strong> to open Cursor
-            Settings.
+            <strong>Cmd + Shift + J</strong> to open Cursor Settings.
           </li>
           <li>
             Select <strong>MCP Skills</strong>.
@@ -264,58 +263,7 @@ export function StdioSetupTabs() {
         </p>
       </Tab>
 
-      <Tab id="codex-cli" title="Codex">
-        <ol>
-          <li>
-            Edit <code>~/.codex/config.toml</code> and add the MCP server
-            configuration:
-            <CodeSnippet noMargin snippet={codexConfigToml} />
-          </li>
-          <li>
-            Replace <code>sentry-user-token</code> with your Sentry User Auth
-            Token. Add <code>SENTRY_HOST</code> if you run self-hosted Sentry.
-            <CodeSnippet noMargin snippet={selfHostedEnvLine} />
-          </li>
-          <li>
-            Restart any running <code>codex</code> session to load the new MCP
-            configuration.
-          </li>
-        </ol>
-      </Tab>
-
-      <Tab id="windsurf" title="Windsurf">
-        <ol>
-          <li>Open Windsurf Settings.</li>
-          <li>
-            Under <strong>Cascade</strong>, you'll find{" "}
-            <strong>Model Context Protocol Servers</strong>.
-          </li>
-          <li>
-            Select <strong>Add Server</strong>.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: {
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-        </ol>
-      </Tab>
-
-      <Tab id="vscode" title="Visual Studio Code">
+      <Tab id="vscode" title="Code">
         <ol>
           <li>
             <strong>CMD + P</strong> and search for{" "}
@@ -358,6 +306,91 @@ export function StdioSetupTabs() {
         </ol>
         <p>
           <small>Note: MCP is supported in VSCode 1.99 and above.</small>
+        </p>
+      </Tab>
+
+      <Tab id="codex-cli" title="Codex">
+        <ol>
+          <li>
+            Edit <code>~/.codex/config.toml</code> and add the MCP server
+            configuration:
+            <CodeSnippet noMargin snippet={codexConfigToml} />
+          </li>
+          <li>
+            Replace <code>sentry-user-token</code> with your Sentry User Auth
+            Token. Add <code>SENTRY_HOST</code> if you run self-hosted Sentry.
+            <CodeSnippet noMargin snippet={selfHostedEnvLine} />
+          </li>
+          <li>
+            Restart any running <code>codex</code> session to load the new MCP
+            configuration.
+          </li>
+        </ol>
+      </Tab>
+
+      <Tab id="gemini" title="Gemini CLI">
+        <ol>
+          <li>
+            Edit <code>~/.gemini/settings.json</code> and add the MCP server
+            configuration:
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  mcpServers: {
+                    sentry: {
+                      ...coreConfig,
+                      env: {
+                        ...coreConfig.env,
+                      },
+                    },
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+          <li>
+            Replace <code>sentry-user-token</code> with your Sentry User Auth
+            Token.
+          </li>
+          <li>
+            For self-hosted Sentry, add <code>SENTRY_HOST</code> to the env
+            object:
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  mcpServers: {
+                    sentry: {
+                      ...coreConfig,
+                      env: {
+                        ...coreConfig.env,
+                        SENTRY_HOST: "sentry.example.com",
+                      },
+                    },
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+          <li>Restart Gemini CLI to load the new configuration.</li>
+        </ol>
+        <p>
+          <small>
+            For more details, see the{" "}
+            <a
+              href="https://github.com/google-gemini/gemini-cli"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Gemini CLI documentation
+            </a>
+            .
+          </small>
         </p>
       </Tab>
 
@@ -425,6 +458,38 @@ export function StdioSetupTabs() {
             .
           </small>
         </p>
+      </Tab>
+
+      <Tab id="windsurf" title="Windsurf">
+        <ol>
+          <li>Open Windsurf Settings.</li>
+          <li>
+            Under <strong>Cascade</strong>, you'll find{" "}
+            <strong>Model Context Protocol Servers</strong>.
+          </li>
+          <li>
+            Select <strong>Add Server</strong>.
+          </li>
+          <li>
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  mcpServers: {
+                    sentry: {
+                      ...coreConfig,
+                      env: {
+                        ...coreConfig.env,
+                      },
+                    },
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+        </ol>
       </Tab>
 
       <Tab id="zed" title="Zed">

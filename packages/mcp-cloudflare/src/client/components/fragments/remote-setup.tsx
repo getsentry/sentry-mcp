@@ -3,6 +3,7 @@ import { Prose } from "../ui/prose";
 import { NPM_REMOTE_NAME } from "@/constants";
 import { Button } from "../ui/button";
 import InstallTabs, { Tab } from "./install-tabs";
+import { getCursorDeepLink } from "@/client/utils";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -11,10 +12,6 @@ export default function RemoteSetup() {
   return (
     <>
       <Prose className="mb-6">
-        <p>Connect directly using the base endpoint:</p>
-        <div className="bg-background-3 p-1 mb-6">
-          <CodeSnippet noMargin snippet={endpoint} />
-        </div>
         <p>
           <strong>Path Constraints:</strong> Restrict the session to a specific
           organization or project by adding them to the URL path. This ensures
@@ -92,15 +89,13 @@ export function RemoteSetupTabs() {
     2,
   );
   return (
-    <InstallTabs className="w-fit max-w-full sticky top-28">
+    <InstallTabs className="w-full sticky top-28">
       <Tab id="cursor" title="Cursor">
         <Button
           variant="secondary"
           size="sm"
           onClick={() => {
-            const deepLink =
-              "cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9";
-            window.location.href = deepLink;
+            window.location.href = getCursorDeepLink(endpoint);
           }}
           className="mt-2 mb-2 bg-violet-300 text-black hover:bg-violet-400 hover:text-black"
         >
@@ -180,69 +175,7 @@ export function RemoteSetupTabs() {
         </p>
       </Tab>
 
-      <Tab id="codex-cli" title="Codex">
-        <ol>
-          <li>Open your terminal to access the CLI.</li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={`codex mcp add sentry -- ${
-                coreConfig.command
-              } ${coreConfig.args.join(" ")}`}
-            />
-          </li>
-          <li>
-            Next time you run <code>codex</code>, the Sentry MCP server will be
-            available. It will automatically open the OAuth flow to connect to
-            your Sentry account.
-          </li>
-        </ol>
-        Or
-        <ol>
-          <li>
-            Edit <code>~/.codex/config.toml</code> and add the remote MCP
-            configuration:
-            <CodeSnippet noMargin snippet={codexRemoteConfigToml} />
-          </li>
-          <li>
-            Save the file and restart any running <code>codex</code> session
-          </li>
-          <li>
-            Next time you run <code>codex</code>, the Sentry MCP server will be
-            available. It will automatically open the OAuth flow to connect to
-            your Sentry account.
-          </li>
-        </ol>
-      </Tab>
-
-      <Tab id="windsurf" title="Windsurf">
-        <ol>
-          <li>Open Windsurf Settings.</li>
-          <li>
-            Under <strong>Cascade</strong>, you'll find{" "}
-            <strong>Model Context Protocol Servers</strong>.
-          </li>
-          <li>
-            Select <strong>Add Server</strong>.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: coreConfig,
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-        </ol>
-      </Tab>
-
-      <Tab id="vscode" title="Visual Studio Code">
+      <Tab id="vscode" title="Code">
         <Button
           variant="secondary"
           size="sm"
@@ -288,9 +221,111 @@ export function RemoteSetupTabs() {
             <strong>Start Server</strong>.
           </li>
         </ol>
+      </Tab>
+
+      <Tab id="codex-cli" title="Codex">
+        <ol>
+          <li>Open your terminal to access the CLI.</li>
+          <li>
+            <CodeSnippet
+              noMargin
+              snippet={`codex mcp add sentry -- ${
+                coreConfig.command
+              } ${coreConfig.args.join(" ")}`}
+            />
+          </li>
+          <li>
+            Next time you run <code>codex</code>, the Sentry MCP server will be
+            available. It will automatically open the OAuth flow to connect to
+            your Sentry account.
+          </li>
+        </ol>
+        Or
+        <ol>
+          <li>
+            Edit <code>~/.codex/config.toml</code> and add the remote MCP
+            configuration:
+            <CodeSnippet noMargin snippet={codexRemoteConfigToml} />
+          </li>
+          <li>
+            Save the file and restart any running <code>codex</code> session
+          </li>
+          <li>
+            Next time you run <code>codex</code>, the Sentry MCP server will be
+            available. It will automatically open the OAuth flow to connect to
+            your Sentry account.
+          </li>
+        </ol>
+      </Tab>
+
+      <Tab id="gemini" title="Gemini CLI">
+        <ol>
+          <li>
+            Edit <code>~/.gemini/settings.json</code> and add the HTTP MCP
+            server configuration:
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  mcpServers: {
+                    sentry: sentryMCPConfig,
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+          <li>Save the file and restart Gemini CLI.</li>
+          <li>
+            Authenticate with Sentry by running:
+            <CodeSnippet noMargin snippet="/mcp auth sentry" />
+          </li>
+          <li>
+            This will open a browser window to complete the OAuth flow and
+            connect Gemini CLI to your Sentry account.
+          </li>
+        </ol>
         <p>
-          <small>Note: MCP is supported in VSCode 1.99 and above.</small>
+          <small>
+            For more details, see the{" "}
+            <a
+              href="https://github.com/google-gemini/gemini-cli"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Gemini CLI documentation
+            </a>
+            .
+          </small>
         </p>
+      </Tab>
+
+      <Tab id="windsurf" title="Windsurf">
+        <ol>
+          <li>Open Windsurf Settings.</li>
+          <li>
+            Under <strong>Cascade</strong>, you'll find{" "}
+            <strong>Model Context Protocol Servers</strong>.
+          </li>
+          <li>
+            Select <strong>Add Server</strong>.
+          </li>
+          <li>
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  mcpServers: {
+                    sentry: coreConfig,
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+        </ol>
       </Tab>
 
       <Tab id="warp" title="Warp">

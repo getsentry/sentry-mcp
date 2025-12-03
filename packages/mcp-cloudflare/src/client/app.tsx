@@ -11,7 +11,6 @@ import UseCases from "./components/usecases";
 import GettingStarted from "./components/getting-started";
 
 import TableOfContents from "./components/docs/toc";
-import Home from "./pages/home";
 
 import Footer from "./components/home-layout/footer";
 
@@ -92,13 +91,6 @@ export default function App() {
         <aside className="max-xl:hidden absolute h-full right-15 inset-y-0">
           <TableOfContents />
         </aside>
-        <main
-          className={`max-w-3xl px-4 sm:px-8 xl:max-w-1/2 mx-auto motion-safe:duration-300 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${
-            isChatOpen ? "xl:-translate-x-1/2" : ""
-          }`}
-        >
-          <Home onChatClick={() => toggleChat(true)} />
-        </main>
       </div>
 
       <Chat
