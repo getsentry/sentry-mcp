@@ -3,6 +3,7 @@ import { Prose } from "../ui/prose";
 import { NPM_REMOTE_NAME } from "@/constants";
 import { Button } from "../ui/button";
 import InstallTabs, { Tab } from "./install-tabs";
+import { getCursorDeepLink } from "@/client/utils";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -94,10 +95,7 @@ export function RemoteSetupTabs() {
           variant="secondary"
           size="sm"
           onClick={() => {
-            const deepLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=${encodeURIComponent(
-              btoa(JSON.stringify({ url: endpoint })),
-            )}`;
-            window.location.href = deepLink;
+            window.location.href = getCursorDeepLink(endpoint);
           }}
           className="mt-2 mb-2 bg-violet-300 text-black hover:bg-violet-400 hover:text-black"
         >

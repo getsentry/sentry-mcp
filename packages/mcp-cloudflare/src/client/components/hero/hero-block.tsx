@@ -1,5 +1,6 @@
 import TerminalAnimation from "../animation/TerminalAnimation";
 import CodeSnippet from "../ui/code-snippet";
+import { openCursorDeepLink } from "@/client/utils";
 
 export default function HeroBlock() {
   const endpoint = new URL("/mcp", window.location.href).href;
@@ -20,26 +21,7 @@ export default function HeroBlock() {
           </div>
           <button
             type="button"
-            onClick={() => {
-              const clickedTime = +new Date();
-              const deepLink =
-                "cursor://anysphere.cursor-deeplink/mcp/install?name=Sentry&config=eyJ1cmwiOiJodHRwczovL21jcC5zZW50cnkuZGV2L21jcCJ9";
-              window.location.href = deepLink;
-              // fallback if cursor is not installed
-              const timeout = setTimeout(() => {
-                if (document.hasFocus() && +new Date() - clickedTime < 2000)
-                  window.location.href = "#getting-started";
-              }, 123);
-              document.addEventListener(
-                "visibilitychange",
-                () => {
-                  if (document.visibilityState === "hidden") {
-                    clearTimeout(timeout);
-                  }
-                },
-                { once: true },
-              );
-            }}
+            onClick={() => openCursorDeepLink(endpoint)}
             className="relative hidden md:block size-fit my-2 group cursor-pointer"
           >
             <div className="absolute inset-0 size-full rounded-xl bg-violet-400/80 bg-[repeating-linear-gradient(-45deg,var(--bg1),var(--bg1)_0.5px,#fff0_0.5px,#fff0_12px)]" />
