@@ -113,7 +113,13 @@ const mcpHandler: ExportedHandler<Env> = {
 
       return new Response(
         "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
-        { status: 401 },
+        {
+          status: 401,
+          headers: {
+            "WWW-Authenticate":
+              'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
+          },
+        },
       );
     }
 

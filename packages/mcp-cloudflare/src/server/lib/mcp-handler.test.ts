@@ -144,9 +144,10 @@ describe("mcp-handler", () => {
       legacyCtx as any,
     );
 
-    // Verify 401 response with re-auth message
+    // Verify 401 response with re-auth message and WWW-Authenticate header
     expect(response.status).toBe(401);
     expect(await response.text()).toContain("re-authorize");
+    expect(response.headers.get("WWW-Authenticate")).toContain("invalid_token");
 
     // Verify waitUntil was called for background grant revocation
     expect(legacyCtx.waitUntil).toHaveBeenCalled();
