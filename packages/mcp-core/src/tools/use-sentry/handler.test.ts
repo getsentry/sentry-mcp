@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import useSentry from "./handler";
 import type { ServerContext } from "../../types";
-import type { Scope } from "../../permissions";
 import type { Skill } from "../../skills";
 
 // Mock the embedded agent
@@ -12,19 +11,6 @@ vi.mock("./agent", () => ({
 // Import the mocked module to get access to the mock function
 import { useSentryAgent } from "./agent";
 const mockUseSentryAgent = useSentryAgent as Mock;
-
-// Use all scopes for testing to ensure all tools are available
-const ALL_SCOPES: Scope[] = [
-  "org:read",
-  "org:write",
-  "project:read",
-  "project:write",
-  "team:read",
-  "team:write",
-  "event:read",
-  "event:write",
-  "project:releases",
-];
 
 // Use all skills for testing to ensure all tools are available
 const ALL_SKILLS: Skill[] = [
@@ -41,7 +27,6 @@ const mockContext: ServerContext = {
   userId: "1",
   clientId: "test-client",
   constraints: {},
-  grantedScopes: new Set(ALL_SCOPES),
   grantedSkills: new Set(ALL_SKILLS),
 };
 

@@ -20,10 +20,14 @@ export type WorkerProps = {
   accessTokenExpiresAt?: number; // Timestamp when the upstream access token expires
   clientId: string;
   scope: string;
-  // Scopes derived from skills - for backward compatibility with old MCP clients
-  // that don't support grantedSkills and only understand grantedScopes
+  /**
+   * @deprecated grantedScopes is deprecated and will be removed on Jan 1, 2026.
+   * Use grantedSkills instead. Skills are the primary authorization method.
+   * This field exists only for backward compatibility during the transition period.
+   */
   grantedScopes?: string[];
-  grantedSkills?: string[]; // Array of skill strings (primary authorization method)
+  /** Primary authorization method - array of skill strings */
+  grantedSkills?: string[];
 
   // Note: constraints are NOT included - they're extracted per-request from URL
   // Note: sentryHost and mcpUrl come from env, not OAuth props

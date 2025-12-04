@@ -38,7 +38,7 @@ describe("mcp-handler", () => {
         id: "test-user-123",
         clientId: "test-client",
         accessToken: "test-token",
-        grantedScopes: ["org:read", "project:read"],
+        grantedSkills: ["inspect", "docs"],
       },
     };
   });
@@ -108,5 +108,55 @@ describe("mcp-handler", () => {
 
     // Verify successful response
     expect(response.status).toBe(200);
+  });
+
+  it("returns 401 and revokes grant for legacy tokens without grantedSkills", async () => {
+    const legacyCtx = {
+      waitUntil: vi.fn(),
+      passThroughOnException: vi.fn(),
+      props: {
+        id: "test-user-123",
+        clientId: "test-client",
+        accessToken: "test-token",
+        // Legacy token: has grantedScopes but no grantedSkills
+        grantedScopes: ["org:read", "project:read"],
+      },
+    };
+
+    // Mock the OAuth provider for grant revocation
+    const mockRevokeGrant = vi.fn();
+    const mockListUserGrants = vi.fn().mockResolvedValue({
+      items: [{ id: "grant-123", clientId: "test-client" }],
+    });
+    const envWithOAuth = {
+      ...env,
+      OAUTH_PROVIDER: {
+        listUserGrants: mockListUserGrants,
+        revokeGrant: mockRevokeGrant,
+      },
+    } as unknown as Env;
+
+    const request = new Request("https://test.mcp.sentry.io/mcp");
+
+    const response = await handler.fetch!(
+      request as any,
+      envWithOAuth,
+      legacyCtx as any,
+    );
+
+    // Verify 401 response with re-auth message
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain("re-authorize");
+
+    // Verify waitUntil was called for background grant revocation
+    expect(legacyCtx.waitUntil).toHaveBeenCalled();
+
+    // Wait for the background task to complete
+    const waitUntilPromise = legacyCtx.waitUntil.mock.calls[0][0];
+    await waitUntilPromise;
+
+    // Verify grant was looked up and revoked
+    expect(mockListUserGrants).toHaveBeenCalledWith("test-user-123");
+    expect(mockRevokeGrant).toHaveBeenCalledWith("grant-123", "test-user-123");
   });
 });

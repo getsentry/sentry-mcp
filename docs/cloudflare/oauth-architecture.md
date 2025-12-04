@@ -185,12 +185,13 @@ MCP tokens contain encrypted properties including Sentry tokens:
 ```typescript
 interface WorkerProps {
   id: string;                    // Sentry user ID
-  name: string;                   // User name
   accessToken: string;            // Sentry access token
   refreshToken?: string;          // Sentry refresh token
   accessTokenExpiresAt?: number;  // Sentry token expiry timestamp
+  clientId: string;               // MCP client ID
   scope: string;                  // MCP permissions granted
-  grantedScopes?: string[];       // Sentry API scopes
+  grantedSkills?: string[];       // Skills granted (primary authorization)
+  // grantedScopes is deprecated and will be removed Jan 1, 2026
 }
 ```
 
@@ -234,12 +235,12 @@ const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
   // ... other params
   props: {
     id: payload.user.id,                    // From Sentry
-    name: payload.user.name,                 // From Sentry
     accessToken: payload.access_token,       // Sentry's access token
     refreshToken: payload.refresh_token,     // Sentry's refresh token
     accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
+    clientId: oauthReqInfo.clientId,         // MCP client ID
     scope: oauthReqInfo.scope.join(" "),     // MCP scopes
-    grantedScopes: Array.from(grantedScopes), // Sentry API scopes
+    grantedSkills: Array.from(validSkills),  // Skills granted (primary authorization)
     // ... other fields
   }
 });

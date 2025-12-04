@@ -3,8 +3,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { startStdio } from "@sentry/mcp-server/transports/stdio";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import type { Scope } from "@sentry/mcp-core/permissions";
-import { ALL_SCOPES } from "@sentry/mcp-core/permissions";
+import { SKILLS, type Skill } from "@sentry/mcp-core/skills";
 
 mswServer.listen({
   onUnhandledRequest: (req, print) => {
@@ -20,17 +19,18 @@ mswServer.listen({
 
 const accessToken = "mocked-access-token";
 
-// Grant all available scopes for evals to ensure MSW mocks apply broadly
+// Grant all available skills for evals to ensure MSW mocks apply broadly
+const allSkills = Object.keys(SKILLS) as Skill[];
 
 const server = new McpServer({
   name: "Sentry MCP",
   version: "0.1.0",
 });
 
-// Run in-process MCP with all scopes so MSW mocks apply
+// Run in-process MCP with all skills so MSW mocks apply
 startStdio(server, {
   accessToken,
-  grantedScopes: new Set<Scope>(ALL_SCOPES),
+  grantedSkills: new Set<Skill>(allSkills),
   constraints: {
     organizationSlug: null,
     projectSlug: null,

@@ -81,7 +81,7 @@ const mcpHandler: ExportedHandler<Env> = {
       userId: oauthCtx.props.userId,
       clientId: oauthCtx.props.clientId,
       accessToken: oauthCtx.props.accessToken,
-      grantedScopes: expandedScopes,
+      grantedSkills,  // Primary authorization method
       constraints: verification.constraints,
       sentryHost,
       mcpUrl: oauthCtx.props.mcpUrl,

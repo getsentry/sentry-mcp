@@ -57,7 +57,8 @@ interface ServerContext {
   userId?: string;
   clientId: string;
   accessToken: string;
-  grantedScopes?: Set<Scope>;
+  grantedSkills: Set<Skill>;  // Primary authorization method
+  // grantedScopes is deprecated and will be removed Jan 1, 2026
   constraints: Constraints;
   sentryHost: string;
   mcpUrl?: string;

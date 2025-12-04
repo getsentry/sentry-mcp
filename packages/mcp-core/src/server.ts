@@ -37,7 +37,6 @@ import { logIssue, type LogIssueOptions } from "./telem/logging";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { MCP_SERVER_NAME } from "./constants";
-import { isToolAllowed, type Scope } from "./permissions";
 import { hasRequiredSkills, type Skill } from "./skills";
 import {
   getConstraintParametersToInject,
@@ -47,7 +46,7 @@ import {
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
  *
- * The server is built with tools filtered based on the granted scopes in the context.
+ * The server is built with tools filtered based on the granted skills in the context.
  * Context is captured in tool handler closures and passed directly to handlers.
  *
  * @example Usage with stdio transport
@@ -105,11 +104,11 @@ export function buildServer({
 }
 
 /**
- * Configures an MCP server with tools filtered by granted skills or scopes.
+ * Configures an MCP server with tools filtered by granted skills.
  *
  * Internal function used by buildServer(). Use buildServer() instead for most cases.
- * Tools are filtered at registration time based on grantedSkills OR grantedScopes
- * (either system can grant access), and context is captured in closures for tool handler execution.
+ * Tools are filtered at registration time based on grantedSkills, and context is
+ * captured in closures for tool handler execution.
  *
  * In agent mode, only the use_sentry tool is registered, bypassing authorization checks.
  */
@@ -132,13 +131,9 @@ function configureServer({
     ? { use_sentry: tools.use_sentry }
     : (customTools ?? tools);
 
-  // Get granted skills and scopes from context for tool filtering
+  // Get granted skills from context for tool filtering
   const grantedSkills: Set<Skill> | undefined = context.grantedSkills
     ? new Set<Skill>(context.grantedSkills)
-    : undefined;
-
-  const grantedScopes: Set<Scope> | undefined = context.grantedScopes
-    ? new Set<Scope>(context.grantedScopes)
     : undefined;
 
   server.server.onerror = (error) => {
@@ -156,40 +151,25 @@ function configureServer({
 
   for (const [toolKey, tool] of Object.entries(toolsToRegister)) {
     /**
-     * Authorization System Precedence
-     * ================================
+     * Skills-Based Authorization
+     * ==========================
      *
-     * The server supports two authorization systems:
-     * 1. **Skills System (NEW)** - User-facing permission groups (inspect, triage, etc.)
-     * 2. **Scopes System (LEGACY)** - Low-level API permissions (event:read, project:write, etc.)
+     * Tools are filtered at registration time based on grantedSkills.
+     * Tool must have non-empty `requiredSkills` array to be exposed.
+     * Empty `requiredSkills: []` means intentionally excluded from skills system.
      *
-     * IMPORTANT: These systems are **MUTUALLY EXCLUSIVE** - only one is active per session:
-     *
-     * ## Skills Mode (when grantedSkills is set):
-     *    - ONLY skills are checked (scopes are ignored)
-     *    - Tool must have non-empty `requiredSkills` array to be exposed
-     *    - Empty `requiredSkills: []` means intentionally excluded from skills system
-     *    - Authorization: `allowed = hasRequiredSkills(grantedSkills, tool.requiredSkills)`
-     *
-     * ## Scopes Mode (when grantedSkills is NOT set, but grantedScopes is set):
-     *    - Falls back to legacy scope checking
-     *    - Empty `requiredScopes: []` means no scopes required (always allowed)
-     *    - Authorization: `allowed = isToolAllowed(tool.requiredScopes, grantedScopes)`
-     *
-     * ## Tool Visibility:
-     *    - If not allowed by active authorization system: tool is NOT registered
-     *    - Only registered tools are visible to MCP clients
+     * In agent mode, authorization is skipped - use_sentry handles it internally.
      *
      * ## Examples:
      *    ```typescript
      *    // Tool available in "triage" skill only:
-     *    { requiredSkills: ["triage"], requiredScopes: ["event:write"] }
+     *    { requiredSkills: ["triage"] }
      *
      *    // Tool available to ALL skills (foundational tool like whoami):
-     *    { requiredSkills: ALL_SKILLS, requiredScopes: [] }
+     *    { requiredSkills: ALL_SKILLS }
      *
      *    // Tool excluded from skills system (like use_sentry in agent mode):
-     *    { requiredSkills: [], requiredScopes: [] }
+     *    { requiredSkills: [] }
      *    ```
      */
     let allowed = false;
@@ -198,18 +178,12 @@ function configureServer({
     if (agentMode) {
       allowed = true;
     }
-    // Skills system takes precedence when set
+    // Skills system: tool must have non-empty requiredSkills to be exposed
     else if (grantedSkills) {
-      // Tool must have non-empty requiredSkills to be exposed in skills mode
       if (tool.requiredSkills && tool.requiredSkills.length > 0) {
         allowed = hasRequiredSkills(grantedSkills, tool.requiredSkills);
       }
       // Empty requiredSkills means NOT exposed via skills system
-    }
-    // Legacy fallback: Check scopes if not using skills
-    else if (grantedScopes) {
-      // isToolAllowed handles empty requiredScopes correctly (returns true)
-      allowed = isToolAllowed(tool.requiredScopes, grantedScopes);
     }
 
     // Skip tool if not allowed by active authorization system
