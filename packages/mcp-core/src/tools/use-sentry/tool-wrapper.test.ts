@@ -41,7 +41,6 @@ describe("wrapToolForAgent", () => {
       userId: "1",
       clientId: "test-client",
       constraints: {},
-      grantedScopes: new Set([]),
     };
 
     const wrappedTool = wrapToolForAgent(mockTool, { context });
@@ -72,7 +71,6 @@ describe("wrapToolForAgent", () => {
       constraints: {
         organizationSlug: "constrained-org",
       },
-      grantedScopes: new Set([]),
     };
 
     const wrappedTool = wrapToolForAgent(mockTool, { context });
@@ -102,7 +100,6 @@ describe("wrapToolForAgent", () => {
         organizationSlug: "constrained-org",
         projectSlug: "constrained-project",
       },
-      grantedScopes: new Set([]),
     };
 
     const wrappedTool = wrapToolForAgent(mockTool, { context });
@@ -132,7 +129,6 @@ describe("wrapToolForAgent", () => {
       constraints: {
         organizationSlug: "constrained-org",
       },
-      grantedScopes: new Set([]),
     };
 
     const wrappedTool = wrapToolForAgent(mockTool, { context });
@@ -176,7 +172,6 @@ describe("wrapToolForAgent", () => {
       userId: "1",
       clientId: "test-client",
       constraints: {},
-      grantedScopes: new Set([]),
     };
 
     const wrappedTool = wrapToolForAgent(errorTool, { context });

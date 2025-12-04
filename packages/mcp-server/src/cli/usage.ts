@@ -1,11 +1,7 @@
-import type { Scope } from "@sentry/mcp-core/permissions";
 import type { Skill } from "@sentry/mcp-core/skills";
 
 export function buildUsage(
   packageName: string,
-  defaultScopes: ReadonlyArray<Scope>,
-  allScopes: ReadonlyArray<Scope>,
-  defaultSkills: ReadonlyArray<Skill>,
   allSkills: ReadonlyArray<Skill>,
 ): string {
   return `Usage: ${packageName} --access-token=<token> [--host=<host>]
@@ -24,18 +20,10 @@ Session constraints:
   --organization-slug <slug>  Force all calls to an organization
   --project-slug <slug>       Optional project constraint
 
-Skill controls (recommended):
+Skill controls:
   --skills <list>     Specify which skills to grant (default: all skills)
 
 All skills: ${allSkills.join(", ")}
-
-Scope controls (legacy - deprecated, use skills instead):
-  --scopes <list>     Override default scopes
-  --add-scopes <list> Add scopes to defaults
-  --all-scopes        Grant every available scope
-
-Default scopes: ${defaultScopes.join(", ")}
-All scopes: ${allScopes.join(", ")}
 
 Examples:
   ${packageName} --access-token=TOKEN

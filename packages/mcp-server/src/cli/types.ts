@@ -1,4 +1,3 @@
-import type { Scope } from "@sentry/mcp-core/permissions";
 import type { Skill } from "@sentry/mcp-core/skills";
 
 export type CliArgs = {
@@ -9,10 +8,7 @@ export type CliArgs = {
   sentryDsn?: string;
   openaiBaseUrl?: string;
   openaiModel?: string;
-  scopes?: string; // LEGACY - for backward compatibility
-  addScopes?: string; // LEGACY - for backward compatibility
-  allScopes?: boolean; // LEGACY - for backward compatibility
-  skills?: string; // NEW - primary authorization method
+  skills?: string;
   agent?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
@@ -28,9 +24,7 @@ export type EnvArgs = {
   mcpUrl?: string;
   sentryDsn?: string;
   openaiModel?: string;
-  scopes?: string; // LEGACY - for backward compatibility
-  addScopes?: string; // LEGACY - for backward compatibility
-  skills?: string; // NEW - primary authorization method
+  skills?: string;
 };
 
 export type MergedArgs = {
@@ -41,10 +35,7 @@ export type MergedArgs = {
   sentryDsn?: string;
   openaiBaseUrl?: string;
   openaiModel?: string;
-  scopes?: string; // LEGACY - for backward compatibility
-  addScopes?: string; // LEGACY - for backward compatibility
-  allScopes?: boolean; // LEGACY - for backward compatibility
-  skills?: string; // NEW - primary authorization method
+  skills?: string;
   agent?: boolean;
   organizationSlug?: string;
   projectSlug?: string;
@@ -60,8 +51,8 @@ export type ResolvedConfig = {
   sentryDsn?: string;
   openaiBaseUrl?: string;
   openaiModel?: string;
-  finalScopes?: Set<Scope>; // LEGACY - for backward compatibility
-  finalSkills?: Set<Skill>; // NEW - primary authorization method
+  /** Primary authorization method */
+  finalSkills?: Set<Skill>;
   organizationSlug?: string;
   projectSlug?: string;
 };

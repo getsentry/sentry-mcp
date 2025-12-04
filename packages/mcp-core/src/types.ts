@@ -5,7 +5,6 @@
  * and server context. Uses advanced TypeScript patterns for type-safe parameter
  * extraction and handler registration.
  */
-import type { Scope } from "./permissions";
 import type { Skill } from "./skills";
 
 /**
@@ -35,11 +34,8 @@ export type ServerContext = {
   openaiBaseUrl?: string;
   userId?: string | null;
   clientId?: string;
-  // Granted skills for tool access control (user-facing capabilities, primary authorization method)
+  /** Primary authorization method - granted skills for tool access control */
   grantedSkills?: Set<Skill> | ReadonlySet<Skill>;
-  // Granted scopes derived from skills - for backward compatibility with old MCP clients
-  // that don't support grantedSkills and only understand grantedScopes
-  grantedScopes?: Set<Scope> | ReadonlySet<Scope>;
   // URL-based session constraints
   constraints: Constraints;
 };

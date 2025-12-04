@@ -1,22 +1,10 @@
-import {
-  ALL_SCOPES,
-  parseScopes,
-  resolveScopes,
-  type Scope,
-} from "@sentry/mcp-core/permissions";
 import { parseSkills, SKILLS, type Skill } from "@sentry/mcp-core/skills";
-import { DEFAULT_SCOPES } from "@sentry/mcp-core/constants";
 import {
   validateAndParseSentryUrlThrows,
   validateOpenAiBaseUrlThrows,
   validateSentryHostThrows,
 } from "@sentry/mcp-core/utils/url-utils";
 import type { MergedArgs, ResolvedConfig } from "./types";
-
-export function formatInvalid(invalid: string[], envName?: string): string {
-  const where = envName ? `${envName} provided` : "Invalid scopes provided";
-  return `Error: ${where}: ${invalid.join(", ")}\nAvailable scopes: ${ALL_SCOPES.join(", ")}`;
-}
 
 export function formatInvalidSkills(
   invalid: string[],
@@ -42,67 +30,6 @@ export function finalize(input: MergedArgs): ResolvedConfig {
   } else if (input.host) {
     validateSentryHostThrows(input.host);
     sentryHost = input.host;
-  }
-
-  // Scopes resolution (LEGACY - deprecated in favor of skills)
-  let finalScopes: Set<Scope> | undefined = undefined;
-  if (input.allScopes) {
-    console.warn(
-      "⚠️  Warning: --all-scopes is deprecated. Consider using skills instead:",
-    );
-    console.warn("   --skills=inspect,triage,project-management,seer,docs");
-    console.warn("   Learn more about skills in the documentation.");
-    console.warn("");
-    finalScopes = new Set<Scope>(ALL_SCOPES as ReadonlyArray<Scope>);
-  } else if (input.scopes || input.addScopes) {
-    // Show deprecation warning
-    if (input.scopes) {
-      console.warn(
-        "⚠️  Warning: --scopes is deprecated. Consider using skills instead:",
-      );
-      console.warn(
-        "   For example, instead of --scopes=event:write,project:write",
-      );
-      console.warn("   Use: --skills=triage,project-management");
-      console.warn("   Learn more about skills in the documentation.");
-      console.warn("");
-    } else if (input.addScopes) {
-      console.warn(
-        "⚠️  Warning: --add-scopes is deprecated. Consider using --skills instead:",
-      );
-      console.warn("   For example, instead of --add-scopes=event:write");
-      console.warn("   Use: --skills=triage");
-      console.warn("   Learn more about skills in the documentation.");
-      console.warn("");
-    }
-
-    // Strict validation: any invalid token is an error
-    if (input.scopes) {
-      const { valid, invalid } = parseScopes(input.scopes);
-      if (invalid.length > 0) {
-        throw new Error(formatInvalid(invalid));
-      }
-      if (valid.size === 0) {
-        throw new Error(
-          "Error: Invalid scopes provided. No valid scopes found.",
-        );
-      }
-      finalScopes = resolveScopes({
-        override: valid,
-        defaults: DEFAULT_SCOPES,
-      });
-    } else if (input.addScopes) {
-      const { valid, invalid } = parseScopes(input.addScopes);
-      if (invalid.length > 0) {
-        throw new Error(formatInvalid(invalid));
-      }
-      if (valid.size === 0) {
-        throw new Error(
-          "Error: Invalid additional scopes provided. No valid scopes found.",
-        );
-      }
-      finalScopes = resolveScopes({ add: valid, defaults: DEFAULT_SCOPES });
-    }
   }
 
   // Skills resolution
@@ -150,7 +77,6 @@ export function finalize(input: MergedArgs): ResolvedConfig {
     sentryDsn: input.sentryDsn,
     openaiBaseUrl: resolvedOpenAiBaseUrl,
     openaiModel: input.openaiModel,
-    finalScopes,
     finalSkills,
     organizationSlug: input.organizationSlug,
     projectSlug: input.projectSlug,

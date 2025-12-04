@@ -6,7 +6,7 @@ import { SENTRY_TOKEN_URL } from "../constants";
 import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
-import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
+import { parseSkills } from "@sentry/mcp-core/skills";
 
 /**
  * Extended AuthRequest that includes skills
@@ -151,9 +151,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     );
   }
 
-  // Calculate Sentry API scopes from validated skills
-  const grantedScopes = await getScopesForSkills(validSkills);
-
   // Convert valid skills Set to array for OAuth props
   const grantedSkills = Array.from(validSkills);
 
@@ -178,9 +175,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
-      // Scopes derived from skills - for backward compatibility with old MCP clients
-      // that don't support grantedSkills and only understand grantedScopes
-      grantedScopes: Array.from(grantedScopes),
       grantedSkills, // Primary authorization method
 
       // Note: constraints are NOT included here - they're extracted per-request from URL

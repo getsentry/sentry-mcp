@@ -10,13 +10,8 @@
 
 import { createMcpHandler } from "agents/mcp";
 import { buildServer } from "@sentry/mcp-core/server";
-import {
-  expandScopes,
-  parseScopes,
-  type Scope,
-} from "@sentry/mcp-core/permissions";
-import { parseSkills, type Skill } from "@sentry/mcp-core/skills";
-import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import { parseSkills } from "@sentry/mcp-core/skills";
+import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
@@ -85,67 +80,61 @@ const mcpHandler: ExportedHandler<Env> = {
       });
     }
 
-    // Parse and expand granted scopes (LEGACY - for backward compatibility)
-    let expandedScopes: Set<Scope> | undefined;
-    if (oauthCtx.props.grantedScopes) {
-      const { valid, invalid } = parseScopes(
-        oauthCtx.props.grantedScopes as string[],
-      );
-      if (invalid.length > 0) {
-        logWarn("Ignoring invalid scopes from OAuth provider", {
-          loggerScope: ["cloudflare", "mcp-handler"],
-          extra: {
-            invalidScopes: invalid,
-          },
-        });
-      }
-      expandedScopes = expandScopes(new Set(valid));
-    }
+    // Parse and validate granted skills (primary authorization method)
+    // Legacy tokens without grantedSkills are no longer supported
+    if (!oauthCtx.props.grantedSkills) {
+      const userId = oauthCtx.props.id as string;
+      const clientId = oauthCtx.props.clientId as string;
 
-    // Parse and validate granted skills (NEW - primary authorization method)
-    let grantedSkills: Set<Skill> | undefined;
-    if (oauthCtx.props.grantedSkills) {
-      const { valid, invalid } = parseSkills(
-        oauthCtx.props.grantedSkills as string[],
-      );
-      if (invalid.length > 0) {
-        logWarn("Ignoring invalid skills from OAuth provider", {
-          loggerScope: ["cloudflare", "mcp-handler"],
-          extra: {
-            invalidSkills: invalid,
-          },
-        });
-      }
-      grantedSkills = new Set(valid);
+      logWarn("Legacy token without grantedSkills detected - revoking grant", {
+        loggerScope: ["cloudflare", "mcp-handler"],
+        extra: { clientId, userId },
+      });
 
-      // Validate that at least one valid skill was granted
-      if (grantedSkills.size === 0) {
-        return new Response(
-          "Authorization failed: No valid skills were granted. Please re-authorize and select at least one permission.",
-          { status: 400 },
-        );
-      }
-    }
+      // Revoke the grant in the background (don't block the response)
+      ctx.waitUntil(
+        (async () => {
+          try {
+            // Find the grant for this user/client combination
+            const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
+            const grant = grants.items.find((g) => g.clientId === clientId);
 
-    // Validate that at least one authorization system is active
-    // This should never happen in practice - indicates a bug in OAuth flow
-    if (!grantedSkills && !expandedScopes) {
-      logIssue(
-        new Error(
-          "No authorization grants found - server would expose no tools",
-        ),
-        {
-          loggerScope: ["cloudflare", "mcp-handler"],
-          extra: {
-            clientId: oauthCtx.props.clientId,
-            hasGrantedSkills: !!oauthCtx.props.grantedSkills,
-            hasGrantedScopes: !!oauthCtx.props.grantedScopes,
-          },
-        },
+            if (grant) {
+              await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
+            }
+          } catch (err) {
+            logWarn("Failed to revoke legacy grant", {
+              loggerScope: ["cloudflare", "mcp-handler"],
+              extra: { error: String(err), clientId, userId },
+            });
+          }
+        })(),
       );
+
       return new Response(
-        "Authorization failed: No valid permissions were granted. Please re-authorize and select at least one permission.",
+        "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
         { status: 401 },
+      );
+    }
+
+    const { valid: validSkills, invalid: invalidSkills } = parseSkills(
+      oauthCtx.props.grantedSkills as string[],
+    );
+
+    if (invalidSkills.length > 0) {
+      logWarn("Ignoring invalid skills from OAuth provider", {
+        loggerScope: ["cloudflare", "mcp-handler"],
+        extra: {
+          invalidSkills,
+        },
+      });
+    }
+
+    // Validate that at least one valid skill was granted
+    if (validSkills.size === 0) {
+      return new Response(
+        "Authorization failed: No valid skills were granted. Please re-authorize and select at least one permission.",
+        { status: 400 },
       );
     }
 
@@ -154,10 +143,7 @@ const mcpHandler: ExportedHandler<Env> = {
       userId: oauthCtx.props.id as string | undefined,
       clientId: oauthCtx.props.clientId as string,
       accessToken: oauthCtx.props.accessToken as string,
-      // Scopes derived from skills - for backward compatibility with old MCP clients
-      // that don't support grantedSkills and only understand grantedScopes
-      grantedScopes: expandedScopes,
-      grantedSkills, // Primary authorization method
+      grantedSkills: validSkills,
       constraints: verification.constraints,
       sentryHost,
       mcpUrl: env.MCP_URL,

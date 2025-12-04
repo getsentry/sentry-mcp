@@ -22,8 +22,6 @@ import { buildUsage } from "./cli/usage";
 import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
-import { ALL_SCOPES } from "@sentry/mcp-core/permissions";
-import { DEFAULT_SCOPES, DEFAULT_SKILLS } from "@sentry/mcp-core/constants";
 import { SKILLS } from "@sentry/mcp-core/skills";
 import { setOpenAIBaseUrl } from "@sentry/mcp-core/internal/agents/openai-provider";
 
@@ -31,13 +29,7 @@ const packageName = "@sentry/mcp-server";
 const allSkills = Object.keys(SKILLS) as ReadonlyArray<
   (typeof SKILLS)[keyof typeof SKILLS]["id"]
 >;
-const usageText = buildUsage(
-  packageName,
-  DEFAULT_SCOPES,
-  ALL_SCOPES,
-  DEFAULT_SKILLS,
-  allSkills,
-);
+const usageText = buildUsage(packageName, allSkills);
 
 function die(message: string): never {
   console.error(message);
@@ -129,7 +121,6 @@ const SENTRY_TIMEOUT = 5000; // 5 seconds
 // Build context once for server configuration and runtime
 const context = {
   accessToken: cfg.accessToken,
-  grantedScopes: cfg.finalScopes,
   grantedSkills: cfg.finalSkills,
   constraints: {
     organizationSlug: cfg.organizationSlug ?? null,
@@ -140,7 +131,7 @@ const context = {
   openaiBaseUrl: cfg.openaiBaseUrl,
 };
 
-// Build server with context to filter tools based on granted scopes
+// Build server with context to filter tools based on granted skills
 // Use agentMode when --agent flag is set (only exposes use_sentry tool)
 const server = buildServer({
   context,

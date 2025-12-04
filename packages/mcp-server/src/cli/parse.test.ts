@@ -10,9 +10,7 @@ describe("cli/parseArgv", () => {
       "--mcp-url=https://mcp.example.com",
       "--sentry-dsn=dsn",
       "--openai-base-url=https://api.example.com/v1",
-      "--scopes=org:read",
-      "--add-scopes=event:write",
-      "--all-scopes",
+      "--skills=inspect,triage",
       "-h",
       "-v",
     ]);
@@ -22,9 +20,7 @@ describe("cli/parseArgv", () => {
     expect(parsed.mcpUrl).toBe("https://mcp.example.com");
     expect(parsed.sentryDsn).toBe("dsn");
     expect(parsed.openaiBaseUrl).toBe("https://api.example.com/v1");
-    expect(parsed.scopes).toBe("org:read");
-    expect(parsed.addScopes).toBe("event:write");
-    expect(parsed.allScopes).toBe(true);
+    expect(parsed.skills).toBe("inspect,triage");
     expect(parsed.help).toBe(true);
     expect(parsed.version).toBe(true);
     expect(parsed.unknownArgs).toEqual([]);
@@ -49,16 +45,12 @@ describe("cli/parseEnv", () => {
       SENTRY_HOST: "envhost",
       MCP_URL: "envmcp",
       SENTRY_DSN: "envdsn",
-      MCP_SCOPES: "org:read",
-      MCP_ADD_SCOPES: "event:write",
       MCP_SKILLS: "inspect,triage",
     } as any);
     expect(env.accessToken).toBe("envtok");
     expect(env.host).toBe("envhost");
     expect(env.mcpUrl).toBe("envmcp");
     expect(env.sentryDsn).toBe("envdsn");
-    expect(env.scopes).toBe("org:read");
-    expect(env.addScopes).toBe("event:write");
     expect(env.skills).toBe("inspect,triage");
   });
 });
@@ -70,8 +62,6 @@ describe("cli/merge", () => {
       SENTRY_HOST: "envhost",
       MCP_URL: "envmcp",
       SENTRY_DSN: "envdsn",
-      MCP_SCOPES: "org:read",
-      MCP_ADD_SCOPES: "event:write",
     } as any);
     const cli = parseArgv([
       "--access-token=clitok",
@@ -79,8 +69,6 @@ describe("cli/merge", () => {
       "--mcp-url=climcp",
       "--sentry-dsn=clidsn",
       "--openai-base-url=https://api.cli/v1",
-      "--scopes=org:admin",
-      "--add-scopes=project:write",
     ]);
     const merged = merge(cli, env);
     expect(merged.accessToken).toBe("clitok");
@@ -88,8 +76,6 @@ describe("cli/merge", () => {
     expect(merged.mcpUrl).toBe("climcp");
     expect(merged.sentryDsn).toBe("clidsn");
     expect(merged.openaiBaseUrl).toBe("https://api.cli/v1");
-    expect(merged.scopes).toBe("org:admin");
-    expect(merged.addScopes).toBe("project:write");
   });
 
   it("applies precedence for skills: CLI over env", () => {
