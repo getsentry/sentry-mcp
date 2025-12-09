@@ -1,12 +1,13 @@
 import { z } from "zod";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { experimental_createMCPClient } from "ai";
 import { defineTool } from "../../internal/tool-helpers/define";
 import type { ServerContext } from "../../types";
 import { useSentryAgent } from "./agent";
-import { buildServer } from "../../server";
 import tools from "../index";
 import type { ToolCall } from "../../internal/agents/callEmbeddedAgent";
+import { wrapToolForAgent } from "./tool-wrapper";
+import { hasRequiredSkills } from "../../skills";
+import type { Tool } from "ai";
+import type { ToolConfig } from "../types";
 
 /**
  * Format tool calls into a readable trace
@@ -32,6 +33,54 @@ function formatToolCallTrace(toolCalls: ToolCall[]): string {
   }
 
   return trace;
+}
+
+function buildAgentTools(context: ServerContext): Record<string, Tool> {
+  const grantedSkills = context.grantedSkills
+    ? new Set(context.grantedSkills)
+    : undefined;
+
+  const toolEntries = Object.entries(tools) as Array<
+    [string, ToolConfig<Record<string, z.ZodTypeAny>>]
+  >;
+
+  const entries = toolEntries.filter(([toolKey, tool]) => {
+    // Prevent recursion by excluding use_sentry itself
+    if (toolKey === "use_sentry") {
+      return false;
+    }
+
+    // Skip discovery tools when the session is already constrained
+    if (
+      toolKey === "find_organizations" &&
+      context.constraints.organizationSlug
+    ) {
+      return false;
+    }
+    if (toolKey === "find_projects" && context.constraints.projectSlug) {
+      return false;
+    }
+
+    // When no skills are provided, allow all tools (use_sentry agent mode
+    // is only exposed to trusted contexts)
+    if (!grantedSkills) {
+      return true;
+    }
+
+    // Tools with empty requiredSkills are intentionally excluded from skill gating
+    if (!tool.requiredSkills || tool.requiredSkills.length === 0) {
+      return false;
+    }
+
+    return hasRequiredSkills(grantedSkills, tool.requiredSkills);
+  });
+
+  return Object.fromEntries(
+    entries.map(([toolKey, tool]) => [
+      toolKey,
+      wrapToolForAgent(tool, { context }),
+    ]),
+  );
 }
 
 export default defineTool({
@@ -88,53 +137,22 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    // Create linked pair of in-memory transports for client-server communication
-    const [clientTransport, serverTransport] =
-      InMemoryTransport.createLinkedPair();
+    const agentTools = buildAgentTools(context);
 
-    // Exclude use_sentry from tools to prevent recursion
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { use_sentry, ...toolsForAgent } = tools;
-
-    // Build internal MCP server with the provided context
-    // Context is captured in tool handler closures during buildServer()
-    const server = buildServer({
-      context,
-      tools: toolsForAgent,
+    // Call the embedded agent with wrapped tools and the user's request
+    const agentResult = await useSentryAgent({
+      request: params.request,
+      tools: agentTools,
     });
 
-    // Connect server to its transport
-    await server.server.connect(serverTransport);
+    let output = agentResult.result.result;
 
-    // Create MCP client with the other end of the transport
-    const mcpClient = await experimental_createMCPClient({
-      name: "mcp.sentry.dev (use-sentry)",
-      transport: clientTransport,
-    });
-
-    try {
-      // Get tools from MCP server (returns Vercel AI SDK compatible tools)
-      const mcpTools = await mcpClient.tools();
-
-      // Call the embedded agent with MCP tools and the user's request
-      const agentResult = await useSentryAgent({
-        request: params.request,
-        tools: mcpTools,
-      });
-
-      let output = agentResult.result.result;
-
-      // If tracing is enabled, append the tool call trace
-      if (params.trace && agentResult.toolCalls.length > 0) {
-        output += "\n\n---\n\n## Tool Call Trace\n\n";
-        output += formatToolCallTrace(agentResult.toolCalls);
-      }
-
-      return output;
-    } finally {
-      // Clean up connections
-      await mcpClient.close();
-      await server.server.close();
+    // If tracing is enabled, append the tool call trace
+    if (params.trace && agentResult.toolCalls.length > 0) {
+      output += "\n\n---\n\n## Tool Call Trace\n\n";
+      output += formatToolCallTrace(agentResult.toolCalls);
     }
+
+    return output;
   },
 });
