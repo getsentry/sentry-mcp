@@ -9,6 +9,7 @@ import { z } from "zod";
 import { agentTool } from "../../internal/agents/tools/utils";
 import type { ServerContext } from "../../types";
 import type { ToolConfig } from "../types";
+import { getConstraintKeysToFilter } from "../../internal/constraint-helpers";
 
 /**
  * Options for wrapping a tool
@@ -74,9 +75,22 @@ export function wrapToolForAgent<TSchema extends Record<string, z.ZodType>>(
   tool: ToolConfig<TSchema>,
   options: WrapToolOptions,
 ) {
+  const constraintKeysToFilter = new Set(
+    getConstraintKeysToFilter(
+      options.context.constraints as ServerContext["constraints"] &
+        Record<string, string | null | undefined>,
+      tool.inputSchema,
+    ),
+  );
+  const filteredInputSchema = Object.fromEntries(
+    Object.entries(tool.inputSchema).filter(
+      ([key]) => !constraintKeysToFilter.has(key),
+    ),
+  ) as Record<string, z.ZodType>;
+
   return agentTool({
     description: tool.description,
-    parameters: z.object(tool.inputSchema),
+    parameters: z.object(filteredInputSchema),
     execute: async (params: unknown) => {
       // Type safety: params is validated by agentTool's Zod schema before reaching here
       const fullParams = injectConstrainedParams(

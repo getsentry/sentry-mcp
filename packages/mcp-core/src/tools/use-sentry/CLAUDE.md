@@ -4,15 +4,14 @@ This tool embeds an AI agent (GPT-5) that can call all Sentry MCP tools to fulfi
 
 ## Architecture Overview
 
-The `use_sentry` tool uses an "agent-in-tool" pattern with **in-memory MCP protocol**:
+The `use_sentry` tool embeds an agent by **wrapping every MCP tool definition** and exposing the wrapped versions directly to the agent:
 
-1. **MCP Tool Handler** (`handler.ts`) - Receives natural language request from calling agent
-2. **In-Memory MCP Server** - Creates internal MCP server with InMemoryTransport from MCP SDK
-3. **MCP Client** - Embedded agent accesses tools through MCP protocol (zero network overhead)
-4. **Embedded AI Agent** (`agent.ts`) - Calls tools via MCP client to fulfill request
-5. **Result Return** - Returns final results directly to calling agent
+1. **MCP Tool Handler** (`handler.ts`) - Receives the natural language request
+2. **Tool Wrappers** - `wrapToolForAgent()` pre-binds the current `ServerContext`, filters constrained parameters, and injects org/project/region constraints
+3. **Embedded AI Agent** (`agent.ts`) - Calls the wrapped tools to fulfill the request
+4. **Result Return** - The agent returns markdown directly to the calling assistant
 
-**Key Innovation**: Uses `InMemoryTransport.createLinkedPair()` from `@modelcontextprotocol/sdk` for full MCP protocol compliance without network overhead.
+**Key Innovation**: The wrappers preserve the real tool handlers (no mock implementations) while ensuring constraint injection and error handling happen consistently for every embedded tool call.
 
 ## Key Components
 

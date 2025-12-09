@@ -315,43 +315,34 @@ This pattern is used when:
 
 ### use_sentry Tool Architecture
 
-The `use_sentry` tool provides a natural language interface to all Sentry MCP tools using an in-memory MCP client-server architecture:
+The `use_sentry` tool exposes a natural language interface by wrapping the real MCP tool handlers that already power the server:
 
 **Architecture**:
-1. Creates linked pair of `InMemoryTransport` from MCP SDK
-2. Builds internal MCP server with all 18 tools (excludes use_sentry to prevent recursion)
-3. Connects server to serverTransport within ServerContext
-4. Creates MCP client with clientTransport
-5. Embedded GPT-5 agent accesses tools through MCP protocol
-6. Zero network overhead - all communication is in-memory
+1. The handler filters the global tool list (respecting granted skills and session constraints)
+2. Each allowed tool is wrapped with `wrapToolForAgent()`, which filters constrained parameters from the schema and injects org/project/region constraints automatically
+3. The embedded GPT-5 agent receives these wrapped tools and executes whatever chain of operations is needed
+4. Tool handlers run directly with the captured `ServerContext`, so API access and telemetry stay identical to normal MCP usage
 
 **Data Flow**:
 ```
 User request → use_sentry handler
   ↓
-Creates InMemoryTransport pair
+Build wrapped tool set (constraints + skills)
   ↓
-Builds internal MCP server (18 tools)
+Embedded agent calls wrapped tools
   ↓
-Creates MCP client
+Wrapped tool injects constraints and calls real handler
   ↓
-Embedded agent calls tools via MCP protocol
+Handler formats result and returns
   ↓
-MCP server executes tool handlers
-  ↓
-Results returned through MCP protocol
-  ↓
-Agent processes and returns final result
+Agent composes final answer
 ```
 
 **Benefits**:
-- Full MCP protocol compliance throughout
-- Architectural consistency - all tool access via MCP
-- Zero performance overhead (no network, no serialization)
-- Proper tool isolation at protocol level
-- No recursion risk (use_sentry excluded from internal server)
-
-**Implementation**: Uses built-in `InMemoryTransport.createLinkedPair()` from `@modelcontextprotocol/sdk/inMemory.js` for reliable in-process communication.
+- Zero duplication: same tool handlers serve both the embedded agent and external MCP clients
+- Constraint injection happens even when agents omit org/project parameters
+- Skill filtering and constraint-aware schema filtering keep the tool surface aligned with the active session
+- Error handling is standardized via `agentTool()` so embedded agents receive trusted failure messages
 
 ## Security Model
 

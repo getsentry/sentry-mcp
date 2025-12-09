@@ -120,6 +120,25 @@ describe("wrapToolForAgent", () => {
     expect(parsed.contextProject).toBe("constrained-project");
   });
 
+  it("filters constrained parameters from the schema", () => {
+    const context: ServerContext = {
+      accessToken: "test-token",
+      sentryHost: "sentry.io",
+      userId: "1",
+      clientId: "test-client",
+      constraints: {
+        organizationSlug: "constrained-org",
+      },
+    };
+
+    const wrappedTool = wrapToolForAgent(mockTool, { context });
+    const shape = (wrappedTool.parameters as z.ZodObject<any>).shape;
+
+    expect(shape.organizationSlug).toBeUndefined();
+    expect(shape.projectSlug).toBeDefined();
+    expect(shape.someParam).toBeDefined();
+  });
+
   it("allows agent-provided params to override constraints", async () => {
     const context: ServerContext = {
       accessToken: "test-token",
