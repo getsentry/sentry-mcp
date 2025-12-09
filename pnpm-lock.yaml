@@ -16,8 +16,8 @@ catalogs:
       specifier: ^1.9.4
       version: 1.9.4
     '@cloudflare/workers-oauth-provider':
-      specifier: ^0.0.12
-      version: 0.0.12
+      specifier: ^0.1.0
+      version: 0.1.0
     '@cloudflare/workers-types':
       specifier: ^4.20251014.0
       version: 4.20251014.0
@@ -221,7 +221,7 @@ importers:
         version: 1.2.12(react@19.1.0)(zod@3.25.76)
       '@cloudflare/workers-oauth-provider':
         specifier: 'catalog:'
-        version: 0.0.12
+        version: 0.1.0
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.22.0(@cfworker/json-schema@4.1.1)
@@ -834,8 +834,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@cloudflare/workers-oauth-provider@0.0.12':
-    resolution: {integrity: sha512-A/qTfCFusZBUcb/D62y610p9IcuZ3TBwmP1yYOUstroUIWfx1q0Y8NmbFN7++4ZWTHzVnFoyU6/iTIrC0lDqFA==}
+  '@cloudflare/workers-oauth-provider@0.1.0':
+    resolution: {integrity: sha512-wok0RqyZlxkaKJCmGGXKyWkN0znRs9SFfTOJ1/TJxnv6N/lfXbCYr5hCbsgmOdvVi8JsKKYWj/qkqOLZybgAyQ==}
 
   '@cloudflare/workers-types@4.20251014.0':
     resolution: {integrity: sha512-tEW98J/kOa0TdylIUOrLKRdwkUw0rvvYVlo+Ce0mqRH3c8kSoxLzUH9gfCvwLe0M89z1RkzFovSKAW2Nwtyn3w==}
@@ -5192,7 +5192,7 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20251011.0':
     optional: true
 
-  '@cloudflare/workers-oauth-provider@0.0.12': {}
+  '@cloudflare/workers-oauth-provider@0.1.0': {}
 
   '@cloudflare/workers-types@4.20251014.0': {}
 

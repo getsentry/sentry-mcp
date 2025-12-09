@@ -3,7 +3,7 @@ import type {
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
 import type { z } from "zod";
-import { logIssue } from "@sentry/mcp-core/telem/logging";
+import { logIssue, logInfo, logWarn } from "@sentry/mcp-core/telem/logging";
 import { TokenResponseSchema, SENTRY_TOKEN_URL } from "./constants";
 import type { WorkerProps } from "../types";
 import * as Sentry from "@sentry/cloudflare";
@@ -214,6 +214,47 @@ export async function refreshAccessToken({
 }
 
 /**
+ * Handles errors during token refresh with graceful fallback.
+ * If the token has enough TTL remaining (>1 minute), reuses it instead of failing.
+ *
+ * IMPORTANT: Does NOT return newProps to prevent race condition corruption.
+ * When multiple requests race to refresh, returning stale props can overwrite
+ * newer tokens that were just saved by a concurrent request.
+ */
+function handleRefreshError(
+  error: any,
+  props: WorkerProps,
+): TokenExchangeCallbackResult {
+  const maybeExpiresAt = props.accessTokenExpiresAt;
+  if (maybeExpiresAt) {
+    const remainingMs = maybeExpiresAt - Date.now();
+    if (remainingMs > 60 * 1000) {
+      // At least 1 minute left
+      logWarn("Upstream refresh failed, falling back to cached token", {
+        loggerScope: ["cloudflare", "oauth", "refresh"],
+        extra: {
+          error: String(error),
+          remainingSec: Math.floor(remainingMs / 1000),
+        },
+      });
+
+      // Do NOT return newProps here - only return TTL
+      // This tells the OAuth provider to keep using existing props in KV
+      // without overwriting them with potentially stale data from this request.
+      // In race conditions, another request may have already updated the tokens.
+      return {
+        accessTokenTTL: Math.floor(remainingMs / 1000),
+      };
+    }
+  }
+
+  logIssue(error);
+  throw new Error("Failed to refresh upstream token in OAuth provider", {
+    cause: error,
+  });
+}
+
+/**
  * Token exchange callback for handling Sentry OAuth token refreshes.
  */
 export async function tokenExchangeCallback(
@@ -241,31 +282,43 @@ export async function tokenExchangeCallback(
     return undefined;
   }
 
-  try {
-    // If we have a cached upstream expiry, and there's ample time left,
-    // avoid calling upstream to reduce unnecessary refreshes.
-    // Mint a new provider token with the remaining TTL.
-    const props = options.props as WorkerProps;
-    const maybeExpiresAt = props.accessTokenExpiresAt;
-    if (maybeExpiresAt && Number.isFinite(maybeExpiresAt)) {
-      const remainingMs = maybeExpiresAt - Date.now();
-      const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes safety window
-      if (remainingMs > SAFE_WINDOW_MS) {
-        const remainingSec = Math.floor(remainingMs / 1000);
-        return {
-          newProps: { ...options.props },
-          accessTokenTTL: remainingSec,
-        };
-      }
+  // If we have a cached upstream expiry, and there's ample time left,
+  // avoid calling upstream to reduce unnecessary refreshes.
+  // Mint a new provider token with the remaining TTL.
+  const props = options.props as WorkerProps;
+  const maybeExpiresAt = props.accessTokenExpiresAt;
+  if (maybeExpiresAt && Number.isFinite(maybeExpiresAt)) {
+    const remainingMs = maybeExpiresAt - Date.now();
+    const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes safety window
+    if (remainingMs > SAFE_WINDOW_MS) {
+      const remainingSec = Math.floor(remainingMs / 1000);
+      logInfo("Token still valid, reusing cached token", {
+        loggerScope: ["cloudflare", "oauth", "refresh"],
+        extra: { remainingSec },
+      });
+      return {
+        newProps: { ...options.props },
+        accessTokenTTL: remainingSec,
+      };
     }
+  }
 
-    // Construct the upstream token URL for Sentry
-    const upstreamTokenUrl = new URL(
-      SENTRY_TOKEN_URL,
-      `https://${env.SENTRY_HOST || "sentry.io"}`,
-    ).href;
+  // Construct the upstream token URL for Sentry
+  const upstreamTokenUrl = new URL(
+    SENTRY_TOKEN_URL,
+    `https://${env.SENTRY_HOST || "sentry.io"}`,
+  ).href;
 
-    // Use our refresh token function to get new tokens from Sentry
+  logInfo("Token expired or expiring soon, refreshing from Sentry", {
+    loggerScope: ["cloudflare", "oauth", "refresh"],
+    extra: {
+      expiresAt: maybeExpiresAt,
+      hasExpiry: !!maybeExpiresAt,
+    },
+  });
+
+  // Use our refresh token function to get new tokens from Sentry
+  try {
     const [tokenResponse, errorResponse] = await refreshAccessToken({
       client_id: env.SENTRY_CLIENT_ID,
       client_secret: env.SENTRY_CLIENT_SECRET,
@@ -274,19 +327,13 @@ export async function tokenExchangeCallback(
     });
 
     if (errorResponse) {
-      // Convert the Response to an Error for the OAuth provider
-      const errorText = await errorResponse.text();
-      throw new Error(
-        `Failed to refresh upstream token in OAuth provider: ${errorText}`,
-      );
+      return handleRefreshError(errorResponse, props);
     }
 
-    if (!tokenResponse.refresh_token) {
-      logIssue("[oauth] Upstream refresh response missing refresh_token", {
-        loggerScope: ["cloudflare", "oauth", "refresh"],
-      });
-      return undefined;
-    }
+    logInfo("Successfully refreshed upstream token", {
+      loggerScope: ["cloudflare", "oauth", "refresh"],
+      extra: { expires_in: tokenResponse.expires_in },
+    });
 
     // Return the updated props with new tokens and TTL
     return {
@@ -300,9 +347,6 @@ export async function tokenExchangeCallback(
       accessTokenTTL: tokenResponse.expires_in,
     };
   } catch (error) {
-    logIssue(error);
-    throw new Error("Failed to refresh upstream token in OAuth provider", {
-      cause: error,
-    });
+    return handleRefreshError(error, props);
   }
 }

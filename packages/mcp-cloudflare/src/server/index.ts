@@ -31,7 +31,7 @@ const addCorsHeaders = (response: Response): Response => {
 };
 
 // Wrap OAuth Provider to restrict CORS headers on public metadata endpoints
-// OAuth Provider v0.0.12 adds overly permissive CORS (allows all methods/headers).
+// OAuth Provider v0.1.0 adds overly permissive CORS (allows all methods/headers).
 // We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
 const wrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
