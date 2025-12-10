@@ -194,7 +194,7 @@ export const IssueSchema = z
     shortId: z.string(),
     title: z.string(),
     firstSeen: z.string().datetime(),
-    lastSeen: z.string().datetime(),
+    lastSeen: z.string().datetime().nullable(),
     count: z.union([z.string(), z.number()]),
     userCount: z.union([z.string(), z.number()]),
     permalink: z.string().url(),
