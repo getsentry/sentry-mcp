@@ -8,7 +8,7 @@ const RESULT_LIMIT = 25;
 
 export default defineTool({
   name: "find_organizations",
-  requiredSkills: ALL_SKILLS, // Foundational tool - available to all skills
+  skills: ALL_SKILLS, // Foundational tool - available to all skills
   requiredScopes: ["org:read"],
   description: [
     "Find organizations that the user has access to in Sentry.",

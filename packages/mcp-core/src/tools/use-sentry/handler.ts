@@ -36,7 +36,7 @@ function formatToolCallTrace(toolCalls: ToolCall[]): string {
 
 export default defineTool({
   name: "use_sentry",
-  requiredSkills: [], // Only available in agent mode - bypasses authorization
+  skills: [], // Only available in agent mode - bypasses authorization
   requiredScopes: [], // No specific scopes - uses authentication token
   description: [
     "Natural language interface to Sentry via an embedded AI agent.",

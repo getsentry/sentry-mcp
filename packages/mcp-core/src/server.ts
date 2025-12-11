@@ -37,7 +37,7 @@ import { logIssue, type LogIssueOptions } from "./telem/logging";
 import { formatErrorForUser } from "./internal/error-handling";
 import { LIB_VERSION } from "./version";
 import { MCP_SERVER_NAME } from "./constants";
-import { hasRequiredSkills, type Skill } from "./skills";
+import { isEnabledBySkills, type Skill } from "./skills";
 import {
   getConstraintParametersToInject,
   getConstraintKeysToFilter,
@@ -155,21 +155,21 @@ function configureServer({
      * ==========================
      *
      * Tools are filtered at registration time based on grantedSkills.
-     * Tool must have non-empty `requiredSkills` array to be exposed.
-     * Empty `requiredSkills: []` means intentionally excluded from skills system.
+     * Tool must have non-empty `skills` array to be exposed.
+     * Empty `skills: []` means intentionally excluded from skills system.
      *
      * In agent mode, authorization is skipped - use_sentry handles it internally.
      *
      * ## Examples:
      *    ```typescript
-     *    // Tool available in "triage" skill only:
-     *    { requiredSkills: ["triage"] }
+     *    // Tool belongs to "triage" skill only:
+     *    { skills: ["triage"] }
      *
-     *    // Tool available to ALL skills (foundational tool like whoami):
-     *    { requiredSkills: ALL_SKILLS }
+     *    // Tool belongs to ALL skills (foundational tool like whoami):
+     *    { skills: ALL_SKILLS }
      *
      *    // Tool excluded from skills system (like use_sentry in agent mode):
-     *    { requiredSkills: [] }
+     *    { skills: [] }
      *    ```
      */
     let allowed = false;
@@ -178,12 +178,12 @@ function configureServer({
     if (agentMode) {
       allowed = true;
     }
-    // Skills system: tool must have non-empty requiredSkills to be exposed
+    // Skills system: tool must have non-empty skills to be exposed
     else if (grantedSkills) {
-      if (tool.requiredSkills && tool.requiredSkills.length > 0) {
-        allowed = hasRequiredSkills(grantedSkills, tool.requiredSkills);
+      if (tool.skills && tool.skills.length > 0) {
+        allowed = isEnabledBySkills(grantedSkills, tool.skills);
       }
-      // Empty requiredSkills means NOT exposed via skills system
+      // Empty skills means NOT exposed via skills system
     }
 
     // Skip tool if not allowed by active authorization system

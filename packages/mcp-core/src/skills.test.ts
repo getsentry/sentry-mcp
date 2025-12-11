@@ -4,7 +4,7 @@ import {
   DEFAULT_SKILLS,
   isValidSkill,
   parseSkills,
-  hasRequiredSkills,
+  isEnabledBySkills,
   type Skill,
 } from "./skills";
 
@@ -113,31 +113,31 @@ describe("skills module", () => {
     });
   });
 
-  describe("hasRequiredSkills", () => {
-    it("returns true when any required skill is granted", () => {
+  describe("isEnabledBySkills", () => {
+    it("returns true when any tool skill is granted", () => {
       const grantedSkills = new Set<Skill>(["inspect", "docs"]);
-      expect(hasRequiredSkills(grantedSkills, ["inspect"])).toBe(true);
-      expect(hasRequiredSkills(grantedSkills, ["docs"])).toBe(true);
-      expect(hasRequiredSkills(grantedSkills, ["inspect", "triage"])).toBe(
+      expect(isEnabledBySkills(grantedSkills, ["inspect"])).toBe(true);
+      expect(isEnabledBySkills(grantedSkills, ["docs"])).toBe(true);
+      expect(isEnabledBySkills(grantedSkills, ["inspect", "triage"])).toBe(
         true,
       );
     });
 
-    it("returns false when no required skills are granted", () => {
+    it("returns false when no tool skills are granted", () => {
       const grantedSkills = new Set<Skill>(["inspect", "docs"]);
-      expect(hasRequiredSkills(grantedSkills, ["triage"])).toBe(false);
+      expect(isEnabledBySkills(grantedSkills, ["triage"])).toBe(false);
       expect(
-        hasRequiredSkills(grantedSkills, ["triage", "project-management"]),
+        isEnabledBySkills(grantedSkills, ["triage", "project-management"]),
       ).toBe(false);
     });
 
     it("returns false when grantedSkills is undefined", () => {
-      expect(hasRequiredSkills(undefined, ["inspect"])).toBe(false);
+      expect(isEnabledBySkills(undefined, ["inspect"])).toBe(false);
     });
 
-    it("returns false when requiredSkills is empty", () => {
+    it("returns false when toolSkills is empty", () => {
       const grantedSkills = new Set<Skill>(["inspect"]);
-      expect(hasRequiredSkills(grantedSkills, [])).toBe(false);
+      expect(isEnabledBySkills(grantedSkills, [])).toBe(false);
     });
   });
 });

@@ -12,7 +12,7 @@ export default defineTool({
     "- Get the user's name and email address.",
   ].join("\n"),
   inputSchema: {},
-  requiredSkills: ALL_SKILLS, // Foundational tool - available to all skills
+  skills: ALL_SKILLS, // Foundational tool - available to all skills
   requiredScopes: [], // No specific scopes required - uses authentication token
   annotations: {
     readOnlyHint: true,

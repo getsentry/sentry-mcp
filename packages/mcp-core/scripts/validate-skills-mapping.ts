@@ -36,7 +36,7 @@ function getToolsForSkill(skill: Skill): string[] {
   const enabledTools: string[] = [];
 
   for (const [toolName, tool] of Object.entries(tools)) {
-    if (tool.requiredSkills.includes(skill)) {
+    if (tool.skills.includes(skill)) {
       enabledTools.push(toolName);
     }
   }
@@ -88,8 +88,8 @@ function findOrphanedTools(): string[] {
       continue;
     }
 
-    // Check if tool has no required skills (orphaned)
-    if (tool.requiredSkills.length === 0) {
+    // Check if tool has no skills (orphaned)
+    if (tool.skills.length === 0) {
       orphanedTools.push(toolName);
     }
   }
