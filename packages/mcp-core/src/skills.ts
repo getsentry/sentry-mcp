@@ -82,8 +82,8 @@ export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
 
   // Count tools for each skill
   for (const tool of Object.values(tools)) {
-    if (Array.isArray(tool.requiredSkills)) {
-      for (const skill of tool.requiredSkills) {
+    if (Array.isArray(tool.skills)) {
+      for (const skill of tool.skills) {
         counts.set(skill as Skill, (counts.get(skill as Skill) || 0) + 1);
       }
     }
@@ -108,13 +108,13 @@ export function isValidSkill(skill: string): skill is Skill {
   return skill in SKILLS;
 }
 
-// Check if tool is enabled by skills
-export function hasRequiredSkills(
+// Check if tool is enabled by granted skills (ANY match = enabled)
+export function isEnabledBySkills(
   grantedSkills: Set<Skill> | undefined,
-  requiredSkills: Skill[],
+  toolSkills: Skill[],
 ): boolean {
-  if (!grantedSkills || requiredSkills.length === 0) return false;
-  return requiredSkills.some((skill) => grantedSkills.has(skill));
+  if (!grantedSkills || toolSkills.length === 0) return false;
+  return toolSkills.some((skill) => grantedSkills.has(skill));
 }
 
 // Parse and validate skills from input
@@ -160,10 +160,8 @@ export async function getScopesForSkills(
 
   // Iterate through all tools and collect required scopes for tools enabled by granted skills
   for (const tool of Object.values(tools)) {
-    // Check if any of the tool's required skills are granted
-    const toolEnabled = tool.requiredSkills.some((reqSkill) =>
-      grantedSkills.has(reqSkill),
-    );
+    // Check if any of the tool's skills are granted
+    const toolEnabled = tool.skills.some((skill) => grantedSkills.has(skill));
 
     // If tool is enabled by granted skills, add its required scopes
     if (toolEnabled) {

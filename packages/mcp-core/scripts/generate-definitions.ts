@@ -131,15 +131,12 @@ async function generateSkillDefinitions() {
       const t = tool as {
         name: string;
         description: string;
-        requiredSkills: string[];
+        skills: string[];
         requiredScopes: string[];
       };
 
       // Check if this tool is enabled by this skill
-      if (
-        Array.isArray(t.requiredSkills) &&
-        t.requiredSkills.includes(skill.id)
-      ) {
+      if (Array.isArray(t.skills) && t.skills.includes(skill.id)) {
         skillTools.push({
           name: t.name,
           description: t.description,
