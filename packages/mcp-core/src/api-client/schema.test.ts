@@ -32,6 +32,31 @@ describe("IssueSchema", () => {
     expect(result).toEqual(errorIssue);
   });
 
+  it("should allow issues with null lastSeen", () => {
+    const staleIssue = {
+      id: "321",
+      shortId: "TEST-321",
+      title: "Intermittent crash",
+      firstSeen: "2025-01-01T00:00:00Z",
+      lastSeen: null,
+      count: 0,
+      userCount: 0,
+      permalink: "https://sentry.io/issues/321/",
+      project: {
+        id: "1",
+        name: "stale-project",
+        slug: "stale-project",
+      },
+      status: "resolved",
+      culprit: "stale.ts",
+      type: "error",
+    };
+
+    const result = IssueSchema.parse(staleIssue);
+
+    expect(result.lastSeen).toBeNull();
+  });
+
   it("should parse a regressed performance issue", () => {
     // Anonymized payload from real regressed issue (issue #633)
     const regressedIssue = {
