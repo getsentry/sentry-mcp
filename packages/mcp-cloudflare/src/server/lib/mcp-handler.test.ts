@@ -1,69 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Env } from "../types";
-
-// Mock the agents/mcp module which has cloudflare: dependencies
-vi.mock("agents/mcp", () => ({
-  createMcpHandler: vi.fn(
-    (server: { server: { setRequestHandler: () => void } }) => {
-      // Return a handler that processes MCP requests through the server
-      return async (request: Request) => {
-        const body = (await request.json()) as {
-          jsonrpc: string;
-          method: string;
-          params?: Record<string, unknown>;
-          id: number | string;
-        };
-
-        // Simulate the MCP server behavior based on method
-        if (body.method === "tools/list") {
-          // Get tools from the actual server
-          const tools = server.server._tools || [];
-          return new Response(
-            JSON.stringify({
-              jsonrpc: "2.0",
-              id: body.id,
-              result: { tools },
-            }),
-            { headers: { "Content-Type": "application/json" } },
-          );
-        }
-
-        if (body.method === "initialize") {
-          return new Response(
-            JSON.stringify({
-              jsonrpc: "2.0",
-              id: body.id,
-              result: {
-                protocolVersion: "2024-11-05",
-                serverInfo: { name: "sentry-mcp", version: "1.0.0" },
-                capabilities: {},
-              },
-            }),
-            { headers: { "Content-Type": "application/json" } },
-          );
-        }
-
-        return new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: body.id,
-            error: { code: -32601, message: "Method not found" },
-          }),
-          { headers: { "Content-Type": "application/json" } },
-        );
-      };
-    },
-  ),
-}));
-
-// Import after mocking
-const { default: mcpHandler } = await import("./mcp-handler");
+import mcpHandler from "./mcp-handler";
 
 /**
  * Tests for the MCP handler.
  *
- * These tests exercise the MCP handler authentication and URL parsing.
- * MCP protocol tests verify the handler correctly integrates with the MCP server.
+ * These tests exercise the MCP handler authentication, URL parsing,
+ * and integration with the MCP server.
+ *
+ * Note: fetchMock is set up globally in test-setup.ts with persistent interceptors
+ * for Sentry API endpoints. Tests here add specific interceptors as needed.
  */
 
 /**
@@ -104,6 +50,9 @@ function createMcpContext(
 
 /**
  * Create an MCP JSON-RPC request.
+ *
+ * Note: The MCP handler requires Accept header to include both
+ * application/json and text/event-stream for streaming responses.
  */
 function createMcpRequest(
   method: string,
@@ -119,6 +68,7 @@ function createMcpRequest(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
       "CF-Connecting-IP": "192.0.2.1",
     },
     body: JSON.stringify({
@@ -128,6 +78,20 @@ function createMcpRequest(
       id,
     }),
   });
+}
+
+/**
+ * Parse an SSE response to extract JSON-RPC response.
+ * SSE format: "event: message\ndata: {...JSON...}\n\n"
+ */
+async function parseSSEResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  // Extract JSON from "data: {...}" line
+  const dataLine = text.split("\n").find((line) => line.startsWith("data: "));
+  if (!dataLine) {
+    throw new Error(`No data line found in SSE response: ${text}`);
+  }
+  return JSON.parse(dataLine.slice(6)) as T;
 }
 
 /**
@@ -152,6 +116,8 @@ describe("MCP Handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  // Note: fetchMock lifecycle is managed by test-setup.ts
 
   describe("authentication", () => {
     it("should reject requests without auth context", async () => {
@@ -203,14 +169,24 @@ describe("MCP Handler", () => {
 
   describe("URL constraints", () => {
     it("should handle /mcp without constraints", async () => {
-      const request = createMcpRequest("tools/list", {}, { path: "/mcp" });
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp" },
+      );
       const ctx = createMcpContext();
 
       const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
 
-      // Should not fail on URL parsing (may fail later on constraints check)
-      // but should get past the URL pattern matching
-      expect(response.status).not.toBe(404);
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { protocolVersion: string };
+      }>(response);
+      expect(body.result?.protocolVersion).toBeDefined();
     });
 
     it("should return 404 for invalid URL pattern", async () => {
@@ -224,6 +200,81 @@ describe("MCP Handler", () => {
       const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
 
       expect(response.status).toBe(404);
+    });
+
+    it("should handle /mcp/:org with valid organization", async () => {
+      // Uses global mock for sentry-mcp-evals organization
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp/sentry-mcp-evals" },
+      );
+      const ctx = createMcpContext();
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { protocolVersion: string };
+      }>(response);
+      expect(body.result?.protocolVersion).toBeDefined();
+    });
+
+    it("should return 404 for non-existent organization", async () => {
+      // Uses global mock for nonexistent-org (returns 404)
+      const request = createMcpRequest(
+        "initialize",
+        {},
+        { path: "/mcp/nonexistent-org" },
+      );
+      const ctx = createMcpContext();
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(404);
+      expect(await response.text()).toContain("not found");
+    });
+  });
+
+  describe("MCP protocol", () => {
+    it("should respond to tools/list with available tools", async () => {
+      const request = createMcpRequest("tools/list");
+      const ctx = createMcpContext();
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { tools: Array<{ name: string }> };
+      }>(response);
+      expect(body.result?.tools).toBeDefined();
+      expect(Array.isArray(body.result?.tools)).toBe(true);
+      // Should have tools based on granted skills (inspect, docs)
+      expect(body.result?.tools.length).toBeGreaterThan(0);
+    });
+
+    it("should filter tools based on granted skills", async () => {
+      const request = createMcpRequest("tools/list");
+      // Only grant "docs" skill
+      const ctx = createMcpContext({ grantedSkills: ["docs"] });
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(200);
+      const body = await parseSSEResponse<{
+        result?: { tools: Array<{ name: string }> };
+      }>(response);
+      const toolNames = body.result?.tools.map((t) => t.name) || [];
+
+      // Should have docs tools
+      expect(toolNames).toContain("search_docs");
+
+      // Should NOT have inspect-only tools
+      expect(toolNames).not.toContain("get_issue_details");
     });
   });
 });
