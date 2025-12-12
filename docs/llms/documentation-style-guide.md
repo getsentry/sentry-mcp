@@ -20,19 +20,6 @@ This guide defines how to write effective documentation for LLMs working with th
 - Reference actual implementations: `See @packages/mcp-server/src/server.ts:45`
 - Use real patterns from the codebase
 
-## MDC Header Format
-
-### For Cursor IDE Rules
-```markdown
----
-description: Brief description of what this document covers
-globs: 
-alwaysApply: true
----
-```
-
-The header is optional for most docs but required for `cursor.mdc` to function as a Cursor IDE rule file.
-
 ## Document Structure
 
 ### Required Sections
@@ -61,7 +48,7 @@ Project-specific rules that must be followed.
 
 ## Common Patterns
 
-Link to reusable patterns: See "Error Handling" in @docs/common-patterns.mdc
+Link to reusable patterns: See "Error Handling" in @docs/common-patterns.md
 
 ## References
 
@@ -116,14 +103,14 @@ export const ParamOrganizationSlug = z
 ## Cross-References
 
 ### File References (MANDATORY):
-- Use @path syntax for local files: `@docs/common-patterns.mdc`
+- Use @path syntax for local files: `@docs/common-patterns.md`
 - Always reference from repo root: `@packages/mcp-server/src/server.ts`
 - Do NOT use Markdown links for local files (avoid markdown `[text](./...)` patterns)
 - Prefer path-only mentions to help agents parse
 
 ### Section References:
-- Refer to sections by name, not anchors: `See "Error Handling" in @docs/common-patterns.mdc`
-- If multiple sections share a name, include a short hint: `("Zod Patterns" in @docs/common-patterns.mdc)`
+- Refer to sections by name, not anchors: `See "Error Handling" in @docs/common-patterns.md`
+- If multiple sections share a name, include a short hint: `("Zod Patterns" in @docs/common-patterns.md)`
 
 ### Code References:
 - Use concrete paths and identifiers: `@packages/mcp-server/src/tools/search-events/index.ts:buildQuery`
@@ -172,7 +159,7 @@ export const ParamOrganizationSlug = z
 
 ### Red Flags:
 - Verbose prose explaining what code could show
-- Repeated content → extract to common-patterns.mdc
+- Repeated content → extract to common-patterns.md
 - No code references → add implementation examples
 - Generic programming advice → remove it
 - Multiple concepts in one doc → split by topic

@@ -1,9 +1,6 @@
----
-description: Logging reference using LogTape and Sentry
----
 # Logging Reference
 
-How logging works in the Sentry MCP server using LogTape and Sentry. For tracing, spans, or metrics see @docs/monitoring.mdc.
+How logging works in the Sentry MCP server using LogTape and Sentry. For tracing, spans, or metrics see @docs/monitoring.md.
 
 ## Overview
 
@@ -88,7 +85,7 @@ const eventId = logIssue(error, {
 **Skip logging:**
 - `UserInputError` - Expected validation failures
 - 4xx API responses - Client errors (except 429 rate limits)
-- See @docs/error-handling.mdc for complete rules
+- See @docs/error-handling.md for complete rules
 
 ## Log Options
 
@@ -128,6 +125,6 @@ app.use(createRequestLogger(["cloudflare", "http"]));
 ## References
 
 - Implementation: @packages/mcp-server/src/telem/logging.ts
-- Error handling patterns: @docs/error-handling.mdc
-- Monitoring and tracing: @docs/monitoring.mdc
+- Error handling patterns: @docs/error-handling.md
+- Monitoring and tracing: @docs/monitoring.md
 - LogTape docs: https://logtape.org/

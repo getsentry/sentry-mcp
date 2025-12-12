@@ -44,4 +44,4 @@ Think of it as:
 
 - Live deployment: https://mcp.sentry.dev
 - Package location: `packages/mcp-cloudflare`
-- **For MCP Server docs**: See "Architecture" in @docs/architecture.mdc
+- **For MCP Server docs**: See "Architecture" in @docs/architecture.md

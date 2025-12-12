@@ -186,4 +186,4 @@ SENTRY_CLIENT_SECRET = "..." # OAuth app secret
 - See "OAuth Architecture" in @docs/cloudflare/oauth-architecture.md
 - See "Chat Interface" in @docs/cloudflare/architecture.md
 - See "Deployment" in @docs/cloudflare/deployment.md
-- See "Architecture" in @docs/architecture.mdc
+- See "Architecture" in @docs/architecture.md

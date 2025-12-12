@@ -1,8 +1,3 @@
----
-description: How to measure and track the token cost of MCP tool definitions
-globs:
-alwaysApply: false
----
 # Token Cost Tracking
 
 Measures the static overhead of MCP tool definitions - the tokens sent to LLM clients with every request.
@@ -130,4 +125,4 @@ tsx measure-token-cost.ts --help       # Show help
 
 - Script: `packages/mcp-server/scripts/measure-token-cost.ts`
 - Workflow: `.github/workflows/token-cost.yml`
-- Tool limits: See "Tool Count Limits" in `docs/adding-tools.mdc`
+- Tool limits: See "Tool Count Limits" in `docs/adding-tools.md`

@@ -77,4 +77,4 @@ Supported URL patterns:
 
 For implementation details and security notes, see:
 - `docs/cloudflare/constraint-flow-verification.md`
-- `docs/architecture.mdc`
+- `docs/architecture.md`

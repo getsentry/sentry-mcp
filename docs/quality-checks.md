@@ -29,7 +29,7 @@ pnpm test               # Run all tests
 - Error case testing (API failures, invalid params)
 - Mock server setup in `packages/mcp-server-mocks`
 
-See `docs/testing.mdc` for detailed testing patterns and `docs/adding-tools.mdc` for the testing workflow.
+See `docs/testing.md` for detailed testing patterns and `docs/adding-tools.md` for the testing workflow.
 
 ## Tool Count Limits
 
@@ -56,8 +56,8 @@ Tool definitions must generate without errors for client consumption.
 - **TypeScript strict mode** - All code must compile without errors
 - **Linting compliance** - Follow established code style patterns
 - **Test coverage** - All new tools must have comprehensive tests
-- **Error handling** - Use patterns from `common-patterns.mdc#error-handling`
-- **API patterns** - Follow patterns from `api-patterns.mdc`
+- **Error handling** - Use patterns from `common-patterns.md#error-handling`
+- **API patterns** - Follow patterns from `api-patterns.md`
 
 ## Pre-Commit Checklist
 
@@ -68,11 +68,10 @@ Before completing any task:
 - [ ] New tools have comprehensive tests
 - [ ] Build process generates tool definitions successfully
 - [ ] Documentation updated if patterns changed
-- [ ] AGENTS.md ↔ cursor.mdc sync maintained (if applicable)
 
 ## References
 
-- Testing patterns: `testing.mdc`
-- Tool development: `adding-tools.mdc`
-- Code patterns: `common-patterns.mdc`
-- API usage: `api-patterns.mdc`
+- Testing patterns: `testing.md`
+- Tool development: `adding-tools.md`
+- Code patterns: `common-patterns.md`
+- API usage: `api-patterns.md`

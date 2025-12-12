@@ -4,22 +4,22 @@ This directory contains contributor documentation used by humans and LLMs. To av
 
 ## Purpose
 
-- Central home for all contributor-focused docs (.mdc files)
+- Central home for all contributor-focused docs (.md files)
 - Consumed by tools (e.g., Cursor) via direct file references
 
 ## Start Here
 
 - Doc map and workflow: see `CLAUDE.md` / `AGENTS.md`
-- Per-topic guides live in this folder (e.g., `adding-tools.mdc`)
+- Per-topic guides live in this folder (e.g., `adding-tools.md`)
 
 ## Integration with Tools
 
 - Cursor IDE: this folder is referenced directly as contextual rules
-- Other AI tools: reference specific `.mdc` files as needed
+- Other AI tools: reference specific `.md` files as needed
 
 ## LLM-Specific
 
-- Meta-docs live under `llms/` (e.g., `llms/document-scopes.mdc`)
+- Meta-docs live under `llms/` (e.g., `llms/document-scopes.md`)
 
 ## Maintenance
 

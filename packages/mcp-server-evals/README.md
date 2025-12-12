@@ -21,4 +21,4 @@ This keeps permissions minimal and readable while still enabling every tool in e
 
 - No API keys are logged; MSW handles Sentry API mocking.
 - For code changes, ensure `pnpm run tsc && pnpm run lint && pnpm run test` all pass.
-- See `docs/adding-tools.mdc` and `docs/testing.mdc` for contribution guidance.
+- See `docs/adding-tools.md` and `docs/testing.md` for contribution guidance.

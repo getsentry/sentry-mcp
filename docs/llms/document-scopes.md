@@ -5,12 +5,12 @@ Defines the specific purpose and content for each documentation file.
 ## Reference Style (MANDATORY)
 
 - Use @path for all local file references, repo-root relative (e.g., `@packages/mcp-server/src/server.ts`).
-- Refer to sections by name: `See "Error Handling" in @docs/common-patterns.mdc`.
+- Refer to sections by name: `See "Error Handling" in @docs/common-patterns.md`.
 - Keep Markdown links only for external sites.
 
 ## Core Documents
 
-### architecture.mdc
+### architecture.md
 **Purpose**: Explain system design and package interactions
 
 **Must Include**:
@@ -24,7 +24,7 @@ Defines the specific purpose and content for each documentation file.
 - Implementation details (link to code instead)
 - General MCP protocol explanation
 
-### common-patterns.mdc
+### common-patterns.md
 **Purpose**: Reusable patterns used throughout the codebase
 
 **Must Include**:
@@ -39,7 +39,7 @@ Defines the specific purpose and content for each documentation file.
 - External library documentation
 - One-off patterns used in single places
 
-### quality-checks.mdc
+### quality-checks.md
 **Purpose**: Required checks and commands for code quality
 
 **Must Include**:
@@ -55,7 +55,7 @@ Defines the specific purpose and content for each documentation file.
 
 ## Feature Implementation Guides
 
-### adding-tools.mdc
+### adding-tools.md
 **Purpose**: How to add new MCP tools
 
 **Must Include**:
@@ -67,12 +67,12 @@ Defines the specific purpose and content for each documentation file.
 
 **Must Exclude**:
 - What MCP tools are conceptually
-- Duplicate testing patterns (link to testing.mdc)
+- Duplicate testing patterns (link to testing.md)
 - Full code examples (reference real implementations)
 
 ## Technical Guides
 
-### testing.mdc
+### testing.md
 **Purpose**: Testing strategies and patterns
 
 **Must Include**:
@@ -87,7 +87,7 @@ Defines the specific purpose and content for each documentation file.
 - General testing philosophy
 - Duplicate mock examples
 
-### api-patterns.mdc
+### api-patterns.md
 **Purpose**: Sentry API client usage and mocking
 
 **Must Include**:
@@ -100,11 +100,11 @@ Defines the specific purpose and content for each documentation file.
 **Must Exclude**:
 - HTTP basics
 - Zod library documentation
-- Duplicate error patterns (link to common-patterns.mdc)
+- Duplicate error patterns (link to common-patterns.md)
 
 ## Operations Guides
 
-### releases/cloudflare.mdc
+### releases/cloudflare.md
 **Purpose**: Cloudflare Workers release process
 
 **Must Include**:
@@ -119,9 +119,9 @@ Defines the specific purpose and content for each documentation file.
 **Must Exclude**:
 - Cloudflare Workers concepts
 - General deployment best practices
-- npm package release process (see stdio.mdc)
+- npm package release process (see stdio.md)
 
-### releases/stdio.mdc
+### releases/stdio.md
 **Purpose**: npm package release process
 
 **Must Include**:
@@ -133,11 +133,11 @@ Defines the specific purpose and content for each documentation file.
 - Beta releases
 
 **Must Exclude**:
-- Cloudflare deployment (see cloudflare.mdc)
+- Cloudflare deployment (see cloudflare.md)
 - General npm documentation
 - IDE-specific setup details
 
-### monitoring.mdc
+### monitoring.md
 **Purpose**: Observability and instrumentation
 
 **Must Include**:
@@ -152,7 +152,7 @@ Defines the specific purpose and content for each documentation file.
 - Sentry product documentation
 - General monitoring concepts
 
-### security.mdc
+### security.md
 **Purpose**: Authentication and security patterns
 
 **Must Include**:
@@ -182,20 +182,6 @@ Defines the specific purpose and content for each documentation file.
 - Duplicate content from other docs
 - Installation instructions
 
-### cursor.mdc
-**Purpose**: Cursor IDE-specific configuration
-
-**Must Include**:
-- Cursor metadata header
-- Link to documentation
-- Critical quality checks
-- Cursor-specific settings
-
-**Must Exclude**:
-- All content duplicated in other docs
-- General coding guidelines
-- Project overview
-
 ### AGENTS.md
 **Purpose**: Agent entry point (Claude Code, Cursor, etc.)
 
@@ -206,7 +192,7 @@ Defines the specific purpose and content for each documentation file.
 - Agent-specific notes (tools, transports, auth defaults)
 
 **Must Exclude**:
-- Detailed architecture (link to architecture.mdc)
+- Detailed architecture (link to architecture.md)
 - Development setup (link to relevant docs)
 - Integration instructions (keep minimal)
 
@@ -215,9 +201,9 @@ Defines the specific purpose and content for each documentation file.
 Focus on clarity and usefulness, not arbitrary line counts.
 
 Key improvements needed:
-- **security.mdc**: Too much OAuth theory → focus on implementation
-- **api-patterns.mdc**: Redundant examples → consolidate patterns
-- **releases/cloudflare.mdc**: Focus on MCP-specific config, not generic Cloudflare docs
-- **monitoring.mdc**: Verbose explanations → code examples
+- **security.md**: Too much OAuth theory → focus on implementation
+- **api-patterns.md**: Redundant examples → consolidate patterns
+- **releases/cloudflare.md**: Focus on MCP-specific config, not generic Cloudflare docs
+- **monitoring.md**: Verbose explanations → code examples
 
 The goal: Each document should be focused enough to be useful in a single context window while remaining comprehensive for its topic.
