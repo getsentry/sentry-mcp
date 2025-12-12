@@ -4,13 +4,13 @@ This directory contains meta-documentation specifically for LLMs working with th
 
 ## Contents
 
-### documentation-style-guide.mdc
+### documentation-style-guide.md
 Guidelines for writing effective documentation that LLMs can consume efficiently. Defines principles like assuming intelligence, being concise, and showing rather than telling.
 
-### document-scopes.mdc  
+### document-scopes.md  
 Defines the specific purpose, content requirements, and line count targets for each documentation file. Helps maintain focus and prevent scope creep.
 
-### documentation-todos.mdc
+### documentation-todos.md
 Specific tasks for improving each document based on the style guide and scope definitions. Tracks the documentation refactoring effort.
 
 ## Purpose

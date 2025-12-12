@@ -139,7 +139,7 @@ Required secrets in GitHub repository settings:
 - `CLOUDFLARE_API_TOKEN` - API token with Workers deployment permissions
 - `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
 
-See `github-actions.mdc` for detailed setup instructions.
+See `github-actions.md` for detailed setup instructions.
 
 #### Manual Deployment
 

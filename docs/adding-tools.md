@@ -1,8 +1,3 @@
----
-description: Step-by-step guide for adding new tools to the Sentry MCP server.
-globs: 
-alwaysApply: false
----
 # Adding New Tools
 
 Step-by-step guide for adding new tools to the Sentry MCP server.
@@ -123,7 +118,7 @@ async handler(params, context: ServerContext) {
     regionUrl: params.regionUrl,
   });
 
-  // 2. Validate inputs (see common-patterns.mdc#error-handling)
+  // 2. Validate inputs (see common-patterns.md#error-handling)
   if (!params.organizationSlug) {
     throw new UserInputError(
       "Organization slug is required. Use find_organizations() to list."
@@ -156,14 +151,14 @@ async handler(params, context: ServerContext) {
 
 ### Response Formatting
 
-See `common-patterns.mdc#response-formatting` for:
+See `common-patterns.md#response-formatting` for:
 - Markdown structure
 - ID/URL formatting
 - Next steps guidance
 
 ## Step 3: Add Tests
 
-Follow comprehensive testing patterns from `testing.mdc` for unit, integration, and evaluation tests.
+Follow comprehensive testing patterns from `testing.md` for unit, integration, and evaluation tests.
 
 Create `packages/mcp-server/src/tools/your-tool-name.test.ts`:
 
@@ -192,8 +187,8 @@ describe("your_tool_name", () => {
 ```
 
 **Testing Requirements:**
-- Input validation (see `testing.mdc#testing-error-cases`)
-- Error handling (use patterns from `common-patterns.mdc#error-handling`)
+- Input validation (see `testing.md#testing-error-cases`)
+- Error handling (use patterns from `common-patterns.md#error-handling`)
 - Output formatting with snapshots
 - API integration with MSW mocks
 
@@ -223,7 +218,7 @@ In `packages/mcp-server-mocks/src/handlers/`:
 }
 ```
 
-See `api-patterns.mdc#mock-patterns` for validation examples.
+See `api-patterns.md#mock-patterns` for validation examples.
 
 ## Step 5: Add Evaluation Tests (Sparingly)
 
@@ -399,10 +394,10 @@ This pattern works with both Cloudflare-hosted and stdio transports.
 
 ## Common Patterns
 
-- Error handling: `common-patterns.mdc#error-handling`
-- API usage: `api-patterns.mdc`
-- Testing: `testing.mdc`
-- Response formatting: `common-patterns.mdc#response-formatting`
+- Error handling: `common-patterns.md#error-handling`
+- API usage: `api-patterns.md`
+- Testing: `testing.md`
+- Response formatting: `common-patterns.md#response-formatting`
 
 ## References
 

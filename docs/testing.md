@@ -111,7 +111,7 @@ pnpm -w run cli --access-token=TOKEN "query"
 
 ## Functional Testing Patterns
 
-See `adding-tools.mdc#step-3-add-tests` for the complete tool testing workflow.
+See `adding-tools.md#step-3-add-tests` for the complete tool testing workflow.
 
 ### Basic Test Structure
 
@@ -132,7 +132,7 @@ describe("tool_name", () => {
 });
 ```
 
-**NOTE**: Follow error handling patterns from `common-patterns.mdc#error-handling` when testing error cases.
+**NOTE**: Follow error handling patterns from `common-patterns.md#error-handling` when testing error cases.
 
 ### Testing Error Cases
 
@@ -157,7 +157,7 @@ it("handles API errors gracefully", async () => {
 
 ## Mock Server Setup
 
-Use MSW patterns from `api-patterns.mdc#mock-patterns` for API mocking.
+Use MSW patterns from `api-patterns.md#mock-patterns` for API mocking.
 
 ### Test Configuration
 
@@ -306,7 +306,7 @@ it("streams large responses efficiently", async () => {
 
 ## Common Testing Patterns
 
-See `common-patterns.mdc` for:
+See `common-patterns.md` for:
 - Mock server setup
 - Error handling tests
 - Parameter validation

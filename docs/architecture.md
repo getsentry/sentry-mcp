@@ -1,8 +1,3 @@
----
-description: 
-globs: 
-alwaysApply: false
----
 # Architecture
 
 System design and package interactions for the Sentry MCP server.
