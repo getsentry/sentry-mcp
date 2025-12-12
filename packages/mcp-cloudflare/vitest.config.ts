@@ -1,26 +1,29 @@
-/// <reference types="vitest" />
-import { defineConfig } from "vitest/config";
+import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
 
-export default defineConfig({
+/**
+ * Unified vitest config using vitest-pool-workers.
+ *
+ * All tests run in the Cloudflare Workers runtime (workerd) which enables:
+ * - Testing with cloudflare:test bindings (KV, AI, etc.)
+ * - Using fetchMock from cloudflare:test for HTTP mocking
+ *
+ * This replaces the previous two-config approach:
+ * - Old: vitest.config.ts (MSW/Node.js) + vitest.workers.config.ts (workerd)
+ * - New: Single config using workerd for all tests
+ */
+export default defineWorkersConfig({
   test: {
-    // Use thread-based workers to avoid process-kill issues in sandboxed environments
-    pool: "threads",
+    include: ["src/**/*.test.ts"],
+    // Exclude tests that require Node.js-specific module handling (CJS deps like ajv)
+    exclude: ["src/server/lib/mcp-handler.test.ts"],
+    setupFiles: ["src/test-setup.ts"],
     poolOptions: {
       workers: {
-        miniflare: {},
-        wrangler: { configPath: "./wrangler.jsonc" },
+        wrangler: { configPath: "./wrangler.test.jsonc" },
+        miniflare: {
+          kvNamespaces: ["OAUTH_KV"],
+        },
       },
     },
-    deps: {
-      interopDefault: true,
-    },
-    include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-    exclude: ["**/*.integration.test.ts", "node_modules"],
-    coverage: {
-      provider: "v8",
-      reporter: ["text", "json", "html"],
-      include: ["**/*.ts"],
-    },
-    setupFiles: ["dotenv/config", "src/test-setup.ts"],
   },
 });
