@@ -213,6 +213,70 @@ describe("tokenExchangeCallback", () => {
       "Failed to refresh upstream token in OAuth provider",
     );
   });
+
+  it("should fall back to cached token when refresh fails and TTL > 1 min", async () => {
+    // Set expiry to 90 seconds (less than 2-minute safety window, so refresh is attempted)
+    // but more than 1 minute (so fallback succeeds instead of throwing)
+    const nearExpiry = Date.now() + 90 * 1000; // 90 seconds left
+    const options: TokenExchangeCallbackOptions = {
+      grantType: "refresh_token",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
+      props: {
+        id: "user-id",
+        clientId: "test-client-id",
+        scope: "org:read project:read",
+        accessToken: "cached-token",
+        refreshToken: "refresh-token",
+        accessTokenExpiresAt: nearExpiry,
+      } as WorkerProps,
+    };
+
+    // Mock failed refresh response (network error or service unavailable)
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => "Service unavailable",
+    });
+
+    const result = await tokenExchangeCallback(options, mockEnv);
+
+    // Should return TTL without newProps to prevent overwriting tokens in race conditions
+    expect(result).toBeDefined();
+    expect(result?.newProps).toBeUndefined(); // No newProps to prevent stale prop overwrites
+    expect(result?.accessTokenTTL).toBeLessThanOrEqual(90); // ~90 seconds
+    expect(result?.accessTokenTTL).toBeGreaterThan(0);
+  });
+
+  it("should throw error when refresh fails and TTL < 1 min", async () => {
+    const almostExpired = Date.now() + 30 * 1000; // 30 seconds left
+    const options: TokenExchangeCallbackOptions = {
+      grantType: "refresh_token",
+      clientId: "test-client-id",
+      userId: "test-user-id",
+      scope: ["org:read", "project:read"],
+      props: {
+        id: "user-id",
+        clientId: "test-client-id",
+        scope: "org:read project:read",
+        accessToken: "cached-token",
+        refreshToken: "refresh-token",
+        accessTokenExpiresAt: almostExpired,
+      } as WorkerProps,
+    };
+
+    // Mock failed refresh response
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => "Service unavailable",
+    });
+
+    await expect(tokenExchangeCallback(options, mockEnv)).rejects.toThrow(
+      "Failed to refresh upstream token",
+    );
+  });
 });
 
 describe("refreshAccessToken", () => {
