@@ -41,7 +41,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build tool definitions
         run: pnpm -w run build
@@ -106,7 +106,7 @@ jobs:
           workflow: token-cost.yml
           branch: main
           name_is_regexp: true
-          name: 'token-stats-.*'
+          name: "token-stats-.*"
           path: main-stats
           search_artifacts: true
 
