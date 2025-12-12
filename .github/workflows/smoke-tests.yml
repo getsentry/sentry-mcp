@@ -13,7 +13,7 @@ jobs:
   smoke-tests:
     name: Run Smoke Tests Against Local Server
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -42,8 +42,8 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-      
+        run: pnpm install --frozen-lockfile
+
       - name: Build
         run: pnpm build
 
@@ -55,7 +55,7 @@ jobs:
           WRANGLER_PID=$!
           echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
           echo "Waiting for server to start (PID: $WRANGLER_PID)..."
-          
+
           # Wait for server to be ready (up to 2 minutes)
           MAX_ATTEMPTS=24
           ATTEMPT=0
@@ -85,7 +85,7 @@ jobs:
             ATTEMPT=$((ATTEMPT+1))
             sleep 5
           done
-          
+
           if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
             echo "❌ Server failed to start after $MAX_ATTEMPTS attempts"
             echo "📋 Full wrangler.log:"
@@ -99,11 +99,11 @@ jobs:
         working-directory: packages/smoke-tests
         run: |
           echo "🧪 Running smoke tests against local server at $PREVIEW_URL"
-          
+
           # Give server a bit more time to stabilize after startup
           echo "⏳ Waiting 5 seconds for server to stabilize..."
           sleep 5
-          
+
           # Verify server is still responding before running tests
           if ! curl -s -f -o /dev/null http://localhost:8788/; then
             echo "❌ Server is not responding before tests!"
@@ -111,10 +111,10 @@ jobs:
             cat ../mcp-cloudflare/wrangler.log
             exit 1
           fi
-          
+
           echo "✅ Server is responding, running tests..."
           pnpm test:ci || TEST_EXIT_CODE=$?
-          
+
           # If tests failed, show server logs for debugging
           if [ "${TEST_EXIT_CODE:-0}" -ne 0 ]; then
             echo "❌ Tests failed with exit code ${TEST_EXIT_CODE}"
