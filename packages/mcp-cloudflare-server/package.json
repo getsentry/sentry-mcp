@@ -1,0 +1,39 @@
+{
+  "name": "@sentry/mcp-cloudflare-server",
+  "version": "0.24.0",
+  "private": true,
+  "type": "module",
+  "license": "FSL-1.1-ALv2",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "pnpm exec wrangler deploy",
+    "cf:versions:upload": "npx wrangler versions upload",
+    "cf-typegen": "wrangler types",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "vitest",
+    "tsc": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@logtape/logtape": "^1.1.1",
+    "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "ajv": "^8.17.1",
+    "urlpattern-polyfill": "^10.1.0",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "catalog:",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@sentry/cloudflare": "catalog:",
+    "@sentry/mcp-core": "workspace:*",
+    "agents": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  }
+}

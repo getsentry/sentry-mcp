@@ -75,6 +75,7 @@
     ]
   },
   "devDependencies": {
-    "@types/json-schema": "^7.0.15"
+    "@types/json-schema": "^7.0.15",
+    "patch-package": "^8.0.1"
   }
 }

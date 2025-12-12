@@ -1,0 +1,28 @@
+{
+  "name": "@sentry/mcp-cloudflare-router",
+  "version": "0.24.0",
+  "private": true,
+  "type": "module",
+  "license": "FSL-1.1-ALv2",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "pnpm exec wrangler deploy",
+    "cf:versions:upload": "npx wrangler versions upload",
+    "cf-typegen": "wrangler types",
+    "test": "vitest run --passWithNoTests",
+    "test:ci": "vitest run --passWithNoTests --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "vitest",
+    "tsc": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@sentry/mcp-server-mocks": "workspace:*",
+    "@sentry/mcp-server-tsconfig": "workspace:*",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  },
+  "dependencies": {
+    "@sentry/cloudflare": "catalog:",
+    "@sentry/mcp-core": "workspace:*"
+  }
+}

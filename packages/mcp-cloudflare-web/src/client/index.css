@@ -1,0 +1,465 @@
+@import url("https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+@plugin "@tailwindcss/typography";
+
+:root {
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+
+  /* --gray600: #1d1127; */
+  /* --gray500: #2b1d38; */
+  --bg1: #160f24;
+  --bg2: #201633;
+  --bg3: #392f59;
+  /* --bg3: #362e5a; */
+  /* --bg4: #452750; */
+  /* --bgblue: #0056ff; */
+
+  /* --yellow100: #fde8b4; */
+  /* --yellow200: #ffd577; */
+  /* --yellow300: #ffc227; */
+  /* --yellow400: #ffa800; */
+  /* --yellow500: #ff8c00; */
+  /* --yellow600: #ff7000; */
+
+  /* --darkorange: #df5128; */
+  /* --lightorange: #f48350; */
+
+  --gr0: #f3b024;
+  --gr1: #f09b82;
+  --gr2: #bf5c7f;
+  --gr3: #8b5395;
+  /* --gr3: #8e528c; */
+
+  /* --ligtpink: #ffc3da; */
+  /* --darkpink: #fe5999; */
+  --selectpink: #e1567c;
+  /* --darkerpink: #e1567d; */
+  /* --brightpink: #f758b6; */
+
+  --pink100: #fdc9d7;
+  --pink200: #fa93ab;
+  --pink300: #f05781;
+
+  --foreground: #ededed;
+  /* --purple100: #d4d1ec; */
+  /* --purple200: #a396da; */
+  /* --purple300: #6c5fc7; */
+
+  /* --blue100: #d2dff7; */
+  /* --blue200: #92a8ea; */
+  /* --blue300: #3d74db; */
+
+  /* --red100: #fcc6c8; */
+  /* --red200: #fd918f; */
+  /* --red300: #f55459; */
+}
+
+@theme inline {
+  --color-pink100: var(--pink100);
+  --color-pink200: var(--pink200);
+  --color-pink300: var(--pink300);
+  --color-select: var(--selectpink);
+
+  --color-background: var(--bg1);
+  --color-background-2: var(--bg2);
+  --color-background-3: var(--bg3);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: "Rubik", sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply scroll-smooth;
+    scroll-padding-top: 6rem;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100vh;
+    font-family: "Rubik", -apple-system, "BlinkMacSystemFont", "Segoe UI",
+      "Helvetica", "Arial", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol";
+  }
+
+  pre {
+    white-space: pre-wrap;
+  }
+}
+
+::selection {
+  background-color: var(--selectpink);
+  color: white;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+/* hide asciinema-player's built-in play button on mount */
+.ap-wrapper .ap-player .ap-overlay-start {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* remove background from terminal container */
+.ap-player .ap-terminal {
+  background: transparent !important;
+}
+
+/* optional: also remove outer container bg */
+.ap-wrapper {
+  background: transparent !important;
+}
+
+/* --- background patterns --- */
+.bg-grid {
+  background-size: var(--size, 40px) var(--size, 40px);
+  background-position: calc(-1 * var(--size, 40px) / 2)
+    calc(-1 * var(--size, 40px) / 2);
+  background-image: linear-gradient(
+      to right,
+      var(--grid-color, #fff2) 1px,
+      transparent 1px
+    ), linear-gradient(to bottom, var(--grid-color, #fff2) 1px, transparent 1px);
+}
+
+.bg-dots {
+  background-image: radial-gradient(#fff4 1px, transparent 0);
+  background-size: var(--size, 40px) var(--size, 40px);
+}
+
+/* --- keyframes --- */
+@keyframes keycapPulse {
+  0% {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.98);
+  }
+
+  11% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  /* fade-in (~120ms of 540ms) */
+  88% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  /* hold 300ms */
+  100% {
+    opacity: 0;
+    transform: translateY(-1rem) scale(0.985);
+  }
+
+  /* fade-out (~120ms) */
+}
+.animate-keycap {
+  animation: keycapPulse var(--dur, 950ms) ease-out both;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes keyPress {
+  0% {
+    filter: brightness(0.85);
+    transform: translateY(0rem) scale(1);
+  }
+
+  30% {
+    filter: brightness(1.25);
+    transform: translateY(2.5rem) scale(0.95);
+  }
+
+  100% {
+    filter: brightness(0.95);
+    transform: translateY(0.5rem) scale(1);
+  }
+}
+@keyframes metaKeyPress {
+  0% {
+    filter: brightness(0.95);
+    transform: translateY(0rem) scale(1);
+  }
+
+  30% {
+    filter: brightness(1.25);
+    transform: translateY(2.5rem) scale(0.95);
+  }
+
+  100% {
+    filter: brightness(1.1);
+    transform: translateY(2rem) scale(0.95);
+  }
+}
+.animate-keycap-inner {
+  animation: keyPress var(--dur, 500ms) ease both;
+  animation-delay: var(--delay, 0s);
+}
+.animate-keycap-inner-meta {
+  animation: metaKeyPress var(--dur, 500ms) ease both;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes urlSelect {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+.animate-select {
+  animation: urlSelect 500ms steps(20) both;
+  animation-delay: var(--delay, 0s);
+}
+
+/* SpeedDisplay animation */
+@keyframes popSpeed {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  30% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+
+  60% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+}
+.speed-animate {
+  animation: popSpeed var(--speed-pop-dur, 500ms) ease-out;
+}
+
+@keyframes issueFlyover {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+  50% {
+    translate: 0 -50%;
+  }
+  100% {
+    transform: translateX(-200%) translateY(0);
+    opacity: 0;
+    scale: 50%;
+  }
+}
+.animate-issue-context {
+  animation: issueFlyover 1s 1 forwards;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+.animate-cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* datawire animation between terminal and browser/ide side for hero demo */
+@layer utilities {
+  .wire {
+    position: relative;
+    overflow: hidden;
+  }
+  .wire::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    /* the solid wire is on the element itself via Tailwind bg-*, this (::before)
+       is only the moving pulse overlay */
+    background: transparent;
+    /* size & look of the pulse */
+    width: var(--pulse-w, 24%); /* % of wire width */
+    left: -30%; /* start off-screen */
+    margin: auto 0; /* vertically center */
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      currentColor 25%,
+      currentColor 75%,
+      transparent 100%
+    );
+    filter: drop-shadow(0 0 6px currentColor);
+    height: 100%;
+    will-change: transform;
+    transform: translate3d(0, 0, 0) translateX(-120%);
+    animation: wire-ltr var(--period, 0.3s) var(--delay, 0s) linear infinite;
+    transition: opacity 0.25s ease;
+  }
+  .wire-rtl::before {
+    animation-name: wire-rtl;
+  }
+  .wire-paused::before {
+    opacity: 0;
+    animation-play-state: paused;
+  }
+
+  @keyframes wire-ltr {
+    from {
+      transform: translate3d(0, 0, 0) translateX(-120%);
+    }
+    to {
+      transform: translate3d(0, 0, 0) translateX(220%);
+    }
+  }
+  @keyframes wire-rtl {
+    from {
+      transform: translate3d(0, 0, 0) translateX(220%);
+    }
+    to {
+      transform: translate3d(0, 0, 0) translateX(-120%);
+    }
+  }
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    color: rgb(249 115 22); /* orange-500 */
+  }
+  50% {
+    color: rgb(253 186 116); /* orange-300 */
+  }
+}
+
+@keyframes spinStar {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.pop {
+  animation: pop 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* two-step: original -> underscore -> original */
+@keyframes mcp_openchat_orig {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+@keyframes mcp_openchat_underscore {
+  0%,
+  100% {
+    transform: translateY(0.5rem);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+    transform: translateY(0);
+  }
+}
+
+/* trigger the animations on group-hover, use --delay per-index */
+.group:hover .animate-openchat .original {
+  animation: mcp_openchat_orig 550ms steps(3) var(--delay, 0ms) 1 both;
+}
+.group:hover .animate-openchat .underscore {
+  animation: mcp_openchat_underscore 550ms steps(3) var(--delay, 0ms) 1 both;
+}

@@ -1,0 +1,42 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sentry-mcp-server",
+  "main": "./src/index.ts",
+  "compatibility_date": "2025-03-21",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "keep_vars": true,
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  // KV for OAuth token storage
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "8dd5e9bafe1945298e2d5ca3b408a553"
+    }
+  ],
+  // Rate limiting
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "MCP_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1003",
+        "simple": {
+          "limit": 60,
+          "period": 60
+        }
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "dev": {
+    "port": 8790
+  }
+}

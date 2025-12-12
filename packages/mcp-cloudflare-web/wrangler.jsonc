@@ -1,0 +1,61 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sentry-mcp-web",
+  "main": "./src/server/index.ts",
+  "compatibility_date": "2025-03-21",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "keep_vars": true,
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  // Static assets (React SPA)
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  // AI for AutoRAG
+  "ai": {
+    "binding": "AI"
+  },
+  // KV for chat client registration
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "8dd5e9bafe1945298e2d5ca3b408a553"
+    }
+  ],
+  // Rate limiting
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "CHAT_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1001",
+        "simple": {
+          "limit": 10,
+          "period": 60
+        }
+      },
+      {
+        "name": "SEARCH_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1002",
+        "simple": {
+          "limit": 20,
+          "period": 60
+        }
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "dev": {
+    "port": 8789
+  }
+}
