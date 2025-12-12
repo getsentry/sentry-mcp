@@ -1,0 +1,26 @@
+{
+  "name": "@sry/cli",
+  "version": "0.1.0",
+  "description": "A gh-like CLI for Sentry",
+  "type": "module",
+  "bin": {
+    "sry": "./src/bin.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/bin.ts",
+    "build": "fossilize -o sry src/bin.ts",
+    "build:all": "FOSSILIZE_PLATFORMS=darwin-arm64,darwin-x64,linux-x64,linux-arm64,win-x64 fossilize -o sry src/bin.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20",
+    "fossilize": "^0.5.0",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ast-grep/napi": "^0.31.0",
+    "@stricli/auto-complete": "^1.2.4",
+    "@stricli/core": "^1.2.4"
+  }
+}
