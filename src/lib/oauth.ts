@@ -24,6 +24,7 @@ type DeviceCodeResponse = {
   device_code: string;
   user_code: string;
   verification_uri: string;
+  verification_uri_complete: string;
   expires_in: number;
   interval: number;
 };
@@ -35,7 +36,8 @@ type DeviceTokenResponse =
 type DeviceFlowCallbacks = {
   onUserCode: (
     userCode: string,
-    verificationUri: string
+    verificationUri: string,
+    verificationUriComplete: string
   ) => void | Promise<void>;
   onPolling?: () => void;
 };
@@ -134,11 +136,21 @@ export async function performDeviceFlow(
   timeout = 900_000 // 15 minutes default
 ): Promise<TokenResponse> {
   // Step 1: Request device code
-  const { device_code, user_code, verification_uri, interval, expires_in } =
-    await requestDeviceCode();
+  const {
+    device_code,
+    user_code,
+    verification_uri,
+    verification_uri_complete,
+    interval,
+    expires_in,
+  } = await requestDeviceCode();
 
   // Notify caller of the user code
-  await callbacks.onUserCode(user_code, verification_uri);
+  await callbacks.onUserCode(
+    user_code,
+    verification_uri,
+    verification_uri_complete
+  );
 
   // Calculate absolute timeout
   const timeoutAt = Date.now() + Math.min(timeout, expires_in * 1000);

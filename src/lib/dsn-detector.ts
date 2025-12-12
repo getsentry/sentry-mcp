@@ -193,13 +193,13 @@ function findSourceFiles(
  */
 async function detectFromCode(cwd: string): Promise<DetectedDsn | null> {
   // Try to use ast-grep if available
-  try {
-    const { js } = await import("@ast-grep/napi");
-    // ast-grep implementation would go here
-    // For now, fall through to regex-based detection
-  } catch {
-    // ast-grep not available, use regex fallback
-  }
+  // try {
+  //   const { js } = await import("@ast-grep/napi");
+  //   // ast-grep implementation would go here
+  //   // For now, fall through to regex-based detection
+  // } catch {
+  //   // ast-grep not available, use regex fallback
+  // }
 
   // Regex-based detection
   const sourceFiles = findSourceFiles(cwd);

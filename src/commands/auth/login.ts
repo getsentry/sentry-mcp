@@ -62,11 +62,18 @@ export const loginCommand = buildCommand({
     try {
       const tokenResponse = await performDeviceFlow(
         {
-          onUserCode: async (userCode, verificationUri) => {
-            process.stdout.write(`Opening browser to: ${verificationUri}\n\n`);
-            process.stdout.write(`Enter code: ${userCode}\n\n`);
+          onUserCode: async (
+            userCode,
+            verificationUri,
+            verificationUriComplete
+          ) => {
+            process.stdout.write("Opening browser...\n");
+            process.stdout.write(
+              `If it doesn't open, visit: ${verificationUri}\n`
+            );
+            process.stdout.write(`Code: ${userCode}\n\n`);
             process.stdout.write("Waiting for authorization...\n");
-            await openBrowser(verificationUri);
+            await openBrowser(verificationUriComplete);
           },
           onPolling: () => {
             // Could add a spinner or dots here
