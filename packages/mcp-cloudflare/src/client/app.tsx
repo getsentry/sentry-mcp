@@ -10,8 +10,6 @@ import HeroBlock from "./components/hero/hero-block";
 import UseCases from "./components/usecases";
 import GettingStarted from "./components/getting-started";
 
-import TableOfContents from "./components/docs/toc";
-
 import Footer from "./components/home-layout/footer";
 
 export default function App() {
@@ -85,13 +83,6 @@ export default function App() {
       <HeroBlock />
       <UseCases />
       <GettingStarted />
-
-      {/* main content */}
-      <div className="relative container mx-auto">
-        <aside className="max-xl:hidden absolute h-full right-15 inset-y-0">
-          <TableOfContents />
-        </aside>
-      </div>
 
       <Chat
         isOpen={isChatOpen}

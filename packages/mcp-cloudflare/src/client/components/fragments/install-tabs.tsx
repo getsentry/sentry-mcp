@@ -163,7 +163,7 @@ export default function InstallTabs({
                       : "group-hover/tab:text-violet-300 group-hover/tab:underline group-hover/tab:-rotate-x-45 group-hover/tab:-translate-y-6.5 group-hover/tab:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] group-active/tab:scale-[0.95]"
                   }`}
                 >
-                  {/* unfinished: soft glow */}
+                  {/* unfinished: soft glow effect */}
                   {/* <div className="absolute top-0 left-1/2 -translate-1/2 w-20 h-6 duration-300 group-hover/tab:bg-violet-400/50 rounded-[100%] blur-lg -z-10 pointer-events-none" /> */}
                   {iconsByID[id] && (
                     <span
@@ -173,7 +173,12 @@ export default function InstallTabs({
                       {iconsByID[id]}
                     </span>
                   )}
-                  {selected && title}
+                  {/* desktop - show title by default */}
+                  <span className="truncate hidden md:block">{title}</span>
+                  {/* mobile - hide title by default, show when selected */}
+                  <span className="md:hidden contents">
+                    {selected && title}
+                  </span>
                 </div>
                 {i < lastIdx && !selected && (
                   <>
