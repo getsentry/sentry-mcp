@@ -17,8 +17,12 @@ import {
   type LogRecord,
   type Sink,
 } from "@logtape/logtape";
-import { captureException, captureMessage, withScope } from "@sentry/core";
-import * as Sentry from "@sentry/node";
+import {
+  captureException,
+  captureMessage,
+  logger as sentryLogger,
+  withScope,
+} from "@sentry/core";
 
 const ROOT_LOG_CATEGORY = ["sentry", "mcp"] as const;
 
@@ -51,13 +55,13 @@ function resolveLowestLevel(): LogLevel {
  * (creating Issues), this sink uses Sentry.logger.* methods to send data to the
  * Logs product.
  *
- * Note: This uses @sentry/node logger API. Cloudflare Workers will need a separate
- * implementation using @sentry/cloudflare logger API.
+ * This uses @sentry/core logger API which works across all platforms (Node.js,
+ * Cloudflare Workers, etc.) as long as Sentry is initialized with the appropriate SDK.
  */
 function createSentryLogsSink(): Sink {
   return (record: LogRecord) => {
-    // Check if Sentry.logger is available (may not be in all environments)
-    if (!Sentry.logger) {
+    // Check if sentryLogger is available (may not be in all environments)
+    if (!sentryLogger) {
       return;
     }
 
@@ -76,29 +80,29 @@ function createSentryLogsSink(): Sink {
     // Extract attributes from properties
     const attributes = record.properties as Record<string, unknown>;
 
-    // Map LogTape levels to Sentry.logger methods
-    // Note: Sentry.logger methods are fire-and-forget and handle errors gracefully
+    // Map LogTape levels to sentryLogger methods
+    // Note: sentryLogger methods are fire-and-forget and handle errors gracefully
     switch (record.level) {
       case "trace":
-        Sentry.logger.trace(message, attributes);
+        sentryLogger.trace(message, attributes);
         break;
       case "debug":
-        Sentry.logger.debug(message, attributes);
+        sentryLogger.debug(message, attributes);
         break;
       case "info":
-        Sentry.logger.info(message, attributes);
+        sentryLogger.info(message, attributes);
         break;
       case "warning":
-        Sentry.logger.warn(message, attributes);
+        sentryLogger.warn(message, attributes);
         break;
       case "error":
-        Sentry.logger.error(message, attributes);
+        sentryLogger.error(message, attributes);
         break;
       case "fatal":
-        Sentry.logger.fatal(message, attributes);
+        sentryLogger.fatal(message, attributes);
         break;
       default:
-        Sentry.logger.info(message, attributes);
+        sentryLogger.info(message, attributes);
     }
   };
 }

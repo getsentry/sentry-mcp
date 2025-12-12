@@ -1,69 +1,69 @@
+import type { Event as SentryEvent } from "@sentry/core";
 import { describe, it, expect } from "vitest";
 import { sentryBeforeSend } from "./sentry";
-import type * as Sentry from "@sentry/node";
 
 describe("sentry", () => {
   describe("OpenAI API key scrubbing", () => {
     it("should scrub OpenAI API keys from message", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         message:
           "Error with key: sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result.message).toBe("Error with key: [REDACTED_OPENAI_KEY]");
     });
 
     it("should scrub multiple OpenAI keys", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         message:
           "Keys: sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234 and sk-xyz123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result.message).toBe(
         "Keys: [REDACTED_OPENAI_KEY] and [REDACTED_OPENAI_KEY]",
       );
     });
 
     it("should not scrub partial matches", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         message:
           "Not a key: sk-abc or task-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result.message).toBe(event.message);
     });
   });
 
   describe("Bearer token scrubbing", () => {
     it("should scrub Bearer tokens", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         message:
           "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result.message).toBe("Authorization: Bearer [REDACTED_TOKEN]");
     });
   });
 
   describe("Sentry token scrubbing", () => {
     it("should scrub Sentry access tokens", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         message:
           "Using token: sntrys_eyJpYXQiOjE2OTQwMzMxNTMuNzk0NjI4LCJ1cmwiOiJodHRwczovL3NlbnRyeS5pbyIsInJlZ2lvbl91cmwiOiJodHRwczovL3VzLnNlbnRyeS5pbyIsIm9yZyI6InNlbnRyeSJ9_abcdef123456",
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result.message).toBe("Using token: [REDACTED_SENTRY_TOKEN]");
     });
   });
 
   describe("Deep object scrubbing", () => {
     it("should scrub sensitive data from nested objects", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         extra: {
           config: {
             apiKey: "sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
@@ -74,7 +74,7 @@ describe("sentry", () => {
         },
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result.extra).toEqual({
         config: {
           apiKey: "[REDACTED_OPENAI_KEY]",
@@ -86,7 +86,7 @@ describe("sentry", () => {
     });
 
     it("should scrub breadcrumbs", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         message: "Test event",
         breadcrumbs: [
           {
@@ -99,7 +99,7 @@ describe("sentry", () => {
         ],
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result.breadcrumbs?.[0].message).toBe(
         "API call with [REDACTED_OPENAI_KEY]",
       );
@@ -113,7 +113,7 @@ describe("sentry", () => {
 
   describe("Exception scrubbing", () => {
     it("should scrub from exception values", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         exception: {
           values: [
             {
@@ -125,7 +125,7 @@ describe("sentry", () => {
         },
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result.exception?.values?.[0].value).toBe(
         "Failed to authenticate with [REDACTED_OPENAI_KEY]",
       );
@@ -134,14 +134,14 @@ describe("sentry", () => {
 
   describe("No sensitive data", () => {
     it("should return event unchanged when no sensitive data", () => {
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         message: "Normal error message",
         extra: {
           foo: "bar",
         },
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       expect(result).toEqual(event);
     });
   });
@@ -149,12 +149,12 @@ describe("sentry", () => {
   describe("Regex state handling", () => {
     it("should handle multiple calls without regex state corruption", () => {
       // This tests the bug where global regex patterns maintain lastIndex between calls
-      const event1: Sentry.Event = {
+      const event1: SentryEvent = {
         message:
           "First error with sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
 
-      const event2: Sentry.Event = {
+      const event2: SentryEvent = {
         message:
           "Second error with sk-xyz123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
@@ -168,7 +168,7 @@ describe("sentry", () => {
       expect(result2?.message).toBe("Second error with [REDACTED_OPENAI_KEY]");
 
       // Test multiple replacements in the same string
-      const event3: Sentry.Event = {
+      const event3: SentryEvent = {
         message:
           "Multiple keys: sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234 and sk-xyz123def456ghi789jkl012mno345pqr678stu901vwx234",
       };
@@ -190,12 +190,12 @@ describe("sentry", () => {
         deep = { nested: deep };
       }
 
-      const event: Sentry.Event = {
+      const event: SentryEvent = {
         message: "Deep nesting test",
         extra: deep,
       };
 
-      const result = sentryBeforeSend(event, {}) as Sentry.Event;
+      const result = sentryBeforeSend(event, {}) as SentryEvent;
       // Should not throw, and should handle max depth gracefully
       expect(result).toBeDefined();
       expect(result.message).toBe("Deep nesting test");
