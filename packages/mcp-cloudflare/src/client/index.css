@@ -192,6 +192,16 @@
     ), linear-gradient(to bottom, var(--grid-color, #fff2) 1px, transparent 1px);
 }
 
+.bg-squares {
+  --size: 20px;
+
+  background-size: var(--size) var(--size);
+  background-repeat: repeat;
+
+  /* squares touch corners: second starts at (squareSize, squareSize) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='25' height='25' x='0' y='0' fill='rgba(255,255,255,0.12)'/%3E%3Crect width='25' height='25' x='25' y='25' fill='rgba(255,255,255,0.12)'/%3E%3C/svg%3E");
+}
+
 .bg-dots {
   background-image: radial-gradient(#fff4 1px, transparent 0);
   background-size: var(--size, 40px) var(--size, 40px);

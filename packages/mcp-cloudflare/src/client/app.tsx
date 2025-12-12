@@ -81,8 +81,11 @@ export default function App() {
       <HeaderDivider />
 
       <HeroBlock />
-      <UseCases />
-      <GettingStarted />
+      <div className="flex flex-col xl:flex-row container mx-auto border-t border-dashed border-white/10">
+        <UseCases />
+        <div className="border-r border-dashed border-white/10" />
+        <GettingStarted />
+      </div>
 
       <Chat
         isOpen={isChatOpen}

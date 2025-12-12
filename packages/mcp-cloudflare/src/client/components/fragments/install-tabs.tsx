@@ -4,6 +4,7 @@ import * as React from "react";
 import { Prose } from "../ui/prose";
 import { cn } from "@/client/lib/utils";
 import { GeminiIcon } from "../ui/icons/gemini";
+import { ChevronRight } from "lucide-react";
 
 export type TabProps = {
   id: string;
@@ -191,9 +192,11 @@ export default function InstallTabs({
           })}
         </div>
         <div
-          className="absolute top-0 right-0 h-14 w-20 bg-gradient-to-l from-background-2 to-transparent rounded-tr-2xl z-10"
+          className="absolute top-0 right-0 h-14 w-20 bg-gradient-to-l from-background-2 to-transparent rounded-tr-2xl z-10 group/scroller"
           onMouseEnter={startAutoScroll}
-        />
+        >
+          <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-1 size-5 group-hover/scroller:scale-y-75 group-hover/scroller:scale-x-125 duration-300" />
+        </div>
       </div>
 
       <div
