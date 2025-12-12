@@ -11,9 +11,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Core - Shared code for MCP transports",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -21,9 +19,7 @@
     "type": "git",
     "url": "git@github.com:getsentry/sentry-mcp.git"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     "./api-client": {
       "types": "./dist/api-client/index.ts",
@@ -137,7 +133,6 @@
     "@logtape/sentry": "^1.1.1",
     "@modelcontextprotocol/sdk": "catalog:",
     "@sentry/core": "catalog:",
-    "@sentry/node": "catalog:",
     "ai": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"

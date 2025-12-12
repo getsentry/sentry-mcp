@@ -1,6 +1,6 @@
 import type { Issue } from "../../api-client";
+import { logInfo } from "../../telem/logging";
 import { getIssueUrl, getIssuesSearchUrl } from "../../utils/url-utils";
-import * as Sentry from "@sentry/node";
 
 /**
  * Format an explanation for how a natural language query was translated
@@ -55,16 +55,14 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
   }
 
   if (issues.length === 0) {
-    Sentry.logger.info(
-      Sentry.logger
-        .fmt`No issues found for query: ${naturalLanguageQuery || query}`,
-      {
+    logInfo(`No issues found for query: ${naturalLanguageQuery || query}`, {
+      extra: {
         query,
         organizationSlug,
         projectSlug: projectSlugOrId,
         naturalLanguageQuery,
       },
-    );
+    });
     output += "No issues found matching your search criteria.\n\n";
     output += "Try adjusting your search criteria or time range.";
     return output;
