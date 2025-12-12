@@ -20,10 +20,13 @@
     "cf-typegen": "wrangler types",
     "test": "vitest run",
     "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "tsc": "tsc --noEmit"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/vite-plugin": "^1.13.15",
     "@cloudflare/workers-types": "catalog:",
     "@sentry/mcp-core": "workspace:*",

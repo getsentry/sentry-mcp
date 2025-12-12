@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sentry-mcp-test",
+  // Note: We don't specify "main" - vitest-pool-workers handles entry points
+  "compatibility_date": "2025-03-21",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "vars": {
+    "COOKIE_SECRET": "test-cookie-secret-32-characters",
+    "SENTRY_CLIENT_ID": "test-client-id",
+    "SENTRY_CLIENT_SECRET": "test-client-secret",
+    "SENTRY_HOST": "sentry.io",
+    "OPENAI_API_KEY": "test-openai-key"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "test-oauth-kv"
+    }
+  ],
+  // Disable observability to avoid OTel issues in tests
+  "observability": {
+    "enabled": false
+  }
+}

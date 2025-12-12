@@ -15,6 +15,7 @@ export default defineConfig({
       interopDefault: true,
     },
     include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    exclude: ["**/*.integration.test.ts", "node_modules"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
