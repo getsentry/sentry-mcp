@@ -4,6 +4,8 @@ import skillDefinitions from "@sentry/mcp-core/skillDefinitions";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
 import { Prose } from "../ui/prose";
 import InstallTabs, { Tab } from "./install-tabs";
+import { KeyIcon } from "../ui/key-icon";
+import { KeyWord } from "../ui/key-word";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 const orderedSkills = [...skillDefinitions].sort((a, b) => a.order - b.order);
@@ -204,7 +206,11 @@ export function StdioSetupTabs() {
       <Tab id="cursor" title="Cursor">
         <ol>
           <li>
-            <strong>Cmd + Shift + J</strong> to open Cursor Settings.
+            <strong>
+              <KeyIcon>⌘</KeyIcon> + <KeyWord>Shift</KeyWord> +{" "}
+              <KeyIcon>J</KeyIcon>
+            </strong>{" "}
+            to open Cursor Settings.
           </li>
           <li>
             Select <strong>MCP Skills</strong>.
@@ -266,8 +272,10 @@ export function StdioSetupTabs() {
       <Tab id="vscode" title="Code">
         <ol>
           <li>
-            <strong>CMD + P</strong> and search for{" "}
-            <strong>MCP: Add Server</strong>.
+            <strong>
+              <KeyIcon>⌘</KeyIcon> + <KeyIcon>P</KeyIcon>
+            </strong>{" "}
+            and search for <strong>MCP: Add Server</strong>.
           </li>
           <li>
             Select <strong>Command (stdio)</strong>
@@ -495,7 +503,10 @@ export function StdioSetupTabs() {
       <Tab id="zed" title="Zed">
         <ol>
           <li>
-            <strong>CMD + ,</strong> to open Zed settings.
+            <strong>
+              <KeyIcon>⌘</KeyIcon> + <KeyIcon>,</KeyIcon>
+            </strong>{" "}
+            to open Zed settings.
           </li>
           <li>
             <CodeSnippet
