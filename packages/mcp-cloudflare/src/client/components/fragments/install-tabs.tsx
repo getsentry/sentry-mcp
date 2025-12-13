@@ -166,7 +166,7 @@ export default function InstallTabs({
                   }`}
                 />
                 <div
-                  className={`bg-background-2 relative rounded-xl py-4 pr-5 pl-6 duration-300 perspective-distant text-nowrap flex items-center overflow-hidden gap-2 group-active/tab:duration-100 group-active/tab:rotate-x-5 group-active/tab:translate-y-1.5 group-active/tab:text-violet-500 z-10 ${
+                  className={`bg-background-2 min-h-14 relative rounded-xl py-4 pr-5 pl-6 duration-300 perspective-distant text-nowrap flex items-center overflow-hidden gap-2 group-active/tab:duration-100 group-active/tab:rotate-x-5 group-active/tab:translate-y-1.5 group-active/tab:text-violet-500 z-10 ${
                     selected
                       ? "text-violet-300 underline"
                       : "group-hover/tab:text-violet-300 group-hover/tab:underline group-hover/tab:-rotate-x-45 group-hover/tab:-translate-y-6.5 group-hover/tab:ease-[cubic-bezier(0.175,0.885,0.32,1.275)] group-active/tab:scale-[0.95]"
