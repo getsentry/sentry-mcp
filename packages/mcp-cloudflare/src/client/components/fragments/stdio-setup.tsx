@@ -200,7 +200,7 @@ export function StdioSetupTabs() {
   const selfHostedEnvLine =
     'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", SENTRY_HOST = "sentry.example.com", OPENAI_API_KEY = "your-openai-key" }';
   return (
-    <InstallTabs className="w-full sticky top-28">
+    <InstallTabs>
       <Tab id="cursor" title="Cursor">
         <ol>
           <li>

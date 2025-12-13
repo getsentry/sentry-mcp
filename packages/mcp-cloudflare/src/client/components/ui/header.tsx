@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
           </div>
         </div>
         <div
-          className={`flex items-center gap-4 motion-safe:duration-300 [--x:0] xl:[--x:30rem] 2xl:[--x:38rem] ${
+          className={`flex items-center gap-4 motion-safe:duration-300 [--x:0] xl:[--x:26.25rem] 2xl:[--x:35.25rem] ${
             isChatOpen ? "-translate-x-[var(--x)]" : ""
           }`}
         >

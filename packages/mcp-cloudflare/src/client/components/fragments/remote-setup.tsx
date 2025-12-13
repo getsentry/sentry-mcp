@@ -89,7 +89,7 @@ export function RemoteSetupTabs() {
     2,
   );
   return (
-    <InstallTabs className="w-full sticky top-28">
+    <InstallTabs>
       <Tab id="cursor" title="Cursor">
         <Button
           variant="secondary"
