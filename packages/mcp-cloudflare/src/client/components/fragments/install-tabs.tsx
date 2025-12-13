@@ -147,9 +147,9 @@ export default function InstallTabs({
                 role="tab"
                 aria-selected={selected}
                 aria-controls={panelId}
-                tabIndex={selected ? 0 : -1}
+                tabIndex={selected ? -1 : 0}
                 onClick={() => setActive(i)}
-                className="relative group/tab cursor-pointer"
+                className="relative group/tab cursor-pointer focus-visible:ring-[3px] focus-visible:ring-violet-300 outline-none focus-visible:z-30 rounded-2xl focus-visible:ring-offset-2   focus-visible:ring-offset-background-2 duration-300"
               >
                 {i > 0 && !selected && (
                   <>

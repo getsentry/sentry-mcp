@@ -31,7 +31,9 @@ export default function Integration() {
                 url.toString(),
               );
             }}
-            className={`${!stdio && "shadow-sm"} rounded-lg !pr-3 !pl-2`}
+            className={`${
+              !stdio && "shadow-sm"
+            } rounded-lg !pr-3 !pl-2 focus:!ring-violet-300 focus-visible:z-30 focus:ring-offset-1 focus:ring-offset-background-3`}
           >
             <Cloud className="size-4 fill-current" />
             Cloud
@@ -53,7 +55,9 @@ export default function Integration() {
                 url.toString(),
               );
             }}
-            className={`${stdio && "shadow-sm"} rounded-lg !pr-3 !pl-2`}
+            className={`${
+              stdio && "shadow-sm"
+            } rounded-lg !pr-3 !pl-2 focus:!ring-violet-300 focus-visible:z-30 focus:ring-offset-1 focus:ring-offset-background-3`}
           >
             <Cable className="size-4" />
             Stdio

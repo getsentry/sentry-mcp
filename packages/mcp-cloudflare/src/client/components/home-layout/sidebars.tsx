@@ -21,7 +21,8 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
             toggleChat(true);
           }
         }}
-        tabIndex={0}
+        // the header button to open chat will remain tabbable
+        tabIndex={-1}
         type="button"
       >
         <span className="sr-only">Open chat panel</span>
