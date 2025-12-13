@@ -147,7 +147,7 @@ export default function InstallTabs({
         )}
         {/* only show once tabs have been scrolled to the right */}
         <div
-          className={`absolute top-0 left-0 h-14 w-20 bg-gradient-to-r from-background-2/95 from-15% to-transparent rounded-tl-xl z-10 group/scrlL duration-150 ${scrollLeft > 0 ? "" : "opacity-0 pointer-events-none"}`}
+          className={`absolute top-0 left-0 h-14 w-20 bg-gradient-to-r from-background-2/95 from-15% to-transparent rounded-tl-xl z-10 group/scrlL ${scrollLeft > 0 ? "" : "opacity-0 pointer-events-none"}`}
           onMouseEnter={startAutoScrollLeft}
         >
           <ChevronLeft
