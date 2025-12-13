@@ -30,12 +30,12 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
           </div>
         </div>
         <div
-          className={`flex items-center gap-4 motion-safe:duration-300 [--x:0] xl:[--x:30rem] 2xl:[--x:38rem] ${
+          className={`flex items-center gap-4 motion-safe:duration-300 [--x:0] xl:[--x:26.25rem] 2xl:[--x:35.25rem] ${
             isChatOpen ? "-translate-x-[var(--x)]" : ""
           }`}
         >
           <Button
-            className="rounded-xl max-md:!py-3 max-md:!px-2.25"
+            className="rounded-xl max-md:!py-3 max-md:!px-2.25 focus:!ring-violet-300"
             variant="secondary"
             asChild
           >
@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
             <Button
               type="button"
               onClick={() => toggleChat(!isChatOpen)}
-              className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl max-md:!py-3 max-md:!px-2.25 flex items-center bg-violet-300 text-background hover:bg-white/90 transition font-bold font-sans border border-background"
+              className="cursor-pointer pl-3 pr-3.5 py-2 rounded-xl max-md:!py-3 max-md:!px-2.25 flex items-center bg-violet-300 text-background hover:bg-white/90 transition font-bold font-sans border border-background focus:!ring-violet-300"
             >
               <PanelLeftClose className="size-4" />
               <span className="max-sm:sr-only">Live Demo</span>

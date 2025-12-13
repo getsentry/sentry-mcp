@@ -48,13 +48,13 @@ export default function CodeSnippet({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-neutral-500 cursor-pointer duration-300 hover:bg-violet-300/25 rounded-md"
+          className="h-8 w-8 text-neutral-500 cursor-pointer duration-300 hover:bg-violet-300/25 rounded-md focus:!ring-violet-300/50 group/copy"
           onClick={handleCopy}
         >
           {copied ? (
             <Check className="h-4 w-4 text-green-500" />
           ) : (
-            <Copy className="h-4 w-4 text-violet-300/50" />
+            <Copy className="h-4 w-4 text-violet-300/50 group-focus/copy:text-violet-300" />
           )}
           <span className="sr-only">Copy Snippet</span>
         </Button>

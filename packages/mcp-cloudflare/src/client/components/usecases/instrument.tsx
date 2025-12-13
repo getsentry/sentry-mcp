@@ -5,9 +5,9 @@ export default function Instrument() {
   return (
     <div
       id="connector"
-      className="group relative p-4 sm:p-8 lg:border-r max-lg:border-b border-dashed border-white/10 overflow-hidden justify-end flex flex-col"
+      className="group relative p-4 sm:p-8 lg:max-xl:border-r border-b border-dashed border-white/10 overflow-hidden justify-end flex flex-col"
     >
-      <div className="absolute inset-0 pointer-events-none bg-grid [--size:1rem] [mask-image:linear-gradient(to_bottom,red,transparent,red)] group-hover:opacity-50 opacity-30 duration-300 -z-20" />
+      <div className="absolute inset-0 pointer-events-none bg-dots [--size:1rem] group-hover:opacity-50 opacity-30 duration-300 -z-20" />
       <div className="px-12 p-6 mb-auto">
         <div className="flex w-full">
           <div className="rounded-full size-12 my-auto border border-white/20 group-hover:border-white/20 duration-300 border-dashed bg-background-2 group-hover:bg-white relative">
