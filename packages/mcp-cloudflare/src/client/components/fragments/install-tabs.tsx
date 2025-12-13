@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Prose } from "../ui/prose";
 import { cn } from "@/client/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { GeminiIcon } from "../ui/icons/gemini";
 import { ZedIcon } from "../ui/icons/zed";
 import { WarpIcon } from "../ui/icons/warp";
@@ -108,8 +108,9 @@ export default function InstallTabs({
   }, [active]);
 
   const navRef = React.useRef<HTMLDivElement | null>(null);
+  const [scrollLeft, setScrollLeft] = React.useState(0);
 
-  const startAutoScroll = React.useCallback(() => {
+  const startAutoScrollRight = React.useCallback(() => {
     const el = navRef.current;
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
@@ -117,6 +118,16 @@ export default function InstallTabs({
     // if already at (or very near) the end, do nothing
     if (el.scrollLeft >= max - 1) return;
     el.scrollTo({ left: max, behavior: "smooth" });
+  }, []);
+
+  const startAutoScrollLeft = React.useCallback(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 0) return;
+    // if already at (or very near) the start, do nothing
+    if (el.scrollLeft <= 1) return;
+    el.scrollTo({ left: 0, behavior: "smooth" });
   }, []);
 
   return (
@@ -127,11 +138,30 @@ export default function InstallTabs({
         aria-orientation="horizontal"
         onKeyDown={onKeyDown}
       >
+        {scrollLeft > 0 && (
+          <>
+            {/* corner crop to hide tabs scrolling to the left */}
+            <div className="bg-gradient-to-r from-background to-transparent from-25% w-12 h-6 absolute -top-6 left-0 z-5" />
+            <div className="bg-gradient-to-br from-background to-transparent from-50% size-4 absolute top-0 left-0 z-5" />
+          </>
+        )}
+        {/* only show once tabs have been scrolled to the right */}
+        <div
+          className={`absolute top-0 left-0 h-14 w-20 bg-gradient-to-r from-background-2/95 from-15% to-transparent rounded-tl-xl z-10 group/scrlL duration-150 ${scrollLeft > 0 ? "" : "opacity-0 pointer-events-none"}`}
+          onMouseEnter={startAutoScrollLeft}
+        >
+          <ChevronLeft
+            className={`absolute top-1/2 -translate-y-1/2 left-1 size-5 group-hover/scrlL:scale-y-75 group-hover/scrlL:scale-x-125 group-hover/scrlL:-translate-x-0.5 duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] ${scrollLeft > 0 ? "" : "translate-x-1/2"}`}
+          />
+        </div>
         {/* [mask:radial-gradient(circle_at_var(--r)_var(--t),blue_var(--r),transparent_var(--r)),radial-gradient(circle_at_calc(100%-var(--r))_var(--t),green_var(--r),transparent_var(--r)),radial-gradient(circle_at_var(--2r)_var(--r),blue_var(--r),transparent_var(--r)),radial-gradient(circle_at_calc(100%-var(--2r))_var(--r),green_var(--r),transparent_var(--r)),linear-gradient(to_right,transparent,transparent_var(--r),red_var(--r),red_calc(100%-var(--r)),transparent_calc(100%-var(--r))),linear-gradient(to_bottom,transparent,transparent_var(--t),red_var(--t))] */}
         <div
           ref={navRef}
           // flex has a min-width-contents by default causing a blowout of container width in getting-started.tsx, or wherever used, so w-0 is used to fix that, and flex-1 makes it fill the space like w-full would
           className="flex min-w-0 w-0 flex-1 overflow-x-auto hide-scrollbar overflow-y-visible pt-8 pb-4 -mb-4 -mt-8 relative [--r:1rem] [--2r:2rem] [--t:3rem] [mask:radial-gradient(circle_at_calc(100%-var(--r))_var(--t),green_var(--r),transparent_var(--r)),radial-gradient(circle_at_var(--2r)_var(--r),blue_var(--r),transparent_var(--r)),radial-gradient(circle_at_calc(100%-var(--2r))_var(--r),green_var(--r),transparent_var(--r)),linear-gradient(to_right,red_calc(100%-var(--r)),transparent_calc(100%-var(--r))),linear-gradient(to_bottom,transparent,transparent_var(--t),red_var(--t))] pr-20"
+          onScroll={(e) =>
+            setScrollLeft((e.target as HTMLDivElement).scrollLeft)
+          }
         >
           {items.map((el, i) => {
             const { id, title } = el.props;
@@ -200,10 +230,10 @@ export default function InstallTabs({
           })}
         </div>
         <div
-          className="absolute top-0 right-0 h-14 w-20 bg-gradient-to-l from-background-2 to-transparent rounded-tr-2xl z-10 group/scroller"
-          onMouseEnter={startAutoScroll}
+          className="absolute top-0 right-0 h-14 w-20 bg-gradient-to-l from-background-2 to-transparent rounded-tr-2xl z-10 group/srclR"
+          onMouseEnter={startAutoScrollRight}
         >
-          <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-1 size-5 group-hover/scroller:scale-y-75 group-hover/scroller:scale-x-125 duration-300" />
+          <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-1 size-5 group-hover/srclR:scale-y-75 group-hover/srclR:scale-x-125 group-hover/srclR:translate-x-0.5 duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)]" />
         </div>
       </div>
 
