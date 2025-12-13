@@ -10,7 +10,7 @@ export default function ValidationSummary({ step }: { step?: number }) {
           : "scale-0 opacity-0"
       } pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 transition-all gap-8`}
     >
-      <div className="flex items-center gap-6 text-2xl font-bold font-mono relative">
+      <div className="flex items-center gap-6 text-xl text-nowrap font-bold font-mono relative">
         <div
           className={`rounded-lg absolute left-0 inset-y-0 size-16 bg-lime-200 bg-[repeating-linear-gradient(45deg,#0008,#0008_4px,#0004_4px,#0004_10px)] scale-95 ${
             step === 5
@@ -50,7 +50,7 @@ export default function ValidationSummary({ step }: { step?: number }) {
           <span className="opacity-50">pnpm run</span> tsc
         </span>
       </div>
-      <div className="flex items-center gap-6 text-2xl font-bold font-mono relative">
+      <div className="flex items-center gap-6 text-xl text-nowrap font-bold font-mono relative">
         <div
           className={`rounded-lg absolute left-0 inset-y-0 size-16 bg-lime-200 bg-[repeating-linear-gradient(45deg,#0008,#0008_4px,#0004_4px,#0004_10px)] scale-95 ${
             step === 5
@@ -88,7 +88,7 @@ export default function ValidationSummary({ step }: { step?: number }) {
           <span className="opacity-50">pnpm run</span> lint
         </span>
       </div>
-      <div className="flex items-center gap-6 text-2xl font-bold font-mono relative">
+      <div className="flex items-center gap-6 text-xl text-nowrap font-bold font-mono relative">
         <div
           className={`rounded-lg absolute left-0 inset-y-0 size-16 bg-lime-200 bg-[repeating-linear-gradient(45deg,#0008,#0008_4px,#0004_4px,#0004_10px)] scale-95 ${
             step === 5
