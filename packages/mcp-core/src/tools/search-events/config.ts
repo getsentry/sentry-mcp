@@ -105,6 +105,31 @@ When user asks for calculated metrics, ratios, or conversions:
 - IMPORTANT: Equations are ONLY supported in the spans dataset, NOT in errors or logs
 - IMPORTANT: When sorting by equations, use "-equation|..." for descending order (highest values first)
 
+PERFORMANCE INVESTIGATION STRATEGY:
+When users ask about "performance problems", "slow pages", "slow endpoints", "latency issues",
+"web vitals", "LCP", "CLS", "INP", "page speed", "load time", "response time", or similar:
+
+1. ALWAYS use AGGREGATE queries first - individual samples are misleading for performance analysis
+2. Use p75() as the primary percentile for consistent performance measurement
+3. Group by transaction to identify which pages/endpoints have problems
+4. Include count() to understand sample size (low count = unreliable data)
+5. Sort by the worst-performing metric (descending with "-" prefix)
+
+CRITICAL: For performance investigations, return AGGREGATES grouped by transaction, NOT individual events.
+
+Performance Categories:
+- Frontend/Web Vitals: measurements.lcp, measurements.cls, measurements.inp, measurements.fcp, measurements.ttfb
+- Backend/API: span.duration on is_transaction:true spans, or specific span.op types
+- Database: span.duration with has:db.statement or db.system filters
+- External Services: span.duration with has:http.url for outbound calls
+
+Web Vitals Thresholds (for context when reporting):
+- LCP: Good < 2500ms, Needs Improvement 2500-4000ms, Poor >= 4000ms
+- CLS: Good < 0.1, Needs Improvement 0.1-0.25, Poor >= 0.25
+- INP: Good < 200ms, Needs Improvement 200-500ms, Poor >= 500ms
+- FCP: Good < 1800ms, Needs Improvement 1800-3000ms, Poor >= 3000ms
+- TTFB: Good < 800ms, Needs Improvement 800-1800ms, Poor >= 1800ms
+
 SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
 1. CRITICAL: Sort MUST go in the separate "sort" field, NEVER in the "query" field
    - WRONG: query: "level:error sort:-timestamp" ← Sort syntax in query field is FORBIDDEN
@@ -187,6 +212,12 @@ export const NUMERIC_FIELDS: Record<string, Set<string>> = {
     "gen_ai.usage.input_tokens",
     "gen_ai.usage.output_tokens",
     "gen_ai.request.max_tokens",
+    // Web Vitals measurements
+    "measurements.lcp",
+    "measurements.cls",
+    "measurements.inp",
+    "measurements.fcp",
+    "measurements.ttfb",
   ]),
   errors: new Set([
     // Most error fields are strings/categories
@@ -239,6 +270,18 @@ export const DATASET_FIELDS = {
     "mcp.tool.name": "Tool name (e.g., search_issues, search_events)",
     "mcp.session.id": "MCP session identifier",
 
+    // Web Vitals measurements (frontend performance metrics)
+    "measurements.lcp":
+      "Largest Contentful Paint - time until largest content element is visible (ms). Good < 2500ms",
+    "measurements.cls":
+      "Cumulative Layout Shift - visual stability score (unitless). Good < 0.1",
+    "measurements.inp":
+      "Interaction to Next Paint - responsiveness to user input (ms). Good < 200ms",
+    "measurements.fcp":
+      "First Contentful Paint - time until first content is visible (ms). Good < 1800ms",
+    "measurements.ttfb":
+      "Time to First Byte - server response time (ms). Good < 800ms",
+
     // Aggregate functions (SPANS dataset only - require numeric fields except count/count_unique)
     "count()": "Count of spans",
     "count_unique(field)": "Count of unique values, e.g. count_unique(user.id)",
@@ -247,7 +290,8 @@ export const DATASET_FIELDS = {
     "min(field)": "Minimum of numeric field, e.g. min(span.duration)",
     "max(field)": "Maximum of numeric field, e.g. max(span.duration)",
     "p50(field)": "50th percentile (median), e.g. p50(span.duration)",
-    "p75(field)": "75th percentile, e.g. p75(span.duration)",
+    "p75(field)":
+      "75th percentile - standard for performance analysis, e.g. p75(span.duration)",
     "p90(field)": "90th percentile, e.g. p90(span.duration)",
     "p95(field)": "95th percentile, e.g. p95(span.duration)",
     "p99(field)": "99th percentile, e.g. p99(span.duration)",
@@ -609,11 +653,65 @@ Query Patterns:
     "fields": ["user_agent.original", "count()"],
     "sort": "-count()"
   }
-- "most common clients making database queries" → 
+- "most common clients making database queries" →
   {
     "query": "has:db.statement AND has:user_agent.original",
     "fields": ["user_agent.original", "count()", "avg(span.duration)"],
     "sort": "-count()"
+  }
+- "web vitals performance problems" →
+  {
+    "query": "is_transaction:true AND has:measurements.lcp",
+    "fields": ["transaction", "p75(measurements.lcp)", "p75(measurements.cls)", "p75(measurements.inp)", "count()"],
+    "sort": "-p75(measurements.lcp)"
+  }
+- "pages with poor LCP" →
+  {
+    "query": "is_transaction:true AND has:measurements.lcp",
+    "fields": ["transaction", "count()", "p75(measurements.lcp)", "p95(measurements.lcp)", "max(measurements.lcp)"],
+    "sort": "-p75(measurements.lcp)"
+  }
+- "CLS layout shift issues" →
+  {
+    "query": "is_transaction:true AND has:measurements.cls",
+    "fields": ["transaction", "count()", "p75(measurements.cls)", "p95(measurements.cls)"],
+    "sort": "-p75(measurements.cls)"
+  }
+- "INP responsiveness problems" →
+  {
+    "query": "has:measurements.inp",
+    "fields": ["transaction", "count()", "p75(measurements.inp)", "p95(measurements.inp)"],
+    "sort": "-p75(measurements.inp)"
+  }
+- "slowest page loads" →
+  {
+    "query": "is_transaction:true",
+    "fields": ["transaction", "count()", "p75(span.duration)", "p95(span.duration)", "avg(span.duration)"],
+    "sort": "-p75(span.duration)"
+  }
+- "frontend performance overview" →
+  {
+    "query": "is_transaction:true AND has:measurements.lcp",
+    "fields": ["transaction", "p75(span.duration)", "p75(measurements.lcp)", "p75(measurements.fcp)", "p75(measurements.ttfb)", "count()"],
+    "sort": "-p75(span.duration)"
+  }
+- "slowest API endpoints" →
+  {
+    "query": "is_transaction:true AND span.op:http.server",
+    "fields": ["transaction", "count()", "p75(span.duration)", "p95(span.duration)"],
+    "sort": "-p75(span.duration)"
+  }
+- "slow database queries" →
+  {
+    "query": "has:db.statement",
+    "fields": ["db.system", "db.statement", "count()", "p75(span.duration)", "p95(span.duration)"],
+    "sort": "-p75(span.duration)"
+  }
+- "performance by endpoint" →
+  {
+    "query": "is_transaction:true",
+    "fields": ["transaction", "count()", "p75(span.duration)", "failure_rate()"],
+    "sort": "-p75(span.duration)"
   }`,
   },
 };
