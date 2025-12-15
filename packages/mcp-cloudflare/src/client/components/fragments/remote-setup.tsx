@@ -4,6 +4,8 @@ import { NPM_REMOTE_NAME } from "@/constants";
 import { Button } from "../ui/button";
 import InstallTabs, { Tab } from "./install-tabs";
 import { getCursorDeepLink } from "@/client/utils";
+import { KeyIcon } from "../ui/key-icon";
+import { KeyWord } from "../ui/key-word";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -89,7 +91,7 @@ export function RemoteSetupTabs() {
     2,
   );
   return (
-    <InstallTabs className="w-full sticky top-28">
+    <InstallTabs>
       <Tab id="cursor" title="Cursor">
         <Button
           variant="secondary"
@@ -105,17 +107,8 @@ export function RemoteSetupTabs() {
           <li>
             Or manually:{" "}
             <strong>
-              <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
-                ⌘
-              </div>{" "}
-              +{" "}
-              <div className="h-8 pl-1.5 pr-2 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
-                Shift
-              </div>{" "}
-              +{" "}
-              <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
-                J
-              </div>
+              <KeyIcon>⌘</KeyIcon> + <KeyWord>Shift</KeyWord> +{" "}
+              <KeyIcon>J</KeyIcon>
             </strong>{" "}
             to open Cursor Settings.
           </li>
@@ -194,13 +187,7 @@ export function RemoteSetupTabs() {
           <li>
             <strong>
               {" "}
-              <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
-                ⌘
-              </div>{" "}
-              +{" "}
-              <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
-                P
-              </div>
+              <KeyIcon>⌘</KeyIcon> + <KeyIcon>P</KeyIcon>
             </strong>{" "}
             and search for <strong>MCP: Add Server</strong>.
           </li>
@@ -396,13 +383,7 @@ export function RemoteSetupTabs() {
         <ol>
           <li>
             <strong>
-              <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
-                ⌘
-              </div>{" "}
-              +{" "}
-              <div className="size-8 [box-shadow:0_4px_0_0_#695f89] duration-300 hover:translate-y-1 hover:[box-shadow:0_0px_0_0_#695f89] inline-grid place-items-center rounded-lg border border-white/10 bg-background-3">
-                ,
-              </div>
+              <KeyIcon>⌘</KeyIcon> + <KeyIcon>,</KeyIcon>
             </strong>{" "}
             to open Zed settings.
           </li>

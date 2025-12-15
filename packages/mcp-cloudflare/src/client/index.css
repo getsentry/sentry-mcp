@@ -129,6 +129,25 @@
   --font-sans: "Rubik", sans-serif;
 }
 
+@utility container {
+  width: 100%;
+  @media (width >= 40rem /* 640px */) {
+    max-width: 40rem /* 640px */;
+  }
+  @media (width >= 48rem /* 768px */) {
+    max-width: 48rem /* 768px */;
+  }
+  @media (width >= 64rem /* 1024px */) {
+    max-width: 48rem /* 1024px */;
+  }
+  @media (width >= 80rem /* 1280px */) {
+    max-width: 72rem /* 1280px */;
+  }
+  @media (width >= 96rem /* 1536px */) {
+    max-width: 90rem /* 1536px */;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -190,6 +209,16 @@
       var(--grid-color, #fff2) 1px,
       transparent 1px
     ), linear-gradient(to bottom, var(--grid-color, #fff2) 1px, transparent 1px);
+}
+
+.bg-squares {
+  --size: 20px;
+
+  background-size: var(--size) var(--size);
+  background-repeat: repeat;
+
+  /* squares touch corners: second starts at (squareSize, squareSize) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='25' height='25' x='0' y='0' fill='rgba(255,255,255,0.12)'/%3E%3Crect width='25' height='25' x='25' y='25' fill='rgba(255,255,255,0.12)'/%3E%3C/svg%3E");
 }
 
 .bg-dots {

@@ -9,10 +9,11 @@ export default function Integration() {
   return (
     <section
       id="getting-started"
-      className="flex flex-col md:container mx-auto relative mb-12 -scroll-mt-8 border-b border-dashed border-white/20 max-w-full duration-300 will-change-contents"
+      className="flex flex-col md:max-w-3xl mx-auto relative mb-12 -scroll-mt-8 max-w-full"
     >
-      <div className="absolute top-0 left-0 right-0 flex justify-start flex-col px-8 pt-4 pointer-events-none">
-        <div className="flex items-center text-xs bg-background-3 rounded-full p-1 sticky top-4 size-fit -translate-x-[1.5px] mx-auto z-20 border-[0.5px] border-violet-300/50 pointer-events-auto">
+      <div className="flex justify-between items-center px-4 sm:px-8 pt-4 sm:pt-8 pb-4">
+        <h1 className="text-2xl md:text-2xl font-semibold">Installation</h1>
+        <div className="flex items-center text-xs bg-background-3 rounded-xl p-1 size-fit -translate-x-[1.5px] z-20 border-[0.5px] border-violet-300/50 gap-0.5">
           <Button
             variant={!stdio ? "default" : "secondary"}
             size="xs"
@@ -30,7 +31,9 @@ export default function Integration() {
                 url.toString(),
               );
             }}
-            className={`${!stdio && "shadow-sm"} rounded-full !pr-3 !pl-2`}
+            className={`${
+              !stdio && "shadow-sm"
+            } rounded-lg !pr-3 !pl-2 focus:!ring-violet-300 focus-visible:z-30 focus:ring-offset-1 focus:ring-offset-background-3`}
           >
             <Cloud className="size-4 fill-current" />
             Cloud
@@ -52,7 +55,9 @@ export default function Integration() {
                 url.toString(),
               );
             }}
-            className={`${stdio && "shadow-sm"} rounded-full !pr-3 !pl-2`}
+            className={`${
+              stdio && "shadow-sm"
+            } rounded-lg !pr-3 !pl-2 focus:!ring-violet-300 focus-visible:z-30 focus:ring-offset-1 focus:ring-offset-background-3`}
           >
             <Cable className="size-4" />
             Stdio
@@ -60,11 +65,9 @@ export default function Integration() {
         </div>
       </div>
 
-      <div className="px-4 sm:px-8 pt-4 sm:pt-8 pb-4 border-b border-dashed border-white/20">
-        {/* Client installation tabs first */}
-        <div className="bg-dots bg-fixed p-4 sm:p-12 flex items-start justify-center mb-4 border border-dashed border-white/10 rounded-lg">
-          {!stdio ? <RemoteSetupTabs /> : <StdioSetupTabs />}
-        </div>
+      {/* Client installation tabs first */}
+      <div className="p-4 sm:p-8 pt-0 sm:pt-0 border-b border-dashed border-white/10">
+        {!stdio ? <RemoteSetupTabs /> : <StdioSetupTabs />}
       </div>
 
       <div className="px-4 sm:px-8 pt-4 sm:pt-8 pb-4">

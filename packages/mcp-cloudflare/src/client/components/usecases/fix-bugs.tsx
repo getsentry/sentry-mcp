@@ -2,10 +2,11 @@ import { BugOff } from "lucide-react";
 
 export default function FixBugs() {
   return (
-    <div className="p-4 sm:p-8 lg:border-r max-lg:border-b border-dashed border-white/10 overflow-hidden justify-end flex flex-col group relative">
+    <div className="p-4 sm:p-8 lg:max-xl:border-r border-b border-dashed border-white/10 overflow-hidden justify-end flex flex-col group relative">
       <div className="absolute inset-0 pointer-events-none bg-grid [--size:1rem] [mask-image:linear-gradient(to_bottom,red,transparent,red)] group-hover:opacity-50 opacity-30 duration-300 -z-20" />
       <div className="relative min-h-64 [mask-image:linear-gradient(to_bottom,rgba(0,0,0,1)_60%,rgba(0,0,0,0)_100%)] mb-auto">
-        <div className="border rounded-2xl border-white/10 overflow-hidden bg-background-2 absolute top-0 left-0 bottom-0 right-0 translate-y-8 group-hover:translate-y-0 duration-200 ease-[cubic-bezier(0.175,0.885,0.32,1.275)]">
+        {/* window 1 (browser) */}
+        <div className="border rounded-2xl border-white/10 overflow-hidden bg-background-2 absolute top-0 left-0 bottom-0 right-8 translate-y-8 group-hover:translate-y-0 duration-200 ease-[cubic-bezier(0.175,0.885,0.32,1.275)]">
           <div className="flex items-center pl-3.5 py-0.5 gap-1.5">
             <div className="size-2 flex-shrink-0 rounded-full border border-white/20 bg-pink-300/50" />
             <div className="size-2 flex-shrink-0 rounded-full border border-white/20 bg-amber-300/50" />
@@ -20,6 +21,7 @@ export default function FixBugs() {
             </div>
           </div>
         </div>
+        {/* window 2 (terminal) */}
         <div className="border rounded-2xl border-white/10 bg-background absolute top-8 left-8 bottom-0 right-0 p-4 text-xs font-mono translate-y-8 group-hover:translate-y-0 duration-200 group-hover:delay-1000 ease-[cubic-bezier(0.175,0.885,0.32,1.275)]">
           &gt;&nbsp;fix&nbsp;
           <span className="group-hover:text-white inline text-transparent group-hover:delay-1000">
