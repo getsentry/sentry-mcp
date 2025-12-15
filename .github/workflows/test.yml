@@ -50,21 +50,6 @@ jobs:
       - name: Run tests
         run: pnpm test:ci
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        with:
-          flags: unittests
-          name: codecov-unittests
-          fail_ci_if_error: false
-
-      - name: Upload results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
         if: ${{ !cancelled() }}
