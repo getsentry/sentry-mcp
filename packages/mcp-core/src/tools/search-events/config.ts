@@ -357,363 +357,223 @@ export const DATASET_FIELDS = {
   },
 };
 
-// Dataset-specific rules and examples
-export const DATASET_CONFIGS = {
-  errors: {
-    rules: `- For errors, focus on: message, level, error.type, error.handled
-- Use level field for severity (error, warning, info, debug)
-- Use error.handled:false for unhandled exceptions/crashes
-- For filename searches: Use stack.filename for suffix-based search (e.g., stack.filename:"**/index.js" or stack.filename:"**/components/Button.tsx")
-- When searching for errors in specific files, prefer including the parent folder to avoid ambiguity (e.g., stack.filename:"**/components/index.js" instead of just stack.filename:"**/index.js")`,
-    examples: `- "null pointer exceptions" → 
-  {
-    "query": "error.type:\\"NullPointerException\\" OR message:\\"*null pointer*\\"",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"],
-    "sort": "-timestamp"
-  }
-- "unhandled errors in production" → 
-  {
-    "query": "error.handled:false AND environment:production",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "error.handled", "environment"],
-    "sort": "-timestamp"
-  }
-- "database connection errors" → 
-  {
-    "query": "message:\\"*database*\\" AND message:\\"*connection*\\" AND level:error",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"],
-    "sort": "-timestamp"
-  }
-- "show me user emails for authentication failures" → 
-  {
-    "query": "message:\\"*auth*\\" AND (message:\\"*failed*\\" OR message:\\"*denied*\\")",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "user.email"],
-    "sort": "-timestamp"
-  }
-- "errors in Button.tsx file" → 
-  {
-    "query": "stack.filename:\\"**/Button.tsx\\"",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit", "stack.filename"],
-    "sort": "-timestamp"
-  }
-- "count errors by type in production" → 
-  {
-    "query": "environment:production",
-    "fields": ["error.type", "count()", "last_seen()"],
-    "sort": "-count()"
-  }
-- "most common errors last 24h" → 
-  {
-    "query": "level:error",
-    "fields": ["title", "error.type", "count()"],
-    "sort": "-count()"
-  }
-- "unhandled errors rate by project" → 
-  {
-    "query": "",
-    "fields": ["project", "count()", "count_if(error.handled,equals,false)", "epm()"],
-    "sort": "-count()"
-  }
-- "errors in the last hour" → 
-  {
-    "query": "",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"],
-    "sort": "-timestamp",
-    "timeRange": {"statsPeriod": "1h"}
-  }
-- "database errors between June 19-20" → 
-  {
-    "query": "message:\\"*database*\\"",
-    "fields": ["issue", "title", "project", "timestamp", "level", "message", "error.type", "culprit"],
-    "sort": "-timestamp",
-    "timeRange": {"start": "2025-06-19T00:00:00", "end": "2025-06-20T23:59:59"}
-  }
-- "unique users affected by errors" → 
-  {
-    "query": "level:error",
-    "fields": ["error.type", "count()", "count_unique(user.id)"],
-    "sort": "-count_unique(user.id)"
-  }
-- "what is the most common error" → 
-  {
-    "query": "",
-    "fields": ["title", "count()"],
-    "sort": "-count()"
-  }
-- "errors by browser" → 
-  {
-    "query": "has:user_agent.original",
-    "fields": ["user_agent.original", "count()"],
-    "sort": "-count()"
-  }
-- "which user agents have the most errors" → 
-  {
-    "query": "level:error AND has:user_agent.original",
-    "fields": ["user_agent.original", "count()", "count_unique(user.id)"],
-    "sort": "-count()"
-  }`,
-  },
-  logs: {
-    rules: `- For logs, focus on: message, severity, severity_number
-- Use severity field for log levels (fatal, error, warning, info, debug, trace)
-- severity_number is numeric (21=fatal, 17=error, 13=warning, 9=info, 5=debug, 1=trace)
-- IMPORTANT: For time-based filtering in logs, do NOT use timestamp filters in the query
-- Instead, time filtering for logs is handled by the statsPeriod parameter (not part of the query string)
-- Keep your query focused on message content, severity levels, and other attributes only
-- When user asks for "error logs", interpret this as logs with severity:error`,
-    examples: `- "warning logs about memory" → 
-  {
-    "query": "severity:warning AND message:\\"*memory*\\"",
-    "fields": ["timestamp", "project", "message", "severity", "trace"],
-    "sort": "-timestamp"
-  }
-- "error logs from database" → 
-  {
-    "query": "severity:error AND message:\\"*database*\\"",
-    "fields": ["timestamp", "project", "message", "severity", "trace"],
-    "sort": "-timestamp"
-  }
-- "show me error logs with user context" → 
-  {
-    "query": "severity:error",
-    "fields": ["timestamp", "project", "message", "severity", "trace", "user.id", "user.email"],
-    "sort": "-timestamp"
-  }
-- "what is the most common log" → 
-  {
-    "query": "",
-    "fields": ["message", "count()"],
-    "sort": "-count()"
-  }
-- "most common error logs" → 
-  {
-    "query": "severity:error",
-    "fields": ["message", "count()"],
-    "sort": "-count()"
-  }
-- "count logs by severity" → 
-  {
-    "query": "",
-    "fields": ["severity", "count()"],
-    "sort": "-count()"
-  }
-- "log volume by project" → 
-  {
-    "query": "",
-    "fields": ["project", "count()", "epm()"],
-    "sort": "-count()"
-  }`,
-  },
-  spans: {
-    rules: `- For traces/spans, focus on: span.op, span.description, span.duration, transaction
-- Use is_transaction:true for transaction spans only
-- Use span.duration for performance queries (value is in milliseconds)
-- IMPORTANT: Use has: queries for attribute-based filtering instead of span.op patterns:
-  - For HTTP requests: use "has:request.url" instead of "span.op:http*"
-  - For database queries: use "has:db.statement" or "has:db.system" instead of "span.op:db*"
-  - For AI/LLM/Agent calls: use "has:gen_ai.system" or "has:gen_ai.request.model" (OpenTelemetry GenAI semantic conventions)
-  - For MCP tool calls: use "has:mcp.tool.name" (Model Context Protocol semantic conventions)
-  - This approach is more flexible and captures all relevant spans regardless of their operation type
+// Structured examples for dataset-specific query patterns
+// These are injected via datasetAttributes tool to provide few-shot learning
+export interface QueryExample {
+  description: string; // Natural language query
+  output: {
+    query: string;
+    fields: string[];
+    sort: string;
+    timeRange?: { statsPeriod: string } | { start: string; end: string };
+  };
+}
 
-OpenTelemetry Semantic Conventions (2025 Stable):
-Core Namespaces:
-- gen_ai.*: GenAI attributes for AI/LLM/Agent calls (system, request.model, operation.name, usage.*)
-- db.*: Database attributes (system, statement, operation, name) - STABLE
-- http.*: HTTP attributes (method, status_code, url, request.*, response.*) - STABLE
-- rpc.*: RPC attributes (system, service, method, grpc.*)
-- messaging.*: Messaging attributes (system, operation, destination.*)
-- faas.*: Function as a Service attributes (name, version, runtime)
-- cloud.*: Cloud provider attributes (provider, region, zone)
-- k8s.*: Kubernetes attributes (namespace, pod, container, node)
-- host.*: Host attributes (name, type, arch, os.*)
-- service.*: Service attributes (name, version, instance.id)
-- process.*: Process attributes (pid, command, runtime.*)
-
-Custom Namespaces:
-- mcp.*: Model Context Protocol attributes for MCP tool calls (tool.name, session.id, transport)
-
-Query Patterns:
-- Use has:namespace.* to find spans with any attribute in that namespace
-- Most common: has:gen_ai.system (agent calls), has:mcp.tool.name (MCP tools), has:db.statement (database), has:http.method (HTTP)`,
-    examples: `- "database queries" → 
-  {
-    "query": "has:db.statement",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.statement"],
-    "sort": "-span.duration"
-  }
-- "slow API calls over 5 seconds" → 
-  {
-    "query": "has:request.url AND span.duration:>5000",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "request.url", "request.method", "span.status_code"],
-    "sort": "-span.duration"
-  }
-- "show me database queries with their SQL" → 
-  {
-    "query": "has:db.statement",
-    "fields": ["span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "db.system", "db.statement"],
-    "sort": "-span.duration"
-  }
-- "average response time by endpoint" → 
-  {
-    "query": "is_transaction:true",
-    "fields": ["transaction", "count()", "avg(span.duration)", "p95(span.duration)"],
-    "sort": "-avg(span.duration)"
-  }
-- "slowest database queries by p95" → 
-  {
-    "query": "has:db.statement",
-    "fields": ["db.statement", "count()", "p50(span.duration)", "p95(span.duration)", "max(span.duration)"],
-    "sort": "-p95(span.duration)"
-  }
-- "API calls in the last 30 minutes" → 
-  {
-    "query": "has:request.url",
-    "fields": ["id", "span.op", "span.description", "span.duration", "transaction", "timestamp", "project", "trace", "request.url", "request.method"],
-    "sort": "-timestamp",
-    "timeRange": {"statsPeriod": "30m"}
-  }
-- "most common transaction" → 
-  {
-    "query": "is_transaction:true",
-    "fields": ["transaction", "count()"],
-    "sort": "-count()"
-  }
-- "top 10 tool call spans by usage" → 
-  {
-    "query": "has:mcp.tool.name",
-    "fields": ["mcp.tool.name", "count()"],
-    "sort": "-count()"
-  }
-- "top 10 agent call spans by usage" → 
-  {
-    "query": "has:gen_ai.system",
-    "fields": ["gen_ai.system", "gen_ai.request.model", "count()"],
-    "sort": "-count()"
-  }
-- "slowest AI/LLM calls" → 
-  {
-    "query": "has:gen_ai.request.model",
-    "fields": ["gen_ai.system", "gen_ai.request.model", "span.duration", "transaction", "timestamp", "project", "trace", "gen_ai.operation.name"],
-    "sort": "-span.duration"
-  }
-- "agent calls by model usage" → 
-  {
-    "query": "has:gen_ai.request.model",
-    "fields": ["gen_ai.request.model", "count()"],
-    "sort": "-count()"
-  }
-- "average agent call duration by model" → 
-  {
-    "query": "has:gen_ai.request.model",
-    "fields": ["gen_ai.request.model", "count()", "avg(span.duration)", "p95(span.duration)"],
-    "sort": "-avg(span.duration)"
-  }
-- "token usage by AI system" → 
-  {
-    "query": "has:gen_ai.usage.input_tokens",
-    "fields": ["gen_ai.system", "sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)", "count()"],
-    "sort": "-sum(gen_ai.usage.input_tokens)"
-  }
-- "how many tokens used today" → 
-  {
-    "query": "has:gen_ai.usage.input_tokens",
-    "fields": ["sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)", "count()"],
-    "sort": "-sum(gen_ai.usage.input_tokens)",
-    "timeRange": {"statsPeriod": "24h"}
-  }
-- "average response time in milliseconds" → 
-  {
-    "query": "is_transaction:true",
-    "fields": ["transaction", "equation|avg(span.duration) * 1000"],
-    "sort": "-equation|avg(span.duration) * 1000",
-    "timeRange": {"statsPeriod": "24h"}
-  }
-- "total input tokens by model" → 
-  {
-    "query": "has:gen_ai.usage.input_tokens",
-    "fields": ["gen_ai.request.model", "sum(gen_ai.usage.input_tokens)", "count()"],
-    "sort": "-sum(gen_ai.usage.input_tokens)"
-  }
-- "tokens used this week" → 
-  {
-    "query": "has:gen_ai.usage.input_tokens",
-    "fields": ["sum(gen_ai.usage.input_tokens)", "sum(gen_ai.usage.output_tokens)", "count()"],
-    "sort": "-sum(gen_ai.usage.input_tokens)",
-    "timeRange": {"statsPeriod": "7d"}
-  }
-- "which user agents have the most tool calls yesterday" → 
-  {
-    "query": "has:mcp.tool.name AND has:user_agent.original",
-    "fields": ["user_agent.original", "count()"],
-    "sort": "-count()",
-    "timeRange": {"statsPeriod": "24h"}
-  }
-- "top 10 browsers by API calls" → 
-  {
-    "query": "has:http.method AND has:user_agent.original",
-    "fields": ["user_agent.original", "count()"],
-    "sort": "-count()"
-  }
-- "most common clients making database queries" →
-  {
-    "query": "has:db.statement AND has:user_agent.original",
-    "fields": ["user_agent.original", "count()", "avg(span.duration)"],
-    "sort": "-count()"
-  }
-- "web vitals performance problems" →
-  {
-    "query": "is_transaction:true AND has:measurements.lcp",
-    "fields": ["transaction", "p75(measurements.lcp)", "p75(measurements.cls)", "p75(measurements.inp)", "count()"],
-    "sort": "-p75(measurements.lcp)"
-  }
-- "pages with poor LCP" →
-  {
-    "query": "is_transaction:true AND has:measurements.lcp",
-    "fields": ["transaction", "count()", "p75(measurements.lcp)", "p95(measurements.lcp)", "max(measurements.lcp)"],
-    "sort": "-p75(measurements.lcp)"
-  }
-- "CLS layout shift issues" →
-  {
-    "query": "is_transaction:true AND has:measurements.cls",
-    "fields": ["transaction", "count()", "p75(measurements.cls)", "p95(measurements.cls)"],
-    "sort": "-p75(measurements.cls)"
-  }
-- "INP responsiveness problems" →
-  {
-    "query": "has:measurements.inp",
-    "fields": ["transaction", "count()", "p75(measurements.inp)", "p95(measurements.inp)"],
-    "sort": "-p75(measurements.inp)"
-  }
-- "slowest page loads" →
-  {
-    "query": "is_transaction:true",
-    "fields": ["transaction", "count()", "p75(span.duration)", "p95(span.duration)", "avg(span.duration)"],
-    "sort": "-p75(span.duration)"
-  }
-- "frontend performance overview" →
-  {
-    "query": "is_transaction:true AND has:measurements.lcp",
-    "fields": ["transaction", "p75(span.duration)", "p75(measurements.lcp)", "p75(measurements.fcp)", "p75(measurements.ttfb)", "count()"],
-    "sort": "-p75(span.duration)"
-  }
-- "slowest API endpoints" →
-  {
-    "query": "is_transaction:true AND span.op:http.server",
-    "fields": ["transaction", "count()", "p75(span.duration)", "p95(span.duration)"],
-    "sort": "-p75(span.duration)"
-  }
-- "slow database queries" →
-  {
-    "query": "has:db.statement",
-    "fields": ["db.system", "db.statement", "count()", "p75(span.duration)", "p95(span.duration)"],
-    "sort": "-p75(span.duration)"
-  }
-- "performance by endpoint" →
-  {
-    "query": "is_transaction:true",
-    "fields": ["transaction", "count()", "p75(span.duration)", "failure_rate()"],
-    "sort": "-p75(span.duration)"
-  }`,
-  },
+export const DATASET_EXAMPLES: Record<
+  "spans" | "errors" | "logs",
+  QueryExample[]
+> = {
+  spans: [
+    {
+      description: "web vitals performance problems",
+      output: {
+        query: "is_transaction:true AND has:measurements.lcp",
+        fields: [
+          "transaction",
+          "p75(measurements.lcp)",
+          "p75(measurements.cls)",
+          "p75(measurements.inp)",
+          "count()",
+        ],
+        sort: "-p75(measurements.lcp)",
+      },
+    },
+    {
+      description: "slowest database queries",
+      output: {
+        query: "has:db.statement",
+        fields: [
+          "db.system",
+          "db.statement",
+          "count()",
+          "p75(span.duration)",
+          "p95(span.duration)",
+        ],
+        sort: "-p75(span.duration)",
+      },
+    },
+    {
+      description: "average response time by endpoint",
+      output: {
+        query: "is_transaction:true",
+        fields: [
+          "transaction",
+          "count()",
+          "avg(span.duration)",
+          "p95(span.duration)",
+        ],
+        sort: "-avg(span.duration)",
+      },
+    },
+    {
+      description: "slow API calls over 5 seconds",
+      output: {
+        query: "has:request.url AND span.duration:>5000",
+        fields: [
+          "span.op",
+          "span.description",
+          "span.duration",
+          "transaction",
+          "timestamp",
+          "trace",
+        ],
+        sort: "-span.duration",
+      },
+    },
+    {
+      description: "token usage by AI model",
+      output: {
+        query: "has:gen_ai.usage.input_tokens",
+        fields: [
+          "gen_ai.request.model",
+          "sum(gen_ai.usage.input_tokens)",
+          "sum(gen_ai.usage.output_tokens)",
+          "count()",
+        ],
+        sort: "-sum(gen_ai.usage.input_tokens)",
+      },
+    },
+    {
+      description: "top MCP tool calls by usage",
+      output: {
+        query: "has:mcp.tool.name",
+        fields: ["mcp.tool.name", "count()"],
+        sort: "-count()",
+      },
+    },
+    {
+      description: "HTTP requests by user agent",
+      output: {
+        query: "has:http.method AND has:user_agent.original",
+        fields: ["user_agent.original", "count()", "avg(span.duration)"],
+        sort: "-count()",
+      },
+    },
+    {
+      description: "frontend performance overview",
+      output: {
+        query: "is_transaction:true AND has:measurements.lcp",
+        fields: [
+          "transaction",
+          "p75(span.duration)",
+          "p75(measurements.lcp)",
+          "p75(measurements.fcp)",
+          "p75(measurements.ttfb)",
+          "count()",
+        ],
+        sort: "-p75(span.duration)",
+      },
+    },
+  ],
+  errors: [
+    {
+      description: "unhandled errors in production",
+      output: {
+        query: "error.handled:false AND environment:production",
+        fields: [
+          "issue",
+          "title",
+          "timestamp",
+          "message",
+          "error.type",
+          "culprit",
+        ],
+        sort: "-timestamp",
+      },
+    },
+    {
+      description: "count errors by type",
+      output: {
+        query: "level:error",
+        fields: ["error.type", "count()", "last_seen()"],
+        sort: "-count()",
+      },
+    },
+    {
+      description: "errors in specific file",
+      output: {
+        query: 'stack.filename:"**/Button.tsx"',
+        fields: ["issue", "title", "timestamp", "message", "stack.filename"],
+        sort: "-timestamp",
+      },
+    },
+    {
+      description: "most common errors",
+      output: {
+        query: "",
+        fields: ["title", "count()"],
+        sort: "-count()",
+      },
+    },
+    {
+      description: "unique users affected by errors",
+      output: {
+        query: "level:error",
+        fields: ["error.type", "count()", "count_unique(user.id)"],
+        sort: "-count_unique(user.id)",
+      },
+    },
+    {
+      description: "errors by browser/user agent",
+      output: {
+        query: "level:error AND has:user_agent.original",
+        fields: ["user_agent.original", "count()", "count_unique(user.id)"],
+        sort: "-count()",
+      },
+    },
+  ],
+  logs: [
+    {
+      description: "error logs about database",
+      output: {
+        query: 'severity:error AND message:"*database*"',
+        fields: ["timestamp", "message", "severity", "trace"],
+        sort: "-timestamp",
+      },
+    },
+    {
+      description: "count logs by severity",
+      output: {
+        query: "",
+        fields: ["severity", "count()"],
+        sort: "-count()",
+      },
+    },
+    {
+      description: "most common log messages",
+      output: {
+        query: "",
+        fields: ["message", "count()"],
+        sort: "-count()",
+      },
+    },
+    {
+      description: "log volume by project",
+      output: {
+        query: "",
+        fields: ["project", "count()", "epm()"],
+        sort: "-count()",
+      },
+    },
+    {
+      description: "warning logs about memory",
+      output: {
+        query: 'severity:warning AND message:"*memory*"',
+        fields: ["timestamp", "message", "severity", "trace"],
+        sort: "-timestamp",
+      },
+    },
+  ],
 };
 
 // Define recommended fields for each dataset

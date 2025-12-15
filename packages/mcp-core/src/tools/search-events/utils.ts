@@ -108,6 +108,7 @@ export function createDatasetAttributesTool(options: {
         DATASET_FIELDS,
         RECOMMENDED_FIELDS,
         NUMERIC_FIELDS,
+        DATASET_EXAMPLES,
       } = await import("./config");
 
       // Get custom attributes for this dataset
@@ -159,7 +160,12 @@ ${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldType
 
 IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
 
-Use this information to construct appropriate queries for the ${dataset} dataset.`;
+EXAMPLE QUERIES FOR ${dataset.toUpperCase()}:
+${DATASET_EXAMPLES[dataset]
+  .map((ex) => `- "${ex.description}" →\n  ${JSON.stringify(ex.output)}`)
+  .join("\n\n")}
+
+Use these examples as patterns for constructing your query.`;
     },
   });
 }
