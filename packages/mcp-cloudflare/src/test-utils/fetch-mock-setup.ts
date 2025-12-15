@@ -49,6 +49,10 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 /**
  * Set up fetchMock for Sentry API mocking in Cloudflare Workers tests.
  *
+ * IMPORTANT: undici MockAgent matches interceptors in registration order
+ * (first match wins). Always register specific path handlers BEFORE
+ * general pattern handlers to ensure correct matching.
+ *
  * Call this in beforeAll() and call resetFetchMock() in afterEach().
  */
 export function setupFetchMock() {
@@ -58,7 +62,7 @@ export function setupFetchMock() {
   for (const host of SENTRY_HOSTS) {
     const pool = fetchMock.get(host);
 
-    // Auth endpoints (control only - sentry.io only)
+    // ===== Auth Endpoints (control only - sentry.io only) =====
     if (host === "https://sentry.io") {
       pool
         .intercept({ path: "/api/0/auth/" })
@@ -75,7 +79,7 @@ export function setupFetchMock() {
         .persist();
     }
 
-    // Organizations
+    // ===== Organizations =====
     pool
       .intercept({ path: "/api/0/organizations/" })
       .reply(200, [organizationFixture], { headers: JSON_HEADERS })
@@ -95,7 +99,7 @@ export function setupFetchMock() {
       )
       .persist();
 
-    // Teams
+    // ===== Teams =====
     pool
       .intercept({ path: "/api/0/organizations/sentry-mcp-evals/teams/" })
       .reply(200, [teamFixture], { headers: JSON_HEADERS })
@@ -117,7 +121,7 @@ export function setupFetchMock() {
       )
       .persist();
 
-    // Projects
+    // ===== Projects =====
     pool
       .intercept({ path: "/api/0/organizations/sentry-mcp-evals/projects/" })
       .reply(200, [{ ...projectFixture, id: "4509106749636608" }], {
@@ -157,7 +161,7 @@ export function setupFetchMock() {
       )
       .persist();
 
-    // Client keys
+    // ===== Client Keys =====
     pool
       .intercept({
         path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
@@ -173,7 +177,8 @@ export function setupFetchMock() {
       .reply(200, [clientKeyFixture], { headers: JSON_HEADERS })
       .persist();
 
-    // Issues - project-scoped
+    // ===== Issues =====
+    // Project-scoped
     pool
       .intercept({ path: "/api/0/projects/sentry-mcp-evals/foobar/issues/" })
       .reply(200, [], { headers: JSON_HEADERS })
@@ -189,18 +194,20 @@ export function setupFetchMock() {
       .reply(200, [issueFixture2, issueFixture], { headers: JSON_HEADERS })
       .persist();
 
-    // Issues - org-scoped
+    // Org-scoped (excludes specific issue IDs that have their own handlers)
     pool
       .intercept({
         path: (p: string) =>
           p.startsWith("/api/0/organizations/sentry-mcp-evals/issues/") &&
           !p.includes("CLOUDFLARE-MCP") &&
-          !p.includes("6507376"),
+          !p.includes("6507376") &&
+          !p.includes("PERF-N1") &&
+          !p.includes("PEATED"),
       })
       .reply(200, [issueFixture2, issueFixture], { headers: JSON_HEADERS })
       .persist();
 
-    // Specific issues
+    // Specific issue details
     pool
       .intercept({
         path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
@@ -229,7 +236,7 @@ export function setupFetchMock() {
       .reply(200, issueFixture2, { headers: JSON_HEADERS })
       .persist();
 
-    // Issue updates
+    // Issue updates (PUT)
     pool
       .intercept({
         path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
@@ -246,7 +253,18 @@ export function setupFetchMock() {
       .reply(200, issueFixture, { headers: JSON_HEADERS })
       .persist();
 
-    // Events for issues
+    // ===== Issue Events =====
+    // IMPORTANT: Specific handlers must come before general patterns
+
+    // Performance issue events - specific handler
+    pool
+      .intercept({
+        path: "/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
+      })
+      .reply(200, performanceEventFixture, { headers: JSON_HEADERS })
+      .persist();
+
+    // General events - catch-all for remaining
     pool
       .intercept({
         path: (p: string) =>
@@ -256,15 +274,7 @@ export function setupFetchMock() {
       .reply(200, eventsFixture, { headers: JSON_HEADERS })
       .persist();
 
-    // Performance events
-    pool
-      .intercept({
-        path: "/api/0/organizations/sentry-mcp-evals/issues/PERF-N1-001/events/latest/",
-      })
-      .reply(200, performanceEventFixture, { headers: JSON_HEADERS })
-      .persist();
-
-    // Traces
+    // ===== Traces =====
     pool
       .intercept({
         path: "/api/0/organizations/sentry-mcp-evals/trace-meta/a4d1aae7216b47ff8117cf4e09ce9d0a/",
@@ -279,7 +289,7 @@ export function setupFetchMock() {
       .reply(200, traceFixture, { headers: JSON_HEADERS })
       .persist();
 
-    // Releases
+    // ===== Releases =====
     pool
       .intercept({ path: "/api/0/organizations/sentry-mcp-evals/releases/" })
       .reply(200, [releaseFixture], { headers: JSON_HEADERS })
@@ -292,13 +302,13 @@ export function setupFetchMock() {
       .reply(200, [releaseFixture], { headers: JSON_HEADERS })
       .persist();
 
-    // Tags
+    // ===== Tags =====
     pool
       .intercept({ path: "/api/0/organizations/sentry-mcp-evals/tags/" })
       .reply(200, tagsFixture, { headers: JSON_HEADERS })
       .persist();
 
-    // Trace items attributes
+    // ===== Trace Items Attributes =====
     pool
       .intercept({
         path: (p: string) =>
@@ -351,7 +361,7 @@ export function setupFetchMock() {
       })
       .persist();
 
-    // Events endpoint (for search_events)
+    // ===== Events Search (for search_events) =====
     pool
       .intercept({
         path: (p: string) =>
@@ -412,7 +422,7 @@ export function setupFetchMock() {
       })
       .persist();
 
-    // Autofix
+    // ===== Autofix =====
     pool
       .intercept({
         path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
