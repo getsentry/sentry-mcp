@@ -19,7 +19,7 @@
     "preview": "vite preview",
     "cf-typegen": "wrangler types",
     "test": "vitest run",
-    "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "vitest",
     "tsc": "tsc --noEmit"
   },
