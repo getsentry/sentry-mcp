@@ -1,6 +1,7 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
+import { HTTPException } from "hono/http-exception";
 import * as Sentry from "@sentry/cloudflare";
 import type { Env } from "./types";
 import sentryOauth from "./oauth";
@@ -12,6 +13,25 @@ import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { createRequestLogger } from "./logging";
 import mcpRoutes from "./routes/mcp";
 import { getClientIp } from "./utils/client-ip";
+
+const csrfProtection = csrf({
+  origin: (origin, c) => {
+    if (!origin) {
+      return true;
+    }
+    const requestUrl = new URL(c.req.url);
+    return origin === requestUrl.origin;
+  },
+});
+
+const browserFormCsrf: MiddlewareHandler = async (c, next) => {
+  // Non-browser clients (including service-to-service requests) won't send the Sec-Fetch-Site
+  // header, so we bypass CSRF enforcement for them to avoid false positives.
+  if (!c.req.header("sec-fetch-site")) {
+    return next();
+  }
+  return csrfProtection(c, next);
+};
 
 const app = new Hono<{
   Bindings: Env;
@@ -39,18 +59,7 @@ const app = new Hono<{
       strictTransportSecurity: "max-age=31536000; includeSubDomains",
     }),
   )
-  .use(
-    "*",
-    csrf({
-      origin: (origin, c) => {
-        if (!origin) {
-          return true;
-        }
-        const requestUrl = new URL(c.req.url);
-        return origin === requestUrl.origin;
-      },
-    }),
-  )
+  .use("*", browserFormCsrf)
   .get("/robots.txt", (c) => {
     return c.text(["User-agent: *", "Allow: /$", "Disallow: /"].join("\n"));
   })
@@ -87,6 +96,9 @@ const app = new Hono<{
 // TODO: propagate the error as sentry isnt injecting into hono
 app.onError((err, c) => {
   logIssue(err);
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
   return c.text("Internal Server Error", 500);
 });
 

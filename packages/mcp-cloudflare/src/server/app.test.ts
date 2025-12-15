@@ -54,4 +54,31 @@ describe("app", () => {
       });
     });
   });
+
+  describe("CSRF middleware", () => {
+    it("allows non-browser POST requests without Sec-Fetch headers", async () => {
+      const res = await app.request("/gatewayx/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({ test: "1" }).toString(),
+      });
+
+      expect(res.status).toBe(404);
+    });
+
+    it("still blocks browser-like cross-site form submissions", async () => {
+      const res = await app.request("/gatewayx/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Sec-Fetch-Site": "cross-site",
+        },
+        body: new URLSearchParams({ test: "1" }).toString(),
+      });
+
+      expect(res.status).toBe(403);
+    });
+  });
 });
