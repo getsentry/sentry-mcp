@@ -115,13 +115,25 @@ When users ask about "performance problems", "slow pages", "slow endpoints", "la
 4. Include count() to understand sample size (low count = unreliable data)
 5. Sort by the worst-performing metric (descending with "-" prefix)
 
-CRITICAL: For performance investigations, return AGGREGATES grouped by transaction, NOT individual events.
+CRITICAL: For performance investigations, return AGGREGATES grouped by the span's transaction attribute, NOT individual events.
 
-Performance Categories:
-- Frontend/Web Vitals: measurements.lcp, measurements.cls, measurements.inp, measurements.fcp, measurements.ttfb
-- Backend/API: span.duration on is_transaction:true spans, or specific span.op types
-- Database: span.duration with has:db.statement or db.system filters
-- External Services: span.duration with has:http.url for outbound calls
+SPAN QUERY PHILOSOPHY - DUCK TYPING:
+Use "has:attribute" to find spans by their characteristics, NOT "is_transaction:true".
+The is_transaction:true filter ONLY returns transaction boundaries (request entry/exit points).
+Most performance queries want specific span types, not just boundaries.
+
+Performance Query Patterns (use duck typing):
+- Web Vitals: has:measurements.lcp, has:measurements.cls, has:measurements.inp
+- Database: has:db.statement or has:db.system
+- HTTP/API calls: has:http.method or has:http.url
+- External Services: has:http.url (for outbound calls)
+- AI/LLM: has:gen_ai.system or has:gen_ai.request.model
+- MCP Tools: has:mcp.tool.name
+
+WHEN TO USE is_transaction:true (rare):
+- ONLY when you specifically need transaction boundaries (full request/response cycle)
+- Example: "total request duration by endpoint" - you want the outermost span
+- For most queries about "slow X" or "X performance", use duck typing instead
 
 Web Vitals Thresholds (for context when reporting):
 - LCP: Good < 2500ms, Needs Improvement 2500-4000ms, Poor >= 4000ms
@@ -377,7 +389,7 @@ export const DATASET_EXAMPLES: Record<
     {
       description: "web vitals performance problems",
       output: {
-        query: "is_transaction:true AND has:measurements.lcp",
+        query: "has:measurements.lcp",
         fields: [
           "transaction",
           "p75(measurements.lcp)",
@@ -403,7 +415,8 @@ export const DATASET_EXAMPLES: Record<
       },
     },
     {
-      description: "average response time by endpoint",
+      description:
+        "total request duration by endpoint (transaction boundaries)",
       output: {
         query: "is_transaction:true",
         fields: [
@@ -462,7 +475,7 @@ export const DATASET_EXAMPLES: Record<
     {
       description: "frontend performance overview",
       output: {
-        query: "is_transaction:true AND has:measurements.lcp",
+        query: "has:measurements.lcp",
         fields: [
           "transaction",
           "p75(span.duration)",
