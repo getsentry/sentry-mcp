@@ -3,10 +3,16 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo",
     "types": [
-      "@cloudflare/workers-types"
+      "@cloudflare/workers-types",
+      "@types/node"
     ]
   },
   "include": [
     "src/server"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/test-setup.ts",
+    "src/test-utils"
   ]
 }

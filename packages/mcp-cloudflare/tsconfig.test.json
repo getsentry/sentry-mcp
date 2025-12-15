@@ -7,6 +7,8 @@
     ]
   },
   "include": [
-    "src/**/*.integration.test.ts"
+    "src/**/*.test.ts",
+    "src/test-setup.ts",
+    "src/test-utils/**/*.ts"
   ]
 }
