@@ -1,7 +1,5 @@
 # sentry-mcp
 
-[![codecov](https://codecov.io/gh/getsentry/sentry-mcp/graph/badge.svg?token=khVKvJP5Ig)](https://codecov.io/gh/getsentry/sentry-mcp)
-
 Sentry's MCP service is primarily designed for human-in-the-loop coding agents. Our tool selection and priorities are focused on developer workflows and debugging use cases, rather than providing a general-purpose MCP server for all Sentry functionality.
 
 This remote MCP server acts as middleware to the upstream Sentry API, optimized for coding assistants like Cursor, Claude Code, and similar development tools. It's based on [Cloudflare's work towards remote MCPs](https://blog.cloudflare.com/remote-model-context-protocol-servers-mcp/).
