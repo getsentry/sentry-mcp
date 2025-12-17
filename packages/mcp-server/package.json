@@ -1,5 +1,6 @@
 {
   "name": "@sentry/mcp-server",
+  "mcpName": "io.github.getsentry/sentry-mcp",
   "version": "0.24.0",
   "type": "module",
   "packageManager": "pnpm@10.8.1",
