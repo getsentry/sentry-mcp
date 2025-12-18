@@ -133,15 +133,3 @@ Received: ${params.issueUrl}`,
     issueId: params.issueId,
   };
 }
-
-/**
- * Helper to safely strip "issue:" prefix from query if agent mistakenly included it
- * The handler is responsible for injecting the issue constraint
- */
-export function stripIssuePrefix(query: string): string {
-  // Remove any "issue:XXX" or "issue:XXX AND" patterns
-  return query
-    .replace(/^\s*issue:[^\s]+\s+(?:AND\s+)?/i, "")
-    .replace(/^\s*issue:[^\s]+\s*$/i, "")
-    .trim();
-}
