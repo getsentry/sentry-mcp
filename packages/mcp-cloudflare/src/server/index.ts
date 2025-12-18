@@ -14,6 +14,7 @@ const PUBLIC_METADATA_PATHS = [
   "/.well-known/", // OAuth discovery endpoints
   "/robots.txt", // Search engine directives
   "/llms.txt", // LLM/AI agent directives
+  "/mcp.json", // MCP server metadata
 ];
 
 const isPublicMetadataEndpoint = (pathname: string): boolean => {
