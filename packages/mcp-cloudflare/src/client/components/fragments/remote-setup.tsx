@@ -92,6 +92,35 @@ export function RemoteSetupTabs() {
   );
   return (
     <InstallTabs>
+      <Tab id="claude-code" title="Claude Code">
+        <ol>
+          <li>Open your terminal to access the CLI.</li>
+          <li>
+            <CodeSnippet
+              noMargin
+              snippet={`claude mcp add --transport http sentry ${endpoint}`}
+            />
+          </li>
+          <li>
+            This will trigger an OAuth authentication flow to connect Claude
+            Code to your Sentry account.
+          </li>
+          <li>
+            You may need to manually authenticate if it doesnt happen
+            automatically, which can be done via <code>/mcp</code>.
+          </li>
+        </ol>
+        <p>
+          <small>
+            For more details, see the{" "}
+            <a href="https://docs.anthropic.com/en/docs/claude-code/mcp">
+              Claude Code MCP documentation
+            </a>
+            .
+          </small>
+        </p>
+      </Tab>
+
       <Tab id="cursor" title="Cursor">
         <Button
           variant="secondary"
@@ -137,35 +166,6 @@ export function RemoteSetupTabs() {
             <CodeSnippet noMargin snippet={`cursor-agent mcp login sentry`} />
           </li>
         </ol>
-      </Tab>
-
-      <Tab id="claude-code" title="Claude Code">
-        <ol>
-          <li>Open your terminal to access the CLI.</li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={`claude mcp add --transport http sentry ${endpoint}`}
-            />
-          </li>
-          <li>
-            This will trigger an OAuth authentication flow to connect Claude
-            Code to your Sentry account.
-          </li>
-          <li>
-            You may need to manually authenticate if it doesnt happen
-            automatically, which can be done via <code>/mcp</code>.
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a href="https://docs.anthropic.com/en/docs/claude-code/mcp">
-              Claude Code MCP documentation
-            </a>
-            .
-          </small>
-        </p>
       </Tab>
 
       <Tab id="vscode" title="Code">
@@ -245,6 +245,36 @@ export function RemoteSetupTabs() {
         </ol>
       </Tab>
 
+      <Tab id="amp" title="Amp">
+        <ol>
+          <li>
+            Open your terminal and use the Amp CLI to add the Sentry MCP server:
+            <CodeSnippet noMargin snippet={`amp mcp add sentry ${endpoint}`} />
+          </li>
+          <li>
+            Amp will automatically initiate OAuth authentication using Dynamic
+            Client Registration (DCR). Follow the browser prompts to authorize
+            the connection.
+          </li>
+          <li>
+            Once authenticated, the Sentry MCP server will be available in Amp.
+          </li>
+        </ol>
+        <p>
+          <small>
+            For more details, see the{" "}
+            <a
+              href="https://ampcode.com/manual#mcp"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Amp MCP documentation
+            </a>
+            .
+          </small>
+        </p>
+      </Tab>
+
       <Tab id="gemini" title="Gemini CLI">
         <ol>
           <li>
@@ -288,23 +318,21 @@ export function RemoteSetupTabs() {
         </p>
       </Tab>
 
-      <Tab id="windsurf" title="Windsurf">
+      <Tab id="opencode" title="OpenCode">
         <ol>
-          <li>Open Windsurf Settings.</li>
           <li>
-            Under <strong>Cascade</strong>, you'll find{" "}
-            <strong>Model Context Protocol Servers</strong>.
-          </li>
-          <li>
-            Select <strong>Add Server</strong>.
-          </li>
-          <li>
+            Edit <code>~/.config/opencode/opencode.json</code> and add the
+            remote MCP server configuration:
             <CodeSnippet
               noMargin
               snippet={JSON.stringify(
                 {
-                  mcpServers: {
-                    sentry: coreConfig,
+                  $schema: "https://opencode.ai/config.json",
+                  mcp: {
+                    sentry: {
+                      type: "remote",
+                      url: endpoint,
+                    },
                   },
                 },
                 undefined,
@@ -312,7 +340,29 @@ export function RemoteSetupTabs() {
               )}
             />
           </li>
+          <li>Save the file and restart OpenCode.</li>
+          <li>
+            Authenticate with Sentry by running:
+            <CodeSnippet noMargin snippet="opencode mcp auth sentry" />
+          </li>
+          <li>
+            This will open a browser window to complete the OAuth flow and
+            connect OpenCode to your Sentry account.
+          </li>
         </ol>
+        <p>
+          <small>
+            For more details, see the{" "}
+            <a
+              href="https://opencode.ai/docs/mcp-servers"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              OpenCode MCP documentation
+            </a>
+            .
+          </small>
+        </p>
       </Tab>
 
       <Tab id="warp" title="Warp">
@@ -377,6 +427,33 @@ export function RemoteSetupTabs() {
             .
           </small>
         </p>
+      </Tab>
+
+      <Tab id="windsurf" title="Windsurf">
+        <ol>
+          <li>Open Windsurf Settings.</li>
+          <li>
+            Under <strong>Cascade</strong>, you'll find{" "}
+            <strong>Model Context Protocol Servers</strong>.
+          </li>
+          <li>
+            Select <strong>Add Server</strong>.
+          </li>
+          <li>
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  mcpServers: {
+                    sentry: coreConfig,
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+        </ol>
       </Tab>
 
       <Tab id="zed" title="Zed">

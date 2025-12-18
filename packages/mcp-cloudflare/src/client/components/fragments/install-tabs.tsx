@@ -12,6 +12,8 @@ import { WindsurfIcon } from "../ui/icons/windsurf";
 import { CodexIcon } from "../ui/icons/codex";
 import { ClaudeIcon } from "../ui/icons/claude";
 import { CursorIcon } from "../ui/icons/cursor";
+import { OpenCodeIcon } from "../ui/icons/opencode";
+import { AmpIcon } from "../ui/icons/amp";
 
 export type TabProps = {
   id: string;
@@ -288,4 +290,6 @@ const iconsByID: Record<string, React.ReactNode> = {
   warp: <WarpIcon />,
   zed: <ZedIcon />,
   gemini: <GeminiIcon className="size-4" />,
+  opencode: <OpenCodeIcon />,
+  amp: <AmpIcon />,
 };

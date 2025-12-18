@@ -203,6 +203,35 @@ export function StdioSetupTabs() {
     'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", SENTRY_HOST = "sentry.example.com", OPENAI_API_KEY = "your-openai-key" }';
   return (
     <InstallTabs>
+      <Tab id="claude-code" title="Claude Code">
+        <ol>
+          <li>Open your terminal to access the CLI.</li>
+          <li>
+            <CodeSnippet
+              noMargin
+              snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e OPENAI_API_KEY=your-openai-key -- ${mcpStdioSnippet}`}
+            />
+          </li>
+          <li>
+            Replace <code>sentry-user-token</code> with your actual User Auth
+            Token.
+          </li>
+          <li>
+            Connecting to self-hosted Sentry? Append
+            <code>-e SENTRY_HOST=your-hostname</code>.
+          </li>
+        </ol>
+        <p>
+          <small>
+            For more details, see the{" "}
+            <Link href="https://docs.anthropic.com/en/docs/claude-code/mcp">
+              Claude Code MCP documentation
+            </Link>
+            .
+          </small>
+        </p>
+      </Tab>
+
       <Tab id="cursor" title="Cursor">
         <ol>
           <li>
@@ -238,35 +267,6 @@ export function StdioSetupTabs() {
             />
           </li>
         </ol>
-      </Tab>
-
-      <Tab id="claude-code" title="Claude Code">
-        <ol>
-          <li>Open your terminal to access the CLI.</li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e OPENAI_API_KEY=your-openai-key -- ${mcpStdioSnippet}`}
-            />
-          </li>
-          <li>
-            Replace <code>sentry-user-token</code> with your actual User Auth
-            Token.
-          </li>
-          <li>
-            Connecting to self-hosted Sentry? Append
-            <code>-e SENTRY_HOST=your-hostname</code>.
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <Link href="https://docs.anthropic.com/en/docs/claude-code/mcp">
-              Claude Code MCP documentation
-            </Link>
-            .
-          </small>
-        </p>
       </Tab>
 
       <Tab id="vscode" title="Code">
@@ -336,6 +336,81 @@ export function StdioSetupTabs() {
         </ol>
       </Tab>
 
+      <Tab id="amp" title="Amp">
+        <ol>
+          <li>
+            Edit your settings file and add the MCP server configuration:
+            <ul>
+              <li>
+                <strong>macOS/Linux:</strong>{" "}
+                <code>~/.config/amp/settings.json</code>
+              </li>
+              <li>
+                <strong>Windows:</strong>{" "}
+                <code>%USERPROFILE%\.config\amp\settings.json</code>
+              </li>
+            </ul>
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  "amp.mcpServers": {
+                    sentry: {
+                      ...coreConfig,
+                      env: {
+                        ...coreConfig.env,
+                      },
+                    },
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+          <li>
+            Replace <code>sentry-user-token</code> with your Sentry User Auth
+            Token.
+          </li>
+          <li>
+            For self-hosted Sentry, add <code>SENTRY_HOST</code> to the env
+            object:
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  "amp.mcpServers": {
+                    sentry: {
+                      ...coreConfig,
+                      env: {
+                        ...coreConfig.env,
+                        SENTRY_HOST: "sentry.example.com",
+                      },
+                    },
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+          <li>Restart Amp to load the new configuration.</li>
+        </ol>
+        <p>
+          <small>
+            For more details, see the{" "}
+            <a
+              href="https://ampcode.com/manual#mcp"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Amp MCP documentation
+            </a>
+            .
+          </small>
+        </p>
+      </Tab>
+
       <Tab id="gemini" title="Gemini CLI">
         <ol>
           <li>
@@ -396,6 +471,75 @@ export function StdioSetupTabs() {
               rel="noopener noreferrer"
             >
               Gemini CLI documentation
+            </a>
+            .
+          </small>
+        </p>
+      </Tab>
+
+      <Tab id="opencode" title="OpenCode">
+        <ol>
+          <li>
+            Edit <code>~/.config/opencode/opencode.json</code> and add the stdio
+            MCP server configuration:
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  $schema: "https://opencode.ai/config.json",
+                  mcp: {
+                    sentry: {
+                      type: "stdio",
+                      ...coreConfig,
+                      env: {
+                        ...coreConfig.env,
+                      },
+                    },
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+          <li>
+            Replace <code>sentry-user-token</code> with your Sentry User Auth
+            Token.
+          </li>
+          <li>
+            For self-hosted Sentry, add <code>SENTRY_HOST</code> to the env
+            object:
+            <CodeSnippet
+              noMargin
+              snippet={JSON.stringify(
+                {
+                  mcp: {
+                    sentry: {
+                      type: "stdio",
+                      ...coreConfig,
+                      env: {
+                        ...coreConfig.env,
+                        SENTRY_HOST: "sentry.example.com",
+                      },
+                    },
+                  },
+                },
+                undefined,
+                2,
+              )}
+            />
+          </li>
+          <li>Restart OpenCode to load the new configuration.</li>
+        </ol>
+        <p>
+          <small>
+            For more details, see the{" "}
+            <a
+              href="https://opencode.ai/docs/mcp-servers"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              OpenCode MCP documentation
             </a>
             .
           </small>
