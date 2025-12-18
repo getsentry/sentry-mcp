@@ -6,7 +6,7 @@ import { createWhoamiTool } from "../../internal/agents/tools/whoami";
 import { createIssueEventFieldsTool } from "./utils";
 import { systemPrompt } from "./config";
 
-// OpenAI structured outputs (used by GPT-4o) require all properties to be in the 'required' array.
+// OpenAI structured outputs (used by GPT-5) require all properties to be in the 'required' array.
 // Avoid .optional()/.default() so the generated JSON Schema keeps every field required.
 // Tracking: https://github.com/getsentry/sentry-mcp/issues/623
 export const searchIssueEventsAgentOutputSchema = z
