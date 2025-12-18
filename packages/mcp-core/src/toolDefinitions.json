@@ -738,6 +738,84 @@
     "requiredScopes": ["event:read"]
   },
   {
+    "name": "search_issue_events",
+    "description": "Search and filter events within a specific issue using natural language queries.\n\nUse this to filter events by time, environment, release, user, trace ID, or other tags. The tool automatically constrains results to the specified issue.\n\nFor cross-issue searches use search_issues, for single event details use get_issue_details.\n\n<examples>\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', naturalLanguageQuery='from last hour')\nsearch_issue_events(issueUrl='https://sentry.io/.../issues/123/', naturalLanguageQuery='production with release v1.0')\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Organization slug. Required when using issueId. Not needed when using issueUrl.",
+          "default": null
+        },
+        "issueId": {
+          "type": "string",
+          "description": "Issue ID (e.g., 'MCP-41', 'PROJECT-123'). Requires organizationSlug. Alternatively, use issueUrl."
+        },
+        "issueUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full Sentry issue URL (e.g., 'https://sentry.io/organizations/my-org/issues/123/'). Includes both organization and issue ID."
+        },
+        "naturalLanguageQuery": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Natural language description of what events you want to find within this issue. Examples: 'from last hour', 'production with release v1.0', 'affecting user alice@example.com', 'with trace ID abc123'"
+        },
+        "projectSlug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Project slug for better tag discovery. Optional - helps find project-specific tags.",
+          "default": null
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sentry region URL. Optional - defaults to main region.",
+          "default": null
+        },
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50,
+          "description": "Maximum number of events to return (1-100, default: 50)"
+        },
+        "includeExplanation": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include explanation of how the natural language query was translated to Sentry syntax"
+        }
+      },
+      "required": ["naturalLanguageQuery"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
     "name": "search_issues",
     "description": "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.\n\nUses AI to translate natural language queries into Sentry issue search syntax.\nReturns grouped issues with metadata like title, status, and user count.\n\nUSE THIS TOOL WHEN USERS WANT:\n- A LIST of issues: 'show me issues', 'what problems do we have'\n- Filtered issue lists: 'unresolved issues', 'critical bugs'\n- Issues by impact: 'errors affecting more than 100 users'\n- Issues by assignment: 'issues assigned to me'\n\nDO NOT USE FOR COUNTS/AGGREGATIONS:\n- 'how many errors' → use search_events\n- 'count of issues' → use search_events\n- 'total number of errors today' → use search_events\n- 'sum/average/statistics' → use search_events\n\nALSO DO NOT USE FOR:\n- Individual error events with timestamps → use search_events\n- Details about a specific issue ID → use get_issue_details\n\nREMEMBER: This tool returns a LIST of issues, not counts or statistics!\n\n<examples>\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='critical bugs from last week')\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='unhandled errors affecting 100+ users')\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='issues assigned to me')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
     "inputSchema": {

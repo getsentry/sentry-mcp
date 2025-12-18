@@ -11,9 +11,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Core - Shared code for MCP transports",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -21,9 +19,7 @@
     "type": "git",
     "url": "git@github.com:getsentry/sentry-mcp.git"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     "./api-client": {
       "types": "./dist/api-client/index.ts",
@@ -85,6 +81,10 @@
       "types": "./dist/tools/search-issues/index.ts",
       "default": "./dist/tools/search-issues/index.js"
     },
+    "./tools/search-issue-events": {
+      "types": "./dist/tools/search-issue-events/index.ts",
+      "default": "./dist/tools/search-issue-events/index.js"
+    },
     "./tools/search-events/agent": {
       "types": "./dist/tools/search-events/agent.ts",
       "default": "./dist/tools/search-events/agent.js"
@@ -92,6 +92,10 @@
     "./tools/search-issues/agent": {
       "types": "./dist/tools/search-issues/agent.ts",
       "default": "./dist/tools/search-issues/agent.js"
+    },
+    "./tools/search-issue-events/agent": {
+      "types": "./dist/tools/search-issue-events/agent.ts",
+      "default": "./dist/tools/search-issue-events/agent.js"
     },
     "./tools/agent-tools": {
       "types": "./dist/tools/agent-tools.ts",
