@@ -66,6 +66,16 @@ const app = new Hono<{
       ].join("\n"),
     );
   })
+  .get("/mcp.json", (c) => {
+    const requestUrl = new URL(c.req.url);
+    return c.json({
+      name: "Sentry",
+      description:
+        "Connect your Sentry account to search, analyze, and manage errors and performance issues across your applications.",
+      icon: `${requestUrl.protocol}//${requestUrl.host}/favicon.ico`,
+      endpoint: `${requestUrl.protocol}//${requestUrl.host}/mcp`,
+    });
+  })
   .route("/oauth", sentryOauth)
   .route("/api/auth", chatOauth)
   .route("/api/chat", chat)
