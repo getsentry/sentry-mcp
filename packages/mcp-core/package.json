@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-core",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.8.1",
@@ -11,7 +11,9 @@
   "author": "Sentry",
   "description": "Sentry MCP Core - Shared code for MCP transports",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": ["sentry"],
+  "keywords": [
+    "sentry"
+  ],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -19,7 +21,9 @@
     "type": "git",
     "url": "git@github.com:getsentry/sentry-mcp.git"
   },
-  "files": ["./dist/*"],
+  "files": [
+    "./dist/*"
+  ],
   "exports": {
     "./api-client": {
       "types": "./dist/api-client/index.ts",
