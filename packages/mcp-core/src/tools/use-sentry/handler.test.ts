@@ -58,9 +58,9 @@ describe("use_sentry handler", () => {
       }),
     });
 
-    // Verify all 19 tools were provided (20 total - use_sentry itself)
+    // Verify all 20 tools were provided (21 total - use_sentry itself)
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
-    expect(Object.keys(toolsArg)).toHaveLength(19);
+    expect(Object.keys(toolsArg)).toHaveLength(20);
 
     // Verify result is returned
     expect(result).toBe("Agent executed tools successfully");
@@ -107,8 +107,8 @@ describe("use_sentry handler", () => {
     // Verify use_sentry is NOT in the list
     expect(toolNames).not.toContain("use_sentry");
 
-    // Verify we have exactly 19 tools (20 total - 1 use_sentry)
-    expect(toolNames).toHaveLength(19);
+    // Verify we have exactly 20 tools (21 total - 1 use_sentry)
+    expect(toolNames).toHaveLength(20);
   });
 
   it("filters find_organizations when organizationSlug constraint is set", async () => {
@@ -134,8 +134,8 @@ describe("use_sentry handler", () => {
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
     expect(toolsArg).toBeDefined();
 
-    // With only org constraint, find_organizations is filtered (19 - 1 = 18)
-    expect(Object.keys(toolsArg)).toHaveLength(18);
+    // With only org constraint, find_organizations is filtered (20 - 1 = 19)
+    expect(Object.keys(toolsArg)).toHaveLength(19);
 
     // Verify find_organizations is filtered but find_projects remains
     expect(toolsArg.find_organizations).toBeUndefined();
@@ -167,8 +167,8 @@ describe("use_sentry handler", () => {
     expect(toolsArg).toBeDefined();
 
     // When both org and project constraints are present,
-    // find_organizations and find_projects are filtered out (19 - 2 = 17)
-    expect(Object.keys(toolsArg)).toHaveLength(17);
+    // find_organizations and find_projects are filtered out (20 - 2 = 18)
+    expect(Object.keys(toolsArg)).toHaveLength(18);
 
     // Verify both find tools are filtered
     expect(toolsArg.find_organizations).toBeUndefined();
