@@ -818,6 +818,23 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/7ca573c0f4814912aaa9bdc77d1a7d51/",
     fetch: () => HttpResponse.json(eventsFixture),
   },
+  // Generic handler for listing events within an issue
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/events/",
+    fetch: () => {
+      // Return an array directly (not wrapped in {data: [...]})
+      return HttpResponse.json([
+        {
+          id: "event1",
+          timestamp: "2025-01-15T10:00:00Z",
+          title: "Test Error",
+          environment: "production",
+          release: "v1.0",
+        },
+      ]);
+    },
+  },
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",

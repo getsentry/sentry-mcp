@@ -1649,6 +1649,63 @@ export class SentryApiService {
     );
   }
 
+  /**
+   * Lists events for a specific issue.
+   * Uses the issue-specific endpoint which already filters by issue ID.
+   *
+   * @see https://docs.sentry.io/api/events/list-an-issues-events/
+   */
+  async listEventsForIssue(
+    {
+      organizationSlug,
+      issueId,
+      query,
+      limit = 50,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      full = false,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      query?: string;
+      limit?: number;
+      sort?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      full?: boolean;
+    },
+    opts?: RequestOptions,
+  ) {
+    const params = new URLSearchParams();
+
+    if (query) {
+      params.append("query", query);
+    }
+
+    params.append("per_page", String(limit));
+
+    if (sort) {
+      params.append("sort", sort);
+    }
+
+    if (statsPeriod) {
+      params.append("statsPeriod", statsPeriod);
+    } else if (start && end) {
+      params.append("start", start);
+      params.append("end", end);
+    }
+
+    if (full) {
+      params.append("full", "true");
+    }
+
+    const apiUrl = `/organizations/${organizationSlug}/issues/${issueId}/events/?${params.toString()}`;
+    return await this.requestJSON(apiUrl, undefined, opts);
+  }
+
   async listEventAttachments(
     {
       organizationSlug,

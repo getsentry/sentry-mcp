@@ -251,6 +251,7 @@ describe("get_issue_details", () => {
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
       - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
+      - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', naturalLanguageQuery='your query')\`
       "
     `);
   });
@@ -406,6 +407,7 @@ describe("get_issue_details", () => {
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
       - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
+      - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', naturalLanguageQuery='your query')\`
       "
     `);
   });
@@ -682,6 +684,7 @@ describe("get_issue_details", () => {
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
       - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
+      - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', naturalLanguageQuery='your query')\`
       "
     `);
   });
@@ -1257,6 +1260,7 @@ describe("get_issue_details", () => {
 
       - You can reference the IssueID in commit messages (e.g. \`Fixes MCP-SERVER-EQE\`) to automatically close the issue when the commit is merged.
       - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
+      - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='MCP-SERVER-EQE', naturalLanguageQuery='your query')\`
       "
     `);
   });

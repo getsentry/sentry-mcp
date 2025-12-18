@@ -5,7 +5,7 @@
     "description": "Search for errors, analyze traces, and explore event details",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 10,
+    "toolCount": 11,
     "tools": [
       {
         "name": "find_organizations",
@@ -45,6 +45,11 @@
       {
         "name": "search_events",
         "description": "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'\n2. Individual events with timestamps: 'show me error logs from last hour'\n\nUSE THIS FOR ALL COUNTS/STATISTICS:\n- 'how many errors today' → returns count\n- 'count of database failures' → returns count\n- 'total number of issues' → returns count\n- 'average response time' → returns avg()\n- 'sum of tokens used' → returns sum()\n\nALSO USE FOR INDIVIDUAL EVENTS:\n- 'error logs from last hour' → returns event list\n- 'database errors with timestamps' → returns event list\n- 'trace spans for slow API calls' → returns span list\n\nDataset Selection (AI automatically chooses):\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, AI/LLM calls, token usage\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "search_issue_events",
+        "description": "Search and filter events within a specific issue using natural language queries.\n\nUse this to filter events by time, environment, release, user, trace ID, or other tags. The tool automatically constrains results to the specified issue.\n\nFor cross-issue searches use search_issues, for single event details use get_issue_details.\n\n<examples>\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', naturalLanguageQuery='from last hour')\nsearch_issue_events(issueUrl='https://sentry.io/.../issues/123/', naturalLanguageQuery='production with release v1.0')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
@@ -145,7 +150,7 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 8,
+    "toolCount": 9,
     "tools": [
       {
         "name": "find_organizations",
@@ -170,6 +175,11 @@
       {
         "name": "search_events",
         "description": "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'\n2. Individual events with timestamps: 'show me error logs from last hour'\n\nUSE THIS FOR ALL COUNTS/STATISTICS:\n- 'how many errors today' → returns count\n- 'count of database failures' → returns count\n- 'total number of issues' → returns count\n- 'average response time' → returns avg()\n- 'sum of tokens used' → returns sum()\n\nALSO USE FOR INDIVIDUAL EVENTS:\n- 'error logs from last hour' → returns event list\n- 'database errors with timestamps' → returns event list\n- 'trace spans for slow API calls' → returns span list\n\nDataset Selection (AI automatically chooses):\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, AI/LLM calls, token usage\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "search_issue_events",
+        "description": "Search and filter events within a specific issue using natural language queries.\n\nUse this to filter events by time, environment, release, user, trace ID, or other tags. The tool automatically constrains results to the specified issue.\n\nFor cross-issue searches use search_issues, for single event details use get_issue_details.\n\n<examples>\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', naturalLanguageQuery='from last hour')\nsearch_issue_events(issueUrl='https://sentry.io/.../issues/123/', naturalLanguageQuery='production with release v1.0')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
