@@ -1661,6 +1661,7 @@ export class SentryApiService {
       issueId,
       query,
       limit = 50,
+      sort,
       statsPeriod,
       start,
       end,
@@ -1670,6 +1671,7 @@ export class SentryApiService {
       issueId: string;
       query?: string;
       limit?: number;
+      sort?: string;
       statsPeriod?: string;
       start?: string;
       end?: string;
@@ -1684,6 +1686,10 @@ export class SentryApiService {
     }
 
     params.append("per_page", String(limit));
+
+    if (sort) {
+      params.append("sort", sort);
+    }
 
     if (statsPeriod) {
       params.append("statsPeriod", statsPeriod);
