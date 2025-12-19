@@ -1,11 +1,16 @@
-import CodeSnippet from "../ui/code-snippet";
 import { Prose } from "../ui/prose";
-import { NPM_REMOTE_NAME } from "@/constants";
-import { Button } from "../ui/button";
 import InstallTabs, { Tab } from "./install-tabs";
-import { getCursorDeepLink } from "@/client/utils";
-import { KeyIcon } from "../ui/key-icon";
-import { KeyWord } from "../ui/key-word";
+// Import IDE instruction components
+import { ClaudeCodeInstructions } from "./instructions/claude-code";
+import { CursorInstructions } from "./instructions/cursor";
+import { VSCodeInstructions } from "./instructions/vscode";
+import { CodexCLIInstructions } from "./instructions/codex-cli";
+import { AmpInstructions } from "./instructions/amp";
+import { GeminiInstructions } from "./instructions/gemini";
+import { OpenCodeInstructions } from "./instructions/opencode";
+import { WarpInstructions } from "./instructions/warp";
+import { WindsurfInstructions } from "./instructions/windsurf";
+import { ZedInstructions } from "./instructions/zed";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 
@@ -53,422 +58,55 @@ export default function RemoteSetup() {
   );
 }
 
-export function RemoteSetupTabs() {
-  const endpoint = new URL("/mcp", window.location.href).href;
+interface RemoteSetupTabsProps {
+  selectedIde?: string;
+  onIdeChange?: (ide: string) => void;
+}
 
-  const mcpRemoteSnippet = `npx ${NPM_REMOTE_NAME}@latest ${endpoint}`;
-  // the shared configuration for all clients
-  const coreConfig = {
-    command: "npx",
-    args: ["-y", `${NPM_REMOTE_NAME}@latest`, endpoint],
-  };
-
-  const codexRemoteConfigToml = [
-    "[mcp_servers.sentry]",
-    'command = "npx"',
-    `args = ["-y", "${NPM_REMOTE_NAME}@latest", "${endpoint}"]`,
-  ].join("\n");
-
-  const sentryMCPConfig = {
-    url: endpoint,
-  };
-
-  // https://code.visualstudio.com/docs/copilot/chat/mcp-servers
-  const vsCodeHandler = `vscode:mcp/install?${encodeURIComponent(
-    JSON.stringify({
-      name: mcpServerName,
-      serverUrl: endpoint,
-    }),
-  )}`;
-  const zedInstructions = JSON.stringify(
-    {
-      context_servers: {
-        [mcpServerName]: coreConfig,
-        settings: {},
-      },
-    },
-    undefined,
-    2,
-  );
+export function RemoteSetupTabs({
+  selectedIde,
+  onIdeChange,
+}: RemoteSetupTabsProps) {
   return (
-    <InstallTabs>
+    <InstallTabs selectedTab={selectedIde} onTabChange={onIdeChange}>
       <Tab id="claude-code" title="Claude Code">
-        <ol>
-          <li>Open your terminal to access the CLI.</li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={`claude mcp add --transport http sentry ${endpoint}`}
-            />
-          </li>
-          <li>
-            This will trigger an OAuth authentication flow to connect Claude
-            Code to your Sentry account.
-          </li>
-          <li>
-            You may need to manually authenticate if it doesnt happen
-            automatically, which can be done via <code>/mcp</code>.
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a href="https://docs.anthropic.com/en/docs/claude-code/mcp">
-              Claude Code MCP documentation
-            </a>
-            .
-          </small>
-        </p>
+        <ClaudeCodeInstructions transport="cloud" />
       </Tab>
 
       <Tab id="cursor" title="Cursor">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            window.location.href = getCursorDeepLink(endpoint);
-          }}
-          className="mt-2 mb-2 bg-violet-300 text-black hover:bg-violet-400 hover:text-black"
-        >
-          Install in Cursor
-        </Button>
-        <ol>
-          <li>
-            Or manually:{" "}
-            <strong>
-              <KeyIcon>⌘</KeyIcon> + <KeyWord>Shift</KeyWord> +{" "}
-              <KeyIcon>J</KeyIcon>
-            </strong>{" "}
-            to open Cursor Settings.
-          </li>
-          <li>
-            Select <strong>Skills and Integrations</strong>.
-          </li>
-          <li>
-            Select <strong>New MCP Server</strong>.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: sentryMCPConfig,
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>
-            Optional: To use the service with <code>cursor-agent</code>:
-            <CodeSnippet noMargin snippet={`cursor-agent mcp login sentry`} />
-          </li>
-        </ol>
+        <CursorInstructions transport="cloud" />
       </Tab>
 
       <Tab id="vscode" title="Code">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            window.location.href = vsCodeHandler;
-          }}
-          className="mt-2 mb-2 bg-violet-300 text-black hover:bg-violet-400 hover:text-black"
-        >
-          Install in VSCode
-        </Button>
-        <p>
-          If this doesn't work, you can manually add the server using the
-          following steps:
-        </p>
-        <ol>
-          <li>
-            <strong>
-              {" "}
-              <KeyIcon>⌘</KeyIcon> + <KeyIcon>P</KeyIcon>
-            </strong>{" "}
-            and search for <strong>MCP: Add Server</strong>.
-          </li>
-          <li>
-            Select <strong>HTTP (HTTP or Server-Sent Events)</strong>.
-          </li>
-          <li>
-            Enter the following configuration, and hit enter
-            <strong> {endpoint}</strong>
-          </li>
-          <li>
-            Enter the name <strong>Sentry</strong> and hit enter.
-          </li>
-          <li>Allow the authentication flow to complete.</li>
-          <li>
-            Activate the server using <strong>MCP: List Servers</strong> and
-            selecting <strong>Sentry</strong>, and selecting{" "}
-            <strong>Start Server</strong>.
-          </li>
-        </ol>
+        <VSCodeInstructions transport="cloud" />
       </Tab>
 
       <Tab id="codex-cli" title="Codex">
-        <ol>
-          <li>Open your terminal to access the CLI.</li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={`codex mcp add sentry -- ${
-                coreConfig.command
-              } ${coreConfig.args.join(" ")}`}
-            />
-          </li>
-          <li>
-            Next time you run <code>codex</code>, the Sentry MCP server will be
-            available. It will automatically open the OAuth flow to connect to
-            your Sentry account.
-          </li>
-        </ol>
-        Or
-        <ol>
-          <li>
-            Edit <code>~/.codex/config.toml</code> and add the remote MCP
-            configuration:
-            <CodeSnippet noMargin snippet={codexRemoteConfigToml} />
-          </li>
-          <li>
-            Save the file and restart any running <code>codex</code> session
-          </li>
-          <li>
-            Next time you run <code>codex</code>, the Sentry MCP server will be
-            available. It will automatically open the OAuth flow to connect to
-            your Sentry account.
-          </li>
-        </ol>
+        <CodexCLIInstructions transport="cloud" />
       </Tab>
 
       <Tab id="amp" title="Amp">
-        <ol>
-          <li>
-            Open your terminal and use the Amp CLI to add the Sentry MCP server:
-            <CodeSnippet noMargin snippet={`amp mcp add sentry ${endpoint}`} />
-          </li>
-          <li>
-            Amp will automatically initiate OAuth authentication using Dynamic
-            Client Registration (DCR). Follow the browser prompts to authorize
-            the connection.
-          </li>
-          <li>
-            Once authenticated, the Sentry MCP server will be available in Amp.
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a
-              href="https://ampcode.com/manual#mcp"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Amp MCP documentation
-            </a>
-            .
-          </small>
-        </p>
+        <AmpInstructions transport="cloud" />
       </Tab>
 
       <Tab id="gemini" title="Gemini CLI">
-        <ol>
-          <li>
-            Edit <code>~/.gemini/settings.json</code> and add the HTTP MCP
-            server configuration:
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: sentryMCPConfig,
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>Save the file and restart Gemini CLI.</li>
-          <li>
-            Authenticate with Sentry by running:
-            <CodeSnippet noMargin snippet="/mcp auth sentry" />
-          </li>
-          <li>
-            This will open a browser window to complete the OAuth flow and
-            connect Gemini CLI to your Sentry account.
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a
-              href="https://github.com/google-gemini/gemini-cli"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Gemini CLI documentation
-            </a>
-            .
-          </small>
-        </p>
+        <GeminiInstructions transport="cloud" />
       </Tab>
 
       <Tab id="opencode" title="OpenCode">
-        <ol>
-          <li>
-            Edit <code>~/.config/opencode/opencode.json</code> and add the
-            remote MCP server configuration:
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  $schema: "https://opencode.ai/config.json",
-                  mcp: {
-                    sentry: {
-                      type: "remote",
-                      url: endpoint,
-                      oauth: {},
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>Save the file and restart OpenCode.</li>
-          <li>
-            Authenticate with Sentry by running:
-            <CodeSnippet noMargin snippet="opencode mcp auth sentry" />
-          </li>
-          <li>
-            This will open a browser window to complete the OAuth flow and
-            connect OpenCode to your Sentry account.
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a
-              href="https://opencode.ai/docs/mcp-servers"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              OpenCode MCP documentation
-            </a>
-            .
-          </small>
-        </p>
+        <OpenCodeInstructions transport="cloud" />
       </Tab>
 
       <Tab id="warp" title="Warp">
-        <ol>
-          <li>
-            Open{" "}
-            <a
-              href="https://warp.dev"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Warp
-            </a>{" "}
-            and navigate to MCP server settings using one of these methods:
-            <ul>
-              <li>
-                From Warp Drive: <strong>Personal → MCP Servers</strong>
-              </li>
-              <li>
-                From Command Palette: search for{" "}
-                <strong>Open MCP Servers</strong>
-              </li>
-              <li>
-                From Settings:{" "}
-                <strong>Settings → AI → Manage MCP servers</strong>
-              </li>
-            </ul>
-          </li>
-          <li>
-            Click <strong>+ Add</strong> button.
-          </li>
-          <li>
-            Select <strong>CLI Server (Command)</strong> option.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  Sentry: {
-                    ...coreConfig,
-                    env: {},
-                    working_directory: null,
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a
-              href="https://docs.warp.dev/knowledge-and-collaboration/mcp"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Warp MCP documentation
-            </a>
-            .
-          </small>
-        </p>
+        <WarpInstructions transport="cloud" />
       </Tab>
 
       <Tab id="windsurf" title="Windsurf">
-        <ol>
-          <li>Open Windsurf Settings.</li>
-          <li>
-            Under <strong>Cascade</strong>, you'll find{" "}
-            <strong>Model Context Protocol Servers</strong>.
-          </li>
-          <li>
-            Select <strong>Add Server</strong>.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: coreConfig,
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-        </ol>
+        <WindsurfInstructions transport="cloud" />
       </Tab>
 
       <Tab id="zed" title="Zed">
-        <ol>
-          <li>
-            <strong>
-              <KeyIcon>⌘</KeyIcon> + <KeyIcon>,</KeyIcon>
-            </strong>{" "}
-            to open Zed settings.
-          </li>
-          <li>
-            <CodeSnippet noMargin snippet={zedInstructions} />
-          </li>
-        </ol>
+        <ZedInstructions transport="cloud" />
       </Tab>
     </InstallTabs>
   );
