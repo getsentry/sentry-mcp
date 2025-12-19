@@ -13,6 +13,7 @@ import { buildServer } from "@sentry/mcp-core/server";
 import { parseSkills } from "@sentry/mcp-core/skills";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
+import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import type { Env } from "../types";
 import { verifyConstraintsAccess } from "./constraint-utils";
 import type { ExportedHandler } from "@cloudflare/workers-types";
@@ -157,9 +158,11 @@ const mcpHandler: ExportedHandler<Env> = {
 
     // Create and configure MCP server with tools filtered by context
     // Context is captured in tool handler closures during buildServer()
+    // Use CfWorkerJsonSchemaValidator for Cloudflare Workers (ajv is not compatible with workerd)
     const server = buildServer({
       context: serverContext,
       agentMode: isAgentMode,
+      jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
     });
 
     // Run MCP handler - context already captured in closures
