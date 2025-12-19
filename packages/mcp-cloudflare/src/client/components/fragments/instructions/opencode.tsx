@@ -22,6 +22,7 @@ export function OpenCodeInstructions({ transport }: OpenCodeInstructionsProps) {
                     sentry: {
                       type: "remote",
                       url: endpoint,
+                      oauth: {},
                     },
                   },
                 },

@@ -2,6 +2,7 @@ import CodeSnippet from "../ui/code-snippet";
 import skillDefinitions from "@sentry/mcp-core/skillDefinitions";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
 import { Prose } from "../ui/prose";
+import { Link } from "../ui/base";
 import InstallTabs, { Tab } from "./install-tabs";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
