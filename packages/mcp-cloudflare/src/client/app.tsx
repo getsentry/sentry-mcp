@@ -22,11 +22,13 @@ export default function App() {
     : false;
 
   const toggleChat = (open: boolean) => {
+    const newParams = new URLSearchParams(searchParams);
     if (open) {
-      setSearchParams({ chat: "1" });
+      newParams.set("chat", "1");
     } else {
-      setSearchParams({});
+      newParams.delete("chat");
     }
+    setSearchParams(newParams);
   };
 
   return (

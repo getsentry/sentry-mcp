@@ -7,7 +7,7 @@ import { Cable, Cloud } from "lucide-react";
 export default function Integration() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Derive state from URL parameters
+  // Derive state from query params with defaults
   const stdio = searchParams.get("transport") === "stdio";
   const selectedIde = searchParams.get("ide") || "claude-code";
 
