@@ -332,9 +332,7 @@ export function RemoteSetupTabs() {
                     sentry: {
                       type: "remote",
                       url: endpoint,
-                      oauth: {
-                        scope: "tools:read tools:execute",
-                      },
+                      oauth: {},
                     },
                   },
                 },
