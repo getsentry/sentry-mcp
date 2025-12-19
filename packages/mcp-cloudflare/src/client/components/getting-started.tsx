@@ -1,11 +1,30 @@
+import { useSearchParams } from "react-router-dom";
 import { Button } from "./ui/button";
-import { useState } from "react";
 import RemoteSetup, { RemoteSetupTabs } from "./fragments/remote-setup";
 import StdioSetup, { StdioSetupTabs } from "./fragments/stdio-setup";
 import { Cable, Cloud } from "lucide-react";
 
 export default function Integration() {
-  const [stdio, setStdio] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Derive state from query params with defaults
+  const stdio = searchParams.get("transport") === "stdio";
+  const selectedIde = searchParams.get("ide") || "claude-code";
+
+  const updateParams = (updates: { transport?: string; ide?: string }) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (updates.transport !== undefined) {
+      newParams.set("transport", updates.transport);
+    }
+    if (updates.ide !== undefined) {
+      newParams.set("ide", updates.ide);
+    }
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const setSelectedIde = (ide: string) => updateParams({ ide });
+  const setStdio = (isStdio: boolean) =>
+    updateParams({ transport: isStdio ? "stdio" : "cloud" });
   return (
     <section
       id="getting-started"
@@ -22,14 +41,6 @@ export default function Integration() {
               document
                 .getElementById("getting-started")
                 ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              // preserve current query string, only change the hash
-              const url = new URL(window.location.href);
-              url.hash = "#getting-started";
-              window.history.pushState(
-                window.history.state,
-                "",
-                url.toString(),
-              );
             }}
             className={`${
               !stdio && "shadow-sm"
@@ -46,14 +57,6 @@ export default function Integration() {
               document
                 .getElementById("getting-started")
                 ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              // preserve current query string, only change the hash
-              const url = new URL(window.location.href);
-              url.hash = "#getting-started";
-              window.history.pushState(
-                window.history.state,
-                "",
-                url.toString(),
-              );
             }}
             className={`${
               stdio && "shadow-sm"
@@ -67,7 +70,17 @@ export default function Integration() {
 
       {/* Client installation tabs first */}
       <div className="p-4 sm:p-8 pt-0 sm:pt-0 border-b border-dashed border-white/10">
-        {!stdio ? <RemoteSetupTabs /> : <StdioSetupTabs />}
+        {!stdio ? (
+          <RemoteSetupTabs
+            selectedIde={selectedIde}
+            onIdeChange={setSelectedIde}
+          />
+        ) : (
+          <StdioSetupTabs
+            selectedIde={selectedIde}
+            onIdeChange={setSelectedIde}
+          />
+        )}
       </div>
 
       <div className="px-4 sm:px-8 pt-4 sm:pt-8 pb-4">

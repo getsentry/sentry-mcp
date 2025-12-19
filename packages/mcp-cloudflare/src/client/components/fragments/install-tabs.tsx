@@ -29,12 +29,16 @@ export default function InstallTabs({
   initialIndex = 0,
   current,
   onChange,
+  selectedTab,
+  onTabChange,
   className = "",
 }: {
   children: React.ReactNode;
   initialIndex?: number;
   current?: number;
   onChange?: (next: number) => void;
+  selectedTab?: string;
+  onTabChange?: (tabId: string) => void;
   className?: string;
 }) {
   const items = React.Children.toArray(children).filter(
@@ -42,18 +46,33 @@ export default function InstallTabs({
   ) as React.ReactElement<TabProps>[];
 
   const [internal, setInternal] = React.useState(initialIndex);
-  const active = typeof current === "number" ? current : internal;
+
+  // Support both numeric index (current) and string ID (selectedTab) control
+  let active: number;
+  if (typeof current === "number") {
+    active = current;
+  } else if (selectedTab) {
+    const index = items.findIndex((el) => el.props.id === selectedTab);
+    active = index >= 0 ? index : internal;
+  } else {
+    active = internal;
+  }
 
   const setActive = React.useCallback(
     (next: number) => {
       if (next < 0 || next >= items.length) return;
-      if (typeof current === "number") onChange?.(next);
-      else {
+      const tabId = items[next]?.props.id;
+      if (typeof current === "number") {
+        onChange?.(next);
+      } else if (selectedTab && onTabChange && tabId) {
+        onTabChange(tabId);
+        setInternal(next);
+      } else {
         setInternal(next);
         onChange?.(next);
       }
     },
-    [current, items.length, onChange],
+    [current, items, onChange, selectedTab, onTabChange],
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {

@@ -2,6 +2,7 @@ import "./instrument";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import App from "./app";
 import { AuthProvider } from "./contexts/auth-context";
@@ -22,8 +23,10 @@ const root = createRoot(container!, {
 
 root.render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </BrowserRouter>
   </StrictMode>,
 );

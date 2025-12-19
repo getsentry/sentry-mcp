@@ -1,11 +1,9 @@
-import { Link } from "../ui/base";
 import CodeSnippet from "../ui/code-snippet";
 import skillDefinitions from "@sentry/mcp-core/skillDefinitions";
 import { NPM_PACKAGE_NAME, SCOPES } from "../../../constants";
 import { Prose } from "../ui/prose";
+import { Link } from "../ui/base";
 import InstallTabs, { Tab } from "./install-tabs";
-import { KeyIcon } from "../ui/key-icon";
-import { KeyWord } from "../ui/key-word";
 
 const mcpServerName = import.meta.env.DEV ? "sentry-dev" : "sentry";
 const orderedSkills = [...skillDefinitions].sort((a, b) => a.order - b.order);
@@ -180,499 +178,67 @@ export default function StdioSetup() {
   );
 }
 
-export function StdioSetupTabs() {
-  const mcpStdioSnippet = `npx ${NPM_PACKAGE_NAME}@latest`;
+// Import IDE instruction components
+import { ClaudeCodeInstructions } from "./instructions/claude-code";
+import { CursorInstructions } from "./instructions/cursor";
+import { VSCodeInstructions } from "./instructions/vscode";
+import { CodexCLIInstructions } from "./instructions/codex-cli";
+import { AmpInstructions } from "./instructions/amp";
+import { GeminiInstructions } from "./instructions/gemini";
+import { OpenCodeInstructions } from "./instructions/opencode";
+import { WarpInstructions } from "./instructions/warp";
+import { WindsurfInstructions } from "./instructions/windsurf";
+import { ZedInstructions } from "./instructions/zed";
 
-  const defaultEnv = {
-    SENTRY_ACCESS_TOKEN: "sentry-user-token",
-    OPENAI_API_KEY: "your-openai-key", // Required for AI-powered search tools
-  } as const;
-  const coreConfig = {
-    command: "npx",
-    args: ["@sentry/mcp-server@latest"],
-    env: defaultEnv,
-  };
+interface StdioSetupTabsProps {
+  selectedIde?: string;
+  onIdeChange?: (ide: string) => void;
+}
 
-  const codexConfigToml = [
-    "[mcp_servers.sentry]",
-    'command = "npx"',
-    'args = ["@sentry/mcp-server@latest"]',
-    'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", OPENAI_API_KEY = "your-openai-key" }',
-  ].join("\n");
-  const selfHostedEnvLine =
-    'env = { SENTRY_ACCESS_TOKEN = "sentry-user-token", SENTRY_HOST = "sentry.example.com", OPENAI_API_KEY = "your-openai-key" }';
+export function StdioSetupTabs({
+  selectedIde,
+  onIdeChange,
+}: StdioSetupTabsProps) {
   return (
-    <InstallTabs>
+    <InstallTabs selectedTab={selectedIde} onTabChange={onIdeChange}>
       <Tab id="claude-code" title="Claude Code">
-        <ol>
-          <li>Open your terminal to access the CLI.</li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={`claude mcp add sentry -e SENTRY_ACCESS_TOKEN=sentry-user-token -e OPENAI_API_KEY=your-openai-key -- ${mcpStdioSnippet}`}
-            />
-          </li>
-          <li>
-            Replace <code>sentry-user-token</code> with your actual User Auth
-            Token.
-          </li>
-          <li>
-            Connecting to self-hosted Sentry? Append
-            <code>-e SENTRY_HOST=your-hostname</code>.
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <Link href="https://docs.anthropic.com/en/docs/claude-code/mcp">
-              Claude Code MCP documentation
-            </Link>
-            .
-          </small>
-        </p>
+        <ClaudeCodeInstructions transport="stdio" />
       </Tab>
 
       <Tab id="cursor" title="Cursor">
-        <ol>
-          <li>
-            <strong>
-              <KeyIcon>⌘</KeyIcon> + <KeyWord>Shift</KeyWord> +{" "}
-              <KeyIcon>J</KeyIcon>
-            </strong>{" "}
-            to open Cursor Settings.
-          </li>
-          <li>
-            Select <strong>MCP Skills</strong>.
-          </li>
-          <li>
-            Select <strong>New MCP Server</strong>.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: {
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-        </ol>
+        <CursorInstructions transport="stdio" />
       </Tab>
 
       <Tab id="vscode" title="Code">
-        <ol>
-          <li>
-            <strong>
-              <KeyIcon>⌘</KeyIcon> + <KeyIcon>P</KeyIcon>
-            </strong>{" "}
-            and search for <strong>MCP: Add Server</strong>.
-          </li>
-          <li>
-            Select <strong>Command (stdio)</strong>
-          </li>
-          <li>
-            Enter the following configuration, and hit enter.
-            <CodeSnippet noMargin snippet={mcpStdioSnippet} />
-          </li>
-          <li>
-            Enter the name <strong>Sentry</strong> and hit enter.
-          </li>
-          <li>
-            Update the server configuration to include your configuration:
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  [mcpServerName]: {
-                    type: "stdio",
-                    ...coreConfig,
-                    env: {
-                      ...coreConfig.env,
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>
-            Activate the server using <strong>MCP: List Servers</strong> and
-            selecting <strong>Sentry</strong>, and selecting{" "}
-            <strong>Start Server</strong>.
-          </li>
-        </ol>
-        <p>
-          <small>Note: MCP is supported in VSCode 1.99 and above.</small>
-        </p>
+        <VSCodeInstructions transport="stdio" />
       </Tab>
 
       <Tab id="codex-cli" title="Codex">
-        <ol>
-          <li>
-            Edit <code>~/.codex/config.toml</code> and add the MCP server
-            configuration:
-            <CodeSnippet noMargin snippet={codexConfigToml} />
-          </li>
-          <li>
-            Replace <code>sentry-user-token</code> with your Sentry User Auth
-            Token. Add <code>SENTRY_HOST</code> if you run self-hosted Sentry.
-            <CodeSnippet noMargin snippet={selfHostedEnvLine} />
-          </li>
-          <li>
-            Restart any running <code>codex</code> session to load the new MCP
-            configuration.
-          </li>
-        </ol>
+        <CodexCLIInstructions transport="stdio" />
       </Tab>
 
       <Tab id="amp" title="Amp">
-        <ol>
-          <li>
-            Edit your settings file and add the MCP server configuration:
-            <ul>
-              <li>
-                <strong>macOS/Linux:</strong>{" "}
-                <code>~/.config/amp/settings.json</code>
-              </li>
-              <li>
-                <strong>Windows:</strong>{" "}
-                <code>%USERPROFILE%\.config\amp\settings.json</code>
-              </li>
-            </ul>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  "amp.mcpServers": {
-                    sentry: {
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>
-            Replace <code>sentry-user-token</code> with your Sentry User Auth
-            Token.
-          </li>
-          <li>
-            For self-hosted Sentry, add <code>SENTRY_HOST</code> to the env
-            object:
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  "amp.mcpServers": {
-                    sentry: {
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                        SENTRY_HOST: "sentry.example.com",
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>Restart Amp to load the new configuration.</li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a
-              href="https://ampcode.com/manual#mcp"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Amp MCP documentation
-            </a>
-            .
-          </small>
-        </p>
+        <AmpInstructions transport="stdio" />
       </Tab>
 
       <Tab id="gemini" title="Gemini CLI">
-        <ol>
-          <li>
-            Edit <code>~/.gemini/settings.json</code> and add the MCP server
-            configuration:
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: {
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>
-            Replace <code>sentry-user-token</code> with your Sentry User Auth
-            Token.
-          </li>
-          <li>
-            For self-hosted Sentry, add <code>SENTRY_HOST</code> to the env
-            object:
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: {
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                        SENTRY_HOST: "sentry.example.com",
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>Restart Gemini CLI to load the new configuration.</li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a
-              href="https://github.com/google-gemini/gemini-cli"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Gemini CLI documentation
-            </a>
-            .
-          </small>
-        </p>
+        <GeminiInstructions transport="stdio" />
       </Tab>
 
       <Tab id="opencode" title="OpenCode">
-        <ol>
-          <li>
-            Edit <code>~/.config/opencode/opencode.json</code> and add the stdio
-            MCP server configuration:
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  $schema: "https://opencode.ai/config.json",
-                  mcp: {
-                    sentry: {
-                      type: "stdio",
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>
-            Replace <code>sentry-user-token</code> with your Sentry User Auth
-            Token.
-          </li>
-          <li>
-            For self-hosted Sentry, add <code>SENTRY_HOST</code> to the env
-            object:
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcp: {
-                    sentry: {
-                      type: "stdio",
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                        SENTRY_HOST: "sentry.example.com",
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-          <li>Restart OpenCode to load the new configuration.</li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a
-              href="https://opencode.ai/docs/mcp-servers"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              OpenCode MCP documentation
-            </a>
-            .
-          </small>
-        </p>
+        <OpenCodeInstructions transport="stdio" />
       </Tab>
 
       <Tab id="warp" title="Warp">
-        <ol>
-          <li>
-            Open{" "}
-            <a
-              href="https://warp.dev"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Warp
-            </a>{" "}
-            and navigate to MCP server settings using one of these methods:
-            <ul>
-              <li>
-                From Warp Drive: <strong>Personal → MCP Servers</strong>
-              </li>
-              <li>
-                From Command Palette: search for{" "}
-                <strong>Open MCP Servers</strong>
-              </li>
-              <li>
-                From Settings:{" "}
-                <strong>Settings → AI → Manage MCP servers</strong>
-              </li>
-            </ul>
-          </li>
-          <li>
-            Click <strong>+ Add</strong> button.
-          </li>
-          <li>
-            Select <strong>CLI Server (Command)</strong> option.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  Sentry: {
-                    ...coreConfig,
-                    env: {
-                      ...coreConfig.env,
-                    },
-                    working_directory: null,
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-        </ol>
-        <p>
-          <small>
-            For more details, see the{" "}
-            <a
-              href="https://docs.warp.dev/knowledge-and-collaboration/mcp"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Warp MCP documentation
-            </a>
-            .
-          </small>
-        </p>
+        <WarpInstructions transport="stdio" />
       </Tab>
 
       <Tab id="windsurf" title="Windsurf">
-        <ol>
-          <li>Open Windsurf Settings.</li>
-          <li>
-            Under <strong>Cascade</strong>, you'll find{" "}
-            <strong>Model Context Protocol Servers</strong>.
-          </li>
-          <li>
-            Select <strong>Add Server</strong>.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  mcpServers: {
-                    sentry: {
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                      },
-                    },
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-        </ol>
+        <WindsurfInstructions transport="stdio" />
       </Tab>
 
       <Tab id="zed" title="Zed">
-        <ol>
-          <li>
-            <strong>
-              <KeyIcon>⌘</KeyIcon> + <KeyIcon>,</KeyIcon>
-            </strong>{" "}
-            to open Zed settings.
-          </li>
-          <li>
-            <CodeSnippet
-              noMargin
-              snippet={JSON.stringify(
-                {
-                  context_servers: {
-                    [mcpServerName]: {
-                      ...coreConfig,
-                      env: {
-                        ...coreConfig.env,
-                      },
-                    },
-                    settings: {},
-                  },
-                },
-                undefined,
-                2,
-              )}
-            />
-          </li>
-        </ol>
+        <ZedInstructions transport="stdio" />
       </Tab>
     </InstallTabs>
   );
