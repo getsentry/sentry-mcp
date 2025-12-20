@@ -5,7 +5,7 @@ import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
 import { exchangeCodeForAccessToken } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-core/telem/logging";
+import { logWarn, logIssue } from "@sentry/mcp-core/telem/logging";
 import { parseSkills } from "@sentry/mcp-core/skills";
 
 /**
@@ -119,6 +119,25 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     redirect_uri: sentryCallbackUrl,
   });
   if (errResponse) return errResponse;
+
+  // Validate that Sentry returned a refresh token
+  // Without it, future token refreshes will fail
+  if (!payload.refresh_token) {
+    const eventId = logIssue(
+      "Sentry did not return refresh_token during authorization",
+      {
+        loggerScope: ["cloudflare", "oauth", "callback"],
+        oauth: {
+          client_id: c.env.SENTRY_CLIENT_ID,
+          user_id: payload.user.id,
+        },
+      },
+    );
+    return c.text(
+      "Authentication failed: No refresh token provided. Please try again.",
+      { status: 500, headers: { "X-Event-ID": eventId ?? "" } },
+    );
+  }
 
   // Parse and validate granted skills first
   const { valid: validSkills, invalid: invalidSkills } = parseSkills(
