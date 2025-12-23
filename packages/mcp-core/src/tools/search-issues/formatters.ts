@@ -164,5 +164,5 @@ function formatDate(dateString?: string | null): string {
   if (diffDays < 30) {
     return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
   }
-  return date.toLocaleDateString();
+  return date.toISOString().split("T")[0];
 }

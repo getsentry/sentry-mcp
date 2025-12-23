@@ -199,8 +199,8 @@ describe("formatIssueResults", () => {
         - **Category**: feedback
         - **Users**: 1
         - **Events**: 1
-        - **First seen**: 12/31/2024
-        - **Last seen**: 12/31/2024
+        - **First seen**: 2025-01-01
+        - **Last seen**: 2025-01-01
         - **Culprit**: \`User Feedback Widget\`
 
         ## Next Steps
