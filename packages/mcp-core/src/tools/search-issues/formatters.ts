@@ -93,6 +93,10 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
     // Issue metadata
     // Issues don't have a level field in the API response
     output += `- **Status**: ${issue.status}\n`;
+    // Display issue category for non-error types (feedback, performance, metric)
+    if (issue.issueCategory && issue.issueCategory !== "error") {
+      output += `- **Category**: ${issue.issueCategory}\n`;
+    }
     output += `- **Users**: ${issue.userCount || 0}\n`;
     output += `- **Events**: ${issue.count || 0}\n`;
 
@@ -127,6 +131,13 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
     "- Update issue status: Use update_issue to resolve or assign issues\n";
   output +=
     "- View event counts: Use search_events for aggregated statistics\n";
+
+  // Add feedback-specific guidance if results contain feedback
+  const hasFeedback = issues.some((i) => i.issueCategory === "feedback");
+  if (hasFeedback) {
+    output +=
+      "- View feedback details: Use get_issue_details to see full feedback content and linked error events\n";
+  }
 
   return output;
 }

@@ -1418,6 +1418,7 @@ export {
   createUnsupportedIssue,
   createCspIssue,
   createCspEvent,
+  createFeedbackIssue,
 } from "./fixtures";
 
 // Export utilities for creating mock servers
