@@ -1,0 +1,75 @@
+{
+  "id": "6507376999",
+  "shareId": null,
+  "shortId": "CLOUDFLARE-MCP-99",
+  "title": "User Feedback: Bug report from Jane",
+  "culprit": "User Feedback Widget",
+  "permalink": "https://sentry-mcp-evals.sentry.io/issues/6507376999/",
+  "logger": null,
+  "level": "info",
+  "status": "unresolved",
+  "statusDetails": {},
+  "substatus": "new",
+  "isPublic": false,
+  "platform": "javascript",
+  "project": {
+    "id": "4509062593708032",
+    "name": "CLOUDFLARE-MCP",
+    "slug": "CLOUDFLARE-MCP",
+    "platform": "javascript"
+  },
+  "type": "feedback",
+  "metadata": {
+    "value": "The checkout button doesn't work on mobile",
+    "type": "Feedback",
+    "title": "User Feedback: Bug report from Jane"
+  },
+  "numComments": 0,
+  "assignedTo": null,
+  "isBookmarked": false,
+  "isSubscribed": false,
+  "subscriptionDetails": null,
+  "hasSeen": false,
+  "annotations": [],
+  "issueType": "feedback",
+  "issueCategory": "feedback",
+  "priority": "medium",
+  "priorityLockedAt": null,
+  "isUnhandled": false,
+  "count": "1",
+  "userCount": 1,
+  "firstSeen": "2025-04-12T10:30:00.000000Z",
+  "lastSeen": "2025-04-12T10:30:00.000000Z",
+  "firstRelease": null,
+  "lastRelease": null,
+  "activity": [
+    {
+      "id": "0",
+      "user": null,
+      "type": "first_seen",
+      "data": {
+        "priority": "medium"
+      },
+      "dateCreated": "2025-04-12T10:30:00.000000Z"
+    }
+  ],
+  "openPeriods": [
+    {
+      "start": "2025-04-12T10:30:00.000000Z",
+      "end": null,
+      "duration": null,
+      "isOpen": true,
+      "lastChecked": "2025-04-12T10:30:00.000000Z"
+    }
+  ],
+  "seenBy": [],
+  "pluginActions": [],
+  "pluginIssues": [],
+  "pluginContexts": [],
+  "userReportCount": 0,
+  "stats": {
+    "24h": [],
+    "30d": []
+  },
+  "participants": []
+}

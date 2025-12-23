@@ -16,13 +16,16 @@ BUILT-IN FIELDS:
 - level: Severity level (error, warning, info, debug, fatal)
   IMPORTANT: Almost NEVER use this field. Terms like "critical", "important", "severe" refer to IMPACT not level.
   Only use if user explicitly says "error level", "warning level", etc.
+- issueCategory: Issue classification (error, performance, metric, feedback)
+  IMPORTANT: User feedback from the User Feedback Widget is stored as issues with issueCategory:feedback
+  Use this field when users ask about "user feedback", "feedback submissions", "user reports", etc.
 - environment: Deployment environment (production, staging, development)
 - release: Version/release identifier
 - firstSeen: When the issue was FIRST encountered (use for "new issues", "started", "began")
   WARNING: Excludes ongoing issues that started before the time window
 - lastSeen: When the issue was LAST encountered (use for "from the last", "recent", "active")
   This includes ALL issues seen during the time window, regardless of when they started
-- assigned: Issues explicitly assigned to a user (email or "me")  
+- assigned: Issues explicitly assigned to a user (email or "me")
 - assignedOrSuggested: Issues assigned to OR suggested for a user (broader match)
 - userCount: Number of unique users affected
 - eventCount: Total number of events
@@ -34,6 +37,9 @@ COMMON QUERY PATTERNS:
 - New issues: firstSeen:-7d
 - High impact: userCount:>100
 - My work: assignedOrSuggested:me
+- User feedback: issueCategory:feedback
+- Recent feedback: issueCategory:feedback lastSeen:-7d
+- Feedback from production: issueCategory:feedback environment:production
 
 SORTING RULES:
 1. CRITICAL: Sort MUST go in the separate "sort" field, NEVER in the "query" field
@@ -57,6 +63,8 @@ EXAMPLES:
 "critical bugs" → query: "level:error is:unresolved", sort: "date"
 "worst issues affecting the most users" → query: "is:unresolved", sort: "user"
 "assigned to john@example.com" → query: "assignedOrSuggested:john@example.com", sort: "date"
+"show me user feedback" → query: "issueCategory:feedback", sort: "date"
+"feedback from the last week" → query: "issueCategory:feedback lastSeen:-7d", sort: "date"
 
 NEVER: query: "is:unresolved sort:user" ← Sort goes in separate field!
 
