@@ -24,19 +24,19 @@ export default function Footer({ isChatOpen }: { isChatOpen: boolean }) {
             className="relative hover:underline opacity-80 hover:opacity-100 group/link"
           >
             <div className="absolute inset-0 size-full text-violet-500 group-hover/link:opacity-50 group-hover/link:delay-0 delay-300">
-              Github
+              GitHub
             </div>
             <div
               className="absolute inset-0 size-full group-hover/link:opacity-50 group-hover/link:delay-0 duration-300 motion-safe:group-hover/link:translate-y-1 group-hover/link:-translate-x-1"
               aria-hidden="true"
             >
-              Github
+              GitHub
             </div>
             <div
               className="perspective-distant transform-3d duration-300 motion-safe:group-hover/link:translate-y-2 group-hover/link:-translate-x-2"
               role="presentation"
             >
-              Github
+              GitHub
             </div>
           </a>
           <a
