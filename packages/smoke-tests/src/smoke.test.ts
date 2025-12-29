@@ -127,11 +127,13 @@ describeIfPreviewUrl(
 
       expect(response.status).toBe(401);
 
-      // Should return auth error, not 404 - this proves the MCP endpoint exists
-      if (data) {
-        expect(data).toHaveProperty("error");
-        expect(data.error).toMatch(/invalid_token|unauthorized/i);
-      }
+      // Should return JSON-RPC error response with auth error
+      expect(data).toHaveProperty("jsonrpc", "2.0");
+      expect(data).toHaveProperty("id", 1);
+      expect(data).toHaveProperty("error");
+      expect(data.error).toHaveProperty("code");
+      expect(data.error).toHaveProperty("message");
+      expect(data.error.message).toMatch(/authentication|token|unauthorized/i);
     });
 
     it("should have metadata endpoint that requires auth", async () => {
@@ -200,14 +202,14 @@ describeIfPreviewUrl(
 
       expect(response.status).toBe(401);
 
-      // Should return auth error, not 404 - this proves the constrained MCP endpoint exists
+      // Should return JSON-RPC error response with auth error
       const data = (response as any).testData;
-      if (typeof data === "object") {
-        expect(data).toHaveProperty("error");
-        expect(data.error).toMatch(/invalid_token|unauthorized/i);
-      } else {
-        expect(data).toMatch(/invalid_token|unauthorized/i);
-      }
+      expect(data).toHaveProperty("jsonrpc", "2.0");
+      expect(data).toHaveProperty("id", 1);
+      expect(data).toHaveProperty("error");
+      expect(data.error).toHaveProperty("code");
+      expect(data.error).toHaveProperty("message");
+      expect(data.error.message).toMatch(/authentication|token|unauthorized/i);
     });
 
     it("should have MCP endpoint with org and project constraints (/mcp/sentry/mcp-server)", async () => {
@@ -253,14 +255,14 @@ describeIfPreviewUrl(
 
       expect(response.status).toBe(401);
 
-      // Should return auth error, not 404 - this proves the fully constrained MCP endpoint exists
+      // Should return JSON-RPC error response with auth error
       const data = (response as any).testData;
-      if (typeof data === "object") {
-        expect(data).toHaveProperty("error");
-        expect(data.error).toMatch(/invalid_token|unauthorized/i);
-      } else {
-        expect(data).toMatch(/invalid_token|unauthorized/i);
-      }
+      expect(data).toHaveProperty("jsonrpc", "2.0");
+      expect(data).toHaveProperty("id", 1);
+      expect(data).toHaveProperty("error");
+      expect(data.error).toHaveProperty("code");
+      expect(data.error).toHaveProperty("message");
+      expect(data.error.message).toMatch(/authentication|token|unauthorized/i);
     });
 
     it("should have chat endpoint that accepts POST", async () => {

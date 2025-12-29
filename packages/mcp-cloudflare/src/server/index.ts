@@ -86,6 +86,46 @@ const wrappedOAuthProvider = {
 
     const response = await oAuthProvider.fetch(request, env, ctx);
 
+    // Convert HTTP 401 responses to JSON-RPC errors for MCP endpoints
+    // The MCP protocol requires JSON-RPC formatted responses, but the OAuth
+    // provider returns standard HTTP error responses for authentication failures.
+    if (response.status === 401 && url.pathname.startsWith("/mcp")) {
+      try {
+        // Extract request ID from JSON-RPC request body for proper error response
+        let requestId: string | number | null = null;
+        if (request.method === "POST") {
+          const clonedRequest = request.clone();
+          const body = await clonedRequest.json().catch(() => null);
+          if (body && typeof body === "object" && "id" in body) {
+            requestId = body.id;
+          }
+        }
+
+        // Return JSON-RPC error response
+        const jsonRpcError = {
+          jsonrpc: "2.0",
+          id: requestId,
+          error: {
+            code: -32000, // Server error (custom error in -32000 to -32099 range)
+            message:
+              "Authentication required. Please provide a valid access token.",
+          },
+        };
+
+        return new Response(JSON.stringify(jsonRpcError), {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+            "WWW-Authenticate":
+              response.headers.get("WWW-Authenticate") || 'Bearer realm="MCP"',
+          },
+        });
+      } catch (err) {
+        // If we can't parse the request, return the original 401 response
+        return response;
+      }
+    }
+
     // Add CORS headers to public metadata endpoints
     if (isPublicMetadataEndpoint(url.pathname)) {
       return addCorsHeaders(response);
