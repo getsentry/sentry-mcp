@@ -7,11 +7,6 @@ import { sanitizeHtml } from "./html-utils";
 import skillDefinitions, {
   type SkillDefinition,
 } from "@sentry/mcp-core/skillDefinitions";
-import {
-  signState,
-  verifyAndParseState,
-  type OAuthState,
-} from "../oauth/state";
 
 const COOKIE_NAME = "mcp-approved-clients";
 const ONE_YEAR_IN_SECONDS = 31536000;
@@ -197,27 +192,19 @@ export interface ApprovalDialogOptions {
    * Will be encoded in the form and returned when approval is complete
    */
   state: Record<string, any>;
-  /**
-   * HMAC secret key for signing state parameters
-   */
-  cookieSecret: string;
 }
 
 /**
- * Encodes and signs arbitrary data to a HMAC-signed compact string.
+ * Encodes arbitrary data to a URL-safe base64 string.
  * @param data - The data to encode (will be stringified).
- * @param secret - HMAC secret key for signing.
- * @returns A HMAC-signed compact string (signature.base64payload).
+ * @returns A URL-safe base64 encoded string.
  */
-async function encodeState(data: any, secret: string): Promise<string> {
+function encodeState(data: any): string {
   try {
-    const now = Date.now();
-    const payload: OAuthState = {
-      req: data as Record<string, unknown>,
-      iat: now,
-      exp: now + 10 * 60 * 1000, // 10 minute expiry
-    };
-    return await signState(payload, secret);
+    const jsonString = JSON.stringify(data);
+    // Use btoa for simplicity, assuming Worker environment supports it well enough
+    // For complex binary data, a Buffer/Uint8Array approach might be better
+    return btoa(jsonString);
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],
@@ -230,28 +217,22 @@ async function encodeState(data: any, secret: string): Promise<string> {
 }
 
 /**
- * Decodes and verifies a HMAC-signed string back to its original data.
- * @param encoded - The HMAC-signed compact string.
- * @param secret - HMAC secret key for verification.
+ * Decodes a URL-safe base64 string back to its original data.
+ * @param encoded - The URL-safe base64 encoded string.
  * @returns The original data.
- * @throws Error if signature is invalid or state has expired.
  */
-async function decodeState<T = any>(
-  encoded: string,
-  secret: string,
-): Promise<T> {
+function decodeState<T = any>(encoded: string): T {
   try {
-    const parsed = await verifyAndParseState(encoded, secret);
-    return parsed.req as T;
+    const jsonString = atob(encoded);
+    return JSON.parse(jsonString);
   } catch (error) {
     logError(error, {
       loggerScope: ["cloudflare", "approval-dialog"],
       extra: {
-        message:
-          "Error decoding approval dialog state - signature verification failed or expired",
+        message: "Error decoding approval dialog state",
       },
     });
-    throw new Error("Could not decode state - invalid signature or expired");
+    throw new Error("Could not decode state");
   }
 }
 
@@ -264,11 +245,11 @@ async function decodeState<T = any>(
  * @param options - Configuration for the approval dialog
  * @returns A Response containing the HTML approval dialog
  */
-export async function renderApprovalDialog(
+export function renderApprovalDialog(
   request: Request,
   options: ApprovalDialogOptions,
-): Promise<Response> {
-  const { client, server, state, cookieSecret } = options;
+): Response {
+  const { client, server, state } = options;
 
   // Use static skill definitions bundled at build time
   const skills: SkillDefinition[] = skillDefinitions as SkillDefinition[];
@@ -292,8 +273,8 @@ export async function renderApprovalDialog(
     )
     .join("");
 
-  // Encode state for form submission (HMAC-signed to prevent tampering)
-  const encodedState = await encodeState(state, cookieSecret);
+  // Encode state for form submission
+  const encodedState = encodeState(state);
 
   // Sanitize any untrusted content
   const serverName = sanitizeHtml(server.name);
@@ -892,10 +873,7 @@ export async function parseRedirectApproval(
       throw new Error("Missing or invalid 'state' in form data.");
     }
 
-    state = await decodeState<{ oauthReqInfo?: AuthRequest }>(
-      encodedState,
-      cookieSecret,
-    ); // Decode and verify the state
+    state = decodeState<{ oauthReqInfo?: AuthRequest }>(encodedState); // Decode the state
     clientId = state?.oauthReqInfo?.clientId; // Extract clientId from within the state
 
     if (!clientId) {

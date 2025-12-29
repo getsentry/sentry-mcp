@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import oauthRoute from "./index";
 import type { Env } from "../types";
-import { verifyAndParseState, signState } from "./state";
+import { verifyAndParseState, } from "./state";
 
 // Mock the OAuth provider
 const mockOAuthProvider = {
@@ -77,16 +77,8 @@ describe("oauth authorize routes", () => {
         state: "original-state",
       };
       const formData = new FormData();
-      // Use HMAC-signed state matching what the app will verify
-      const signedState = await signState(
-        {
-          req: { oauthReqInfo },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      formData.append("state", signedState);
+      // Use simple base64 encoding for approval form state
+      formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
       formData.append("skill", "triage");
       formData.append("skill", "project-management");
       const request = new Request("http://localhost/oauth/authorize", {
@@ -125,15 +117,7 @@ describe("oauth authorize routes", () => {
         state: "original-state",
       };
       const formData = new FormData();
-      const signedState = await signState(
-        {
-          req: { oauthReqInfo },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      formData.append("state", signedState);
+      formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
       const request = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: formData,
@@ -159,15 +143,7 @@ describe("oauth authorize routes", () => {
         state: "original-state",
       };
       const formData = new FormData();
-      const signedState = await signState(
-        {
-          req: { oauthReqInfo },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      formData.append("state", signedState);
+      formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
       formData.append("skill", "triage");
       const request = new Request("http://localhost/oauth/authorize", {
         method: "POST",
@@ -192,15 +168,7 @@ describe("oauth authorize routes", () => {
         scope: ["read"],
       };
       const formData = new FormData();
-      const signedState = await signState(
-        {
-          req: { oauthReqInfo },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      formData.append("state", signedState);
+      formData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
       const request = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: formData,
