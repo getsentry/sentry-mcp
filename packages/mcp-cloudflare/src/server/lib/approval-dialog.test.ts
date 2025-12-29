@@ -21,11 +21,10 @@ describe("approval-dialog", () => {
         method: "GET",
       });
 
-      const response = await renderApprovalDialog(mockRequest, {
+      const response = renderApprovalDialog(mockRequest, {
         client: mockClient,
         server: { name: "Test Server" },
         state: { oauthReqInfo: { clientId: "test-client" } },
-        cookieSecret: TEST_SECRET,
       });
       const html = await response.text();
 
@@ -48,7 +47,6 @@ describe("approval-dialog", () => {
         },
         server: { name: "Test Server" },
         state: { test: "data" },
-        cookieSecret: TEST_SECRET,
       });
       const html = await response.text();
 
