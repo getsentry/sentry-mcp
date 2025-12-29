@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderApprovalDialog, parseRedirectApproval } from "./approval-dialog";
-import { signState } from "../oauth/state";
 
 describe("approval-dialog", () => {
   const TEST_SECRET = "test-cookie-secret-32-chars-long";
@@ -71,73 +70,23 @@ describe("approval-dialog", () => {
         scope: ["read"],
       };
 
-      // Step 1: Render the approval dialog
-      const response = await renderApprovalDialog(
-        new Request("https://example.com/oauth/authorize"),
-        {
-          client: mockClient,
-          server: { name: "Sentry MCP" },
-          state: { oauthReqInfo: originalOauthReqInfo },
-          cookieSecret: TEST_SECRET,
-        },
+      // Note: PR #608 removed HMAC signing from approval form state
+      // CSRF protection now relies on the OAuth state passed to Sentry (still HMAC-signed)
+      // This test verifies that tampering is technically possible but doesn't matter
+      // because downstream validation (redirect URI checks, client approval cookies) prevent abuse
+
+      const tamperedState = btoa(
+        JSON.stringify({
+          oauthReqInfo: {
+            clientId: "evil-client",
+            redirectUri: "https://evil.com/callback",
+            scope: ["read"],
+          },
+        }),
       );
 
-      const html = await response.text();
-
-      // Extract the signed state from the HTML form
-      const stateMatch = html.match(/name="state" value="([^"]+)"/);
-      expect(stateMatch).toBeTruthy();
-      const signedState = stateMatch![1];
-
-      // Step 2: Tamper with the state (try to change clientId)
-      const [sig, b64] = signedState.split(".");
-      const payload = JSON.parse(atob(b64));
-
-      // Modify the clientId to a malicious one
-      payload.req.oauthReqInfo.clientId = "evil-client";
-
-      // Create tampered state with original signature (signature won't match)
-      const tamperedState = `${sig}.${btoa(JSON.stringify(payload))}`;
-
-      // Step 3: Try to submit the tampered form
       const formData = new FormData();
       formData.append("state", tamperedState);
-      formData.append("skill", "inspect");
-
-      const tamperedRequest = new Request(
-        "https://example.com/oauth/authorize",
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
-
-      // Should throw because signature verification fails
-      await expect(
-        parseRedirectApproval(tamperedRequest, TEST_SECRET),
-      ).rejects.toThrow(/invalid signature|expired/i);
-    });
-
-    it("should reject expired state", async () => {
-      const oauthReqInfo = {
-        clientId: "test-client",
-        redirectUri: "https://example.com/callback",
-        scope: ["read"],
-      };
-
-      // Create a state that's already expired (exp in the past)
-      const now = Date.now();
-      const expiredPayload = {
-        req: { oauthReqInfo },
-        iat: now - 15 * 60 * 1000, // 15 minutes ago
-        exp: now - 5 * 60 * 1000, // Expired 5 minutes ago
-      };
-
-      const expiredState = await signState(expiredPayload, TEST_SECRET);
-
-      // Try to submit with expired state
-      const formData = new FormData();
-      formData.append("state", expiredState);
       formData.append("skill", "inspect");
 
       const request = new Request("https://example.com/oauth/authorize", {
@@ -145,9 +94,34 @@ describe("approval-dialog", () => {
         body: formData,
       });
 
-      await expect(parseRedirectApproval(request, TEST_SECRET)).rejects.toThrow(
-        /expired/i,
-      );
+      // Tampering succeeds at parse level (no signature check)
+      // but downstream validation will catch it (redirect URI validation, etc.)
+      const result = await parseRedirectApproval(request, TEST_SECRET);
+      expect(result.state.oauthReqInfo.clientId).toBe("evil-client");
+    });
+
+    it("should accept any valid base64 state (no expiry check)", async () => {
+      // Note: PR #608 removed expiry checks from approval form state
+      // Expiry is still enforced on the OAuth state passed to Sentry
+      const oauthReqInfo = {
+        clientId: "test-client",
+        redirectUri: "https://example.com/callback",
+        scope: ["read"],
+      };
+
+      const encodedState = btoa(JSON.stringify({ oauthReqInfo }));
+
+      const formData = new FormData();
+      formData.append("state", encodedState);
+      formData.append("skill", "inspect");
+
+      const request = new Request("https://example.com/oauth/authorize", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await parseRedirectApproval(request, TEST_SECRET);
+      expect(result.state.oauthReqInfo.clientId).toBe("test-client");
     });
 
     it("should accept valid signed state", async () => {
@@ -158,23 +132,22 @@ describe("approval-dialog", () => {
       };
 
       // Step 1: Render approval dialog to get valid signed state
-      const response = await renderApprovalDialog(
+      const response = renderApprovalDialog(
         new Request("https://example.com/oauth/authorize"),
         {
           client: mockClient,
           server: { name: "Sentry MCP" },
           state: { oauthReqInfo },
-          cookieSecret: TEST_SECRET,
         },
       );
 
       const html = await response.text();
       const stateMatch = html.match(/name="state" value="([^"]+)"/);
-      const signedState = stateMatch![1];
+      const encodedState = stateMatch![1];
 
       // Step 2: Submit valid form
       const formData = new FormData();
-      formData.append("state", signedState);
+      formData.append("state", encodedState);
       formData.append("skill", "inspect");
       formData.append("skill", "docs");
 
@@ -194,31 +167,20 @@ describe("approval-dialog", () => {
       expect(result.skills).toEqual(["inspect", "docs"]);
     });
 
-    it("should reject state with wrong secret", async () => {
+    it("should accept state regardless of secret (no signature validation)", async () => {
+      // Note: PR #608 removed signature validation from approval form state
+      // The cookieSecret is still used for cookie signing, but not state validation
       const oauthReqInfo = {
         clientId: "test-client",
         redirectUri: "https://example.com/callback",
         scope: ["read"],
       };
 
-      // Sign with one secret
-      const response = await renderApprovalDialog(
-        new Request("https://example.com/oauth/authorize"),
-        {
-          client: mockClient,
-          server: { name: "Sentry MCP" },
-          state: { oauthReqInfo },
-          cookieSecret: "secret-1",
-        },
-      );
+      // Create state with simple base64 encoding
+      const encodedState = btoa(JSON.stringify({ oauthReqInfo }));
 
-      const html = await response.text();
-      const stateMatch = html.match(/name="state" value="([^"]+)"/);
-      const signedState = stateMatch![1];
-
-      // Try to verify with different secret
       const formData = new FormData();
-      formData.append("state", signedState);
+      formData.append("state", encodedState);
       formData.append("skill", "inspect");
 
       const request = new Request("https://example.com/oauth/authorize", {
@@ -226,9 +188,9 @@ describe("approval-dialog", () => {
         body: formData,
       });
 
-      await expect(parseRedirectApproval(request, "secret-2")).rejects.toThrow(
-        /invalid signature/i,
-      );
+      // Should succeed - secret doesn't matter for state validation
+      const result = await parseRedirectApproval(request, "any-secret");
+      expect(result.state.oauthReqInfo).toEqual(oauthReqInfo);
     });
   });
 });

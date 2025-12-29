@@ -303,6 +303,20 @@ export function renderApprovalDialog(
       ? client.redirectUris.map((uri) => sanitizeHtml(uri))
       : [];
 
+  // Generate redirect URI warnings
+  const redirectWarningsHtml = redirectUris
+    .map((uri) => {
+      return `
+        <div class="redirect-warning">
+          <div class="redirect-uri-display">${uri}</div>
+          <div class="redirect-warning-text">
+            After approval, you will be redirected to this URL. Only approve if you recognize and trust this destination.
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
   // Generate HTML for the approval dialog
   const htmlContent = `
     <!DOCTYPE html>
@@ -649,6 +663,38 @@ export function renderApprovalDialog(
             line-height: 1.6;
           }
 
+          /* Redirect URI warning styles */
+          .redirect-warning {
+            padding: var(--space-md);
+            border-radius: var(--radius-md);
+            background: rgba(251, 191, 36, 0.08);
+            border: 1px solid oklch(0.75 0.15 85);
+            border-left: 4px solid oklch(0.75 0.15 85);
+          }
+
+          .redirect-warning:not(:last-child) {
+            margin-bottom: var(--space-md);
+          }
+
+          .redirect-uri-display {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            word-break: break-all;
+            padding: var(--space-sm);
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--space-sm);
+          }
+
+          .redirect-warning-text {
+            font-size: 0.9375rem;
+            color: oklch(0.85 0.12 85);
+            line-height: 1.5;
+            font-weight: 500;
+          }
+
           /* Large screens and up: Two-column layout */
           @media (min-width: 1024px) {
             .approval-grid {
@@ -715,6 +761,17 @@ export function renderApprovalDialog(
 
             <p class="alert"><strong>${clientName || "A new MCP Client"}</strong> is requesting access</p>
 
+            ${
+              redirectUris.length > 0
+                ? `
+            <div style="margin-bottom: var(--space-xl);">
+              <h2 class="section-header" style="margin-bottom: var(--space-md);">Redirect Destination</h2>
+              ${redirectWarningsHtml}
+            </div>
+            `
+                : ""
+            }
+
             <form method="post" action="${new URL(request.url).pathname}" aria-label="Authorization form">
               <input type="hidden" name="state" value="${encodedState}">
 
@@ -779,19 +836,6 @@ export function renderApprovalDialog(
                           <a href="${tosUri}" target="_blank" rel="noopener noreferrer">
                             ${tosUri}
                           </a>
-                        </div>
-                      </div>
-                    `
-                        : ""
-                    }
-
-                    ${
-                      redirectUris.length > 0
-                        ? `
-                      <div class="client-detail">
-                        <div class="detail-label">Redirect URIs:</div>
-                        <div class="detail-value small">
-                          ${redirectUris.map((uri) => `<div>${uri}</div>`).join("")}
                         </div>
                       </div>
                     `
