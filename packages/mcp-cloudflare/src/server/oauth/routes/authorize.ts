@@ -95,11 +95,13 @@ export default new Hono<{ Bindings: Env }>()
         },
       });
 
-      const redirectUri = requestUrl.searchParams.get("redirect_uri");
-      const state = requestUrl.searchParams.get("state");
-
-      if (redirectUri) {
-        return createResourceValidationError(redirectUri, state ?? undefined);
+      // Use validated redirect_uri from oauthReqInfo (already validated by parseAuthRequest)
+      // instead of raw query param to prevent open redirects
+      if (oauthReqInfo.redirectUri) {
+        return createResourceValidationError(
+          oauthReqInfo.redirectUri,
+          oauthReqInfo.state ?? undefined,
+        );
       }
 
       return c.text("Invalid resource parameter", 400);
