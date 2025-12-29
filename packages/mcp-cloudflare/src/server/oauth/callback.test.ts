@@ -110,18 +110,21 @@ describe("oauth callback routes", () => {
       });
 
       const approvalFormData = new FormData();
-      approvalFormData.append(
-        "state",
-        btoa(
-          JSON.stringify({
+      const approvalState = await signState(
+        {
+          req: {
             oauthReqInfo: {
               clientId: "different-client",
               redirectUri: "https://example.com/callback",
               scope: ["read"],
             },
-          }),
-        ),
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
       );
+      approvalFormData.append("state", approvalState);
       const approvalRequest = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: approvalFormData,
@@ -175,7 +178,15 @@ describe("oauth callback routes", () => {
         scope: ["read"],
       };
       const approvalFormData = new FormData();
-      approvalFormData.append("state", btoa(JSON.stringify({ oauthReqInfo })));
+      const approvalState = await signState(
+        {
+          req: { oauthReqInfo },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      approvalFormData.append("state", approvalState);
       const approvalRequest = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: approvalFormData,
@@ -220,18 +231,21 @@ describe("oauth callback routes", () => {
 
       // Submit approval to get approval cookie
       const approvalFormData = new FormData();
-      approvalFormData.append(
-        "state",
-        btoa(
-          JSON.stringify({
+      const approvalState = await signState(
+        {
+          req: {
             oauthReqInfo: {
               clientId: "test-client",
               redirectUri: "https://example.com/callback",
               scope: ["read"],
             },
-          }),
-        ),
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
       );
+      approvalFormData.append("state", approvalState);
       const approvalRequest = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: approvalFormData,
@@ -285,19 +299,22 @@ describe("oauth callback routes", () => {
 
       // Submit approval to get approval cookie
       const approvalFormData = new FormData();
-      approvalFormData.append(
-        "state",
-        btoa(
-          JSON.stringify({
+      const approvalState = await signState(
+        {
+          req: {
             oauthReqInfo: {
               clientId: "test-client",
               redirectUri: "https://example.com/callback",
               scope: ["read"],
               resource: "http://localhost/mcp",
             },
-          }),
-        ),
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
       );
+      approvalFormData.append("state", approvalState);
       const approvalRequest = new Request("http://localhost/oauth/authorize", {
         method: "POST",
         body: approvalFormData,
@@ -362,19 +379,22 @@ describe("oauth callback routes", () => {
 
       // First approve a valid client to get the cookie
       const validApprovalFormData = new FormData();
-      validApprovalFormData.append(
-        "state",
-        btoa(
-          JSON.stringify({
+      const validApprovalState = await signState(
+        {
+          req: {
             oauthReqInfo: {
               clientId: "test-client",
               redirectUri: "https://example.com/callback",
               scope: ["read"],
               // No resource parameter for the approval
             },
-          }),
-        ),
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
       );
+      validApprovalFormData.append("state", validApprovalState);
       const validApprovalRequest = new Request(
         "http://localhost/oauth/authorize",
         {
@@ -430,19 +450,22 @@ describe("oauth callback routes", () => {
 
       // First approve a valid client to get the cookie
       const validApprovalFormData = new FormData();
-      validApprovalFormData.append(
-        "state",
-        btoa(
-          JSON.stringify({
+      const validApprovalState = await signState(
+        {
+          req: {
             oauthReqInfo: {
               clientId: "test-client",
               redirectUri: "https://example.com/callback",
               scope: ["read"],
               // No resource parameter for the approval
             },
-          }),
-        ),
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
       );
+      validApprovalFormData.append("state", validApprovalState);
       const validApprovalRequest = new Request(
         "http://localhost/oauth/authorize",
         {

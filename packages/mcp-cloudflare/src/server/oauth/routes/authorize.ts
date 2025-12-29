@@ -128,12 +128,13 @@ export default new Hono<{ Bindings: Env }>()
     //   return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
     // }
 
-    return renderApprovalDialog(c.req.raw, {
+    return await renderApprovalDialog(c.req.raw, {
       client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
       server: {
         name: "Sentry MCP",
       },
       state: { oauthReqInfo: oauthReqInfoWithResource },
+      cookieSecret: c.env.COOKIE_SECRET,
     });
   })
 
