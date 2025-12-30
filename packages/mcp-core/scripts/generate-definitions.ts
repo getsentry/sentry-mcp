@@ -68,6 +68,12 @@ function generateToolDefinitions() {
       description: string;
       inputSchema: Record<string, ZodTypeAny>;
       requiredScopes: string[]; // must exist on all tools (can be empty)
+      annotations?: {
+        readOnlyHint?: boolean;
+        destructiveHint?: boolean;
+        idempotentHint?: boolean;
+        openWorldHint?: boolean;
+      };
     };
     if (!Array.isArray(t.requiredScopes)) {
       throw new Error(`Tool '${t.name}' is missing requiredScopes array`);
@@ -80,6 +86,8 @@ function generateToolDefinitions() {
       inputSchema: jsonSchema,
       // Preserve tool access requirements for UIs/docs
       requiredScopes: t.requiredScopes,
+      // Export MCP tool annotations for clients
+      ...(t.annotations && { annotations: t.annotations }),
     };
   });
   return defs.sort(byName);
