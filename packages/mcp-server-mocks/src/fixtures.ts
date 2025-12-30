@@ -48,6 +48,9 @@ import cspIssueFixtureJson from "./fixtures/csp-issue.json" with {
 import cspEventFixtureJson from "./fixtures/csp-event.json" with {
   type: "json",
 };
+import feedbackIssueFixtureJson from "./fixtures/feedback-issue.json" with {
+  type: "json",
+};
 
 // Type helper for deep partial overrides
 type DeepPartial<T> = T extends object
@@ -66,6 +69,7 @@ const unsupportedIssueFixture = unsupportedIssueFixtureJson as any;
 const performanceEventFixture = performanceEventFixtureJson as any;
 const cspIssueFixture = cspIssueFixtureJson as any;
 const cspEventFixture = cspEventFixtureJson as any;
+const feedbackIssueFixture = feedbackIssueFixtureJson as any;
 
 /**
  * Deep merge helper that recursively merges objects.
@@ -313,4 +317,28 @@ export function createCspEvent(
   overrides: DeepPartial<typeof cspEventFixture> = {},
 ): typeof cspEventFixture {
   return deepMerge(JSON.parse(JSON.stringify(cspEventFixture)), overrides);
+}
+
+/**
+ * Create a FeedbackIssue with optional overrides.
+ * Represents a user feedback submission from the User Feedback Widget.
+ *
+ * @param overrides - Partial issue properties to override
+ * @returns A complete FeedbackIssue object
+ *
+ * @example
+ * ```typescript
+ * const issue = createFeedbackIssue({
+ *   shortId: "PROJ-FEEDBACK-001",
+ *   title: "User Feedback: Can't login",
+ *   metadata: {
+ *     value: "Login button is not responding"
+ *   }
+ * });
+ * ```
+ */
+export function createFeedbackIssue(
+  overrides: DeepPartial<typeof feedbackIssueFixture> = {},
+): typeof feedbackIssueFixture {
+  return deepMerge(JSON.parse(JSON.stringify(feedbackIssueFixture)), overrides);
 }
