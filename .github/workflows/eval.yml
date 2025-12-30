@@ -64,7 +64,9 @@ jobs:
 
       - name: Create eval status check
         uses: actions/github-script@v7
-        if: ${{ !cancelled() }}
+        # Skip for fork PRs (no write permissions) but still run for pushes and same-repo PRs
+        if: ${{ !cancelled() && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        continue-on-error: true # Don't fail workflow if check creation fails
         with:
           script: |
             const fs = require('fs');
