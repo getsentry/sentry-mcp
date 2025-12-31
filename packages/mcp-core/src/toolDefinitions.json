@@ -39,7 +39,12 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": []
+    "requiredScopes": [],
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
+    }
   },
   {
     "name": "create_dsn",
@@ -77,7 +82,12 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["project:write"]
+    "requiredScopes": ["project:write"],
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
+    }
   },
   {
     "name": "create_project",
@@ -128,7 +138,12 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["project:write", "team:read"]
+    "requiredScopes": ["project:write", "team:read"],
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
+    }
   },
   {
     "name": "create_team",
@@ -162,7 +177,12 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["team:write"]
+    "requiredScopes": ["team:write"],
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
+    }
   },
   {
     "name": "find_dsns",
@@ -196,7 +216,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["project:read"]
+    "requiredScopes": ["project:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "find_organizations",
@@ -221,7 +245,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["org:read"]
+    "requiredScopes": ["org:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "find_projects",
@@ -264,7 +292,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["project:read"]
+    "requiredScopes": ["project:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "find_releases",
@@ -320,7 +352,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["project:read"]
+    "requiredScopes": ["project:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "find_teams",
@@ -363,7 +399,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["team:read"]
+    "requiredScopes": ["team:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "get_doc",
@@ -380,7 +420,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": []
+    "requiredScopes": [],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "get_event_attachment",
@@ -431,7 +475,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["event:read"]
+    "requiredScopes": ["event:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "get_issue_details",
@@ -473,7 +521,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["event:read"]
+    "requiredScopes": ["event:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "get_trace_details",
@@ -508,7 +560,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["event:read"]
+    "requiredScopes": ["event:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "search_docs",
@@ -675,7 +731,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": []
+    "requiredScopes": [],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "search_events",
@@ -735,7 +795,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["event:read"]
+    "requiredScopes": ["event:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "search_issue_events",
@@ -813,7 +877,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["event:read"]
+    "requiredScopes": ["event:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "search_issues",
@@ -872,7 +940,11 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["event:read"]
+    "requiredScopes": ["event:read"],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "update_issue",
@@ -924,7 +996,13 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["event:write"]
+    "requiredScopes": ["event:write"],
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "update_project",
@@ -1010,7 +1088,13 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["project:write"]
+    "requiredScopes": ["project:write"],
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "use_sentry",
@@ -1033,12 +1117,20 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": []
+    "requiredScopes": [],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   },
   {
     "name": "whoami",
     "description": "Identify the authenticated user in Sentry.\n\nUse this tool when you need to:\n- Get the user's name and email address.",
     "inputSchema": {},
-    "requiredScopes": []
+    "requiredScopes": [],
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": true
+    }
   }
 ]
