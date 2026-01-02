@@ -170,11 +170,11 @@ describe("approval-dialog", () => {
 
       const html = await response.text();
       const stateMatch = html.match(/name="state" value="([^"]+)"/);
-      const signedState = stateMatch![1];
+      const encodedState = stateMatch![1];
 
       // Step 2: Submit valid form
       const formData = new FormData();
-      formData.append("state", signedState);
+      formData.append("state", encodedState);
       formData.append("skill", "inspect");
       formData.append("skill", "docs");
 
