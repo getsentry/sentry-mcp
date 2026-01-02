@@ -296,7 +296,6 @@ export async function renderApprovalDialog(
   const encodedState = await encodeState(state, cookieSecret);
 
   // Sanitize any untrusted content
-  const serverName = sanitizeHtml(server.name);
   const clientName = client?.clientName
     ? sanitizeHtml(client.clientName)
     : "Unknown MCP Client";
@@ -434,27 +433,10 @@ export async function renderApprovalDialog(
             border: 1px solid var(--border-default);
           }
 
-          .header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--space-md);
-            margin-bottom: var(--space-sm);
-          }
-
           .logo {
             width: 40px;
             height: 40px;
             color: var(--purple-light);
-            flex-shrink: 0;
-          }
-
-          .title {
-            margin: 0;
-            font-size: 1.75rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            letter-spacing: -0.02em;
           }
 
           .alert {
@@ -466,30 +448,10 @@ export async function renderApprovalDialog(
             line-height: 1.4;
           }
 
-          .client-info {
-            background: rgba(0, 0, 0, 0.25);
-            padding: var(--space-md);
-            gap: var(--space-md);
-            display: flex;
-            flex-direction: column;
-          }
-
-          .detail-label {
-            font-weight: 500;
-            color: var(--text-tertiary);
-            font-size: 0.875rem;
-            margin-bottom: var(--space-xs);
-          }
-
-          .detail-value {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            word-break: break-all;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-          }
-
-          .detail-value.small {
+          .policy-links {
             font-size: 0.8125rem;
+            color: var(--text-tertiary);
+            margin: var(--space-md) 0;
           }
 
           .actions {
@@ -559,15 +521,6 @@ export async function renderApprovalDialog(
             background: rgba(255, 255, 255, 0.05);
           }
 
-          /* Section header (for Client, Skills, etc.) */
-          .section-header {
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            letter-spacing: -0.01em;
-            margin: 0;
-          }
-
           /* Permission items */
           .permission-item {
             display: flex;
@@ -605,12 +558,13 @@ export async function renderApprovalDialog(
             cursor: pointer;
             line-height: 1;
             user-select: none;
+            width: 1.5rem;
+            text-align: center;
           }
 
           /* Checkbox states */
           .permission-item input[type="checkbox"]:checked + .permission-checkbox {
             color: var(--purple-primary);
-            transform: scale(1.1);
           }
 
           .permission-item input[type="checkbox"]:checked + .permission-checkbox::before {
@@ -677,11 +631,6 @@ export async function renderApprovalDialog(
             gap: var(--space-md);
           }
 
-          .authorization-text {
-            color: var(--text-secondary);
-            line-height: 1.6;
-          }
-
           /* Redirect URI warning styles */
           .redirect-warning {
             padding: var(--space-md);
@@ -697,7 +646,7 @@ export async function renderApprovalDialog(
 
           .redirect-uri-display {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            font-size: 1rem;
+            font-size: 0.875rem;
             font-weight: 600;
             color: var(--text-primary);
             word-break: break-all;
@@ -738,10 +687,6 @@ export async function renderApprovalDialog(
               border-radius: var(--radius-md);
             }
 
-            .title {
-              font-size: 1.5rem;
-            }
-
             .alert {
               font-size: 1.125rem;
             }
@@ -770,26 +715,12 @@ export async function renderApprovalDialog(
       <body>
         <div class="container">
           <header class="precard">
-            <div class="header">
-              <svg class="logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M17.48 1.996c.45.26.823.633 1.082 1.083l13.043 22.622a2.962 2.962 0 0 1-2.562 4.44h-3.062c.043-.823.039-1.647 0-2.472h3.052a.488.488 0 0 0 .43-.734L16.418 4.315a.489.489 0 0 0-.845 0L12.582 9.51a23.16 23.16 0 0 1 7.703 8.362 23.19 23.19 0 0 1 2.8 11.024v1.234h-7.882v-1.236a15.284 15.284 0 0 0-6.571-12.543l-1.48 2.567a12.301 12.301 0 0 1 5.105 9.987v1.233h-9.3a2.954 2.954 0 0 1-2.56-1.48A2.963 2.963 0 0 1 .395 25.7l1.864-3.26a6.854 6.854 0 0 1 2.15 1.23l-1.883 3.266a.49.49 0 0 0 .43.734h6.758a9.985 9.985 0 0 0-4.83-7.272l-1.075-.618 3.927-6.835 1.075.615a17.728 17.728 0 0 1 6.164 5.956 17.752 17.752 0 0 1 2.653 8.154h2.959a20.714 20.714 0 0 0-3.05-9.627 20.686 20.686 0 0 0-7.236-7.036l-1.075-.618 4.215-7.309a2.958 2.958 0 0 1 4.038-1.083Z" fill="currentColor"></path></svg>
-              <h1 class="title">${serverName}</h1>
-            </div>
+            <svg class="logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M17.48 1.996c.45.26.823.633 1.082 1.083l13.043 22.622a2.962 2.962 0 0 1-2.562 4.44h-3.062c.043-.823.039-1.647 0-2.472h3.052a.488.488 0 0 0 .43-.734L16.418 4.315a.489.489 0 0 0-.845 0L12.582 9.51a23.16 23.16 0 0 1 7.703 8.362 23.19 23.19 0 0 1 2.8 11.024v1.234h-7.882v-1.236a15.284 15.284 0 0 0-6.571-12.543l-1.48 2.567a12.301 12.301 0 0 1 5.105 9.987v1.233h-9.3a2.954 2.954 0 0 1-2.56-1.48A2.963 2.963 0 0 1 .395 25.7l1.864-3.26a6.854 6.854 0 0 1 2.15 1.23l-1.883 3.266a.49.49 0 0 0 .43.734h6.758a9.985 9.985 0 0 0-4.83-7.272l-1.075-.618 3.927-6.835 1.075.615a17.728 17.728 0 0 1 6.164 5.956 17.752 17.752 0 0 1 2.653 8.154h2.959a20.714 20.714 0 0 0-3.05-9.627 20.686 20.686 0 0 0-7.236-7.036l-1.075-.618 4.215-7.309a2.958 2.958 0 0 1 4.038-1.083Z" fill="currentColor"></path></svg>
           </header>
 
           <main class="card">
 
-            <p class="alert"><strong>${clientName || "A new MCP Client"}</strong> is requesting access</p>
-
-            ${
-              redirectUris.length > 0
-                ? `
-            <div style="margin-bottom: var(--space-xl);">
-              <h2 class="section-header" style="margin-bottom: var(--space-md);">Redirect Destination</h2>
-              ${redirectWarningsHtml}
-            </div>
-            `
-                : ""
-            }
+            <p class="alert"><strong>${clientUri ? `<a href="${clientUri}" target="_blank" rel="noopener noreferrer">${clientName}</a>` : clientName}</strong> is requesting access to Sentry</p>
 
             <form method="post" action="${new URL(request.url).pathname}" aria-label="Authorization form">
               <input type="hidden" name="state" value="${encodedState}">
@@ -797,83 +728,28 @@ export async function renderApprovalDialog(
               <div class="approval-grid">
                 <!-- Left column: Skills selection -->
                 <div class="approval-column">
-                  <h2 class="section-header" id="skills-heading">Skills</h2>
-                  <section class="permission-section" aria-labelledby="skills-heading">
+                  <section class="permission-section">
                     <div role="group" aria-label="Select skills to grant access">
                       ${skillsHtml}
                     </div>
                   </section>
                 </div>
 
-                <!-- Right column: Client info and actions -->
+                <!-- Right column: Actions -->
                 <div class="approval-column">
-                  <h2 class="section-header">Client</h2>
-                  <section class="client-info" aria-label="Client Information">
-                    <div class="client-detail">
-                      <div class="detail-label">Name:</div>
-                      <div class="detail-value">
-                        ${clientName}
-                      </div>
-                    </div>
+                  ${redirectWarningsHtml}
 
-                    ${
-                      clientUri
-                        ? `
-                      <div class="client-detail">
-                        <div class="detail-label">Website:</div>
-                        <div class="detail-value small">
-                          <a href="${clientUri}" target="_blank" rel="noopener noreferrer">
-                            ${clientUri}
-                          </a>
-                        </div>
-                      </div>
-                    `
-                        : ""
-                    }
-
-                    ${
-                      policyUri
-                        ? `
-                      <div class="client-detail">
-                        <div class="detail-label">Privacy Policy:</div>
-                        <div class="detail-value">
-                          <a href="${policyUri}" target="_blank" rel="noopener noreferrer">
-                            ${policyUri}
-                          </a>
-                        </div>
-                      </div>
-                    `
-                        : ""
-                    }
-
-                    ${
-                      tosUri
-                        ? `
-                      <div class="client-detail">
-                        <div class="detail-label">Terms of Service:</div>
-                        <div class="detail-value">
-                          <a href="${tosUri}" target="_blank" rel="noopener noreferrer">
-                            ${tosUri}
-                          </a>
-                        </div>
-                      </div>
-                    `
-                        : ""
-                    }
-
-                    ${
-                      contacts
-                        ? `
-                      <div class="client-detail">
-                        <div class="detail-label">Contact:</div>
-                        <div class="detail-value">${contacts}</div>
-                      </div>
-                    `
-                        : ""
-                    }
-                  </section>
-
-                  <p class="authorization-text">This MCP Client is requesting authorization to Sentry. If you approve, you will be redirected to complete authentication.</p>
+                  ${
+                    policyUri || tosUri
+                      ? `<p class="policy-links">By approving, you agree to ${clientName}'s ${
+                          policyUri && tosUri
+                            ? `<a href="${policyUri}" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and <a href="${tosUri}" target="_blank" rel="noopener noreferrer">Terms of Service</a>`
+                            : policyUri
+                              ? `<a href="${policyUri}" target="_blank" rel="noopener noreferrer">Privacy Policy</a>`
+                              : `<a href="${tosUri}" target="_blank" rel="noopener noreferrer">Terms of Service</a>`
+                        }.</p>`
+                      : ""
+                  }
 
                   <div class="actions">
                     <button type="button" class="button button-secondary" onclick="window.history.back()" aria-label="Cancel authorization">Cancel</button>
