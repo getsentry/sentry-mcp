@@ -1,0 +1,35 @@
+{
+  "name": "sentry-mcp-http-oauth",
+  "version": "1.0.0",
+  "description": "Sentry MCP Server with HTTP Streamable Transport and OAuth 2.1",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.3.22",
+    "@logtape/logtape": "^1.1.1",
+    "@logtape/sentry": "^1.1.1",
+    "@modelcontextprotocol/sdk": "^1.21.0",
+    "@sentry/core": "10.32.0",
+    "ai": "^4.3.16",
+    "dotenv": "^16.6.1",
+    "fastmcp": "^3.26.7",
+    "ioredis": "^5.4.1",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.33",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "zod": "^3.25.67"
+    }
+  }
+}

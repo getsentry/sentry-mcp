@@ -1,0 +1,24 @@
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+
+# Custom CA certificates (user-provided)
+custom-cas/*
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

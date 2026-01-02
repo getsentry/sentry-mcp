@@ -1,0 +1,97 @@
+services:
+  # Sentry MCP Server
+  sentry-mcp:
+    build:
+      context: ..
+      dockerfile: fastmcp-http-oauth/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      BASE_URL: "${BASE_URL:-http://localhost:3000}"
+
+      # Sentry OAuth configuration
+      SENTRY_HOST: "${SENTRY_HOST}"
+      SENTRY_CLIENT_ID: "${SENTRY_CLIENT_ID}"
+      SENTRY_CLIENT_SECRET: "${SENTRY_CLIENT_SECRET}"
+
+      # Redis/Valkey connection
+      REDIS_URL: "${REDIS_URL:-redis://valkey:6379}"
+      REDIS_TLS: "${REDIS_TLS:-false}"
+      REDIS_TLS_REJECT_UNAUTHORIZED: "${REDIS_TLS_REJECT_UNAUTHORIZED:-true}"
+
+      # Security keys (generate with: openssl rand -base64 32)
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
+      JWT_SIGNING_KEY: "${JWT_SIGNING_KEY}"
+
+      # AI-Powered Tools (Optional)
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-}"
+
+      # Documentation Tools (Optional)
+      MCP_URL: "${MCP_URL:-https://mcp.sentry.dev}"
+
+      # Logging (set to "debug" for verbose output)
+      LOG_LEVEL: "${LOG_LEVEL:-}"
+    depends_on:
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Valkey (Redis-compatible) for token storage
+  # For TLS-enabled Valkey, see valkey-tls service below
+  valkey:
+    image: valkey/valkey:8-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    command: ["valkey-server", "--save", "60", "1", "--loglevel", "warning"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Valkey with TLS enabled (alternative to plain valkey)
+  # Uncomment this and comment out the valkey service above to use TLS
+  # valkey-tls:
+  #   image: valkey/valkey:8-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - valkey_data:/data
+  #     - ./certs:/certs:ro  # Mount TLS certificates
+  #   command:
+  #     - valkey-server
+  #     - --save
+  #     - "60"
+  #     - "1"
+  #     - --loglevel
+  #     - warning
+  #     - --tls-port
+  #     - "6379"
+  #     - --port
+  #     - "0"
+  #     - --tls-cert-file
+  #     - /certs/server.crt
+  #     - --tls-key-file
+  #     - /certs/server.key
+  #     - --tls-ca-cert-file
+  #     - /certs/ca.crt
+  #   healthcheck:
+  #     test: ["CMD", "valkey-cli", "--tls", "--cert", "/certs/server.crt", "--key", "/certs/server.key", "--cacert", "/certs/ca.crt", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
+
+volumes:
+  valkey_data:
