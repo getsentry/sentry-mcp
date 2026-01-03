@@ -43,7 +43,6 @@
   "dependencies": {
     "@biomejs/biome": "catalog:",
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
     "dotenv": "catalog:",
     "dotenv-cli": "catalog:",
     "lint-staged": "catalog:",
