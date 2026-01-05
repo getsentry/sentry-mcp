@@ -473,16 +473,32 @@ async function createServer(config: ServerConfig) {
       }
 
       // Parse JWT claims for user info (basic decode, already verified by loadUpstreamTokens)
-      const [, payloadB64] = token.split(".");
-      const payload = JSON.parse(
-        Buffer.from(payloadB64, "base64url").toString(),
-      );
+      let payload: { sub?: string; client_id?: string };
+      try {
+        const parts = token.split(".");
+        if (parts.length < 2 || !parts[1]) {
+          throw new Error("Token missing payload segment");
+        }
+        payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+      } catch (err) {
+        throw new Error(
+          `Failed to parse token payload: ${err instanceof Error ? err.message : "invalid format"}`,
+        );
+      }
+
+      // Normalize scopes to array (OAuth 2.0/2.1 may return space-separated string)
+      const rawScope = upstreamTokens.scope as string | string[] | undefined;
+      const scopes = Array.isArray(rawScope)
+        ? rawScope
+        : typeof rawScope === "string"
+          ? rawScope.split(" ").filter(Boolean)
+          : [];
 
       return {
         accessToken: upstreamTokens.accessToken,
         userId: payload.sub,
-        clientId: payload.client_id,
-        scopes: upstreamTokens.scope,
+        clientId: payload.client_id ?? "unknown",
+        scopes,
         sentryHost: config.sentryHost,
       };
     },
