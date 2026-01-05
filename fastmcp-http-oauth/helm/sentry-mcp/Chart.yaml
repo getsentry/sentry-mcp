@@ -1,0 +1,13 @@
+apiVersion: v2
+name: sentry-mcp
+description: Sentry MCP Server with HTTP Streamable Transport and OAuth 2.1
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - sentry
+  - mcp
+  - model-context-protocol
+  - oauth
+maintainers:
+  - name: Sentry MCP Team

@@ -1,0 +1,194 @@
+# Default values for sentry-mcp
+# This is a YAML-formatted file.
+
+replicaCount: 2
+
+image:
+  repository: sentry-mcp
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext:
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: sentry-mcp.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: sentry-mcp-tls
+  #    hosts:
+  #      - sentry-mcp.local
+
+resources: {}
+  #limits:
+  #  cpu: 500m
+  #  memory: 512Mi
+  #requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  # minAvailable: 1
+  maxUnavailable: 1
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# =============================================================================
+# Configuration (non-secret values)
+# =============================================================================
+# You can either:
+# 1. Set values directly here (a ConfigMap will be created)
+# 2. Use an existing ConfigMap by setting existingConfigMap
+# =============================================================================
+
+# Use an existing ConfigMap instead of creating one
+# If set, the config section below is ignored
+existingConfigMap: ""
+
+config:
+  # Server configuration
+  port: "3000"
+  host: "0.0.0.0"
+  baseUrl: ""  # Required: e.g., "https://mcp.example.com"
+
+  # Sentry configuration
+  sentryHost: ""  # Required: e.g., "sentry.io" or your self-hosted instance
+
+  # Sentry OAuth Client ID (not secret, but paired with secret client_secret)
+  sentryClientId: ""  # Required
+
+  # Sentry OAuth scopes (comma-separated)
+  # Default: org:read,project:read,project:write,team:read,team:write,event:write
+  sentryScopes: ""
+
+  # Redis/Valkey configuration
+  redisUrl: "redis://valkey:6379"
+  redisTls: "false"
+  redisTlsRejectUnauthorized: "true"
+
+  # OpenAI configuration (optional)
+  openaiBaseUrl: ""
+
+  # MCP documentation URL
+  mcpUrl: "https://mcp.sentry.dev"
+
+  # Logging level (debug, info, warn, error)
+  logLevel: ""
+
+  # Allowed redirect URI patterns (comma-separated)
+  # Default: * (allow all)
+  allowedRedirectUriPatterns: ""
+
+# =============================================================================
+# Secrets
+# =============================================================================
+# You can either:
+# 1. Set values directly here (a Secret will be created) - NOT RECOMMENDED FOR PROD
+# 2. Use an existing Secret by setting existingSecret
+# =============================================================================
+
+# Use an existing Secret instead of creating one
+# The secret must contain the following keys:
+#   - SENTRY_CLIENT_SECRET
+#   - ENCRYPTION_KEY
+#   - JWT_SIGNING_KEY
+#   - OPENAI_API_KEY (optional)
+existingSecret: ""
+
+# Secret values (only used if existingSecret is not set)
+# WARNING: Setting secrets in values.yaml is not recommended for production
+# Use existingSecret instead
+secrets:
+  # Sentry OAuth client secret (required)
+  sentryClientSecret: ""
+
+  # Encryption key for token storage (required)
+  # Generate with: openssl rand -base64 32
+  encryptionKey: ""
+
+  # JWT signing key for session tokens (required)
+  # Generate with: openssl rand -base64 32
+  jwtSigningKey: ""
+
+  # OpenAI API key for AI-powered tools (optional)
+  openaiApiKey: ""
+
+# Redis authentication (if your Redis requires authentication)
+# This is separate because it might be managed differently
+redis:
+  # Use an existing secret for Redis password
+  existingSecret: ""
+  # Key in the existing secret that contains the password
+  existingSecretKey: "redis-password"
+  # Or set the password directly (not recommended for production)
+  password: ""

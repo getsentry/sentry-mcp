@@ -1,0 +1,38 @@
+{{- if not .Values.existingConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sentry-mcp.fullname" . }}
+  labels:
+    {{- include "sentry-mcp.labels" . | nindent 4 }}
+data:
+  PORT: {{ .Values.config.port | quote }}
+  HOST: {{ .Values.config.host | quote }}
+  {{- if .Values.config.baseUrl }}
+  BASE_URL: {{ .Values.config.baseUrl | quote }}
+  {{- end }}
+  {{- if .Values.config.sentryHost }}
+  SENTRY_HOST: {{ .Values.config.sentryHost | quote }}
+  {{- end }}
+  {{- if .Values.config.sentryClientId }}
+  SENTRY_CLIENT_ID: {{ .Values.config.sentryClientId | quote }}
+  {{- end }}
+  {{- if .Values.config.sentryScopes }}
+  SENTRY_SCOPES: {{ .Values.config.sentryScopes | quote }}
+  {{- end }}
+  REDIS_URL: {{ .Values.config.redisUrl | quote }}
+  REDIS_TLS: {{ .Values.config.redisTls | quote }}
+  REDIS_TLS_REJECT_UNAUTHORIZED: {{ .Values.config.redisTlsRejectUnauthorized | quote }}
+  {{- if .Values.config.openaiBaseUrl }}
+  OPENAI_BASE_URL: {{ .Values.config.openaiBaseUrl | quote }}
+  {{- end }}
+  {{- if .Values.config.mcpUrl }}
+  MCP_URL: {{ .Values.config.mcpUrl | quote }}
+  {{- end }}
+  {{- if .Values.config.logLevel }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  {{- end }}
+  {{- if .Values.config.allowedRedirectUriPatterns }}
+  ALLOWED_REDIRECT_URI_PATTERNS: {{ .Values.config.allowedRedirectUriPatterns | quote }}
+  {{- end }}
+{{- end }}

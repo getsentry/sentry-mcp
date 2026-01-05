@@ -56,7 +56,9 @@ fastmcp-http-oauth/
 ├── .env.example           # Environment template
 ├── .env                   # Local environment (gitignored)
 ├── custom-cas/            # Custom CA certificates (for self-signed certs)
-└── __tests__/             # Unit tests
+├── __tests__/             # Unit tests
+└── helm/                  # Helm chart for Kubernetes deployment
+    └── sentry-mcp/        # Chart directory
 ```
 
 ### How It Works
@@ -299,6 +301,141 @@ docker compose build --no-cache
 - Redis connections support TLS
 - Non-root user in production container
 - `ALLOWED_REDIRECT_URI_PATTERNS` restricts OAuth callbacks
+
+## Kubernetes Deployment (Helm)
+
+A Helm chart is provided in `helm/sentry-mcp/` for Kubernetes deployments.
+
+### Chart Structure
+
+```
+helm/sentry-mcp/
+├── Chart.yaml           # Chart metadata
+├── values.yaml          # Default values
+├── .helmignore          # Files to ignore
+└── templates/
+    ├── _helpers.tpl     # Template helpers
+    ├── deployment.yaml  # Main deployment
+    ├── service.yaml     # Service definition
+    ├── configmap.yaml   # Non-secret config (optional)
+    ├── secret.yaml      # Secret config (optional)
+    ├── pdb.yaml         # PodDisruptionBudget
+    ├── serviceaccount.yaml
+    ├── ingress.yaml     # Ingress (optional)
+    ├── hpa.yaml         # HorizontalPodAutoscaler (optional)
+    └── NOTES.txt        # Post-install notes
+```
+
+### Installation
+
+```bash
+# Basic install (NOT for production - secrets in values)
+helm install sentry-mcp ./helm/sentry-mcp \
+  --set config.baseUrl=https://mcp.example.com \
+  --set config.sentryHost=sentry.io \
+  --set config.sentryClientId=your-client-id \
+  --set secrets.sentryClientSecret=your-secret \
+  --set secrets.encryptionKey=$(openssl rand -base64 32) \
+  --set secrets.jwtSigningKey=$(openssl rand -base64 32)
+
+# Production install with existing secret
+helm install sentry-mcp ./helm/sentry-mcp \
+  --set config.baseUrl=https://mcp.example.com \
+  --set config.sentryHost=sentry.io \
+  --set config.sentryClientId=your-client-id \
+  --set existingSecret=my-sentry-mcp-secrets
+```
+
+### Using Existing Secrets
+
+For production, create your secrets separately and reference them:
+
+```bash
+# Create secret (one-time)
+kubectl create secret generic my-sentry-mcp-secrets \
+  --from-literal=SENTRY_CLIENT_SECRET=your-secret \
+  --from-literal=ENCRYPTION_KEY=$(openssl rand -base64 32) \
+  --from-literal=JWT_SIGNING_KEY=$(openssl rand -base64 32) \
+  --from-literal=OPENAI_API_KEY=sk-xxx  # optional
+
+# Install with existing secret
+helm install sentry-mcp ./helm/sentry-mcp \
+  --set existingSecret=my-sentry-mcp-secrets \
+  --set config.baseUrl=https://mcp.example.com \
+  --set config.sentryHost=sentry.io \
+  --set config.sentryClientId=your-client-id
+```
+
+### Using Existing ConfigMap
+
+You can also use an existing ConfigMap for non-secret values:
+
+```bash
+# Create configmap
+kubectl create configmap my-sentry-mcp-config \
+  --from-literal=PORT=3000 \
+  --from-literal=HOST=0.0.0.0 \
+  --from-literal=BASE_URL=https://mcp.example.com \
+  --from-literal=SENTRY_HOST=sentry.io \
+  --from-literal=SENTRY_CLIENT_ID=your-client-id \
+  --from-literal=REDIS_URL=redis://redis:6379
+
+# Install with existing configmap
+helm install sentry-mcp ./helm/sentry-mcp \
+  --set existingConfigMap=my-sentry-mcp-config \
+  --set existingSecret=my-sentry-mcp-secrets
+```
+
+### Key Values
+
+| Value | Description | Required |
+|-------|-------------|----------|
+| `config.baseUrl` | External URL (for OAuth callbacks) | Yes |
+| `config.sentryHost` | Sentry instance hostname | Yes |
+| `config.sentryClientId` | Sentry OAuth client ID | Yes |
+| `config.redisUrl` | Redis/Valkey URL | No (default: redis://valkey:6379) |
+| `existingSecret` | Name of existing K8s Secret | Recommended for prod |
+| `existingConfigMap` | Name of existing K8s ConfigMap | Optional |
+| `podDisruptionBudget.enabled` | Enable PDB | Yes (default: true) |
+| `podDisruptionBudget.maxUnavailable` | Max unavailable pods | No (default: 1) |
+
+### Required Secret Keys
+
+When using `existingSecret`, your secret must contain:
+- `SENTRY_CLIENT_SECRET` - Sentry OAuth client secret
+- `ENCRYPTION_KEY` - Token encryption key (generate with `openssl rand -base64 32`)
+- `JWT_SIGNING_KEY` - JWT signing key (generate with `openssl rand -base64 32`)
+- `OPENAI_API_KEY` - (optional) OpenAI API key for AI-powered tools
+
+### PodDisruptionBudget
+
+The PDB is enabled by default to ensure high availability:
+
+```yaml
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+  # Or use minAvailable instead:
+  # minAvailable: 1
+```
+
+### Upgrading
+
+```bash
+# Upgrade with new values
+helm upgrade sentry-mcp ./helm/sentry-mcp --reuse-values \
+  --set image.tag=v1.2.0
+
+# See what would change
+helm diff upgrade sentry-mcp ./helm/sentry-mcp --reuse-values \
+  --set image.tag=v1.2.0
+```
+
+### Uninstalling
+
+```bash
+helm uninstall sentry-mcp
+```
 
 ## Integration with Parent Project
 
