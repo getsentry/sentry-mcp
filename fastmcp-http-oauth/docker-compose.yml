@@ -4,6 +4,7 @@ services:
     build:
       context: ..
       dockerfile: fastmcp-http-oauth/Dockerfile
+      target: production
     ports:
       - "3000:3000"
     environment:
@@ -43,6 +44,19 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+
+  # Test runner service (uses test target with pnpm available)
+  # Usage: docker compose run --rm test
+  test:
+    build:
+      context: ..
+      dockerfile: fastmcp-http-oauth/Dockerfile
+      target: test
+    profiles:
+      - test
+    volumes:
+      # Mount test files for faster iteration (optional)
+      - ./__tests__:/app/fastmcp-http-oauth/__tests__:ro
 
   # Valkey (Redis-compatible) for token storage
   # For TLS-enabled Valkey, see valkey-tls service below

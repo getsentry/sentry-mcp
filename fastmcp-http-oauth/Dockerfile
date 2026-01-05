@@ -24,12 +24,23 @@ COPY packages/mcp-core/dist /app/packages/mcp-core/dist
 # Copy example source and config
 COPY fastmcp-http-oauth/*.ts ./
 COPY fastmcp-http-oauth/tsconfig.json ./
+COPY fastmcp-http-oauth/vitest.config.ts ./
+
+# Copy test files
+COPY fastmcp-http-oauth/__tests__ ./__tests__/
 
 # Build example
 RUN pnpm exec tsc
 
+# ---- Test stage ----
+# Used for running tests via: docker compose run --rm sentry-mcp-test pnpm test
+FROM builder AS test
+WORKDIR /app/fastmcp-http-oauth
+# Tests run as root in the test stage (no security concerns for test environment)
+CMD ["pnpm", "test"]
+
 # ---- Production stage ----
-FROM node:22-alpine
+FROM node:22-alpine AS production
 
 RUN apk --no-cache add ca-certificates
 COPY fastmcp-http-oauth/custom-cas /usr/local/share/ca-certificates

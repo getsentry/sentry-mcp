@@ -10,6 +10,9 @@ node_modules/
 # Build output
 dist/
 
+# Test coverage output
+coverage/
+
 # Custom CA certificates (user-provided)
 custom-cas/*
 
@@ -22,3 +25,6 @@ custom-cas/*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Lockfile (generated inside container)
+pnpm-lock.yaml
