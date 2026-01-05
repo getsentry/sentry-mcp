@@ -82,16 +82,8 @@ import eventsSpansFixture from "./fixtures/events-spans.json" with {
 import eventsSpansEmptyFixture from "./fixtures/events-spans-empty.json" with {
   type: "json",
 };
-
-// a newer issue, seen less recently
-const issueFixture2 = {
-  ...issueFixture,
-  id: 6507376926,
-  shortId: "CLOUDFLARE-MCP-42",
-  count: 1,
-  title: "Error: Tool list_issues is already registered",
-  firstSeen: "2025-04-11T22:51:19.403000Z",
-  lastSeen: "2025-04-12T11:34:11Z",
+import issueFixture2 from "./fixtures/issue-secondary.json" with {
+  type: "json",
 };
 
 /**

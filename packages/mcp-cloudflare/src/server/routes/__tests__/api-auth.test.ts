@@ -50,7 +50,7 @@ describe("/api/auth", () => {
         {
           headers: {
             "CF-Connecting-IP": "192.0.2.1",
-            Cookie: `sentry_auth_data=${JSON.stringify(expiredAuthData)}`,
+            Cookie: `sentry_auth_data=${encodeURIComponent(JSON.stringify(expiredAuthData))}`,
           },
         },
         env,

@@ -15,6 +15,7 @@ import {
   eventsSpansFixture,
   eventsSpansEmptyFixture,
   issueFixture,
+  issueFixture2,
   eventsFixture,
   projectFixture,
   teamFixture,
@@ -29,17 +30,6 @@ import {
   traceItemsAttributesLogsNumberFixture,
 } from "@sentry/mcp-server-mocks/payloads";
 
-// Second issue fixture for tests that need multiple issues
-const issueFixture2 = {
-  ...issueFixture,
-  id: 6507376926,
-  shortId: "CLOUDFLARE-MCP-42",
-  count: 1,
-  title: "Error: Tool list_issues is already registered",
-  firstSeen: "2025-04-11T22:51:19.403000Z",
-  lastSeen: "2025-04-12T11:34:11Z",
-};
-
 // Sentry hosts to mock
 const SENTRY_HOSTS = ["https://sentry.io", "https://us.sentry.io"];
 
@@ -53,7 +43,9 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
  * (first match wins). Always register specific path handlers BEFORE
  * general pattern handlers to ensure correct matching.
  *
- * Call this in beforeAll() and call resetFetchMock() in afterEach().
+ * Usage: Call setupFetchMock() in beforeEach() and resetFetchMock() in afterEach()
+ * to ensure clean mock state between tests. Using beforeEach (not beforeAll)
+ * prevents test pollution since fetchMock.deactivate() clears all interceptors.
  */
 export function setupFetchMock() {
   fetchMock.activate();
@@ -178,36 +170,10 @@ export function setupFetchMock() {
       .persist();
 
     // ===== Issues =====
-    // Project-scoped
-    pool
-      .intercept({ path: "/api/0/projects/sentry-mcp-evals/foobar/issues/" })
-      .reply(200, [], { headers: JSON_HEADERS })
-      .persist();
+    // IMPORTANT: Specific handlers must be registered BEFORE general patterns
+    // because undici MockAgent matches in registration order (first match wins).
 
-    pool
-      .intercept({
-        path: (p: string) =>
-          p.startsWith(
-            "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/issues/",
-          ),
-      })
-      .reply(200, [issueFixture2, issueFixture], { headers: JSON_HEADERS })
-      .persist();
-
-    // Org-scoped (excludes specific issue IDs that have their own handlers)
-    pool
-      .intercept({
-        path: (p: string) =>
-          p.startsWith("/api/0/organizations/sentry-mcp-evals/issues/") &&
-          !p.includes("CLOUDFLARE-MCP") &&
-          !p.includes("6507376") &&
-          !p.includes("PERF-N1") &&
-          !p.includes("PEATED"),
-      })
-      .reply(200, [issueFixture2, issueFixture], { headers: JSON_HEADERS })
-      .persist();
-
-    // Specific issue details
+    // Specific issue details (must come first)
     pool
       .intercept({
         path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
@@ -236,7 +202,7 @@ export function setupFetchMock() {
       .reply(200, issueFixture2, { headers: JSON_HEADERS })
       .persist();
 
-    // Issue updates (PUT)
+    // Issue updates (PUT) - specific handlers
     pool
       .intercept({
         path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
@@ -251,6 +217,31 @@ export function setupFetchMock() {
         method: "PUT",
       })
       .reply(200, issueFixture, { headers: JSON_HEADERS })
+      .persist();
+
+    // Project-scoped issues
+    pool
+      .intercept({ path: "/api/0/projects/sentry-mcp-evals/foobar/issues/" })
+      .reply(200, [], { headers: JSON_HEADERS })
+      .persist();
+
+    pool
+      .intercept({
+        path: (p: string) =>
+          p.startsWith(
+            "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/issues/",
+          ),
+      })
+      .reply(200, [issueFixture2, issueFixture], { headers: JSON_HEADERS })
+      .persist();
+
+    // Org-scoped issues (general catch-all - must come AFTER specific handlers)
+    pool
+      .intercept({
+        path: (p: string) =>
+          p.startsWith("/api/0/organizations/sentry-mcp-evals/issues/"),
+      })
+      .reply(200, [issueFixture2, issueFixture], { headers: JSON_HEADERS })
       .persist();
 
     // ===== Issue Events =====

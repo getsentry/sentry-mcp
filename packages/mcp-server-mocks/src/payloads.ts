@@ -10,6 +10,9 @@ import autofixStateFixture from "./fixtures/autofix-state.json" with {
   type: "json",
 };
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
+import issueFixture2 from "./fixtures/issue-secondary.json" with {
+  type: "json",
+};
 import eventsFixture from "./fixtures/event.json" with { type: "json" };
 import performanceEventFixture from "./fixtures/performance-event.json" with {
   type: "json",
@@ -69,6 +72,7 @@ import eventsSpansEmptyFixture from "./fixtures/events-spans-empty.json" with {
 export {
   autofixStateFixture,
   issueFixture,
+  issueFixture2,
   eventsFixture,
   performanceEventFixture,
   eventAttachmentsFixture,

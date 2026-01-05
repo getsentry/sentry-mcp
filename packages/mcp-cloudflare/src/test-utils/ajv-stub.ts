@@ -7,6 +7,9 @@
  *
  * This stub provides the minimal API surface that the SDK imports,
  * but is never actually used since we use CfWorkerJsonSchemaValidator.
+ *
+ * TODO(cloudflare/workers-sdk#9822): Remove this stub when the upstream issue is fixed.
+ * The issue is in "Backlog" status as of Jan 2026. Check periodically for resolution.
  */
 
 export class Ajv {

@@ -10,6 +10,10 @@ import path from "node:path";
  *
  * Bindings (KV, vars, compatibility flags) are defined in wrangler.test.jsonc
  * to keep test config aligned with production wrangler.jsonc.
+ *
+ * IMPORTANT: Run tests via `pnpm run test` (uses turbo) to ensure dependencies
+ * like @sentry/mcp-server-mocks are built first. Running directly with
+ * `pnpm --filter @sentry/mcp-cloudflare test` may fail if mocks aren't built.
  */
 export default defineWorkersConfig({
   test: {
@@ -30,6 +34,8 @@ export default defineWorkersConfig({
    *
    * This is TEST-ONLY - production uses CfWorkerJsonSchemaValidator which
    * doesn't actually invoke ajv, but the import still triggers the CJS issue.
+   *
+   * TODO(cloudflare/workers-sdk#9822): Remove this alias and ajv-stub.ts when fixed.
    */
   resolve: {
     alias: {
