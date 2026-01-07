@@ -12,7 +12,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
   return (
     <header className="pl-4 container mx-auto w-full px-4 sm:px-8 sticky py-4 top-0 z-30 backdrop-blur-xl bg-gradient-to-b from-background to-1% to-background/80">
-      {/* <div className="absolute inset-0 h-full w-full -z-10 pointer-events-none bg-gradient-to-r from-transparent to-background-2 hidden md:block" /> */}
       <div className="absolute inset-0 h-full w-screen left-1/2 -translate-x-1/2 [mask-image:linear-gradient(to_right,transparent,red_4rem,red_calc(100%-4rem),transparent)] border-b-[1px] border-white/15 pointer-events-none -z-10" />
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -31,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
         </div>
         <div
           className={`flex items-center gap-4 motion-safe:duration-300 [--x:0] xl:[--x:26.25rem] 2xl:[--x:35.25rem] ${
-            isChatOpen ? "-translate-x-[var(--x)]" : ""
+            isChatOpen ? "-translate-x-(--x)" : ""
           }`}
         >
           <Button

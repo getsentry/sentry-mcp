@@ -32,7 +32,15 @@ export default function App() {
   };
 
   return (
-    <div className="overflow-x-clip max-w-screen relative">
+    <div
+      className="overflow-x-clip max-w-screen relative w-full"
+      style={
+        {
+          "container-type": "inline-size",
+          "--scrollbar-width": "calc(100vw - 100cqw)",
+        } as React.CSSProperties
+      }
+    >
       {/* //!NOTE: order matters for z- */}
       <Sidebars isChatOpen={isChatOpen} toggleChat={toggleChat} />
       <Header toggleChat={toggleChat} isChatOpen={isChatOpen} />
