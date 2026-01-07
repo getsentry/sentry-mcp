@@ -127,25 +127,34 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   --font-sans: "Rubik", sans-serif;
+
+  --sidebar-width: calc((100% - var(--x)) / 2);
+}
+
+@media (width >= 40rem /* 640px */) {
+  :root {
+    --x: 40rem /* 640px */;
+  }
+}
+@media (width >= 48rem /* 768px */) {
+  :root {
+    --x: 48rem /* 768px */;
+  }
+}
+@media (width >= 80rem /* 1280px */) {
+  :root {
+    --x: 72rem /* 1152px */;
+  }
+}
+@media (width >= 96rem /* 1536px */) {
+  :root {
+    --x: 90rem /* 1440px */;
+  }
 }
 
 @utility container {
   width: 100%;
-  @media (width >= 40rem /* 640px */) {
-    max-width: 40rem /* 640px */;
-  }
-  @media (width >= 48rem /* 768px */) {
-    max-width: 48rem /* 768px */;
-  }
-  @media (width >= 64rem /* 1024px */) {
-    max-width: 48rem /* 1024px */;
-  }
-  @media (width >= 80rem /* 1280px */) {
-    max-width: 72rem /* 1280px */;
-  }
-  @media (width >= 96rem /* 1536px */) {
-    max-width: 90rem /* 1536px */;
-  }
+  max-width: var(--x, 100%);
 }
 
 @layer base {
@@ -159,7 +168,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-x-clip;
     min-height: 100vh;
     font-family: "Rubik", -apple-system, "BlinkMacSystemFont", "Segoe UI",
       "Helvetica", "Arial", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
