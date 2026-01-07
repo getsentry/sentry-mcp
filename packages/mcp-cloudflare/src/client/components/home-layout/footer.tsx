@@ -4,8 +4,8 @@ export default function Footer({ isChatOpen }: { isChatOpen: boolean }) {
   return (
     <>
       <div
-        className={`group inset-x-0 bottom-14 bg-background-2 w-full sm:h-40 max-sm:gap-4 bg-fixed z-10 border-t flex-col bg-clip-padding border-white/20 flex font-mono py-6 justify-around motion-safe:duration-300 [--x:0] xl:[--x:20rem] 2xl:[--x:24rem] ${
-          isChatOpen && "xl:-translate-x-(--x)"
+        className={`group inset-x-0 bottom-14 bg-background-2 w-full sm:h-40 max-sm:gap-4 bg-fixed z-10 border-t flex-col bg-clip-padding border-white/20 flex font-mono py-6 justify-around motion-safe:duration-300 ${
+          isChatOpen && "xl:-translate-x-[calc(var(--x)/4)]"
         }`}
       >
         <div className="flex items-center gap-2 flex-shrink-0 sm:mx-auto max-sm:mx-4 font-sans">
@@ -86,8 +86,8 @@ export default function Footer({ isChatOpen }: { isChatOpen: boolean }) {
         </div>
       </div>
       <div
-        className={`group inset-x-0 bottom-0 bg-background-2 w-full h-14 bg-fixed bg-[repeating-linear-gradient(45deg,#fff2,#fff2_4px,#fff0_4.5px,#fff0_12px)] z-10 border-t flex max-sm:px-4 sm:justify-center items-center bg-clip-padding border-white/20 opacity-75 [--x:0] xl:[--x:20rem] 2xl:[--x:24rem] motion-safe:duration-300 ${
-          isChatOpen && "xl:-translate-x-(--x)"
+        className={`group inset-x-0 bottom-0 bg-background-2 w-full h-14 bg-fixed bg-[repeating-linear-gradient(45deg,#fff2,#fff2_4px,#fff0_4.5px,#fff0_12px)] z-10 border-t flex max-sm:px-4 sm:justify-center items-center bg-clip-padding border-white/20 opacity-75 motion-safe:duration-300 ${
+          isChatOpen && "xl:-translate-x-[calc(var(--x)/4)]"
         }`}
       >
         <span className="opacity-50 text-xs sm:max-w-2/3">

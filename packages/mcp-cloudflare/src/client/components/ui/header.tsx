@@ -29,8 +29,8 @@ export const Header: React.FC<HeaderProps> = ({ toggleChat, isChatOpen }) => {
           </div>
         </div>
         <div
-          className={`flex items-center gap-4 motion-safe:duration-300 [--x:0] xl:[--x:26.25rem] 2xl:[--x:35.25rem] ${
-            isChatOpen ? "-translate-x-(--x)" : ""
+          className={`flex items-center gap-4 motion-safe:duration-300 [--offset:0] xl:[--offset:26.25rem] 2xl:[--offset:35.25rem] ${
+            isChatOpen ? "xl:-translate-x-(--offset)" : ""
           }`}
         >
           <Button

@@ -7,13 +7,13 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
   return (
     <>
       {/* left sidebar */}
-      <aside className="group hidden sm:block fixed left-0 inset-y-0 h-full sm:w-[calc((100%-40rem)/2)] md:w-[calc((100%-48rem)/2)] lg:w-[calc((100%-48rem)/2)] xl:w-[calc((100%-72rem)/2)] 2xl:w-[calc((100%-90rem)/2)] bg-fixed bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)] z-10 border-r opacity-50 bg-clip-padding border-white/20" />
+      <aside className="group hidden sm:block fixed left-0 inset-y-0 h-full w-(--sidebar-width) bg-fixed bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)] z-10 border-r opacity-50 bg-clip-padding border-white/20" />
       {/* right sidebar */}
       <button
-        className={`group hidden sm:grid fixed right-0 inset-y-0 h-full w-1/2 duration-300 cursor-pointer place-items-center z-40 border-l sm:[--x:20rem] md:[--x:24rem] lg:[--x:24rem] xl:[--x:36rem] 2xl:[--x:45rem] transition-colors ${
+        className={`group hidden sm:grid fixed right-0 inset-y-0 h-full w-1/2 duration-300 cursor-pointer place-items-center z-40 border-l transition-colors ${
           isChatOpen
             ? "bg-background-2 -translate-x-[1px] opacity-100 border-white/10 motion-safe:transition-all"
-            : "translate-x-(--x) opacity-50 hover:bg-background-2 bg-clip-padding border-white/20 bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)]"
+            : "translate-x-[calc(var(--x)/2)] opacity-50 hover:bg-background-2 bg-clip-padding border-white/20 bg-[repeating-linear-gradient(-45deg,#fff2,#fff2_1px,#fff0_1.5px,#fff0_12px)]"
         }`}
         onClick={() => toggleChat(true)}
         onKeyDown={(e) => {
@@ -27,7 +27,7 @@ export function Sidebars({ isChatOpen, toggleChat }: SidebarProps) {
       >
         <span className="sr-only">Open chat panel</span>
         {!isChatOpen && (
-          <div className="font-mono absolute w-8 xl:w-12 min-[1800px]:w-fit min-[1800px]:flex-nowrap text-center flex flex-wrap justify-center md:left-[calc((100vw-48rem)/4)] lg:left-[calc((100vw-48rem)/4)] xl:left-[calc((100vw-72rem)/4)] 2xl:left-[calc((100vw-90rem)/4)] top-1/2 -translate-1/2 opacity-0 group-hover:opacity-100 px-1 gap-0.25 gap-x-2">
+          <div className="font-mono absolute w-8 xl:w-12 min-[1800px]:w-fit min-[1800px]:flex-nowrap text-center flex flex-wrap justify-center md:left-[calc((100vw-var(--x))/4)] top-1/2 -translate-1/2 opacity-0 group-hover:opacity-100 px-1 gap-0.25 gap-x-2">
             <div className="flex flex-nowrap">
               {"open".split("").map((char, i) => (
                 <span
