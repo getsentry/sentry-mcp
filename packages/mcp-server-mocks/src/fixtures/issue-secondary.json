@@ -1,0 +1,53 @@
+{
+  "id": "6507376926",
+  "shareId": null,
+  "shortId": "CLOUDFLARE-MCP-42",
+  "title": "Error: Tool list_issues is already registered",
+  "culprit": "Object.fetch(index)",
+  "permalink": "https://sentry-mcp-evals.sentry.io/issues/6507376926/",
+  "logger": null,
+  "level": "error",
+  "status": "unresolved",
+  "statusDetails": {},
+  "substatus": "ongoing",
+  "isPublic": false,
+  "platform": "javascript",
+  "project": {
+    "id": "4509062593708032",
+    "name": "CLOUDFLARE-MCP",
+    "slug": "CLOUDFLARE-MCP",
+    "platform": "bun"
+  },
+  "type": "error",
+  "metadata": {
+    "value": "Tool list_issues is already registered",
+    "type": "Error",
+    "filename": "index.js",
+    "function": "Object.fetch",
+    "in_app_frame_mix": "in-app-only",
+    "sdk": {
+      "name": "sentry.javascript.cloudflare",
+      "name_normalized": "sentry.javascript.cloudflare"
+    },
+    "severity": 0,
+    "severity_reason": "ml",
+    "initial_priority": 50,
+    "title": "Error: Tool list_issues is already registered"
+  },
+  "numComments": 0,
+  "assignedTo": null,
+  "isBookmarked": false,
+  "isSubscribed": false,
+  "subscriptionDetails": null,
+  "hasSeen": false,
+  "annotations": [],
+  "issueType": "error",
+  "issueCategory": "error",
+  "priority": "medium",
+  "priorityLockedAt": null,
+  "isUnhandled": true,
+  "count": "1",
+  "userCount": 1,
+  "firstSeen": "2025-04-11T22:51:19.403000Z",
+  "lastSeen": "2025-04-12T11:34:11Z"
+}

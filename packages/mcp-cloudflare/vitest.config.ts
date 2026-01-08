@@ -1,25 +1,50 @@
-/// <reference types="vitest" />
-import { defineConfig } from "vitest/config";
+import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import path from "node:path";
 
-export default defineConfig({
+/**
+ * Unified vitest config using vitest-pool-workers.
+ *
+ * All tests run in the Cloudflare Workers runtime (workerd) which enables:
+ * - Testing with cloudflare:test bindings (KV, AI, etc.)
+ * - Using fetchMock from cloudflare:test for HTTP mocking
+ *
+ * Bindings (KV, vars, compatibility flags) are defined in wrangler.test.jsonc
+ * to keep test config aligned with production wrangler.jsonc.
+ *
+ * IMPORTANT: Run tests via `pnpm run test` (uses turbo) to ensure dependencies
+ * like @sentry/mcp-server-mocks are built first. Running directly with
+ * `pnpm --filter @sentry/mcp-cloudflare test` may fail if mocks aren't built.
+ */
+export default defineWorkersConfig({
   test: {
-    // Use thread-based workers to avoid process-kill issues in sandboxed environments
-    pool: "threads",
+    include: ["src/**/*.test.ts"],
+    setupFiles: ["src/test-setup.ts"],
     poolOptions: {
       workers: {
-        miniflare: {},
-        wrangler: { configPath: "./wrangler.jsonc" },
+        wrangler: { configPath: "./wrangler.test.jsonc" },
       },
     },
-    deps: {
-      interopDefault: true,
+  },
+  /**
+   * Workaround for ajv CJS compatibility in workerd runtime.
+   *
+   * The MCP SDK imports ajv at module level (even when using CfWorkerJsonSchemaValidator).
+   * ajv uses CJS require() for JSON files which fails in workerd.
+   * See: https://github.com/cloudflare/workers-sdk/issues/9822
+   *
+   * This is TEST-ONLY - production uses CfWorkerJsonSchemaValidator which
+   * doesn't actually invoke ajv, but the import still triggers the CJS issue.
+   *
+   * TODO(cloudflare/workers-sdk#9822): Remove this alias and ajv-stub.ts when fixed.
+   */
+  resolve: {
+    alias: {
+      ajv: path.resolve(__dirname, "src/test-utils/ajv-stub.ts"),
+      "ajv-formats": path.resolve(__dirname, "src/test-utils/ajv-stub.ts"),
     },
-    include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-    coverage: {
-      provider: "v8",
-      reporter: ["text", "json", "html"],
-      include: ["**/*.ts"],
-    },
-    setupFiles: ["dotenv/config", "src/test-setup.ts"],
+  },
+  // Force bundling to apply the ajv alias during module resolution
+  ssr: {
+    noExternal: ["@modelcontextprotocol/sdk", "agents", "zod-to-json-schema"],
   },
 });

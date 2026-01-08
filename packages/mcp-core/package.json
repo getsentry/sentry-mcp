@@ -123,7 +123,7 @@
     "build": "tsdown",
     "pretest": "pnpm run generate-definitions",
     "test": "vitest run",
-    "test:ci": "pnpm run generate-definitions && vitest run --coverage --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:ci": "pnpm run generate-definitions && vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "pnpm run generate-definitions && vitest",
     "tsc": "tsc --noEmit",
     "generate-definitions": "tsx scripts/generate-definitions.ts && biome format --write src/toolDefinitions.json src/skillDefinitions.json",
