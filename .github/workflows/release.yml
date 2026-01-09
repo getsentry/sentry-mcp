@@ -1,48 +1,17 @@
 name: Release
-
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to release
-        required: true
-      force:
-        description: Force a release even when there are release-blockers (empty string == false)
+        description: Version to release (or "auto")
         required: false
-
+      force:
+        description: Force a release even when there are release-blockers
+        required: false
 jobs:
   release:
-    runs-on: ubuntu-latest
-    name: "Release a new version"
-    steps:
-      - name: Get auth token
-        id: token
-        uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
-        with:
-          app-id: ${{ vars.SENTRY_RELEASE_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.SENTRY_RELEASE_BOT_PRIVATE_KEY }}
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ steps.token.outputs.token }}
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      # pnpm/action-setup@v4
-      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
-        name: Install pnpm
-        with:
-          run_install: false
-
-      - name: Prepare release
-        uses: getsentry/action-prepare-release@v1
-        env:
-          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
-        with:
-          version: ${{ github.event.inputs.version }}
-          force: ${{ github.event.inputs.force }}
+    uses: getsentry/craft/.github/workflows/release.yml@v2
+    with:
+      version: ${{ inputs.version }}
+      force: ${{ inputs.force }}
+    secrets: inherit
