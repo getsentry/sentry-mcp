@@ -64,6 +64,9 @@ import traceMixedFixture from "./fixtures/trace-mixed.json" with {
 import traceEventFixture from "./fixtures/trace-event.json" with {
   type: "json",
 };
+import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
+  type: "json",
+};
 
 /**
  * Standard organization payload for mock responses.
@@ -1039,6 +1042,20 @@ export const restHandlers = buildHandlers([
           ],
         },
       }),
+  },
+  // Issue tag values endpoints
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/tags/:tagKey/",
+    fetch: ({ params }) => {
+      const tagKey = params.tagKey as string;
+      // Return fixture with the requested tag key
+      return HttpResponse.json({
+        ...issueTagValuesFixture,
+        key: tagKey,
+        name: tagKey.charAt(0).toUpperCase() + tagKey.slice(1),
+      });
+    },
   },
   {
     method: "post",

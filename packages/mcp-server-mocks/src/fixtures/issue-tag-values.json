@@ -1,0 +1,47 @@
+{
+  "key": "url",
+  "name": "URL",
+  "totalValues": 156,
+  "topValues": [
+    {
+      "key": "url",
+      "name": "/upload/github/org/repo/commit/abc123",
+      "value": "/upload/github/org/repo/commit/abc123",
+      "count": 45,
+      "lastSeen": "2024-01-15T10:30:00.000Z",
+      "firstSeen": "2024-01-10T08:00:00.000Z"
+    },
+    {
+      "key": "url",
+      "name": "/api/v1/users/profile",
+      "value": "/api/v1/users/profile",
+      "count": 32,
+      "lastSeen": "2024-01-15T09:45:00.000Z",
+      "firstSeen": "2024-01-11T14:20:00.000Z"
+    },
+    {
+      "key": "url",
+      "name": "/dashboard/overview",
+      "value": "/dashboard/overview",
+      "count": 28,
+      "lastSeen": "2024-01-15T08:15:00.000Z",
+      "firstSeen": "2024-01-12T11:30:00.000Z"
+    },
+    {
+      "key": "url",
+      "name": "/settings/notifications",
+      "value": "/settings/notifications",
+      "count": 21,
+      "lastSeen": "2024-01-14T22:00:00.000Z",
+      "firstSeen": "2024-01-13T16:45:00.000Z"
+    },
+    {
+      "key": "url",
+      "name": "/checkout/payment",
+      "value": "/checkout/payment",
+      "count": 15,
+      "lastSeen": "2024-01-14T18:30:00.000Z",
+      "firstSeen": "2024-01-14T10:00:00.000Z"
+    }
+  ]
+}

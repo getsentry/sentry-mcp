@@ -15,6 +15,7 @@ import {
   ReleaseListSchema,
   IssueListSchema,
   IssueSchema,
+  IssueTagValuesSchema,
   EventSchema,
   EventAttachmentListSchema,
   ErrorsSearchResponseSchema,
@@ -42,6 +43,7 @@ import type {
   EventAttachmentList,
   Issue,
   IssueList,
+  IssueTagValues,
   OrganizationList,
   Project,
   ProjectList,
@@ -1544,6 +1546,51 @@ export class SentryApiService {
       opts,
     );
     return IssueSchema.parse(body);
+  }
+
+  /**
+   * Retrieves tag value distribution for a specific issue.
+   *
+   * Returns aggregate counts of unique tag values, useful for understanding
+   * how an issue is distributed across different tag values (e.g., URLs,
+   * browsers, environments).
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.issueId Issue identifier (short ID or numeric ID)
+   * @param params.tagKey Tag key to get values for (e.g., "url", "browser", "environment")
+   * @param opts Request options
+   * @returns Tag value distribution with counts and percentages
+   *
+   * @example
+   * ```typescript
+   * const tagValues = await apiService.getIssueTagValues({
+   *   organizationSlug: "my-org",
+   *   issueId: "PROJECT-123",
+   *   tagKey: "url"
+   * });
+   * console.log(`Total unique values: ${tagValues.totalValues}`);
+   * tagValues.topValues.forEach(v => console.log(`${v.value}: ${v.count}`));
+   * ```
+   */
+  async getIssueTagValues(
+    {
+      organizationSlug,
+      issueId,
+      tagKey,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      tagKey: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<IssueTagValues> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/tags/${tagKey}/`,
+      undefined,
+      opts,
+    );
+    return IssueTagValuesSchema.parse(body);
   }
 
   async getEventForIssue(
