@@ -175,7 +175,7 @@ export default defineTool({
 
     // Add usage hints
     output += "\n## Using this information\n\n";
-    output += `- Use \`get_issue_details(issueId='${parsedIssueId}')\` to see the full issue details\n`;
+    output += `- Use \`get_issue_details(organizationSlug='${orgSlug}', issueId='${parsedIssueId}')\` to see the full issue details\n`;
     output += `- Try other tag keys like: url, browser, environment, release, os, device, user\n`;
 
     return output;
