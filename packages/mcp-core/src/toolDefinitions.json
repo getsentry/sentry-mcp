@@ -509,6 +509,7 @@
         },
         "tagKey": {
           "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
           "description": "The tag key to get values for (e.g., 'url', 'browser', 'environment', 'release')."
         }
       },

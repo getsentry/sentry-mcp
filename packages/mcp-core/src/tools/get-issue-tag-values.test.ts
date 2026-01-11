@@ -102,4 +102,34 @@ describe("get_issue_tag_values", () => {
       ),
     ).rejects.toThrow(UserInputError);
   });
+
+  it("throws error when tagKey contains path traversal characters", async () => {
+    await expect(
+      getIssueTagValues.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          tagKey: "../../../admin",
+          regionUrl: null,
+          issueUrl: undefined,
+        },
+        getServerContext(),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("throws error when tagKey contains slashes", async () => {
+    await expect(
+      getIssueTagValues.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          tagKey: "url/path",
+          regionUrl: null,
+          issueUrl: undefined,
+        },
+        getServerContext(),
+      ),
+    ).rejects.toThrow();
+  });
 });

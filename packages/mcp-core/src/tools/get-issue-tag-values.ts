@@ -68,6 +68,10 @@ export default defineTool({
     tagKey: z
       .string()
       .trim()
+      .regex(
+        /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/,
+        "Tag key must contain only alphanumeric characters, dots, hyphens, and underscores, and must start with an alphanumeric character",
+      )
       .describe(
         "The tag key to get values for (e.g., 'url', 'browser', 'environment', 'release').",
       ),
@@ -158,9 +162,7 @@ export default defineTool({
       output += `| \`${displayValue}\` | ${value.count} | ${firstSeen} | ${lastSeen} |\n`;
     }
 
-    // Calculate percentage for context
     if (tagValues.topValues.length > 0 && tagValues.totalValues > 0) {
-      const topTotal = tagValues.topValues.reduce((sum, v) => sum + v.count, 0);
       const shownCount = tagValues.topValues.length;
       output += `\n*Showing top ${shownCount} of ${tagValues.totalValues} unique values*\n`;
     }
