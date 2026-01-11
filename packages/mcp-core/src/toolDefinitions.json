@@ -476,6 +476,50 @@
     "requiredScopes": ["event:read"]
   },
   {
+    "name": "get_issue_tag_values",
+    "description": "Get tag value distribution for a specific Sentry issue.\n\nUse this tool when you need to:\n- Understand how an issue is distributed across different tag values\n- Get aggregate counts of unique tag values (e.g., 'how many unique URLs are affected')\n- Analyze which browsers, environments, or URLs are most impacted by an issue\n- View the tag distributions page data programmatically\n\nCommon tag keys:\n- `url`: Request URLs affected by the issue\n- `browser`: Browser types and versions\n- `browser.name`: Browser names only\n- `os`: Operating systems\n- `environment`: Deployment environments (production, staging, etc.)\n- `release`: Software releases\n- `device`: Device types\n- `user`: Affected users\n\n<examples>\n### Get URL distribution for an issue\n```\nget_issue_tag_values(organizationSlug='my-organization', issueId='PROJECT-123', tagKey='url')\n```\n\n### Get browser distribution using issue URL\n```\nget_issue_tag_values(issueUrl='https://sentry.io/issues/PROJECT-123/', tagKey='browser')\n```\n\n### Get environment distribution\n```\nget_issue_tag_values(organizationSlug='my-organization', issueId='PROJECT-123', tagKey='environment')\n```\n</examples>\n\n<hints>\n- If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- Common tag keys: url, browser, browser.name, os, environment, release, device, user\n- Tag keys are case-sensitive\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "issueId": {
+          "type": "string",
+          "description": "The Issue ID. e.g. `PROJECT-1Z43`"
+        },
+        "issueUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43"
+        },
+        "tagKey": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+          "description": "The tag key to get values for (e.g., 'url', 'browser', 'environment', 'release')."
+        }
+      },
+      "required": ["tagKey"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
     "name": "get_trace_details",
     "description": "Get detailed information about a specific Sentry trace by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific trace ID (e.g., 'a4d1aae7216b47ff8117cf4e09ce9d0a')\n- Ask to 'show me trace [TRACE-ID]', 'explain trace [TRACE-ID]'\n- Want high-level overview and link to view trace details in Sentry\n- Need trace statistics and span breakdown\n\nDO NOT USE for:\n- General searching for traces (use search_events with trace queries)\n- Individual span details (this shows trace overview)\n\nTRIGGER PATTERNS:\n- 'Show me trace abc123' → use get_trace_details\n- 'Explain trace a4d1aae7216b47ff8117cf4e09ce9d0a' → use get_trace_details\n- 'What is trace [trace-id]' → use get_trace_details\n\n<examples>\n### Get trace overview\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\n```\n</examples>\n\n<hints>\n- Trace IDs are 32-character hexadecimal strings\n</hints>",
     "inputSchema": {

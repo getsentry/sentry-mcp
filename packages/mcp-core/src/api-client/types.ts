@@ -55,6 +55,7 @@ import type {
   EventAttachmentListSchema,
   IssueListSchema,
   IssueSchema,
+  IssueTagValuesSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProjectListSchema,
@@ -116,3 +117,6 @@ export type TraceMeta = z.infer<typeof TraceMetaSchema>;
 export type TraceSpan = z.infer<typeof TraceSpanSchema>;
 export type TraceIssue = z.infer<typeof TraceIssueSchema>;
 export type Trace = z.infer<typeof TraceSchema>;
+
+// Issue tag values
+export type IssueTagValues = z.infer<typeof IssueTagValuesSchema>;

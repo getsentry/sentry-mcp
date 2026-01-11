@@ -667,6 +667,33 @@ export const EventAttachmentSchema = z.object({
 export const EventAttachmentListSchema = z.array(EventAttachmentSchema);
 
 /**
+ * Schema for individual tag values within an issue's tag distribution.
+ *
+ * Represents a single value's occurrence count and percentage within a tag.
+ */
+export const IssueTagValueSchema = z.object({
+  key: z.string().optional(),
+  name: z.string().optional(),
+  value: z.string(),
+  count: z.number(),
+  lastSeen: z.string().datetime().nullable().optional(),
+  firstSeen: z.string().datetime().nullable().optional(),
+});
+
+/**
+ * Schema for Sentry issue tag values response.
+ *
+ * Contains aggregate counts of unique tag values for an issue,
+ * useful for understanding the distribution of tags like URL, browser, etc.
+ */
+export const IssueTagValuesSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  totalValues: z.number(),
+  topValues: z.array(IssueTagValueSchema),
+});
+
+/**
  * Schema for Sentry trace metadata response.
  *
  * Contains high-level statistics about a trace including span counts,
