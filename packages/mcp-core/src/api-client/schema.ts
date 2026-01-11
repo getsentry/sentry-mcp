@@ -676,8 +676,8 @@ export const IssueTagValueSchema = z.object({
   name: z.string().optional(),
   value: z.string(),
   count: z.number(),
-  lastSeen: z.string().datetime().optional(),
-  firstSeen: z.string().datetime().optional(),
+  lastSeen: z.string().datetime().nullable().optional(),
+  firstSeen: z.string().datetime().nullable().optional(),
 });
 
 /**

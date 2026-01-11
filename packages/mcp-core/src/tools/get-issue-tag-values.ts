@@ -155,10 +155,15 @@ export default defineTool({
         ? new Date(value.lastSeen).toISOString().split("T")[0]
         : "-";
       // Truncate long values for readability
-      const displayValue =
+      let displayValue =
         value.value.length > 60
           ? `${value.value.substring(0, 57)}...`
           : value.value;
+      // Escape markdown table special characters
+      displayValue = displayValue
+        .replace(/\|/g, "\\|")
+        .replace(/`/g, "\\`")
+        .replace(/\n/g, " ");
       output += `| \`${displayValue}\` | ${value.count} | ${firstSeen} | ${lastSeen} |\n`;
     }
 
