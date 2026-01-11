@@ -159,8 +159,9 @@ export default defineTool({
         value.value.length > 60
           ? `${value.value.substring(0, 57)}...`
           : value.value;
-      // Escape markdown table special characters
+      // Escape markdown table special characters (backslashes first)
       displayValue = displayValue
+        .replace(/\\/g, "\\\\")
         .replace(/\|/g, "\\|")
         .replace(/`/g, "\\`")
         .replace(/\n/g, " ");
