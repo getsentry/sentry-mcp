@@ -11,7 +11,7 @@ export const issueRoute = buildRouteMap({
     brief: "Manage Sentry issues",
     fullDescription:
       "View and manage issues from your Sentry projects. " +
-      "Use 'sry issue list' to list issues and 'sry issue get <id>' to view issue details.",
+      "Use 'sentry issue list' to list issues and 'sentry issue get <id>' to view issue details.",
     hideRoute: {},
   },
 });

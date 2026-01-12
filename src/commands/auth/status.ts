@@ -1,11 +1,11 @@
 /**
- * sry auth status
+ * sentry auth status
  *
  * Display authentication status and verify credentials.
  */
 
 import { buildCommand } from "@stricli/core";
-import type { SryContext } from "../../context.js";
+import type { SentryContext } from "../../context.js";
 import { listOrganizations } from "../../lib/api-client.js";
 import {
   getConfigPath,
@@ -15,7 +15,7 @@ import {
   readConfig,
 } from "../../lib/config.js";
 import { formatExpiration, maskToken } from "../../lib/formatters/human.js";
-import type { SryConfig } from "../../types/index.js";
+import type { SentryConfig } from "../../types/index.js";
 
 type StatusFlags = {
   readonly showToken: boolean;
@@ -26,7 +26,7 @@ type StatusFlags = {
  */
 function writeTokenInfo(
   stdout: NodeJS.WriteStream,
-  config: SryConfig,
+  config: SentryConfig,
   showToken: boolean
 ): void {
   if (!config.auth?.token) {
@@ -104,7 +104,7 @@ export const statusCommand = buildCommand({
       },
     },
   },
-  async func(this: SryContext, flags: StatusFlags): Promise<void> {
+  async func(this: SentryContext, flags: StatusFlags): Promise<void> {
     const { process } = this;
     const { stdout } = process;
 
@@ -115,7 +115,7 @@ export const statusCommand = buildCommand({
 
     if (!authenticated) {
       stdout.write("Status: Not authenticated\n");
-      stdout.write("\nRun 'sry auth login' to authenticate.\n");
+      stdout.write("\nRun 'sentry auth login' to authenticate.\n");
       return;
     }
 

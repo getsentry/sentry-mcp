@@ -16,14 +16,14 @@ const routes = buildRouteMap({
   docs: {
     brief: "A gh-like CLI for Sentry",
     fullDescription:
-      "sry is a command-line interface for interacting with Sentry. " +
+      "sentry is a command-line interface for interacting with Sentry. " +
       "It provides commands for authentication, viewing issues, and making API calls.",
     hideRoute: {},
   },
 });
 
 export const app = buildApplication(routes, {
-  name: "sry",
+  name: "sentry",
   versionInfo: {
     currentVersion: "0.1.0",
   },

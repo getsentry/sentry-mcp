@@ -14,7 +14,7 @@ import { setAuthToken } from "./config.js";
 
 // OAuth proxy server URL - handles the actual OAuth flow with Sentry
 const OAUTH_PROXY_URL =
-  process.env.SRY_OAUTH_PROXY_URL ?? "https://sry-oauth.vercel.app";
+  process.env.SENTRY_OAUTH_PROXY_URL ?? "https://sry-oauth.vercel.app";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -180,7 +180,7 @@ export async function performDeviceFlow(
         // Token expired
         if (error.code === "expired_token") {
           throw new Error(
-            "Device code expired. Please run 'sry auth login' again."
+            "Device code expired. Please run 'sentry auth login' again."
           );
         }
 

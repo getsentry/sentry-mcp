@@ -1,12 +1,12 @@
 /**
  * Configuration Types
  *
- * Types for the sry CLI configuration file.
+ * Types for the Sentry CLI configuration file.
  */
 
 import type { CachedProject } from "./dsn.js";
 
-export type SryConfig = {
+export type SentryConfig = {
   auth?: {
     token?: string;
     refreshToken?: string;

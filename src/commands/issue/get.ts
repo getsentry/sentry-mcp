@@ -1,11 +1,11 @@
 /**
- * sry issue get
+ * sentry issue get
  *
  * Get detailed information about a Sentry issue.
  */
 
 import { buildCommand } from "@stricli/core";
-import type { SryContext } from "../../context.js";
+import type { SentryContext } from "../../context.js";
 import {
   getIssue,
   getIssueByShortId,
@@ -137,7 +137,7 @@ export const getCommand = buildCommand({
     },
   },
   async func(
-    this: SryContext,
+    this: SentryContext,
     flags: GetFlags,
     issueId: string
   ): Promise<void> {
@@ -155,7 +155,7 @@ export const getCommand = buildCommand({
           stderr.write(
             "Error: Organization is required for short ID lookup.\n\n" +
               "Please specify it using:\n" +
-              `  sry issue get ${issueId} --org <org-slug>\n\n` +
+              `  sentry issue get ${issueId} --org <org-slug>\n\n` +
               "Or set SENTRY_DSN environment variable for automatic detection.\n"
           );
           process.exitCode = 1;

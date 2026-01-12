@@ -1,12 +1,12 @@
 /**
- * sry api
+ * sentry api
  *
  * Make raw authenticated API requests to Sentry.
  * Similar to 'gh api' for GitHub.
  */
 
 import { buildCommand } from "@stricli/core";
-import type { SryContext } from "../context.js";
+import type { SentryContext } from "../context.js";
 import { rawApiRequest } from "../lib/api-client.js";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -162,9 +162,9 @@ export const apiCommand = buildCommand({
       "The endpoint should start with '/api/0/' or be a full URL. " +
       "Authentication is handled automatically using your stored credentials.\n\n" +
       "Examples:\n" +
-      "  sry api /api/0/organizations/\n" +
-      "  sry api /api/0/issues/123/ --method PUT --field status=resolved\n" +
-      "  sry api /api/0/projects/my-org/my-project/issues/",
+      "  sentry api /api/0/organizations/\n" +
+      "  sentry api /api/0/issues/123/ --method PUT --field status=resolved\n" +
+      "  sentry api /api/0/projects/my-org/my-project/issues/",
   },
   parameters: {
     positional: {
@@ -211,7 +211,7 @@ export const apiCommand = buildCommand({
     },
   },
   async func(
-    this: SryContext,
+    this: SentryContext,
     flags: ApiFlags,
     endpoint: string
   ): Promise<void> {

@@ -1,15 +1,15 @@
 {
-  "name": "@sry/cli",
+  "name": "@sentry/cli",
   "version": "0.1.0",
   "description": "A gh-like CLI for Sentry",
   "type": "module",
   "bin": {
-    "sry": "./src/bin.ts"
+    "sentry": "./src/bin.ts"
   },
   "scripts": {
     "dev": "bun run src/bin.ts",
-    "build": "fossilize -o sry src/bin.ts",
-    "build:all": "FOSSILIZE_PLATFORMS=darwin-arm64,darwin-x64,linux-x64,linux-arm64,win-x64 fossilize -o sry src/bin.ts",
+    "build": "fossilize -o sentry src/bin.ts",
+    "build:all": "FOSSILIZE_PLATFORMS=darwin-arm64,darwin-x64,linux-x64,linux-arm64,win-x64 fossilize -o sentry src/bin.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

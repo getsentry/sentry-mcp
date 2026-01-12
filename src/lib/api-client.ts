@@ -90,7 +90,7 @@ function getAuthHeaders(): Record<string, string> {
 
   if (!token) {
     throw new SentryApiError(
-      "Not authenticated. Run 'sry auth login' first.",
+      "Not authenticated. Run 'sentry auth login' first.",
       401
     );
   }
@@ -143,7 +143,7 @@ export async function apiRequest<T>(
 }
 
 /**
- * Make a raw API request (for the 'sry api' command)
+ * Make a raw API request (for the 'sentry api' command)
  */
 export async function rawApiRequest(
   endpoint: string,

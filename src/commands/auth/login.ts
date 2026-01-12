@@ -1,5 +1,5 @@
 import { buildCommand, numberParser } from "@stricli/core";
-import type { SryContext } from "../../context.js";
+import type { SentryContext } from "../../context.js";
 import { getConfigPath, isAuthenticated } from "../../lib/config.js";
 import {
   completeOAuthFlow,
@@ -37,13 +37,13 @@ export const loginCommand = buildCommand({
       },
     },
   },
-  async func(this: SryContext, flags: LoginFlags): Promise<void> {
+  async func(this: SentryContext, flags: LoginFlags): Promise<void> {
     const { process } = this;
 
     // Check if already authenticated
     if (isAuthenticated()) {
       process.stdout.write(
-        "You are already authenticated. Use 'sry auth logout' first to re-authenticate.\n"
+        "You are already authenticated. Use 'sentry auth logout' first to re-authenticate.\n"
       );
       return;
     }
