@@ -1,11 +1,11 @@
 /**
- * sry project list
+ * sentry project list
  *
  * List projects in an organization.
  */
 
 import { buildCommand, numberParser } from "@stricli/core";
-import type { SryContext } from "../../context.js";
+import type { SentryContext } from "../../context.js";
 import { listOrganizations, listProjects } from "../../lib/api-client.js";
 import { getDefaultOrganization } from "../../lib/config.js";
 import {
@@ -97,11 +97,11 @@ export const listCommand = buildCommand({
       "List projects in an organization. If no organization is specified, " +
       "uses the default organization or lists projects from all accessible organizations.\n\n" +
       "Examples:\n" +
-      "  sry project list\n" +
-      "  sry project list --org my-org\n" +
-      "  sry project list --limit 10\n" +
-      "  sry project list --json\n" +
-      "  sry project list --platform javascript",
+      "  sentry project list\n" +
+      "  sentry project list --org my-org\n" +
+      "  sentry project list --limit 10\n" +
+      "  sentry project list --json\n" +
+      "  sentry project list --platform javascript",
   },
   parameters: {
     positional: {
@@ -141,7 +141,7 @@ export const listCommand = buildCommand({
     },
   },
   async func(
-    this: SryContext,
+    this: SentryContext,
     flags: ListFlags,
     orgArg?: string
   ): Promise<void> {

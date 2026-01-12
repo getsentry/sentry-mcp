@@ -1,11 +1,11 @@
 /**
- * sry auth logout
+ * sentry auth logout
  *
  * Clear stored authentication credentials.
  */
 
 import { buildCommand } from "@stricli/core";
-import type { SryContext } from "../../context.js";
+import type { SentryContext } from "../../context.js";
 import { clearAuth, getConfigPath, isAuthenticated } from "../../lib/config.js";
 
 export const logoutCommand = buildCommand({
@@ -17,7 +17,7 @@ export const logoutCommand = buildCommand({
   parameters: {
     flags: {},
   },
-  func(this: SryContext): void {
+  func(this: SentryContext): void {
     const { process } = this;
     const { stdout } = process;
 

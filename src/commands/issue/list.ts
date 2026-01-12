@@ -1,11 +1,11 @@
 /**
- * sry issue list
+ * sentry issue list
  *
  * List issues from a Sentry project.
  */
 
 import { buildCommand, numberParser } from "@stricli/core";
-import type { SryContext } from "../../context.js";
+import type { SentryContext } from "../../context.js";
 import { getProject, listIssues } from "../../lib/api-client.js";
 import {
   getCachedProject,
@@ -143,7 +143,7 @@ function writeIssueRows(
  */
 function writeListFooter(stdout: NodeJS.WriteStream): void {
   stdout.write(
-    "\nTip: Use 'sry issue get <SHORT_ID>' to view issue details.\n"
+    "\nTip: Use 'sentry issue get <SHORT_ID>' to view issue details.\n"
   );
 }
 
@@ -152,7 +152,7 @@ export const listCommand = buildCommand({
     brief: "List issues in a project",
     fullDescription:
       "List issues from a Sentry project. Use --org and --project to specify " +
-      "the target, or set defaults with 'sry config set'.",
+      "the target, or set defaults with 'sentry config set'.",
   },
   parameters: {
     flags: {
@@ -193,7 +193,7 @@ export const listCommand = buildCommand({
       },
     },
   },
-  async func(this: SryContext, flags: ListFlags): Promise<void> {
+  async func(this: SentryContext, flags: ListFlags): Promise<void> {
     const { process, cwd } = this;
     const { stdout, stderr } = process;
 
@@ -237,10 +237,10 @@ export const listCommand = buildCommand({
       stderr.write(
         "Error: Organization and project are required.\n\n" +
           "Please specify them using:\n" +
-          "  sry issue list --org <org-slug> --project <project-slug>\n\n" +
+          "  sentry issue list --org <org-slug> --project <project-slug>\n\n" +
           "Or set defaults:\n" +
-          "  sry config set defaults.organization <org-slug>\n" +
-          "  sry config set defaults.project <project-slug>\n\n" +
+          "  sentry config set defaults.organization <org-slug>\n" +
+          "  sentry config set defaults.project <project-slug>\n\n" +
           "Or set SENTRY_DSN environment variable for automatic detection.\n"
       );
       process.exitCode = 1;

@@ -1,11 +1,11 @@
 /**
- * Type definitions for the sry CLI
+ * Type definitions for the Sentry CLI
  *
  * Re-exports all types from domain-specific modules.
  */
 
 // Configuration types
-export type { SryConfig } from "./config.js";
+export type { SentryConfig } from "./config.js";
 
 // DSN types
 export type {

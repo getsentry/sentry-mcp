@@ -1,11 +1,11 @@
 /**
- * sry org list
+ * sentry org list
  *
  * List organizations the user has access to.
  */
 
 import { buildCommand, numberParser } from "@stricli/core";
-import type { SryContext } from "../../context.js";
+import type { SentryContext } from "../../context.js";
 import { listOrganizations } from "../../lib/api-client.js";
 import {
   calculateOrgSlugWidth,
@@ -24,9 +24,9 @@ export const listCommand = buildCommand({
     fullDescription:
       "List organizations that you have access to.\n\n" +
       "Examples:\n" +
-      "  sry org list\n" +
-      "  sry org list --limit 10\n" +
-      "  sry org list --json",
+      "  sentry org list\n" +
+      "  sentry org list --limit 10\n" +
+      "  sentry org list --json",
   },
   parameters: {
     flags: {
@@ -43,7 +43,7 @@ export const listCommand = buildCommand({
       },
     },
   },
-  async func(this: SryContext, flags: ListFlags): Promise<void> {
+  async func(this: SentryContext, flags: ListFlags): Promise<void> {
     const { process } = this;
     const { stdout, stderr } = process;
 
