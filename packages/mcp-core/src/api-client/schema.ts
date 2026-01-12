@@ -672,9 +672,9 @@ export const EventAttachmentListSchema = z.array(EventAttachmentSchema);
  * Represents a single value's occurrence count and percentage within a tag.
  */
 export const IssueTagValueSchema = z.object({
-  key: z.string().optional(),
-  name: z.string().optional(),
-  value: z.string(),
+  key: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  value: z.string().nullable(),
   count: z.number(),
   lastSeen: z.string().datetime().nullable().optional(),
   firstSeen: z.string().datetime().nullable().optional(),

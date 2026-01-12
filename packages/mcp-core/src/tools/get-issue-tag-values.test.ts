@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import getIssueTagValues from "./get-issue-tag-values.js";
 import { getServerContext } from "../test-setup.js";
 import { UserInputError } from "../errors.js";
@@ -131,5 +133,56 @@ describe("get_issue_tag_values", () => {
         getServerContext(),
       ),
     ).rejects.toThrow();
+  });
+
+  it("handles null values in topValues gracefully", async () => {
+    // Override the handler to return null values (which can occur with certain tag types)
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/:org/issues/:issueId/tags/:tagKey/",
+        () => {
+          return HttpResponse.json({
+            key: "custom_tag",
+            name: "Custom Tag",
+            totalValues: 2,
+            topValues: [
+              {
+                key: "custom_tag",
+                name: "valid_value",
+                value: "valid_value",
+                count: 10,
+                lastSeen: "2024-01-15T10:30:00.000Z",
+                firstSeen: "2024-01-10T08:00:00.000Z",
+              },
+              {
+                key: "custom_tag",
+                name: null,
+                value: null,
+                count: 5,
+                lastSeen: "2024-01-14T09:00:00.000Z",
+                firstSeen: "2024-01-12T14:00:00.000Z",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await getIssueTagValues.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        tagKey: "custom_tag",
+        regionUrl: null,
+        issueUrl: undefined,
+      },
+      getServerContext(),
+    );
+
+    // Verify the output handles null values by displaying "(null)"
+    expect(result).toContain("# Tag Distribution: Custom Tag");
+    expect(result).toContain("`valid_value`");
+    expect(result).toContain("`(null)`");
+    expect(result).toContain("| 5 |"); // The null value entry should have count 5
   });
 });
