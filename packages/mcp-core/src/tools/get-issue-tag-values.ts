@@ -154,11 +154,11 @@ export default defineTool({
       const lastSeen = value.lastSeen
         ? new Date(value.lastSeen).toISOString().split("T")[0]
         : "-";
+      // Handle null values (can occur with certain tag types)
+      const rawValue = value.value ?? "(null)";
       // Truncate long values for readability
       let displayValue =
-        value.value.length > 60
-          ? `${value.value.substring(0, 57)}...`
-          : value.value;
+        rawValue.length > 60 ? `${rawValue.substring(0, 57)}...` : rawValue;
       // Escape markdown table special characters (backslashes first)
       displayValue = displayValue
         .replace(/\\/g, "\\\\")
