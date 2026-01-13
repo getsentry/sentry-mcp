@@ -97,8 +97,8 @@ catalogs:
       specifier: ^8.0.0
       version: 8.0.0
     hono:
-      specifier: ^4.10.3
-      version: 4.10.3
+      specifier: ^4.11.4
+      version: 4.11.4
     lint-staged:
       specifier: ^15.5.2
       version: 15.5.2
@@ -260,7 +260,7 @@ importers:
         version: 2.1.1
       hono:
         specifier: 'catalog:'
-        version: 4.10.3
+        version: 4.11.4
       lucide-react:
         specifier: 'catalog:'
         version: 0.503.0(react@19.1.0)
@@ -3128,8 +3128,8 @@ packages:
   hoist-non-react-statics@3.3.2:
     resolution: {integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==}
 
-  hono@4.10.3:
-    resolution: {integrity: sha512-2LOYWUbnhdxdL8MNbNg9XZig6k+cZXm5IjHn2Aviv7honhBMOHb+jxrKIeJRZJRmn+htUCKhaicxwXuUDlchRA==}
+  hono@4.11.4:
+    resolution: {integrity: sha512-U7tt8JsyrxSRKspfhtLET79pU8K+tInj5QZXs1jSugO1Vq5dFj3kmZsRldo29mTBfcjDRVRXrEZ6LS63Cog9ZA==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -7445,7 +7445,7 @@ snapshots:
     dependencies:
       react-is: 16.13.1
 
-  hono@4.10.3: {}
+  hono@4.11.4: {}
 
   hookable@5.5.3: {}
 
@@ -9493,7 +9493,7 @@ snapshots:
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.4.1
       fs-extra: 11.3.0
-      hono: 4.10.3
+      hono: 4.11.4
       jsdoc-api: 9.3.4
       just-filter-object: 3.2.0
       just-map-values: 3.2.0
