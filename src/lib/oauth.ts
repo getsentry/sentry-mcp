@@ -16,11 +16,21 @@ import { setAuthToken } from "./config.js";
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Sentry instance URL (supports self-hosted)
+// Sentry instance URL (supports self-hosted via env override)
 const SENTRY_URL = process.env.SENTRY_URL ?? "https://sentry.io";
 
-// OAuth client ID (required for identifying the application)
-const SENTRY_CLIENT_ID = process.env.SENTRY_CLIENT_ID ?? "";
+/**
+ * OAuth client ID
+ *
+ * Build-time: Injected via Bun.build({ define: { SENTRY_CLIENT_ID: "..." } })
+ * Runtime: Can be overridden via SENTRY_CLIENT_ID env var (for self-hosted)
+ *
+ * @see packages/cli/script/build.ts
+ */
+declare const SENTRY_CLIENT_ID_BUILD: string | undefined;
+const SENTRY_CLIENT_ID =
+  process.env.SENTRY_CLIENT_ID ??
+  (typeof SENTRY_CLIENT_ID_BUILD !== "undefined" ? SENTRY_CLIENT_ID_BUILD : "");
 
 // OAuth scopes requested for the CLI
 const SCOPES = [
@@ -249,8 +259,10 @@ export async function performDeviceFlow(
 /**
  * Complete the OAuth flow and store the token
  */
-export function completeOAuthFlow(tokenResponse: TokenResponse): void {
-  setAuthToken(
+export async function completeOAuthFlow(
+  tokenResponse: TokenResponse
+): Promise<void> {
+  await setAuthToken(
     tokenResponse.access_token,
     tokenResponse.expires_in,
     tokenResponse.refresh_token
@@ -260,6 +272,6 @@ export function completeOAuthFlow(tokenResponse: TokenResponse): void {
 /**
  * Alternative: Token-based auth (for users who have an API token)
  */
-export function setApiToken(token: string): void {
-  setAuthToken(token);
+export async function setApiToken(token: string): Promise<void> {
+  await setAuthToken(token);
 }

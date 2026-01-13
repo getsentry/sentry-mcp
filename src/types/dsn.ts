@@ -35,14 +35,3 @@ export type DetectedDsn = ParsedDsn & {
   /** File path if detected from file */
   sourcePath?: string;
 };
-
-/**
- * Cached project information from DSN resolution
- */
-export type CachedProject = {
-  orgSlug: string;
-  orgName: string;
-  projectSlug: string;
-  projectName: string;
-  cachedAt: number;
-};

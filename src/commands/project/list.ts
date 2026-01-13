@@ -149,7 +149,7 @@ export const listCommand = buildCommand({
     const { stdout, stderr } = process;
 
     try {
-      const orgSlug = orgArg ?? flags.org ?? getDefaultOrganization();
+      const orgSlug = orgArg ?? flags.org ?? (await getDefaultOrganization());
       const showOrg = !orgSlug;
 
       // Fetch projects

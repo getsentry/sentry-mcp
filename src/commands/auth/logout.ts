@@ -17,16 +17,16 @@ export const logoutCommand = buildCommand({
   parameters: {
     flags: {},
   },
-  func(this: SentryContext): void {
+  async func(this: SentryContext): Promise<void> {
     const { process } = this;
     const { stdout } = process;
 
-    if (!isAuthenticated()) {
+    if (!(await isAuthenticated())) {
       stdout.write("Not currently authenticated.\n");
       return;
     }
 
-    clearAuth();
+    await clearAuth();
     stdout.write("✓ Logged out successfully.\n");
     stdout.write(`  Credentials removed from: ${getConfigPath()}\n`);
   },

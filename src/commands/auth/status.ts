@@ -46,9 +46,9 @@ function writeTokenInfo(
 /**
  * Write default settings
  */
-function writeDefaults(stdout: NodeJS.WriteStream): void {
-  const defaultOrg = getDefaultOrganization();
-  const defaultProject = getDefaultProject();
+async function writeDefaults(stdout: NodeJS.WriteStream): Promise<void> {
+  const defaultOrg = await getDefaultOrganization();
+  const defaultProject = await getDefaultProject();
 
   if (!(defaultOrg || defaultProject)) {
     return;
@@ -108,8 +108,8 @@ export const statusCommand = buildCommand({
     const { process } = this;
     const { stdout } = process;
 
-    const config = readConfig();
-    const authenticated = isAuthenticated();
+    const config = await readConfig();
+    const authenticated = await isAuthenticated();
 
     stdout.write(`Config file: ${getConfigPath()}\n\n`);
 
@@ -122,7 +122,7 @@ export const statusCommand = buildCommand({
     stdout.write("Status: Authenticated ✓\n\n");
 
     writeTokenInfo(stdout, config, flags.showToken);
-    writeDefaults(stdout);
+    await writeDefaults(stdout);
     await verifyCredentials(stdout);
   },
 });

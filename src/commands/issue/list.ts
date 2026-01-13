@@ -51,7 +51,7 @@ async function resolveFromDsn(cwd: string): Promise<ResolvedTarget | null> {
   }
 
   // Check cache first
-  const cached = getCachedProject(dsn.orgId, dsn.projectId);
+  const cached = await getCachedProject(dsn.orgId, dsn.projectId);
   if (cached) {
     return {
       org: cached.orgSlug,
@@ -67,7 +67,7 @@ async function resolveFromDsn(cwd: string): Promise<ResolvedTarget | null> {
 
   // Cache the result
   if (projectInfo.organization) {
-    setCachedProject(dsn.orgId, dsn.projectId, {
+    await setCachedProject(dsn.orgId, dsn.projectId, {
       orgSlug: projectInfo.organization.slug,
       orgName: projectInfo.organization.name,
       projectSlug: projectInfo.slug,
@@ -212,8 +212,8 @@ export const listCommand = buildCommand({
 
     // 2. Check config defaults
     if (!target) {
-      const defaultOrg = getDefaultOrganization();
-      const defaultProject = getDefaultProject();
+      const defaultOrg = await getDefaultOrganization();
+      const defaultProject = await getDefaultProject();
       if (defaultOrg && defaultProject) {
         target = {
           org: defaultOrg,

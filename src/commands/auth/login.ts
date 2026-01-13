@@ -41,7 +41,7 @@ export const loginCommand = buildCommand({
     const { process } = this;
 
     // Check if already authenticated
-    if (isAuthenticated()) {
+    if (await isAuthenticated()) {
       process.stdout.write(
         "You are already authenticated. Use 'sentry auth logout' first to re-authenticate.\n"
       );
@@ -50,7 +50,7 @@ export const loginCommand = buildCommand({
 
     // Token-based authentication
     if (flags.token) {
-      setApiToken(flags.token);
+      await setApiToken(flags.token);
       process.stdout.write("✓ Authenticated with API token\n");
       process.stdout.write(`  Config saved to: ${getConfigPath()}\n`);
       return;
@@ -87,7 +87,7 @@ export const loginCommand = buildCommand({
       process.stdout.write("\n\n");
 
       // Store the token
-      completeOAuthFlow(tokenResponse);
+      await completeOAuthFlow(tokenResponse);
 
       process.stdout.write("✓ Authentication successful!\n");
       process.stdout.write(`  Config saved to: ${getConfigPath()}\n`);

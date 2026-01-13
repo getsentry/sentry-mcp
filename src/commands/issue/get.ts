@@ -54,7 +54,7 @@ async function resolveOrg(
   }
 
   // 2. Check config defaults
-  const defaultOrg = getDefaultOrganization();
+  const defaultOrg = await getDefaultOrganization();
   if (defaultOrg) {
     return defaultOrg;
   }
@@ -64,7 +64,7 @@ async function resolveOrg(
     const dsn = await detectDsn(cwd);
     if (dsn?.orgId) {
       // Check cache for org slug
-      const cached = getCachedProject(dsn.orgId, dsn.projectId);
+      const cached = await getCachedProject(dsn.orgId, dsn.projectId);
       if (cached) {
         return cached.orgSlug;
       }

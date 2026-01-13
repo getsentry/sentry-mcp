@@ -14,6 +14,11 @@ import { getAuthToken } from "./config.js";
 
 const SENTRY_API_BASE = "https://sentry.io/api/0";
 
+/**
+ * Pattern to detect short IDs (contain letters, vs numeric IDs which are just digits)
+ */
+const SHORT_ID_PATTERN = /[a-zA-Z]/;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Error Handling
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,8 +90,8 @@ async function parseResponseBody(response: Response): Promise<unknown> {
 /**
  * Get auth headers for requests
  */
-function getAuthHeaders(): Record<string, string> {
-  const token = getAuthToken();
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const token = await getAuthToken();
 
   if (!token) {
     throw new SentryApiError(
@@ -115,7 +120,7 @@ export async function apiRequest<T>(
   const { method = "GET", body, params } = options;
 
   const url = buildUrl(endpoint, params);
-  const headers = getAuthHeaders();
+  const headers = await getAuthHeaders();
 
   const response = await fetch(url, {
     method,
@@ -153,7 +158,7 @@ export async function rawApiRequest(
 
   const url = buildUrl(endpoint, params);
   const headers = {
-    ...getAuthHeaders(),
+    ...(await getAuthHeaders()),
     ...customHeaders,
   };
 
@@ -263,7 +268,7 @@ export function getIssueByShortId(
  */
 export function isShortId(issueId: string): boolean {
   // Short IDs contain letters and hyphens, numeric IDs are just digits
-  return /[a-zA-Z]/.test(issueId);
+  return SHORT_ID_PATTERN.test(issueId);
 }
 
 /**
