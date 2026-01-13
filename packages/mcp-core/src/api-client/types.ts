@@ -56,6 +56,8 @@ import type {
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  ExternalIssueSchema,
+  ExternalIssueListSchema,
   OrganizationListSchema,
   OrganizationSchema,
   ProjectListSchema,
@@ -120,3 +122,7 @@ export type Trace = z.infer<typeof TraceSchema>;
 
 // Issue tag values
 export type IssueTagValues = z.infer<typeof IssueTagValuesSchema>;
+
+// External issue links (Jira, GitHub, etc.)
+export type ExternalIssue = z.infer<typeof ExternalIssueSchema>;
+export type ExternalIssueList = z.infer<typeof ExternalIssueListSchema>;

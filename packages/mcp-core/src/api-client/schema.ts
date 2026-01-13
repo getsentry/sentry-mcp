@@ -694,6 +694,22 @@ export const IssueTagValuesSchema = z.object({
 });
 
 /**
+ * Schema for external issue link (e.g., Jira, GitHub Issues).
+ *
+ * Represents a link between a Sentry issue and an external issue tracking
+ * system like Jira, GitHub Issues, GitLab, etc.
+ */
+export const ExternalIssueSchema = z.object({
+  id: z.string(),
+  issueId: z.string(),
+  serviceType: z.string(),
+  displayName: z.string(),
+  webUrl: z.string(),
+});
+
+export const ExternalIssueListSchema = z.array(ExternalIssueSchema);
+
+/**
  * Schema for Sentry trace metadata response.
  *
  * Contains high-level statistics about a trace including span counts,
