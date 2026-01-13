@@ -5,6 +5,7 @@ import findProjects from "./find-projects";
 import findReleases from "./find-releases";
 import getIssueDetails from "./get-issue-details";
 import getIssueTagValues from "./get-issue-tag-values";
+import getIssueExternalLinks from "./get-issue-external-links";
 import getTraceDetails from "./get-trace-details";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
@@ -30,6 +31,7 @@ export default {
   find_releases: findReleases,
   get_issue_details: getIssueDetails,
   get_issue_tag_values: getIssueTagValues,
+  get_issue_external_links: getIssueExternalLinks,
   get_trace_details: getTraceDetails,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,

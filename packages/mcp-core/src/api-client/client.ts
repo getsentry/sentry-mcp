@@ -16,6 +16,7 @@ import {
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  ExternalIssueListSchema,
   EventSchema,
   EventAttachmentListSchema,
   ErrorsSearchResponseSchema,
@@ -44,6 +45,7 @@ import type {
   Issue,
   IssueList,
   IssueTagValues,
+  ExternalIssueList,
   OrganizationList,
   Project,
   ProjectList,
@@ -1591,6 +1593,42 @@ export class SentryApiService {
       opts,
     );
     return IssueTagValuesSchema.parse(body);
+  }
+
+  /**
+   * Retrieves external issue links for a specific issue.
+   *
+   * Returns a list of external issue tracking links (e.g., Jira, GitHub Issues)
+   * that are connected to the given Sentry issue.
+   *
+   * @param params - Parameters including organization slug and issue ID
+   * @param opts - Optional request options
+   * @returns Promise resolving to list of external issue links
+   *
+   * @example
+   * ```typescript
+   * const externalIssues = await apiService.getIssueExternalLinks({
+   *   organizationSlug: "my-org",
+   *   issueId: "PROJECT-123",
+   * });
+   * ```
+   */
+  async getIssueExternalLinks(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ExternalIssueList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
+      undefined,
+      opts,
+    );
+    return ExternalIssueListSchema.parse(body);
   }
 
   async getEventForIssue(
