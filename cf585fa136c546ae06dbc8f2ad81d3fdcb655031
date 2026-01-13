@@ -1,0 +1,372 @@
+packages/mcp-core/src/internal/agents/provider-factory.ts
+  fe5d3b4e2e519299 31-53,103-110,119,146,149,151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.31",
+  "base_commit_sha": "cf585fa136c546ae06dbc8f2ad81d3fdcb655031",
+  "prompts": {
+    "fe5d3b4e2e519299": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ac1bf379-89fb-42e1-afb4-1d4b57a073c4",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "David Cramer <dcramer@gmail.com>",
+      "messages": [
+        {
+          "type": "user",
+          "text": "iterate-pr",
+          "timestamp": "2026-01-13T03:29:49.226Z"
+        },
+        {
+          "type": "assistant",
+          "text": "The user wants to run the \"iterate-pr\" skill. This is a Sentry skill that iterates on a PR until CI passes. Let me invoke this skill using the Skill tool.",
+          "timestamp": "2026-01-13T03:29:53.712Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Skill",
+          "input": {
+            "skill": "sentry-skills:iterate-pr"
+          },
+          "timestamp": "2026-01-13T03:29:54.350Z"
+        },
+        {
+          "type": "user",
+          "text": "Base directory for this skill: /home/dcramer/.claude/plugins/cache/sentry-skills/sentry-skills/0189f2ed17fd/skills/iterate-pr\n\n# Iterate on PR Until CI Passes\n\nContinuously iterate on the current branch until all CI checks pass and review feedback is addressed.\n\n**Requires**: GitHub CLI (`gh`) authenticated and available.\n\n## Process\n\n### Step 1: Identify the PR\n\n```bash\ngh pr view --json number,url,headRefName,baseRefName\n```\n\nIf no PR exists for the current branch, stop and inform the user.\n\n### Step 2: Check CI Status First\n\nAlways check CI/GitHub Actions status before looking at review feedback:\n\n```bash\ngh pr checks --json name,state,bucket,link,workflow\n```\n\nThe `bucket` field categorizes state into: `pass`, `fail`, `pending`, `skipping`, or `cancel`.\n\n**Important:** If any of these checks are still `pending`, wait before proceeding:\n- `sentry` / `sentry-io`\n- `codecov`\n- `cursor` / `bugbot` / `seer`\n- Any linter or code analysis checks\n\nThese bots may post additional feedback comments once their checks complete. Waiting avoids duplicate work.\n\n### Step 3: Gather Review Feedback\n\nOnce CI checks have completed (or at least the bot-related checks), gather human and bot feedback:\n\n**Review Comments and Status:**\n```bash\ngh pr view --json reviews,comments,reviewDecision\n```\n\n**Inline Code Review Comments:**\n```bash\ngh api repos/{owner}/{repo}/pulls/{pr_number}/comments\n```\n\n**PR Conversation Comments (includes bot comments):**\n```bash\ngh api repos/{owner}/{repo}/issues/{pr_number}/comments\n```\n\nLook for bot comments from: Sentry, Codecov, Cursor, Bugbot, Seer, and other automated tools.\n\n### Step 4: Investigate Failures\n\nFor each CI failure, get the actual logs:\n\n```bash\n# List recent runs for this branch\ngh run list --branch $(git branch --show-current) --limit 5 --json databaseId,name,status,conclusion\n\n# View failed logs for a specific run\ngh run view <run-id> --log-failed\n```\n\nDo NOT assume what failed based on the check name alone. Always read the actual logs.\n\n### Step 5: Validate Feedback\n\nFor each piece of feedback (CI failure or review comment):\n\n1. **Read the relevant code** - Understand the context before making changes\n2. **Verify the issue is real** - Not all feedback is correct; reviewers and bots can be wrong\n3. **Check if already addressed** - The issue may have been fixed in a subsequent commit\n4. **Skip invalid feedback** - If the concern is not legitimate, move on\n\n### Step 6: Address Valid Issues\n\nMake minimal, targeted code changes. Only fix what is actually broken.\n\n### Step 7: Commit and Push\n\n```bash\ngit add -A\ngit commit -m \"fix: <descriptive message of what was fixed>\"\ngit push origin $(git branch --show-current)\n```\n\n### Step 8: Wait for CI\n\nUse the built-in watch functionality:\n\n```bash\ngh pr checks --watch --interval 30\n```\n\nThis waits until all checks complete. Exit code 0 means all passed, exit code 1 means failures.\n\nAlternatively, poll manually if you need more control:\n\n```bash\ngh pr checks --json name,state,bucket | jq '.[] | select(.bucket != \"pass\")'\n```\n\n### Step 9: Repeat\n\nReturn to Step 2 if:\n- Any CI checks failed\n- New review feedback appeared\n\nContinue until all checks pass and no unaddressed feedback remains.\n\n## Exit Conditions\n\n**Success:**\n- All CI checks are green (`bucket: pass`)\n- No unaddressed human review feedback\n\n**Ask for Help:**\n- Same failure persists after 3 attempts (likely a flaky test or deeper issue)\n- Review feedback requires clarification or decision from the user\n- CI failure is unrelated to branch changes (infrastructure issue)\n\n**Stop Immediately:**\n- No PR exists for the current branch\n- Branch is out of sync and needs rebase (inform user)\n\n## Tips\n\n- Use `gh pr checks --required` to focus only on required checks\n- Use `gh run view <run-id> --verbose` to see all job steps, not just failures\n- If a check is from an external service, the `link` field in checks JSON provides the URL to investigate\n",
+          "timestamp": "2026-01-13T03:29:54.397Z"
+        },
+        {
+          "type": "assistant",
+          "text": "The user wants me to iterate on the current PR until CI passes. Let me follow the process outlined in the skill.\n\nStep 1: Identify the PR\nI need to check if there's a PR for the current branch (feat/anthropic-provider-support).",
+          "timestamp": "2026-01-13T03:29:57.620Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I'll iterate on the current PR until CI passes. Let me start by identifying the PR and checking its status.",
+          "timestamp": "2026-01-13T03:29:58.035Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "gh pr view --json number,url,headRefName,baseRefName",
+            "description": "Get PR details for current branch"
+          },
+          "timestamp": "2026-01-13T03:29:59.486Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Good, there's a PR #709 for the current branch. Now let me check the CI status.",
+          "timestamp": "2026-01-13T03:30:02.945Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Found PR #709. Let me check the CI status.",
+          "timestamp": "2026-01-13T03:30:03.347Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "gh pr checks --json name,state,bucket,link,workflow",
+            "description": "Check CI status for PR"
+          },
+          "timestamp": "2026-01-13T03:30:03.883Z"
+        },
+        {
+          "type": "assistant",
+          "text": "All CI checks are passing! Let me check for any review feedback that needs to be addressed.",
+          "timestamp": "2026-01-13T03:30:08.903Z"
+        },
+        {
+          "type": "assistant",
+          "text": "All CI checks are passing. Let me check for any review feedback.",
+          "timestamp": "2026-01-13T03:30:09.089Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "gh pr view --json reviews,comments,reviewDecision",
+            "description": "Get PR review status and comments"
+          },
+          "timestamp": "2026-01-13T03:30:09.550Z"
+        },
+        {
+          "type": "assistant",
+          "text": "There's one review from cursor that just says \"COMMENTED\" but has an empty body. Let me check for inline code review comments and PR conversation comments to get more details.",
+          "timestamp": "2026-01-13T03:30:14.283Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "gh api repos/getsentry/sentry-mcp/pulls/709/comments",
+            "description": "Get inline code review comments"
+          },
+          "timestamp": "2026-01-13T03:30:15.313Z"
+        },
+        {
+          "type": "assistant",
+          "text": "There's a review comment from Cursor Bugbot about a valid issue: when an explicit provider is set via `--agent-provider` flag or `EMBEDDED_AGENT_PROVIDER` environment variable, the code doesn't validate that the corresponding API key exists. This could lead to the server starting with AI-powered tools registered, but then failing at runtime when those tools are called.\n\nThis is a valid concern. Let me read the relevant code to understand the issue better and fix it.",
+          "timestamp": "2026-01-13T03:30:21.411Z"
+        },
+        {
+          "type": "assistant",
+          "text": "There's a valid review comment from Cursor Bugbot about API key validation being bypassed when a provider is explicitly configured. Let me read the relevant code and fix this issue.",
+          "timestamp": "2026-01-13T03:30:22.030Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "/home/dcramer/src/sentry-mcp/packages/mcp-core/src/internal/agents/provider-factory.ts"
+          },
+          "timestamp": "2026-01-13T03:30:23.003Z"
+        },
+        {
+          "type": "assistant",
+          "text": "The Cursor bugbot feedback is valid. When an explicit provider is set via `setAgentProvider()` or `EMBEDDED_AGENT_PROVIDER`, the code doesn't validate that the corresponding API key exists. This means:\n\n1. `getResolvedProviderType()` returns the provider type without checking if the API key exists\n2. `getAgentProvider()` builds the provider without checking if the API key exists\n3. `hasAgentProvider()` returns true without checking if the API key exists\n\nThe fix should add API key validation when a provider is explicitly configured. Let me create a helper function to check if the API key exists for a given provider type, and use it in both `getAgentProvider()` and `getResolvedProviderType()`.\n\nHere's my plan:\n1. Add a helper function `hasApiKeyForProvider(type: AgentProviderType): boolean`\n2. Modify `getAgentProvider()` to validate the API key when a provider is explicitly configured\n3. Modify `getResolvedProviderType()` to validate the API key when a provider is explicitly configured\n4. `hasAgentProvider()` already calls `getAgentProvider()`, so it will inherit the fix\n\nLet me implement this fix.",
+          "timestamp": "2026-01-13T03:30:29.392Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "activeForm": "Fixing API key validation for explicit provider configuration",
+                "content": "Fix API key validation for explicit provider configuration",
+                "status": "in_progress"
+              }
+            ]
+          },
+          "timestamp": "2026-01-13T03:30:30.259Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me fix the issue by adding API key validation when a provider is explicitly configured.",
+          "timestamp": "2026-01-13T03:30:33.033Z"
+        },
+        {
+          "type": "assistant",
+          "text": "The feedback is valid. When a provider is explicitly configured, the code doesn't validate that the corresponding API key exists. Let me fix this by adding API key validation.",
+          "timestamp": "2026-01-13T03:30:33.550Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/dcramer/src/sentry-mcp/packages/mcp-core/src/internal/agents/provider-factory.ts",
+            "new_string": "/**\n * Check if the API key exists for a given provider type.\n */\nfunction hasApiKeyForProvider(type: AgentProviderType): boolean {\n  switch (type) {\n    case \"anthropic\":\n      return Boolean(process.env.ANTHROPIC_API_KEY);\n    case \"openai\":\n      return Boolean(process.env.OPENAI_API_KEY);\n  }\n}\n\n/**\n * Get the expected API key name for a provider type.\n */\nfunction getApiKeyName(type: AgentProviderType): string {\n  switch (type) {\n    case \"anthropic\":\n      return \"ANTHROPIC_API_KEY\";\n    case \"openai\":\n      return \"OPENAI_API_KEY\";\n  }\n}\n\n/**\n * Build a provider instance for the given type.\n */\nfunction buildProvider(type: AgentProviderType): EmbeddedAgentProvider {",
+            "old_string": "/**\n * Build a provider instance for the given type.\n */\nfunction buildProvider(type: AgentProviderType): EmbeddedAgentProvider {",
+            "replace_all": false
+          },
+          "timestamp": "2026-01-13T03:30:36.423Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Good, now I need to update `getAgentProvider()` to validate the API key when a provider is explicitly configured. Let me find and update that function.",
+          "timestamp": "2026-01-13T03:30:46.988Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me update `getAgentProvider()` to validate the API key when a provider is explicitly configured.",
+          "timestamp": "2026-01-13T03:30:47.282Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/dcramer/src/sentry-mcp/packages/mcp-core/src/internal/agents/provider-factory.ts",
+            "new_string": "export function getAgentProvider(): EmbeddedAgentProvider {\n  // 1. Explicit configuration\n  let providerType = configuredProvider;\n\n  // 2. Environment variable\n  if (!providerType) {\n    const envProvider = process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase();\n    if (envProvider === \"openai\" || envProvider === \"anthropic\") {\n      providerType = envProvider;\n    }\n  }\n\n  // 3. Validate API key for explicitly configured provider\n  if (providerType && !hasApiKeyForProvider(providerType)) {\n    throw new ConfigurationError(\n      `Provider \"${providerType}\" is configured but ${getApiKeyName(providerType)} is not set. ` +\n        \"Please set the API key environment variable.\",\n    );\n  }\n\n  // 4. Auto-detect based on available API keys\n  if (!providerType) {\n    if (process.env.ANTHROPIC_API_KEY) {\n      providerType = \"anthropic\";\n    } else if (process.env.OPENAI_API_KEY) {\n      providerType = \"openai\";\n    }\n  }\n\n  // 5. No provider available\n  if (!providerType) {\n    throw new ConfigurationError(\n      \"No embedded agent provider configured. \" +\n        \"Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable, \" +\n        \"or use --agent-provider flag to specify a provider.\",\n    );\n  }\n\n  return buildProvider(providerType);\n}",
+            "old_string": "export function getAgentProvider(): EmbeddedAgentProvider {\n  // 1. Explicit configuration\n  let providerType = configuredProvider;\n\n  // 2. Environment variable\n  if (!providerType) {\n    const envProvider = process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase();\n    if (envProvider === \"openai\" || envProvider === \"anthropic\") {\n      providerType = envProvider;\n    }\n  }\n\n  // 3. Auto-detect based on available API keys\n  if (!providerType) {\n    if (process.env.ANTHROPIC_API_KEY) {\n      providerType = \"anthropic\";\n    } else if (process.env.OPENAI_API_KEY) {\n      providerType = \"openai\";\n    }\n  }\n\n  // 4. No provider available\n  if (!providerType) {\n    throw new ConfigurationError(\n      \"No embedded agent provider configured. \" +\n        \"Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable, \" +\n        \"or use --agent-provider flag to specify a provider.\",\n    );\n  }\n\n  return buildProvider(providerType);\n}",
+            "replace_all": false
+          },
+          "timestamp": "2026-01-13T03:30:53.278Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Good, now I also need to update `getResolvedProviderType()` to validate the API key when a provider is explicitly configured. This function is used to check which provider is available without throwing, so it should also validate the API key.",
+          "timestamp": "2026-01-13T03:30:56.785Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me update `getResolvedProviderType()` to also validate the API key for explicitly configured providers.",
+          "timestamp": "2026-01-13T03:30:57.127Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/dcramer/src/sentry-mcp/packages/mcp-core/src/internal/agents/provider-factory.ts",
+            "new_string": "/**\n * Get the resolved provider type without throwing.\n * Returns undefined if no provider is available or API key is missing.\n */\nexport function getResolvedProviderType(): AgentProviderType | undefined {\n  // Check explicit configuration (with API key validation)\n  if (configuredProvider) {\n    return hasApiKeyForProvider(configuredProvider) ? configuredProvider : undefined;\n  }\n\n  // Check environment variable (with API key validation)\n  const envProvider = process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase();\n  if (envProvider === \"openai\" || envProvider === \"anthropic\") {\n    return hasApiKeyForProvider(envProvider) ? envProvider : undefined;\n  }\n\n  // Auto-detect based on available API keys\n  if (process.env.ANTHROPIC_API_KEY) {\n    return \"anthropic\";\n  }\n  if (process.env.OPENAI_API_KEY) {\n    return \"openai\";\n  }\n\n  return undefined;\n}",
+            "old_string": "/**\n * Get the resolved provider type without throwing.\n * Returns undefined if no provider is available.\n */\nexport function getResolvedProviderType(): AgentProviderType | undefined {\n  // Check explicit configuration\n  if (configuredProvider) {\n    return configuredProvider;\n  }\n\n  // Check environment variable\n  const envProvider = process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase();\n  if (envProvider === \"openai\" || envProvider === \"anthropic\") {\n    return envProvider;\n  }\n\n  // Auto-detect\n  if (process.env.ANTHROPIC_API_KEY) {\n    return \"anthropic\";\n  }\n  if (process.env.OPENAI_API_KEY) {\n    return \"openai\";\n  }\n\n  return undefined;\n}",
+            "replace_all": false
+          },
+          "timestamp": "2026-01-13T03:31:01.123Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now I should run the quality checks to make sure everything is working correctly before committing.",
+          "timestamp": "2026-01-13T03:31:04.280Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me run the quality checks to ensure everything is correct.",
+          "timestamp": "2026-01-13T03:31:04.588Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "pnpm run tsc",
+            "description": "Run TypeScript type checking"
+          },
+          "timestamp": "2026-01-13T03:31:05.259Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Let me check the full output to see if there were any TypeScript errors.",
+          "timestamp": "2026-01-13T03:31:17.784Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "tail -50 /home/dcramer/.claude/projects/-home-dcramer-src-sentry-mcp/ac1bf379-89fb-42e1-afb4-1d4b57a073c4/tool-results/toolu_01NDnFUuxBeyuxxPmAa7nuHD.txt",
+            "description": "Check TypeScript output for errors"
+          },
+          "timestamp": "2026-01-13T03:31:18.765Z"
+        },
+        {
+          "type": "assistant",
+          "text": "TypeScript compiled successfully with no errors. Now let me run linting.",
+          "timestamp": "2026-01-13T03:31:21.936Z"
+        },
+        {
+          "type": "assistant",
+          "text": "TypeScript compilation succeeded. Now let me run the tests.",
+          "timestamp": "2026-01-13T03:31:22.292Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "pnpm run test",
+            "description": "Run tests",
+            "timeout": 180000
+          },
+          "timestamp": "2026-01-13T03:31:22.865Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Let me check the end of the test output to see if all tests passed.",
+          "timestamp": "2026-01-13T03:31:33.234Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "tail -80 /home/dcramer/.claude/projects/-home-dcramer-src-sentry-mcp/ac1bf379-89fb-42e1-afb4-1d4b57a073c4/tool-results/toolu_01GnXsyT2UqrM8XGsPcw2h9g.txt",
+            "description": "Check test output for results"
+          },
+          "timestamp": "2026-01-13T03:31:34.230Z"
+        },
+        {
+          "type": "assistant",
+          "text": "All tests passed. Now let me run lint to make sure the code is formatted correctly.",
+          "timestamp": "2026-01-13T03:31:37.488Z"
+        },
+        {
+          "type": "assistant",
+          "text": "All tests passed. Let me run the linter.",
+          "timestamp": "2026-01-13T03:31:37.492Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "pnpm run lint:fix",
+            "description": "Fix linting issues"
+          },
+          "timestamp": "2026-01-13T03:31:37.964Z"
+        },
+        {
+          "type": "assistant",
+          "text": "I need to fix the linting error - the linter prefers template literals over string concatenation. Let me fix this.",
+          "timestamp": "2026-01-13T03:31:41.590Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Let me fix the linting issue - the linter prefers template literals over string concatenation.",
+          "timestamp": "2026-01-13T03:31:41.594Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Edit",
+          "input": {
+            "file_path": "/home/dcramer/src/sentry-mcp/packages/mcp-core/src/internal/agents/provider-factory.ts",
+            "new_string": "  // 3. Validate API key for explicitly configured provider\n  if (providerType && !hasApiKeyForProvider(providerType)) {\n    throw new ConfigurationError(\n      `Provider \"${providerType}\" is configured but ${getApiKeyName(providerType)} is not set. Please set the API key environment variable.`,\n    );\n  }",
+            "old_string": "  // 3. Validate API key for explicitly configured provider\n  if (providerType && !hasApiKeyForProvider(providerType)) {\n    throw new ConfigurationError(\n      `Provider \"${providerType}\" is configured but ${getApiKeyName(providerType)} is not set. ` +\n        \"Please set the API key environment variable.\",\n    );\n  }",
+            "replace_all": false
+          },
+          "timestamp": "2026-01-13T03:31:44.097Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me run linting again to make sure it passes.",
+          "timestamp": "2026-01-13T03:31:47.784Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "pnpm run lint:fix",
+            "description": "Run linter again"
+          },
+          "timestamp": "2026-01-13T03:31:48.315Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Linting passed. Now let me commit the changes and push.",
+          "timestamp": "2026-01-13T03:31:51.858Z"
+        },
+        {
+          "type": "assistant",
+          "text": "All quality checks pass. Let me commit and push the fix.",
+          "timestamp": "2026-01-13T03:31:52.227Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "git diff",
+            "description": "Show staged changes"
+          },
+          "timestamp": "2026-01-13T03:31:52.693Z"
+        },
+        {
+          "type": "assistant",
+          "text": "Good. Let me commit and push these changes.",
+          "timestamp": "2026-01-13T03:31:55.980Z"
+        },
+        {
+          "type": "tool_use",
+          "name": "Bash",
+          "input": {
+            "command": "git add -A && git commit -m \"$(cat <<'EOF'\nfix(agents): validate API key when provider is explicitly configured\n\nWhen an embedded agent provider is explicitly set via --agent-provider flag\nor EMBEDDED_AGENT_PROVIDER environment variable, the server now validates\nthat the corresponding API key (ANTHROPIC_API_KEY or OPENAI_API_KEY) is\nactually set before proceeding. This prevents the server from registering\nAI-powered search tools and then failing at runtime due to missing auth.\n\n- Added hasApiKeyForProvider() helper to check API key existence\n- Added getApiKeyName() helper for clear error messages\n- Updated getAgentProvider() to throw ConfigurationError if API key missing\n- Updated getResolvedProviderType() to return undefined if API key missing\n- hasAgentProvider() inherits the fix since it calls getAgentProvider()\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>\nEOF\n)\"",
+            "description": "Commit the API key validation fix"
+          },
+          "timestamp": "2026-01-13T03:32:00.776Z"
+        }
+      ],
+      "total_additions": 41,
+      "total_deletions": 10,
+      "accepted_lines": 39,
+      "overriden_lines": 0
+    }
+  }
+}
