@@ -18,6 +18,16 @@ import pkg from "../package.json";
 const VERSION = pkg.version;
 
 /**
+ * Build-time constants injected into the binary
+ *
+ * SENTRY_CLIENT_ID: OAuth client ID for device flow authentication
+ *   - Required for npm distribution
+ *   - Set via SENTRY_CLIENT_ID environment variable at build time
+ *   - Can be overridden at runtime for self-hosted Sentry
+ */
+const SENTRY_CLIENT_ID = process.env.SENTRY_CLIENT_ID ?? "";
+
+/**
  * Build targets configuration
  */
 type BuildTarget = {
@@ -102,6 +112,7 @@ async function buildTarget(target: BuildTarget): Promise<boolean> {
     },
     define: {
       SENTRY_CLI_VERSION: JSON.stringify(VERSION),
+      SENTRY_CLIENT_ID_BUILD: JSON.stringify(SENTRY_CLIENT_ID),
     },
     sourcemap: "none",
   });
@@ -129,6 +140,14 @@ async function build(): Promise<void> {
 
   console.log(`\nSentry CLI Build v${VERSION}`);
   console.log("=".repeat(40));
+
+  // Check for required build-time secrets
+  if (!SENTRY_CLIENT_ID) {
+    console.warn(
+      "\n⚠️  Warning: SENTRY_CLIENT_ID not set. OAuth will not work in the built binary."
+    );
+    console.warn("   Set it via: SENTRY_CLIENT_ID=xxx bun run build\n");
+  }
 
   // Determine targets
   let targets: BuildTarget[];
