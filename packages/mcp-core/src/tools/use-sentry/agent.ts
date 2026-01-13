@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { Tool } from "ai";
-import { ConfigurationError } from "../../errors";
 import {
   callEmbeddedAgent,
   type ToolCall,
@@ -32,12 +31,7 @@ export async function useSentryAgent(options: UseSentryAgentOptions): Promise<{
   result: z.infer<typeof outputSchema>;
   toolCalls: ToolCall[];
 }> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new ConfigurationError(
-      "OPENAI_API_KEY environment variable is required for use_sentry tool",
-    );
-  }
-
+  // Provider check happens in callEmbeddedAgent via getAgentProvider()
   // Frame the request to make clear we're asking the agent to use tools
   // Don't just pass the raw request as it might trigger safety responses
   const prompt = options.request;

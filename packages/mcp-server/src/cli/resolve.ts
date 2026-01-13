@@ -70,6 +70,23 @@ export function finalize(input: MergedArgs): ResolvedConfig {
     ? validateOpenAiBaseUrlThrows(input.openaiBaseUrl)
     : undefined;
 
+  // Validate anthropic base URL if provided (same validation as OpenAI)
+  const resolvedAnthropicBaseUrl = input.anthropicBaseUrl
+    ? validateOpenAiBaseUrlThrows(input.anthropicBaseUrl)
+    : undefined;
+
+  // Validate agent provider if explicitly set
+  let agentProvider: "openai" | "anthropic" | undefined = undefined;
+  if (input.agentProvider) {
+    const provider = input.agentProvider.toLowerCase();
+    if (provider !== "openai" && provider !== "anthropic") {
+      throw new Error(
+        `Error: Invalid agent provider "${input.agentProvider}". Must be "openai" or "anthropic".`,
+      );
+    }
+    agentProvider = provider;
+  }
+
   return {
     accessToken: input.accessToken,
     sentryHost,
@@ -77,6 +94,9 @@ export function finalize(input: MergedArgs): ResolvedConfig {
     sentryDsn: input.sentryDsn,
     openaiBaseUrl: resolvedOpenAiBaseUrl,
     openaiModel: input.openaiModel,
+    anthropicBaseUrl: resolvedAnthropicBaseUrl,
+    anthropicModel: input.anthropicModel,
+    agentProvider,
     finalSkills,
     organizationSlug: input.organizationSlug,
     projectSlug: input.projectSlug,

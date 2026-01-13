@@ -23,7 +23,11 @@ import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
 import { SKILLS } from "@sentry/mcp-core/skills";
-import { setOpenAIBaseUrl } from "@sentry/mcp-core/internal/agents/openai-provider";
+import {
+  setAgentProvider,
+  setProviderBaseUrls,
+  getResolvedProviderType,
+} from "@sentry/mcp-core/internal/agents/provider-factory";
 
 const packageName = "@sentry/mcp-server";
 const allSkills = Object.keys(SKILLS) as ReadonlyArray<
@@ -60,23 +64,37 @@ const cfg = (() => {
   }
 })();
 
-// Check for OpenAI API key and warn if missing
-if (!process.env.OPENAI_API_KEY) {
-  console.warn("Warning: OPENAI_API_KEY environment variable is not set.");
-  console.warn("The following AI-powered search tools will be unavailable:");
-  console.warn("  - search_events (natural language event search)");
-  console.warn("  - search_issues (natural language issue search)");
-  console.warn(
-    "All other tools will function normally. To enable AI-powered search, set OPENAI_API_KEY.",
-  );
-  console.warn("");
+// Configure embedded agent provider
+if (cfg.agentProvider) {
+  setAgentProvider(cfg.agentProvider);
 }
-
-// Configure OpenAI settings from CLI flags
-// Note: baseUrl can only be set via CLI flag, not env var (security: prevents credential theft)
-setOpenAIBaseUrl(cfg.openaiBaseUrl);
+setProviderBaseUrls({
+  openaiBaseUrl: cfg.openaiBaseUrl,
+  anthropicBaseUrl: cfg.anthropicBaseUrl,
+});
 if (cfg.openaiModel) {
   process.env.OPENAI_MODEL = cfg.openaiModel;
+}
+if (cfg.anthropicModel) {
+  process.env.ANTHROPIC_MODEL = cfg.anthropicModel;
+}
+
+// Check for LLM API keys and warn if none available
+const resolvedProvider = getResolvedProviderType();
+if (!resolvedProvider) {
+  console.warn(
+    "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
+  );
+  console.warn("The following AI-powered search tools will be unavailable:");
+  console.warn(
+    "  - search_events, search_issues, search_issue_events, use_sentry",
+  );
+  console.warn(
+    "Use list_issues and list_events for direct Sentry query syntax instead.",
+  );
+  console.warn("");
+} else {
+  console.warn(`Using ${resolvedProvider} for AI-powered search tools.`);
 }
 
 Sentry.init({

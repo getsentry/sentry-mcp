@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ConfigurationError } from "../../errors";
 import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
 import type { SentryApiService } from "../../api-client";
 import { createWhoamiTool } from "../../internal/agents/tools/whoami";
@@ -78,12 +77,7 @@ export async function searchIssueEventsAgent(
   result: z.output<typeof searchIssueEventsAgentOutputSchema>;
   toolCalls: any[];
 }> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new ConfigurationError(
-      "OPENAI_API_KEY environment variable is required for natural language query translation",
-    );
-  }
-
+  // Provider check happens in callEmbeddedAgent via getAgentProvider()
   // Create tools pre-bound with the provided API service and organization
   const issueEventFieldsTool = createIssueEventFieldsTool({
     apiService: options.apiService,

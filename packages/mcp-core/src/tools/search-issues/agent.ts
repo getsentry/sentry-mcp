@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
-import { ConfigurationError } from "../../errors";
 import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
 import { createDatasetFieldsTool } from "../../internal/agents/tools/dataset-fields";
 import { createWhoamiTool } from "../../internal/agents/tools/whoami";
@@ -37,12 +36,7 @@ export async function searchIssuesAgent(
   result: z.output<typeof searchIssuesAgentOutputSchema>;
   toolCalls: any[];
 }> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new ConfigurationError(
-      "OPENAI_API_KEY environment variable is required for semantic search",
-    );
-  }
-
+  // Provider check happens in callEmbeddedAgent via getAgentProvider()
   // Create tools pre-bound with the provided API service and organization
   return await callEmbeddedAgent<
     z.output<typeof searchIssuesAgentOutputSchema>,

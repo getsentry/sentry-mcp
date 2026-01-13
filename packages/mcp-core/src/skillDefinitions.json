@@ -5,7 +5,7 @@
     "description": "Search for errors, analyze traces, and explore event details",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 12,
+    "toolCount": 15,
     "tools": [
       {
         "name": "find_organizations",
@@ -48,6 +48,21 @@
         "requiredScopes": ["event:read"]
       },
       {
+        "name": "list_events",
+        "description": "Search events using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_events instead.\n\nDatasets:\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, traces, AI/LLM calls\n\nQuery Syntax Examples:\n- message:\"connection timeout\"\n- level:error\n- span.op:http.client span.status_code:500\n- log.level:error\n- transaction:/api/users\n\n<examples>\nlist_events(organizationSlug='my-org', dataset='errors', query='level:error')\nlist_events(organizationSlug='my-org', dataset='spans', query='span.op:db')\nlist_events(organizationSlug='my-org', dataset='logs', query='severity:error')\nlist_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "list_issue_events",
+        "description": "List events within a specific issue using Sentry query syntax (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_issue_events instead.\n\nCommon Query Filters:\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n- user.email:alice@example.com - Filter by user email\n- timestamp:>2024-01-01 - Filter by timestamp\n\n<examples>\nlist_issue_events(issueUrl='https://sentry.io/organizations/my-org/issues/123/', query='environment:production')\nlist_issue_events(issueId='MCP-41', organizationSlug='my-org', query='release:v1.0.0')\nlist_issue_events(issueId='PROJECT-123', organizationSlug='my-org', statsPeriod='1h')\n</examples>\n\n<hints>\n- Use issueUrl for convenience (includes org + issue ID)\n- Or provide both issueId and organizationSlug\n- The query filters events WITHIN the issue, no need for issue: prefix\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "list_issues",
+        "description": "List issues using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_issues instead.\n\nCommon Query Syntax:\n- is:unresolved - Show unresolved issues only\n- is:unassigned - Show unassigned issues\n- level:error - Filter by error level\n- firstSeen:-24h - First seen in last 24 hours\n- lastSeen:-1h - Last seen in last hour\n- has:user - Issues with user context\n- user.email:user@example.com - Filter by user email\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n\nCombine queries: is:unresolved is:unassigned level:error\n\n<examples>\nlist_issues(organizationSlug='my-org', query='is:unresolved is:unassigned')\nlist_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', sort='freq')\nlist_issues(organizationSlug='my-org', projectSlugOrId='my-project', query='is:unresolved')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
         "name": "search_events",
         "description": "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'\n2. Individual events with timestamps: 'show me error logs from last hour'\n\nUSE THIS FOR ALL COUNTS/STATISTICS:\n- 'how many errors today' → returns count\n- 'count of database failures' → returns count\n- 'total number of issues' → returns count\n- 'average response time' → returns avg()\n- 'sum of tokens used' → returns sum()\n\nALSO USE FOR INDIVIDUAL EVENTS:\n- 'error logs from last hour' → returns event list\n- 'database errors with timestamps' → returns event list\n- 'trace spans for slow API calls' → returns span list\n\nDataset Selection (AI automatically chooses):\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, AI/LLM calls, token usage\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n</hints>",
         "requiredScopes": ["event:read"]
@@ -75,7 +90,7 @@
     "description": "Sentry's AI debugger that helps you analyze, root cause, and fix issues",
     "defaultEnabled": true,
     "order": 2,
-    "toolCount": 7,
+    "toolCount": 9,
     "tools": [
       {
         "name": "analyze_issue_with_seer",
@@ -95,6 +110,16 @@
       {
         "name": "get_issue_details",
         "description": "Get detailed information about a specific Sentry issue by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')\n- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'\n- Want details/stacktrace/analysis for a known issue\n- Provide a Sentry issue URL\n\nDO NOT USE for:\n- General searching or listing issues (use search_issues)\n- Root cause analysis (use analyze_issue_with_seer)\n\nTRIGGER PATTERNS:\n- 'Explain ISSUE-123' → use get_issue_details\n- 'Tell me about PROJECT-456' → use get_issue_details\n- 'What happened in [issue URL]' → use get_issue_details\n\n<examples>\n### With Sentry URL (recommended - simplest approach)\n```\nget_issue_details(issueUrl='https://sentry.sentry.io/issues/6916805731/?project=4509062593708032&query=is%3Aunresolved')\n```\n\n### With issue ID and organization\n```\nget_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')\n```\n\n### With event ID and organization\n```\nget_issue_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n</examples>\n\n<hints>\n- **IMPORTANT**: If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- When using issueUrl, all other parameters are automatically extracted - don't provide them separately\n- If using issueId (not URL), then organizationSlug is required\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "list_events",
+        "description": "Search events using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_events instead.\n\nDatasets:\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, traces, AI/LLM calls\n\nQuery Syntax Examples:\n- message:\"connection timeout\"\n- level:error\n- span.op:http.client span.status_code:500\n- log.level:error\n- transaction:/api/users\n\n<examples>\nlist_events(organizationSlug='my-org', dataset='errors', query='level:error')\nlist_events(organizationSlug='my-org', dataset='spans', query='span.op:db')\nlist_events(organizationSlug='my-org', dataset='logs', query='severity:error')\nlist_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "list_issues",
+        "description": "List issues using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_issues instead.\n\nCommon Query Syntax:\n- is:unresolved - Show unresolved issues only\n- is:unassigned - Show unassigned issues\n- level:error - Filter by error level\n- firstSeen:-24h - First seen in last 24 hours\n- lastSeen:-1h - Last seen in last hour\n- has:user - Issues with user context\n- user.email:user@example.com - Filter by user email\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n\nCombine queries: is:unresolved is:unassigned level:error\n\n<examples>\nlist_issues(organizationSlug='my-org', query='is:unresolved is:unassigned')\nlist_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', sort='freq')\nlist_issues(organizationSlug='my-org', projectSlugOrId='my-project', query='is:unresolved')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
         "requiredScopes": ["event:read"]
       },
       {
@@ -155,7 +180,7 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 9,
+    "toolCount": 12,
     "tools": [
       {
         "name": "find_organizations",
@@ -175,6 +200,21 @@
       {
         "name": "get_issue_details",
         "description": "Get detailed information about a specific Sentry issue by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific issue ID (e.g., 'CLOUDFLARE-MCP-41', 'PROJECT-123')\n- Ask to 'explain [ISSUE-ID]', 'tell me about [ISSUE-ID]'\n- Want details/stacktrace/analysis for a known issue\n- Provide a Sentry issue URL\n\nDO NOT USE for:\n- General searching or listing issues (use search_issues)\n- Root cause analysis (use analyze_issue_with_seer)\n\nTRIGGER PATTERNS:\n- 'Explain ISSUE-123' → use get_issue_details\n- 'Tell me about PROJECT-456' → use get_issue_details\n- 'What happened in [issue URL]' → use get_issue_details\n\n<examples>\n### With Sentry URL (recommended - simplest approach)\n```\nget_issue_details(issueUrl='https://sentry.sentry.io/issues/6916805731/?project=4509062593708032&query=is%3Aunresolved')\n```\n\n### With issue ID and organization\n```\nget_issue_details(organizationSlug='my-organization', issueId='CLOUDFLARE-MCP-41')\n```\n\n### With event ID and organization\n```\nget_issue_details(organizationSlug='my-organization', eventId='c49541c747cb4d8aa3efb70ca5aba243')\n```\n</examples>\n\n<hints>\n- **IMPORTANT**: If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- When using issueUrl, all other parameters are automatically extracted - don't provide them separately\n- If using issueId (not URL), then organizationSlug is required\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "list_events",
+        "description": "Search events using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_events instead.\n\nDatasets:\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, traces, AI/LLM calls\n\nQuery Syntax Examples:\n- message:\"connection timeout\"\n- level:error\n- span.op:http.client span.status_code:500\n- log.level:error\n- transaction:/api/users\n\n<examples>\nlist_events(organizationSlug='my-org', dataset='errors', query='level:error')\nlist_events(organizationSlug='my-org', dataset='spans', query='span.op:db')\nlist_events(organizationSlug='my-org', dataset='logs', query='severity:error')\nlist_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "list_issue_events",
+        "description": "List events within a specific issue using Sentry query syntax (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_issue_events instead.\n\nCommon Query Filters:\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n- user.email:alice@example.com - Filter by user email\n- timestamp:>2024-01-01 - Filter by timestamp\n\n<examples>\nlist_issue_events(issueUrl='https://sentry.io/organizations/my-org/issues/123/', query='environment:production')\nlist_issue_events(issueId='MCP-41', organizationSlug='my-org', query='release:v1.0.0')\nlist_issue_events(issueId='PROJECT-123', organizationSlug='my-org', statsPeriod='1h')\n</examples>\n\n<hints>\n- Use issueUrl for convenience (includes org + issue ID)\n- Or provide both issueId and organizationSlug\n- The query filters events WITHIN the issue, no need for issue: prefix\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "list_issues",
+        "description": "List issues using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_issues instead.\n\nCommon Query Syntax:\n- is:unresolved - Show unresolved issues only\n- is:unassigned - Show unassigned issues\n- level:error - Filter by error level\n- firstSeen:-24h - First seen in last 24 hours\n- lastSeen:-1h - Last seen in last hour\n- has:user - Issues with user context\n- user.email:user@example.com - Filter by user email\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n\nCombine queries: is:unresolved is:unassigned level:error\n\n<examples>\nlist_issues(organizationSlug='my-org', query='is:unresolved is:unassigned')\nlist_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', sort='freq')\nlist_issues(organizationSlug='my-org', projectSlugOrId='my-project', query='is:unresolved')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
         "requiredScopes": ["event:read"]
       },
       {

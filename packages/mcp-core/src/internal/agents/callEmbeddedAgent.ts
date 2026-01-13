@@ -1,5 +1,5 @@
 import { generateText, Output, type Tool } from "ai";
-import { getOpenAIModel } from "./openai-provider";
+import { getAgentProvider } from "./provider-factory";
 import { UserInputError } from "../../errors";
 import type { z } from "zod";
 
@@ -37,39 +37,23 @@ export async function callEmbeddedAgent<
 }): Promise<EmbeddedAgentResult<TOutput>> {
   const capturedToolCalls: ToolCall[] = [];
 
+  // Get the configured provider (OpenAI or Anthropic)
+  const provider = getAgentProvider();
+
   const result = await generateText({
-    model: getOpenAIModel(), // Uses configured default model (gpt-5)
+    model: provider.getModel(),
     system,
     prompt,
     tools,
     maxSteps: 5,
-    temperature: 1, // GPT-5 only supports temperature of 1
     experimental_output: Output.object({ schema }),
     experimental_telemetry: {
       isEnabled: true,
       functionId: "callEmbeddedAgent",
     },
-    // Disable strict schema validation for both output and tool parameter schemas.
-    //
-    // OpenAI's structured outputs have limitations:
-    // - structuredOutputs: true (default) enforces strict mode for BOTH output and tool schemas
-    // - This requires ALL properties to be in the "required" array, breaking .optional()/.nullable()
-    //
-    // By setting both to false:
-    // - structuredOutputs: false - Disables strict mode for tool parameter schemas
-    // - strictJsonSchema: false - Disables strict mode for output schema
-    // - We still get valid JSON, just without the strict "all fields required" constraint
-    //
-    // See:
-    // - Issue: https://github.com/getsentry/sentry-mcp/issues/623
-    // - AI SDK docs: https://ai-sdk.dev/providers/ai-sdk-providers/openai#structuredoutputs
-    // - OpenAI docs: https://platform.openai.com/docs/guides/structured-outputs
-    providerOptions: {
-      openai: {
-        structuredOutputs: false,
-        strictJsonSchema: false,
-      },
-    },
+    // Provider-specific options (e.g., OpenAI needs structuredOutputs: false)
+    // See: https://github.com/getsentry/sentry-mcp/issues/623
+    providerOptions: provider.getProviderOptions(),
     onStepFinish: (event) => {
       if (event.toolCalls && event.toolCalls.length > 0) {
         for (const toolCall of event.toolCalls) {
