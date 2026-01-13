@@ -1,37 +1,43 @@
 /**
  * OAuth Authentication
  *
- * Implements Device Flow for Sentry OAuth via proxy server.
- * No client secret needed on the CLI side.
+ * Implements RFC 8628 Device Authorization Grant for Sentry OAuth.
+ * https://datatracker.ietf.org/doc/html/rfc8628
  */
 
-import type { TokenResponse } from "../types/index.js";
+import type {
+  DeviceCodeResponse,
+  TokenErrorResponse,
+  TokenResponse,
+} from "../types/index.js";
 import { setAuthToken } from "./config.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-// OAuth proxy server URL - handles the actual OAuth flow with Sentry
-const OAUTH_PROXY_URL =
-  process.env.SENTRY_OAUTH_PROXY_URL ?? "https://sry-oauth.vercel.app";
+// Sentry instance URL (supports self-hosted)
+const SENTRY_URL = process.env.SENTRY_URL ?? "https://sentry.io";
+
+// OAuth client ID (required for identifying the application)
+const SENTRY_CLIENT_ID = process.env.SENTRY_CLIENT_ID ?? "";
+
+// OAuth scopes requested for the CLI
+const SCOPES = [
+  "project:read",
+  "project:write",
+  "org:read",
+  "event:read",
+  "event:write",
+  "member:read",
+  "team:read",
+].join(" ");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type DeviceCodeResponse = {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  verification_uri_complete: string;
-  expires_in: number;
-  interval: number;
-};
-
-type DeviceTokenResponse =
-  | TokenResponse
-  | { error: string; error_description?: string };
+type DeviceTokenResponse = TokenResponse | TokenErrorResponse;
 
 type DeviceFlowCallbacks = {
   onUserCode: (
@@ -57,19 +63,29 @@ function isTokenResponse(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Device Flow Implementation
+// Device Flow Implementation (RFC 8628)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Request a device code from the OAuth proxy
+ * Request a device code from Sentry's device authorization endpoint
  */
 async function requestDeviceCode(): Promise<DeviceCodeResponse> {
+  if (!SENTRY_CLIENT_ID) {
+    throw new Error(
+      "SENTRY_CLIENT_ID environment variable is required for authentication"
+    );
+  }
+
   let response: Response;
 
   try {
-    response = await fetch(`${OAUTH_PROXY_URL}/device/code`, {
+    response = await fetch(`${SENTRY_URL}/oauth/device/code/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: SENTRY_CLIENT_ID,
+        scope: SCOPES,
+      }),
     });
   } catch (error) {
     const isConnectionError =
@@ -79,7 +95,7 @@ async function requestDeviceCode(): Promise<DeviceCodeResponse> {
         error.message.includes("network"));
 
     if (isConnectionError) {
-      throw new Error(`Cannot connect to OAuth proxy at ${OAUTH_PROXY_URL}`);
+      throw new Error(`Cannot connect to Sentry at ${SENTRY_URL}`);
     }
     throw error;
   }
@@ -93,13 +109,17 @@ async function requestDeviceCode(): Promise<DeviceCodeResponse> {
 }
 
 /**
- * Poll for the access token
+ * Poll Sentry's token endpoint for the access token
  */
 async function pollForToken(deviceCode: string): Promise<TokenResponse> {
-  const response = await fetch(`${OAUTH_PROXY_URL}/device/token`, {
+  const response = await fetch(`${SENTRY_URL}/oauth/token/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ device_code: deviceCode }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: SENTRY_CLIENT_ID,
+      device_code: deviceCode,
+      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+    }),
   });
 
   const data = (await response.json()) as DeviceTokenResponse;
@@ -116,24 +136,63 @@ async function pollForToken(deviceCode: string): Promise<TokenResponse> {
  * Custom error class for device flow errors
  */
 class DeviceFlowError extends Error {
-  constructor(
-    public readonly code: string,
-    description?: string
-  ) {
+  readonly code: string;
+
+  constructor(code: string, description?: string) {
     super(description ?? code);
     this.name = "DeviceFlowError";
+    this.code = code;
+  }
+}
+
+type PollResult =
+  | { status: "success"; token: TokenResponse }
+  | { status: "pending" }
+  | { status: "slow_down" }
+  | { status: "error"; message: string };
+
+/**
+ * Handle a single poll attempt, returning a result object
+ */
+async function attemptPoll(deviceCode: string): Promise<PollResult> {
+  try {
+    const token = await pollForToken(deviceCode);
+    return { status: "success", token };
+  } catch (error) {
+    if (!(error instanceof DeviceFlowError)) {
+      throw error;
+    }
+
+    switch (error.code) {
+      case "authorization_pending":
+        return { status: "pending" };
+      case "slow_down":
+        return { status: "slow_down" };
+      case "expired_token":
+        return {
+          status: "error",
+          message: "Device code expired. Please run 'sentry auth login' again.",
+        };
+      case "access_denied":
+        return {
+          status: "error",
+          message: "Authorization was denied. Please try again.",
+        };
+      default:
+        return { status: "error", message: error.message };
+    }
   }
 }
 
 /**
- * Perform the Device Flow for OAuth authentication
+ * Perform the Device Flow for OAuth authentication (RFC 8628)
  *
  * @param callbacks - Callbacks for UI updates
  * @param timeout - Maximum time to wait for authorization (ms)
  */
 export async function performDeviceFlow(
   callbacks: DeviceFlowCallbacks,
-  timeout = 900_000 // 15 minutes default
+  timeout = 600_000 // 10 minutes default (matches Sentry's expires_in)
 ): Promise<TokenResponse> {
   // Step 1: Request device code
   const {
@@ -149,72 +208,38 @@ export async function performDeviceFlow(
   await callbacks.onUserCode(
     user_code,
     verification_uri,
-    verification_uri_complete
+    verification_uri_complete ?? `${verification_uri}?user_code=${user_code}`
   );
 
   // Calculate absolute timeout
   const timeoutAt = Date.now() + Math.min(timeout, expires_in * 1000);
 
+  // Track polling interval (may increase on slow_down)
+  let pollInterval = interval;
+
   // Step 2: Poll for token
   while (Date.now() < timeoutAt) {
-    await sleep(interval * 1000);
-
+    await sleep(pollInterval * 1000);
     callbacks.onPolling?.();
 
-    try {
-      const token = await pollForToken(device_code);
-      return token;
-    } catch (error) {
-      if (error instanceof DeviceFlowError) {
-        // Continue polling if authorization is pending
-        if (error.code === "authorization_pending") {
-          continue;
-        }
+    const result = await attemptPoll(device_code);
 
-        // Slow down if rate limited
-        if (error.code === "slow_down") {
-          await sleep(5000);
-          continue;
-        }
-
-        // Token expired
-        if (error.code === "expired_token") {
-          throw new Error(
-            "Device code expired. Please run 'sentry auth login' again."
-          );
-        }
-
-        // Other errors are fatal
-        throw error;
-      }
-
-      throw error;
+    switch (result.status) {
+      case "success":
+        return result.token;
+      case "pending":
+        continue;
+      case "slow_down":
+        pollInterval += 5;
+        continue;
+      case "error":
+        throw new Error(result.message);
+      default:
+        throw new Error("Unexpected poll result");
     }
   }
 
   throw new Error("Authentication timed out. Please try again.");
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Browser
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Open a URL in the user's default browser
- */
-export async function openBrowser(url: string): Promise<void> {
-  const { platform } = process;
-  const { spawn } = await import("node:child_process");
-
-  const command =
-    platform === "darwin" ? "open" : platform === "win32" ? "cmd" : "xdg-open";
-  const args = platform === "win32" ? ["/c", "start", "", url] : [url];
-
-  return new Promise((resolve) => {
-    const proc = spawn(command, args, { detached: true, stdio: "ignore" });
-    proc.unref();
-    setTimeout(resolve, 500);
-  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
