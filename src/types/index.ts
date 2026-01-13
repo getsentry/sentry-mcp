@@ -5,15 +5,11 @@
  */
 
 // Configuration types
-export type { SentryConfig } from "./config.js";
+export type { CachedProject, SentryConfig } from "./config.js";
+export { SentryConfigSchema } from "./config.js";
 
 // DSN types
-export type {
-  CachedProject,
-  DetectedDsn,
-  DsnSource,
-  ParsedDsn,
-} from "./dsn.js";
+export type { DetectedDsn, DsnSource, ParsedDsn } from "./dsn.js";
 
 // OAuth types
 export type {

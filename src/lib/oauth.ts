@@ -249,8 +249,10 @@ export async function performDeviceFlow(
 /**
  * Complete the OAuth flow and store the token
  */
-export function completeOAuthFlow(tokenResponse: TokenResponse): void {
-  setAuthToken(
+export async function completeOAuthFlow(
+  tokenResponse: TokenResponse
+): Promise<void> {
+  await setAuthToken(
     tokenResponse.access_token,
     tokenResponse.expires_in,
     tokenResponse.refresh_token
@@ -260,6 +262,6 @@ export function completeOAuthFlow(tokenResponse: TokenResponse): void {
 /**
  * Alternative: Token-based auth (for users who have an API token)
  */
-export function setApiToken(token: string): void {
-  setAuthToken(token);
+export async function setApiToken(token: string): Promise<void> {
+  await setAuthToken(token);
 }

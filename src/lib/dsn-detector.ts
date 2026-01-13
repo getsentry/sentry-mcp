@@ -4,10 +4,11 @@
  * Automatically detects Sentry DSN from various sources:
  * 1. Environment variable (SENTRY_DSN)
  * 2. .env files in the current directory
- * 3. Code analysis using ast-grep (Sentry.init patterns)
+ * 3. Code analysis using regex patterns (Sentry.init patterns)
+ *
+ * Uses Bun file APIs and Bun.Glob for file operations.
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { DetectedDsn, DsnSource } from "../types/index.js";
 import { parseDsn } from "./dsn.js";
@@ -30,9 +31,31 @@ const ENV_FILES = [
 ];
 
 /**
- * File extensions to search for Sentry.init patterns
+ * Glob pattern for source files to search
  */
-const CODE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
+const CODE_GLOB = new Bun.Glob("**/*.{ts,tsx,js,jsx,mjs,cjs}");
+
+/**
+ * Directories to skip when searching for source files
+ */
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".next",
+  "coverage",
+  ".turbo",
+  ".cache",
+]);
+
+/**
+ * Regex patterns for extracting DSN from code (defined at top level for performance)
+ */
+const DSN_PATTERN_INIT =
+  /Sentry\.init\s*\(\s*\{[^}]*dsn\s*:\s*["'`]([^"'`]+)["'`]/s;
+const DSN_PATTERN_GENERIC = /dsn\s*:\s*["'`](https?:\/\/[^"'`]+@[^"'`]+)["'`]/s;
+const ENV_FILE_PATTERN = /^SENTRY_DSN\s*=\s*(['"]?)(.+?)\1\s*(?:#.*)?$/;
 
 /**
  * Create a DetectedDsn from a raw DSN string
@@ -82,7 +105,7 @@ function parseEnvFile(content: string): string | null {
     }
 
     // Match SENTRY_DSN=value or SENTRY_DSN="value" or SENTRY_DSN='value'
-    const match = trimmed.match(/^SENTRY_DSN\s*=\s*(['"]?)(.+?)\1\s*(?:#.*)?$/);
+    const match = trimmed.match(ENV_FILE_PATTERN);
     if (match?.[2]) {
       return match[2];
     }
@@ -94,16 +117,17 @@ function parseEnvFile(content: string): string | null {
 /**
  * Detect DSN from .env files in the given directory
  */
-function detectFromEnvFiles(cwd: string): DetectedDsn | null {
+async function detectFromEnvFiles(cwd: string): Promise<DetectedDsn | null> {
   for (const filename of ENV_FILES) {
     const filepath = join(cwd, filename);
+    const file = Bun.file(filepath);
 
-    if (!existsSync(filepath)) {
+    if (!(await file.exists())) {
       continue;
     }
 
     try {
-      const content = readFileSync(filepath, "utf-8");
+      const content = await file.text();
       const dsn = parseEnvFile(content);
 
       if (dsn) {
@@ -119,94 +143,46 @@ function detectFromEnvFiles(cwd: string): DetectedDsn | null {
 
 /**
  * Extract DSN string from Sentry.init code using regex
- * This is a simpler alternative to ast-grep for basic cases
  */
 function extractDsnFromCode(content: string): string | null {
-  // Match patterns like:
-  // Sentry.init({ dsn: "..." })
-  // Sentry.init({ dsn: '...' })
-  // Sentry.init({ dsn: `...` })
-  const patterns = [
-    /Sentry\.init\s*\(\s*\{[^}]*dsn\s*:\s*["'`]([^"'`]+)["'`]/s,
-    /dsn\s*:\s*["'`](https?:\/\/[^"'`]+@[^"'`]+)["'`]/s,
-  ];
+  // Try Sentry.init pattern first
+  const initMatch = content.match(DSN_PATTERN_INIT);
+  if (initMatch?.[1]) {
+    return initMatch[1];
+  }
 
-  for (const pattern of patterns) {
-    const match = content.match(pattern);
-    if (match?.[1]) {
-      return match[1];
-    }
+  // Try generic dsn: "..." pattern
+  const genericMatch = content.match(DSN_PATTERN_GENERIC);
+  if (genericMatch?.[1]) {
+    return genericMatch[1];
   }
 
   return null;
 }
 
 /**
- * Recursively find source files in a directory (limited depth)
+ * Check if a path should be skipped
  */
-function findSourceFiles(
-  dir: string,
-  maxDepth = 3,
-  currentDepth = 0
-): string[] {
-  if (currentDepth >= maxDepth) {
-    return [];
-  }
-
-  const files: string[] = [];
-
-  try {
-    const entries = readdirSync(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      // Skip common non-source directories
-      if (
-        entry.isDirectory() &&
-        ![
-          "node_modules",
-          ".git",
-          "dist",
-          "build",
-          ".next",
-          "coverage",
-        ].includes(entry.name)
-      ) {
-        files.push(
-          ...findSourceFiles(join(dir, entry.name), maxDepth, currentDepth + 1)
-        );
-      } else if (entry.isFile()) {
-        const ext = entry.name.slice(entry.name.lastIndexOf("."));
-        if (CODE_EXTENSIONS.includes(ext)) {
-          files.push(join(dir, entry.name));
-        }
-      }
-    }
-  } catch {
-    // Skip directories we can't read
-  }
-
-  return files;
+function shouldSkipPath(filepath: string): boolean {
+  const parts = filepath.split("/");
+  return parts.some((part) => SKIP_DIRS.has(part));
 }
 
 /**
- * Detect DSN from source code using ast-grep (if available) or regex fallback
+ * Detect DSN from source code using Bun.Glob
  */
 async function detectFromCode(cwd: string): Promise<DetectedDsn | null> {
-  // Try to use ast-grep if available
-  // try {
-  //   const { js } = await import("@ast-grep/napi");
-  //   // ast-grep implementation would go here
-  //   // For now, fall through to regex-based detection
-  // } catch {
-  //   // ast-grep not available, use regex fallback
-  // }
+  for await (const relativePath of CODE_GLOB.scan({ cwd, onlyFiles: true })) {
+    // Skip node_modules and other non-source directories
+    if (shouldSkipPath(relativePath)) {
+      continue;
+    }
 
-  // Regex-based detection
-  const sourceFiles = findSourceFiles(cwd);
+    const filepath = join(cwd, relativePath);
+    const file = Bun.file(filepath);
 
-  for (const filepath of sourceFiles) {
     try {
-      const content = readFileSync(filepath, "utf-8");
+      const content = await file.text();
       const dsn = extractDsnFromCode(content);
 
       if (dsn) {
@@ -245,7 +221,7 @@ export async function detectDsn(cwd: string): Promise<DetectedDsn | null> {
   }
 
   // 2. Check .env files
-  const envFileDsn = detectFromEnvFiles(cwd);
+  const envFileDsn = await detectFromEnvFiles(cwd);
   if (envFileDsn) {
     return envFileDsn;
   }
@@ -270,5 +246,7 @@ export function getDsnSourceDescription(dsn: DetectedDsn): string {
       return dsn.sourcePath ?? ".env file";
     case "code":
       return dsn.sourcePath ?? "source code";
+    default:
+      return "unknown source";
   }
 }

@@ -2,6 +2,7 @@
  * Browser utilities
  *
  * Cross-platform utilities for interacting with the user's browser.
+ * Uses Bun.spawn and Bun.which for process management.
  */
 
 /**
@@ -9,25 +10,34 @@
  */
 export async function openBrowser(url: string): Promise<void> {
   const { platform } = process;
-  const { spawn } = await import("node:child_process");
 
-  let command: string;
+  let command: string | null;
   let args: string[];
 
   if (platform === "darwin") {
-    command = "open";
+    command = Bun.which("open");
     args = [url];
   } else if (platform === "win32") {
-    command = "cmd";
+    command = Bun.which("cmd");
     args = ["/c", "start", "", url];
   } else {
-    command = "xdg-open";
+    // Linux and other Unix-like systems
+    command = Bun.which("xdg-open");
     args = [url];
   }
 
-  return new Promise((resolve) => {
-    const proc = spawn(command, args, { detached: true, stdio: "ignore" });
-    proc.unref();
-    setTimeout(resolve, 500);
+  if (!command) {
+    throw new Error(
+      `Could not find browser opener command for platform: ${platform}`
+    );
+  }
+
+  const proc = Bun.spawn([command, ...args], {
+    stdout: "ignore",
+    stderr: "ignore",
   });
+
+  // Give browser time to open, then detach
+  await Bun.sleep(500);
+  proc.unref();
 }
