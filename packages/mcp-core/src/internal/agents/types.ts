@@ -23,4 +23,7 @@ export interface EmbeddedAgentProvider {
 
   /** Get provider-specific options for generateText calls */
   getProviderOptions(): ProviderOptions;
+
+  /** Get the temperature value for this provider, or undefined to use default */
+  getTemperature(): number | undefined;
 }
