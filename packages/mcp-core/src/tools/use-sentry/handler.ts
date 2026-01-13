@@ -5,7 +5,7 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import type { ServerContext } from "../../types";
 import { useSentryAgent } from "./agent";
 import { buildServer } from "../../server";
-import tools from "../index";
+import tools, { SIMPLE_REPLACEMENT_TOOLS } from "../index";
 import type { ToolCall } from "../../internal/agents/callEmbeddedAgent";
 
 /**
@@ -92,9 +92,15 @@ export default defineTool({
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
 
-    // Exclude use_sentry from tools to prevent recursion
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { use_sentry, ...toolsForAgent } = tools;
+    // Exclude use_sentry (to prevent recursion) and simple replacement tools
+    // (since use_sentry only runs when an agent provider is available, list_* tools aren't needed)
+    const toolsToExclude = new Set<string>([
+      "use_sentry",
+      ...SIMPLE_REPLACEMENT_TOOLS,
+    ]);
+    const toolsForAgent = Object.fromEntries(
+      Object.entries(tools).filter(([key]) => !toolsToExclude.has(key)),
+    );
 
     // Build internal MCP server with the provided context
     // Context is captured in tool handler closures during buildServer()

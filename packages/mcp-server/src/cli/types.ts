@@ -8,6 +8,9 @@ export type CliArgs = {
   sentryDsn?: string;
   openaiBaseUrl?: string;
   openaiModel?: string;
+  anthropicBaseUrl?: string;
+  anthropicModel?: string;
+  agentProvider?: string;
   skills?: string;
   agent?: boolean;
   organizationSlug?: string;
@@ -24,6 +27,8 @@ export type EnvArgs = {
   mcpUrl?: string;
   sentryDsn?: string;
   openaiModel?: string;
+  anthropicModel?: string;
+  agentProvider?: string;
   skills?: string;
 };
 
@@ -35,6 +40,9 @@ export type MergedArgs = {
   sentryDsn?: string;
   openaiBaseUrl?: string;
   openaiModel?: string;
+  anthropicBaseUrl?: string;
+  anthropicModel?: string;
+  agentProvider?: string;
   skills?: string;
   agent?: boolean;
   organizationSlug?: string;
@@ -51,6 +59,9 @@ export type ResolvedConfig = {
   sentryDsn?: string;
   openaiBaseUrl?: string;
   openaiModel?: string;
+  anthropicBaseUrl?: string;
+  anthropicModel?: string;
+  agentProvider?: "openai" | "anthropic";
   /** Primary authorization method */
   finalSkills?: Set<Skill>;
   organizationSlug?: string;

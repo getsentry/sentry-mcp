@@ -11,9 +11,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Core - Shared code for MCP transports",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -21,9 +19,7 @@
     "type": "git",
     "url": "git@github.com:getsentry/sentry-mcp.git"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     "./api-client": {
       "types": "./dist/api-client/index.ts",
@@ -113,6 +109,18 @@
       "types": "./dist/internal/agents/openai-provider.ts",
       "default": "./dist/internal/agents/openai-provider.js"
     },
+    "./internal/agents/anthropic-provider": {
+      "types": "./dist/internal/agents/anthropic-provider.ts",
+      "default": "./dist/internal/agents/anthropic-provider.js"
+    },
+    "./internal/agents/provider-factory": {
+      "types": "./dist/internal/agents/provider-factory.ts",
+      "default": "./dist/internal/agents/provider-factory.js"
+    },
+    "./internal/agents/types": {
+      "types": "./dist/internal/agents/types.ts",
+      "default": "./dist/internal/agents/types.js"
+    },
     "./utils/url-utils": {
       "types": "./dist/utils/url-utils.ts",
       "default": "./dist/utils/url-utils.js"
@@ -140,6 +148,7 @@
     "zod-to-json-schema": "catalog:"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "catalog:",
     "@ai-sdk/openai": "catalog:",
     "@logtape/logtape": "^1.1.1",
     "@logtape/sentry": "^1.1.1",

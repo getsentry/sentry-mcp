@@ -555,6 +555,221 @@
     "requiredScopes": ["event:read"]
   },
   {
+    "name": "list_events",
+    "description": "Search events using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_events instead.\n\nDatasets:\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, traces, AI/LLM calls\n\nQuery Syntax Examples:\n- message:\"connection timeout\"\n- level:error\n- span.op:http.client span.status_code:500\n- log.level:error\n- transaction:/api/users\n\n<examples>\nlist_events(organizationSlug='my-org', dataset='errors', query='level:error')\nlist_events(organizationSlug='my-org', dataset='spans', query='span.op:db')\nlist_events(organizationSlug='my-org', dataset='logs', query='severity:error')\nlist_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "dataset": {
+          "type": "string",
+          "enum": ["errors", "logs", "spans"],
+          "default": "errors",
+          "description": "Dataset to query: errors (exceptions), logs, or spans (traces)"
+        },
+        "query": {
+          "type": "string",
+          "default": "",
+          "description": "Sentry event search query syntax (empty for all events)"
+        },
+        "fields": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fields to return. If not specified, uses sensible defaults. Include aggregate functions like count(), avg() for statistics."
+        },
+        "sort": {
+          "type": "string",
+          "default": "-timestamp",
+          "description": "Sort field (prefix with - for descending). Use -count() for aggregations."
+        },
+        "projectSlug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The project's slug. You can find a list of existing projects in an organization using the `find_projects()` tool.",
+          "default": null
+        },
+        "statsPeriod": {
+          "type": "string",
+          "default": "14d",
+          "description": "Time period: 1h, 24h, 7d, 14d, 30d, etc."
+        },
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "Maximum number of results to return (1-100)"
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        }
+      },
+      "required": ["organizationSlug"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
+    "name": "list_issue_events",
+    "description": "List events within a specific issue using Sentry query syntax (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_issue_events instead.\n\nCommon Query Filters:\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n- user.email:alice@example.com - Filter by user email\n- timestamp:>2024-01-01 - Filter by timestamp\n\n<examples>\nlist_issue_events(issueUrl='https://sentry.io/organizations/my-org/issues/123/', query='environment:production')\nlist_issue_events(issueId='MCP-41', organizationSlug='my-org', query='release:v1.0.0')\nlist_issue_events(issueId='PROJECT-123', organizationSlug='my-org', statsPeriod='1h')\n</examples>\n\n<hints>\n- Use issueUrl for convenience (includes org + issue ID)\n- Or provide both issueId and organizationSlug\n- The query filters events WITHIN the issue, no need for issue: prefix\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Organization slug. Required when using issueId. Not needed when using issueUrl.",
+          "default": null
+        },
+        "issueId": {
+          "type": "string",
+          "description": "Issue ID (e.g., 'MCP-41', 'PROJECT-123'). Requires organizationSlug."
+        },
+        "issueUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full Sentry issue URL. Includes both organization and issue ID."
+        },
+        "query": {
+          "type": "string",
+          "default": "",
+          "description": "Sentry event search query syntax (empty for all events)"
+        },
+        "sort": {
+          "type": "string",
+          "default": "-timestamp",
+          "description": "Sort field (prefix with - for descending). Default: -timestamp"
+        },
+        "statsPeriod": {
+          "type": "string",
+          "default": "14d",
+          "description": "Time period: 1h, 24h, 7d, 14d, 30d, etc."
+        },
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50,
+          "description": "Maximum number of events to return (1-100)"
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
+    "name": "list_issues",
+    "description": "List issues using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_issues instead.\n\nCommon Query Syntax:\n- is:unresolved - Show unresolved issues only\n- is:unassigned - Show unassigned issues\n- level:error - Filter by error level\n- firstSeen:-24h - First seen in last 24 hours\n- lastSeen:-1h - Last seen in last hour\n- has:user - Issues with user context\n- user.email:user@example.com - Filter by user email\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n\nCombine queries: is:unresolved is:unassigned level:error\n\n<examples>\nlist_issues(organizationSlug='my-org', query='is:unresolved is:unassigned')\nlist_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', sort='freq')\nlist_issues(organizationSlug='my-org', projectSlugOrId='my-project', query='is:unresolved')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "query": {
+          "type": "string",
+          "default": "is:unresolved",
+          "description": "Sentry issue search query syntax"
+        },
+        "projectSlugOrId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter by project slug or numeric ID (optional)"
+        },
+        "sort": {
+          "type": "string",
+          "enum": ["date", "freq", "new", "user"],
+          "default": "date",
+          "description": "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)"
+        },
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "Maximum number of issues to return (1-100)"
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        }
+      },
+      "required": ["organizationSlug"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
     "name": "search_docs",
     "description": "Search Sentry documentation for SDK setup, instrumentation, and configuration guidance.\n\nUse this tool when you need to:\n- Set up Sentry SDK or framework integrations (Django, Flask, Express, Next.js, etc.)\n- Configure features like performance monitoring, error sampling, or release tracking\n- Implement custom instrumentation (spans, transactions, breadcrumbs)\n- Configure data scrubbing, filtering, or sampling rules\n\nReturns snippets only. Use `get_doc(path='...')` to fetch full documentation content.\n\n<examples>\n```\nsearch_docs(query='Django setup configuration SENTRY_DSN', guide='python/django')\nsearch_docs(query='source maps webpack upload', guide='javascript/nextjs')\n```\n</examples>\n\n<hints>\n- Use guide parameter to filter to specific technologies (e.g., 'javascript/nextjs')\n- Include specific feature names like 'beforeSend', 'tracesSampleRate', 'SENTRY_DSN'\n</hints>",
     "inputSchema": {

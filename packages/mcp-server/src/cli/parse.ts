@@ -10,6 +10,9 @@ export function parseArgv(argv: string[]): CliArgs {
     "sentry-dsn": { type: "string" as const },
     "openai-base-url": { type: "string" as const },
     "openai-model": { type: "string" as const },
+    "anthropic-base-url": { type: "string" as const },
+    "anthropic-model": { type: "string" as const },
+    "agent-provider": { type: "string" as const },
     "organization-slug": { type: "string" as const },
     "project-slug": { type: "string" as const },
     skills: { type: "string" as const },
@@ -53,6 +56,9 @@ export function parseArgv(argv: string[]): CliArgs {
     sentryDsn: values["sentry-dsn"] as string | undefined,
     openaiBaseUrl: values["openai-base-url"] as string | undefined,
     openaiModel: values["openai-model"] as string | undefined,
+    anthropicBaseUrl: values["anthropic-base-url"] as string | undefined,
+    anthropicModel: values["anthropic-model"] as string | undefined,
+    agentProvider: values["agent-provider"] as string | undefined,
     organizationSlug: values["organization-slug"] as string | undefined,
     projectSlug: values["project-slug"] as string | undefined,
     skills: values.skills as string | undefined,
@@ -74,6 +80,9 @@ export function parseEnv(env: NodeJS.ProcessEnv): EnvArgs {
     fromEnv.sentryDsn = env.SENTRY_DSN || env.DEFAULT_SENTRY_DSN;
 
   if (env.OPENAI_MODEL) fromEnv.openaiModel = env.OPENAI_MODEL;
+  if (env.ANTHROPIC_MODEL) fromEnv.anthropicModel = env.ANTHROPIC_MODEL;
+  if (env.EMBEDDED_AGENT_PROVIDER)
+    fromEnv.agentProvider = env.EMBEDDED_AGENT_PROVIDER;
   if (env.MCP_SKILLS) fromEnv.skills = env.MCP_SKILLS;
   return fromEnv;
 }
@@ -89,6 +98,9 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     sentryDsn: cli.sentryDsn ?? env.sentryDsn,
     openaiBaseUrl: cli.openaiBaseUrl,
     openaiModel: cli.openaiModel ?? env.openaiModel,
+    anthropicBaseUrl: cli.anthropicBaseUrl,
+    anthropicModel: cli.anthropicModel ?? env.anthropicModel,
+    agentProvider: cli.agentProvider ?? env.agentProvider,
     // Skills precedence: CLI skills override env
     skills: cli.skills ?? env.skills,
     agent: cli.agent === true,

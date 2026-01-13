@@ -24,7 +24,10 @@ import type {
   ServerRequest,
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
-import tools from "./tools/index";
+import tools, {
+  AGENT_DEPENDENT_TOOLS,
+  SIMPLE_REPLACEMENT_TOOLS,
+} from "./tools/index";
 import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
 import {
@@ -42,6 +45,7 @@ import {
   getConstraintParametersToInject,
   getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
+import { hasAgentProvider } from "./internal/agents/provider-factory";
 
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
@@ -127,9 +131,25 @@ function configureServer({
   // - Agent mode: only use_sentry
   // - Custom tools provided: use those
   // - Default: all standard tools
-  const toolsToRegister = agentMode
+  let toolsToRegister = agentMode
     ? { use_sentry: tools.use_sentry }
     : (customTools ?? tools);
+
+  // Filter tools based on agent provider availability (skip in agent mode or custom tools)
+  // When an agent provider is available, use smart tools (search_*) and exclude simple tools (list_*)
+  // When no agent provider is available, use simple tools (list_*) and exclude smart tools (search_*)
+  if (!agentMode && !customTools) {
+    const hasAgent = hasAgentProvider();
+    const toolsToExclude = new Set<string>(
+      hasAgent ? SIMPLE_REPLACEMENT_TOOLS : AGENT_DEPENDENT_TOOLS,
+    );
+
+    toolsToRegister = Object.fromEntries(
+      Object.entries(toolsToRegister).filter(
+        ([key]) => !toolsToExclude.has(key),
+      ),
+    ) as typeof toolsToRegister;
+  }
 
   // Get granted skills from context for tool filtering
   const grantedSkills: Set<Skill> | undefined = context.grantedSkills
