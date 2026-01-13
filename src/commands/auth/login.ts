@@ -1,9 +1,9 @@
 import { buildCommand, numberParser } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
+import { openBrowser } from "../../lib/browser.js";
 import { getConfigPath, isAuthenticated } from "../../lib/config.js";
 import {
   completeOAuthFlow,
-  openBrowser,
   performDeviceFlow,
   setApiToken,
 } from "../../lib/oauth.js";

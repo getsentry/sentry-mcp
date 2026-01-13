@@ -17,8 +17,14 @@ export type TokenResponse = {
   access_token: string;
   token_type: string;
   expires_in: number;
+  expires_at?: string;
   refresh_token?: string;
   scope?: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 };
 
 export type TokenErrorResponse = {
