@@ -3,7 +3,7 @@ import type { LanguageModelV1 } from "ai";
 import { USER_AGENT } from "../../version";
 
 // Default configuration constants
-const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5-20250514";
+const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5";
 
 // Module-level state for baseURL (set only via explicit configuration, not env vars)
 let configuredBaseUrl: string | undefined;
@@ -20,7 +20,7 @@ export function setAnthropicBaseUrl(baseUrl: string | undefined): void {
  * Retrieve an Anthropic language model configured from environment variables and explicit config.
  *
  * Configuration:
- * - ANTHROPIC_MODEL: Model to use (default: "claude-sonnet-4-5-20250514") - env var OK
+ * - ANTHROPIC_MODEL: Model to use (default: "claude-sonnet-4-5") - env var OK
  * - Base URL: Must be set via setAnthropicBaseUrl() - NOT from env vars (security risk)
  */
 export function getAnthropicModel(model?: string): LanguageModelV1 {

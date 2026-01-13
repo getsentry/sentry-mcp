@@ -19,7 +19,7 @@ Embedded agent configuration:
   --openai-base-url <url>       Override OpenAI API base URL
   --openai-model <model>        Override OpenAI model (default: gpt-5)
   --anthropic-base-url <url>    Override Anthropic API base URL
-  --anthropic-model <model>     Override Anthropic model (default: claude-sonnet-4-5-20250514)
+  --anthropic-model <model>     Override Anthropic model (default: claude-sonnet-4-5)
 
 Session constraints:
   --organization-slug <slug>  Force all calls to an organization
