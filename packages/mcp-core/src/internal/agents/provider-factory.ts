@@ -28,6 +28,30 @@ export function setProviderBaseUrls(config: {
 }
 
 /**
+ * Check if the API key exists for a given provider type.
+ */
+function hasApiKeyForProvider(type: AgentProviderType): boolean {
+  switch (type) {
+    case "anthropic":
+      return Boolean(process.env.ANTHROPIC_API_KEY);
+    case "openai":
+      return Boolean(process.env.OPENAI_API_KEY);
+  }
+}
+
+/**
+ * Get the expected API key name for a provider type.
+ */
+function getApiKeyName(type: AgentProviderType): string {
+  switch (type) {
+    case "anthropic":
+      return "ANTHROPIC_API_KEY";
+    case "openai":
+      return "OPENAI_API_KEY";
+  }
+}
+
+/**
  * Build a provider instance for the given type.
  */
 function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
@@ -76,7 +100,14 @@ export function getAgentProvider(): EmbeddedAgentProvider {
     }
   }
 
-  // 3. Auto-detect based on available API keys
+  // 3. Validate API key for explicitly configured provider
+  if (providerType && !hasApiKeyForProvider(providerType)) {
+    throw new ConfigurationError(
+      `Provider "${providerType}" is configured but ${getApiKeyName(providerType)} is not set. Please set the API key environment variable.`,
+    );
+  }
+
+  // 4. Auto-detect based on available API keys
   if (!providerType) {
     if (process.env.ANTHROPIC_API_KEY) {
       providerType = "anthropic";
@@ -85,7 +116,7 @@ export function getAgentProvider(): EmbeddedAgentProvider {
     }
   }
 
-  // 4. No provider available
+  // 5. No provider available
   if (!providerType) {
     throw new ConfigurationError(
       "No embedded agent provider configured. " +
@@ -112,21 +143,23 @@ export function hasAgentProvider(): boolean {
 
 /**
  * Get the resolved provider type without throwing.
- * Returns undefined if no provider is available.
+ * Returns undefined if no provider is available or API key is missing.
  */
 export function getResolvedProviderType(): AgentProviderType | undefined {
-  // Check explicit configuration
+  // Check explicit configuration (with API key validation)
   if (configuredProvider) {
-    return configuredProvider;
+    return hasApiKeyForProvider(configuredProvider)
+      ? configuredProvider
+      : undefined;
   }
 
-  // Check environment variable
+  // Check environment variable (with API key validation)
   const envProvider = process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase();
   if (envProvider === "openai" || envProvider === "anthropic") {
-    return envProvider;
+    return hasApiKeyForProvider(envProvider) ? envProvider : undefined;
   }
 
-  // Auto-detect
+  // Auto-detect based on available API keys
   if (process.env.ANTHROPIC_API_KEY) {
     return "anthropic";
   }
