@@ -1,0 +1,23 @@
+packages/mcp-core/src/telem/sentry.ts
+  7242eb4122dfcfce 93,96-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.31",
+  "base_commit_sha": "d451a3c82565f4947d5f2d4b6116c2b9e25617ba",
+  "prompts": {
+    "7242eb4122dfcfce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "484d05d0-8a7c-4bf2-b248-c4b36feef6a5",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "David Cramer <dcramer@gmail.com>",
+      "messages": [],
+      "total_additions": 51,
+      "total_deletions": 41,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}
