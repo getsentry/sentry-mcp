@@ -1,0 +1,25 @@
+.claude/settings.json
+  0169d4b8b6f761e8 143-144,148-150
+AGENTS.md
+  0169d4b8b6f761e8 77-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.31",
+  "base_commit_sha": "040e6e41c42c997c78c9487a1b47f2c5bac9ab89",
+  "prompts": {
+    "0169d4b8b6f761e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39027a7f-bbd5-45c8-b40c-fb721b3dde00",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "David Cramer <dcramer@gmail.com>",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 1,
+      "accepted_lines": 25,
+      "overriden_lines": 0
+    }
+  }
+}
