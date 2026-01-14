@@ -189,6 +189,42 @@ export class SentryApiService {
   }
 
   /**
+   * Validates and applies time parameters to a URLSearchParams object.
+   *
+   * Enforces mutual exclusivity between relative (statsPeriod) and
+   * absolute (start/end) time ranges, and ensures start/end are paired.
+   *
+   * @param queryParams The URLSearchParams to modify
+   * @param statsPeriod Relative time period (e.g., "24h", "7d")
+   * @param start Absolute start time (ISO 8601)
+   * @param end Absolute end time (ISO 8601)
+   * @throws {ApiValidationError} If time parameters are invalid
+   */
+  private applyTimeParams(
+    queryParams: URLSearchParams,
+    statsPeriod?: string,
+    start?: string,
+    end?: string,
+  ): void {
+    if (statsPeriod && (start || end)) {
+      throw new ApiValidationError(
+        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
+      );
+    }
+    if ((start && !end) || (!start && end)) {
+      throw new ApiValidationError(
+        "Both start and end parameters must be provided together for absolute time ranges.",
+      );
+    }
+    if (statsPeriod) {
+      queryParams.set("statsPeriod", statsPeriod);
+    } else if (start && end) {
+      queryParams.set("start", start);
+      queryParams.set("end", end);
+    }
+  }
+
+  /**
    * Internal method for making authenticated requests to Sentry API.
    *
    * Handles:
@@ -1301,24 +1337,7 @@ export class SentryApiService {
     if (project) {
       searchQuery.set("project", project);
     }
-    // Validate time parameters - can't use both relative and absolute
-    if (statsPeriod && (start || end)) {
-      throw new ApiValidationError(
-        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
-      );
-    }
-    if ((start && !end) || (!start && end)) {
-      throw new ApiValidationError(
-        "Both start and end parameters must be provided together for absolute time ranges.",
-      );
-    }
-    // Use either relative time (statsPeriod) or absolute time (start/end)
-    if (statsPeriod) {
-      searchQuery.set("statsPeriod", statsPeriod);
-    } else if (start && end) {
-      searchQuery.set("start", start);
-      searchQuery.set("end", end);
-    }
+    this.applyTimeParams(searchQuery, statsPeriod, start, end);
     if (useCache !== undefined) {
       searchQuery.set("useCache", useCache ? "1" : "0");
     }
@@ -1436,24 +1455,7 @@ export class SentryApiService {
     if (project) {
       queryParams.set("project", project);
     }
-    // Validate time parameters - can't use both relative and absolute
-    if (statsPeriod && (start || end)) {
-      throw new ApiValidationError(
-        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
-      );
-    }
-    if ((start && !end) || (!start && end)) {
-      throw new ApiValidationError(
-        "Both start and end parameters must be provided together for absolute time ranges.",
-      );
-    }
-    // Use either relative time (statsPeriod) or absolute time (start/end)
-    if (statsPeriod) {
-      queryParams.set("statsPeriod", statsPeriod);
-    } else if (start && end) {
-      queryParams.set("start", start);
-      queryParams.set("end", end);
-    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
 
     const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
 
@@ -2010,24 +2012,12 @@ export class SentryApiService {
     queryParams.set("query", params.query);
     queryParams.set("dataset", "errors");
 
-    // Validate time parameters - can't use both relative and absolute
-    if (params.statsPeriod && (params.start || params.end)) {
-      throw new ApiValidationError(
-        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
-      );
-    }
-    if ((params.start && !params.end) || (!params.start && params.end)) {
-      throw new ApiValidationError(
-        "Both start and end parameters must be provided together for absolute time ranges.",
-      );
-    }
-    // Use either relative time (statsPeriod) or absolute time (start/end)
-    if (params.statsPeriod) {
-      queryParams.set("statsPeriod", params.statsPeriod);
-    } else if (params.start && params.end) {
-      queryParams.set("start", params.start);
-      queryParams.set("end", params.end);
-    }
+    this.applyTimeParams(
+      queryParams,
+      params.statsPeriod,
+      params.start,
+      params.end,
+    );
 
     if (params.projectId) {
       queryParams.set("project", params.projectId);
@@ -2084,24 +2074,12 @@ export class SentryApiService {
     queryParams.set("query", params.query);
     queryParams.set("dataset", params.dataset);
 
-    // Validate time parameters - can't use both relative and absolute
-    if (params.statsPeriod && (params.start || params.end)) {
-      throw new ApiValidationError(
-        "Cannot use both statsPeriod and start/end parameters. Use either statsPeriod for relative time or start/end for absolute time.",
-      );
-    }
-    if ((params.start && !params.end) || (!params.start && params.end)) {
-      throw new ApiValidationError(
-        "Both start and end parameters must be provided together for absolute time ranges.",
-      );
-    }
-    // Use either relative time (statsPeriod) or absolute time (start/end)
-    if (params.statsPeriod) {
-      queryParams.set("statsPeriod", params.statsPeriod);
-    } else if (params.start && params.end) {
-      queryParams.set("start", params.start);
-      queryParams.set("end", params.end);
-    }
+    this.applyTimeParams(
+      queryParams,
+      params.statsPeriod,
+      params.start,
+      params.end,
+    );
 
     if (params.projectId) {
       queryParams.set("project", params.projectId);

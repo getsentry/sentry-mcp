@@ -3,37 +3,18 @@ import { openai } from "@ai-sdk/openai";
 import { streamText, type ToolSet } from "ai";
 import { experimental_createMCPClient } from "ai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { z } from "zod";
 import type { Env } from "../types";
 import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import type {
-  ErrorResponse,
-  ChatRequest,
-  RateLimitResult,
+import {
+  AuthDataSchema,
+  TokenResponseSchema,
+  type AuthData,
+  type ChatRequest,
+  type RateLimitResult,
 } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
-
-function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
-  return errorResponse;
-}
-
-const AuthDataSchema = z.object({
-  access_token: z.string(),
-  refresh_token: z.string(),
-  expires_at: z.string(),
-  token_type: z.string(),
-});
-
-type AuthData = z.infer<typeof AuthDataSchema>;
-
-const TokenResponseSchema = z.object({
-  access_token: z.string(),
-  refresh_token: z.string(),
-  expires_in: z.number().optional(),
-  token_type: z.string(),
-});
 
 async function refreshTokenIfNeeded(
   c: Context<{ Bindings: Env }>,
@@ -88,10 +69,10 @@ async function refreshTokenIfNeeded(
 
     const tokenResponse = TokenResponseSchema.parse(await response.json());
 
-    // Prepare new auth data
-    const newAuthData = {
+    // Prepare new auth data - fall back to original refresh_token if not rotated
+    const newAuthData: AuthData = {
       access_token: tokenResponse.access_token,
-      refresh_token: tokenResponse.refresh_token,
+      refresh_token: tokenResponse.refresh_token ?? authData.refresh_token,
       expires_at: new Date(
         Date.now() + (tokenResponse.expires_in || 28800) * 1000,
       ).toISOString(),
@@ -112,10 +93,10 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       loggerScope: ["cloudflare", "chat"],
     });
     return c.json(
-      createErrorResponse({
+      {
         error: "AI service not configured",
         name: "AI_SERVICE_UNAVAILABLE",
-      }),
+      },
       500,
     );
   }
@@ -126,10 +107,10 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
 
   if (!authDataCookie) {
     return c.json(
-      createErrorResponse({
+      {
         error: "Authorization required",
         name: "MISSING_AUTH_TOKEN",
-      }),
+      },
       401,
     );
   }
@@ -140,10 +121,10 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     accessToken = authData.access_token;
   } catch (error) {
     return c.json(
-      createErrorResponse({
+      {
         error: "Invalid auth data",
         name: "INVALID_AUTH_DATA",
-      }),
+      },
       401,
     );
   }
@@ -168,22 +149,22 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       });
       if (!success) {
         return c.json(
-          createErrorResponse({
+          {
             error:
               "Rate limit exceeded. You can send up to 10 messages per minute. Please wait before sending another message.",
             name: "RATE_LIMIT_EXCEEDED",
-          }),
+          },
           429,
         );
       }
     } catch (error) {
       const eventId = logIssue(error);
       return c.json(
-        createErrorResponse({
+        {
           error: "There was an error communicating with the rate limiter.",
           name: "RATE_LIMITER_ERROR",
           eventId,
-        }),
+        },
         500,
       );
     }
@@ -200,10 +181,10 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
     // Validate messages array
     if (!Array.isArray(messages)) {
       return c.json(
-        createErrorResponse({
+        {
           error: "Messages must be an array",
           name: "INVALID_MESSAGES_FORMAT",
-        }),
+        },
         400,
       );
     }
@@ -295,36 +276,24 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             );
           } catch (retryError) {
             if (authInfo.statusCode === 403) {
-              return c.json(
-                createErrorResponse(getAuthErrorResponse(authInfo)),
-                403,
-              );
+              return c.json(getAuthErrorResponse(authInfo), 403);
             }
-            return c.json(
-              createErrorResponse(getAuthErrorResponse(authInfo)),
-              401,
-            );
+            return c.json(getAuthErrorResponse(authInfo), 401);
           }
         } else {
           if (authInfo.statusCode === 403) {
-            return c.json(
-              createErrorResponse(getAuthErrorResponse(authInfo)),
-              403,
-            );
+            return c.json(getAuthErrorResponse(authInfo), 403);
           }
-          return c.json(
-            createErrorResponse(getAuthErrorResponse(authInfo)),
-            401,
-          );
+          return c.json(getAuthErrorResponse(authInfo), 401);
         }
       } else {
         const eventId = logIssue(error);
         return c.json(
-          createErrorResponse({
+          {
             error: "Failed to connect to MCP server",
             name: "MCP_CONNECTION_FAILED",
             eventId,
-          }),
+          },
           500,
         );
       }
@@ -385,53 +354,50 @@ Remember: You're a test assistant, not a general-purpose helper. Stay focused on
       }
     }
 
-    logIssue(error, {
-      loggerScope: ["cloudflare", "chat"],
-    });
-
     // Provide more specific error messages for common issues
+    // Each branch logs to Sentry and gets an eventId
     if (error instanceof Error) {
       if (error.message.includes("API key")) {
         const eventId = logIssue(error);
         return c.json(
-          createErrorResponse({
+          {
             error: "Authentication failed with AI service",
             name: "AI_AUTH_FAILED",
             eventId,
-          }),
+          },
           401,
         );
       }
       if (error.message.includes("rate limit")) {
         const eventId = logIssue(error);
         return c.json(
-          createErrorResponse({
+          {
             error: "Rate limit exceeded. Please try again later.",
             name: "AI_RATE_LIMIT",
             eventId,
-          }),
+          },
           429,
         );
       }
       if (error.message.includes("Authorization")) {
         const eventId = logIssue(error);
         return c.json(
-          createErrorResponse({
+          {
             error: "Invalid or missing Sentry authentication",
             name: "SENTRY_AUTH_INVALID",
             eventId,
-          }),
+          },
           401,
         );
       }
 
       const eventId = logIssue(error);
       return c.json(
-        createErrorResponse({
+        {
           error: "Internal server error",
           name: "INTERNAL_ERROR",
           eventId,
-        }),
+        },
         500,
       );
     }

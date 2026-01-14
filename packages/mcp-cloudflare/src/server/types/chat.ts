@@ -1,6 +1,27 @@
 /**
  * Type definitions for Chat API
  */
+import { z } from "zod";
+
+// Shared schemas for authentication data across chat routes
+export const AuthDataSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string(),
+  expires_at: z.string(),
+  token_type: z.string(),
+});
+
+export type AuthData = z.infer<typeof AuthDataSchema>;
+
+export const TokenResponseSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string().optional(),
+  expires_in: z.number().optional(),
+  token_type: z.string(),
+  scope: z.string().optional(),
+});
+
+export type TokenResponse = z.infer<typeof TokenResponseSchema>;
 
 // Error response types
 export type ErrorName =
