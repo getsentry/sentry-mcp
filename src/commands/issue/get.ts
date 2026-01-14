@@ -142,44 +142,36 @@ export const getCommand = buildCommand({
     issueId: string
   ): Promise<void> {
     const { process, cwd } = this;
-    const { stdout, stderr } = process;
+    const { stdout } = process;
 
-    try {
-      let issue: SentryIssue;
+    let issue: SentryIssue;
 
-      // Check if it's a short ID (contains letters) vs numeric ID
-      if (isShortId(issueId)) {
-        // Short ID requires organization context
-        const org = await resolveOrg(flags.org, cwd);
-        if (!org) {
-          stderr.write(
-            "Error: Organization is required for short ID lookup.\n\n" +
-              "Please specify it using:\n" +
-              `  sentry issue get ${issueId} --org <org-slug>\n\n` +
-              "Or set SENTRY_DSN environment variable for automatic detection.\n"
-          );
-          process.exitCode = 1;
-          return;
-        }
-        issue = await getIssueByShortId(org, issueId);
-      } else {
-        // Numeric ID can be fetched directly
-        issue = await getIssue(issueId);
+    // Check if it's a short ID (contains letters) vs numeric ID
+    if (isShortId(issueId)) {
+      // Short ID requires organization context
+      const org = await resolveOrg(flags.org, cwd);
+      if (!org) {
+        throw new Error(
+          "Organization is required for short ID lookup.\n\n" +
+            "Please specify it using:\n" +
+            `  sentry issue get ${issueId} --org <org-slug>\n\n` +
+            "Or set SENTRY_DSN environment variable for automatic detection."
+        );
       }
-
-      const event = flags.event ? await tryGetLatestEvent(issue.id) : undefined;
-
-      if (flags.json) {
-        const output = event ? { issue, event } : { issue };
-        writeJson(stdout, output);
-        return;
-      }
-
-      writeHumanOutput(stdout, issue, event);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      stderr.write(`Error fetching issue: ${message}\n`);
-      process.exitCode = 1;
+      issue = await getIssueByShortId(org, issueId);
+    } else {
+      // Numeric ID can be fetched directly
+      issue = await getIssue(issueId);
     }
+
+    const event = flags.event ? await tryGetLatestEvent(issue.id) : undefined;
+
+    if (flags.json) {
+      const output = event ? { issue, event } : { issue };
+      writeJson(stdout, output);
+      return;
+    }
+
+    writeHumanOutput(stdout, issue, event);
   },
 });

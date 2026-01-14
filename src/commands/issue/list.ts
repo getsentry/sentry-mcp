@@ -195,7 +195,7 @@ export const listCommand = buildCommand({
   },
   async func(this: SentryContext, flags: ListFlags): Promise<void> {
     const { process, cwd } = this;
-    const { stdout, stderr } = process;
+    const { stdout } = process;
 
     // Resolve organization and project
     let target: ResolvedTarget | null = null;
@@ -234,56 +234,48 @@ export const listCommand = buildCommand({
     }
 
     if (!target) {
-      stderr.write(
-        "Error: Organization and project are required.\n\n" +
+      throw new Error(
+        "Organization and project are required.\n\n" +
           "Please specify them using:\n" +
           "  sentry issue list --org <org-slug> --project <project-slug>\n\n" +
           "Or set defaults:\n" +
           "  sentry config set defaults.organization <org-slug>\n" +
           "  sentry config set defaults.project <project-slug>\n\n" +
-          "Or set SENTRY_DSN environment variable for automatic detection.\n"
+          "Or set SENTRY_DSN environment variable for automatic detection."
       );
-      process.exitCode = 1;
+    }
+
+    const issues = await listIssues(target.org, target.project, {
+      query: flags.query,
+      limit: flags.limit,
+      sort: flags.sort,
+    });
+
+    if (flags.json) {
+      writeJson(stdout, issues);
       return;
     }
 
-    try {
-      const issues = await listIssues(target.org, target.project, {
-        query: flags.query,
-        limit: flags.limit,
-        sort: flags.sort,
-      });
-
-      if (flags.json) {
-        writeJson(stdout, issues);
-        return;
-      }
-
-      if (issues.length === 0) {
-        stdout.write("No issues found.\n");
-        if (target.detectedFrom) {
-          stdout.write(`\nℹ Detected from ${target.detectedFrom}\n`);
-        }
-        return;
-      }
-
-      writeListHeader(
-        stdout,
-        target.orgDisplay,
-        target.projectDisplay,
-        issues.length
-      );
-      writeIssueRows(stdout, issues);
-      writeListFooter(stdout);
-
-      // Show detection source if auto-detected
+    if (issues.length === 0) {
+      stdout.write("No issues found.\n");
       if (target.detectedFrom) {
         stdout.write(`\nℹ Detected from ${target.detectedFrom}\n`);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      stderr.write(`Error listing issues: ${message}\n`);
-      process.exitCode = 1;
+      return;
+    }
+
+    writeListHeader(
+      stdout,
+      target.orgDisplay,
+      target.projectDisplay,
+      issues.length
+    );
+    writeIssueRows(stdout, issues);
+    writeListFooter(stdout);
+
+    // Show detection source if auto-detected
+    if (target.detectedFrom) {
+      stdout.write(`\nℹ Detected from ${target.detectedFrom}\n`);
     }
   },
 });

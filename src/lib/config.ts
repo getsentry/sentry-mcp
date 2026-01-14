@@ -14,8 +14,21 @@ import { join } from "node:path";
 import type { CachedProject, SentryConfig } from "../types/index.js";
 import { SentryConfigSchema } from "../types/index.js";
 
-const CONFIG_DIR = join(homedir(), ".sentry-cli-next");
-const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+/**
+ * Get config directory path (reads env var at runtime for test isolation)
+ */
+function getConfigDir(): string {
+  return (
+    process.env.SENTRY_CLI_CONFIG_DIR || join(homedir(), ".sentry-cli-next")
+  );
+}
+
+/**
+ * Get config file path
+ */
+function getConfigFile(): string {
+  return join(getConfigDir(), "config.json");
+}
 
 /**
  * Ensure the config directory exists
@@ -28,7 +41,7 @@ const CONFIG_FILE = join(CONFIG_DIR, "config.json");
  * mkdirSync with recursive: true is idempotent - it won't fail if dir exists.
  */
 function ensureConfigDir(): void {
-  mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  mkdirSync(getConfigDir(), { recursive: true, mode: 0o700 });
 }
 
 /**
@@ -36,7 +49,8 @@ function ensureConfigDir(): void {
  */
 export async function readConfig(): Promise<SentryConfig> {
   try {
-    const file = Bun.file(CONFIG_FILE);
+    const configFile = getConfigFile();
+    const file = Bun.file(configFile);
     if (!(await file.exists())) {
       return {};
     }
@@ -62,7 +76,7 @@ export async function readConfig(): Promise<SentryConfig> {
  */
 export async function writeConfig(config: SentryConfig): Promise<void> {
   ensureConfigDir();
-  await Bun.write(CONFIG_FILE, JSON.stringify(config, null, 2));
+  await Bun.write(getConfigFile(), JSON.stringify(config, null, 2));
 }
 
 /**
@@ -163,7 +177,7 @@ export async function isAuthenticated(): Promise<boolean> {
  * Get the config file path (for display purposes)
  */
 export function getConfigPath(): string {
-  return CONFIG_FILE;
+  return getConfigFile();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

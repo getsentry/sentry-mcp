@@ -1,12 +1,13 @@
 import { buildCommand, numberParser } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
+import { listOrganizations } from "../../lib/api-client.js";
 import { openBrowser } from "../../lib/browser.js";
-import { getConfigPath, isAuthenticated } from "../../lib/config.js";
 import {
-  completeOAuthFlow,
-  performDeviceFlow,
-  setApiToken,
-} from "../../lib/oauth.js";
+  getConfigPath,
+  isAuthenticated,
+  setAuthToken,
+} from "../../lib/config.js";
+import { completeOAuthFlow, performDeviceFlow } from "../../lib/oauth.js";
 
 type LoginFlags = {
   readonly token?: string;
@@ -50,7 +51,20 @@ export const loginCommand = buildCommand({
 
     // Token-based authentication
     if (flags.token) {
-      await setApiToken(flags.token);
+      // Save token first, then validate by making an API call
+      await setAuthToken(flags.token);
+
+      // Validate the token by trying to list organizations
+      try {
+        await listOrganizations();
+      } catch {
+        // Token is invalid - clear it and throw
+        await clearAuth();
+        throw new Error(
+          "Invalid API token. Please check your token and try again."
+        );
+      }
+
       process.stdout.write("✓ Authenticated with API token\n");
       process.stdout.write(`  Config saved to: ${getConfigPath()}\n`);
       return;
@@ -98,8 +112,7 @@ export const loginCommand = buildCommand({
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`\n✗ Authentication failed: ${message}\n`);
-      process.exitCode = 1;
+      throw new Error(`Authentication failed: ${message}`);
     }
   },
 });

@@ -45,41 +45,35 @@ export const listCommand = buildCommand({
   },
   async func(this: SentryContext, flags: ListFlags): Promise<void> {
     const { process } = this;
-    const { stdout, stderr } = process;
+    const { stdout } = process;
 
-    try {
-      const orgs = await listOrganizations();
-      const limitedOrgs = orgs.slice(0, flags.limit);
+    const orgs = await listOrganizations();
+    const limitedOrgs = orgs.slice(0, flags.limit);
 
-      if (flags.json) {
-        writeJson(stdout, limitedOrgs);
-        return;
-      }
+    if (flags.json) {
+      writeJson(stdout, limitedOrgs);
+      return;
+    }
 
-      if (limitedOrgs.length === 0) {
-        stdout.write("No organizations found.\n");
-        return;
-      }
+    if (limitedOrgs.length === 0) {
+      stdout.write("No organizations found.\n");
+      return;
+    }
 
-      const slugWidth = calculateOrgSlugWidth(limitedOrgs);
+    const slugWidth = calculateOrgSlugWidth(limitedOrgs);
 
-      // Header
-      stdout.write(`${"SLUG".padEnd(slugWidth)}  NAME\n`);
+    // Header
+    stdout.write(`${"SLUG".padEnd(slugWidth)}  NAME\n`);
 
-      // Rows
-      for (const org of limitedOrgs) {
-        stdout.write(`${formatOrgRow(org, slugWidth)}\n`);
-      }
+    // Rows
+    for (const org of limitedOrgs) {
+      stdout.write(`${formatOrgRow(org, slugWidth)}\n`);
+    }
 
-      if (orgs.length > flags.limit) {
-        stdout.write(
-          `\nShowing ${flags.limit} of ${orgs.length} organizations\n`
-        );
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      stderr.write(`Error listing organizations: ${message}\n`);
-      process.exitCode = 1;
+    if (orgs.length > flags.limit) {
+      stdout.write(
+        `\nShowing ${flags.limit} of ${orgs.length} organizations\n`
+      );
     }
   },
 });
