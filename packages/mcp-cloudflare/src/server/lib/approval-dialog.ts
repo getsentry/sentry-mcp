@@ -299,21 +299,11 @@ export async function renderApprovalDialog(
   const clientName = client?.clientName
     ? sanitizeHtml(client.clientName)
     : "Unknown MCP Client";
-  const serverDescription = server.description
-    ? sanitizeHtml(server.description)
-    : "";
 
   // Safe URLs
-  const logoUrl = server.logo ? sanitizeHtml(server.logo) : "";
   const clientUri = client?.clientUri ? sanitizeHtml(client.clientUri) : "";
   const policyUri = client?.policyUri ? sanitizeHtml(client.policyUri) : "";
   const tosUri = client?.tosUri ? sanitizeHtml(client.tosUri) : "";
-
-  // Client contacts
-  const contacts =
-    client?.contacts && client.contacts.length > 0
-      ? sanitizeHtml(client.contacts.join(", "))
-      : "";
 
   // Get redirect URIs
   const redirectUris =

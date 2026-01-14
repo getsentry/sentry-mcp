@@ -5,6 +5,11 @@ import { SCOPES } from "../../constants";
 import type { Env } from "../types";
 import { createErrorPage, createSuccessPage } from "../lib/html-utils";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import {
+  AuthDataSchema,
+  TokenResponseSchema,
+  type TokenResponse,
+} from "../types/chat";
 
 // Generate a secure random state parameter using Web Crypto API
 function generateState(): string {
@@ -68,25 +73,6 @@ const ClientRegistrationResponseSchema = z.object({
 type ClientRegistrationResponse = z.infer<
   typeof ClientRegistrationResponseSchema
 >;
-
-// Token exchange schema - this is what the MCP server's OAuth returns
-const TokenResponseSchema = z.object({
-  access_token: z.string(),
-  token_type: z.string(),
-  expires_in: z.number().optional(),
-  refresh_token: z.string().optional(),
-  scope: z.string().optional(),
-});
-
-type TokenResponse = z.infer<typeof TokenResponseSchema>;
-
-// Auth data schema (same as in chat.ts)
-const AuthDataSchema = z.object({
-  access_token: z.string(),
-  refresh_token: z.string(),
-  expires_at: z.string(),
-  token_type: z.string(),
-});
 
 // Get or register OAuth client with the MCP server
 export async function getOrRegisterChatClient(

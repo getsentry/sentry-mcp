@@ -9,15 +9,10 @@ import { experimental_createMCPClient } from "ai";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Env } from "../types";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import type { ErrorResponse } from "../types/chat";
+import { AuthDataSchema } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
-import { z } from "zod";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
-
-function createErrorResponse(errorResponse: ErrorResponse): ErrorResponse {
-  return errorResponse;
-}
 
 export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // Support cookie-based auth (preferred) with fallback to Authorization header
@@ -28,7 +23,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     const { getCookie } = await import("hono/cookie");
     const authDataCookie = getCookie(c, "sentry_auth_data");
     if (authDataCookie) {
-      const AuthDataSchema = z.object({ access_token: z.string() });
       const authData = AuthDataSchema.parse(JSON.parse(authDataCookie));
       accessToken = authData.access_token;
     }
@@ -46,10 +40,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
   if (!accessToken) {
     return c.json(
-      createErrorResponse({
+      {
         error: "Authorization required",
         name: "MISSING_AUTH_TOKEN",
-      }),
+      },
       401,
     );
   }
@@ -135,18 +129,18 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     const authInfo = analyzeAuthError(error);
     if (authInfo.isAuthError) {
       return c.json(
-        createErrorResponse(getAuthErrorResponse(authInfo)),
+        getAuthErrorResponse(authInfo),
         authInfo.statusCode || (401 as any),
       );
     }
 
     const eventId = logIssue(error);
     return c.json(
-      createErrorResponse({
+      {
         error: "Failed to fetch MCP metadata",
         name: "METADATA_FETCH_FAILED",
         eventId,
-      }),
+      },
       500,
     );
   }

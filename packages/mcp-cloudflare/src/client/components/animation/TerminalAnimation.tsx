@@ -18,6 +18,31 @@ export type Step = {
   pauseMs: number | null;
 };
 
+// Helper functions extracted to avoid nested ternaries (per project guidelines)
+function getBorderColorClass(index: number): string {
+  switch (index) {
+    case 1:
+      return "xl:border-orange-400/50";
+    case 2:
+      return "xl:border-pink-400/50";
+    case 4:
+      return "xl:border-lime-200/50";
+    default:
+      return "border-white/10";
+  }
+}
+
+function getPulseColorClass(index: number): string {
+  switch (index) {
+    case 4:
+      return "text-lime-200/50";
+    case 2:
+      return "text-pink-400/50";
+    default:
+      return "text-orange-400/50";
+  }
+}
+
 const steps: Step[] = [
   {
     label: "Copypaste Sentry Issue URL",
@@ -101,9 +126,62 @@ export default function TerminalAnimation() {
     } catch {}
   }, [clearAllTimers]);
 
-  const handleMarkerReached = useCallback((markerIndex: number) => {
-    gotoStep(markerIndex);
-  }, []);
+  const gotoStep = useCallback(
+    (idx: number) => {
+      const p = playerRef.current;
+      if (!p) return;
+
+      const step = steps[idx];
+      if (!step) return;
+
+      clearAllTimers();
+      isManualSeekRef.current = true;
+
+      const isFastStep = idx === 3 || idx === 4;
+      const newSpeed = isFastStep ? 30 : 3;
+      setSpeed(newSpeed);
+
+      try {
+        p.pause?.();
+        p.seek?.(step.startTime + (isFastStep ? 87 : OFFSET)); // skip 87 seconds fakes a 30x speedup
+      } catch (err) {
+        console.error("[TerminalAnimation] gotoStep seek failed", {
+          stepIndex: idx,
+          label: step.label,
+          err,
+        });
+      }
+
+      currentStepRef.current = idx;
+      setCurrentIndex(idx);
+
+      setTimeout(() => {
+        isManualSeekRef.current = false;
+      }, 100);
+      // NOTE (for self): 1s delay on mobile got left out during handleMarkerReached consolidantion into gotoStep, bring back gotoStep(markerIndex, source: "marker" | "manual") if needed to add back
+      const mobile = isMobileRef.current;
+
+      if (mobile) {
+        try {
+          p.play?.();
+        } catch {}
+      } else if (step.pauseMs) {
+        autoContinueTimerRef.current = setTimeout(() => {
+          try {
+            p.play?.();
+          } catch {}
+        }, step.pauseMs);
+      }
+    },
+    [clearAllTimers],
+  );
+
+  const handleMarkerReached = useCallback(
+    (markerIndex: number) => {
+      gotoStep(markerIndex);
+    },
+    [gotoStep],
+  );
 
   const mountOnce = useCallback(async () => {
     if (playerRef.current) return;
@@ -164,63 +242,6 @@ export default function TerminalAnimation() {
     });
   }, [handleMarkerReached]);
 
-  const gotoStep = useCallback(
-    (idx: number) => {
-      const p = playerRef.current;
-      if (!p) return;
-
-      const step = steps[idx];
-      if (!step) return;
-
-      clearAllTimers();
-      isManualSeekRef.current = true;
-
-      const isFastStep = idx === 3 || idx === 4;
-      const newSpeed = isFastStep ? 30 : 3;
-      setSpeed(newSpeed);
-
-      try {
-        p.pause?.();
-        p.seek?.(step.startTime + (isFastStep ? 87 : OFFSET)); // skip 87 seconds fakes a 30x speedup
-      } catch (err) {
-        console.error("[TerminalAnimation] gotoStep seek failed", {
-          stepIndex: idx,
-          label: step.label,
-          err,
-        });
-      }
-
-      currentStepRef.current = idx;
-      setCurrentIndex(idx);
-
-      setTimeout(() => {
-        isManualSeekRef.current = false;
-      }, 100);
-      // NOTE (for self): 1s delay on mobile got left out during handleMarkerReached consolidantion into gotoStep, bring back gotoStep(markerIndex, source: "marker" | "manual") if needed to add back
-      const mobile = isMobileRef.current;
-
-      if (mobile) {
-        try {
-          p.play?.();
-        } catch {}
-      } else if (step.pauseMs) {
-        autoContinueTimerRef.current = setTimeout(() => {
-          try {
-            p.play?.();
-          } catch {}
-        }, step.pauseMs);
-      }
-    },
-    [clearAllTimers],
-  );
-
-  const activateStep = useCallback(
-    (stepIndex: number) => {
-      gotoStep(stepIndex);
-    },
-    [gotoStep],
-  );
-
   const restart = useCallback(() => {
     clearAllTimers();
     const p = playerRef.current;
@@ -267,15 +288,7 @@ export default function TerminalAnimation() {
   return (
     <>
       <div
-        className={`${
-          currentIndex === 1
-            ? "xl:border-orange-400/50"
-            : currentIndex === 2
-              ? "xl:border-pink-400/50"
-              : currentIndex === 4
-                ? "xl:border-lime-200/50"
-                : "border-white/10"
-        } relative w-full flex flex-col justify-between col-span-2 gap-8 max-xl:row-span-6 border bg-background/50 rounded-xl sm:rounded-3xl overflow-hidden`}
+        className={`${getBorderColorClass(currentIndex)} relative w-full flex flex-col justify-between col-span-2 gap-8 max-xl:row-span-6 border bg-background/50 rounded-xl sm:rounded-3xl overflow-hidden`}
       >
         <div className="w-full relative overflow-hidden min-h-56 h-full sm:[mask-image:radial-gradient(circle_at_top_right,transparent_10%,red_20%)] [mask-image:radial-gradient(circle_at_top_right,transparent_20%,red_30%)]">
           <div
@@ -289,7 +302,7 @@ export default function TerminalAnimation() {
 
         <div className="relative bottom-0 inset-x-0">
           <StepsList
-            onSelectAction={(i) => (i === 0 ? restart() : activateStep(i))}
+            onSelectAction={(i) => (i === 0 ? restart() : gotoStep(i))}
             globalIndex={Math.max(currentIndex, 0)}
             className=""
             restart={restart}
@@ -311,13 +324,7 @@ export default function TerminalAnimation() {
               currentIndex === 1 || currentIndex === 2 || currentIndex === 4
             }
             direction={currentIndex === 4 ? "ltr" : "rtl"}
-            pulseColorClass={
-              currentIndex === 4
-                ? "text-lime-200/50"
-                : currentIndex === 2
-                  ? "text-pink-400/50"
-                  : "text-orange-400/50"
-            }
+            pulseColorClass={getPulseColorClass(currentIndex)}
             heightClass="h-0.5"
             periodSec={0.3}
             pulseWidthPct={200}

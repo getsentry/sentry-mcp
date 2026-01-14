@@ -87,31 +87,9 @@ program
       const openaiKey = process.env.OPENAI_API_KEY;
 
       // Determine mode based on access token availability
+      // Local mode (stdio transport) when access token is provided
+      // Remote mode (SSE transport with OAuth) when no access token
       const useLocalMode = !!accessToken;
-
-      // Only require Sentry access token for local mode
-      if (useLocalMode && !accessToken) {
-        logError("No Sentry access token found");
-        console.log(chalk.yellow("To authenticate with Sentry:\n"));
-        console.log(chalk.gray("1. Use an access token:"));
-        console.log(
-          chalk.gray("   - Set SENTRY_ACCESS_TOKEN environment variable"),
-        );
-        console.log(chalk.gray("   - Add it to your .env file"));
-        console.log(chalk.gray("   - Or use --access-token flag\n"));
-        console.log(chalk.gray("2. Get an access token from:"));
-        console.log(
-          chalk.gray(
-            "   https://sentry.io/settings/account/api/auth-tokens/\n",
-          ),
-        );
-        console.log(
-          chalk.gray(
-            "Required scopes: org:read, project:read, project:write, team:read, team:write, event:write\n",
-          ),
-        );
-        process.exit(1);
-      }
 
       if (!openaiKey) {
         logError("OPENAI_API_KEY environment variable is required");
