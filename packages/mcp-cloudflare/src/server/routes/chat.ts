@@ -69,10 +69,10 @@ async function refreshTokenIfNeeded(
 
     const tokenResponse = TokenResponseSchema.parse(await response.json());
 
-    // Prepare new auth data
-    const newAuthData = {
+    // Prepare new auth data - fall back to original refresh_token if not rotated
+    const newAuthData: AuthData = {
       access_token: tokenResponse.access_token,
-      refresh_token: tokenResponse.refresh_token,
+      refresh_token: tokenResponse.refresh_token ?? authData.refresh_token,
       expires_at: new Date(
         Date.now() + (tokenResponse.expires_in || 28800) * 1000,
       ).toISOString(),
