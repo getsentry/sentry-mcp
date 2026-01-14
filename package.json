@@ -1,16 +1,17 @@
 {
-  "name": "@sentry/cli",
-  "version": "0.1.0",
+  "name": "@betegon/sentry",
+  "version": "0.1.1",
   "description": "A gh-like CLI for Sentry",
   "type": "module",
   "bin": {
-    "sentry": "./src/bin.ts"
+    "sentry": "./bin/sentry"
   },
   "scripts": {
     "dev": "bun run src/bin.ts",
     "build": "bun run script/build.ts --single",
     "build:all": "bun run script/build.ts",
-    "build:baseline": "bun run script/build.ts --baseline",
+    "package": "bun run script/package.ts",
+    "prepublish": "bun run script/build.ts && bun run script/package.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
