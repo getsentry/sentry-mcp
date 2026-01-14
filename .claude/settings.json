@@ -140,9 +140,14 @@
       "Skill(sentry-skills:find-bugs)",
       "Skill(sentry-skills:deslop)",
       "Skill(sentry-skills:iterate-pr)",
-      "Skill(sentry-skills:claude-settings-audit)"
+      "Skill(sentry-skills:claude-settings-audit)",
+      "Skill(sentry-skills:agents-md)"
     ],
     "deny": []
+  },
+  "enabledPlugins": {
+    "sentry-skills@sentry-skills": true,
+    "pr-review-toolkit@claude-plugins-official": true
   },
   "enableAllProjectMcpServers": true,
   "includeCoAuthoredBy": true,

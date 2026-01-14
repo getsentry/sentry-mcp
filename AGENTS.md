@@ -74,3 +74,22 @@ pnpm run measure-tokens                   # Check tool definition size
 2. Update relevant docs when changing functionality.
 3. Follow @docs/error-handling.md for error types.
 4. Follow @docs/pr-management.md for commits and PRs.
+
+## Commit Attribution
+
+AI commits MUST include:
+```
+Co-Authored-By: (the agent model's name and attribution byline)
+```
+
+## Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/commit` | Create commits following Sentry conventions |
+| `/create-pr` | Create pull requests following Sentry conventions |
+| `/code-review` | Review code following Sentry engineering practices |
+| `/find-bugs` | Find bugs and security issues in local changes |
+| `/iterate-pr` | Fix CI failures until all checks pass |
+| `/agents-md` | Maintain agent documentation |
+| `/claude-settings-audit` | Audit settings.json permissions |
