@@ -1,0 +1,33 @@
+packages/mcp-cloudflare/src/server/routes/chat-oauth.ts
+  56c14c11f3735b96 8
+packages/mcp-test-client/src/index.ts
+  56c14c11f3735b96 90-91
+packages/mcp-cloudflare/src/server/routes/chat.ts
+  56c14c11f3735b96 9-13
+packages/mcp-cloudflare/src/server/types/chat.ts
+  56c14c11f3735b96 4-24
+packages/mcp-core/src/api-client/client.ts
+  56c14c11f3735b96 192-226,1340,1458,2015
+packages/mcp-cloudflare/src/client/components/animation/TerminalAnimation.tsx
+  56c14c11f3735b96 21-45,129-178,183,291,305,327
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.31",
+  "base_commit_sha": "1506f363c3c22a8c0386d2e309842c6e6e2080aa",
+  "prompts": {
+    "56c14c11f3735b96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "10617c3d-a198-4fdb-87a4-591d48e88d1d",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "David Cramer <dcramer@gmail.com>",
+      "messages": [],
+      "total_additions": 189,
+      "total_deletions": 270,
+      "accepted_lines": 149,
+      "overriden_lines": 0
+    }
+  }
+}
