@@ -114,9 +114,9 @@ export const statusCommand = buildCommand({
     stdout.write(`Config file: ${getConfigPath()}\n\n`);
 
     if (!authenticated) {
-      stdout.write("Status: Not authenticated\n");
-      stdout.write("\nRun 'sentry auth login' to authenticate.\n");
-      return;
+      throw new Error(
+        "Not authenticated. Run 'sentry auth login' to authenticate."
+      );
     }
 
     stdout.write("Status: Authenticated ✓\n\n");

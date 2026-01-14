@@ -146,51 +146,43 @@ export const listCommand = buildCommand({
     orgArg?: string
   ): Promise<void> {
     const { process } = this;
-    const { stdout, stderr } = process;
+    const { stdout } = process;
 
-    try {
-      const orgSlug = orgArg ?? flags.org ?? (await getDefaultOrganization());
-      const showOrg = !orgSlug;
+    const orgSlug = orgArg ?? flags.org ?? (await getDefaultOrganization());
+    const showOrg = !orgSlug;
 
-      // Fetch projects
-      let allProjects: ProjectWithOrg[];
-      if (orgSlug) {
-        allProjects = await fetchOrgProjects(orgSlug);
-      } else {
-        allProjects = await fetchAllOrgProjects();
-      }
+    // Fetch projects
+    let allProjects: ProjectWithOrg[];
+    if (orgSlug) {
+      allProjects = await fetchOrgProjects(orgSlug);
+    } else {
+      allProjects = await fetchAllOrgProjects();
+    }
 
-      // Filter and limit
-      const filtered = filterByPlatform(allProjects, flags.platform);
-      const limited = filtered.slice(0, flags.limit);
+    // Filter and limit
+    const filtered = filterByPlatform(allProjects, flags.platform);
+    const limited = filtered.slice(0, flags.limit);
 
-      if (flags.json) {
-        writeJson(stdout, limited);
-        return;
-      }
+    if (flags.json) {
+      writeJson(stdout, limited);
+      return;
+    }
 
-      if (limited.length === 0) {
-        const msg = orgSlug
-          ? `No projects found in organization '${orgSlug}'.\n`
-          : "No projects found.\n";
-        stdout.write(msg);
-        return;
-      }
+    if (limited.length === 0) {
+      const msg = orgSlug
+        ? `No projects found in organization '${orgSlug}'.\n`
+        : "No projects found.\n";
+      stdout.write(msg);
+      return;
+    }
 
-      const slugWidth = calculateProjectSlugWidth(limited, showOrg);
+    const slugWidth = calculateProjectSlugWidth(limited, showOrg);
 
-      writeHeader(stdout, slugWidth);
-      writeRows(stdout, limited, slugWidth, showOrg);
+    writeHeader(stdout, slugWidth);
+    writeRows(stdout, limited, slugWidth, showOrg);
 
-      if (filtered.length > flags.limit) {
-        stdout.write(
-          `\nShowing ${flags.limit} of ${filtered.length} projects\n`
-        );
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      stderr.write(`Error listing projects: ${message}\n`);
-      process.exitCode = 1;
+    if (filtered.length > flags.limit) {
+      stdout.write(`\nShowing ${flags.limit} of ${filtered.length} projects\n`);
     }
   },
 });

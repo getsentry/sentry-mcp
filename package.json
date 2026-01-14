@@ -12,7 +12,9 @@
     "build:all": "bun run script/build.ts",
     "package": "bun run script/package.ts",
     "prepublish": "bun run script/build.ts && bun run script/package.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:e2e": "bun test test/e2e"
   },
   "devDependencies": {
     "@types/bun": "latest",
