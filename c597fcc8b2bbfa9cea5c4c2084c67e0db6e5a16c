@@ -1,0 +1,23 @@
+packages/mcp-cloudflare/src/server/routes/chat.ts
+  1cfd372d491b4d16 72-73,75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.31",
+  "base_commit_sha": "c597fcc8b2bbfa9cea5c4c2084c67e0db6e5a16c",
+  "prompts": {
+    "1cfd372d491b4d16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df56c9f8-164f-4326-9baa-81a222e48848",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "David Cramer <dcramer@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
