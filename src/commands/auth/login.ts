@@ -9,10 +9,12 @@ import {
   setAuthToken,
 } from "../../lib/config.js";
 import { completeOAuthFlow, performDeviceFlow } from "../../lib/oauth.js";
+import { generateQRCode } from "../../lib/qrcode.js";
 
 type LoginFlags = {
   readonly token?: string;
   readonly timeout: number;
+  readonly qr: boolean;
 };
 
 export const loginCommand = buildCommand({
@@ -36,6 +38,11 @@ export const loginCommand = buildCommand({
         parse: numberParser,
         brief: "Timeout for OAuth flow in seconds (default: 900)",
         default: 900,
+      },
+      qr: {
+        kind: "boolean",
+        brief: "Show QR code for mobile scanning",
+        default: true,
       },
     },
   },
@@ -84,13 +91,19 @@ export const loginCommand = buildCommand({
           ) => {
             const browserOpened = await openBrowser(verificationUriComplete);
             if (browserOpened) {
-              process.stdout.write("Opening browser...\n");
-              process.stdout.write(
-                `If it doesn't open, visit: ${verificationUri}\n`
-              );
-            } else {
-              process.stdout.write(`Visit: ${verificationUri}\n`);
+              process.stdout.write("Opening browser...\n\n");
             }
+
+            if (flags.qr) {
+              process.stdout.write(
+                "Scan this QR code or visit the URL below:\n\n"
+              );
+              const qr = await generateQRCode(verificationUriComplete);
+              process.stdout.write(qr);
+              process.stdout.write("\n");
+            }
+
+            process.stdout.write(`URL: ${verificationUri}\n`);
             process.stdout.write(`Code: ${userCode}\n\n`);
             process.stdout.write("Waiting for authorization...\n");
           },
