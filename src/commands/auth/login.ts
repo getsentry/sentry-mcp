@@ -3,6 +3,7 @@ import type { SentryContext } from "../../context.js";
 import { listOrganizations } from "../../lib/api-client.js";
 import { openBrowser } from "../../lib/browser.js";
 import {
+  clearAuth,
   getConfigPath,
   isAuthenticated,
   setAuthToken,
@@ -88,7 +89,10 @@ export const loginCommand = buildCommand({
             verificationUri,
             verificationUriComplete
           ) => {
-            process.stdout.write("Opening browser...\n\n");
+            const browserOpened = await openBrowser(verificationUriComplete);
+            if (browserOpened) {
+              process.stdout.write("Opening browser...\n\n");
+            }
 
             if (flags.qr) {
               process.stdout.write(
@@ -102,7 +106,6 @@ export const loginCommand = buildCommand({
             process.stdout.write(`URL: ${verificationUri}\n`);
             process.stdout.write(`Code: ${userCode}\n\n`);
             process.stdout.write("Waiting for authorization...\n");
-            await openBrowser(verificationUriComplete);
           },
           onPolling: () => {
             // Could add a spinner or dots here

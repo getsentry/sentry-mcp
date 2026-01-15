@@ -6,12 +6,15 @@
  */
 
 /**
- * Open a URL in the user's default browser
+ * Open a URL in the user's default browser.
+ *
+ * This is a "best effort" operation - returns true if successful, false otherwise.
+ * Never throws, so callers can safely attempt to open a browser without breaking flows.
  */
-export async function openBrowser(url: string): Promise<void> {
+export async function openBrowser(url: string): Promise<boolean> {
   const { platform } = process;
 
-  let command: string | null;
+  let command: string | null = null;
   let args: string[];
 
   if (platform === "darwin") {
@@ -21,23 +24,38 @@ export async function openBrowser(url: string): Promise<void> {
     command = Bun.which("cmd");
     args = ["/c", "start", "", url];
   } else {
-    // Linux and other Unix-like systems
-    command = Bun.which("xdg-open");
+    // Linux and other Unix-like systems - try multiple openers
+    const linuxOpeners = [
+      "xdg-open",
+      "sensible-browser",
+      "x-www-browser",
+      "gnome-open",
+      "kde-open",
+    ];
+    for (const opener of linuxOpeners) {
+      command = Bun.which(opener);
+      if (command) {
+        break;
+      }
+    }
     args = [url];
   }
 
   if (!command) {
-    throw new Error(
-      `Could not find browser opener command for platform: ${platform}`
-    );
+    return false;
   }
 
-  const proc = Bun.spawn([command, ...args], {
-    stdout: "ignore",
-    stderr: "ignore",
-  });
+  try {
+    const proc = Bun.spawn([command, ...args], {
+      stdout: "ignore",
+      stderr: "ignore",
+    });
 
-  // Give browser time to open, then detach
-  await Bun.sleep(500);
-  proc.unref();
+    // Give browser time to open, then detach
+    await Bun.sleep(500);
+    proc.unref();
+    return true;
+  } catch {
+    return false;
+  }
 }
