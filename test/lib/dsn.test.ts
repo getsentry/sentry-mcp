@@ -9,7 +9,7 @@ import {
   extractOrgIdFromHost,
   isValidDsn,
   parseDsn,
-} from "../../src/lib/dsn.js";
+} from "../../src/lib/dsn/index.js";
 
 describe("extractOrgIdFromHost", () => {
   test("extracts org ID from US ingest host", () => {
