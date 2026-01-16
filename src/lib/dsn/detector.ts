@@ -12,7 +12,7 @@
  * 3. Full scan: .env files, then source code (slow)
  */
 
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { getCachedDsn, setCachedDsn } from "./cache.js";
 import { detectFromEnv, SENTRY_DSN_ENV } from "./env.js";
 import {
@@ -23,8 +23,8 @@ import {
 import {
   detectAllFromCode,
   detectFromCode,
-  extractDsnFromCode,
-} from "./languages/javascript.js";
+  languageDetectors,
+} from "./languages/index.js";
 import { createDetectedDsn, parseDsn } from "./parser.js";
 import type {
   CachedDsnEntry,
@@ -180,7 +180,11 @@ async function verifyCachedDsn(
 
   try {
     const content = await Bun.file(filePath).text();
-    const foundDsn = extractDsnFromContent(content, cached.source);
+    const foundDsn = extractDsnFromContent(
+      content,
+      cached.source,
+      cached.sourcePath
+    );
 
     if (foundDsn === cached.dsn) {
       // Same DSN - cache is valid!
@@ -199,17 +203,31 @@ async function verifyCachedDsn(
 }
 
 /**
- * Extract DSN from content based on source type
+ * Extract DSN from content based on source type and file path.
+ *
+ * @param content - File content
+ * @param source - Source type (env_file, code, etc.)
+ * @param sourcePath - Path to the file (used to determine language for code files)
  */
 function extractDsnFromContent(
   content: string,
-  source: DsnSource
+  source: DsnSource,
+  sourcePath?: string
 ): string | null {
   switch (source) {
     case "env_file":
       return extractDsnFromEnvFile(content);
-    case "code":
-      return extractDsnFromCode(content);
+    case "code": {
+      if (!sourcePath) {
+        return null;
+      }
+      // Find the right language detector based on file extension
+      const ext = extname(sourcePath);
+      const detector = languageDetectors.find((d) =>
+        d.extensions.includes(ext)
+      );
+      return detector?.extractDsn(content) ?? null;
+    }
     default:
       return null;
   }
