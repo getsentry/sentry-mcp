@@ -8,10 +8,10 @@
 import type { LanguageDetector } from "./types.js";
 
 /**
- * Regex patterns for extracting DSN from Go code.
- * Matches: Dsn: "..." in struct initialization
+ * Regex pattern for DSN in Go struct initialization.
+ * Matches: Dsn: "https://...@..." in sentry.ClientOptions{}
  */
-const DSN_PATTERN_STRUCT = /Dsn:\s*["']([^"']+)["']/s;
+const DSN_PATTERN_STRUCT = /Dsn:\s*["'](https?:\/\/[^"']+@[^"']+)["']/s;
 
 /**
  * Generic pattern for dsn assignment

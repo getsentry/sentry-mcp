@@ -64,7 +64,6 @@ export const pythonDetector: LanguageDetector = {
     ".ruff_cache",
     "dist",
     "build",
-    "*.egg-info",
   ],
   extractDsn: extractDsnFromPython,
 };

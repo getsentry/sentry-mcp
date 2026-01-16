@@ -57,6 +57,10 @@ const codeGlob = new Bun.Glob(globPattern);
 
 /**
  * Check if a path should be skipped during scanning.
+ * Matches any path segment against the combined skip directories from all detectors.
+ *
+ * @param filepath - Relative file path to check
+ * @returns True if any path segment matches a skip directory
  */
 function shouldSkipPath(filepath: string): boolean {
   const parts = filepath.split("/");
@@ -64,7 +68,10 @@ function shouldSkipPath(filepath: string): boolean {
 }
 
 /**
- * Get the detector for a file based on its extension.
+ * Get the appropriate detector for a file based on its extension.
+ *
+ * @param filepath - File path to get detector for
+ * @returns The matching detector, or undefined if no detector handles this extension
  */
 function getDetectorForFile(filepath: string): LanguageDetector | undefined {
   const ext = extname(filepath);
@@ -145,16 +152,3 @@ export async function detectAllFromCode(cwd: string): Promise<DetectedDsn[]> {
 
   return results;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Exports for backward compatibility and cache verification
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Re-export individual detectors for direct access if needed
-export { goDetector } from "./go.js";
-export { javaDetector } from "./java.js";
-export { extractDsnFromCode, javascriptDetector } from "./javascript.js";
-export { phpDetector } from "./php.js";
-export { pythonDetector } from "./python.js";
-export { rubyDetector } from "./ruby.js";
-export type { LanguageDetector } from "./types.js";
