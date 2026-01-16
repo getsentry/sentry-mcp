@@ -9,13 +9,18 @@
  * For SaaS DSNs, the host contains the org ID in the pattern: oXXX.ingest...
  */
 
-import type { ParsedDsn } from "../types/index.js";
+import type { DetectedDsn, DsnSource, ParsedDsn } from "./types.js";
 
 /**
  * Regular expression to match org ID from Sentry SaaS ingest hosts
  * Matches patterns like: o1169445.ingest.sentry.io or o1169445.ingest.us.sentry.io
  */
 const ORG_ID_PATTERN = /^o(\d+)\.ingest(?:\.[a-z]+)?\.sentry\.io$/;
+
+/**
+ * Pattern to strip trailing colon from protocol
+ */
+const PROTOCOL_COLON_PATTERN = /:$/;
 
 /**
  * Extract organization ID from a Sentry ingest host
@@ -54,7 +59,7 @@ export function parseDsn(dsn: string): ParsedDsn | null {
     const url = new URL(dsn);
 
     // Protocol without the trailing colon
-    const protocol = url.protocol.replace(/:$/, "");
+    const protocol = url.protocol.replace(PROTOCOL_COLON_PATTERN, "");
 
     // Public key is the username portion
     const publicKey = url.username;
@@ -70,7 +75,7 @@ export function parseDsn(dsn: string): ParsedDsn | null {
 
     // Project ID is the last path segment
     const pathParts = url.pathname.split("/").filter(Boolean);
-    const projectId = pathParts[pathParts.length - 1];
+    const projectId = pathParts.at(-1);
     if (!projectId) {
       return null;
     }
@@ -99,4 +104,31 @@ export function parseDsn(dsn: string): ParsedDsn | null {
  */
 export function isValidDsn(value: string): boolean {
   return parseDsn(value) !== null;
+}
+
+/**
+ * Create a DetectedDsn from a raw DSN string.
+ * Parses the DSN and attaches source metadata.
+ *
+ * @param raw - Raw DSN string
+ * @param source - Where the DSN was detected from
+ * @param sourcePath - Relative path to source file (for file-based sources)
+ * @returns DetectedDsn with parsed components, or null if DSN is invalid
+ */
+export function createDetectedDsn(
+  raw: string,
+  source: DsnSource,
+  sourcePath?: string
+): DetectedDsn | null {
+  const parsed = parseDsn(raw);
+  if (!parsed) {
+    return null;
+  }
+
+  return {
+    ...parsed,
+    raw,
+    source,
+    sourcePath,
+  };
 }

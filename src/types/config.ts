@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { CachedDsnEntrySchema } from "../lib/dsn/types.js";
 
 /**
  * Schema for cached project information
@@ -47,6 +48,12 @@ export const SentryConfigSchema = z.object({
    * Key format: "{orgId}:{projectId}"
    */
   projectCache: z.record(CachedProjectSchema).optional(),
+  /**
+   * Cache of detected DSNs per directory
+   * Key: absolute directory path
+   * Value: cached DSN entry with source and resolution info
+   */
+  dsnCache: z.record(CachedDsnEntrySchema).optional(),
 });
 
 export type SentryConfig = z.infer<typeof SentryConfigSchema>;
