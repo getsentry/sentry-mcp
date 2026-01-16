@@ -5,7 +5,7 @@ Sentry MCP is a Model Context Protocol server that exposes Sentry's error tracki
 ## Principles
 
 - **Type Safety**: Prefer strict types over `any` - they catch bugs and improve tooling. Use `unknown` for truly unknown types.
-- **Security**: Never log secrets. Validate external input. See @docs/security.md.
+- **Security**: Never log secrets. Validate external input. See docs/security.md.
 - **Simplicity**: Follow existing patterns. Check neighboring files before inventing new approaches.
 
 ## Constraints
@@ -35,19 +35,19 @@ sentry-mcp/
 ## Essential Documentation
 
 **Read before making changes:**
-- @docs/adding-tools.md — Tool implementation guide
-- @docs/testing.md — Testing requirements
-- @docs/common-patterns.md — Error handling, Zod schemas, response formatting
-- @docs/error-handling.md — Error types and propagation
+- docs/adding-tools.md — Tool implementation guide
+- docs/testing.md — Testing requirements
+- docs/common-patterns.md — Error handling, Zod schemas, response formatting
+- docs/error-handling.md — Error types and propagation
 
 **Reference:**
-- @docs/architecture.md — System design
-- @docs/api-patterns.md — Sentry API client usage
-- @docs/quality-checks.md — Pre-commit checklist
-- @docs/pr-management.md — Commit/PR guidelines
-- @docs/security.md — Authentication patterns
-- @docs/releases/stdio.md — npm package release
-- @docs/releases/cloudflare.md — Cloudflare deployment
+- docs/architecture.md — System design
+- docs/api-patterns.md — Sentry API client usage
+- docs/quality-checks.md — Pre-commit checklist
+- docs/pr-management.md — Commit/PR guidelines
+- docs/security.md — Authentication patterns
+- docs/releases/stdio.md — npm package release
+- docs/releases/cloudflare.md — Cloudflare deployment
 
 ## Commands
 
@@ -72,8 +72,8 @@ pnpm run measure-tokens                   # Check tool definition size
 
 1. Check neighboring files for existing patterns before writing new code.
 2. Update relevant docs when changing functionality.
-3. Follow @docs/error-handling.md for error types.
-4. Follow @docs/pr-management.md for commits and PRs.
+3. Follow docs/error-handling.md for error types.
+4. Follow docs/pr-management.md for commits and PRs.
 
 ## Commit Attribution
 
