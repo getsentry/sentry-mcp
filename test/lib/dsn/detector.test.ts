@@ -98,18 +98,67 @@ describe("DSN Detector (New Module)", () => {
       expect(cached?.dsn).toBe(dsn2);
     });
 
-    test("env var takes priority over cached value", async () => {
+    test("code DSN takes priority over env file", async () => {
       const envFileDsn = "https://file@o111.ingest.sentry.io/111";
-      const envVarDsn = "https://var@o222.ingest.sentry.io/222";
+      const codeDsn = "https://code@o222.ingest.sentry.io/222";
 
-      // Set up env file and cache it
+      // Set up both env file and code file
       writeFileSync(join(testDir, ".env"), `SENTRY_DSN=${envFileDsn}`);
-      await detectDsn(testDir);
+      mkdirSync(join(testDir, "src"), { recursive: true });
+      writeFileSync(
+        join(testDir, "src/config.ts"),
+        `Sentry.init({ dsn: "${codeDsn}" })`
+      );
 
-      // Now set env var
+      // Should return code DSN (highest priority)
+      const result = await detectDsn(testDir);
+      expect(result?.raw).toBe(codeDsn);
+      expect(result?.source).toBe("code");
+    });
+
+    test("code DSN takes priority over env var", async () => {
+      const envVarDsn = "https://var@o111.ingest.sentry.io/111";
+      const codeDsn = "https://code@o222.ingest.sentry.io/222";
+
+      // Set env var
       process.env.SENTRY_DSN = envVarDsn;
 
-      // Should return env var DSN
+      // Set up code file
+      mkdirSync(join(testDir, "src"), { recursive: true });
+      writeFileSync(
+        join(testDir, "src/config.ts"),
+        `Sentry.init({ dsn: "${codeDsn}" })`
+      );
+
+      // Should return code DSN (highest priority)
+      const result = await detectDsn(testDir);
+      expect(result?.raw).toBe(codeDsn);
+      expect(result?.source).toBe("code");
+    });
+
+    test("env file takes priority over env var", async () => {
+      const envVarDsn = "https://var@o111.ingest.sentry.io/111";
+      const envFileDsn = "https://file@o222.ingest.sentry.io/222";
+
+      // Set env var
+      process.env.SENTRY_DSN = envVarDsn;
+
+      // Set up env file
+      writeFileSync(join(testDir, ".env"), `SENTRY_DSN=${envFileDsn}`);
+
+      // Should return env file DSN (higher priority than env var)
+      const result = await detectDsn(testDir);
+      expect(result?.raw).toBe(envFileDsn);
+      expect(result?.source).toBe("env_file");
+    });
+
+    test("env var is used when no code or env file exists", async () => {
+      const envVarDsn = "https://var@o111.ingest.sentry.io/111";
+
+      // Only set env var
+      process.env.SENTRY_DSN = envVarDsn;
+
+      // Should return env var DSN (lowest priority, but only one available)
       const result = await detectDsn(testDir);
       expect(result?.raw).toBe(envVarDsn);
       expect(result?.source).toBe("env");

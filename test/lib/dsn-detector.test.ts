@@ -21,11 +21,13 @@ describe("detectDsn", () => {
   });
 
   describe("from environment variable", () => {
-    test("returns DSN when SENTRY_DSN is set", async () => {
+    test("returns DSN when SENTRY_DSN is set and no other sources exist", async () => {
       const dsn = "https://key@o123.ingest.sentry.io/456";
       process.env.SENTRY_DSN = dsn;
 
-      const result = await detectDsn("/tmp");
+      // Use proper temp directory (empty, so only env var is available)
+      await using tmp = await tmpdir();
+      const result = await detectDsn(tmp.path);
 
       expect(result).toEqual({
         protocol: "https",
@@ -63,7 +65,7 @@ describe("detectDsn", () => {
       expect(result?.source).toBe("env_file");
     });
 
-    test("env var takes priority over .env file", async () => {
+    test(".env file takes priority over env var", async () => {
       const envDsn = "https://env@o111.ingest.sentry.io/111";
       const fileDsn = "https://file@o222.ingest.sentry.io/222";
 
@@ -75,8 +77,9 @@ describe("detectDsn", () => {
 
       const result = await detectDsn(tmp.path);
 
-      expect(result?.raw).toBe(envDsn);
-      expect(result?.source).toBe("env");
+      // .env file has higher priority than env var
+      expect(result?.raw).toBe(fileDsn);
+      expect(result?.source).toBe("env_file");
     });
 
     test(".env.local takes priority over .env", async () => {
@@ -195,7 +198,7 @@ Sentry.init({ dsn: "${dsn}" });
   });
 
   describe("priority order", () => {
-    test("environment variable takes highest priority", async () => {
+    test("code takes highest priority", async () => {
       const envDsn = "https://env@o111.ingest.sentry.io/111";
       const fileDsn = "https://file@o222.ingest.sentry.io/222";
       const codeDsn = "https://code@o333.ingest.sentry.io/333";
@@ -211,11 +214,12 @@ Sentry.init({ dsn: "${dsn}" });
 
       const result = await detectDsn(tmp.path);
 
-      expect(result?.raw).toBe(envDsn);
-      expect(result?.source).toBe("env");
+      // Code DSN has highest priority
+      expect(result?.raw).toBe(codeDsn);
+      expect(result?.source).toBe("code");
     });
 
-    test(".env file takes priority over code", async () => {
+    test("code takes priority over .env file", async () => {
       const fileDsn = "https://file@o222.ingest.sentry.io/222";
       const codeDsn = "https://code@o333.ingest.sentry.io/333";
 
@@ -228,8 +232,39 @@ Sentry.init({ dsn: "${dsn}" });
 
       const result = await detectDsn(tmp.path);
 
+      // Code DSN has higher priority than .env file
+      expect(result?.raw).toBe(codeDsn);
+      expect(result?.source).toBe("code");
+    });
+
+    test(".env file takes priority over env var", async () => {
+      const envDsn = "https://env@o111.ingest.sentry.io/111";
+      const fileDsn = "https://file@o222.ingest.sentry.io/222";
+
+      process.env.SENTRY_DSN = envDsn;
+
+      await using tmp = await tmpdir({
+        env: { SENTRY_DSN: fileDsn },
+      });
+
+      const result = await detectDsn(tmp.path);
+
+      // .env file has higher priority than env var
       expect(result?.raw).toBe(fileDsn);
       expect(result?.source).toBe("env_file");
+    });
+
+    test("env var is used when no code or .env file exists", async () => {
+      const envDsn = "https://env@o111.ingest.sentry.io/111";
+
+      process.env.SENTRY_DSN = envDsn;
+
+      await using tmp = await tmpdir();
+
+      const result = await detectDsn(tmp.path);
+
+      expect(result?.raw).toBe(envDsn);
+      expect(result?.source).toBe("env");
     });
   });
 
