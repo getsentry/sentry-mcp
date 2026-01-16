@@ -6,10 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import {
-  detectDsn,
-  getDsnSourceDescription,
-} from "../../src/lib/dsn-detector.js";
+import { detectDsn, getDsnSourceDescription } from "../../src/lib/dsn/index.js";
 import { tmpdir } from "../fixture.js";
 
 describe("detectDsn", () => {

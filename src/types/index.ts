@@ -4,12 +4,11 @@
  * Re-exports all types from domain-specific modules.
  */
 
+// DSN types
+export type { DetectedDsn, DsnSource, ParsedDsn } from "../lib/dsn/types.js";
 // Configuration types
 export type { CachedProject, SentryConfig } from "./config.js";
 export { SentryConfigSchema } from "./config.js";
-
-// DSN types
-export type { DetectedDsn, DsnSource, ParsedDsn } from "./dsn.js";
 
 // OAuth types
 export type {

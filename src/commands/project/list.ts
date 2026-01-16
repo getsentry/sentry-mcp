@@ -7,7 +7,8 @@
 import { buildCommand, numberParser } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
 import { listOrganizations, listProjects } from "../../lib/api-client.js";
-import { getDefaultOrganization } from "../../lib/config.js";
+import { getCachedProject, getDefaultOrganization } from "../../lib/config.js";
+import { detectDsn, getDsnSourceDescription } from "../../lib/dsn/index.js";
 import {
   calculateProjectSlugWidth,
   formatProjectRow,
@@ -22,10 +23,14 @@ type ListFlags = {
   readonly platform?: string;
 };
 
+/** Project with its organization context for display */
 type ProjectWithOrg = SentryProject & { orgSlug?: string };
 
 /**
- * Fetch projects for a single organization
+ * Fetch projects for a single organization.
+ *
+ * @param orgSlug - Organization slug to fetch projects from
+ * @returns Projects with org context attached
  */
 async function fetchOrgProjects(orgSlug: string): Promise<ProjectWithOrg[]> {
   const projects = await listProjects(orgSlug);
@@ -33,7 +38,10 @@ async function fetchOrgProjects(orgSlug: string): Promise<ProjectWithOrg[]> {
 }
 
 /**
- * Fetch projects from all accessible organizations
+ * Fetch projects from all accessible organizations.
+ * Skips orgs where the user lacks access.
+ *
+ * @returns Combined list of projects from all accessible orgs
  */
 async function fetchAllOrgProjects(): Promise<ProjectWithOrg[]> {
   const orgs = await listOrganizations();
@@ -44,7 +52,7 @@ async function fetchAllOrgProjects(): Promise<ProjectWithOrg[]> {
       const projects = await fetchOrgProjects(org.slug);
       results.push(...projects);
     } catch {
-      // Skip orgs we can't access
+      // User may lack access to some orgs
     }
   }
 
@@ -52,7 +60,11 @@ async function fetchAllOrgProjects(): Promise<ProjectWithOrg[]> {
 }
 
 /**
- * Filter projects by platform
+ * Filter projects by platform name (case-insensitive partial match).
+ *
+ * @param projects - Projects to filter
+ * @param platform - Platform substring to match (e.g., "javascript", "python")
+ * @returns Filtered projects, or all projects if no platform specified
  */
 function filterByPlatform(
   projects: ProjectWithOrg[],
@@ -68,14 +80,14 @@ function filterByPlatform(
 }
 
 /**
- * Write project list header
+ * Write the column header row for project list output.
  */
 function writeHeader(stdout: NodeJS.WriteStream, slugWidth: number): void {
   stdout.write(`${"SLUG".padEnd(slugWidth)}  ${"PLATFORM".padEnd(20)}  NAME\n`);
 }
 
 /**
- * Write project rows
+ * Write formatted project rows to stdout.
  */
 function writeRows(
   stdout: NodeJS.WriteStream,
@@ -88,6 +100,35 @@ function writeRows(
       `${formatProjectRow(project, { showOrg, orgSlug: project.orgSlug, slugWidth })}\n`
     );
   }
+}
+
+/** Result of resolving organization from DSN detection */
+type DsnOrgResult = {
+  orgSlug: string;
+  detectedFrom: string;
+};
+
+/**
+ * Attempt to resolve organization slug from DSN in the current directory.
+ * Uses cached project info when available to get the org slug.
+ *
+ * @param cwd - Current working directory to search for DSN
+ * @returns Org slug and detection source, or null if not found
+ */
+async function resolveOrgFromDsn(cwd: string): Promise<DsnOrgResult | null> {
+  const dsn = await detectDsn(cwd);
+  if (!dsn?.orgId) {
+    return null;
+  }
+
+  // Prefer cached org slug over numeric ID for better display
+  const cached = await getCachedProject(dsn.orgId, dsn.projectId);
+  const orgSlug = cached?.orgSlug ?? dsn.orgId;
+
+  return {
+    orgSlug,
+    detectedFrom: getDsnSourceDescription(dsn),
+  };
 }
 
 export const listCommand = buildCommand({
@@ -145,10 +186,22 @@ export const listCommand = buildCommand({
     flags: ListFlags,
     orgArg?: string
   ): Promise<void> {
-    const { process } = this;
+    const { process, cwd } = this;
     const { stdout } = process;
 
-    const orgSlug = orgArg ?? flags.org ?? (await getDefaultOrganization());
+    // Resolve organization from multiple sources
+    let orgSlug = orgArg ?? flags.org ?? (await getDefaultOrganization());
+    let detectedFrom: string | undefined;
+
+    // Try DSN auto-detection if no org specified
+    if (!orgSlug) {
+      const dsnResult = await resolveOrgFromDsn(cwd).catch(() => null);
+      if (dsnResult) {
+        orgSlug = dsnResult.orgSlug;
+        detectedFrom = dsnResult.detectedFrom;
+      }
+    }
+
     const showOrg = !orgSlug;
 
     // Fetch projects
@@ -183,6 +236,12 @@ export const listCommand = buildCommand({
 
     if (filtered.length > flags.limit) {
       stdout.write(`\nShowing ${flags.limit} of ${filtered.length} projects\n`);
+    }
+
+    // Show detection source and hint if auto-detected
+    if (detectedFrom) {
+      stdout.write(`\nDetected from ${detectedFrom}\n`);
+      stdout.write("Use --org to see projects from other organizations.\n");
     }
   },
 });

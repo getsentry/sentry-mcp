@@ -13,7 +13,7 @@ import {
   isShortId,
 } from "../../lib/api-client.js";
 import { getCachedProject, getDefaultOrganization } from "../../lib/config.js";
-import { detectDsn } from "../../lib/dsn-detector.js";
+import { detectDsn } from "../../lib/dsn/index.js";
 import {
   formatEventDetails,
   formatIssueDetails,

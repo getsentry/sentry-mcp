@@ -6,14 +6,19 @@
 
 import { buildCommand, numberParser } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
-import { getProject, listIssues } from "../../lib/api-client.js";
+import {
+  getProject,
+  listIssues,
+  listOrganizations,
+  listProjects,
+} from "../../lib/api-client.js";
 import {
   getCachedProject,
   getDefaultOrganization,
   getDefaultProject,
   setCachedProject,
 } from "../../lib/config.js";
-import { detectDsn, getDsnSourceDescription } from "../../lib/dsn-detector.js";
+import { detectDsn, getDsnSourceDescription } from "../../lib/dsn/index.js";
 import { divider, formatIssueRow } from "../../lib/formatters/human.js";
 import { writeJson } from "../../lib/formatters/json.js";
 import type { SentryIssue } from "../../types/index.js";
@@ -28,21 +33,28 @@ type ListFlags = {
 };
 
 /**
- * Result of resolving org and project
+ * Resolved organization and project target for issue listing.
+ * Contains both API identifiers and display-friendly names.
  */
 type ResolvedTarget = {
+  /** Organization slug for API calls */
   org: string;
+  /** Project slug for API calls */
   project: string;
-  /** Display name for org (slug or name) */
+  /** Display name for org (slug or friendly name) */
   orgDisplay: string;
-  /** Display name for project (slug or name) */
+  /** Display name for project (slug or friendly name) */
   projectDisplay: string;
-  /** Source description if auto-detected */
+  /** Source description if auto-detected (e.g., ".env.local") */
   detectedFrom?: string;
 };
 
 /**
- * Resolve org and project from DSN with caching
+ * Resolve organization and project from DSN detection.
+ * Uses cached project info when available, otherwise fetches and caches it.
+ *
+ * @param cwd - Current working directory to search for DSN
+ * @returns Resolved target with org/project info, or null if DSN not found
  */
 async function resolveFromDsn(cwd: string): Promise<ResolvedTarget | null> {
   const dsn = await detectDsn(cwd);
@@ -50,7 +62,9 @@ async function resolveFromDsn(cwd: string): Promise<ResolvedTarget | null> {
     return null;
   }
 
-  // Check cache first
+  const detectedFrom = getDsnSourceDescription(dsn);
+
+  // Use cached project info if available
   const cached = await getCachedProject(dsn.orgId, dsn.projectId);
   if (cached) {
     return {
@@ -58,14 +72,13 @@ async function resolveFromDsn(cwd: string): Promise<ResolvedTarget | null> {
       project: cached.projectSlug,
       orgDisplay: cached.orgName,
       projectDisplay: cached.projectName,
-      detectedFrom: getDsnSourceDescription(dsn),
+      detectedFrom,
     };
   }
 
-  // Cache miss - fetch project details
+  // Cache miss - fetch and cache project details
   const projectInfo = await getProject(dsn.orgId, dsn.projectId);
 
-  // Cache the result
   if (projectInfo.organization) {
     await setCachedProject(dsn.orgId, dsn.projectId, {
       orgSlug: projectInfo.organization.slug,
@@ -79,17 +92,17 @@ async function resolveFromDsn(cwd: string): Promise<ResolvedTarget | null> {
       project: projectInfo.slug,
       orgDisplay: projectInfo.organization.name,
       projectDisplay: projectInfo.name,
-      detectedFrom: getDsnSourceDescription(dsn),
+      detectedFrom,
     };
   }
 
-  // Fallback if org info not in response (shouldn't happen)
+  // Fallback to numeric IDs if org info missing (edge case)
   return {
     org: dsn.orgId,
     project: dsn.projectId,
     orgDisplay: dsn.orgId,
     projectDisplay: projectInfo.name,
-    detectedFrom: getDsnSourceDescription(dsn),
+    detectedFrom,
   };
 }
 
@@ -113,7 +126,7 @@ function parseSort(value: string): SortValue {
 }
 
 /**
- * Write issue list header
+ * Write the issue list header with column titles.
  */
 function writeListHeader(
   stdout: NodeJS.WriteStream,
@@ -127,7 +140,7 @@ function writeListHeader(
 }
 
 /**
- * Write issue list rows
+ * Write formatted issue rows to stdout.
  */
 function writeIssueRows(
   stdout: NodeJS.WriteStream,
@@ -139,12 +152,73 @@ function writeIssueRows(
 }
 
 /**
- * Write list footer with tip
+ * Write footer with usage tip.
  */
 function writeListFooter(stdout: NodeJS.WriteStream): void {
   stdout.write(
     "\nTip: Use 'sentry issue get <SHORT_ID>' to view issue details.\n"
   );
+}
+
+/** Minimal project reference for error message display */
+type ProjectRef = {
+  orgSlug: string;
+  projectSlug: string;
+};
+
+/**
+ * Fetch all projects from all accessible organizations.
+ * Used to show available options when no project is specified.
+ *
+ * @returns List of org/project slug pairs
+ */
+async function fetchAllProjects(): Promise<ProjectRef[]> {
+  const orgs = await listOrganizations();
+  const results: ProjectRef[] = [];
+
+  for (const org of orgs) {
+    try {
+      const projects = await listProjects(org.slug);
+      for (const project of projects) {
+        results.push({
+          orgSlug: org.slug,
+          projectSlug: project.slug,
+        });
+      }
+    } catch {
+      // User may lack access to some orgs
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Build a helpful error message listing all available projects.
+ * Fetches projects from all accessible organizations.
+ *
+ * @returns Formatted error message with project list and usage instructions
+ */
+async function buildNoProjectError(): Promise<string> {
+  const projects = await fetchAllProjects();
+
+  const lines: string[] = ["No project specified.", ""];
+
+  if (projects.length > 0) {
+    lines.push("Available projects:");
+    lines.push("");
+    for (const p of projects) {
+      lines.push(`  ${p.orgSlug}/${p.projectSlug}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("Specify a project using:");
+  lines.push("  sentry issue list --org <org-slug> --project <project-slug>");
+  lines.push("");
+  lines.push("Or set SENTRY_DSN in your environment for automatic detection.");
+
+  return lines.join("\n");
 }
 
 export const listCommand = buildCommand({
@@ -234,15 +308,8 @@ export const listCommand = buildCommand({
     }
 
     if (!target) {
-      throw new Error(
-        "Organization and project are required.\n\n" +
-          "Please specify them using:\n" +
-          "  sentry issue list --org <org-slug> --project <project-slug>\n\n" +
-          "Or set defaults:\n" +
-          "  sentry config set defaults.organization <org-slug>\n" +
-          "  sentry config set defaults.project <project-slug>\n\n" +
-          "Or set SENTRY_DSN environment variable for automatic detection."
-      );
+      const errorMessage = await buildNoProjectError();
+      throw new Error(errorMessage);
     }
 
     const issues = await listIssues(target.org, target.project, {
