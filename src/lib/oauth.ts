@@ -5,13 +5,14 @@
  * https://datatracker.ietf.org/doc/html/rfc8628
  */
 
-import type {
-  DeviceCodeResponse,
-  TokenErrorResponse,
-  TokenResponse,
+import type { TokenResponse } from "../types/index.js";
+import {
+  DeviceCodeResponseSchema,
+  TokenErrorResponseSchema,
+  TokenResponseSchema,
 } from "../types/index.js";
 import { setAuthToken } from "./config.js";
-import { DeviceFlowError } from "./errors.js";
+import { ApiError, ConfigError, DeviceFlowError } from "./errors.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration
@@ -48,8 +49,6 @@ const SCOPES = [
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type DeviceTokenResponse = TokenResponse | TokenErrorResponse;
-
 type DeviceFlowCallbacks = {
   onUserCode: (
     userCode: string,
@@ -67,12 +66,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isTokenResponse(
-  response: DeviceTokenResponse
-): response is TokenResponse {
-  return "access_token" in response;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Device Flow Implementation (RFC 8628)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,10 +73,11 @@ function isTokenResponse(
 /**
  * Request a device code from Sentry's device authorization endpoint
  */
-async function requestDeviceCode(): Promise<DeviceCodeResponse> {
+async function requestDeviceCode() {
   if (!SENTRY_CLIENT_ID) {
-    throw new Error(
-      "SENTRY_CLIENT_ID environment variable is required for authentication"
+    throw new ConfigError(
+      "SENTRY_CLIENT_ID is required for authentication",
+      "Set SENTRY_CLIENT_ID environment variable or use a pre-built binary"
     );
   }
 
@@ -106,17 +100,38 @@ async function requestDeviceCode(): Promise<DeviceCodeResponse> {
         error.message.includes("network"));
 
     if (isConnectionError) {
-      throw new Error(`Cannot connect to Sentry at ${SENTRY_URL}`);
+      throw new ApiError(
+        `Cannot connect to Sentry at ${SENTRY_URL}`,
+        0,
+        "Check your network connection and SENTRY_URL configuration"
+      );
     }
     throw error;
   }
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to initiate device flow: ${error}`);
+    const errorText = await response.text();
+    throw new ApiError(
+      "Failed to initiate device flow",
+      response.status,
+      errorText,
+      "/oauth/device/code/"
+    );
   }
 
-  return response.json() as Promise<DeviceCodeResponse>;
+  const data = await response.json();
+
+  const result = DeviceCodeResponseSchema.safeParse(data);
+  if (!result.success) {
+    throw new ApiError(
+      "Invalid response from device authorization endpoint",
+      response.status,
+      result.error.errors.map((e) => e.message).join(", "),
+      "/oauth/device/code/"
+    );
+  }
+
+  return result.data;
 }
 
 /**
@@ -133,14 +148,30 @@ async function pollForToken(deviceCode: string): Promise<TokenResponse> {
     }),
   });
 
-  const data = (await response.json()) as DeviceTokenResponse;
+  const data = await response.json();
 
-  if (isTokenResponse(data)) {
-    return data;
+  // Try to parse as success response first
+  const tokenResult = TokenResponseSchema.safeParse(data);
+  if (tokenResult.success) {
+    return tokenResult.data;
   }
 
-  // Return the error response to be handled by the caller
-  throw new DeviceFlowError(data.error, data.error_description);
+  // Try to parse as error response
+  const errorResult = TokenErrorResponseSchema.safeParse(data);
+  if (errorResult.success) {
+    throw new DeviceFlowError(
+      errorResult.data.error,
+      errorResult.data.error_description
+    );
+  }
+
+  // If neither schema matches, throw a generic error
+  throw new ApiError(
+    "Unexpected response from token endpoint",
+    response.status,
+    JSON.stringify(data),
+    "/oauth/token/"
+  );
 }
 
 type PollResult =
@@ -183,10 +214,17 @@ async function attemptPoll(deviceCode: string): Promise<PollResult> {
 }
 
 /**
- * Perform the Device Flow for OAuth authentication (RFC 8628)
+ * Perform the Device Flow for OAuth authentication (RFC 8628).
  *
- * @param callbacks - Callbacks for UI updates
- * @param timeout - Maximum time to wait for authorization (ms)
+ * Initiates the device authorization flow by requesting a device code,
+ * then polls for the access token until the user completes authorization.
+ *
+ * @param callbacks - Callbacks for UI updates during the flow
+ * @param timeout - Maximum time to wait for authorization in ms (default: 10 minutes)
+ * @returns The token response containing access_token and metadata
+ * @throws {ConfigError} When SENTRY_CLIENT_ID is not configured
+ * @throws {ApiError} When unable to connect to Sentry or API returns an error
+ * @throws {DeviceFlowError} When authorization fails, is denied, or times out
  */
 export async function performDeviceFlow(
   callbacks: DeviceFlowCallbacks,
@@ -231,13 +269,16 @@ export async function performDeviceFlow(
         pollInterval += 5;
         continue;
       case "error":
-        throw new Error(result.message);
+        throw new DeviceFlowError("authorization_failed", result.message);
       default:
-        throw new Error("Unexpected poll result");
+        throw new DeviceFlowError("unexpected_error", "Unexpected poll result");
     }
   }
 
-  throw new Error("Authentication timed out. Please try again.");
+  throw new DeviceFlowError(
+    "expired_token",
+    "Authentication timed out. Please try again."
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -245,7 +286,9 @@ export async function performDeviceFlow(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Complete the OAuth flow and store the token
+ * Complete the OAuth flow by storing the token in the config file.
+ *
+ * @param tokenResponse - The token response from performDeviceFlow
  */
 export async function completeOAuthFlow(
   tokenResponse: TokenResponse
@@ -258,7 +301,11 @@ export async function completeOAuthFlow(
 }
 
 /**
- * Alternative: Token-based auth (for users who have an API token)
+ * Store an API token directly (alternative to OAuth device flow).
+ *
+ * Use this for users who have an existing API token from Sentry settings.
+ *
+ * @param token - The API token to store
  */
 export async function setApiToken(token: string): Promise<void> {
   await setAuthToken(token);

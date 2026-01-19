@@ -10,11 +10,16 @@ export type { DetectedDsn, DsnSource, ParsedDsn } from "../lib/dsn/types.js";
 export type { CachedProject, SentryConfig } from "./config.js";
 export { SentryConfigSchema } from "./config.js";
 
-// OAuth types
+// OAuth types and schemas
 export type {
   DeviceCodeResponse,
   TokenErrorResponse,
   TokenResponse,
+} from "./oauth.js";
+export {
+  DeviceCodeResponseSchema,
+  TokenErrorResponseSchema,
+  TokenResponseSchema,
 } from "./oauth.js";
 
 // Sentry API types and schemas
