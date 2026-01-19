@@ -2,8 +2,10 @@
  * Sentry API Client
  *
  * Handles authenticated requests to the Sentry API.
+ * Uses ky for retry logic, timeouts, and better error handling.
  */
 
+import ky, { type KyInstance } from "ky";
 import type {
   SentryEvent,
   SentryIssue,
@@ -12,7 +14,36 @@ import type {
 } from "../types/index.js";
 import { getAuthToken } from "./config.js";
 
-const SENTRY_API_BASE = "https://sentry.io/api/0";
+const DEFAULT_SENTRY_URL = "https://sentry.io";
+
+/** Request timeout in milliseconds */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Maximum retry attempts for failed requests */
+const MAX_RETRIES = 2;
+
+/** Maximum backoff delay between retries in milliseconds */
+const MAX_BACKOFF_MS = 10_000;
+
+/** HTTP status codes that trigger automatic retry */
+const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
+
+/**
+ * Get the Sentry API base URL.
+ * Supports self-hosted instances via SENTRY_URL env var.
+ */
+function getApiBaseUrl(): string {
+  const baseUrl = process.env.SENTRY_URL || DEFAULT_SENTRY_URL;
+  return `${baseUrl}/api/0/`;
+}
+
+/**
+ * Normalize endpoint path for use with ky's prefixUrl.
+ * Removes leading slash since ky handles URL joining.
+ */
+function normalizePath(endpoint: string): string {
+  return endpoint.startsWith("/") ? endpoint.slice(1) : endpoint;
+}
 
 /**
  * Pattern to detect short IDs (contain letters, vs numeric IDs which are just digits)
@@ -46,51 +77,11 @@ type ApiRequestOptions = {
 };
 
 /**
- * Build URL with query parameters
+ * Create a configured ky instance with retry, timeout, and authentication.
+ *
+ * @throws {SentryApiError} When not authenticated (status 401)
  */
-function buildUrl(
-  endpoint: string,
-  params?: Record<string, string | number | boolean | undefined>
-): string {
-  const url = endpoint.startsWith("http")
-    ? endpoint
-    : `${SENTRY_API_BASE}${endpoint}`;
-
-  if (!params) {
-    return url;
-  }
-
-  const searchParams = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) {
-      searchParams.set(key, String(value));
-    }
-  }
-
-  const queryString = searchParams.toString();
-  return queryString ? `${url}?${queryString}` : url;
-}
-
-/**
- * Parse response body as JSON or text
- */
-async function parseResponseBody(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (!text) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-/**
- * Get auth headers for requests
- */
-async function getAuthHeaders(): Promise<Record<string, string>> {
+async function createApiClient(): Promise<KyInstance> {
   const token = await getAuthToken();
 
   if (!token) {
@@ -100,10 +91,66 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     );
   }
 
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  return ky.create({
+    prefixUrl: getApiBaseUrl(),
+    timeout: REQUEST_TIMEOUT_MS,
+    retry: {
+      limit: MAX_RETRIES,
+      methods: ["get", "put", "delete", "patch"],
+      statusCodes: RETRYABLE_STATUS_CODES,
+      backoffLimit: MAX_BACKOFF_MS,
+    },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    hooks: {
+      beforeError: [
+        async (error) => {
+          const { response } = error;
+          if (response) {
+            const text = await response.text();
+            let detail: string | undefined;
+            try {
+              const body = JSON.parse(text) as { detail?: string };
+              detail = body.detail ?? JSON.stringify(body);
+            } catch {
+              detail = text;
+            }
+            throw new SentryApiError(
+              `API request failed: ${response.status} ${response.statusText}`,
+              response.status,
+              detail
+            );
+          }
+          return error;
+        },
+      ],
+    },
+  });
+}
+
+/**
+ * Build URLSearchParams from an options object, filtering out undefined values.
+ *
+ * @param params - Key-value pairs to convert to search params
+ * @returns URLSearchParams instance, or undefined if no valid params
+ */
+function buildSearchParams(
+  params?: Record<string, string | number | boolean | undefined>
+): URLSearchParams | undefined {
+  if (!params) {
+    return undefined;
+  }
+
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      searchParams.set(key, String(value));
+    }
+  }
+
+  return searchParams.toString() ? searchParams : undefined;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,64 +158,61 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Make an authenticated request to the Sentry API
+ * Make an authenticated request to the Sentry API.
+ *
+ * @param endpoint - API endpoint path (e.g., "/organizations/")
+ * @param options - Request options including method, body, and query params
+ * @returns Parsed JSON response
+ * @throws {SentryApiError} On authentication failure or API errors
  */
 export async function apiRequest<T>(
   endpoint: string,
   options: ApiRequestOptions = {}
 ): Promise<T> {
   const { method = "GET", body, params } = options;
+  const client = await createApiClient();
 
-  const url = buildUrl(endpoint, params);
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(url, {
+  const response = await client(normalizePath(endpoint), {
     method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+    json: body,
+    searchParams: buildSearchParams(params),
   });
 
-  if (!response.ok) {
-    let detail: string | undefined;
-    try {
-      const errorBody = (await response.json()) as { detail?: string };
-      detail = errorBody.detail ?? JSON.stringify(errorBody);
-    } catch {
-      detail = await response.text();
-    }
-    throw new SentryApiError(
-      `API request failed: ${response.status} ${response.statusText}`,
-      response.status,
-      detail
-    );
-  }
-
-  const body2 = await parseResponseBody(response);
-  return body2 as T;
+  return response.json<T>();
 }
 
 /**
- * Make a raw API request (for the 'sentry api' command)
+ * Make a raw API request that returns full response details.
+ * Unlike apiRequest, this does not throw on non-2xx responses.
+ * Used by the 'sentry api' command for direct API access.
+ *
+ * @param endpoint - API endpoint path (e.g., "/organizations/")
+ * @param options - Request options including method, body, params, and custom headers
+ * @returns Response status, headers, and parsed body
+ * @throws {SentryApiError} Only on authentication failure (not on API errors)
  */
 export async function rawApiRequest(
   endpoint: string,
   options: ApiRequestOptions & { headers?: Record<string, string> } = {}
 ): Promise<{ status: number; headers: Headers; body: unknown }> {
   const { method = "GET", body, params, headers: customHeaders = {} } = options;
+  const client = await createApiClient();
 
-  const url = buildUrl(endpoint, params);
-  const headers = {
-    ...(await getAuthHeaders()),
-    ...customHeaders,
-  };
-
-  const response = await fetch(url, {
+  const response = await client(normalizePath(endpoint), {
     method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+    json: body,
+    searchParams: buildSearchParams(params),
+    headers: customHeaders,
+    throwHttpErrors: false,
   });
 
-  const responseBody = await parseResponseBody(response);
+  const text = await response.text();
+  let responseBody: unknown;
+  try {
+    responseBody = JSON.parse(text);
+  } catch {
+    responseBody = text;
+  }
 
   return {
     status: response.status,
