@@ -181,13 +181,20 @@ export function formatIssueDetails(issue: SentryIssue): string[] {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Format event details
+ * Format event details for display.
+ *
+ * @param event - The Sentry event to format
+ * @param header - Optional header text (defaults to "Latest Event")
+ * @returns Array of formatted lines
  */
-export function formatEventDetails(event: SentryEvent): string[] {
+export function formatEventDetails(
+  event: SentryEvent,
+  header = "Latest Event"
+): string[] {
   const lines: string[] = [];
 
   lines.push("");
-  lines.push("─── Latest Event ───");
+  lines.push(`─── ${header} ───`);
   lines.push("");
   lines.push(`Event ID:   ${event.eventID}`);
   lines.push(`Received:   ${new Date(event.dateReceived).toLocaleString()}`);
