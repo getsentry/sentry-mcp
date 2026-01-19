@@ -1,7 +1,7 @@
 /**
  * Project/Org Command E2E Tests
  *
- * Tests for sentry project list and org list commands.
+ * Tests for sentry project and org commands (list, get).
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -13,10 +13,11 @@ import { runCli } from "../fixture.js";
 // Test credentials from environment - these MUST be set
 const TEST_TOKEN = process.env.SENTRY_TEST_AUTH_TOKEN;
 const TEST_ORG = process.env.SENTRY_TEST_ORG;
+const TEST_PROJECT = process.env.SENTRY_TEST_PROJECT;
 
-if (!(TEST_TOKEN && TEST_ORG)) {
+if (!(TEST_TOKEN && TEST_ORG && TEST_PROJECT)) {
   throw new Error(
-    "SENTRY_TEST_AUTH_TOKEN and SENTRY_TEST_ORG environment variables are required for E2E tests"
+    "SENTRY_TEST_AUTH_TOKEN, SENTRY_TEST_ORG, and SENTRY_TEST_PROJECT environment variables are required for E2E tests"
   );
 }
 
@@ -116,5 +117,112 @@ describe("sentry project list", () => {
     expect(result.exitCode).toBe(0);
     const data = JSON.parse(result.stdout);
     expect(Array.isArray(data)).toBe(true);
+  });
+});
+
+describe("sentry org get", () => {
+  test("requires authentication", async () => {
+    const result = await runCli(["org", "get", TEST_ORG], {
+      env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr + result.stdout).toMatch(/not authenticated|login/i);
+  });
+
+  test("gets organization details", async () => {
+    await setAuthToken(TEST_TOKEN);
+
+    const result = await runCli(["org", "get", TEST_ORG], {
+      env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(TEST_ORG);
+    expect(result.stdout).toContain("Slug:");
+  });
+
+  test("supports --json output", async () => {
+    await setAuthToken(TEST_TOKEN);
+
+    const result = await runCli(["org", "get", TEST_ORG, "--json"], {
+      env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
+    });
+
+    expect(result.exitCode).toBe(0);
+    const data = JSON.parse(result.stdout);
+    expect(data.slug).toBe(TEST_ORG);
+  });
+
+  test("handles non-existent org", async () => {
+    await setAuthToken(TEST_TOKEN);
+
+    const result = await runCli(["org", "get", "nonexistent-org-12345"], {
+      env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr + result.stdout).toMatch(/not found|error|404/i);
+  });
+});
+
+describe("sentry project get", () => {
+  test("requires authentication", async () => {
+    const result = await runCli(
+      ["project", "get", TEST_PROJECT, "--org", TEST_ORG],
+      { env: { SENTRY_CLI_CONFIG_DIR: testConfigDir } }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr + result.stdout).toMatch(/not authenticated|login/i);
+  });
+
+  test("requires org and project", async () => {
+    await setAuthToken(TEST_TOKEN);
+
+    const result = await runCli(["project", "get"], {
+      env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr + result.stdout).toMatch(/organization|project/i);
+  });
+
+  test("gets project details", async () => {
+    await setAuthToken(TEST_TOKEN);
+
+    const result = await runCli(
+      ["project", "get", TEST_PROJECT, "--org", TEST_ORG],
+      { env: { SENTRY_CLI_CONFIG_DIR: testConfigDir } }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(TEST_PROJECT);
+    expect(result.stdout).toContain("Slug:");
+  });
+
+  test("supports --json output", async () => {
+    await setAuthToken(TEST_TOKEN);
+
+    const result = await runCli(
+      ["project", "get", TEST_PROJECT, "--org", TEST_ORG, "--json"],
+      { env: { SENTRY_CLI_CONFIG_DIR: testConfigDir } }
+    );
+
+    expect(result.exitCode).toBe(0);
+    const data = JSON.parse(result.stdout);
+    expect(data.slug).toBe(TEST_PROJECT);
+  });
+
+  test("handles non-existent project", async () => {
+    await setAuthToken(TEST_TOKEN);
+
+    const result = await runCli(
+      ["project", "get", "nonexistent-project-12345", "--org", TEST_ORG],
+      { env: { SENTRY_CLI_CONFIG_DIR: testConfigDir } }
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr + result.stdout).toMatch(/not found|error|404/i);
   });
 });

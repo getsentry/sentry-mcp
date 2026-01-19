@@ -257,6 +257,46 @@ export function calculateOrgSlugWidth(orgs: SentryOrganization[]): number {
   return Math.max(...orgs.map((o) => o.slug.length), 4);
 }
 
+/**
+ * Format detailed organization information.
+ *
+ * @param org - The Sentry organization to format
+ * @returns Array of formatted lines
+ */
+export function formatOrgDetails(org: SentryOrganization): string[] {
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`${org.slug}: ${org.name}`);
+  lines.push("═".repeat(Math.min(80, org.name.length + org.slug.length + 2)));
+  lines.push("");
+
+  // Basic info
+  lines.push(`Slug:       ${org.slug}`);
+  lines.push(`Name:       ${org.name}`);
+  lines.push(`ID:         ${org.id}`);
+  lines.push(`Created:    ${new Date(org.dateCreated).toLocaleString()}`);
+  lines.push("");
+
+  // Settings
+  lines.push(`2FA:        ${org.require2FA ? "Required" : "Not required"}`);
+  lines.push(`Early Adopter: ${org.isEarlyAdopter ? "Yes" : "No"}`);
+
+  // Features
+  if (org.features && org.features.length > 0) {
+    lines.push("");
+    lines.push(`Features (${org.features.length}):`);
+    const maxFeatures = 10;
+    const displayFeatures = org.features.slice(0, maxFeatures);
+    lines.push(`  ${displayFeatures.join(", ")}`);
+    if (org.features.length > maxFeatures) {
+      lines.push(`  ... and ${org.features.length - maxFeatures} more`);
+    }
+  }
+
+  return lines;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Project Formatting
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,6 +335,69 @@ export function calculateProjectSlugWidth(
     ),
     4
   );
+}
+
+/**
+ * Format detailed project information.
+ *
+ * @param project - The Sentry project to format
+ * @returns Array of formatted lines
+ */
+export function formatProjectDetails(project: SentryProject): string[] {
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`${project.slug}: ${project.name}`);
+  lines.push(
+    "═".repeat(Math.min(80, project.name.length + project.slug.length + 2))
+  );
+  lines.push("");
+
+  // Basic info
+  lines.push(`Slug:       ${project.slug}`);
+  lines.push(`Name:       ${project.name}`);
+  lines.push(`ID:         ${project.id}`);
+  lines.push(`Platform:   ${project.platform || "Not set"}`);
+  lines.push(`Status:     ${project.status}`);
+  lines.push(`Created:    ${new Date(project.dateCreated).toLocaleString()}`);
+
+  // Organization context
+  if (project.organization) {
+    lines.push("");
+    lines.push(
+      `Organization: ${project.organization.name} (${project.organization.slug})`
+    );
+  }
+
+  // Activity info
+  lines.push("");
+  if (project.firstEvent) {
+    lines.push(`First Event: ${new Date(project.firstEvent).toLocaleString()}`);
+  } else {
+    lines.push("First Event: No events yet");
+  }
+
+  // Capabilities
+  lines.push("");
+  lines.push("Capabilities:");
+  lines.push(`  Sessions:  ${project.hasSessions ? "Yes" : "No"}`);
+  lines.push(`  Replays:   ${project.hasReplays ? "Yes" : "No"}`);
+  lines.push(`  Profiles:  ${project.hasProfiles ? "Yes" : "No"}`);
+  lines.push(`  Monitors:  ${project.hasMonitors ? "Yes" : "No"}`);
+
+  // Features
+  if (project.features && project.features.length > 0) {
+    lines.push("");
+    lines.push(`Features (${project.features.length}):`);
+    const maxFeatures = 10;
+    const displayFeatures = project.features.slice(0, maxFeatures);
+    lines.push(`  ${displayFeatures.join(", ")}`);
+    if (project.features.length > maxFeatures) {
+      lines.push(`  ... and ${project.features.length - maxFeatures} more`);
+    }
+  }
+
+  return lines;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
