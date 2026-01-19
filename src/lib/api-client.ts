@@ -279,6 +279,20 @@ export function getLatestEvent(issueId: string): Promise<SentryEvent> {
 }
 
 /**
+ * Get a specific event by ID
+ * @see https://docs.sentry.io/api/events/retrieve-an-event-for-a-project/
+ */
+export function getEvent(
+  orgSlug: string,
+  projectSlug: string,
+  eventId: string
+): Promise<SentryEvent> {
+  return apiRequest<SentryEvent>(
+    `/projects/${orgSlug}/${projectSlug}/events/${eventId}/`
+  );
+}
+
+/**
  * Update an issue's status
  */
 export function updateIssueStatus(

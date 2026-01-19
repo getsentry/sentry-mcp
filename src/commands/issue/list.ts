@@ -7,20 +7,13 @@
 import { buildCommand, numberParser } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
 import {
-  getProject,
   listIssues,
   listOrganizations,
   listProjects,
 } from "../../lib/api-client.js";
-import {
-  getCachedProject,
-  getDefaultOrganization,
-  getDefaultProject,
-  setCachedProject,
-} from "../../lib/config.js";
-import { detectDsn, getDsnSourceDescription } from "../../lib/dsn/index.js";
 import { divider, formatIssueRow } from "../../lib/formatters/human.js";
 import { writeJson } from "../../lib/formatters/json.js";
+import { resolveOrgAndProject } from "../../lib/resolve-target.js";
 import type { SentryIssue } from "../../types/index.js";
 
 type ListFlags = {
@@ -31,80 +24,6 @@ type ListFlags = {
   readonly sort: "date" | "new" | "priority" | "freq" | "user";
   readonly json: boolean;
 };
-
-/**
- * Resolved organization and project target for issue listing.
- * Contains both API identifiers and display-friendly names.
- */
-type ResolvedTarget = {
-  /** Organization slug for API calls */
-  org: string;
-  /** Project slug for API calls */
-  project: string;
-  /** Display name for org (slug or friendly name) */
-  orgDisplay: string;
-  /** Display name for project (slug or friendly name) */
-  projectDisplay: string;
-  /** Source description if auto-detected (e.g., ".env.local") */
-  detectedFrom?: string;
-};
-
-/**
- * Resolve organization and project from DSN detection.
- * Uses cached project info when available, otherwise fetches and caches it.
- *
- * @param cwd - Current working directory to search for DSN
- * @returns Resolved target with org/project info, or null if DSN not found
- */
-async function resolveFromDsn(cwd: string): Promise<ResolvedTarget | null> {
-  const dsn = await detectDsn(cwd);
-  if (!(dsn?.orgId && dsn.projectId)) {
-    return null;
-  }
-
-  const detectedFrom = getDsnSourceDescription(dsn);
-
-  // Use cached project info if available
-  const cached = await getCachedProject(dsn.orgId, dsn.projectId);
-  if (cached) {
-    return {
-      org: cached.orgSlug,
-      project: cached.projectSlug,
-      orgDisplay: cached.orgName,
-      projectDisplay: cached.projectName,
-      detectedFrom,
-    };
-  }
-
-  // Cache miss - fetch and cache project details
-  const projectInfo = await getProject(dsn.orgId, dsn.projectId);
-
-  if (projectInfo.organization) {
-    await setCachedProject(dsn.orgId, dsn.projectId, {
-      orgSlug: projectInfo.organization.slug,
-      orgName: projectInfo.organization.name,
-      projectSlug: projectInfo.slug,
-      projectName: projectInfo.name,
-    });
-
-    return {
-      org: projectInfo.organization.slug,
-      project: projectInfo.slug,
-      orgDisplay: projectInfo.organization.name,
-      projectDisplay: projectInfo.name,
-      detectedFrom,
-    };
-  }
-
-  // Fallback to numeric IDs if org info missing (edge case)
-  return {
-    org: dsn.orgId,
-    project: dsn.projectId,
-    orgDisplay: dsn.orgId,
-    projectDisplay: projectInfo.name,
-    detectedFrom,
-  };
-}
 
 type SortValue = "date" | "new" | "priority" | "freq" | "user";
 
@@ -271,41 +190,11 @@ export const listCommand = buildCommand({
     const { process, cwd } = this;
     const { stdout } = process;
 
-    // Resolve organization and project
-    let target: ResolvedTarget | null = null;
-
-    // 1. Check CLI flags
-    if (flags.org && flags.project) {
-      target = {
-        org: flags.org,
-        project: flags.project,
-        orgDisplay: flags.org,
-        projectDisplay: flags.project,
-      };
-    }
-
-    // 2. Check config defaults
-    if (!target) {
-      const defaultOrg = await getDefaultOrganization();
-      const defaultProject = await getDefaultProject();
-      if (defaultOrg && defaultProject) {
-        target = {
-          org: defaultOrg,
-          project: defaultProject,
-          orgDisplay: defaultOrg,
-          projectDisplay: defaultProject,
-        };
-      }
-    }
-
-    // 3. Try DSN auto-detection
-    if (!target) {
-      try {
-        target = await resolveFromDsn(cwd);
-      } catch {
-        // DSN detection failed, continue to show error
-      }
-    }
+    const target = await resolveOrgAndProject({
+      org: flags.org,
+      project: flags.project,
+      cwd,
+    });
 
     if (!target) {
       const errorMessage = await buildNoProjectError();
