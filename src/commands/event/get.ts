@@ -7,10 +7,9 @@
 import { buildCommand } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
 import { getEvent } from "../../lib/api-client.js";
-import { formatEventDetails } from "../../lib/formatters/human.js";
-import { writeJson } from "../../lib/formatters/json.js";
+import { formatEventDetails, writeJson } from "../../lib/formatters/index.js";
 import { resolveOrgAndProject } from "../../lib/resolve-target.js";
-import type { SentryEvent } from "../../types/index.js";
+import type { SentryEvent, Writer } from "../../types/index.js";
 
 type GetFlags = {
   readonly org?: string;
@@ -87,8 +86,7 @@ export const getCommand = buildCommand({
     flags: GetFlags,
     eventId: string
   ): Promise<void> {
-    const { process, cwd } = this;
-    const { stdout } = process;
+    const { stdout, cwd } = this;
 
     const target = await resolveOrgAndProject({
       org: flags.org,

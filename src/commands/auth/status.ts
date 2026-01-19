@@ -109,8 +109,7 @@ export const statusCommand = buildCommand({
     },
   },
   async func(this: SentryContext, flags: StatusFlags): Promise<void> {
-    const { process } = this;
-    const { stdout, stderr } = process;
+    const { stdout, stderr } = this;
 
     const config = await readConfig();
     const authenticated = await isAuthenticated();

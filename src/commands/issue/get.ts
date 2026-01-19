@@ -15,10 +15,10 @@ import {
 import {
   formatEventDetails,
   formatIssueDetails,
-} from "../../lib/formatters/human.js";
-import { writeJson } from "../../lib/formatters/json.js";
+  writeJson,
+} from "../../lib/formatters/index.js";
 import { resolveOrg } from "../../lib/resolve-target.js";
-import type { SentryEvent, SentryIssue } from "../../types/index.js";
+import type { SentryEvent, SentryIssue, Writer } from "../../types/index.js";
 
 type GetFlags = {
   readonly org?: string;
@@ -97,8 +97,7 @@ export const getCommand = buildCommand({
     flags: GetFlags,
     issueId: string
   ): Promise<void> {
-    const { process, cwd } = this;
-    const { stdout } = process;
+    const { stdout, cwd } = this;
 
     let issue: SentryIssue;
 

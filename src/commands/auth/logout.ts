@@ -18,8 +18,7 @@ export const logoutCommand = buildCommand({
     flags: {},
   },
   async func(this: SentryContext): Promise<void> {
-    const { process } = this;
-    const { stdout } = process;
+    const { stdout } = this;
 
     if (!(await isAuthenticated())) {
       stdout.write("Not currently authenticated.\n");

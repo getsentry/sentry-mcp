@@ -216,8 +216,7 @@ export const apiCommand = buildCommand({
     flags: ApiFlags,
     endpoint: string
   ): Promise<void> {
-    const { process } = this;
-    const { stdout } = process;
+    const { stdout, process } = this;
 
     const body = flags.field?.length > 0 ? parseFields(flags.field) : undefined;
     const headers =

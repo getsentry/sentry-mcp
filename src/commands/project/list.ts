@@ -12,9 +12,9 @@ import { detectDsn, getDsnSourceDescription } from "../../lib/dsn/index.js";
 import {
   calculateProjectSlugWidth,
   formatProjectRow,
-} from "../../lib/formatters/human.js";
-import { writeJson } from "../../lib/formatters/json.js";
-import type { SentryProject } from "../../types/index.js";
+  writeJson,
+} from "../../lib/formatters/index.js";
+import type { SentryProject, Writer } from "../../types/index.js";
 
 type ListFlags = {
   readonly org?: string;
@@ -186,8 +186,7 @@ export const listCommand = buildCommand({
     flags: ListFlags,
     orgArg?: string
   ): Promise<void> {
-    const { process, cwd } = this;
-    const { stdout } = process;
+    const { stdout, cwd } = this;
 
     // Resolve organization from multiple sources
     let orgSlug = orgArg ?? flags.org ?? (await getDefaultOrganization());
