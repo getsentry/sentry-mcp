@@ -6,11 +6,16 @@
  */
 
 import ky, { type KyInstance } from "ky";
-import type {
-  SentryEvent,
-  SentryIssue,
-  SentryOrganization,
-  SentryProject,
+import { z } from "zod";
+import {
+  type SentryEvent,
+  SentryEventSchema,
+  type SentryIssue,
+  SentryIssueSchema,
+  type SentryOrganization,
+  SentryOrganizationSchema,
+  type SentryProject,
+  SentryProjectSchema,
 } from "../types/index.js";
 import { getAuthToken } from "./config.js";
 import { ApiError, AuthError } from "./errors.js";
@@ -55,10 +60,12 @@ const SHORT_ID_PATTERN = /[a-zA-Z]/;
 // Request Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ApiRequestOptions = {
+type ApiRequestOptions<T = unknown> = {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   body?: unknown;
   params?: Record<string, string | number | boolean | undefined>;
+  /** Optional Zod schema for runtime validation of response data */
+  schema?: z.ZodType<T>;
 };
 
 /**
@@ -144,16 +151,17 @@ function buildSearchParams(
  * Make an authenticated request to the Sentry API.
  *
  * @param endpoint - API endpoint path (e.g., "/organizations/")
- * @param options - Request options including method, body, and query params
- * @returns Parsed JSON response
+ * @param options - Request options including method, body, query params, and validation schema
+ * @returns Parsed JSON response (validated if schema provided)
  * @throws {AuthError} When not authenticated
  * @throws {ApiError} On API errors
+ * @throws {z.ZodError} When response fails schema validation
  */
 export async function apiRequest<T>(
   endpoint: string,
-  options: ApiRequestOptions = {}
+  options: ApiRequestOptions<T> = {}
 ): Promise<T> {
-  const { method = "GET", body, params } = options;
+  const { method = "GET", body, params, schema } = options;
   const client = await createApiClient();
 
   const response = await client(normalizePath(endpoint), {
@@ -162,7 +170,14 @@ export async function apiRequest<T>(
     searchParams: buildSearchParams(params),
   });
 
-  return response.json<T>();
+  const data = await response.json();
+
+  // Validate response if schema provided
+  if (schema) {
+    return schema.parse(data);
+  }
+
+  return data as T;
 }
 
 /**
@@ -213,21 +228,27 @@ export async function rawApiRequest(
  * List organizations the user has access to
  */
 export function listOrganizations(): Promise<SentryOrganization[]> {
-  return apiRequest<SentryOrganization[]>("/organizations/");
+  return apiRequest<SentryOrganization[]>("/organizations/", {
+    schema: z.array(SentryOrganizationSchema),
+  });
 }
 
 /**
  * Get a specific organization
  */
 export function getOrganization(orgSlug: string): Promise<SentryOrganization> {
-  return apiRequest<SentryOrganization>(`/organizations/${orgSlug}/`);
+  return apiRequest<SentryOrganization>(`/organizations/${orgSlug}/`, {
+    schema: SentryOrganizationSchema,
+  });
 }
 
 /**
  * List projects in an organization
  */
 export function listProjects(orgSlug: string): Promise<SentryProject[]> {
-  return apiRequest<SentryProject[]>(`/organizations/${orgSlug}/projects/`);
+  return apiRequest<SentryProject[]>(`/organizations/${orgSlug}/projects/`, {
+    schema: z.array(SentryProjectSchema),
+  });
 }
 
 /**
@@ -237,7 +258,9 @@ export function getProject(
   orgSlug: string,
   projectSlug: string
 ): Promise<SentryProject> {
-  return apiRequest<SentryProject>(`/projects/${orgSlug}/${projectSlug}/`);
+  return apiRequest<SentryProject>(`/projects/${orgSlug}/${projectSlug}/`, {
+    schema: SentryProjectSchema,
+  });
 }
 
 /**
@@ -264,6 +287,7 @@ export function listIssues(
         sort: options.sort,
         statsPeriod: options.statsPeriod,
       },
+      schema: z.array(SentryIssueSchema),
     }
   );
 }
@@ -272,7 +296,9 @@ export function listIssues(
  * Get a specific issue by numeric ID
  */
 export function getIssue(issueId: string): Promise<SentryIssue> {
-  return apiRequest<SentryIssue>(`/issues/${issueId}/`);
+  return apiRequest<SentryIssue>(`/issues/${issueId}/`, {
+    schema: SentryIssueSchema,
+  });
 }
 
 /**
@@ -286,7 +312,10 @@ export function getIssueByShortId(
   shortId: string
 ): Promise<SentryIssue> {
   return apiRequest<SentryIssue>(
-    `/organizations/${orgSlug}/issues/${shortId}/`
+    `/organizations/${orgSlug}/issues/${shortId}/`,
+    {
+      schema: SentryIssueSchema,
+    }
   );
 }
 
@@ -303,7 +332,9 @@ export function isShortId(issueId: string): boolean {
  * Get the latest event for an issue
  */
 export function getLatestEvent(issueId: string): Promise<SentryEvent> {
-  return apiRequest<SentryEvent>(`/issues/${issueId}/events/latest/`);
+  return apiRequest<SentryEvent>(`/issues/${issueId}/events/latest/`, {
+    schema: SentryEventSchema,
+  });
 }
 
 /**
@@ -316,7 +347,10 @@ export function getEvent(
   eventId: string
 ): Promise<SentryEvent> {
   return apiRequest<SentryEvent>(
-    `/projects/${orgSlug}/${projectSlug}/events/${eventId}/`
+    `/projects/${orgSlug}/${projectSlug}/events/${eventId}/`,
+    {
+      schema: SentryEventSchema,
+    }
   );
 }
 
@@ -330,5 +364,6 @@ export function updateIssueStatus(
   return apiRequest<SentryIssue>(`/issues/${issueId}/`, {
     method: "PUT",
     body: { status },
+    schema: SentryIssueSchema,
   });
 }

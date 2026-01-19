@@ -7,13 +7,16 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { StricliContext } from "@stricli/core";
+import type { CommandContext } from "@stricli/core";
+import type { Writer } from "./types/index.js";
 
-export interface SentryContext extends StricliContext {
+export interface SentryContext extends CommandContext {
   readonly env: NodeJS.ProcessEnv;
   readonly cwd: string;
   readonly homeDir: string;
   readonly configDir: string;
+  readonly stdout: Writer;
+  readonly stderr: Writer;
 }
 
 export function buildContext(process: NodeJS.Process): SentryContext {
@@ -26,5 +29,7 @@ export function buildContext(process: NodeJS.Process): SentryContext {
     cwd: process.cwd(),
     homeDir,
     configDir,
+    stdout: process.stdout,
+    stderr: process.stderr,
   };
 }

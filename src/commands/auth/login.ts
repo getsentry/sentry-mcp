@@ -48,11 +48,11 @@ export const loginCommand = buildCommand({
     },
   },
   async func(this: SentryContext, flags: LoginFlags): Promise<void> {
-    const { process } = this;
+    const { stdout } = this;
 
     // Check if already authenticated
     if (await isAuthenticated()) {
-      process.stdout.write(
+      stdout.write(
         "You are already authenticated. Use 'sentry auth logout' first to re-authenticate.\n"
       );
       return;
@@ -75,13 +75,13 @@ export const loginCommand = buildCommand({
         );
       }
 
-      process.stdout.write("✓ Authenticated with API token\n");
-      process.stdout.write(`  Config saved to: ${getConfigPath()}\n`);
+      stdout.write("✓ Authenticated with API token\n");
+      stdout.write(`  Config saved to: ${getConfigPath()}\n`);
       return;
     }
 
     // Device Flow OAuth
-    process.stdout.write("Starting authentication...\n\n");
+    stdout.write("Starting authentication...\n\n");
 
     const tokenResponse = await performDeviceFlow(
       {
@@ -92,42 +92,40 @@ export const loginCommand = buildCommand({
         ) => {
           const browserOpened = await openBrowser(verificationUriComplete);
           if (browserOpened) {
-            process.stdout.write("Opening browser...\n\n");
+            stdout.write("Opening browser...\n\n");
           }
 
           if (flags.qr) {
-            process.stdout.write(
-              "Scan this QR code or visit the URL below:\n\n"
-            );
+            stdout.write("Scan this QR code or visit the URL below:\n\n");
             const qr = await generateQRCode(verificationUriComplete);
-            process.stdout.write(qr);
-            process.stdout.write("\n");
+            stdout.write(qr);
+            stdout.write("\n");
           }
 
-          process.stdout.write(`URL: ${verificationUri}\n`);
-          process.stdout.write(`Code: ${userCode}\n\n`);
-          process.stdout.write("Waiting for authorization...\n");
+          stdout.write(`URL: ${verificationUri}\n`);
+          stdout.write(`Code: ${userCode}\n\n`);
+          stdout.write("Waiting for authorization...\n");
         },
         onPolling: () => {
           // Could add a spinner or dots here
-          process.stdout.write(".");
+          stdout.write(".");
         },
       },
       flags.timeout * 1000
     );
 
     // Clear the polling dots
-    process.stdout.write("\n\n");
+    stdout.write("\n\n");
 
     // Store the token
     await completeOAuthFlow(tokenResponse);
 
-    process.stdout.write("✓ Authentication successful!\n");
-    process.stdout.write(`  Config saved to: ${getConfigPath()}\n`);
+    stdout.write("✓ Authentication successful!\n");
+    stdout.write(`  Config saved to: ${getConfigPath()}\n`);
 
     if (tokenResponse.expires_in) {
       const hours = Math.round(tokenResponse.expires_in / 3600);
-      process.stdout.write(`  Token expires in: ${hours} hours\n`);
+      stdout.write(`  Token expires in: ${hours} hours\n`);
     }
   },
 });

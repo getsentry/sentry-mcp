@@ -10,8 +10,8 @@ import { listOrganizations } from "../../lib/api-client.js";
 import {
   calculateOrgSlugWidth,
   formatOrgRow,
-} from "../../lib/formatters/human.js";
-import { writeJson } from "../../lib/formatters/json.js";
+  writeJson,
+} from "../../lib/formatters/index.js";
 
 type ListFlags = {
   readonly limit: number;
@@ -44,8 +44,7 @@ export const listCommand = buildCommand({
     },
   },
   async func(this: SentryContext, flags: ListFlags): Promise<void> {
-    const { process } = this;
-    const { stdout } = process;
+    const { stdout } = this;
 
     const orgs = await listOrganizations();
     const limitedOrgs = orgs.slice(0, flags.limit);

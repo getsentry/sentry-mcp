@@ -11,10 +11,13 @@ import {
   listOrganizations,
   listProjects,
 } from "../../lib/api-client.js";
-import { divider, formatIssueRow } from "../../lib/formatters/human.js";
-import { writeJson } from "../../lib/formatters/json.js";
+import {
+  divider,
+  formatIssueRow,
+  writeJson,
+} from "../../lib/formatters/index.js";
 import { resolveOrgAndProject } from "../../lib/resolve-target.js";
-import type { SentryIssue } from "../../types/index.js";
+import type { SentryIssue, Writer } from "../../types/index.js";
 
 type ListFlags = {
   readonly org?: string;
@@ -184,8 +187,7 @@ export const listCommand = buildCommand({
     },
   },
   async func(this: SentryContext, flags: ListFlags): Promise<void> {
-    const { process, cwd } = this;
-    const { stdout } = process;
+    const { stdout, cwd } = this;
 
     const target = await resolveOrgAndProject({
       org: flags.org,

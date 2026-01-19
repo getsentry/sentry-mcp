@@ -7,33 +7,12 @@
 import { buildCommand } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
 import { getOrganization } from "../../lib/api-client.js";
-import { formatOrgDetails } from "../../lib/formatters/human.js";
-import { writeJson } from "../../lib/formatters/json.js";
+import { formatOrgDetails, writeOutput } from "../../lib/formatters/index.js";
 import { resolveOrg } from "../../lib/resolve-target.js";
 
 type GetFlags = {
   readonly json: boolean;
 };
-
-/**
- * Write human-readable organization output to stdout.
- *
- * @param stdout - Stream to write formatted output
- * @param org - Organization data to display
- * @param detectedFrom - Optional source description if org was auto-detected
- */
-function writeHumanOutput(
-  stdout: Writer,
-  org: Parameters<typeof formatOrgDetails>[0],
-  detectedFrom?: string
-): void {
-  const lines = formatOrgDetails(org);
-  stdout.write(`${lines.join("\n")}\n`);
-
-  if (detectedFrom) {
-    stdout.write(`\nDetected from ${detectedFrom}\n`);
-  }
-}
 
 export const getCommand = buildCommand({
   docs: {
@@ -69,8 +48,7 @@ export const getCommand = buildCommand({
     flags: GetFlags,
     orgSlug?: string
   ): Promise<void> {
-    const { process, cwd } = this;
-    const { stdout } = process;
+    const { stdout, cwd } = this;
 
     const resolved = await resolveOrg({ org: orgSlug, cwd });
 
@@ -85,11 +63,10 @@ export const getCommand = buildCommand({
 
     const org = await getOrganization(resolved.org);
 
-    if (flags.json) {
-      writeJson(stdout, org);
-      return;
-    }
-
-    writeHumanOutput(stdout, org, resolved.detectedFrom);
+    writeOutput(stdout, org, {
+      json: flags.json,
+      formatHuman: formatOrgDetails,
+      detectedFrom: resolved.detectedFrom,
+    });
   },
 });
