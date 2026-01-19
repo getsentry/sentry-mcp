@@ -188,6 +188,19 @@ describe("sentry project get", () => {
     expect(result.stderr + result.stdout).toMatch(/organization|project/i);
   });
 
+  test("rejects partial flags (--org without project)", async () => {
+    await setAuthToken(TEST_TOKEN);
+
+    const result = await runCli(["project", "get", "--org", TEST_ORG], {
+      env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr + result.stdout).toMatch(
+      /--org was specified but --project is also required/i
+    );
+  });
+
   test("gets project details", async () => {
     await setAuthToken(TEST_TOKEN);
 

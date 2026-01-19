@@ -55,6 +55,28 @@ function formatFeaturesList(features: string[] | undefined): string[] {
   return lines;
 }
 
+/** Minimum width for header separator line */
+const MIN_HEADER_WIDTH = 20;
+
+/**
+ * Format a details header with slug and name.
+ * Handles empty values gracefully.
+ *
+ * @param slug - Resource slug (e.g., org or project slug)
+ * @param name - Resource display name
+ * @returns Array with header line and separator
+ */
+function formatDetailsHeader(slug: string, name: string): [string, string] {
+  const displaySlug = slug || "(no slug)";
+  const displayName = name || "(unnamed)";
+  const header = `${displaySlug}: ${displayName}`;
+  const separatorWidth = Math.max(
+    MIN_HEADER_WIDTH,
+    Math.min(80, header.length)
+  );
+  return [header, "═".repeat(separatorWidth)];
+}
+
 /**
  * Get status icon for an issue status
  */
@@ -292,13 +314,12 @@ export function formatOrgDetails(org: SentryOrganization): string[] {
   const lines: string[] = [];
 
   // Header
-  lines.push(`${org.slug}: ${org.name}`);
-  lines.push("═".repeat(Math.min(80, org.name.length + org.slug.length + 2)));
-  lines.push("");
+  const [header, separator] = formatDetailsHeader(org.slug, org.name);
+  lines.push(header, separator, "");
 
   // Basic info
-  lines.push(`Slug:       ${org.slug}`);
-  lines.push(`Name:       ${org.name}`);
+  lines.push(`Slug:       ${org.slug || "(none)"}`);
+  lines.push(`Name:       ${org.name || "(unnamed)"}`);
   lines.push(`ID:         ${org.id}`);
   lines.push(`Created:    ${new Date(org.dateCreated).toLocaleString()}`);
   lines.push("");
@@ -363,15 +384,12 @@ export function formatProjectDetails(project: SentryProject): string[] {
   const lines: string[] = [];
 
   // Header
-  lines.push(`${project.slug}: ${project.name}`);
-  lines.push(
-    "═".repeat(Math.min(80, project.name.length + project.slug.length + 2))
-  );
-  lines.push("");
+  const [header, separator] = formatDetailsHeader(project.slug, project.name);
+  lines.push(header, separator, "");
 
   // Basic info
-  lines.push(`Slug:       ${project.slug}`);
-  lines.push(`Name:       ${project.name}`);
+  lines.push(`Slug:       ${project.slug || "(none)"}`);
+  lines.push(`Name:       ${project.name || "(unnamed)"}`);
   lines.push(`ID:         ${project.id}`);
   lines.push(`Platform:   ${project.platform || "Not set"}`);
   lines.push(`Status:     ${project.status}`);
