@@ -11,6 +11,7 @@ import type {
   TokenResponse,
 } from "../types/index.js";
 import { setAuthToken } from "./config.js";
+import { DeviceFlowError } from "./errors.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration
@@ -140,19 +141,6 @@ async function pollForToken(deviceCode: string): Promise<TokenResponse> {
 
   // Return the error response to be handled by the caller
   throw new DeviceFlowError(data.error, data.error_description);
-}
-
-/**
- * Custom error class for device flow errors
- */
-class DeviceFlowError extends Error {
-  readonly code: string;
-
-  constructor(code: string, description?: string) {
-    super(description ?? code);
-    this.name = "DeviceFlowError";
-    this.code = code;
-  }
 }
 
 type PollResult =

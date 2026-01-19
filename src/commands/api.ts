@@ -217,43 +217,36 @@ export const apiCommand = buildCommand({
     endpoint: string
   ): Promise<void> {
     const { process } = this;
-    const { stdout, stderr } = process;
+    const { stdout } = process;
 
-    try {
-      const body =
-        flags.field?.length > 0 ? parseFields(flags.field) : undefined;
-      const headers =
-        flags.header?.length > 0 ? parseHeaders(flags.header) : undefined;
+    const body = flags.field?.length > 0 ? parseFields(flags.field) : undefined;
+    const headers =
+      flags.header?.length > 0 ? parseHeaders(flags.header) : undefined;
 
-      const response = await rawApiRequest(endpoint, {
-        method: flags.method,
-        body,
-        headers,
-      });
+    const response = await rawApiRequest(endpoint, {
+      method: flags.method,
+      body,
+      headers,
+    });
 
-      // Silent mode - only set exit code
-      if (flags.silent) {
-        if (response.status >= 400) {
-          process.exitCode = 1;
-        }
-        return;
-      }
-
-      // Output headers if requested
-      if (flags.include) {
-        writeResponseHeaders(stdout, response.status, response.headers);
-      }
-
-      // Output body
-      writeResponseBody(stdout, response.body);
-
-      // Set exit code for error responses
+    // Silent mode - only set exit code
+    if (flags.silent) {
       if (response.status >= 400) {
         process.exitCode = 1;
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      stderr.write(`Error: ${message}\n`);
+      return;
+    }
+
+    // Output headers if requested
+    if (flags.include) {
+      writeResponseHeaders(stdout, response.status, response.headers);
+    }
+
+    // Output body
+    writeResponseBody(stdout, response.body);
+
+    // Set exit code for error responses
+    if (response.status >= 400) {
       process.exitCode = 1;
     }
   },

@@ -13,6 +13,7 @@ import type {
   SentryProject,
 } from "../types/index.js";
 import { getAuthToken } from "./config.js";
+import { ApiError, AuthError } from "./errors.js";
 
 const DEFAULT_SENTRY_URL = "https://sentry.io";
 
@@ -51,22 +52,6 @@ function normalizePath(endpoint: string): string {
 const SHORT_ID_PATTERN = /[a-zA-Z]/;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Error Handling
-// ─────────────────────────────────────────────────────────────────────────────
-
-export class SentryApiError extends Error {
-  readonly status: number;
-  readonly detail?: string;
-
-  constructor(message: string, status: number, detail?: string) {
-    super(message);
-    this.name = "SentryApiError";
-    this.status = status;
-    this.detail = detail;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Request Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -79,16 +64,14 @@ type ApiRequestOptions = {
 /**
  * Create a configured ky instance with retry, timeout, and authentication.
  *
- * @throws {SentryApiError} When not authenticated (status 401)
+ * @throws {AuthError} When not authenticated
+ * @throws {ApiError} When API request fails
  */
 async function createApiClient(): Promise<KyInstance> {
   const token = await getAuthToken();
 
   if (!token) {
-    throw new SentryApiError(
-      "Not authenticated. Run 'sentry auth login' first.",
-      401
-    );
+    throw new AuthError("not_authenticated");
   }
 
   return ky.create({
@@ -117,7 +100,7 @@ async function createApiClient(): Promise<KyInstance> {
             } catch {
               detail = text;
             }
-            throw new SentryApiError(
+            throw new ApiError(
               `API request failed: ${response.status} ${response.statusText}`,
               response.status,
               detail
@@ -140,7 +123,7 @@ function buildSearchParams(
   params?: Record<string, string | number | boolean | undefined>
 ): URLSearchParams | undefined {
   if (!params) {
-    return undefined;
+    return;
   }
 
   const searchParams = new URLSearchParams();
@@ -163,7 +146,8 @@ function buildSearchParams(
  * @param endpoint - API endpoint path (e.g., "/organizations/")
  * @param options - Request options including method, body, and query params
  * @returns Parsed JSON response
- * @throws {SentryApiError} On authentication failure or API errors
+ * @throws {AuthError} When not authenticated
+ * @throws {ApiError} On API errors
  */
 export async function apiRequest<T>(
   endpoint: string,
@@ -189,7 +173,7 @@ export async function apiRequest<T>(
  * @param endpoint - API endpoint path (e.g., "/organizations/")
  * @param options - Request options including method, body, params, and custom headers
  * @returns Response status, headers, and parsed body
- * @throws {SentryApiError} Only on authentication failure (not on API errors)
+ * @throws {AuthError} Only on authentication failure (not on API errors)
  */
 export async function rawApiRequest(
   endpoint: string,
