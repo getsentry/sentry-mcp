@@ -127,6 +127,58 @@ export class ConfigError extends CliError {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Context Errors (Missing Required Context)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_CONTEXT_ALTERNATIVES = [
+  "Run from a directory with a Sentry-configured project",
+  "Set SENTRY_DSN environment variable",
+] as const;
+
+/**
+ * Missing required context errors (org, project, etc).
+ *
+ * Provides consistent error formatting with usage hints and alternatives.
+ *
+ * @param resource - What is required (e.g., "Organization", "Organization and project")
+ * @param command - Primary usage example (e.g., "sentry org get <org-slug>")
+ * @param alternatives - Alternative ways to resolve (defaults to DSN/project detection hints)
+ */
+export class ContextError extends CliError {
+  readonly resource: string;
+  readonly command: string;
+  readonly alternatives: string[];
+
+  constructor(
+    resource: string,
+    command: string,
+    alternatives: string[] = [...DEFAULT_CONTEXT_ALTERNATIVES]
+  ) {
+    super(`${resource} is required.`);
+    this.name = "ContextError";
+    this.resource = resource;
+    this.command = command;
+    this.alternatives = alternatives;
+  }
+
+  override format(): string {
+    const lines = [
+      `${this.resource} is required.`,
+      "",
+      "Specify it using:",
+      `  ${this.command}`,
+    ];
+    if (this.alternatives.length > 0) {
+      lines.push("", "Or:");
+      for (const alt of this.alternatives) {
+        lines.push(`  - ${alt}`);
+      }
+    }
+    return lines.join("\n");
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Validation Errors
 // ─────────────────────────────────────────────────────────────────────────────
 

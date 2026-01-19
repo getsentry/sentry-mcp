@@ -7,6 +7,7 @@
 import { buildCommand } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
 import { getOrganization } from "../../lib/api-client.js";
+import { ContextError } from "../../lib/errors.js";
 import { formatOrgDetails, writeOutput } from "../../lib/formatters/index.js";
 import { resolveOrg } from "../../lib/resolve-target.js";
 
@@ -53,12 +54,7 @@ export const getCommand = buildCommand({
     const resolved = await resolveOrg({ org: orgSlug, cwd });
 
     if (!resolved) {
-      throw new Error(
-        "Organization is required.\n\n" +
-          "Please specify it using:\n" +
-          "  sentry org get <org-slug>\n\n" +
-          "Or set SENTRY_DSN environment variable for automatic detection."
-      );
+      throw new ContextError("Organization", "sentry org get <org-slug>");
     }
 
     const org = await getOrganization(resolved.org);

@@ -7,6 +7,7 @@
 import { buildCommand } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
 import { getEvent } from "../../lib/api-client.js";
+import { ContextError } from "../../lib/errors.js";
 import { formatEventDetails, writeJson } from "../../lib/formatters/index.js";
 import { resolveOrgAndProject } from "../../lib/resolve-target.js";
 import type { SentryEvent, Writer } from "../../types/index.js";
@@ -95,11 +96,9 @@ export const getCommand = buildCommand({
     });
 
     if (!target) {
-      throw new Error(
-        "Organization and project are required to fetch an event.\n\n" +
-          "Please specify them using:\n" +
-          `  sentry event get ${eventId} --org <org-slug> --project <project-slug>\n\n` +
-          "Or set SENTRY_DSN environment variable for automatic detection."
+      throw new ContextError(
+        "Organization and project",
+        `sentry event get ${eventId} --org <org-slug> --project <project-slug>`
       );
     }
 

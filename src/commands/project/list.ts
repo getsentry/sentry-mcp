@@ -145,16 +145,6 @@ export const listCommand = buildCommand({
       "  sentry project list --platform javascript",
   },
   parameters: {
-    positional: {
-      kind: "tuple",
-      parameters: [
-        {
-          brief: "Organization slug (optional)",
-          parse: String,
-          optional: true,
-        },
-      ],
-    },
     flags: {
       org: {
         kind: "parsed",
@@ -181,15 +171,11 @@ export const listCommand = buildCommand({
       },
     },
   },
-  async func(
-    this: SentryContext,
-    flags: ListFlags,
-    orgArg?: string
-  ): Promise<void> {
+  async func(this: SentryContext, flags: ListFlags): Promise<void> {
     const { stdout, cwd } = this;
 
     // Resolve organization from multiple sources
-    let orgSlug = orgArg ?? flags.org ?? (await getDefaultOrganization());
+    let orgSlug = flags.org ?? (await getDefaultOrganization());
     let detectedFrom: string | undefined;
 
     // Try DSN auto-detection if no org specified

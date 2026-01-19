@@ -7,6 +7,7 @@
 import { buildCommand } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
 import { getProject } from "../../lib/api-client.js";
+import { ContextError } from "../../lib/errors.js";
 import {
   formatProjectDetails,
   writeOutput,
@@ -67,11 +68,9 @@ export const getCommand = buildCommand({
     });
 
     if (!resolved) {
-      throw new Error(
-        "Organization and project are required.\n\n" +
-          "Please specify them using:\n" +
-          "  sentry project get <project-slug> --org <org-slug>\n\n" +
-          "Or set SENTRY_DSN environment variable for automatic detection."
+      throw new ContextError(
+        "Organization and project",
+        "sentry project get <project-slug> --org <org-slug>"
       );
     }
 

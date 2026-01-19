@@ -95,10 +95,13 @@ describe("sentry project list", () => {
   test("lists projects with valid auth and org filter", async () => {
     await setAuthToken(TEST_TOKEN);
 
-    // Use org filter to avoid timeout from listing all projects
-    const result = await runCli(["project", "list", TEST_ORG, "--limit", "5"], {
-      env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
-    });
+    // Use --org flag to filter by organization
+    const result = await runCli(
+      ["project", "list", "--org", TEST_ORG, "--limit", "5"],
+      {
+        env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
+      }
+    );
 
     expect(result.exitCode).toBe(0);
   });
@@ -106,9 +109,9 @@ describe("sentry project list", () => {
   test("supports --json output", async () => {
     await setAuthToken(TEST_TOKEN);
 
-    // Use org filter to avoid timeout
+    // Use --org flag to filter by organization
     const result = await runCli(
-      ["project", "list", TEST_ORG, "--json", "--limit", "5"],
+      ["project", "list", "--org", TEST_ORG, "--json", "--limit", "5"],
       {
         env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
       }

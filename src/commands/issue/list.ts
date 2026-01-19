@@ -6,11 +6,8 @@
 
 import { buildCommand, numberParser } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
-import {
-  listIssues,
-  listOrganizations,
-  listProjects,
-} from "../../lib/api-client.js";
+import { listIssues } from "../../lib/api-client.js";
+import { ContextError } from "../../lib/errors.js";
 import {
   divider,
   formatIssueRow,
@@ -79,67 +76,6 @@ function writeListFooter(stdout: Writer): void {
   );
 }
 
-/** Minimal project reference for error message display */
-type ProjectRef = {
-  orgSlug: string;
-  projectSlug: string;
-};
-
-/**
- * Fetch all projects from all accessible organizations.
- * Used to show available options when no project is specified.
- *
- * @returns List of org/project slug pairs
- */
-async function fetchAllProjects(): Promise<ProjectRef[]> {
-  const orgs = await listOrganizations();
-  const results: ProjectRef[] = [];
-
-  for (const org of orgs) {
-    try {
-      const projects = await listProjects(org.slug);
-      for (const project of projects) {
-        results.push({
-          orgSlug: org.slug,
-          projectSlug: project.slug,
-        });
-      }
-    } catch {
-      // User may lack access to some orgs
-    }
-  }
-
-  return results;
-}
-
-/**
- * Build a helpful error message listing all available projects.
- * Fetches projects from all accessible organizations.
- *
- * @returns Formatted error message with project list and usage instructions
- */
-async function buildNoProjectError(): Promise<string> {
-  const projects = await fetchAllProjects();
-
-  const lines: string[] = ["No project specified.", ""];
-
-  if (projects.length > 0) {
-    lines.push("Available projects:");
-    lines.push("");
-    for (const p of projects) {
-      lines.push(`  ${p.orgSlug}/${p.projectSlug}`);
-    }
-    lines.push("");
-  }
-
-  lines.push("Specify a project using:");
-  lines.push("  sentry issue list --org <org-slug> --project <project-slug>");
-  lines.push("");
-  lines.push("Or set SENTRY_DSN in your environment for automatic detection.");
-
-  return lines.join("\n");
-}
-
 export const listCommand = buildCommand({
   docs: {
     brief: "List issues in a project",
@@ -196,8 +132,10 @@ export const listCommand = buildCommand({
     });
 
     if (!target) {
-      const errorMessage = await buildNoProjectError();
-      throw new Error(errorMessage);
+      throw new ContextError(
+        "Organization and project",
+        "sentry issue list --org <org-slug> --project <project-slug>"
+      );
     }
 
     const issues = await listIssues(target.org, target.project, {
