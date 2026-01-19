@@ -6,10 +6,10 @@
  * Fast path (cache hit): ~5ms - verify single file
  * Slow path (cache miss): ~2-5s - full scan
  *
- * Detection priority:
- * 1. SENTRY_DSN environment variable (instant)
- * 2. Cached source file verification (fast)
- * 3. Full scan: .env files, then source code (slow)
+ * Detection priority (explicit code DSN wins):
+ * 1. Source code (explicit DSN in Sentry.init, etc.)
+ * 2. .env files (.env.local, .env, etc.)
+ * 3. SENTRY_DSN environment variable
  */
 
 import { extname, join } from "node:path";
@@ -43,21 +43,17 @@ import type {
  * Fast path (cache hit): ~5ms
  * Slow path (cache miss): ~2-5s
  *
+ * Priority: code > .env files > SENTRY_DSN env var
+ *
  * @param cwd - Directory to search in
  * @returns Detected DSN with source info, or null if not found
  */
 export async function detectDsn(cwd: string): Promise<DetectedDsn | null> {
-  // 1. ALWAYS check env var first (instant, highest priority)
-  const envDsn = detectFromEnv();
-  if (envDsn) {
-    return envDsn;
-  }
-
-  // 2. Check cache for this directory
+  // 1. Check cache for this directory (fast path)
   const cached = await getCachedDsn(cwd);
 
   if (cached) {
-    // 3. Verify cached source file still has same DSN
+    // 2. Verify cached source file still has same DSN
     const verified = await verifyCachedDsn(cwd, cached);
     if (verified) {
       // Check if DSN changed
@@ -82,11 +78,11 @@ export async function detectDsn(cwd: string): Promise<DetectedDsn | null> {
     // Cache invalid, fall through to full scan
   }
 
-  // 4. Full scan (cache miss)
+  // 3. Full scan (cache miss): code → .env → env var
   const detected = await fullScanFirst(cwd);
 
   if (detected) {
-    // 5. Cache for next time (without resolved info yet)
+    // 4. Cache for next time (without resolved info yet)
     await setCachedDsn(cwd, {
       dsn: detected.raw,
       projectId: detected.projectId,
@@ -105,6 +101,8 @@ export async function detectDsn(cwd: string): Promise<DetectedDsn | null> {
  * Unlike detectDsn, this finds ALL DSNs from all sources.
  * Used when we need to check for conflicts.
  *
+ * Collection order matches priority: code > .env files > env var
+ *
  * @param cwd - Directory to search in
  * @returns Detection result with all found DSNs and conflict status
  */
@@ -120,10 +118,10 @@ export async function detectAllDsns(cwd: string): Promise<DsnDetectionResult> {
     }
   };
 
-  // 1. Check env var
-  const envDsn = detectFromEnv();
-  if (envDsn) {
-    addDsn(envDsn);
+  // 1. Check all code files (highest priority)
+  const codeDsns = await detectAllFromCode(cwd);
+  for (const dsn of codeDsns) {
+    addDsn(dsn);
   }
 
   // 2. Check all .env files
@@ -132,10 +130,10 @@ export async function detectAllDsns(cwd: string): Promise<DsnDetectionResult> {
     addDsn(dsn);
   }
 
-  // 3. Check all code files
-  const codeDsns = await detectAllFromCode(cwd);
-  for (const dsn of codeDsns) {
-    addDsn(dsn);
+  // 3. Check env var (lowest priority)
+  const envDsn = detectFromEnv();
+  if (envDsn) {
+    addDsn(envDsn);
   }
 
   // Determine if there's a conflict (multiple DIFFERENT DSNs)
@@ -241,20 +239,27 @@ function extractDsnFromContent(
  * Full scan to find first DSN (cache miss path)
  *
  * Searches in priority order:
- * 1. .env files
- * 2. Source code
+ * 1. Source code (explicit DSN takes highest priority)
+ * 2. .env files
+ * 3. SENTRY_DSN environment variable (lowest priority)
  */
 async function fullScanFirst(cwd: string): Promise<DetectedDsn | null> {
-  // 1. Check .env files
+  // 1. Search source code first (explicit DSN = highest priority)
+  const codeDsn = await detectFromCode(cwd);
+  if (codeDsn) {
+    return codeDsn;
+  }
+
+  // 2. Check .env files
   const envFileDsn = await detectFromEnvFiles(cwd);
   if (envFileDsn) {
     return envFileDsn;
   }
 
-  // 2. Search source code
-  const codeDsn = await detectFromCode(cwd);
-  if (codeDsn) {
-    return codeDsn;
+  // 3. Check SENTRY_DSN environment variable (lowest priority)
+  const envDsn = detectFromEnv();
+  if (envDsn) {
+    return envDsn;
   }
 
   return null;
