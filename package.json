@@ -13,8 +13,8 @@
     "package": "bun run script/package.ts",
     "prepublish": "bun run script/build.ts && bun run script/package.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "bun x ultracite check",
-    "lint:fix": "bun x ultracite fix",
+    "lint": "bunx ultracite check",
+    "lint:fix": "bunx ultracite fix",
     "test": "bun test",
     "test:e2e": "bun test test/e2e"
   },
