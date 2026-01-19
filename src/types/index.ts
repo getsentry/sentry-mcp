@@ -17,12 +17,18 @@ export type {
   TokenResponse,
 } from "./oauth.js";
 
-// Sentry API types
+// Sentry API types and schemas
 export type {
   SentryEvent,
   SentryIssue,
   SentryOrganization,
   SentryProject,
+} from "./sentry.js";
+export {
+  SentryEventSchema,
+  SentryIssueSchema,
+  SentryOrganizationSchema,
+  SentryProjectSchema,
 } from "./sentry.js";
 
 // I/O types
