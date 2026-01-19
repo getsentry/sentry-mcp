@@ -38,7 +38,8 @@ export const loginCommand = buildCommand({
         kind: "parsed",
         parse: numberParser,
         brief: "Timeout for OAuth flow in seconds (default: 900)",
-        default: 900,
+        // Stricli requires string defaults (raw CLI input); numberParser converts to number
+        default: "900",
       },
       qr: {
         kind: "boolean",

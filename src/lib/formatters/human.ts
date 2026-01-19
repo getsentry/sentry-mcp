@@ -80,14 +80,20 @@ function formatDetailsHeader(slug: string, name: string): [string, string] {
 /**
  * Get status icon for an issue status
  */
-export function formatStatusIcon(status: string): string {
+export function formatStatusIcon(status: string | undefined): string {
+  if (!status) {
+    return "●";
+  }
   return STATUS_ICONS[status as IssueStatus] ?? "●";
 }
 
 /**
  * Get full status label for an issue status
  */
-export function formatStatusLabel(status: string): string {
+export function formatStatusLabel(status: string | undefined): string {
+  if (!status) {
+    return "● Unknown";
+  }
   return STATUS_LABELS[status as IssueStatus] ?? "● Unknown";
 }
 
@@ -125,6 +131,9 @@ export function formatTable(
     const formatted = row
       .map((cell, i) => {
         const col = columns[i];
+        if (!col) {
+          return cell;
+        }
         return col.align === "right"
           ? cell.padStart(col.width)
           : cell.padEnd(col.width);
@@ -152,7 +161,7 @@ export function divider(length = 80, char = "─"): string {
  */
 export function formatIssueRow(issue: SentryIssue): string {
   const status = formatStatusIcon(issue.status);
-  const level = issue.level.toUpperCase().padEnd(7);
+  const level = (issue.level ?? "unknown").toUpperCase().padEnd(7);
   const count = `${issue.count}`.padStart(5);
   const shortId = issue.shortId.padEnd(15);
 
@@ -174,20 +183,26 @@ export function formatIssueDetails(issue: SentryIssue): string[] {
 
   // Status and level
   lines.push(`Status:     ${formatStatusLabel(issue.status)}`);
-  lines.push(`Level:      ${issue.level}`);
+  lines.push(`Level:      ${issue.level ?? "unknown"}`);
   lines.push(`Platform:   ${issue.platform}`);
   lines.push(`Type:       ${issue.type}`);
   lines.push("");
 
   // Project
-  lines.push(`Project:    ${issue.project.name} (${issue.project.slug})`);
-  lines.push("");
+  if (issue.project) {
+    lines.push(`Project:    ${issue.project.name} (${issue.project.slug})`);
+    lines.push("");
+  }
 
   // Stats
   lines.push(`Events:     ${issue.count}`);
   lines.push(`Users:      ${issue.userCount}`);
-  lines.push(`First seen: ${new Date(issue.firstSeen).toLocaleString()}`);
-  lines.push(`Last seen:  ${new Date(issue.lastSeen).toLocaleString()}`);
+  if (issue.firstSeen) {
+    lines.push(`First seen: ${new Date(issue.firstSeen).toLocaleString()}`);
+  }
+  if (issue.lastSeen) {
+    lines.push(`Last seen:  ${new Date(issue.lastSeen).toLocaleString()}`);
+  }
   lines.push("");
 
   // Culprit
@@ -197,16 +212,16 @@ export function formatIssueDetails(issue: SentryIssue): string[] {
   }
 
   // Metadata
-  if (issue.metadata.value) {
+  if (issue.metadata?.value) {
     lines.push("Message:");
     lines.push(`  ${issue.metadata.value}`);
     lines.push("");
   }
 
-  if (issue.metadata.filename) {
+  if (issue.metadata?.filename) {
     lines.push(`File:       ${issue.metadata.filename}`);
   }
-  if (issue.metadata.function) {
+  if (issue.metadata?.function) {
     lines.push(`Function:   ${issue.metadata.function}`);
   }
 
@@ -244,7 +259,9 @@ export function formatEventDetails(
   lines.push(`─── ${header} ───`);
   lines.push("");
   lines.push(`Event ID:   ${event.eventID}`);
-  lines.push(`Received:   ${new Date(event.dateReceived).toLocaleString()}`);
+  if (event.dateReceived) {
+    lines.push(`Received:   ${new Date(event.dateReceived).toLocaleString()}`);
+  }
 
   if (event.user) {
     lines.push("");
@@ -268,7 +285,7 @@ export function formatEventDetails(
     lines.push(`SDK:        ${event.sdk.name} ${event.sdk.version}`);
   }
 
-  if (event.tags.length > 0) {
+  if (event.tags?.length) {
     lines.push("");
     lines.push("Tags:");
     const maxTags = 10;
@@ -321,7 +338,9 @@ export function formatOrgDetails(org: SentryOrganization): string[] {
   lines.push(`Slug:       ${org.slug || "(none)"}`);
   lines.push(`Name:       ${org.name || "(unnamed)"}`);
   lines.push(`ID:         ${org.id}`);
-  lines.push(`Created:    ${new Date(org.dateCreated).toLocaleString()}`);
+  if (org.dateCreated) {
+    lines.push(`Created:    ${new Date(org.dateCreated).toLocaleString()}`);
+  }
   lines.push("");
 
   // Settings
@@ -393,7 +412,9 @@ export function formatProjectDetails(project: SentryProject): string[] {
   lines.push(`ID:         ${project.id}`);
   lines.push(`Platform:   ${project.platform || "Not set"}`);
   lines.push(`Status:     ${project.status}`);
-  lines.push(`Created:    ${new Date(project.dateCreated).toLocaleString()}`);
+  if (project.dateCreated) {
+    lines.push(`Created:    ${new Date(project.dateCreated).toLocaleString()}`);
+  }
 
   // Organization context
   if (project.organization) {

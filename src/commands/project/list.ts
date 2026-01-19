@@ -156,7 +156,8 @@ export const listCommand = buildCommand({
         kind: "parsed",
         parse: numberParser,
         brief: "Maximum number of projects to list",
-        default: 30,
+        // Stricli requires string defaults (raw CLI input); numberParser converts to number
+        default: "30",
       },
       json: {
         kind: "boolean",

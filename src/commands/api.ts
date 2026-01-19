@@ -63,6 +63,9 @@ function setNestedValue(
 
   for (let i = 0; i < keys.length - 1; i++) {
     const k = keys[i];
+    if (k === undefined) {
+      continue;
+    }
     if (!(k in current)) {
       current[k] = {};
     }
@@ -183,20 +186,18 @@ export const apiCommand = buildCommand({
         parse: parseMethod,
         brief: "HTTP method (GET, POST, PUT, DELETE, PATCH)",
         default: "GET" as const,
-        variableName: "X",
+        placeholder: "METHOD",
       },
       field: {
         kind: "parsed",
         parse: String,
         brief: "Request body field (key=value). Can be repeated.",
-        optional: true,
         variadic: true,
       },
       header: {
         kind: "parsed",
         parse: String,
         brief: "Additional header (Key: Value). Can be repeated.",
-        optional: true,
         variadic: true,
       },
       include: {
@@ -216,7 +217,7 @@ export const apiCommand = buildCommand({
     flags: ApiFlags,
     endpoint: string
   ): Promise<void> {
-    const { stdout, process } = this;
+    const { stdout } = this;
 
     const body = flags.field?.length > 0 ? parseFields(flags.field) : undefined;
     const headers =
@@ -231,7 +232,7 @@ export const apiCommand = buildCommand({
     // Silent mode - only set exit code
     if (flags.silent) {
       if (response.status >= 400) {
-        process.exitCode = 1;
+        (this.process as NodeJS.Process).exitCode = 1;
       }
       return;
     }
@@ -246,7 +247,7 @@ export const apiCommand = buildCommand({
 
     // Set exit code for error responses
     if (response.status >= 400) {
-      process.exitCode = 1;
+      (this.process as NodeJS.Process).exitCode = 1;
     }
   },
 });

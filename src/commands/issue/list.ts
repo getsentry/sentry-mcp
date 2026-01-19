@@ -107,7 +107,8 @@ export const listCommand = buildCommand({
         kind: "parsed",
         parse: numberParser,
         brief: "Maximum number of issues to return",
-        default: 25,
+        // Stricli requires string defaults (raw CLI input); numberParser converts to number
+        default: "25",
       },
       sort: {
         kind: "parsed",
