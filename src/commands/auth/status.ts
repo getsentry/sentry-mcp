@@ -14,6 +14,7 @@ import {
   isAuthenticated,
   readConfig,
 } from "../../lib/config.js";
+import { AuthError } from "../../lib/errors.js";
 import { formatExpiration, maskToken } from "../../lib/formatters/human.js";
 import type { SentryConfig, Writer } from "../../types/index.js";
 
@@ -66,7 +67,10 @@ async function writeDefaults(stdout: Writer): Promise<void> {
 /**
  * Verify credentials by fetching organizations
  */
-async function verifyCredentials(stdout: Writer): Promise<void> {
+async function verifyCredentials(
+  stdout: Writer,
+  stderr: Writer
+): Promise<void> {
   stdout.write("\nVerifying credentials...\n");
 
   try {
@@ -84,7 +88,7 @@ async function verifyCredentials(stdout: Writer): Promise<void> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    stdout.write(`\n✗ Could not verify credentials: ${message}\n`);
+    stderr.write(`\n✗ Could not verify credentials: ${message}\n`);
   }
 }
 
@@ -106,7 +110,7 @@ export const statusCommand = buildCommand({
   },
   async func(this: SentryContext, flags: StatusFlags): Promise<void> {
     const { process } = this;
-    const { stdout } = process;
+    const { stdout, stderr } = process;
 
     const config = await readConfig();
     const authenticated = await isAuthenticated();
@@ -114,15 +118,13 @@ export const statusCommand = buildCommand({
     stdout.write(`Config file: ${getConfigPath()}\n\n`);
 
     if (!authenticated) {
-      throw new Error(
-        "Not authenticated. Run 'sentry auth login' to authenticate."
-      );
+      throw new AuthError("not_authenticated");
     }
 
     stdout.write("Status: Authenticated ✓\n\n");
 
     writeTokenInfo(stdout, config, flags.showToken);
     await writeDefaults(stdout);
-    await verifyCredentials(stdout);
+    await verifyCredentials(stdout, stderr);
   },
 });
