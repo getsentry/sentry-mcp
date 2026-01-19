@@ -17,6 +17,10 @@ type GetFlags = {
 
 /**
  * Write human-readable organization output to stdout.
+ *
+ * @param stdout - Stream to write formatted output
+ * @param org - Organization data to display
+ * @param detectedFrom - Optional source description if org was auto-detected
  */
 function writeHumanOutput(
   stdout: NodeJS.WriteStream,

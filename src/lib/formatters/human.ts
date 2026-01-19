@@ -30,6 +30,31 @@ const STATUS_LABELS: Record<IssueStatus, string> = {
   ignored: "− Ignored",
 };
 
+/** Maximum features to display before truncating with "... and N more" */
+const MAX_DISPLAY_FEATURES = 10;
+
+/**
+ * Format a features array for display, truncating if necessary.
+ *
+ * @param features - Array of feature names (may be undefined)
+ * @returns Formatted lines to append to output, or empty array if no features
+ */
+function formatFeaturesList(features: string[] | undefined): string[] {
+  if (!features || features.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = ["", `Features (${features.length}):`];
+  const displayFeatures = features.slice(0, MAX_DISPLAY_FEATURES);
+  lines.push(`  ${displayFeatures.join(", ")}`);
+
+  if (features.length > MAX_DISPLAY_FEATURES) {
+    lines.push(`  ... and ${features.length - MAX_DISPLAY_FEATURES} more`);
+  }
+
+  return lines;
+}
+
 /**
  * Get status icon for an issue status
  */
@@ -283,16 +308,7 @@ export function formatOrgDetails(org: SentryOrganization): string[] {
   lines.push(`Early Adopter: ${org.isEarlyAdopter ? "Yes" : "No"}`);
 
   // Features
-  if (org.features && org.features.length > 0) {
-    lines.push("");
-    lines.push(`Features (${org.features.length}):`);
-    const maxFeatures = 10;
-    const displayFeatures = org.features.slice(0, maxFeatures);
-    lines.push(`  ${displayFeatures.join(", ")}`);
-    if (org.features.length > maxFeatures) {
-      lines.push(`  ... and ${org.features.length - maxFeatures} more`);
-    }
-  }
+  lines.push(...formatFeaturesList(org.features));
 
   return lines;
 }
@@ -386,16 +402,7 @@ export function formatProjectDetails(project: SentryProject): string[] {
   lines.push(`  Monitors:  ${project.hasMonitors ? "Yes" : "No"}`);
 
   // Features
-  if (project.features && project.features.length > 0) {
-    lines.push("");
-    lines.push(`Features (${project.features.length}):`);
-    const maxFeatures = 10;
-    const displayFeatures = project.features.slice(0, maxFeatures);
-    lines.push(`  ${displayFeatures.join(", ")}`);
-    if (project.features.length > maxFeatures) {
-      lines.push(`  ... and ${project.features.length - maxFeatures} more`);
-    }
-  }
+  lines.push(...formatFeaturesList(project.features));
 
   return lines;
 }

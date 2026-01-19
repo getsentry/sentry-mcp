@@ -18,6 +18,10 @@ type GetFlags = {
 
 /**
  * Write human-readable project output to stdout.
+ *
+ * @param stdout - Stream to write formatted output
+ * @param project - Project data to display
+ * @param detectedFrom - Optional source description if project was auto-detected
  */
 function writeHumanOutput(
   stdout: NodeJS.WriteStream,
