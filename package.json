@@ -1,6 +1,6 @@
 {
   "name": "@betegon/sentry",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "A gh-like CLI for Sentry",
   "type": "module",
   "bin": {
