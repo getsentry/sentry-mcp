@@ -26,7 +26,7 @@ type GetFlags = {
  * @param detectedFrom - Optional source description for auto-detection
  */
 function writeHumanOutput(
-  stdout: NodeJS.WriteStream,
+  stdout: Writer,
   event: SentryEvent,
   detectedFrom?: string
 ): void {

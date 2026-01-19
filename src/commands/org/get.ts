@@ -23,7 +23,7 @@ type GetFlags = {
  * @param detectedFrom - Optional source description if org was auto-detected
  */
 function writeHumanOutput(
-  stdout: NodeJS.WriteStream,
+  stdout: Writer,
   org: Parameters<typeof formatOrgDetails>[0],
   detectedFrom?: string
 ): void {

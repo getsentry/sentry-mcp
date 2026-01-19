@@ -15,7 +15,7 @@ import {
   readConfig,
 } from "../../lib/config.js";
 import { formatExpiration, maskToken } from "../../lib/formatters/human.js";
-import type { SentryConfig } from "../../types/index.js";
+import type { SentryConfig, Writer } from "../../types/index.js";
 
 type StatusFlags = {
   readonly showToken: boolean;
@@ -25,7 +25,7 @@ type StatusFlags = {
  * Write token information
  */
 function writeTokenInfo(
-  stdout: NodeJS.WriteStream,
+  stdout: Writer,
   config: SentryConfig,
   showToken: boolean
 ): void {
@@ -46,7 +46,7 @@ function writeTokenInfo(
 /**
  * Write default settings
  */
-async function writeDefaults(stdout: NodeJS.WriteStream): Promise<void> {
+async function writeDefaults(stdout: Writer): Promise<void> {
   const defaultOrg = await getDefaultOrganization();
   const defaultProject = await getDefaultProject();
 
@@ -66,7 +66,7 @@ async function writeDefaults(stdout: NodeJS.WriteStream): Promise<void> {
 /**
  * Verify credentials by fetching organizations
  */
-async function verifyCredentials(stdout: NodeJS.WriteStream): Promise<void> {
+async function verifyCredentials(stdout: Writer): Promise<void> {
   stdout.write("\nVerifying credentials...\n");
 
   try {

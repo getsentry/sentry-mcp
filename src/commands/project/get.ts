@@ -24,7 +24,7 @@ type GetFlags = {
  * @param detectedFrom - Optional source description if project was auto-detected
  */
 function writeHumanOutput(
-  stdout: NodeJS.WriteStream,
+  stdout: Writer,
   project: Parameters<typeof formatProjectDetails>[0],
   detectedFrom?: string
 ): void {
