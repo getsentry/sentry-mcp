@@ -2,60 +2,21 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider.js";
 
 describe("openai-provider", () => {
-  const originalEnv = process.env.OPENAI_REASONING_EFFORT;
+  const originalModel = process.env.OPENAI_MODEL;
 
   beforeEach(() => {
     setOpenAIBaseUrl(undefined);
+    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+    delete process.env.OPENAI_MODEL;
   });
 
   afterEach(() => {
-    if (originalEnv === undefined) {
+    if (originalModel === undefined) {
       // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-      delete process.env.OPENAI_REASONING_EFFORT;
+      delete process.env.OPENAI_MODEL;
     } else {
-      process.env.OPENAI_REASONING_EFFORT = originalEnv;
+      process.env.OPENAI_MODEL = originalModel;
     }
-  });
-
-  describe("reasoning effort configuration", () => {
-    it("uses default reasoning effort when env var is not set", () => {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-      delete process.env.OPENAI_REASONING_EFFORT;
-
-      const model = getOpenAIModel();
-
-      // The model object should be created with default reasoning effort
-      expect(model).toBeDefined();
-      expect(model.modelId).toBe("gpt-5");
-    });
-
-    it("disables reasoning effort when env var is empty string", () => {
-      process.env.OPENAI_REASONING_EFFORT = "";
-
-      const model = getOpenAIModel();
-
-      // The model object should be created without reasoning effort
-      expect(model).toBeDefined();
-      expect(model.modelId).toBe("gpt-5");
-    });
-
-    it("uses specified reasoning effort when env var is set", () => {
-      process.env.OPENAI_REASONING_EFFORT = "high";
-
-      const model = getOpenAIModel();
-
-      // The model object should be created with high reasoning effort
-      expect(model).toBeDefined();
-      expect(model.modelId).toBe("gpt-5");
-    });
-
-    it("throws error for invalid reasoning effort value", () => {
-      process.env.OPENAI_REASONING_EFFORT = "invalid";
-
-      expect(() => getOpenAIModel()).toThrow(
-        'Invalid OPENAI_REASONING_EFFORT value: "invalid". Must be one of: "low", "medium", "high", or "" (empty string to disable). Default is "low".',
-      );
-    });
   });
 
   describe("base URL configuration", () => {
@@ -90,14 +51,11 @@ describe("openai-provider", () => {
     });
 
     it("uses OPENAI_MODEL env var when set", () => {
-      process.env.OPENAI_MODEL = "gpt-4o";
+      process.env.OPENAI_MODEL = "gpt-4-turbo";
 
       const model = getOpenAIModel();
 
-      expect(model.modelId).toBe("gpt-4o");
-
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-      delete process.env.OPENAI_MODEL;
+      expect(model.modelId).toBe("gpt-4-turbo");
     });
   });
 });
