@@ -30,6 +30,53 @@ const STATUS_LABELS: Record<IssueStatus, string> = {
   ignored: "− Ignored",
 };
 
+/** Maximum features to display before truncating with "... and N more" */
+const MAX_DISPLAY_FEATURES = 10;
+
+/**
+ * Format a features array for display, truncating if necessary.
+ *
+ * @param features - Array of feature names (may be undefined)
+ * @returns Formatted lines to append to output, or empty array if no features
+ */
+function formatFeaturesList(features: string[] | undefined): string[] {
+  if (!features || features.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = ["", `Features (${features.length}):`];
+  const displayFeatures = features.slice(0, MAX_DISPLAY_FEATURES);
+  lines.push(`  ${displayFeatures.join(", ")}`);
+
+  if (features.length > MAX_DISPLAY_FEATURES) {
+    lines.push(`  ... and ${features.length - MAX_DISPLAY_FEATURES} more`);
+  }
+
+  return lines;
+}
+
+/** Minimum width for header separator line */
+const MIN_HEADER_WIDTH = 20;
+
+/**
+ * Format a details header with slug and name.
+ * Handles empty values gracefully.
+ *
+ * @param slug - Resource slug (e.g., org or project slug)
+ * @param name - Resource display name
+ * @returns Array with header line and separator
+ */
+function formatDetailsHeader(slug: string, name: string): [string, string] {
+  const displaySlug = slug || "(no slug)";
+  const displayName = name || "(unnamed)";
+  const header = `${displaySlug}: ${displayName}`;
+  const separatorWidth = Math.max(
+    MIN_HEADER_WIDTH,
+    Math.min(80, header.length)
+  );
+  return [header, "═".repeat(separatorWidth)];
+}
+
 /**
  * Get status icon for an issue status
  */
@@ -257,6 +304,36 @@ export function calculateOrgSlugWidth(orgs: SentryOrganization[]): number {
   return Math.max(...orgs.map((o) => o.slug.length), 4);
 }
 
+/**
+ * Format detailed organization information.
+ *
+ * @param org - The Sentry organization to format
+ * @returns Array of formatted lines
+ */
+export function formatOrgDetails(org: SentryOrganization): string[] {
+  const lines: string[] = [];
+
+  // Header
+  const [header, separator] = formatDetailsHeader(org.slug, org.name);
+  lines.push(header, separator, "");
+
+  // Basic info
+  lines.push(`Slug:       ${org.slug || "(none)"}`);
+  lines.push(`Name:       ${org.name || "(unnamed)"}`);
+  lines.push(`ID:         ${org.id}`);
+  lines.push(`Created:    ${new Date(org.dateCreated).toLocaleString()}`);
+  lines.push("");
+
+  // Settings
+  lines.push(`2FA:        ${org.require2FA ? "Required" : "Not required"}`);
+  lines.push(`Early Adopter: ${org.isEarlyAdopter ? "Yes" : "No"}`);
+
+  // Features
+  lines.push(...formatFeaturesList(org.features));
+
+  return lines;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Project Formatting
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,6 +372,57 @@ export function calculateProjectSlugWidth(
     ),
     4
   );
+}
+
+/**
+ * Format detailed project information.
+ *
+ * @param project - The Sentry project to format
+ * @returns Array of formatted lines
+ */
+export function formatProjectDetails(project: SentryProject): string[] {
+  const lines: string[] = [];
+
+  // Header
+  const [header, separator] = formatDetailsHeader(project.slug, project.name);
+  lines.push(header, separator, "");
+
+  // Basic info
+  lines.push(`Slug:       ${project.slug || "(none)"}`);
+  lines.push(`Name:       ${project.name || "(unnamed)"}`);
+  lines.push(`ID:         ${project.id}`);
+  lines.push(`Platform:   ${project.platform || "Not set"}`);
+  lines.push(`Status:     ${project.status}`);
+  lines.push(`Created:    ${new Date(project.dateCreated).toLocaleString()}`);
+
+  // Organization context
+  if (project.organization) {
+    lines.push("");
+    lines.push(
+      `Organization: ${project.organization.name} (${project.organization.slug})`
+    );
+  }
+
+  // Activity info
+  lines.push("");
+  if (project.firstEvent) {
+    lines.push(`First Event: ${new Date(project.firstEvent).toLocaleString()}`);
+  } else {
+    lines.push("First Event: No events yet");
+  }
+
+  // Capabilities
+  lines.push("");
+  lines.push("Capabilities:");
+  lines.push(`  Sessions:  ${project.hasSessions ? "Yes" : "No"}`);
+  lines.push(`  Replays:   ${project.hasReplays ? "Yes" : "No"}`);
+  lines.push(`  Profiles:  ${project.hasProfiles ? "Yes" : "No"}`);
+  lines.push(`  Monitors:  ${project.hasMonitors ? "Yes" : "No"}`);
+
+  // Features
+  lines.push(...formatFeaturesList(project.features));
+
+  return lines;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

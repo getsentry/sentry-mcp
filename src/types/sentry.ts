@@ -15,7 +15,8 @@ export type SentryOrganization = {
     avatarType: string;
     avatarUuid: string | null;
   };
-  features: string[];
+  /** Feature flags enabled for this organization (may be omitted in some API responses) */
+  features?: string[];
 };
 
 export type SentryProject = {
@@ -26,7 +27,8 @@ export type SentryProject = {
   dateCreated: string;
   isBookmarked: boolean;
   isMember: boolean;
-  features: string[];
+  /** Feature flags enabled for this project (may be omitted in some API responses) */
+  features?: string[];
   firstEvent: string | null;
   firstTransactionEvent: boolean;
   access: string[];

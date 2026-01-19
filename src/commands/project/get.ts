@@ -1,40 +1,35 @@
 /**
- * sentry event get
+ * sentry project get
  *
- * Get detailed information about a Sentry event.
+ * Get detailed information about a Sentry project.
  */
 
 import { buildCommand } from "@stricli/core";
 import type { SentryContext } from "../../context.js";
-import { getEvent } from "../../lib/api-client.js";
-import { formatEventDetails } from "../../lib/formatters/human.js";
+import { getProject } from "../../lib/api-client.js";
+import { formatProjectDetails } from "../../lib/formatters/human.js";
 import { writeJson } from "../../lib/formatters/json.js";
 import { resolveOrgAndProject } from "../../lib/resolve-target.js";
-import type { SentryEvent } from "../../types/index.js";
 
 type GetFlags = {
   readonly org?: string;
-  readonly project?: string;
   readonly json: boolean;
 };
 
 /**
- * Write human-readable event output to stdout.
+ * Write human-readable project output to stdout.
  *
- * @param stdout - Output stream
- * @param event - The event to display
- * @param detectedFrom - Optional source description for auto-detection
+ * @param stdout - Stream to write formatted output
+ * @param project - Project data to display
+ * @param detectedFrom - Optional source description if project was auto-detected
  */
 function writeHumanOutput(
   stdout: Writer,
-  event: SentryEvent,
+  project: Parameters<typeof formatProjectDetails>[0],
   detectedFrom?: string
 ): void {
-  const lines = formatEventDetails(event, `Event ${event.eventID}`);
-
-  // Skip leading empty line for standalone display
-  const output = lines.slice(1);
-  stdout.write(`${output.join("\n")}\n`);
+  const lines = formatProjectDetails(project);
+  stdout.write(`${lines.join("\n")}\n`);
 
   if (detectedFrom) {
     stdout.write(`\nDetected from ${detectedFrom}\n`);
@@ -43,11 +38,11 @@ function writeHumanOutput(
 
 export const getCommand = buildCommand({
   docs: {
-    brief: "Get details of a specific event",
+    brief: "Get details of a project",
     fullDescription:
-      "Retrieve detailed information about a Sentry event by its ID.\n\n" +
+      "Retrieve detailed information about a Sentry project.\n\n" +
       "The organization and project are resolved from:\n" +
-      "  1. --org and --project flags\n" +
+      "  1. Positional argument <project-slug> and --org flag\n" +
       "  2. Config defaults\n" +
       "  3. SENTRY_DSN environment variable or source code detection",
   },
@@ -56,9 +51,9 @@ export const getCommand = buildCommand({
       kind: "tuple",
       parameters: [
         {
-          brief:
-            "Event ID (hexadecimal, e.g., 9999aaaaca8b46d797c23c6077c6ff01)",
+          brief: "Project slug (optional if auto-detected)",
           parse: String,
+          optional: true,
         },
       ],
     },
@@ -67,12 +62,6 @@ export const getCommand = buildCommand({
         kind: "parsed",
         parse: String,
         brief: "Organization slug",
-        optional: true,
-      },
-      project: {
-        kind: "parsed",
-        parse: String,
-        brief: "Project slug",
         optional: true,
       },
       json: {
@@ -85,33 +74,33 @@ export const getCommand = buildCommand({
   async func(
     this: SentryContext,
     flags: GetFlags,
-    eventId: string
+    projectSlug?: string
   ): Promise<void> {
     const { process, cwd } = this;
     const { stdout } = process;
 
-    const target = await resolveOrgAndProject({
+    const resolved = await resolveOrgAndProject({
       org: flags.org,
-      project: flags.project,
+      project: projectSlug,
       cwd,
     });
 
-    if (!target) {
+    if (!resolved) {
       throw new Error(
-        "Organization and project are required to fetch an event.\n\n" +
+        "Organization and project are required.\n\n" +
           "Please specify them using:\n" +
-          `  sentry event get ${eventId} --org <org-slug> --project <project-slug>\n\n` +
+          "  sentry project get <project-slug> --org <org-slug>\n\n" +
           "Or set SENTRY_DSN environment variable for automatic detection."
       );
     }
 
-    const event = await getEvent(target.org, target.project, eventId);
+    const project = await getProject(resolved.org, resolved.project);
 
     if (flags.json) {
-      writeJson(stdout, event);
+      writeJson(stdout, project);
       return;
     }
 
-    writeHumanOutput(stdout, event, target.detectedFrom);
+    writeHumanOutput(stdout, project, resolved.detectedFrom);
   },
 });

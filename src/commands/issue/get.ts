@@ -43,7 +43,7 @@ async function tryGetLatestEvent(
  * Write human-readable issue output
  */
 function writeHumanOutput(
-  stdout: NodeJS.WriteStream,
+  stdout: Writer,
   issue: SentryIssue,
   event?: SentryEvent
 ): void {

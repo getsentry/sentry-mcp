@@ -8,6 +8,7 @@
 import { buildCommand } from "@stricli/core";
 import type { SentryContext } from "../context.js";
 import { rawApiRequest } from "../lib/api-client.js";
+import type { Writer } from "../types/index.js";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -124,7 +125,7 @@ function parseHeaders(headers: string[]): Record<string, string> {
  * Write response headers to stdout
  */
 function writeResponseHeaders(
-  stdout: NodeJS.WriteStream,
+  stdout: Writer,
   status: number,
   headers: Headers
 ): void {
@@ -138,7 +139,7 @@ function writeResponseHeaders(
 /**
  * Write response body to stdout
  */
-function writeResponseBody(stdout: NodeJS.WriteStream, body: unknown): void {
+function writeResponseBody(stdout: Writer, body: unknown): void {
   if (body === null || body === undefined) {
     return;
   }

@@ -24,3 +24,14 @@ export type {
   SentryOrganization,
   SentryProject,
 } from "./sentry.js";
+
+// I/O types
+
+/**
+ * Simple writer interface for output streams.
+ * Compatible with process.stdout, process.stderr, and test mocks.
+ * Avoids dependency on Node.js-specific types like NodeJS.WriteStream.
+ */
+export type Writer = {
+  write(data: string): void;
+};

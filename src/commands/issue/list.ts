@@ -48,7 +48,7 @@ function parseSort(value: string): SortValue {
  * Write the issue list header with column titles.
  */
 function writeListHeader(
-  stdout: NodeJS.WriteStream,
+  stdout: Writer,
   org: string,
   project: string,
   count: number
@@ -61,10 +61,7 @@ function writeListHeader(
 /**
  * Write formatted issue rows to stdout.
  */
-function writeIssueRows(
-  stdout: NodeJS.WriteStream,
-  issues: SentryIssue[]
-): void {
+function writeIssueRows(stdout: Writer, issues: SentryIssue[]): void {
   for (const issue of issues) {
     stdout.write(`${formatIssueRow(issue)}\n`);
   }
@@ -73,7 +70,7 @@ function writeIssueRows(
 /**
  * Write footer with usage tip.
  */
-function writeListFooter(stdout: NodeJS.WriteStream): void {
+function writeListFooter(stdout: Writer): void {
   stdout.write(
     "\nTip: Use 'sentry issue get <SHORT_ID>' to view issue details.\n"
   );

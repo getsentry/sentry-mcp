@@ -82,7 +82,7 @@ function filterByPlatform(
 /**
  * Write the column header row for project list output.
  */
-function writeHeader(stdout: NodeJS.WriteStream, slugWidth: number): void {
+function writeHeader(stdout: Writer, slugWidth: number): void {
   stdout.write(`${"SLUG".padEnd(slugWidth)}  ${"PLATFORM".padEnd(20)}  NAME\n`);
 }
 
@@ -90,7 +90,7 @@ function writeHeader(stdout: NodeJS.WriteStream, slugWidth: number): void {
  * Write formatted project rows to stdout.
  */
 function writeRows(
-  stdout: NodeJS.WriteStream,
+  stdout: Writer,
   projects: ProjectWithOrg[],
   slugWidth: number,
   showOrg: boolean
