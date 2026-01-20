@@ -11,6 +11,8 @@ import { ContextError } from "../../lib/errors.js";
 import {
   divider,
   formatIssueRow,
+  info,
+  muted,
   writeJson,
 } from "../../lib/formatters/index.js";
 import { resolveOrgAndProject } from "../../lib/resolve-target.js";
@@ -54,7 +56,7 @@ function writeListHeader(
   count: number
 ): void {
   stdout.write(`Issues in ${org}/${project} (showing ${count}):\n\n`);
-  stdout.write("  STATUS  SHORT ID         COUNT  TITLE\n");
+  stdout.write(muted("● LEVEL   SHORT ID         COUNT  TITLE\n"));
   stdout.write(`${divider(80)}\n`);
 }
 
@@ -153,7 +155,7 @@ export const listCommand = buildCommand({
     if (issues.length === 0) {
       stdout.write("No issues found.\n");
       if (target.detectedFrom) {
-        stdout.write(`\nℹ Detected from ${target.detectedFrom}\n`);
+        stdout.write(`\n${info("ℹ")} Detected from ${target.detectedFrom}\n`);
       }
       return;
     }
@@ -169,7 +171,7 @@ export const listCommand = buildCommand({
 
     // Show detection source if auto-detected
     if (target.detectedFrom) {
-      stdout.write(`\nℹ Detected from ${target.detectedFrom}\n`);
+      stdout.write(`\n${info("ℹ")} Detected from ${target.detectedFrom}\n`);
     }
   },
 });

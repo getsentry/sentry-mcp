@@ -24,12 +24,16 @@ export {
 
 // Sentry API types and schemas
 export type {
+  IssueLevel,
+  IssueStatus,
   SentryEvent,
   SentryIssue,
   SentryOrganization,
   SentryProject,
 } from "./sentry.js";
 export {
+  ISSUE_LEVELS,
+  ISSUE_STATUSES,
   SentryEventSchema,
   SentryIssueSchema,
   SentryOrganizationSchema,

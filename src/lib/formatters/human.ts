@@ -6,28 +6,28 @@
  */
 
 import type {
+  IssueStatus,
   SentryEvent,
   SentryIssue,
   SentryOrganization,
   SentryProject,
 } from "../../types/index.js";
+import { green, levelColor, muted, statusColor, yellow } from "./colors.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Status Formatting
 // ─────────────────────────────────────────────────────────────────────────────
 
-type IssueStatus = "resolved" | "unresolved" | "ignored";
-
 const STATUS_ICONS: Record<IssueStatus, string> = {
-  resolved: "✓",
-  unresolved: "●",
-  ignored: "−",
+  resolved: green("✓"),
+  unresolved: yellow("●"),
+  ignored: muted("−"),
 };
 
 const STATUS_LABELS: Record<IssueStatus, string> = {
-  resolved: "✓ Resolved",
-  unresolved: "● Unresolved",
-  ignored: "− Ignored",
+  resolved: `${green("✓")} Resolved`,
+  unresolved: `${yellow("●")} Unresolved`,
+  ignored: `${muted("−")} Ignored`,
 };
 
 /** Maximum features to display before truncating with "... and N more" */
@@ -74,7 +74,7 @@ function formatDetailsHeader(slug: string, name: string): [string, string] {
     MIN_HEADER_WIDTH,
     Math.min(80, header.length)
   );
-  return [header, "═".repeat(separatorWidth)];
+  return [header, muted("═".repeat(separatorWidth))];
 }
 
 /**
@@ -82,9 +82,9 @@ function formatDetailsHeader(slug: string, name: string): [string, string] {
  */
 export function formatStatusIcon(status: string | undefined): string {
   if (!status) {
-    return "●";
+    return statusColor("●", status);
   }
-  return STATUS_ICONS[status as IssueStatus] ?? "●";
+  return STATUS_ICONS[status as IssueStatus] ?? statusColor("●", status);
 }
 
 /**
@@ -92,9 +92,9 @@ export function formatStatusIcon(status: string | undefined): string {
  */
 export function formatStatusLabel(status: string | undefined): string {
   if (!status) {
-    return "● Unknown";
+    return `${statusColor("●", status)} Unknown`;
   }
-  return STATUS_LABELS[status as IssueStatus] ?? "● Unknown";
+  return STATUS_LABELS[status as IssueStatus] ?? `${statusColor("●", status)} Unknown`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ export function formatTable(
  * Create a horizontal divider
  */
 export function divider(length = 80, char = "─"): string {
-  return char.repeat(length);
+  return muted(char.repeat(length));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,7 +161,8 @@ export function divider(length = 80, char = "─"): string {
  */
 export function formatIssueRow(issue: SentryIssue): string {
   const status = formatStatusIcon(issue.status);
-  const level = (issue.level ?? "unknown").toUpperCase().padEnd(7);
+  const levelText = (issue.level ?? "unknown").toUpperCase().padEnd(7);
+  const level = levelColor(levelText, issue.level);
   const count = `${issue.count}`.padStart(5);
   const shortId = issue.shortId.padEnd(15);
 
@@ -177,7 +178,7 @@ export function formatIssueDetails(issue: SentryIssue): string[] {
   // Header
   lines.push(`${issue.shortId}: ${issue.title}`);
   lines.push(
-    "═".repeat(Math.min(80, issue.title.length + issue.shortId.length + 2))
+    muted("═".repeat(Math.min(80, issue.title.length + issue.shortId.length + 2)))
   );
   lines.push("");
 
@@ -256,7 +257,7 @@ export function formatEventDetails(
   const lines: string[] = [];
 
   lines.push("");
-  lines.push(`─── ${header} ───`);
+  lines.push(muted(`─── ${header} ───`));
   lines.push("");
   lines.push(`Event ID:   ${event.eventID}`);
   if (event.dateReceived) {

@@ -85,6 +85,22 @@ export const SentryProjectSchema = z
 export type SentryProject = z.infer<typeof SentryProjectSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Issue Status & Level Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ISSUE_STATUSES = ["resolved", "unresolved", "ignored"] as const;
+export type IssueStatus = (typeof ISSUE_STATUSES)[number];
+
+export const ISSUE_LEVELS = [
+  "fatal",
+  "error",
+  "warning",
+  "info",
+  "debug",
+] as const;
+export type IssueLevel = (typeof ISSUE_LEVELS)[number];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Issue
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -99,7 +115,7 @@ export const SentryIssueSchema = z
     permalink: z.string().optional(),
     logger: z.string().nullable().optional(),
     level: z.string().optional(),
-    status: z.enum(["resolved", "unresolved", "ignored"]).optional(),
+    status: z.enum(ISSUE_STATUSES).optional(),
     statusDetails: z.record(z.unknown()).optional(),
     isPublic: z.boolean().optional(),
     platform: z.string().optional(),
