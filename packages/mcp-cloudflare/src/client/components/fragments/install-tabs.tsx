@@ -309,7 +309,7 @@ const iconsByID: Record<string, React.ReactNode> = {
   vscode: <VSCodeIcon />,
   warp: <WarpIcon />,
   zed: <ZedIcon />,
-  gemini: <GeminiIcon className="size-4" />,
+  gemini: <GeminiIcon />,
   opencode: <OpenCodeIcon />,
   amp: <AmpIcon />,
 };

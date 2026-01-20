@@ -77,7 +77,7 @@ export function RemoteSetupTabs({
         <CursorInstructions transport="cloud" />
       </Tab>
 
-      <Tab id="vscode" title="Code">
+      <Tab id="vscode" title="VSCode">
         <VSCodeInstructions transport="cloud" />
       </Tab>
 
