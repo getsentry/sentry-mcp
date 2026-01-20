@@ -163,6 +163,28 @@ describe("DSN Detector (New Module)", () => {
       expect(result?.raw).toBe(envVarDsn);
       expect(result?.source).toBe("env");
     });
+
+    test("skips node_modules and dist directories", async () => {
+      const nodeModulesDsn = "https://nm@o111.ingest.sentry.io/111";
+      const distDsn = "https://dist@o222.ingest.sentry.io/222";
+
+      // Put DSNs in directories that should be skipped
+      mkdirSync(join(testDir, "node_modules/some-package"), { recursive: true });
+      writeFileSync(
+        join(testDir, "node_modules/some-package/index.js"),
+        `Sentry.init({ dsn: "${nodeModulesDsn}" })`
+      );
+
+      mkdirSync(join(testDir, "dist"), { recursive: true });
+      writeFileSync(
+        join(testDir, "dist/bundle.js"),
+        `Sentry.init({ dsn: "${distDsn}" })`
+      );
+
+      // Should not find any DSN (skipped directories)
+      const result = await detectDsn(testDir);
+      expect(result).toBeNull();
+    });
   });
 
   describe("detectAllDsns (conflict detection)", () => {

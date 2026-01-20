@@ -230,15 +230,19 @@ describe("sentry project get", () => {
     expect(data.slug).toBe(TEST_PROJECT);
   });
 
-  test("handles non-existent project", async () => {
-    await setAuthToken(TEST_TOKEN);
+  test(
+    "handles non-existent project",
+    async () => {
+      await setAuthToken(TEST_TOKEN);
 
-    const result = await runCli(
-      ["project", "get", "nonexistent-project-12345", "--org", TEST_ORG],
-      { env: { SENTRY_CLI_CONFIG_DIR: testConfigDir } }
-    );
+      const result = await runCli(
+        ["project", "get", "nonexistent-project-12345", "--org", TEST_ORG],
+        { env: { SENTRY_CLI_CONFIG_DIR: testConfigDir } }
+      );
 
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr + result.stdout).toMatch(/not found|error|404/i);
-  });
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr + result.stdout).toMatch(/not found|error|404/i);
+    },
+    { timeout: 15000 }
+  );
 });

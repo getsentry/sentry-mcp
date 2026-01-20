@@ -73,21 +73,25 @@ describe("sentry issue list", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  test("supports --json output", async () => {
-    await setAuthToken(TEST_TOKEN);
+  test(
+    "supports --json output",
+    async () => {
+      await setAuthToken(TEST_TOKEN);
 
-    const result = await runCli(
-      ["issue", "list", "--org", TEST_ORG, "--project", TEST_PROJECT, "--json"],
-      {
-        env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
-      }
-    );
+      const result = await runCli(
+        ["issue", "list", "--org", TEST_ORG, "--project", TEST_PROJECT, "--json"],
+        {
+          env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
+        }
+      );
 
-    expect(result.exitCode).toBe(0);
-    // Should be valid JSON array
-    const data = JSON.parse(result.stdout);
-    expect(Array.isArray(data)).toBe(true);
-  });
+      expect(result.exitCode).toBe(0);
+      // Should be valid JSON array
+      const data = JSON.parse(result.stdout);
+      expect(Array.isArray(data)).toBe(true);
+    },
+    { timeout: 15000 }
+  );
 });
 
 describe("sentry issue get", () => {

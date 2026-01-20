@@ -27,9 +27,14 @@ type ApiFlags = {
 const VALID_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "DELETE", "PATCH"];
 
 /**
- * Parse HTTP method from string
+ * Parse and validate HTTP method from string.
+ *
+ * @param value - HTTP method string (case-insensitive)
+ * @returns Normalized uppercase HTTP method
+ * @throws {Error} When method is not one of GET, POST, PUT, DELETE, PATCH
+ * @internal Exported for testing
  */
-function parseMethod(value: string): HttpMethod {
+export function parseMethod(value: string): HttpMethod {
   const upper = value.toUpperCase();
   if (!VALID_METHODS.includes(upper as HttpMethod)) {
     throw new Error(
@@ -40,9 +45,13 @@ function parseMethod(value: string): HttpMethod {
 }
 
 /**
- * Parse a single key=value field into nested object structure
+ * Parse a field value, attempting JSON parse first.
+ *
+ * @param value - Raw string value to parse
+ * @returns Parsed JSON value, or original string if not valid JSON
+ * @internal Exported for testing
  */
-function parseFieldValue(value: string): unknown {
+export function parseFieldValue(value: string): unknown {
   try {
     return JSON.parse(value);
   } catch {
@@ -50,23 +59,41 @@ function parseFieldValue(value: string): unknown {
   }
 }
 
+/** Keys that could cause prototype pollution if used in nested object assignment */
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 /**
- * Set a nested value in an object using dot notation key
+ * Set a nested value in an object using dot notation key.
+ * Creates intermediate objects as needed.
+ *
+ * @param obj - Target object to modify
+ * @param key - Dot-notation key (e.g., "user.name")
+ * @param value - Value to set
+ * @throws {Error} When key contains dangerous segments (__proto__, constructor, prototype)
+ * @internal Exported for testing
  */
-function setNestedValue(
+export function setNestedValue(
   obj: Record<string, unknown>,
   key: string,
   value: unknown
 ): void {
   const keys = key.split(".");
+
+  // Validate all key segments to prevent prototype pollution
+  for (const k of keys) {
+    if (DANGEROUS_KEYS.has(k)) {
+      throw new Error(`Invalid field key: "${k}" is not allowed`);
+    }
+  }
+
   let current = obj;
 
   for (let i = 0; i < keys.length - 1; i++) {
     const k = keys[i];
-    if (k === undefined) {
-      continue;
+    if (!k) {
+      continue; // Skip empty segments from consecutive dots
     }
-    if (!(k in current)) {
+    if (!Object.hasOwn(current, k)) {
       current[k] = {};
     }
     current = current[k] as Record<string, unknown>;
@@ -79,9 +106,15 @@ function setNestedValue(
 }
 
 /**
- * Parse field arguments into request body object
+ * Parse field arguments into request body object.
+ * Supports dot notation for nested keys and JSON values.
+ *
+ * @param fields - Array of "key=value" strings
+ * @returns Parsed object with nested structure
+ * @throws {Error} When field doesn't contain "="
+ * @internal Exported for testing
  */
-function parseFields(fields: string[]): Record<string, unknown> {
+export function parseFields(fields: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
   for (const field of fields) {
@@ -101,9 +134,14 @@ function parseFields(fields: string[]): Record<string, unknown> {
 }
 
 /**
- * Parse header arguments into headers object
+ * Parse header arguments into headers object.
+ *
+ * @param headers - Array of "Key: Value" strings
+ * @returns Object mapping header names to values
+ * @throws {Error} When header doesn't contain ":"
+ * @internal Exported for testing
  */
-function parseHeaders(headers: string[]): Record<string, string> {
+export function parseHeaders(headers: string[]): Record<string, string> {
   const result: Record<string, string> = {};
 
   for (const header of headers) {
@@ -163,19 +201,19 @@ export const apiCommand = buildCommand({
     brief: "Make an authenticated API request",
     fullDescription:
       "Make a raw API request to the Sentry API. Similar to 'gh api' for GitHub. " +
-      "The endpoint should start with '/api/0/' or be a full URL. " +
+      "The endpoint is relative to /api/0/ (do not include the prefix). " +
       "Authentication is handled automatically using your stored credentials.\n\n" +
       "Examples:\n" +
-      "  sentry api /api/0/organizations/\n" +
-      "  sentry api /api/0/issues/123/ --method PUT --field status=resolved\n" +
-      "  sentry api /api/0/projects/my-org/my-project/issues/",
+      "  sentry api organizations/\n" +
+      "  sentry api issues/123/ --method PUT --field status=resolved\n" +
+      "  sentry api projects/my-org/my-project/issues/",
   },
   parameters: {
     positional: {
       kind: "tuple",
       parameters: [
         {
-          brief: "API endpoint (e.g., /api/0/organizations/)",
+          brief: "API endpoint relative to /api/0/ (e.g., organizations/)",
           parse: String,
         },
       ],
@@ -193,12 +231,14 @@ export const apiCommand = buildCommand({
         parse: String,
         brief: "Request body field (key=value). Can be repeated.",
         variadic: true,
+        default: [],
       },
       header: {
         kind: "parsed",
         parse: String,
         brief: "Additional header (Key: Value). Can be repeated.",
         variadic: true,
+        default: [],
       },
       include: {
         kind: "boolean",
@@ -229,10 +269,12 @@ export const apiCommand = buildCommand({
       headers,
     });
 
+    const isError = response.status >= 400;
+
     // Silent mode - only set exit code
     if (flags.silent) {
-      if (response.status >= 400) {
-        (this.process as NodeJS.Process).exitCode = 1;
+      if (isError) {
+        process.exit(1);
       }
       return;
     }
@@ -245,9 +287,9 @@ export const apiCommand = buildCommand({
     // Output body
     writeResponseBody(stdout, response.body);
 
-    // Set exit code for error responses
-    if (response.status >= 400) {
-      (this.process as NodeJS.Process).exitCode = 1;
+    // Exit with error code for error responses
+    if (isError) {
+      process.exit(1);
     }
   },
 });
