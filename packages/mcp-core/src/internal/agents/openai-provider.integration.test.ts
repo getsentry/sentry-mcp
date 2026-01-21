@@ -17,6 +17,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { searchIssuesAgent } from "../../tools/search-issues/agent";
 import { SentryApiService } from "../../api-client";
+import { setAgentProvider } from "./provider-factory";
 
 // Mock Sentry API server - intercepts Sentry calls but bypasses OpenAI
 const mswServer = setupServer(
@@ -48,12 +49,16 @@ describe("OpenAI Provider Integration", () => {
 
   beforeAll(() => {
     if (hasOpenAIKey) {
+      // Explicitly set OpenAI provider to ensure we test OpenAI even if
+      // ANTHROPIC_API_KEY is also set (auto-detect prefers Anthropic)
+      setAgentProvider("openai");
       mswServer.listen({ onUnhandledRequest: "bypass" });
     }
   });
 
   afterAll(() => {
     if (hasOpenAIKey) {
+      setAgentProvider(undefined); // Reset for other tests
       mswServer.close();
     }
   });
