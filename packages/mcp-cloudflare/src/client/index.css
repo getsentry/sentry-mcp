@@ -354,7 +354,7 @@
     translate: 0 -50%;
   }
   100% {
-    transform: translateX(-200%) translateY(0);
+    transform: translateX(-150%) translateY(0);
     opacity: 0;
     scale: 50%;
   }
