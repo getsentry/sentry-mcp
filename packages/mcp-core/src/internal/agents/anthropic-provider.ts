@@ -20,6 +20,7 @@ export function setAnthropicBaseUrl(baseUrl: string | undefined): void {
  * Retrieve an Anthropic language model configured from environment variables and explicit config.
  *
  * Configuration:
+ * - ANTHROPIC_API_KEY: API key for authentication (required)
  * - ANTHROPIC_MODEL: Model to use (default: "claude-sonnet-4-5") - env var OK
  * - Base URL: Must be set via setAnthropicBaseUrl() - NOT from env vars (security risk)
  */

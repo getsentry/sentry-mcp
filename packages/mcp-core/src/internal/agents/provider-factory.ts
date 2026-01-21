@@ -77,7 +77,7 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
             strictJsonSchema: false,
           },
         }),
-        // GPT-5 only supports temperature of 1
+        // GPT-5 only supports temperature=1 (AI SDK defaults to 0)
         getTemperature: () => 1,
       };
   }
