@@ -42,7 +42,7 @@
     "urlpattern-polyfill": "^10.1.0",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "wrangler": "^4.45.0"
+    "wrangler": "^4.59.1"
   },
   "dependencies": {
     "@ai-sdk/openai": "catalog:",
