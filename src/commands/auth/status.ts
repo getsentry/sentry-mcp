@@ -15,6 +15,7 @@ import {
   readConfig,
 } from "../../lib/config.js";
 import { AuthError } from "../../lib/errors.js";
+import { error, success } from "../../lib/formatters/colors.js";
 import { formatExpiration, maskToken } from "../../lib/formatters/human.js";
 import type { SentryConfig, Writer } from "../../types/index.js";
 
@@ -76,7 +77,7 @@ async function verifyCredentials(
   try {
     const orgs = await listOrganizations();
     stdout.write(
-      `\n✓ Access verified. You have access to ${orgs.length} organization(s):\n`
+      `\n${success("✓")} Access verified. You have access to ${orgs.length} organization(s):\n`
     );
 
     const maxDisplay = 5;
@@ -86,9 +87,9 @@ async function verifyCredentials(
     if (orgs.length > maxDisplay) {
       stdout.write(`  ... and ${orgs.length - maxDisplay} more\n`);
     }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    stderr.write(`\n✗ Could not verify credentials: ${message}\n`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    stderr.write(`\n${error("✗")} Could not verify credentials: ${message}\n`);
   }
 }
 
@@ -120,7 +121,7 @@ export const statusCommand = buildCommand({
       throw new AuthError("not_authenticated");
     }
 
-    stdout.write("Status: Authenticated ✓\n\n");
+    stdout.write(`Status: Authenticated ${success("✓")}\n\n`);
 
     writeTokenInfo(stdout, config, flags.showToken);
     await writeDefaults(stdout);

@@ -9,6 +9,7 @@ import {
   setAuthToken,
 } from "../../lib/config.js";
 import { AuthError } from "../../lib/errors.js";
+import { success } from "../../lib/formatters/colors.js";
 import { completeOAuthFlow, performDeviceFlow } from "../../lib/oauth.js";
 import { generateQRCode } from "../../lib/qrcode.js";
 
@@ -76,7 +77,7 @@ export const loginCommand = buildCommand({
         );
       }
 
-      stdout.write("✓ Authenticated with API token\n");
+      stdout.write(`${success("✓")} Authenticated with API token\n`);
       stdout.write(`  Config saved to: ${getConfigPath()}\n`);
       return;
     }
@@ -121,7 +122,7 @@ export const loginCommand = buildCommand({
     // Store the token
     await completeOAuthFlow(tokenResponse);
 
-    stdout.write("✓ Authentication successful!\n");
+    stdout.write(`${success("✓")} Authentication successful!\n`);
     stdout.write(`  Config saved to: ${getConfigPath()}\n`);
 
     if (tokenResponse.expires_in) {

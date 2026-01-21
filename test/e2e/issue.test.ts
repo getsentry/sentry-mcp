@@ -79,7 +79,15 @@ describe("sentry issue list", () => {
       await setAuthToken(TEST_TOKEN);
 
       const result = await runCli(
-        ["issue", "list", "--org", TEST_ORG, "--project", TEST_PROJECT, "--json"],
+        [
+          "issue",
+          "list",
+          "--org",
+          TEST_ORG,
+          "--project",
+          TEST_PROJECT,
+          "--json",
+        ],
         {
           env: { SENTRY_CLI_CONFIG_DIR: testConfigDir },
         }
@@ -90,7 +98,7 @@ describe("sentry issue list", () => {
       const data = JSON.parse(result.stdout);
       expect(Array.isArray(data)).toBe(true);
     },
-    { timeout: 15000 }
+    { timeout: 15_000 }
   );
 });
 

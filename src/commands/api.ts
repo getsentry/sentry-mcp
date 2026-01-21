@@ -14,8 +14,8 @@ type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 type ApiFlags = {
   readonly method: HttpMethod;
-  readonly field: string[];
-  readonly header: string[];
+  readonly field?: string[];
+  readonly header?: string[];
   readonly include: boolean;
   readonly silent: boolean;
 };
@@ -231,14 +231,14 @@ export const apiCommand = buildCommand({
         parse: String,
         brief: "Request body field (key=value). Can be repeated.",
         variadic: true,
-        default: [],
+        optional: true,
       },
       header: {
         kind: "parsed",
         parse: String,
         brief: "Additional header (Key: Value). Can be repeated.",
         variadic: true,
-        default: [],
+        optional: true,
       },
       include: {
         kind: "boolean",
@@ -259,9 +259,14 @@ export const apiCommand = buildCommand({
   ): Promise<void> {
     const { stdout } = this;
 
-    const body = flags.field?.length > 0 ? parseFields(flags.field) : undefined;
+    const body =
+      flags.field && flags.field.length > 0
+        ? parseFields(flags.field)
+        : undefined;
     const headers =
-      flags.header?.length > 0 ? parseHeaders(flags.header) : undefined;
+      flags.header && flags.header.length > 0
+        ? parseHeaders(flags.header)
+        : undefined;
 
     const response = await rawApiRequest(endpoint, {
       method: flags.method,

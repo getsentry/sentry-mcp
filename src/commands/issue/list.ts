@@ -10,6 +10,7 @@ import { listIssues } from "../../lib/api-client.js";
 import { ContextError } from "../../lib/errors.js";
 import {
   divider,
+  formatIssueListHeader,
   formatIssueRow,
   info,
   muted,
@@ -56,16 +57,20 @@ function writeListHeader(
   count: number
 ): void {
   stdout.write(`Issues in ${org}/${project} (showing ${count}):\n\n`);
-  stdout.write(muted("● LEVEL   SHORT ID         COUNT  TITLE\n"));
+  stdout.write(muted(`${formatIssueListHeader()}\n`));
   stdout.write(`${divider(80)}\n`);
 }
 
 /**
  * Write formatted issue rows to stdout.
  */
-function writeIssueRows(stdout: Writer, issues: SentryIssue[]): void {
+function writeIssueRows(
+  stdout: Writer,
+  issues: SentryIssue[],
+  termWidth: number
+): void {
   for (const issue of issues) {
-    stdout.write(`${formatIssueRow(issue)}\n`);
+    stdout.write(`${formatIssueRow(issue, termWidth)}\n`);
   }
 }
 
@@ -110,7 +115,7 @@ export const listCommand = buildCommand({
         parse: numberParser,
         brief: "Maximum number of issues to return",
         // Stricli requires string defaults (raw CLI input); numberParser converts to number
-        default: "25",
+        default: "10",
       },
       sort: {
         kind: "parsed",
@@ -166,7 +171,10 @@ export const listCommand = buildCommand({
       target.projectDisplay,
       issues.length
     );
-    writeIssueRows(stdout, issues);
+
+    // Get terminal width for wrapping long titles
+    const termWidth = process.stdout.columns || 80;
+    writeIssueRows(stdout, issues, termWidth);
     writeListFooter(stdout);
 
     // Show detection source if auto-detected

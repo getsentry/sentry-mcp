@@ -94,7 +94,10 @@ export function formatStatusLabel(status: string | undefined): string {
   if (!status) {
     return `${statusColor("●", status)} Unknown`;
   }
-  return STATUS_LABELS[status as IssueStatus] ?? `${statusColor("●", status)} Unknown`;
+  return (
+    STATUS_LABELS[status as IssueStatus] ??
+    `${statusColor("●", status)} Unknown`
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -153,20 +156,133 @@ export function divider(length = 80, char = "─"): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Issue Formatting
+// Date Formatting
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Format a single issue for list display (one line)
+ * Format a date as relative time (e.g., "2h ago", "3d ago") or short date for older dates.
+ *
+ * - < 1 hour: "Xm ago"
+ * - < 24 hours: "Xh ago"
+ * - < 3 days: "Xd ago"
+ * - >= 3 days: Short date (e.g., "Jan 18")
  */
-export function formatIssueRow(issue: SentryIssue): string {
-  const status = formatStatusIcon(issue.status);
-  const levelText = (issue.level ?? "unknown").toUpperCase().padEnd(7);
-  const level = levelColor(levelText, issue.level);
-  const count = `${issue.count}`.padStart(5);
-  const shortId = issue.shortId.padEnd(15);
+export function formatRelativeTime(dateString: string | undefined): string {
+  if (!dateString) {
+    return muted("—").padEnd(10);
+  }
 
-  return `${status} ${level} ${shortId} ${count}  ${issue.title}`;
+  const date = new Date(dateString);
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const diffMins = Math.floor(diffMs / 60_000);
+  const diffHours = Math.floor(diffMs / 3_600_000);
+  const diffDays = Math.floor(diffMs / 86_400_000);
+
+  let text: string;
+  if (diffMins < 60) {
+    text = `${diffMins}m ago`;
+  } else if (diffHours < 24) {
+    text = `${diffHours}h ago`;
+  } else if (diffDays < 3) {
+    text = `${diffDays}d ago`;
+  } else {
+    // Short date: "Jan 18"
+    text = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
+  return text.padEnd(10);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Issue Formatting
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Column widths for issue list table */
+const COL_LEVEL = 7;
+const COL_SHORT_ID = 22;
+const COL_COUNT = 5;
+const COL_SEEN = 10;
+
+/** Column where title starts (sum of all previous columns + separators) */
+const TITLE_START_COL =
+  COL_LEVEL + 1 + COL_SHORT_ID + 1 + COL_COUNT + 2 + COL_SEEN + 2; // = 50
+
+/**
+ * Format the header row for issue list table.
+ * Uses same column widths as data rows to ensure alignment.
+ */
+export function formatIssueListHeader(): string {
+  return (
+    "LEVEL".padEnd(COL_LEVEL) +
+    " " +
+    "SHORT ID".padEnd(COL_SHORT_ID) +
+    " " +
+    "COUNT".padStart(COL_COUNT) +
+    "  " +
+    "SEEN".padEnd(COL_SEEN) +
+    "  " +
+    "TITLE"
+  );
+}
+
+/**
+ * Wrap long text with indentation for continuation lines.
+ * Breaks at word boundaries when possible.
+ *
+ * @param text - Text to wrap
+ * @param startCol - Column where text starts (for indenting continuation lines)
+ * @param termWidth - Terminal width
+ */
+function wrapTitle(text: string, startCol: number, termWidth: number): string {
+  const availableWidth = termWidth - startCol;
+
+  // No wrapping needed or terminal too narrow
+  if (text.length <= availableWidth || availableWidth < 20) {
+    return text;
+  }
+
+  const indent = " ".repeat(startCol);
+  const lines: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= availableWidth) {
+      lines.push(remaining);
+      break;
+    }
+
+    // Find break point (prefer word boundary)
+    let breakAt = availableWidth;
+    const lastSpace = remaining.lastIndexOf(" ", availableWidth);
+    if (lastSpace > availableWidth * 0.5) {
+      breakAt = lastSpace;
+    }
+
+    lines.push(remaining.slice(0, breakAt).trimEnd());
+    remaining = remaining.slice(breakAt).trimStart();
+  }
+
+  // First line has no indent, continuation lines do
+  return lines.join(`\n${indent}`);
+}
+
+/**
+ * Format a single issue for list display.
+ * Wraps long titles with proper indentation.
+ *
+ * @param issue - Issue to format
+ * @param termWidth - Terminal width for wrapping (default 80)
+ */
+export function formatIssueRow(issue: SentryIssue, termWidth = 80): string {
+  const levelText = (issue.level ?? "unknown").toUpperCase().padEnd(COL_LEVEL);
+  const level = levelColor(levelText, issue.level);
+  const shortId = issue.shortId.padEnd(COL_SHORT_ID);
+  const count = `${issue.count}`.padStart(COL_COUNT);
+  const seen = formatRelativeTime(issue.lastSeen);
+  const title = wrapTitle(issue.title, TITLE_START_COL, termWidth);
+
+  return `${level} ${shortId} ${count}  ${seen}  ${title}`;
 }
 
 /**
@@ -178,7 +294,9 @@ export function formatIssueDetails(issue: SentryIssue): string[] {
   // Header
   lines.push(`${issue.shortId}: ${issue.title}`);
   lines.push(
-    muted("═".repeat(Math.min(80, issue.title.length + issue.shortId.length + 2)))
+    muted(
+      "═".repeat(Math.min(80, issue.title.length + issue.shortId.length + 2))
+    )
   );
   lines.push("");
 
