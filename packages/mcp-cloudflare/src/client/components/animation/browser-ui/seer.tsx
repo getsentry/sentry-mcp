@@ -24,7 +24,7 @@ export default function Seer({ step }: { step: number }) {
       <SeerClipMask id={id} />
       {/* ⚠️ Seer */}
       <div
-        className="relative z-10 mx-auto aspect-square w-36 overflow-hidden bg-gradient-to-b from-pink-600 to-pink-400 -translate-y-64"
+        className="relative z-10 mx-auto aspect-square w-36 overflow-hidden bg-gradient-to-b from-pink-600 to-pink-400 -translate-y-64 xl:-translate-y-44 2xl:-translate-y-64"
         style={{
           clipPath: `url(#${id})`,
         }}

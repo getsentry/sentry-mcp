@@ -198,6 +198,7 @@ export default function InstallTabs({
                 role="tab"
                 aria-selected={selected}
                 aria-controls={panelId}
+                aria-label={title}
                 tabIndex={selected ? -1 : 0}
                 onClick={() => setActive(i)}
                 className="relative group/tab cursor-pointer focus-visible:ring-[3px] focus-visible:ring-violet-300 outline-none focus-visible:z-30 rounded-2xl focus-visible:ring-offset-2   focus-visible:ring-offset-background-2 duration-300"
@@ -308,7 +309,7 @@ const iconsByID: Record<string, React.ReactNode> = {
   vscode: <VSCodeIcon />,
   warp: <WarpIcon />,
   zed: <ZedIcon />,
-  gemini: <GeminiIcon className="size-4" />,
+  gemini: <GeminiIcon />,
   opencode: <OpenCodeIcon />,
   amp: <AmpIcon />,
 };

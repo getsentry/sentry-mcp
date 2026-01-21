@@ -209,7 +209,7 @@ export function StdioSetupTabs({
         <CursorInstructions transport="stdio" />
       </Tab>
 
-      <Tab id="vscode" title="Code">
+      <Tab id="vscode" title="VSCode">
         <VSCodeInstructions transport="stdio" />
       </Tab>
 
