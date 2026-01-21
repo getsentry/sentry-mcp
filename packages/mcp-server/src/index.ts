@@ -136,6 +136,31 @@ if (cli.agent) {
 
 const SENTRY_TIMEOUT = 5000; // 5 seconds
 
+// Graceful shutdown handlers
+async function shutdown(signal: string) {
+  console.error(`${signal} received, shutting down...`);
+  await Sentry.flush(SENTRY_TIMEOUT);
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+// Uncaught error handlers
+process.on("uncaughtException", async (error) => {
+  console.error("Uncaught exception:", error);
+  Sentry.captureException(error);
+  await Sentry.flush(SENTRY_TIMEOUT);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", async (reason) => {
+  console.error("Unhandled rejection:", reason);
+  Sentry.captureException(reason);
+  await Sentry.flush(SENTRY_TIMEOUT);
+  process.exit(1);
+});
+
 // Build context once for server configuration and runtime
 const context = {
   accessToken: cfg.accessToken,
@@ -156,12 +181,9 @@ const server = buildServer({
   agentMode: cli.agent,
 });
 
-startStdio(server, context).catch((err) => {
+startStdio(server, context).catch(async (err) => {
   console.error("Server error:", err);
-  // ensure we've flushed all events
-  Sentry.flush(SENTRY_TIMEOUT);
+  Sentry.captureException(err);
+  await Sentry.flush(SENTRY_TIMEOUT);
   process.exit(1);
 });
-
-// ensure we've flushed all events
-Sentry.flush(SENTRY_TIMEOUT);
