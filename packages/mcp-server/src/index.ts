@@ -89,7 +89,9 @@ function hasProviderConflict(): boolean {
 }
 
 function getProviderSource(): string {
-  if (cfg.agentProvider) return "explicitly configured";
+  // Check CLI flag first (cli.agentProvider is only set by --agent-provider flag)
+  if (cli.agentProvider) return "explicitly configured";
+  // Then check env var (process.env takes precedence over cfg since cfg merges both)
   if (process.env.EMBEDDED_AGENT_PROVIDER)
     return "from EMBEDDED_AGENT_PROVIDER";
   return "auto-detected";
@@ -126,11 +128,6 @@ if (!resolvedProvider) {
   console.warn(
     `Using ${resolvedProvider} for AI-powered search tools (${getProviderSource()}).`,
   );
-  if (hasProviderConflict()) {
-    console.warn(
-      "Note: Both API keys detected. Consider setting EMBEDDED_AGENT_PROVIDER to avoid conflicts.",
-    );
-  }
 }
 
 Sentry.init({
