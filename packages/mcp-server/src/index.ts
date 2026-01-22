@@ -79,16 +79,27 @@ if (cfg.anthropicModel) {
   process.env.ANTHROPIC_MODEL = cfg.anthropicModel;
 }
 
+// Helper functions for provider status messages
+function hasProviderConflict(): boolean {
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+  const hasExplicitProvider =
+    cfg.agentProvider || process.env.EMBEDDED_AGENT_PROVIDER;
+  return hasAnthropic && hasOpenAI && !hasExplicitProvider;
+}
+
+function getProviderSource(): string {
+  if (cfg.agentProvider) return "explicitly configured";
+  if (process.env.EMBEDDED_AGENT_PROVIDER)
+    return "from EMBEDDED_AGENT_PROVIDER";
+  return "auto-detected";
+}
+
 // Check for LLM API keys and warn if none available
 const resolvedProvider = getResolvedProviderType();
-const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
-const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
-const hasExplicitProvider =
-  cfg.agentProvider || process.env.EMBEDDED_AGENT_PROVIDER;
 
 if (!resolvedProvider) {
-  // Check if we have a conflict (both API keys but no explicit provider)
-  if (hasAnthropic && hasOpenAI && !hasExplicitProvider) {
+  if (hasProviderConflict()) {
     console.warn(
       "Warning: Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set, but no provider is explicitly configured.",
     );
@@ -98,7 +109,6 @@ if (!resolvedProvider) {
     console.warn(
       "AI-powered search tools will be unavailable until a provider is selected.",
     );
-    console.warn("");
   } else {
     console.warn(
       "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
@@ -110,18 +120,13 @@ if (!resolvedProvider) {
     console.warn(
       "Use list_issues and list_events for direct Sentry query syntax instead.",
     );
-    console.warn("");
   }
+  console.warn("");
 } else {
-  const providerSource = cfg.agentProvider
-    ? "explicitly configured"
-    : hasExplicitProvider
-      ? "from EMBEDDED_AGENT_PROVIDER"
-      : "auto-detected";
   console.warn(
-    `Using ${resolvedProvider} for AI-powered search tools (${providerSource}).`,
+    `Using ${resolvedProvider} for AI-powered search tools (${getProviderSource()}).`,
   );
-  if (hasAnthropic && hasOpenAI && !hasExplicitProvider) {
+  if (hasProviderConflict()) {
     console.warn(
       "Note: Both API keys detected. Consider setting EMBEDDED_AGENT_PROVIDER to avoid conflicts.",
     );
