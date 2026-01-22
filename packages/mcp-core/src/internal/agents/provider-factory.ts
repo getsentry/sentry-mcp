@@ -89,8 +89,9 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
  * Resolution order:
  * 1. Explicit configuration via setAgentProvider()
  * 2. EMBEDDED_AGENT_PROVIDER environment variable
- * 3. Auto-detect: check ANTHROPIC_API_KEY, then OPENAI_API_KEY
- * 4. Throw ConfigurationError if no provider available
+ * 3. Detect conflicts when both API keys are present
+ * 4. Auto-detect: check ANTHROPIC_API_KEY, then OPENAI_API_KEY
+ * 5. Throw ConfigurationError if no provider available
  */
 export function getAgentProvider(): EmbeddedAgentProvider {
   // 1. Explicit configuration
@@ -111,7 +112,20 @@ export function getAgentProvider(): EmbeddedAgentProvider {
     );
   }
 
-  // 4. Auto-detect based on available API keys
+  // 4. Check for conflicts when both API keys are present
+  if (!providerType) {
+    const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+    const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+
+    if (hasAnthropic && hasOpenAI) {
+      throw new ConfigurationError(
+        "Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set. " +
+          "Please specify which provider to use by setting the EMBEDDED_AGENT_PROVIDER environment variable to 'openai' or 'anthropic'.",
+      );
+    }
+  }
+
+  // 5. Auto-detect based on available API keys
   if (!providerType) {
     if (process.env.ANTHROPIC_API_KEY) {
       providerType = "anthropic";
@@ -120,7 +134,7 @@ export function getAgentProvider(): EmbeddedAgentProvider {
     }
   }
 
-  // 5. No provider available
+  // 6. No provider available
   if (!providerType) {
     throw new ConfigurationError(
       "No embedded agent provider configured. " +
@@ -147,7 +161,7 @@ export function hasAgentProvider(): boolean {
 
 /**
  * Get the resolved provider type without throwing.
- * Returns undefined if no provider is available or API key is missing.
+ * Returns undefined if no provider is available, API key is missing, or both API keys are present without explicit selection.
  */
 export function getResolvedProviderType(): AgentProviderType | undefined {
   // Check explicit configuration (with API key validation)
@@ -161,6 +175,13 @@ export function getResolvedProviderType(): AgentProviderType | undefined {
   const envProvider = process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase();
   if (envProvider === "openai" || envProvider === "anthropic") {
     return hasApiKeyForProvider(envProvider) ? envProvider : undefined;
+  }
+
+  // Check for conflicts when both API keys are present
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+  if (hasAnthropic && hasOpenAI) {
+    return undefined; // Conflict - require explicit selection
   }
 
   // Auto-detect based on available API keys

@@ -81,20 +81,51 @@ if (cfg.anthropicModel) {
 
 // Check for LLM API keys and warn if none available
 const resolvedProvider = getResolvedProviderType();
+const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+const hasExplicitProvider =
+  cfg.agentProvider || process.env.EMBEDDED_AGENT_PROVIDER;
+
 if (!resolvedProvider) {
-  console.warn(
-    "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
-  );
-  console.warn("The following AI-powered search tools will be unavailable:");
-  console.warn(
-    "  - search_events, search_issues, search_issue_events, use_sentry",
-  );
-  console.warn(
-    "Use list_issues and list_events for direct Sentry query syntax instead.",
-  );
-  console.warn("");
+  // Check if we have a conflict (both API keys but no explicit provider)
+  if (hasAnthropic && hasOpenAI && !hasExplicitProvider) {
+    console.warn(
+      "Warning: Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set, but no provider is explicitly configured.",
+    );
+    console.warn(
+      "Please set EMBEDDED_AGENT_PROVIDER='openai' or 'anthropic' to specify which provider to use.",
+    );
+    console.warn(
+      "AI-powered search tools will be unavailable until a provider is selected.",
+    );
+    console.warn("");
+  } else {
+    console.warn(
+      "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
+    );
+    console.warn("The following AI-powered search tools will be unavailable:");
+    console.warn(
+      "  - search_events, search_issues, search_issue_events, use_sentry",
+    );
+    console.warn(
+      "Use list_issues and list_events for direct Sentry query syntax instead.",
+    );
+    console.warn("");
+  }
 } else {
-  console.warn(`Using ${resolvedProvider} for AI-powered search tools.`);
+  const providerSource = cfg.agentProvider
+    ? "explicitly configured"
+    : hasExplicitProvider
+      ? "from EMBEDDED_AGENT_PROVIDER"
+      : "auto-detected";
+  console.warn(
+    `Using ${resolvedProvider} for AI-powered search tools (${providerSource}).`,
+  );
+  if (hasAnthropic && hasOpenAI && !hasExplicitProvider) {
+    console.warn(
+      "Note: Both API keys detected. Consider setting EMBEDDED_AGENT_PROVIDER to avoid conflicts.",
+    );
+  }
 }
 
 Sentry.init({

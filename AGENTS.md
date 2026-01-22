@@ -46,6 +46,7 @@ sentry-mcp/
 - docs/quality-checks.md — Pre-commit checklist
 - docs/pr-management.md — Commit/PR guidelines
 - docs/security.md — Authentication patterns
+- docs/embedded-agents.md — LLM provider configuration for AI-powered tools
 - docs/releases/stdio.md — npm package release
 - docs/releases/cloudflare.md — Cloudflare deployment
 
