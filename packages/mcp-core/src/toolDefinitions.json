@@ -42,6 +42,60 @@
     "requiredScopes": []
   },
   {
+    "name": "compare_transaction_profiles",
+    "description": "Compare transaction profiles between two time periods to detect performance regressions.\n\nUSE THIS TOOL WHEN:\n- User asks if performance has regressed after a release\n- User wants to compare current vs baseline performance\n- User notices a transaction is slower and wants to find the cause\n- User asks about performance changes over time\n\nRETURNS:\n- Comparison summary with regression status\n- Key function-level changes with percentage differences\n- Major regressions highlighted with suggested actions\n- Both improved and degraded functions identified\n\nTRIGGER PATTERNS:\n- 'Has /api/users gotten slower?' -> use compare_transaction_profiles\n- 'Compare performance before and after release' -> use compare_transaction_profiles\n- 'Did we introduce a performance regression?' -> use compare_transaction_profiles\n- 'What changed between last week and this week?' -> use compare_transaction_profiles\n\n<examples>\n### Compare last 7 days vs previous 14 days\n```\ncompare_transaction_profiles(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectId=1\n)\n```\n\n### Compare specific time periods\n```\ncompare_transaction_profiles(\n  organizationSlug='my-org',\n  transactionName='POST /graphql',\n  projectId='my-app',\n  baselinePeriod='30d',\n  currentPeriod='7d'\n)\n```\n</examples>\n\n<hints>\n- Baseline period should be older/longer to establish normal performance\n- Current period should be recent to detect new regressions\n- Changes >20% are flagged as major regressions\n- Changes 10-20% are flagged as minor regressions\n- Use focusOnUserCode: true (default) to focus on your code, not libraries\n- For single transaction analysis, use get_transaction_profile instead\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "transactionName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Transaction name (e.g., '/api/users', 'POST /graphql')"
+        },
+        "projectId": {
+          "type": ["string", "number"],
+          "description": "Project ID or slug"
+        },
+        "baselinePeriod": {
+          "type": "string",
+          "default": "14d",
+          "description": "Baseline time period (older): '7d', '14d', '30d' (default: '14d')"
+        },
+        "currentPeriod": {
+          "type": "string",
+          "default": "7d",
+          "description": "Current time period (recent): '1h', '24h', '7d' (default: '7d')"
+        },
+        "focusOnUserCode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Compare only user code (is_application: true). Set to false to include library code."
+        }
+      },
+      "required": ["organizationSlug", "transactionName", "projectId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
     "name": "create_dsn",
     "description": "Create an additional DSN for an EXISTING project.\n\nUSE THIS TOOL WHEN:\n- Project already exists and needs additional DSN\n- 'Create another DSN for project X'\n- 'I need a production DSN for existing project'\n\nDO NOT USE for new projects (use create_project instead)\n\nBe careful when using this tool!\n\n<examples>\n### Create additional DSN for existing project\n```\ncreate_dsn(organizationSlug='my-organization', projectSlug='my-project', name='Production')\n```\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<projectSlug>.\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n</hints>",
     "inputSchema": {
@@ -549,6 +603,62 @@
         }
       },
       "required": ["organizationSlug", "traceId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
+    "name": "get_transaction_profile",
+    "description": "Analyze CPU profiling data for a specific transaction to identify performance bottlenecks.\n\nUSE THIS TOOL WHEN:\n- User asks why a specific endpoint/transaction is slow\n- User wants to understand where CPU time is spent in a transaction\n- User needs to identify optimization opportunities\n- User asks about performance bottlenecks in a specific API endpoint\n\nRETURNS:\n- Hot paths (call stacks consuming the most CPU time)\n- Performance percentiles (p75, p95, p99) for each function\n- User code vs library code breakdown\n- Actionable recommendations for optimization\n\nTRIGGER PATTERNS:\n- 'Why is /api/users slow?' → use get_transaction_profile\n- 'Show me the profile for POST /graphql' → use get_transaction_profile\n- 'What's the bottleneck in /api/orders' → use get_transaction_profile\n- 'Analyze performance of /checkout' → use get_transaction_profile\n\n<examples>\n### Analyze a transaction\n```\nget_transaction_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectId=1\n)\n```\n\n### Analyze with custom time period\n```\nget_transaction_profile(\n  organizationSlug='my-org',\n  transactionName='POST /graphql',\n  projectId='my-app',\n  statsPeriod='24h'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library code noise\n- High p99 relative to p75 indicates inconsistent performance\n- The output includes profile IDs for deep-dive analysis with get_profile_details\n- For regression detection, use compare_transaction_profiles instead\n- Transaction names are case-sensitive and must match exactly\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "transactionName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Transaction name (e.g., '/api/users', 'POST /graphql')"
+        },
+        "projectId": {
+          "type": ["string", "number"],
+          "description": "Project ID or slug"
+        },
+        "statsPeriod": {
+          "type": "string",
+          "default": "7d",
+          "description": "Time period: '1h', '24h', '7d', '14d', '30d' (default: '7d')"
+        },
+        "focusOnUserCode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show only user code (is_application: true). Set to false to include library code."
+        },
+        "maxHotPaths": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 10,
+          "description": "Number of hot paths to display (1-20, default: 10)"
+        }
+      },
+      "required": ["organizationSlug", "transactionName", "projectId"],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },

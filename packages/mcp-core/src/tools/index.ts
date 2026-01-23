@@ -23,6 +23,8 @@ import useSentry from "./use-sentry";
 import listIssues from "./list-issues";
 import listEvents from "./list-events";
 import listIssueEvents from "./list-issue-events";
+import getTransactionProfile from "./get-transaction-profile";
+import compareTransactionProfiles from "./compare-transaction-profiles";
 
 /**
  * Tools that require an embedded agent provider (LLM-powered).
@@ -72,6 +74,8 @@ export default {
   list_issues: listIssues,
   list_events: listEvents,
   list_issue_events: listIssueEvents,
+  get_transaction_profile: getTransactionProfile,
+  compare_transaction_profiles: compareTransactionProfiles,
 } as const;
 
 // Type export

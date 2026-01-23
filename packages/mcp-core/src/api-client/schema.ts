@@ -778,3 +778,182 @@ export const TraceIssueSchema = z
 export const TraceSchema = z.array(
   z.union([TraceSpanSchema, TraceIssueSchema]),
 );
+
+/**
+ * Schema for individual frames in a flamegraph.
+ *
+ * Represents a single stack frame with file/function information and
+ * whether it's application code or library code.
+ */
+export const FlamegraphFrameSchema = z
+  .object({
+    file: z.string(),
+    image: z.string().optional(),
+    is_application: z.boolean(),
+    line: z.number(),
+    name: z.string(),
+    path: z.string().optional(),
+    fingerprint: z.number(),
+  })
+  .passthrough();
+
+/**
+ * Schema for aggregated performance statistics for a single frame.
+ *
+ * Contains sample counts, total weight/duration, and performance percentiles
+ * (p75, p95, p99) for the frame across all samples.
+ */
+export const FlamegraphFrameInfoSchema = z
+  .object({
+    count: z.number(),
+    weight: z.number(),
+    sumDuration: z.number(),
+    sumSelfTime: z.number(),
+    p75Duration: z.number(),
+    p95Duration: z.number(),
+    p99Duration: z.number(),
+  })
+  .passthrough();
+
+/**
+ * Schema for profile metadata within a flamegraph response.
+ *
+ * Links to individual profile IDs and their time ranges.
+ */
+export const FlamegraphProfileMetadataSchema = z
+  .object({
+    project_id: z.number(),
+    profile_id: z.string(),
+    start: z.number(),
+    end: z.number(),
+  })
+  .passthrough();
+
+/**
+ * Schema for a single profile within a flamegraph (typically one per thread).
+ *
+ * Contains arrays of samples (call stack patterns), their occurrence counts,
+ * durations, and relative weights.
+ */
+export const FlamegraphProfileSchema = z
+  .object({
+    endValue: z.number(),
+    isMainThread: z.boolean(),
+    name: z.string(),
+    samples: z.array(z.array(z.number())), // Arrays of frame indices
+    startValue: z.number(),
+    threadID: z.number(),
+    type: z.string(),
+    unit: z.string(),
+    weights: z.array(z.number()),
+    sample_durations_ns: z.array(z.number()),
+    sample_counts: z.array(z.number()),
+  })
+  .passthrough();
+
+/**
+ * Schema for flamegraph API response.
+ *
+ * Flamegraphs provide pre-aggregated CPU profiling data with:
+ * - Unique call stack patterns (samples)
+ * - Performance statistics (counts, durations, percentiles)
+ * - Frame metadata (file, function, is_application)
+ *
+ * This is the primary data source for profile analysis as it's
+ * already aggregated and includes percentile calculations.
+ */
+export const FlamegraphSchema = z
+  .object({
+    activeProfileIndex: z.number(),
+    metadata: z.record(z.unknown()).optional(),
+    platform: z.string(),
+    profiles: z.array(FlamegraphProfileSchema),
+    projectID: z.number(),
+    shared: z.object({
+      frames: z.array(FlamegraphFrameSchema),
+      frame_infos: z.array(FlamegraphFrameInfoSchema),
+      profiles: z.array(FlamegraphProfileMetadataSchema),
+    }),
+    transactionName: z.string().optional(),
+    metrics: z.unknown().optional(),
+  })
+  .passthrough();
+
+/**
+ * Schema for individual frames in raw profile chunk data.
+ *
+ * Similar to FlamegraphFrameSchema but uses different field names
+ * (function instead of name, in_app instead of is_application).
+ * Many fields are optional as the API may not include them for all frames.
+ */
+export const ProfileFrameSchema = z
+  .object({
+    filename: z.string().nullable().optional(),
+    function: z.string(),
+    in_app: z.boolean(),
+    lineno: z.number().nullable().optional(),
+    module: z.string().nullable().optional(),
+    abs_path: z.string().nullable().optional(),
+    platform: z.string().nullable().optional(),
+    data: z.record(z.unknown()).optional(),
+  })
+  .passthrough();
+
+/**
+ * Schema for individual samples in raw profile chunk data.
+ *
+ * Each sample represents a point-in-time snapshot of the call stack,
+ * with a reference to the stack_id and thread_id.
+ */
+export const ProfileSampleSchema = z
+  .object({
+    stack_id: z.number(),
+    thread_id: z.string(),
+    timestamp: z.number(),
+  })
+  .passthrough();
+
+/**
+ * Schema for raw profile chunk data.
+ *
+ * Contains the raw sampling data including:
+ * - frames: All unique stack frames
+ * - samples: Individual sample points with timestamps
+ * - stacks: Arrays of frame indices forming call stacks
+ * - thread_metadata: Information about profiled threads
+ *
+ * This is used for deep-dive analysis when flamegraph data isn't sufficient.
+ */
+export const ProfileChunkSchema = z
+  .object({
+    chunk_id: z.string(),
+    profiler_id: z.string(),
+    environment: z.string().nullable(),
+    platform: z.string(),
+    release: z.string(),
+    version: z.string(),
+    profile: z.object({
+      frames: z.array(ProfileFrameSchema),
+      samples: z.array(ProfileSampleSchema),
+      stacks: z.array(z.array(z.number())),
+      thread_metadata: z.record(
+        z
+          .object({
+            name: z.string().nullable(),
+          })
+          .passthrough(),
+      ),
+    }),
+  })
+  .passthrough();
+
+/**
+ * Schema for profile chunks API response wrapper.
+ *
+ * The API returns chunks in an array wrapper, even for single chunk requests.
+ */
+export const ProfileChunkResponseSchema = z
+  .object({
+    chunks: z.array(ProfileChunkSchema),
+  })
+  .passthrough();

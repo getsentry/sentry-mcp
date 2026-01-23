@@ -71,6 +71,15 @@ import type {
   TraceSpanSchema,
   TraceIssueSchema,
   UserSchema,
+  FlamegraphSchema,
+  FlamegraphFrameSchema,
+  FlamegraphFrameInfoSchema,
+  FlamegraphProfileSchema,
+  FlamegraphProfileMetadataSchema,
+  ProfileChunkSchema,
+  ProfileChunkResponseSchema,
+  ProfileFrameSchema,
+  ProfileSampleSchema,
 } from "./schema";
 
 export type User = z.infer<typeof UserSchema>;
@@ -117,6 +126,19 @@ export type TraceMeta = z.infer<typeof TraceMetaSchema>;
 export type TraceSpan = z.infer<typeof TraceSpanSchema>;
 export type TraceIssue = z.infer<typeof TraceIssueSchema>;
 export type Trace = z.infer<typeof TraceSchema>;
+
+// Profile types
+export type Flamegraph = z.infer<typeof FlamegraphSchema>;
+export type FlamegraphFrame = z.infer<typeof FlamegraphFrameSchema>;
+export type FlamegraphFrameInfo = z.infer<typeof FlamegraphFrameInfoSchema>;
+export type FlamegraphProfile = z.infer<typeof FlamegraphProfileSchema>;
+export type FlamegraphProfileMetadata = z.infer<
+  typeof FlamegraphProfileMetadataSchema
+>;
+export type ProfileChunk = z.infer<typeof ProfileChunkSchema>;
+export type ProfileChunkResponse = z.infer<typeof ProfileChunkResponseSchema>;
+export type ProfileFrame = z.infer<typeof ProfileFrameSchema>;
+export type ProfileSample = z.infer<typeof ProfileSampleSchema>;
 
 // Issue tag values
 export type IssueTagValues = z.infer<typeof IssueTagValuesSchema>;
