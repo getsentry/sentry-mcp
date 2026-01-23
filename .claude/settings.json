@@ -102,6 +102,7 @@
       "Bash(timeout:*)",
       "Bash(tee:*)",
       "Bash(xargs kill:*)",
+      "Bash(dex:*)",
       "WebFetch(domain:mcp.sentry.dev)",
       "WebFetch(domain:docs.sentry.io)",
       "WebFetch(domain:develop.sentry.dev)",
@@ -134,6 +135,7 @@
       "mcp__spotlight__get_errors",
       "mcp__spotlight__get_local_errors",
       "WebSearch",
+      "Skill(dex:dex)",
       "Skill(sentry-skills:commit)",
       "Skill(sentry-skills:create-pr)",
       "Skill(sentry-skills:code-review)",
@@ -146,6 +148,7 @@
     "deny": []
   },
   "enabledPlugins": {
+    "dex@dex": true,
     "sentry-skills@sentry-skills": true,
     "pr-review-toolkit@claude-plugins-official": true
   },

@@ -68,6 +68,10 @@ pnpm run tsc && pnpm run lint && pnpm run test
 pnpm run measure-tokens                   # Check tool definition size
 ```
 
+## Task Management
+
+Use `/dex` skill to coordinate complex work. Create tasks with full context, break down into subtasks, complete with detailed results.
+
 ## Workflow
 
 1. Check neighboring files for existing patterns before writing new code.
@@ -81,15 +85,3 @@ AI commits MUST include:
 ```
 Co-Authored-By: (the agent model's name and attribution byline)
 ```
-
-## Skills
-
-| Skill | Purpose |
-|-------|---------|
-| `/commit` | Create commits following Sentry conventions |
-| `/create-pr` | Create pull requests following Sentry conventions |
-| `/code-review` | Review code following Sentry engineering practices |
-| `/find-bugs` | Find bugs and security issues in local changes |
-| `/iterate-pr` | Fix CI failures until all checks pass |
-| `/agents-md` | Maintain agent documentation |
-| `/claude-settings-audit` | Audit settings.json permissions |
