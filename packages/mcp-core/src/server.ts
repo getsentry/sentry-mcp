@@ -86,10 +86,12 @@ import { hasAgentProvider } from "./internal/agents/provider-factory";
 export function buildServer({
   context,
   agentMode = false,
+  experimentalMode = false,
   tools: customTools,
 }: {
   context: ServerContext;
   agentMode?: boolean;
+  experimentalMode?: boolean;
   tools?: Record<string, ToolConfig<any>>;
 }): McpServer {
   const server = new McpServer({
@@ -101,6 +103,7 @@ export function buildServer({
     server,
     context,
     agentMode,
+    experimentalMode,
     tools: customTools,
   });
 
@@ -120,11 +123,13 @@ function configureServer({
   server,
   context,
   agentMode = false,
+  experimentalMode = false,
   tools: customTools,
 }: {
   server: McpServer;
   context: ServerContext;
   agentMode?: boolean;
+  experimentalMode?: boolean;
   tools?: Record<string, ToolConfig<any>>;
 }) {
   // Determine which tools to register:
@@ -135,9 +140,8 @@ function configureServer({
     ? { use_sentry: tools.use_sentry }
     : (customTools ?? tools);
 
-  // Filter tools based on agent provider availability (skip in agent mode or custom tools)
-  // When an agent provider is available, use smart tools (search_*) and exclude simple tools (list_*)
-  // When no agent provider is available, use simple tools (list_*) and exclude smart tools (search_*)
+  // Filter tools based on agent provider availability and experimental mode
+  // Skip filtering in agent mode (use_sentry handles all tools internally) or when custom tools are provided
   if (!agentMode && !customTools) {
     const hasAgent = hasAgentProvider();
     const toolsToExclude = new Set<string>(
@@ -146,7 +150,8 @@ function configureServer({
 
     toolsToRegister = Object.fromEntries(
       Object.entries(toolsToRegister).filter(
-        ([key]) => !toolsToExclude.has(key),
+        ([key, tool]) =>
+          !toolsToExclude.has(key) && (experimentalMode || !tool.experimental),
       ),
     ) as typeof toolsToRegister;
   }
