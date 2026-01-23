@@ -44,6 +44,7 @@ program
     "--agent",
     "Use agent mode (/mcp?agent=1) instead of standard mode (for use_sentry tool)",
   )
+  .option("--experimental", "Enable experimental tools (/mcp?experimental=1)")
   .action(async (prompt, options) => {
     try {
       // Initialize Sentry with CLI-provided DSN if available
@@ -109,6 +110,7 @@ program
           host: sentryHost || process.env.SENTRY_HOST,
           sentryDsn: sentryDsn,
           useAgentEndpoint: options.agent,
+          useExperimental: options.experimental,
         });
       } else {
         // Use remote SSE transport when no access token
@@ -116,6 +118,7 @@ program
           mcpHost: options.mcpHost,
           accessToken: accessToken,
           useAgentEndpoint: options.agent,
+          useExperimental: options.experimental,
         });
       }
 

@@ -57,9 +57,13 @@ export async function connectToRemoteMCPServer(
 
           // Create HTTP streaming client with authentication
           // Use ?agent=1 query param for agent mode, otherwise standard /mcp
+          // Use ?experimental=1 to enable experimental tools
           const mcpUrl = new URL(`${mcpHost}/mcp`);
           if (config.useAgentEndpoint) {
             mcpUrl.searchParams.set("agent", "1");
+          }
+          if (config.useExperimental) {
+            mcpUrl.searchParams.set("experimental", "1");
           }
           const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
             requestInit: {
