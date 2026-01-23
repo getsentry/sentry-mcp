@@ -122,7 +122,7 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
     }
 
     if (issue.seerFixabilityScore != null) {
-      output += `- **Seer Fixability**: ${getSeerActionabilityLabel(issue.seerFixabilityScore)}\n`;
+      output += `- **Seer Actionability**: ${getSeerActionabilityLabel(issue.seerFixabilityScore)}\n`;
     }
 
     output += "\n";

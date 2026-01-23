@@ -172,7 +172,7 @@ describe("formatIssueResults", () => {
         issues: [issue],
       });
 
-      expect(result).toContain("**Seer Fixability**: super_high");
+      expect(result).toContain("**Seer Actionability**: super_high");
     });
 
     it("does not display fixability when not present", () => {
@@ -185,7 +185,7 @@ describe("formatIssueResults", () => {
         issues: [issue],
       });
 
-      expect(result).not.toContain("Seer Fixability");
+      expect(result).not.toContain("Seer Actionability");
     });
 
     it("displays correct label for different score thresholds", () => {
@@ -215,9 +215,9 @@ describe("formatIssueResults", () => {
         issues: [lowIssue],
       });
 
-      expect(highResult).toContain("**Seer Fixability**: high");
-      expect(mediumResult).toContain("**Seer Fixability**: medium");
-      expect(lowResult).toContain("**Seer Fixability**: low");
+      expect(highResult).toContain("**Seer Actionability**: high");
+      expect(mediumResult).toContain("**Seer Actionability**: medium");
+      expect(lowResult).toContain("**Seer Actionability**: low");
     });
   });
 

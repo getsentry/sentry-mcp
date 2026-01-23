@@ -1757,9 +1757,9 @@ export function formatIssueOutput({
     output += `**Issue Category**: ${issue.issueCategory}\n`;
   }
 
-  // Add Seer fixability score if available
+  // Add Seer actionability score if available
   if (issue.seerFixabilityScore != null) {
-    output += `**Seer Fixability**: ${getSeerActionabilityLabel(issue.seerFixabilityScore)}\n`;
+    output += `**Seer Actionability**: ${getSeerActionabilityLabel(issue.seerFixabilityScore)}\n`;
   }
 
   output += `**Platform**: ${issue.platform}\n`;
