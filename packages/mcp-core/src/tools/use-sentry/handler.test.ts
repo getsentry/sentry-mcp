@@ -58,9 +58,9 @@ describe("use_sentry handler", () => {
       }),
     });
 
-    // Verify all 23 tools were provided (27 total - use_sentry - 3 list_* tools)
+    // Verify all 22 tools were provided (26 total - use_sentry - 3 list_* tools)
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
-    expect(Object.keys(toolsArg)).toHaveLength(23);
+    expect(Object.keys(toolsArg)).toHaveLength(22);
 
     // Verify result is returned
     expect(result).toBe("Agent executed tools successfully");
@@ -107,8 +107,8 @@ describe("use_sentry handler", () => {
     // Verify use_sentry is NOT in the list
     expect(toolNames).not.toContain("use_sentry");
 
-    // Verify we have exactly 23 tools (27 total - use_sentry - 3 list_* tools)
-    expect(toolNames).toHaveLength(23);
+    // Verify we have exactly 22 tools (26 total - use_sentry - 3 list_* tools)
+    expect(toolNames).toHaveLength(22);
   });
 
   it("filters find_organizations when organizationSlug constraint is set", async () => {
@@ -134,8 +134,8 @@ describe("use_sentry handler", () => {
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
     expect(toolsArg).toBeDefined();
 
-    // With only org constraint, find_organizations is filtered (23 - 1 = 22)
-    expect(Object.keys(toolsArg)).toHaveLength(22);
+    // With only org constraint, find_organizations is filtered (22 - 1 = 21)
+    expect(Object.keys(toolsArg)).toHaveLength(21);
 
     // Verify find_organizations is filtered but find_projects remains
     expect(toolsArg.find_organizations).toBeUndefined();
@@ -167,8 +167,8 @@ describe("use_sentry handler", () => {
     expect(toolsArg).toBeDefined();
 
     // When both org and project constraints are present,
-    // find_organizations and find_projects are filtered out (23 - 2 = 21)
-    expect(Object.keys(toolsArg)).toHaveLength(21);
+    // find_organizations and find_projects are filtered out (22 - 2 = 20)
+    expect(Object.keys(toolsArg)).toHaveLength(20);
 
     // Verify both find tools are filtered
     expect(toolsArg.find_organizations).toBeUndefined();
