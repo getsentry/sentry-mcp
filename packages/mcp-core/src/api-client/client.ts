@@ -2382,9 +2382,13 @@ export class SentryApiService {
   ): Promise<Flamegraph> {
     const queryParams = new URLSearchParams();
     queryParams.set("project", projectId.toString());
+    // Escape backslashes first, then quotes for proper string escaping
+    const escapedTransaction = transactionName
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"');
     queryParams.set(
       "query",
-      `event.type:transaction transaction:"${transactionName.replace(/"/g, '\\"')}"`,
+      `event.type:transaction transaction:"${escapedTransaction}"`,
     );
     queryParams.set("statsPeriod", statsPeriod);
 
