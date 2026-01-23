@@ -94,8 +94,7 @@ describe("get_profile", () => {
         3. **Review query patterns** - Look for N+1 queries or inefficient data access
 
         ### Investigation Actions
-        1. **Get detailed profile**: Use profiler_id \`profile-abc123\` for sample-level analysis
-        2. **Compare with baseline**: Use compare_transaction_profiles to check for regressions"
+        1. **Compare with baseline**: Use get_profile with compareAgainstPeriod to check for regressions"
       `);
     });
 
@@ -305,7 +304,7 @@ describe("get_profile", () => {
       );
     });
 
-    it("throws when transactionName and profilerId are both missing", async () => {
+    it("throws when transactionName is missing", async () => {
       await expect(
         getProfile.handler(
           {
@@ -325,7 +324,7 @@ describe("get_profile", () => {
           },
         ),
       ).rejects.toThrowErrorMatchingInlineSnapshot(
-        `[UserInputError: Either transactionName or profilerId is required to identify the profile.]`,
+        `[UserInputError: Transaction name is required to identify the profile.]`,
       );
     });
 

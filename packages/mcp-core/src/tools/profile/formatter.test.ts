@@ -209,7 +209,7 @@ describe("formatter", () => {
 
       expect(output).toContain("## Actionable Next Steps");
       expect(output).toContain("### Immediate Actions");
-      expect(output).toContain("compare_transaction_profiles");
+      expect(output).toContain("Compare with baseline");
     });
 
     it("respects focusOnUserCode option in hot paths", () => {

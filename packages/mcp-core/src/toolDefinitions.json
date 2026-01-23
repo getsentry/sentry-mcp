@@ -555,10 +555,6 @@
           "type": "string",
           "description": "Transaction name (e.g., '/api/users', 'POST /graphql')"
         },
-        "profilerId": {
-          "type": "string",
-          "description": "Specific profiler ID for direct profile lookup"
-        },
         "statsPeriod": {
           "type": "string",
           "default": "7d",

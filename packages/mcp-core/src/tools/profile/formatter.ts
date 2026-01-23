@@ -287,18 +287,8 @@ function formatActionableSteps(
   sections.push("");
   sections.push("### Investigation Actions");
 
-  // Link to profiles for deep dive
-  if (flamegraph.shared.profiles.length > 0) {
-    const profileId = flamegraph.shared.profiles[0]?.profile_id;
-    if (profileId) {
-      sections.push(
-        `1. **Get detailed profile**: Use profiler_id \`${profileId}\` for sample-level analysis`,
-      );
-    }
-  }
-
   sections.push(
-    "2. **Compare with baseline**: Use compare_transaction_profiles to check for regressions",
+    "1. **Compare with baseline**: Use get_profile with compareAgainstPeriod to check for regressions",
   );
 
   return sections.join("\n");

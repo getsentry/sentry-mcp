@@ -21,12 +21,10 @@ function resolveProfileParams(params: {
   organizationSlug?: string | null;
   projectId?: string | number | null;
   transactionName?: string | null;
-  profilerId?: string | null;
 }): {
   organizationSlug: string;
   projectId?: string | number;
   transactionName?: string;
-  profilerId?: string;
 } {
   // Try URL first
   if (params.profileUrl) {
@@ -43,7 +41,6 @@ function resolveProfileParams(params: {
       organizationSlug: parsed.organizationSlug,
       projectId: parsed.projectSlug ?? params.projectId ?? undefined,
       transactionName: params.transactionName ?? undefined,
-      profilerId: parsed.profilerId ?? params.profilerId ?? undefined,
     };
   }
 
@@ -54,17 +51,16 @@ function resolveProfileParams(params: {
     );
   }
 
-  if (!params.transactionName && !params.profilerId) {
+  if (!params.transactionName) {
     throw new UserInputError(
-      "Either transactionName or profilerId is required to identify the profile.",
+      "Transaction name is required to identify the profile.",
     );
   }
 
   return {
     organizationSlug: params.organizationSlug,
     projectId: params.projectId ?? undefined,
-    transactionName: params.transactionName ?? undefined,
-    profilerId: params.profilerId ?? undefined,
+    transactionName: params.transactionName,
   };
 }
 
@@ -149,10 +145,6 @@ export default defineTool({
       .trim()
       .optional()
       .describe("Transaction name (e.g., '/api/users', 'POST /graphql')"),
-    profilerId: z
-      .string()
-      .optional()
-      .describe("Specific profiler ID for direct profile lookup"),
 
     // Time params
     statsPeriod: z
@@ -197,7 +189,6 @@ export default defineTool({
       organizationSlug: params.organizationSlug,
       projectId: params.projectId,
       transactionName: params.transactionName,
-      profilerId: params.profilerId,
     });
 
     const { organizationSlug, projectId, transactionName } = resolved;
