@@ -22,36 +22,20 @@ describe("compare_transaction_profiles", () => {
       },
     );
 
-    // Verify output structure
-    expect(result).toContain("# Profile Comparison: /api/users");
-    expect(result).toContain("## Summary");
-    expect(result).toContain("**Status**:");
-    expect(result).toContain("## Key Changes");
-  });
+    expect(result).toMatchInlineSnapshot(`
+      "# Profile Comparison: /api/users
 
-  it("includes function names in comparison", async () => {
-    const result = await compareTransactionProfiles.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        projectId: "cloudflare-mcp",
-        transactionName: "/api/users",
-        baselinePeriod: "14d",
-        currentPeriod: "7d",
-        focusOnUserCode: true,
-        regionUrl: null,
-      },
-      {
-        constraints: {
-          organizationSlug: null,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
-    );
+      ## Summary
+      - **Status**: ✅ No Significant Changes
 
-    // User code functions from fixture
-    expect(result).toContain("handle_request");
-    expect(result).toContain("fetch_data");
+      ## Key Changes
+
+      | Function | File:Line | Baseline | Current | Change | Status |
+      |----------|-----------|----------|---------|--------|--------|
+      | \`handle_request\` | main.py:10 | 160ms | 160ms | 0.00% | ➖ |
+      | \`fetch_data\` | utils.py:25 | 160ms | 160ms | 0.00% | ➖ |
+      "
+    `);
   });
 
   it("returns no data message when both periods have no data", async () => {
@@ -74,8 +58,22 @@ describe("compare_transaction_profiles", () => {
       },
     );
 
-    expect(result).toContain("No Profile Data Found");
-    expect(result).toContain("/api/nonexistent");
+    expect(result).toMatchInlineSnapshot(`
+      "# Profile Comparison: /api/nonexistent
+
+      ## No Profile Data Found
+
+      No profiling data found for transaction **/api/nonexistent** in either time period.
+
+      **Possible reasons:**
+      - Transaction name doesn't match exactly (names are case-sensitive)
+      - No profiles collected for this transaction
+      - Profiling may not be enabled for this project
+
+      **Suggestions:**
+      - Verify the exact transaction name using search_events
+      - Check if profiling is enabled for this project"
+    `);
   });
 
   it("works with numeric project ID", async () => {
@@ -98,7 +96,9 @@ describe("compare_transaction_profiles", () => {
       },
     );
 
+    // Verify it works with numeric project ID
     expect(result).toContain("# Profile Comparison: /api/users");
+    expect(result).toContain("## Summary");
   });
 
   it("shows no significant changes when comparing identical periods", async () => {
@@ -121,7 +121,20 @@ describe("compare_transaction_profiles", () => {
       },
     );
 
-    // When baseline and current are the same, should show no significant changes
-    expect(result).toContain("No Significant Changes");
+    expect(result).toMatchInlineSnapshot(`
+      "# Profile Comparison: /api/users
+
+      ## Summary
+      - **Status**: ✅ No Significant Changes
+
+      ## Key Changes
+
+      | Function | File:Line | Baseline | Current | Change | Status |
+      |----------|-----------|----------|---------|--------|--------|
+      | \`handle_request\` | main.py:10 | 160ms | 160ms | 0.00% | ➖ |
+      | \`fetch_data\` | utils.py:25 | 160ms | 160ms | 0.00% | ➖ |
+      | \`execute\` | psycopg2/pool.py:100 | 100ms | 100ms | 0.00% | ➖ |
+      "
+    `);
   });
 });
