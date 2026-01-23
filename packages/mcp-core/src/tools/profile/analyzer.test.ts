@@ -186,23 +186,24 @@ describe("analyzer", () => {
 
     it("marks root and leaf frames correctly", () => {
       const flamegraph = createMockFlamegraph();
+      // Note: reconstructCallStack expects leaf-to-root order
       const callStack = reconstructCallStack(
-        [0, 1, 2],
+        [2, 1, 0], // leaf first, root last
         flamegraph.shared.frames,
         flamegraph.shared.frame_infos,
       );
 
-      // First frame is root
-      expect(callStack[0].isRoot).toBe(true);
-      expect(callStack[0].isLeaf).toBe(false);
+      // First frame is leaf (leaf-to-root order)
+      expect(callStack[0].isLeaf).toBe(true);
+      expect(callStack[0].isRoot).toBe(false);
 
       // Middle frame
       expect(callStack[1].isRoot).toBe(false);
       expect(callStack[1].isLeaf).toBe(false);
 
-      // Last frame is leaf
-      expect(callStack[2].isRoot).toBe(false);
-      expect(callStack[2].isLeaf).toBe(true);
+      // Last frame is root
+      expect(callStack[2].isRoot).toBe(true);
+      expect(callStack[2].isLeaf).toBe(false);
     });
 
     it("handles single-frame stacks", () => {
@@ -337,8 +338,8 @@ describe("analyzer", () => {
       const baseline = createMockFlamegraph();
       const current = createMockFlamegraph();
 
-      // Make current 30% slower
-      current.shared.frame_infos[0].weight = 208; // 160 * 1.3 = 208
+      // Make current 30% slower (comparison uses sumDuration)
+      current.shared.frame_infos[0].sumDuration = 208000000; // 160ms * 1.3 = 208ms
 
       const comparisons = compareFrameStats(baseline, current, {
         focusOnUserCode: false,
@@ -355,8 +356,8 @@ describe("analyzer", () => {
       const baseline = createMockFlamegraph();
       const current = createMockFlamegraph();
 
-      // Make current 15% slower
-      current.shared.frame_infos[1].weight = 184; // 160 * 1.15 = 184
+      // Make current 15% slower (comparison uses sumDuration)
+      current.shared.frame_infos[1].sumDuration = 184000000; // 160ms * 1.15 = 184ms
 
       const comparisons = compareFrameStats(baseline, current, {
         focusOnUserCode: false,
@@ -372,8 +373,8 @@ describe("analyzer", () => {
       const baseline = createMockFlamegraph();
       const current = createMockFlamegraph();
 
-      // Make current 20% faster
-      current.shared.frame_infos[0].weight = 128; // 160 * 0.8 = 128
+      // Make current 20% faster (comparison uses sumDuration)
+      current.shared.frame_infos[0].sumDuration = 128000000; // 160ms * 0.8 = 128ms
 
       const comparisons = compareFrameStats(baseline, current, {
         focusOnUserCode: false,
@@ -389,8 +390,8 @@ describe("analyzer", () => {
       const baseline = createMockFlamegraph();
       const current = createMockFlamegraph();
 
-      // Make current 5% slower (within no_change threshold)
-      current.shared.frame_infos[0].weight = 168; // 160 * 1.05
+      // Make current 5% slower (within no_change threshold, uses sumDuration)
+      current.shared.frame_infos[0].sumDuration = 168000000; // 160ms * 1.05 = 168ms
 
       const comparisons = compareFrameStats(baseline, current, {
         focusOnUserCode: false,

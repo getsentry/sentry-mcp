@@ -76,8 +76,12 @@ export interface FrameComparison {
 /**
  * Analyzes flamegraph data to extract hot paths (most CPU-intensive call stacks).
  *
- * Hot paths are sorted by total duration (most time spent) and limited to maxHotPaths.
- * Each path includes the full call stack with depth tracking and user code filtering.
+ * Hot paths are merged when duplicate stacks appear, sorted by total duration
+ * (most time spent), and limited to maxHotPaths. Each path includes the full
+ * call stack with depth tracking.
+ *
+ * Note: Call stacks are stored leaf-to-root (main frame at end) for efficient
+ * flamegraph/call tree merging. User code filtering is done during formatting.
  *
  * @param flamegraph Flamegraph data from API
  * @param options Analysis options
@@ -98,26 +102,62 @@ export function analyzeHotPathsFromFlamegraph(
   // Calculate total samples for percentage calculation
   const totalSamples = profile.sample_counts.reduce((a, b) => a + b, 0);
 
-  // Combine samples with their stats
-  const hotPaths = profile.samples.map((stackIndices, idx) => {
+  // Merge duplicate stacks: same stack can appear multiple times in samples
+  // Key is the stack signature (sorted frame indices joined)
+  const mergedStacks = new Map<
+    string,
+    {
+      stackIndices: number[];
+      sampleCount: number;
+      duration: number;
+      weight: number;
+    }
+  >();
+
+  for (let idx = 0; idx < profile.samples.length; idx++) {
+    const stackIndices = profile.samples[idx];
     const sampleCount = profile.sample_counts[idx] || 0;
     const duration = profile.sample_durations_ns[idx] || 0;
     const weight = profile.weights[idx] || 0;
 
-    // Reconstruct call stack preserving order
-    const callStack = reconstructCallStack(stackIndices, frames, frameInfos);
+    // Create a unique key for this stack (order matters for stack identity)
+    const stackKey = stackIndices.join(",");
 
-    // Filter to user code if requested
-    const userCodeFrames = options.focusOnUserCode
-      ? callStack.filter((f) => f.frame.is_application)
-      : callStack;
+    const existing = mergedStacks.get(stackKey);
+    if (existing) {
+      existing.sampleCount += sampleCount;
+      existing.duration += duration;
+      existing.weight += weight;
+    } else {
+      mergedStacks.set(stackKey, {
+        stackIndices,
+        sampleCount,
+        duration,
+        weight,
+      });
+    }
+  }
+
+  // Convert merged stacks to hot paths
+  const hotPaths = Array.from(mergedStacks.values()).map((merged) => {
+    // Reconstruct call stack - keep all frames, filter during formatting
+    // Store leaf-to-root for efficient merging (reverse the API order)
+    const callStack = reconstructCallStack(
+      [...merged.stackIndices].reverse(),
+      frames,
+      frameInfos,
+    );
+
+    // User code frames computed but filtering done in formatter
+    const userCodeFrames = callStack.filter((f) => f.frame.is_application);
 
     return {
-      stackIndices,
-      sampleCount,
-      duration,
-      weight,
-      percentOfTotal: totalSamples > 0 ? (sampleCount / totalSamples) * 100 : 0,
+      stackIndices: merged.stackIndices,
+      sampleCount: merged.sampleCount,
+      duration: merged.duration,
+      weight: merged.weight,
+      percentOfTotal:
+        totalSamples > 0 ? (merged.sampleCount / totalSamples) * 100 : 0,
       callStack,
       userCodeFrames,
     };
@@ -129,42 +169,50 @@ export function analyzeHotPathsFromFlamegraph(
     .slice(0, options.maxHotPaths);
 }
 
+/** Default frame info for missing data */
+const DEFAULT_FRAME_INFO: FlamegraphFrameInfo = {
+  count: 0,
+  weight: 0,
+  sumDuration: 0,
+  sumSelfTime: 0,
+  p75Duration: 0,
+  p95Duration: 0,
+  p99Duration: 0,
+};
+
+/** Default frame for missing data */
+const DEFAULT_FRAME: FlamegraphFrame = {
+  file: "unknown",
+  name: "unknown",
+  line: 0,
+  is_application: false,
+  fingerprint: 0,
+};
+
 /**
  * Reconstructs a call stack from frame indices with depth tracking.
  *
- * Preserves the order from the API (root to leaf) and marks root/leaf frames.
- * Each frame includes its depth (0=root, N=leaf) for proper stack visualization.
+ * Frames are ordered leaf-to-root (leaf at index 0, root at end) for efficient
+ * flamegraph/call tree merging. This allows top-down traversal and early
+ * termination when merging stacks.
  *
- * @param stackIndices Array of frame indices forming the call stack
+ * @param stackIndices Array of frame indices forming the call stack (leaf to root)
  * @param frames All frames from flamegraph
  * @param frameInfos Performance stats for each frame
- * @returns Reconstructed call stack with metadata
+ * @returns Reconstructed call stack with metadata (leaf first, root last)
  */
 export function reconstructCallStack(
   stackIndices: number[],
   frames: FlamegraphFrame[],
   frameInfos: FlamegraphFrameInfo[],
 ): CallStackFrame[] {
-  return stackIndices.map((frameIdx, depth) => ({
-    frame: frames[frameIdx] || {
-      file: "unknown",
-      name: "unknown",
-      line: 0,
-      is_application: false,
-      fingerprint: 0,
-    },
-    frameInfo: frameInfos[frameIdx] || {
-      count: 0,
-      weight: 0,
-      sumDuration: 0,
-      sumSelfTime: 0,
-      p75Duration: 0,
-      p95Duration: 0,
-      p99Duration: 0,
-    },
-    depth,
-    isRoot: depth === 0,
-    isLeaf: depth === stackIndices.length - 1,
+  const stackLength = stackIndices.length;
+  return stackIndices.map((frameIdx, idx) => ({
+    frame: frames[frameIdx] || DEFAULT_FRAME,
+    frameInfo: frameInfos[frameIdx] || DEFAULT_FRAME_INFO,
+    depth: idx,
+    isLeaf: idx === 0,
+    isRoot: idx === stackLength - 1,
     frameIndex: frameIdx,
   }));
 }
@@ -191,21 +239,16 @@ export function identifyHotspotFramesFromFlamegraph(
 
   // Map frames to hotspots with stats
   const hotspots = frames
-    .map((frame, idx) => ({
-      frame,
-      frameInfo: frameInfos[idx] || {
-        count: 0,
-        weight: 0,
-        sumDuration: 0,
-        sumSelfTime: 0,
-        p75Duration: 0,
-        p95Duration: 0,
-        p99Duration: 0,
-      },
-      percentOfTotal:
-        totalSamples > 0 ? (frameInfos[idx]?.count / totalSamples) * 100 : 0,
-      frameIndex: idx,
-    }))
+    .map((frame, idx) => {
+      const frameInfo = frameInfos[idx] || DEFAULT_FRAME_INFO;
+      return {
+        frame,
+        frameInfo,
+        percentOfTotal:
+          totalSamples > 0 ? (frameInfo.count / totalSamples) * 100 : 0,
+        frameIndex: idx,
+      };
+    })
     .filter((h) => !options.focusOnUserCode || h.frame.is_application)
     .sort((a, b) => b.frameInfo.weight - a.frameInfo.weight)
     .slice(0, 20); // Top 20 hotspots
@@ -323,18 +366,21 @@ export function compareFrameStats(
 
     const baselineFrame = baselineFrames[indices.baselineIdx];
     const currentFrame = currentFrames[indices.currentIdx];
-    const baselineInfo = baselineInfos[indices.baselineIdx];
-    const currentInfo = currentInfos[indices.currentIdx];
+    const baselineInfo =
+      baselineInfos[indices.baselineIdx] || DEFAULT_FRAME_INFO;
+    const currentInfo = currentInfos[indices.currentIdx] || DEFAULT_FRAME_INFO;
 
     // Skip if not user code and we're filtering
     if (options.focusOnUserCode && !currentFrame.is_application) {
       continue;
     }
 
-    // Calculate percentage change in weight (total CPU time)
+    // Calculate percentage change in sumDuration (total CPU time in nanoseconds)
+    // Note: weight is a relative value, sumDuration is the actual time
     const percentChange =
-      baselineInfo.weight > 0
-        ? ((currentInfo.weight - baselineInfo.weight) / baselineInfo.weight) *
+      baselineInfo.sumDuration > 0
+        ? ((currentInfo.sumDuration - baselineInfo.sumDuration) /
+            baselineInfo.sumDuration) *
           100
         : 0;
 

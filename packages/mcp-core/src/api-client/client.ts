@@ -2384,7 +2384,7 @@ export class SentryApiService {
     queryParams.set("project", projectId.toString());
     queryParams.set(
       "query",
-      `event.type:transaction transaction:${transactionName}`,
+      `event.type:transaction transaction:"${transactionName.replace(/"/g, '\\"')}"`,
     );
     queryParams.set("statsPeriod", statsPeriod);
 

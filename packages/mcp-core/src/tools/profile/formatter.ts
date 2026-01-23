@@ -122,11 +122,11 @@ function formatPerformanceSummary(
 
   const userCodeTime = hotspots
     .filter((h) => h.frame.is_application)
-    .reduce((sum, h) => sum + h.frameInfo.weight, 0);
+    .reduce((sum, h) => sum + h.frameInfo.sumDuration, 0);
 
   const libraryTime = hotspots
     .filter((h) => !h.frame.is_application)
-    .reduce((sum, h) => sum + h.frameInfo.weight, 0);
+    .reduce((sum, h) => sum + h.frameInfo.sumDuration, 0);
 
   const totalTime = userCodeTime + libraryTime;
   const userPercent = totalTime > 0 ? (userCodeTime / totalTime) * 100 : 0;
@@ -198,18 +198,23 @@ function formatHotPaths(
     );
     sections.push("");
 
-    // Display call stack
+    // Display call stack - filter to user code during formatting if requested
+    // Call stack is stored leaf-to-root, so we reverse for display (root-to-leaf)
     const framesToShow = options.focusOnUserCode
       ? path.userCodeFrames
       : path.callStack;
 
     if (framesToShow.length > 0) {
       sections.push("```");
-      framesToShow.forEach((frame, i) => {
-        const indent = "  ".repeat(frame.depth);
+      // Display root-to-leaf (reverse the stored order for readability)
+      const displayFrames = [...framesToShow].reverse();
+      displayFrames.forEach((frame, i) => {
+        const indent = "  ".repeat(i);
         const marker = frame.frame.is_application ? "[YOUR CODE]" : "[library]";
-        const isPrimary = i === 0 && options.focusOnUserCode;
-        const suffix = isPrimary ? " ← PRIMARY BOTTLENECK" : "";
+        // The last displayed frame (original leaf) is the primary bottleneck
+        const isLeaf = i === displayFrames.length - 1;
+        const suffix =
+          isLeaf && options.focusOnUserCode ? " ← PRIMARY BOTTLENECK" : "";
         sections.push(
           `${indent}${frame.frame.file}:${frame.frame.name}:${frame.frame.line} ${marker}${suffix}`,
         );
@@ -218,8 +223,8 @@ function formatHotPaths(
       sections.push("");
     }
 
-    // Performance characteristics
-    const leafFrame = path.callStack[path.callStack.length - 1];
+    // Performance characteristics - leaf frame is at index 0 (leaf-to-root order)
+    const leafFrame = path.callStack[0];
     if (leafFrame) {
       const insights = generatePerformanceInsights(leafFrame.frameInfo);
       sections.push("**Performance Characteristics:**");
@@ -262,7 +267,8 @@ function formatActionableSteps(
   // Suggest optimization for top path
   if (hotPaths.length > 0) {
     const topPath = hotPaths[0];
-    const leafFrame = topPath.callStack[topPath.callStack.length - 1];
+    // Leaf frame is at index 0 (leaf-to-root order)
+    const leafFrame = topPath.callStack[0];
     if (leafFrame) {
       sections.push(
         `1. **Optimize \`${leafFrame.frame.name}\` function** - Accounts for ${formatPercentage(topPath.percentOfTotal)} of CPU time`,
@@ -374,7 +380,7 @@ export function formatFlamegraphComparison(
           : formatPercentage(comp.percentChange);
 
       sections.push(
-        `| \`${comp.frame.name}\` | ${truncatedLocation} | ${formatDuration(comp.baseline.weight)} | ${formatDuration(comp.current.weight)} | ${change} | ${statusIcon} |`,
+        `| \`${comp.frame.name}\` | ${truncatedLocation} | ${formatDuration(comp.baseline.sumDuration)} | ${formatDuration(comp.current.sumDuration)} | ${change} | ${statusIcon} |`,
       );
     }
     sections.push("");
@@ -391,7 +397,7 @@ export function formatFlamegraphComparison(
         `- **Change**: +${formatPercentage(reg.percentChange)} slower`,
       );
       sections.push(
-        `- **Impact**: ${formatDuration(reg.baseline.weight)} → ${formatDuration(reg.current.weight)}`,
+        `- **Impact**: ${formatDuration(reg.baseline.sumDuration)} → ${formatDuration(reg.current.sumDuration)}`,
       );
       sections.push(`- **Location**: ${reg.frame.file}:${reg.frame.line}`);
       sections.push("");

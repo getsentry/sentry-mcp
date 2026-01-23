@@ -1137,7 +1137,11 @@ export const restHandlers = buildHandlers([
       const query = url.searchParams.get("query");
 
       // Return empty but valid flamegraph for unknown transactions
-      if (!query?.includes("transaction:/api/users")) {
+      // Note: Query may have quoted transaction name: transaction:"/api/users"
+      if (
+        !query?.includes('transaction:"/api/users"') &&
+        !query?.includes("transaction:/api/users")
+      ) {
         return HttpResponse.json({
           ...flamegraphFixture,
           projectID: Number(project) || flamegraphFixture.projectID,

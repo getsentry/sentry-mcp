@@ -261,8 +261,8 @@ describe("formatter", () => {
       const baseline = createMockFlamegraph();
       const current = createMockFlamegraph();
 
-      // Make current 50% slower
-      current.shared.frame_infos[0].weight = 240;
+      // Make current 50% slower (comparison uses sumDuration, not weight)
+      current.shared.frame_infos[0].sumDuration = 240000000;
 
       const output = formatFlamegraphComparison(baseline, current, {
         focusOnUserCode: false,
@@ -291,10 +291,10 @@ describe("formatter", () => {
       const baseline = createMockFlamegraph();
       const current = createMockFlamegraph();
 
-      // Make current 20% faster
-      current.shared.frame_infos[0].weight = 128;
-      current.shared.frame_infos[1].weight = 128;
-      current.shared.frame_infos[2].weight = 80;
+      // Make current 20% faster (comparison uses sumDuration, not weight)
+      current.shared.frame_infos[0].sumDuration = 128000000;
+      current.shared.frame_infos[1].sumDuration = 128000000;
+      current.shared.frame_infos[2].sumDuration = 80000000;
 
       const output = formatFlamegraphComparison(baseline, current, {
         focusOnUserCode: false,
