@@ -82,7 +82,7 @@ export function formatFlamegraphAnalysis(
   sections.push(formatHotPaths(hotPaths, flamegraph, options));
 
   // Actionable next steps
-  sections.push(formatActionableSteps(hotPaths, flamegraph));
+  sections.push(formatActionableSteps(hotPaths, options));
 
   return sections.join("\n\n");
 }
@@ -256,7 +256,7 @@ function formatHotPaths(
  */
 function formatActionableSteps(
   hotPaths: HotPath[],
-  flamegraph: Flamegraph,
+  options: FlamegraphAnalysisOptions,
 ): string {
   const sections = [
     "## Actionable Next Steps",
@@ -267,11 +267,14 @@ function formatActionableSteps(
   // Suggest optimization for top path
   if (hotPaths.length > 0) {
     const topPath = hotPaths[0];
-    // Leaf frame is at index 0 (leaf-to-root order)
-    const leafFrame = topPath.callStack[0];
-    if (leafFrame) {
+    // When focusOnUserCode is true, recommend the user code frame, not library code
+    // userCodeFrames contains user code from the call stack
+    const frameToRecommend = options.focusOnUserCode
+      ? topPath.userCodeFrames[topPath.userCodeFrames.length - 1] // deepest user code frame
+      : topPath.callStack[0]; // actual leaf frame
+    if (frameToRecommend) {
       sections.push(
-        `1. **Optimize \`${leafFrame.frame.name}\` function** - Accounts for ${formatPercentage(topPath.percentOfTotal)} of CPU time`,
+        `1. **Optimize \`${frameToRecommend.frame.name}\` function** - Accounts for ${formatPercentage(topPath.percentOfTotal)} of CPU time`,
       );
     }
   }

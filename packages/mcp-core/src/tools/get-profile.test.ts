@@ -89,7 +89,7 @@ describe("get_profile", () => {
         ## Actionable Next Steps
 
         ### Immediate Actions (High Impact)
-        1. **Optimize \`execute\` function** - Accounts for 62.5% of CPU time
+        1. **Optimize \`handle_request\` function** - Accounts for 62.5% of CPU time
         2. **Add caching layer** - Consider caching frequently accessed data
         3. **Review query patterns** - Look for N+1 queries or inefficient data access
 
