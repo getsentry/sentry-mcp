@@ -219,6 +219,7 @@ export const IssueSchema = z
         value: z.string().nullable().optional(),
       })
       .optional(),
+    seerFixabilityScore: z.number().nullable().optional(),
   })
   .passthrough();
 

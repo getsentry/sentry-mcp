@@ -34,6 +34,18 @@ import {
 } from "./tool-helpers/seer";
 import { logIssue } from "../telem/logging";
 
+/**
+ * Convert Seer fixability score to actionability label.
+ * Thresholds match Sentry core: src/sentry/seer/autofix/constants.py
+ */
+export function getSeerActionabilityLabel(score: number): string {
+  if (score > 0.76) return "super_high";
+  if (score > 0.66) return "high";
+  if (score > 0.4) return "medium";
+  if (score > 0.25) return "low";
+  return "super_low";
+}
+
 // Language detection mappings
 const LANGUAGE_EXTENSIONS: Record<string, string> = {
   ".java": "java",
@@ -1743,6 +1755,11 @@ export function formatIssueOutput({
   }
   if (issue.issueCategory) {
     output += `**Issue Category**: ${issue.issueCategory}\n`;
+  }
+
+  // Add Seer actionability score if available
+  if (issue.seerFixabilityScore != null) {
+    output += `**Seer Actionability**: ${getSeerActionabilityLabel(issue.seerFixabilityScore)}\n`;
   }
 
   output += `**Platform**: ${issue.platform}\n`;

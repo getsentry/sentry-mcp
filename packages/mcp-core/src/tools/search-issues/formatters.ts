@@ -1,6 +1,7 @@
 import type { Issue } from "../../api-client";
 import { logInfo } from "../../telem/logging";
 import { getIssueUrl, getIssuesSearchUrl } from "../../utils/url-utils";
+import { getSeerActionabilityLabel } from "../../internal/formatting";
 
 /**
  * Format an explanation for how a natural language query was translated
@@ -118,6 +119,10 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
 
     if (issue.culprit) {
       output += `- **Culprit**: \`${issue.culprit}\`\n`;
+    }
+
+    if (issue.seerFixabilityScore != null) {
+      output += `- **Seer Actionability**: ${getSeerActionabilityLabel(issue.seerFixabilityScore)}\n`;
     }
 
     output += "\n";

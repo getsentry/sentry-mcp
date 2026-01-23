@@ -29,6 +29,10 @@ BUILT-IN FIELDS:
 - assignedOrSuggested: Issues assigned to OR suggested for a user (broader match)
 - userCount: Number of unique users affected
 - eventCount: Total number of events
+- issue.seer_actionability: Seer's AI-assessed fix difficulty (super_high, high, medium, low, super_low)
+  Use for: "easy to fix", "simple fixes", "quick wins", "low-hanging fruit", "actionable issues", "trivial"
+  Values represent how likely Seer can automatically fix the issue.
+  super_high = very easy/trivial, high = easy, medium = moderate, low/super_low = harder to fix
 
 COMMON QUERY PATTERNS:
 - Unresolved issues: is:unresolved (NO level filter unless explicitly requested)
@@ -40,6 +44,10 @@ COMMON QUERY PATTERNS:
 - User feedback: issueCategory:feedback
 - Recent feedback: issueCategory:feedback lastSeen:-7d
 - Feedback from production: issueCategory:feedback environment:production
+- Easy to fix issues: is:unresolved issue.seer_actionability:[high,super_high]
+- Quick wins: is:unresolved issue.seer_actionability:[high,super_high]
+- Very easy/trivial fixes: is:unresolved issue.seer_actionability:super_high
+- Actionable issues: is:unresolved issue.seer_actionability:[medium,high,super_high]
 
 SORTING RULES:
 1. CRITICAL: Sort MUST go in the separate "sort" field, NEVER in the "query" field
@@ -65,6 +73,10 @@ EXAMPLES:
 "assigned to john@example.com" → query: "assignedOrSuggested:john@example.com", sort: "date"
 "show me user feedback" → query: "issueCategory:feedback", sort: "date"
 "feedback from the last week" → query: "issueCategory:feedback lastSeen:-7d", sort: "date"
+"easy to fix bugs" → query: "is:unresolved issue.seer_actionability:[high,super_high]", sort: "date"
+"show me quick wins" → query: "is:unresolved issue.seer_actionability:[high,super_high]", sort: "user"
+"trivial issues to fix" → query: "is:unresolved issue.seer_actionability:super_high", sort: "date"
+"actionable errors" → query: "is:unresolved issue.seer_actionability:[medium,high,super_high]", sort: "freq"
 
 NEVER: query: "is:unresolved sort:user" ← Sort goes in separate field!
 

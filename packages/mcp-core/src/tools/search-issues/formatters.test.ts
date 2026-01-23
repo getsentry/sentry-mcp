@@ -160,6 +160,67 @@ describe("formatIssueResults", () => {
     });
   });
 
+  describe("seer fixability score", () => {
+    it("displays fixability score when present", () => {
+      const issue = createPerformanceIssue({
+        shortId: "TEST-1",
+        seerFixabilityScore: 0.8,
+      });
+
+      const result = formatIssueResults({
+        ...baseParams,
+        issues: [issue],
+      });
+
+      expect(result).toContain("**Seer Actionability**: super_high");
+    });
+
+    it("does not display fixability when not present", () => {
+      const issue = createPerformanceIssue({
+        shortId: "TEST-1",
+      });
+
+      const result = formatIssueResults({
+        ...baseParams,
+        issues: [issue],
+      });
+
+      expect(result).not.toContain("Seer Actionability");
+    });
+
+    it("displays correct label for different score thresholds", () => {
+      const highIssue = createPerformanceIssue({
+        shortId: "TEST-HIGH",
+        seerFixabilityScore: 0.7,
+      });
+      const mediumIssue = createPerformanceIssue({
+        shortId: "TEST-MED",
+        seerFixabilityScore: 0.5,
+      });
+      const lowIssue = createPerformanceIssue({
+        shortId: "TEST-LOW",
+        seerFixabilityScore: 0.3,
+      });
+
+      const highResult = formatIssueResults({
+        ...baseParams,
+        issues: [highIssue],
+      });
+      const mediumResult = formatIssueResults({
+        ...baseParams,
+        issues: [mediumIssue],
+      });
+      const lowResult = formatIssueResults({
+        ...baseParams,
+        issues: [lowIssue],
+      });
+
+      expect(highResult).toContain("**Seer Actionability**: high");
+      expect(mediumResult).toContain("**Seer Actionability**: medium");
+      expect(lowResult).toContain("**Seer Actionability**: low");
+    });
+  });
+
   describe("output format", () => {
     it("formats feedback issue correctly", () => {
       const feedbackIssue = createFeedbackIssue({

@@ -72,6 +72,25 @@ describeEval("search-issues-agent", {
           sort: "date", // Agent should always return a sort value
         },
       },
+      {
+        // Easy to fix issues - should use seer_actionability filter
+        input: "Show me easy to fix bugs",
+        expectedTools: [],
+        expected: {
+          query: /issue\.seer_actionability/,
+          sort: "date",
+        },
+      },
+      {
+        // Quick wins query - should combine actionability with unresolved
+        input: "Show me quick wins in production",
+        expectedTools: [],
+        expected: {
+          query:
+            /issue\.seer_actionability.*environment:production|environment:production.*issue\.seer_actionability/,
+          sort: /date|user/,
+        },
+      },
     ];
   },
   task: async (input) => {
