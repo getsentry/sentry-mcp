@@ -5,6 +5,7 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import { isNumericId } from "../utils/slug-validation";
 import {
   formatFlamegraphAnalysis,
   formatFlamegraphComparison,
@@ -19,11 +20,11 @@ import { parseSentryUrl, isProfileUrl } from "../internal/url-helpers";
 function resolveProfileParams(params: {
   profileUrl?: string | null;
   organizationSlug?: string | null;
-  projectId?: string | number | null;
+  projectSlugOrId?: string | number | null;
   transactionName?: string | null;
 }): {
   organizationSlug: string;
-  projectId?: string | number;
+  projectSlugOrId?: string | number;
   transactionName?: string;
 } {
   // Try URL first
@@ -39,7 +40,8 @@ function resolveProfileParams(params: {
     // Use URL values, falling back to explicit params
     return {
       organizationSlug: parsed.organizationSlug,
-      projectId: parsed.projectSlug ?? params.projectId ?? undefined,
+      projectSlugOrId:
+        parsed.projectSlug ?? params.projectSlugOrId ?? undefined,
       transactionName: params.transactionName ?? undefined,
     };
   }
@@ -59,7 +61,7 @@ function resolveProfileParams(params: {
 
   return {
     organizationSlug: params.organizationSlug,
-    projectId: params.projectId ?? undefined,
+    projectSlugOrId: params.projectSlugOrId ?? undefined,
     transactionName: params.transactionName,
   };
 }
@@ -100,7 +102,7 @@ export default defineTool({
     "get_profile(",
     "  organizationSlug='my-org',",
     "  transactionName='/api/users',",
-    "  projectId='backend'",
+    "  projectSlugOrId='backend'",
     ")",
     "```",
     "",
@@ -109,7 +111,7 @@ export default defineTool({
     "get_profile(",
     "  organizationSlug='my-org',",
     "  transactionName='/api/users',",
-    "  projectId='backend',",
+    "  projectSlugOrId='backend',",
     "  statsPeriod='7d',",
     "  compareAgainstPeriod='14d'",
     ")",
@@ -137,10 +139,10 @@ export default defineTool({
     // Explicit params (fallback)
     organizationSlug: ParamOrganizationSlug.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
-    projectId: z
+    projectSlugOrId: z
       .union([z.string(), z.number()])
       .optional()
-      .describe("Project ID or slug"),
+      .describe("Project slug or numeric ID"),
     transactionName: z
       .string()
       .trim()
@@ -188,15 +190,15 @@ export default defineTool({
     const resolved = resolveProfileParams({
       profileUrl: params.profileUrl,
       organizationSlug: params.organizationSlug,
-      projectId: params.projectId,
+      projectSlugOrId: params.projectSlugOrId,
       transactionName: params.transactionName,
     });
 
-    const { organizationSlug, projectId, transactionName } = resolved;
+    const { organizationSlug, projectSlugOrId, transactionName } = resolved;
 
-    if (!projectId) {
+    if (!projectSlugOrId) {
       throw new UserInputError(
-        "Project ID is required. Please provide a projectId parameter or include it in the profile URL.",
+        "Project is required. Please provide a projectSlugOrId parameter or include it in the profile URL.",
       );
     }
 
@@ -206,9 +208,27 @@ export default defineTool({
       );
     }
 
+    // Resolve project slug to numeric ID if needed (flamegraph API requires numeric ID)
+    let projectId: string | number;
+    if (
+      typeof projectSlugOrId === "number" ||
+      isNumericId(String(projectSlugOrId))
+    ) {
+      projectId = projectSlugOrId;
+      setTag("project.id", String(projectSlugOrId));
+    } else {
+      // It's a slug, resolve to ID
+      const project = await apiService.getProject({
+        organizationSlug,
+        projectSlugOrId: String(projectSlugOrId),
+      });
+      projectId = project.id;
+      setTag("project.slug", String(projectSlugOrId));
+      setTag("project.id", String(project.id));
+    }
+
     setTag("organization.slug", organizationSlug);
     setTag("transaction.name", transactionName);
-    setTag("project.id", String(projectId));
 
     // Comparison mode: compare two time periods
     if (params.compareAgainstPeriod) {

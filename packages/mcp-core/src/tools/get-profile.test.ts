@@ -7,7 +7,7 @@ describe("get_profile", () => {
       const result = await getProfile.handler(
         {
           organizationSlug: "sentry-mcp-evals",
-          projectId: "cloudflare-mcp",
+          projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/users",
           statsPeriod: "7d",
           focusOnUserCode: true,
@@ -102,7 +102,7 @@ describe("get_profile", () => {
       const result = await getProfile.handler(
         {
           organizationSlug: "sentry-mcp-evals",
-          projectId: "cloudflare-mcp",
+          projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/nonexistent",
           statsPeriod: "7d",
           focusOnUserCode: true,
@@ -142,7 +142,7 @@ describe("get_profile", () => {
       const result = await getProfile.handler(
         {
           organizationSlug: "sentry-mcp-evals",
-          projectId: 4509062593708032,
+          projectSlugOrId: 4509062593708032,
           transactionName: "/api/users",
           statsPeriod: "7d",
           focusOnUserCode: true,
@@ -168,7 +168,7 @@ describe("get_profile", () => {
       const result = await getProfile.handler(
         {
           organizationSlug: "sentry-mcp-evals",
-          projectId: "cloudflare-mcp",
+          projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/users",
           statsPeriod: "7d",
           compareAgainstPeriod: "14d",
@@ -205,7 +205,7 @@ describe("get_profile", () => {
       const result = await getProfile.handler(
         {
           organizationSlug: "sentry-mcp-evals",
-          projectId: "cloudflare-mcp",
+          projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/nonexistent",
           statsPeriod: "7d",
           compareAgainstPeriod: "14d",
@@ -244,7 +244,7 @@ describe("get_profile", () => {
       const result = await getProfile.handler(
         {
           organizationSlug: "sentry-mcp-evals",
-          projectId: "cloudflare-mcp",
+          projectSlugOrId: "cloudflare-mcp",
           transactionName: "/api/users",
           statsPeriod: "7d",
           compareAgainstPeriod: "7d",
@@ -284,7 +284,7 @@ describe("get_profile", () => {
       await expect(
         getProfile.handler(
           {
-            projectId: "cloudflare-mcp",
+            projectSlugOrId: "cloudflare-mcp",
             transactionName: "/api/users",
             statsPeriod: "7d",
             focusOnUserCode: true,
@@ -309,7 +309,7 @@ describe("get_profile", () => {
         getProfile.handler(
           {
             organizationSlug: "sentry-mcp-evals",
-            projectId: "cloudflare-mcp",
+            projectSlugOrId: "cloudflare-mcp",
             statsPeriod: "7d",
             focusOnUserCode: true,
             maxHotPaths: 5,
@@ -328,7 +328,7 @@ describe("get_profile", () => {
       );
     });
 
-    it("throws when projectId is missing", async () => {
+    it("throws when projectSlugOrId is missing", async () => {
       await expect(
         getProfile.handler(
           {
@@ -348,7 +348,7 @@ describe("get_profile", () => {
           },
         ),
       ).rejects.toThrowErrorMatchingInlineSnapshot(
-        `[UserInputError: Project ID is required. Please provide a projectId parameter or include it in the profile URL.]`,
+        `[UserInputError: Project is required. Please provide a projectSlugOrId parameter or include it in the profile URL.]`,
       );
     });
 
