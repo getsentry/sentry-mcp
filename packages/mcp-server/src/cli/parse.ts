@@ -17,6 +17,7 @@ export function parseArgv(argv: string[]): CliArgs {
     "project-slug": { type: "string" as const },
     skills: { type: "string" as const },
     agent: { type: "boolean" as const },
+    experimental: { type: "boolean" as const },
     help: { type: "boolean" as const, short: "h" as const },
     version: { type: "boolean" as const, short: "v" as const },
   };
@@ -62,7 +63,8 @@ export function parseArgv(argv: string[]): CliArgs {
     organizationSlug: values["organization-slug"] as string | undefined,
     projectSlug: values["project-slug"] as string | undefined,
     skills: values.skills as string | undefined,
-    agent: (values.agent as boolean | undefined) === true,
+    agent: values.agent === true,
+    experimental: values.experimental === true,
     help: (values.help as boolean | undefined) === true,
     version: (values.version as boolean | undefined) === true,
     unknownArgs:
@@ -104,6 +106,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     // Skills precedence: CLI skills override env
     skills: cli.skills ?? env.skills,
     agent: cli.agent === true,
+    experimental: cli.experimental === true,
     organizationSlug: cli.organizationSlug,
     projectSlug: cli.projectSlug,
     help: cli.help === true,

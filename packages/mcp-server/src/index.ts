@@ -107,6 +107,7 @@ Sentry.init({
       "mcp.server_version": LIB_VERSION,
       "mcp.transport": "stdio",
       "mcp.agent_mode": cli.agent ? "true" : "false",
+      "mcp.experimental_mode": cli.experimental ? "true" : "false",
       "sentry.host": cfg.sentryHost,
       "mcp.mcp-url": cfg.mcpUrl,
     },
@@ -131,6 +132,12 @@ if (cli.agent) {
   console.warn(
     "The use_sentry tool provides access to all Sentry operations through natural language.",
   );
+  console.warn("");
+}
+
+// Log experimental mode status
+if (cli.experimental) {
+  console.warn("Experimental mode enabled: Experimental tools are available.");
   console.warn("");
 }
 
@@ -172,13 +179,17 @@ const context = {
   sentryHost: cfg.sentryHost,
   mcpUrl: cfg.mcpUrl,
   openaiBaseUrl: cfg.openaiBaseUrl,
+  agentMode: cli.agent,
+  experimentalMode: cli.experimental,
 };
 
 // Build server with context to filter tools based on granted skills
 // Use agentMode when --agent flag is set (only exposes use_sentry tool)
+// Use experimentalMode when --experimental flag is set (includes experimental tools)
 const server = buildServer({
   context,
   agentMode: cli.agent,
+  experimentalMode: cli.experimental,
 });
 
 startStdio(server, context).catch(async (err) => {

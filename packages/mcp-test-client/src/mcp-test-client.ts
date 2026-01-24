@@ -35,6 +35,9 @@ export async function connectToMCPServer(
           if (config.useAgentEndpoint) {
             args.push("--agent");
           }
+          if (config.useExperimental) {
+            args.push("--experimental");
+          }
 
           // Resolve the path to the mcp-server binary
           const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -56,6 +56,9 @@ const mcpHandler: ExportedHandler<Env> = {
     // Check for agent mode query parameter
     const isAgentMode = url.searchParams.get("agent") === "1";
 
+    // Check for experimental mode query parameter
+    const isExperimentalMode = url.searchParams.get("experimental") === "1";
+
     // Extract OAuth props from ExecutionContext (set by OAuth provider)
     const oauthCtx = ctx as OAuthExecutionContext;
 
@@ -153,6 +156,8 @@ const mcpHandler: ExportedHandler<Env> = {
       constraints: verification.constraints,
       sentryHost,
       mcpUrl: env.MCP_URL,
+      agentMode: isAgentMode,
+      experimentalMode: isExperimentalMode,
     };
 
     // Create and configure MCP server with tools filtered by context
@@ -160,6 +165,7 @@ const mcpHandler: ExportedHandler<Env> = {
     const server = buildServer({
       context: serverContext,
       agentMode: isAgentMode,
+      experimentalMode: isExperimentalMode,
     });
 
     // Run MCP handler - context already captured in closures

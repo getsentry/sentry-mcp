@@ -13,6 +13,7 @@ Common optional flags:
   --host <host>           Change Sentry host (self-hosted)
   --sentry-dsn <dsn>      Override DSN used for telemetry reporting
   --agent                 Agent mode: only expose use_sentry tool (for AI agents)
+  --experimental          Enable experimental tools (hidden by default)
 
 Embedded agent configuration:
   --agent-provider <provider>   LLM provider: openai or anthropic (auto-detects from API keys)

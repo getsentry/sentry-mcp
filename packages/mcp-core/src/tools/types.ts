@@ -16,6 +16,7 @@ export interface ToolConfig<
   inputSchema: TSchema;
   skills: Skill[]; // Which skill categories this tool belongs to
   requiredScopes: Scope[]; // LEGACY: Which API scopes needed (deprecated, for backward compatibility)
+  experimental?: boolean; // Mark tool as experimental (hidden by default)
   annotations: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
