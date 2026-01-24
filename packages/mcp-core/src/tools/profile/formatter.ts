@@ -30,6 +30,28 @@ const CHANGE_TYPE_ICONS: Record<FrameComparison["changeType"], string> = {
 };
 
 /**
+ * Determines the overall comparison status based on regression/improvement counts.
+ */
+function determineComparisonStatus(
+  majorCount: number,
+  minorCount: number,
+  improvementCount: number,
+): string {
+  if (majorCount > 0) return "⚠️ Performance Regression Detected";
+  if (minorCount > 0) return "⚠️ Minor Performance Changes Detected";
+  if (improvementCount > 0) return "✅ Performance Improvements Detected";
+  return "✅ No Significant Changes";
+}
+
+/**
+ * Truncates a file location string for table display.
+ */
+function truncateLocation(location: string, maxLength = 30): string {
+  if (location.length <= maxLength) return location;
+  return `...${location.slice(-(maxLength - 3))}`;
+}
+
+/**
  * Options for flamegraph analysis formatting.
  */
 export interface FlamegraphAnalysisOptions {
@@ -120,13 +142,16 @@ function formatPerformanceSummary(
     focusOnUserCode: false, // Get both user and library for breakdown
   });
 
-  const userCodeTime = hotspots
-    .filter((h) => h.frame.is_application)
-    .reduce((sum, h) => sum + h.frameInfo.sumDuration, 0);
-
-  const libraryTime = hotspots
-    .filter((h) => !h.frame.is_application)
-    .reduce((sum, h) => sum + h.frameInfo.sumDuration, 0);
+  // Calculate time breakdown in a single pass
+  let userCodeTime = 0;
+  let libraryTime = 0;
+  for (const h of hotspots) {
+    if (h.frame.is_application) {
+      userCodeTime += h.frameInfo.sumDuration;
+    } else {
+      libraryTime += h.frameInfo.sumDuration;
+    }
+  }
 
   const totalTime = userCodeTime + libraryTime;
   const userPercent = totalTime > 0 ? (userCodeTime / totalTime) * 100 : 0;
@@ -159,12 +184,12 @@ function formatPerformanceSummary(
     for (const func of topFunctions) {
       const insights = generatePerformanceInsights(func.frameInfo);
       const insightText = insights.map((i) => i.icon).join(" ");
-      const location = `${func.frame.file}:${func.frame.line}`;
-      const truncatedLocation =
-        location.length > 30 ? `...${location.slice(-27)}` : location;
+      const location = truncateLocation(
+        `${func.frame.file}:${func.frame.line}`,
+      );
 
       sections.push(
-        `| \`${func.frame.name}\` | ${truncatedLocation} | ${func.frameInfo.count.toLocaleString()} | ${formatPercentage(func.percentOfTotal)} | ${formatDuration(func.frameInfo.p75Duration)} | ${formatDuration(func.frameInfo.p95Duration)} | ${formatDuration(func.frameInfo.p99Duration)} | ${insightText} |`,
+        `| \`${func.frame.name}\` | ${location} | ${func.frameInfo.count.toLocaleString()} | ${formatPercentage(func.percentOfTotal)} | ${formatDuration(func.frameInfo.p75Duration)} | ${formatDuration(func.frameInfo.p95Duration)} | ${formatDuration(func.frameInfo.p99Duration)} | ${insightText} |`,
       );
     }
   }
@@ -265,13 +290,12 @@ function formatActionableSteps(
   ];
 
   // Suggest optimization for top path
-  if (hotPaths.length > 0) {
-    const topPath = hotPaths[0];
+  const topPath = hotPaths[0];
+  if (topPath) {
     // When focusOnUserCode is true, recommend the user code frame, not library code
-    // userCodeFrames contains user code from the call stack
     const frameToRecommend = options.focusOnUserCode
-      ? topPath.userCodeFrames[topPath.userCodeFrames.length - 1] // deepest user code frame
-      : topPath.callStack[0]; // actual leaf frame
+      ? topPath.userCodeFrames[topPath.userCodeFrames.length - 1]
+      : topPath.callStack[0];
     if (frameToRecommend) {
       sections.push(
         `1. **Optimize \`${frameToRecommend.frame.name}\` function** - Accounts for ${formatPercentage(topPath.percentOfTotal)} of CPU time`,
@@ -279,18 +303,11 @@ function formatActionableSteps(
     }
   }
 
-  // Generic recommendations
   sections.push(
     "2. **Add caching layer** - Consider caching frequently accessed data",
-  );
-  sections.push(
     "3. **Review query patterns** - Look for N+1 queries or inefficient data access",
-  );
-
-  sections.push("");
-  sections.push("### Investigation Actions");
-
-  sections.push(
+    "",
+    "### Investigation Actions",
     "1. **Compare with baseline**: Use get_profile with compareAgainstPeriod to check for regressions",
   );
 
@@ -336,16 +353,11 @@ export function formatFlamegraphComparison(
     (c) => c.changeType === "improvement",
   );
 
-  let status: string;
-  if (majorRegressions.length > 0) {
-    status = "⚠️ Performance Regression Detected";
-  } else if (minorRegressions.length > 0) {
-    status = "⚠️ Minor Performance Changes Detected";
-  } else if (improvements.length > 0) {
-    status = "✅ Performance Improvements Detected";
-  } else {
-    status = "✅ No Significant Changes";
-  }
+  const status = determineComparisonStatus(
+    majorRegressions.length,
+    minorRegressions.length,
+    improvements.length,
+  );
 
   sections.push(`- **Status**: ${status}`);
   sections.push("");
@@ -363,9 +375,9 @@ export function formatFlamegraphComparison(
 
     // Show top 10 changes
     for (const comp of comparisons.slice(0, 10)) {
-      const location = `${comp.frame.file}:${comp.frame.line}`;
-      const truncatedLocation =
-        location.length > 30 ? `...${location.slice(-27)}` : location;
+      const location = truncateLocation(
+        `${comp.frame.file}:${comp.frame.line}`,
+      );
       const statusIcon = CHANGE_TYPE_ICONS[comp.changeType];
       const change =
         comp.percentChange > 0
@@ -373,7 +385,7 @@ export function formatFlamegraphComparison(
           : formatPercentage(comp.percentChange);
 
       sections.push(
-        `| \`${comp.frame.name}\` | ${truncatedLocation} | ${formatDuration(comp.baseline.sumDuration)} | ${formatDuration(comp.current.sumDuration)} | ${change} | ${statusIcon} |`,
+        `| \`${comp.frame.name}\` | ${location} | ${formatDuration(comp.baseline.sumDuration)} | ${formatDuration(comp.current.sumDuration)} | ${change} | ${statusIcon} |`,
       );
     }
     sections.push("");
@@ -483,16 +495,15 @@ export function formatProfileChunkAnalysis(
 
       if (options.focusOnUserCode && !frame.in_app) continue;
 
-      const location =
+      const rawLocation =
         frame.filename && frame.lineno
           ? `${frame.filename}:${frame.lineno}`
           : frame.abs_path || "unknown";
-      const truncatedLocation =
-        location.length > 40 ? `...${location.slice(-37)}` : location;
+      const location = truncateLocation(rawLocation, 40);
       const type = frame.in_app ? "User Code" : "Library";
 
       sections.push(
-        `| \`${frame.function}\` | ${truncatedLocation} | ${count} | ${type} |`,
+        `| \`${frame.function}\` | ${location} | ${count} | ${type} |`,
       );
     }
   }

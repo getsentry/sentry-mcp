@@ -324,7 +324,7 @@ describe("get_profile", () => {
           },
         ),
       ).rejects.toThrowErrorMatchingInlineSnapshot(
-        `[UserInputError: Transaction name is required to identify the profile.]`,
+        `[UserInputError: Transaction name is required for flamegraph analysis. Please provide a transactionName parameter.]`,
       );
     });
 

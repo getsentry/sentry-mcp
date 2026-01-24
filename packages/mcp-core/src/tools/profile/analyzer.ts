@@ -420,6 +420,10 @@ export function compareFrameStats(
   );
 }
 
+const MICROSECOND = 1_000;
+const MILLISECOND = 1_000_000;
+const SECOND = 1_000_000_000;
+
 /**
  * Formats duration from nanoseconds to human-readable string.
  *
@@ -427,13 +431,13 @@ export function compareFrameStats(
  * @returns Formatted duration string (e.g., "157ms", "1.2s")
  */
 export function formatDuration(ns: number): string {
-  if (ns < 1_000_000) {
-    return `${(ns / 1_000).toFixed(0)}µs`;
+  if (ns < MILLISECOND) {
+    return `${(ns / MICROSECOND).toFixed(0)}µs`;
   }
-  if (ns < 1_000_000_000) {
-    return `${(ns / 1_000_000).toFixed(0)}ms`;
+  if (ns < SECOND) {
+    return `${(ns / MILLISECOND).toFixed(0)}ms`;
   }
-  return `${(ns / 1_000_000_000).toFixed(1)}s`;
+  return `${(ns / SECOND).toFixed(1)}s`;
 }
 
 /**

@@ -13,6 +13,12 @@ import {
 import { hasProfileData } from "./profile/analyzer";
 import { parseSentryUrl, isProfileUrl } from "../internal/url-helpers";
 
+interface ResolvedProfileParams {
+  organizationSlug: string;
+  projectSlugOrId?: string | number;
+  transactionName?: string;
+}
+
 /**
  * Resolves profile parameters from URL or explicit params.
  * URL takes precedence if provided and valid.
@@ -22,22 +28,15 @@ function resolveProfileParams(params: {
   organizationSlug?: string | null;
   projectSlugOrId?: string | number | null;
   transactionName?: string | null;
-}): {
-  organizationSlug: string;
-  projectSlugOrId?: string | number;
-  transactionName?: string;
-} {
-  // Try URL first
+}): ResolvedProfileParams {
+  // URL-based resolution
   if (params.profileUrl) {
     if (!isProfileUrl(params.profileUrl)) {
       throw new UserInputError(
         "Invalid profile URL. URL must be a Sentry profile URL (containing /profiling/profile/).",
       );
     }
-
     const parsed = parseSentryUrl(params.profileUrl);
-
-    // Use URL values, falling back to explicit params
     return {
       organizationSlug: parsed.organizationSlug,
       projectSlugOrId:
@@ -46,23 +45,17 @@ function resolveProfileParams(params: {
     };
   }
 
-  // Use explicit params
+  // Explicit params resolution
   if (!params.organizationSlug) {
     throw new UserInputError(
       "Organization slug is required. Provide either a profileUrl or organizationSlug parameter.",
     );
   }
 
-  if (!params.transactionName) {
-    throw new UserInputError(
-      "Transaction name is required to identify the profile.",
-    );
-  }
-
   return {
     organizationSlug: params.organizationSlug,
     projectSlugOrId: params.projectSlugOrId ?? undefined,
-    transactionName: params.transactionName,
+    transactionName: params.transactionName ?? undefined,
   };
 }
 
