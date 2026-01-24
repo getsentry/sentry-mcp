@@ -156,6 +156,8 @@ const mcpHandler: ExportedHandler<Env> = {
       constraints: verification.constraints,
       sentryHost,
       mcpUrl: env.MCP_URL,
+      agentMode: isAgentMode,
+      experimentalMode: isExperimentalMode,
     };
 
     // Create and configure MCP server with tools filtered by context

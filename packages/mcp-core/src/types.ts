@@ -38,4 +38,8 @@ export type ServerContext = {
   grantedSkills?: Set<Skill> | ReadonlySet<Skill>;
   // URL-based session constraints
   constraints: Constraints;
+  /** Whether agent mode is enabled (only use_sentry tool exposed) */
+  agentMode?: boolean;
+  /** Whether experimental tools are enabled */
+  experimentalMode?: boolean;
 };

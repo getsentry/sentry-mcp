@@ -179,6 +179,8 @@ const context = {
   sentryHost: cfg.sentryHost,
   mcpUrl: cfg.mcpUrl,
   openaiBaseUrl: cfg.openaiBaseUrl,
+  agentMode: cli.agent,
+  experimentalMode: cli.experimental,
 };
 
 // Build server with context to filter tools based on granted skills
