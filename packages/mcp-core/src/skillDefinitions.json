@@ -5,7 +5,7 @@
     "description": "Search for errors, analyze traces, and explore event details",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 16,
+    "toolCount": 17,
     "tools": [
       {
         "name": "find_organizations",
@@ -45,6 +45,11 @@
       {
         "name": "get_profile",
         "description": "Analyze CPU profiling data to identify performance bottlenecks and detect regressions.\n\nUSE THIS TOOL WHEN:\n- User asks why a specific endpoint/transaction is slow\n- User wants to understand where CPU time is spent\n- User asks about performance bottlenecks\n- User wants to compare performance between time periods\n- User shares a Sentry profile URL\n\nRETURNS:\n- Hot paths (call stacks consuming the most CPU time)\n- Performance percentiles (p75, p95, p99) for each function\n- User code vs library code breakdown\n- Actionable recommendations for optimization\n- Regression analysis when comparing periods\n\n<examples>\n### Analyze from URL (with transaction name)\n```\nget_profile(\n  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=abc123',\n  transactionName='/api/users'\n)\n```\n\n### Analyze by transaction name\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend'\n)\n```\n\n### Compare performance between periods\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend',\n  statsPeriod='7d',\n  compareAgainstPeriod='14d'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library code\n- High p99 relative to p75 indicates inconsistent performance\n- Use compareAgainstPeriod to detect regressions over time\n- Transaction names are case-sensitive\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "get_sentry_resource",
+        "description": "Unified entry point for fetching Sentry resources. Auto-detects resource type from URL or accepts explicit type and identifiers.\n\nUSE THIS TOOL WHEN:\n- User provides a Sentry URL (any type: issue, event, trace, profile, replay, monitor, release)\n- User wants to fetch a specific resource by type and ID\n\nFULLY SUPPORTED:\n- **issue**: Fetch issue details by ID\n- **event**: Fetch specific event within an issue\n- **trace**: Fetch trace details (supports span focus from URL)\n- **profile**: Fetch and analyze CPU profiling data\n\nURL RECOGNIZED (returns helpful guidance):\n- **replay**: Session replay URLs\n- **monitor**: Cron monitor URLs\n- **release**: Release URLs\n\n<examples>\n### URL mode (auto-detect type)\n```\nget_sentry_resource(url='https://my-org.sentry.io/issues/PROJECT-123')\nget_sentry_resource(url='https://my-org.sentry.io/explore/traces/trace/abc123...')\nget_sentry_resource(url='https://my-org.sentry.io/replays/def456...')\n```\n\n### Explicit mode - Issue\n```\nget_sentry_resource(\n  resourceType='issue',\n  organizationSlug='my-org',\n  issueId='PROJECT-123'\n)\n```\n\n### Explicit mode - Trace\n```\nget_sentry_resource(\n  resourceType='trace',\n  organizationSlug='my-org',\n  traceId='a4d1aae7216b47ff8117cf4e09ce9d0a'\n)\n```\n</examples>\n\n<hints>\n- URL mode is simplest: just pass the Sentry URL and the tool auto-detects the resource type\n- For explicit mode, required params depend on resourceType:\n  - issue: organizationSlug, issueId\n  - event: organizationSlug, issueId, eventId\n  - trace: organizationSlug, traceId\n  - profile: organizationSlug, projectSlug, transactionName\n</hints>",
         "requiredScopes": ["event:read"]
       },
       {
