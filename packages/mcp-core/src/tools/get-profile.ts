@@ -68,6 +68,7 @@ export default defineTool({
   name: "get_profile",
   skills: ["inspect"],
   requiredScopes: ["event:read"],
+  experimental: true,
 
   description: [
     "Analyze CPU profiling data to identify performance bottlenecks and detect regressions.",
