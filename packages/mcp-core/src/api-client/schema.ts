@@ -114,6 +114,10 @@ export const ProjectSchema = z
     slug: z.string(),
     name: z.string(),
     platform: z.string().nullable().optional(),
+    hasProfiles: z.boolean().optional(),
+    hasReplays: z.boolean().optional(),
+    hasLogs: z.boolean().optional(),
+    firstTransactionEvent: z.boolean().optional(),
   })
   .passthrough();
 

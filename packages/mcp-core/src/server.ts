@@ -29,7 +29,7 @@ import tools, {
   SIMPLE_REPLACEMENT_TOOLS,
 } from "./tools/index";
 import type { ToolConfig } from "./tools/types";
-import type { ServerContext } from "./types";
+import type { ServerContext, ProjectCapabilities } from "./types";
 import {
   setTag,
   setUser,
@@ -225,6 +225,23 @@ function configureServer({
       (toolKey === "find_projects" && context.constraints.projectSlug)
     ) {
       continue;
+    }
+
+    // Skip tools when project lacks required capabilities (experimental)
+    // Fail-open: if capabilities are unknown, show all tools
+    if (
+      experimentalMode &&
+      context.constraints.projectSlug &&
+      context.constraints.projectCapabilities &&
+      tool.requiredCapabilities?.length
+    ) {
+      const caps = context.constraints.projectCapabilities;
+      const hasAllCapabilities = tool.requiredCapabilities.every(
+        (cap: keyof ProjectCapabilities) => caps[cap] === true,
+      );
+      if (!hasAllCapabilities) {
+        continue;
+      }
     }
 
     // Filter out constraint parameters from schema that will be auto-injected

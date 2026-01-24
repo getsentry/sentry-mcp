@@ -69,11 +69,16 @@ const mcpHandler: ExportedHandler<Env> = {
     const sentryHost = env.SENTRY_HOST || "sentry.io";
 
     // Verify user has access to the requested org/project
+    // Cache verification results in KV to avoid repeated API calls
     const verification = await verifyConstraintsAccess(
       { organizationSlug, projectSlug },
       {
         accessToken: oauthCtx.props.accessToken as string,
         sentryHost,
+        cache: {
+          kv: env.MCP_CACHE,
+          userId: oauthCtx.props.id as string,
+        },
       },
     );
 

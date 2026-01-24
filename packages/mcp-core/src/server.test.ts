@@ -133,6 +133,184 @@ describe("buildServer", () => {
     });
   });
 
+  describe("capability-based tool filtering (experimental)", () => {
+    it("hides tools when project lacks required capabilities", () => {
+      const server = buildServer({
+        experimentalMode: true,
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: {
+              profiles: false,
+              replays: false,
+              logs: false,
+              traces: false,
+            },
+          },
+        },
+        tools: {
+          tool_with_caps: createMockTool("tool_with_caps", {
+            requiredCapabilities: ["profiles"],
+          }),
+          tool_without_caps: createMockTool("tool_without_caps"),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // Tool with unmet capability requirement should be hidden
+      expect(toolNames).not.toContain("tool_with_caps");
+      // Tool without capability requirements should be visible
+      expect(toolNames).toContain("tool_without_caps");
+    });
+
+    it("shows tools when project has required capabilities", () => {
+      const server = buildServer({
+        experimentalMode: true,
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: {
+              profiles: true,
+              replays: false,
+              logs: false,
+              traces: true,
+            },
+          },
+        },
+        tools: {
+          profile_tool: createMockTool("profile_tool", {
+            requiredCapabilities: ["profiles"],
+          }),
+          trace_tool: createMockTool("trace_tool", {
+            requiredCapabilities: ["traces"],
+          }),
+          replay_tool: createMockTool("replay_tool", {
+            requiredCapabilities: ["replays"],
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // Tools with met capability requirements should be visible
+      expect(toolNames).toContain("profile_tool");
+      expect(toolNames).toContain("trace_tool");
+      // Tool with unmet capability requirement should be hidden
+      expect(toolNames).not.toContain("replay_tool");
+    });
+
+    it("shows all tools when capabilities are unknown (fail-open)", () => {
+      const server = buildServer({
+        experimentalMode: true,
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: null, // Capabilities unknown
+          },
+        },
+        tools: {
+          tool_with_caps: createMockTool("tool_with_caps", {
+            requiredCapabilities: ["profiles"],
+          }),
+          tool_without_caps: createMockTool("tool_without_caps"),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // All tools should be visible when capabilities are unknown (fail-open)
+      expect(toolNames).toContain("tool_with_caps");
+      expect(toolNames).toContain("tool_without_caps");
+    });
+
+    it("shows all tools when no project constraint is active", () => {
+      const server = buildServer({
+        experimentalMode: true,
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: null, // No project constraint
+            projectCapabilities: null,
+          },
+        },
+        tools: {
+          tool_with_caps: createMockTool("tool_with_caps", {
+            requiredCapabilities: ["profiles"],
+          }),
+          tool_without_caps: createMockTool("tool_without_caps"),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // All tools should be visible when no project constraint is active
+      expect(toolNames).toContain("tool_with_caps");
+      expect(toolNames).toContain("tool_without_caps");
+    });
+
+    it("requires all capabilities when tool has multiple requirements", () => {
+      const server = buildServer({
+        experimentalMode: true,
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: {
+              profiles: true,
+              replays: false, // One capability missing
+              logs: false,
+              traces: true,
+            },
+          },
+        },
+        tools: {
+          multi_cap_tool: createMockTool("multi_cap_tool", {
+            requiredCapabilities: ["profiles", "replays"],
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // Tool should be hidden because not all required capabilities are present
+      expect(toolNames).not.toContain("multi_cap_tool");
+    });
+
+    it("does not filter by capabilities when experimentalMode is false", () => {
+      const server = buildServer({
+        experimentalMode: false,
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: {
+              profiles: false,
+              replays: false,
+              logs: false,
+              traces: false,
+            },
+          },
+        },
+        tools: {
+          tool_with_caps: createMockTool("tool_with_caps", {
+            requiredCapabilities: ["profiles"],
+          }),
+          tool_without_caps: createMockTool("tool_without_caps"),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // All tools should be visible when experimentalMode is false
+      expect(toolNames).toContain("tool_with_caps");
+      expect(toolNames).toContain("tool_without_caps");
+    });
+  });
+
   describe("experimental tool filtering with default tools", () => {
     // Test that experimental filtering works when using default tools (no custom tools provided)
     // We verify this by checking that the default tools are filtered correctly

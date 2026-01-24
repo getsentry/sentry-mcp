@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { ServerContext } from "../types";
+import type { ServerContext, ProjectCapabilities } from "../types";
 import type { Scope } from "../permissions";
 import type { Skill } from "../skills";
 import type {
@@ -17,6 +17,7 @@ export interface ToolConfig<
   skills: Skill[]; // Which skill categories this tool belongs to
   requiredScopes: Scope[]; // LEGACY: Which API scopes needed (deprecated, for backward compatibility)
   experimental?: boolean; // Mark tool as experimental (hidden by default)
+  requiredCapabilities?: (keyof ProjectCapabilities)[]; // Project capabilities required for this tool
   annotations: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;

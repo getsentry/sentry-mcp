@@ -1,19 +1,126 @@
-import type { Constraints } from "@sentry/mcp-core/types";
+import type { Constraints, ProjectCapabilities } from "@sentry/mcp-core/types";
 import { SentryApiService, ApiError } from "@sentry/mcp-core/api-client";
-import { logIssue } from "@sentry/mcp-core/telem/logging";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+
+// Timeout for fetching project capabilities (5 seconds)
+const CAPABILITIES_TIMEOUT_MS = 5000;
+
+// Cache configuration
+const CACHE_TTL_SECONDS = 900; // 15 minutes
+const CACHE_KEY_VERSION = "v1";
+
+/**
+ * Cached constraints data stored in KV.
+ */
+export type CachedConstraints = {
+  regionUrl: string | null;
+  projectCapabilities: ProjectCapabilities;
+  cachedAt: number;
+};
+
+/**
+ * Options for caching constraints verification results.
+ */
+export type CacheOptions = {
+  kv: KVNamespace;
+  userId: string;
+};
+
+/**
+ * Build a cache key for constraints verification.
+ * Format: caps:v1:{userId}:{sentryHost}:{organizationSlug}:{projectSlug}
+ */
+function buildCacheKey(
+  userId: string,
+  sentryHost: string,
+  organizationSlug: string,
+  projectSlug: string,
+): string {
+  return `caps:${CACHE_KEY_VERSION}:${userId}:${sentryHost}:${organizationSlug}:${projectSlug}`;
+}
+
+/**
+ * Attempt to retrieve cached constraints from KV.
+ * Returns null on cache miss or any error (fail-open).
+ */
+async function getCachedConstraints(
+  kv: KVNamespace,
+  key: string,
+): Promise<CachedConstraints | null> {
+  try {
+    const cached = await kv.get(key, "json");
+    return cached as CachedConstraints | null;
+  } catch (error) {
+    logWarn("Failed to read constraints cache", {
+      loggerScope: ["cloudflare", "constraint-utils"],
+      extra: { key, error: String(error) },
+    });
+    return null;
+  }
+}
+
+/**
+ * Store constraints in KV cache.
+ * Fire-and-forget - errors are logged but don't block the response.
+ */
+async function setCachedConstraints(
+  kv: KVNamespace,
+  key: string,
+  data: CachedConstraints,
+): Promise<void> {
+  try {
+    await kv.put(key, JSON.stringify(data), {
+      expirationTtl: CACHE_TTL_SECONDS,
+    });
+  } catch (error) {
+    logWarn("Failed to write constraints cache", {
+      loggerScope: ["cloudflare", "constraint-utils"],
+      extra: { key, error: String(error) },
+    });
+  }
+}
+
+/**
+ * Helper to race a promise against a timeout with proper cleanup.
+ * Returns the result or throws a timeout error.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("CAPABILITY_TIMEOUT")),
+      timeoutMs,
+    );
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+}
 
 /**
  * Verify that provided org/project constraints exist and the user has access
  * by querying Sentry's API using the provided OAuth access token.
+ *
+ * If cache options are provided with a projectSlug, results will be cached
+ * in KV to avoid repeated API calls during MCP sessions.
  */
 export async function verifyConstraintsAccess(
   { organizationSlug, projectSlug }: Constraints,
   {
     accessToken,
     sentryHost = "sentry.io",
+    cache,
   }: {
     accessToken: string | undefined | null;
     sentryHost?: string;
+    cache?: CacheOptions;
   },
 ): Promise<
   | {
@@ -42,6 +149,31 @@ export async function verifyConstraintsAccess(
     };
   }
 
+  // Check cache if project constraints are requested and cache is available
+  // Cache key includes userId to ensure per-user isolation
+  let cacheKey: string | null = null;
+  if (projectSlug && cache) {
+    cacheKey = buildCacheKey(
+      cache.userId,
+      sentryHost,
+      organizationSlug,
+      projectSlug,
+    );
+    const cached = await getCachedConstraints(cache.kv, cacheKey);
+    if (cached) {
+      // Cache hit - return cached constraints without API calls
+      return {
+        ok: true,
+        constraints: {
+          organizationSlug,
+          projectSlug,
+          regionUrl: cached.regionUrl,
+          projectCapabilities: cached.projectCapabilities,
+        },
+      };
+    }
+  }
+
   // Use shared API client for consistent behavior and error handling
   const api = new SentryApiService({ accessToken, host: sentryHost });
 
@@ -68,31 +200,68 @@ export async function verifyConstraintsAccess(
   }
 
   // Verify project access if specified
+  let projectCapabilities: ProjectCapabilities | null = null;
   if (projectSlug) {
     try {
-      await api.getProject(
-        {
-          organizationSlug,
-          projectSlugOrId: projectSlug,
-        },
-        regionUrl ? { host: new URL(regionUrl).host } : undefined,
+      // Fetch project with timeout to avoid blocking on slow API responses
+      const project = await withTimeout(
+        api.getProject(
+          {
+            organizationSlug,
+            projectSlugOrId: projectSlug,
+          },
+          regionUrl ? { host: new URL(regionUrl).host } : undefined,
+        ),
+        CAPABILITIES_TIMEOUT_MS,
       );
+
+      // Extract capability flags from project response
+      // If fields are missing, === true comparison safely defaults to false
+      projectCapabilities = {
+        profiles: project.hasProfiles === true,
+        replays: project.hasReplays === true,
+        logs: project.hasLogs === true,
+        traces: project.firstTransactionEvent === true,
+      };
     } catch (error) {
-      if (error instanceof ApiError) {
+      // Check if this was a timeout
+      if (error instanceof Error && error.message === "CAPABILITY_TIMEOUT") {
+        // Timeout - log and proceed with null capabilities (fail-open for tool filtering)
+        // Note: We couldn't verify project access in time, but we allow through
+        // to avoid blocking users due to slow API responses. Tools will still
+        // require valid auth tokens to actually execute.
+        logIssue(
+          new Error(
+            `Project verification timed out after ${CAPABILITIES_TIMEOUT_MS}ms for ${projectSlug}`,
+          ),
+        );
+      } else if (error instanceof ApiError) {
+        // API errors (404, 401, 403, etc.) should fail verification
         const message =
           error.status === 404
             ? `Project '${projectSlug}' not found in organization '${organizationSlug}'`
             : error.message;
         return { ok: false, status: error.status, message };
+      } else {
+        const eventId = logIssue(error);
+        return {
+          ok: false,
+          status: 502,
+          message: "Failed to verify project",
+          eventId,
+        };
       }
-      const eventId = logIssue(error);
-      return {
-        ok: false,
-        status: 502,
-        message: "Failed to verify project",
-        eventId,
-      };
     }
+  }
+
+  // Cache successful verification results for project constraints
+  // Fire-and-forget write - don't block response on cache update
+  if (cacheKey && projectCapabilities) {
+    void setCachedConstraints(cache!.kv, cacheKey, {
+      regionUrl: regionUrl || null,
+      projectCapabilities,
+      cachedAt: Date.now(),
+    });
   }
 
   return {
@@ -101,6 +270,7 @@ export async function verifyConstraintsAccess(
       organizationSlug,
       projectSlug: projectSlug || null,
       regionUrl: regionUrl || null,
+      projectCapabilities,
     },
   };
 }

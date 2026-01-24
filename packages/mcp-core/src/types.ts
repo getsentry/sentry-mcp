@@ -8,12 +8,23 @@
 import type { Skill } from "./skills";
 
 /**
+ * Project capabilities indicating what data types the project has
+ */
+export type ProjectCapabilities = {
+  profiles?: boolean;
+  replays?: boolean;
+  logs?: boolean;
+  traces?: boolean;
+};
+
+/**
  * Constraints that restrict the MCP session scope
  */
 export type Constraints = {
   organizationSlug?: string | null;
   projectSlug?: string | null;
   regionUrl?: string | null;
+  projectCapabilities?: ProjectCapabilities | null;
 };
 
 /**
