@@ -105,6 +105,7 @@ describe("parseSentryUrl", () => {
       ).toMatchInlineSnapshot(`
         {
           "organizationSlug": "my-org",
+          "spanId": undefined,
           "traceId": "a4d1aae7216b47ff8117cf4e09ce9d0a",
           "type": "trace",
         }
@@ -119,6 +120,7 @@ describe("parseSentryUrl", () => {
       ).toMatchInlineSnapshot(`
         {
           "organizationSlug": "my-org",
+          "spanId": undefined,
           "traceId": "b5e2bbf8327c58009228df5f1ade0e1b",
           "type": "trace",
         }
@@ -133,7 +135,23 @@ describe("parseSentryUrl", () => {
       ).toMatchInlineSnapshot(`
         {
           "organizationSlug": "my-org",
+          "spanId": undefined,
           "traceId": "c6f3ccg9438d69110339eg6g2bef1f2c",
+          "type": "trace",
+        }
+      `);
+    });
+
+    it("parses trace URL with span focus query param", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/performance/trace/a4d1aae7216b47ff8117cf4e09ce9d0a?node=span-abc123def456",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "spanId": "abc123def456",
+          "traceId": "a4d1aae7216b47ff8117cf4e09ce9d0a",
           "type": "trace",
         }
       `);
@@ -210,6 +228,184 @@ describe("parseSentryUrl", () => {
     });
   });
 
+  describe("replay URLs", () => {
+    it("parses replay URL with subdomain", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/replays/abc123def456789/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "replayId": "abc123def456789",
+          "type": "replay",
+        }
+      `);
+    });
+
+    it("parses replay URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.io/organizations/my-org/replays/replay123/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "replayId": "replay123",
+          "type": "replay",
+        }
+      `);
+    });
+
+    it("parses replay URL without trailing slash", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/replays/abc123"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "replayId": "abc123",
+          "type": "replay",
+        }
+      `);
+    });
+
+    it("does not parse replay selectors URL as replay", () => {
+      const result = parseSentryUrl(
+        "https://my-org.sentry.io/replays/selectors/",
+      );
+      expect(result.type).toBe("unknown");
+    });
+  });
+
+  describe("monitor/cron URLs", () => {
+    it("parses crons URL with monitor slug", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/crons/my-cron-job/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "monitorSlug": "my-cron-job",
+          "organizationSlug": "my-org",
+          "type": "monitor",
+        }
+      `);
+    });
+
+    it("parses crons URL with project and monitor slug", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/crons/my-project/my-monitor/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "monitorSlug": "my-monitor",
+          "organizationSlug": "my-org",
+          "projectSlug": "my-project",
+          "type": "monitor",
+        }
+      `);
+    });
+
+    it("parses monitors URL", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/monitors/heartbeat-check/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "monitorSlug": "heartbeat-check",
+          "organizationSlug": "my-org",
+          "type": "monitor",
+        }
+      `);
+    });
+
+    it("parses crons URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.io/organizations/my-org/crons/daily-backup/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "monitorSlug": "daily-backup",
+          "organizationSlug": "my-org",
+          "type": "monitor",
+        }
+      `);
+    });
+
+    it("does not parse crons/new URL as monitor", () => {
+      const result = parseSentryUrl("https://my-org.sentry.io/crons/new/");
+      expect(result.type).toBe("unknown");
+    });
+  });
+
+  describe("release URLs", () => {
+    it("parses release URL with version", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/releases/v1.2.3/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "releaseVersion": "v1.2.3",
+          "type": "release",
+        }
+      `);
+    });
+
+    it("parses release URL with complex version", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/releases/backend@2024.01.15-abc123/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "releaseVersion": "backend@2024.01.15-abc123",
+          "type": "release",
+        }
+      `);
+    });
+
+    it("parses release URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.io/organizations/my-org/releases/production-v5/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "releaseVersion": "production-v5",
+          "type": "release",
+        }
+      `);
+    });
+
+    it("does not parse releases redirect URLs", () => {
+      const result = parseSentryUrl(
+        "https://my-org.sentry.io/releases/new-events/",
+      );
+      expect(result.type).toBe("unknown");
+    });
+  });
+
+  describe("performance summary URLs", () => {
+    it("extracts transaction from performance summary URL", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/performance/summary/?transaction=/api/users",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "transaction": "/api/users",
+          "type": "unknown",
+        }
+      `);
+    });
+
+    it("handles encoded transaction names", () => {
+      const result = parseSentryUrl(
+        "https://my-org.sentry.io/performance/summary/?transaction=%2Fapi%2Fusers%2F%3Aid",
+      );
+      expect(result.transaction).toBe("/api/users/:id");
+      expect(result.type).toBe("unknown");
+    });
+  });
+
   describe("unknown URLs", () => {
     it("returns unknown for unrecognized path", () => {
       expect(
@@ -229,6 +425,45 @@ describe("parseSentryUrl", () => {
         {
           "organizationSlug": "my-org",
           "type": "unknown",
+        }
+      `);
+    });
+
+    it("returns unknown for discover URL", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/discover/results/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "type": "unknown",
+        }
+      `);
+    });
+  });
+
+  describe("region URL handling", () => {
+    it("handles us.sentry.io region URL with org in path", () => {
+      expect(
+        parseSentryUrl("https://us.sentry.io/my-org/issues/123"),
+      ).toMatchInlineSnapshot(`
+        {
+          "issueId": "123",
+          "organizationSlug": "my-org",
+          "type": "issue",
+        }
+      `);
+    });
+
+    it("handles eu.sentry.io region URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://eu.sentry.io/organizations/my-org/replays/abc123/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "replayId": "abc123",
+          "type": "replay",
         }
       `);
     });
