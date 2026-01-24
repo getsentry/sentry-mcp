@@ -94,12 +94,15 @@ export default defineTool({
 
     // Exclude use_sentry (to prevent recursion) and simple replacement tools
     // (since use_sentry only runs when an agent provider is available, list_* tools aren't needed)
+    // Also exclude experimental tools (use_sentry doesn't support experimentalMode)
     const toolsToExclude = new Set<string>([
       "use_sentry",
       ...SIMPLE_REPLACEMENT_TOOLS,
     ]);
     const toolsForAgent = Object.fromEntries(
-      Object.entries(tools).filter(([key]) => !toolsToExclude.has(key)),
+      Object.entries(tools).filter(
+        ([key, tool]) => !toolsToExclude.has(key) && !tool.experimental,
+      ),
     );
 
     // Build internal MCP server with the provided context
