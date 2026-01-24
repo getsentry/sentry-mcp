@@ -170,11 +170,7 @@ function extractOrganizationSlug(parsedUrl: URL, pathParts: string[]): string {
     return hostParts[0];
   }
 
-  // For region-prefixed URLs like us.sentry.io, org must be in path
-  if (pathParts.length > 1 && knownSegments.includes(pathParts[1])) {
-    return pathParts[0];
-  }
-
+  // If we reach here with region-prefixed URL, we couldn't determine the org
   throw new UserInputError(
     "Invalid Sentry URL. Could not determine organization from URL.",
   );

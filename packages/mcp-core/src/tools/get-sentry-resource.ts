@@ -37,6 +37,7 @@ interface ResolvedResourceParams {
   eventId?: string;
   // Trace params
   traceId?: string;
+  // TODO: spanId is parsed from URLs but not yet used - add when get_trace_details supports span focusing
   spanId?: string;
   // Profile params
   projectSlug?: string;
