@@ -23,6 +23,7 @@ import useSentry from "./use-sentry";
 import listIssues from "./list-issues";
 import listEvents from "./list-events";
 import listIssueEvents from "./list-issue-events";
+import getProfile from "./get-profile";
 
 /**
  * Tools that require an embedded agent provider (LLM-powered).
@@ -72,6 +73,7 @@ export default {
   list_issues: listIssues,
   list_events: listEvents,
   list_issue_events: listIssueEvents,
+  get_profile: getProfile,
 } as const;
 
 // Type export

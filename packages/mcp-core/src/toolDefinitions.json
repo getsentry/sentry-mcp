@@ -520,6 +520,69 @@
     "requiredScopes": ["event:read"]
   },
   {
+    "name": "get_profile",
+    "description": "Analyze CPU profiling data to identify performance bottlenecks and detect regressions.\n\nUSE THIS TOOL WHEN:\n- User asks why a specific endpoint/transaction is slow\n- User wants to understand where CPU time is spent\n- User asks about performance bottlenecks\n- User wants to compare performance between time periods\n- User shares a Sentry profile URL\n\nRETURNS:\n- Hot paths (call stacks consuming the most CPU time)\n- Performance percentiles (p75, p95, p99) for each function\n- User code vs library code breakdown\n- Actionable recommendations for optimization\n- Regression analysis when comparing periods\n\n<examples>\n### Analyze from URL (with transaction name)\n```\nget_profile(\n  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=abc123',\n  transactionName='/api/users'\n)\n```\n\n### Analyze by transaction name\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend'\n)\n```\n\n### Compare performance between periods\n```\nget_profile(\n  organizationSlug='my-org',\n  transactionName='/api/users',\n  projectSlugOrId='backend',\n  statsPeriod='7d',\n  compareAgainstPeriod='14d'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library code\n- High p99 relative to p75 indicates inconsistent performance\n- Use compareAgainstPeriod to detect regressions over time\n- Transaction names are case-sensitive\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "profileUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Sentry profile URL. If provided, organization and project are extracted from URL. transactionName is still required."
+        },
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "projectSlugOrId": {
+          "type": ["string", "number"],
+          "description": "Project slug or numeric ID"
+        },
+        "transactionName": {
+          "type": "string",
+          "description": "Transaction name (e.g., '/api/users', 'POST /graphql')"
+        },
+        "statsPeriod": {
+          "type": "string",
+          "default": "7d",
+          "description": "Time period: '1h', '24h', '7d', '14d', '30d' (default: '7d')"
+        },
+        "compareAgainstPeriod": {
+          "type": "string",
+          "description": "Compare against this baseline period (e.g., '14d', '30d'). Enables regression detection."
+        },
+        "focusOnUserCode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show only user code (is_application: true). Set to false to include library code."
+        },
+        "maxHotPaths": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 10,
+          "description": "Number of hot paths to display (1-20, default: 10)"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
     "name": "get_trace_details",
     "description": "Get detailed information about a specific Sentry trace by ID.\n\nUSE THIS TOOL WHEN USERS:\n- Provide a specific trace ID (e.g., 'a4d1aae7216b47ff8117cf4e09ce9d0a')\n- Ask to 'show me trace [TRACE-ID]', 'explain trace [TRACE-ID]'\n- Want high-level overview and link to view trace details in Sentry\n- Need trace statistics and span breakdown\n\nDO NOT USE for:\n- General searching for traces (use search_events with trace queries)\n- Individual span details (this shows trace overview)\n\nTRIGGER PATTERNS:\n- 'Show me trace abc123' → use get_trace_details\n- 'Explain trace a4d1aae7216b47ff8117cf4e09ce9d0a' → use get_trace_details\n- 'What is trace [trace-id]' → use get_trace_details\n\n<examples>\n### Get trace overview\n```\nget_trace_details(organizationSlug='my-organization', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\n```\n</examples>\n\n<hints>\n- Trace IDs are 32-character hexadecimal strings\n</hints>",
     "inputSchema": {

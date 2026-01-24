@@ -67,6 +67,9 @@ import traceEventFixture from "./fixtures/trace-event.json" with {
 import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
 };
+import flamegraphFixture from "./fixtures/flamegraph.json" with {
+  type: "json",
+};
 
 /**
  * Standard organization payload for mock responses.
@@ -1124,6 +1127,37 @@ export const restHandlers = buildHandlers([
       return HttpResponse.json(updatedIssue);
     },
   },
+  // Profiling endpoints
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/profiling/flamegraph/",
+    fetch: ({ request }) => {
+      const url = new URL(request.url);
+      const project = url.searchParams.get("project");
+      const query = url.searchParams.get("query");
+
+      // Return empty but valid flamegraph for unknown transactions
+      // Note: Query may have quoted transaction name: transaction:"/api/users"
+      if (
+        !query?.includes('transaction:"/api/users"') &&
+        !query?.includes("transaction:/api/users")
+      ) {
+        return HttpResponse.json({
+          ...flamegraphFixture,
+          projectID: Number(project) || flamegraphFixture.projectID,
+          transactionName: "unknown",
+          profiles: [],
+          shared: {
+            frames: [],
+            frame_infos: [],
+            profiles: [],
+          },
+        });
+      }
+
+      return HttpResponse.json(flamegraphFixture);
+    },
+  },
   // Event attachment endpoints
   {
     method: "get",
@@ -1439,6 +1473,7 @@ export {
   traceFixture,
   traceMixedFixture,
   traceEventFixture,
+  flamegraphFixture,
 };
 
 // Export fixture factories

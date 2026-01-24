@@ -29,6 +29,8 @@ import {
   TraceSchema,
   UserSchema,
   UserRegionsSchema,
+  FlamegraphSchema,
+  ProfileChunkResponseSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
 import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
@@ -54,6 +56,8 @@ import type {
   Trace,
   TraceMeta,
   User,
+  Flamegraph,
+  ProfileChunk,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -2330,5 +2334,139 @@ export class SentryApiService {
       opts,
     );
     return TraceSchema.parse(body);
+  }
+
+  /**
+   * Retrieves flamegraph data for a transaction.
+   *
+   * Flamegraphs provide pre-aggregated CPU profiling data including:
+   * - Unique call stack patterns (samples)
+   * - Performance statistics (counts, durations, percentiles)
+   * - Frame metadata (file, function, is_application)
+   *
+   * This is the primary data source for profile analysis as it includes
+   * aggregated hot paths and percentile calculations (p75, p95, p99).
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.projectId Project ID or slug
+   * @param params.transactionName Transaction name to analyze (e.g., "/api/users")
+   * @param params.statsPeriod Time period for analysis (e.g., "7d", "14d", "30d")
+   * @param opts Request options
+   * @returns Flamegraph with pre-aggregated profiling data
+   *
+   * @example
+   * ```typescript
+   * const flamegraph = await apiService.getFlamegraph({
+   *   organizationSlug: "my-org",
+   *   projectId: 1,
+   *   transactionName: "/api/users",
+   *   statsPeriod: "7d"
+   * });
+   * console.log(`Analyzed ${flamegraph.profiles.length} profiles`);
+   * ```
+   */
+  async getFlamegraph(
+    {
+      organizationSlug,
+      projectId,
+      transactionName,
+      statsPeriod = "7d",
+    }: {
+      organizationSlug: string;
+      projectId: string | number;
+      transactionName: string;
+      statsPeriod?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<Flamegraph> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("project", projectId.toString());
+    // Escape backslashes first, then quotes for proper string escaping
+    const escapedTransaction = transactionName
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"');
+    queryParams.set(
+      "query",
+      `event.type:transaction transaction:"${escapedTransaction}"`,
+    );
+    queryParams.set("statsPeriod", statsPeriod);
+
+    const path = `/organizations/${organizationSlug}/profiling/flamegraph/?${queryParams.toString()}`;
+    const body = await this.requestJSON(path, undefined, opts);
+    return FlamegraphSchema.parse(body);
+  }
+
+  /**
+   * Retrieves raw profile chunk data for detailed analysis.
+   *
+   * Profile chunks contain:
+   * - frames: All unique stack frames
+   * - samples: Individual sample points with timestamps
+   * - stacks: Arrays of frame indices forming call stacks
+   * - thread_metadata: Information about profiled threads
+   *
+   * This is used for deep-dive analysis when flamegraph data isn't sufficient.
+   * Most use cases should use getFlamegraph() instead, as it provides
+   * pre-aggregated data that's easier to work with.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.profilerId Profiler ID from flamegraph output
+   * @param params.projectId Project ID or slug
+   * @param params.start Start time (ISO format)
+   * @param params.end End time (ISO format)
+   * @param opts Request options
+   * @returns Raw profile chunk data
+   * @throws ApiNotFoundError if no profile chunk is found
+   *
+   * @example
+   * ```typescript
+   * const chunk = await apiService.getProfileChunk({
+   *   organizationSlug: "my-org",
+   *   profilerId: "041bde57b9844e36b8b7e5734efae5f7",
+   *   projectId: 1,
+   *   start: "2024-01-01T00:00:00Z",
+   *   end: "2024-01-01T01:00:00Z"
+   * });
+   * console.log(`Chunk has ${chunk.profile.samples.length} samples`);
+   * ```
+   */
+  async getProfileChunk(
+    {
+      organizationSlug,
+      profilerId,
+      projectId,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      profilerId: string;
+      projectId: string | number;
+      start: string;
+      end: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ProfileChunk> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("profiler_id", profilerId);
+    queryParams.set("project", projectId.toString());
+    queryParams.set("start", start);
+    queryParams.set("end", end);
+
+    const path = `/organizations/${organizationSlug}/profiling/chunks/?${queryParams.toString()}`;
+    const body = await this.requestJSON(path, undefined, opts);
+
+    // Response wraps chunks in {chunks: []}
+    const response = ProfileChunkResponseSchema.parse(body);
+    if (!response.chunks || response.chunks.length === 0) {
+      throw new ApiNotFoundError(
+        `No profile chunk found for profiler_id ${profilerId}`,
+        undefined,
+        body,
+      );
+    }
+
+    return response.chunks[0];
   }
 }
