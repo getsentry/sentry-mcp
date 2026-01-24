@@ -14,9 +14,20 @@ These tools require an LLM provider (OpenAI or Anthropic) to be configured.
 
 ## Provider Selection
 
-### Auto-Detection
+### Explicit Configuration (Recommended)
 
-Sentry MCP automatically detects which LLM provider to use based on environment variables:
+Always set `EMBEDDED_AGENT_PROVIDER` to explicitly specify your LLM provider:
+
+```bash
+export EMBEDDED_AGENT_PROVIDER=openai   # or 'anthropic'
+export OPENAI_API_KEY=sk-...            # corresponding API key
+```
+
+> **Deprecation Notice:** Auto-detection based on API keys alone is deprecated and will be removed in a future release. Please update your configuration to explicitly set `EMBEDDED_AGENT_PROVIDER`.
+
+### Resolution Order
+
+Sentry MCP resolves the LLM provider in this order:
 
 1. **Explicit configuration** (highest priority)
    - `EMBEDDED_AGENT_PROVIDER` environment variable
@@ -26,9 +37,10 @@ Sentry MCP automatically detects which LLM provider to use based on environment 
    - If both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are set without explicit provider selection, an error is thrown
    - This prevents silent bugs when external tools inject API keys
 
-3. **Auto-detection** (lowest priority)
+3. **Auto-detection** (lowest priority, **deprecated**)
    - If only `ANTHROPIC_API_KEY` is set → use Anthropic
    - If only `OPENAI_API_KEY` is set → use OpenAI
+   - A deprecation warning is logged when this fallback is used
 
 ### Configuration Methods
 

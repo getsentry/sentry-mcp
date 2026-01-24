@@ -125,9 +125,21 @@ if (!resolvedProvider) {
   }
   console.warn("");
 } else {
+  const providerSource = getProviderSource();
   console.warn(
-    `Using ${resolvedProvider} for AI-powered search tools (${getProviderSource()}).`,
+    `Using ${resolvedProvider} for AI-powered search tools (${providerSource}).`,
   );
+  // Warn about auto-detection deprecation
+  if (providerSource === "auto-detected") {
+    console.warn(
+      "Deprecation warning: Auto-detection of LLM provider is deprecated.",
+    );
+    console.warn(
+      `Please set EMBEDDED_AGENT_PROVIDER='${resolvedProvider}' explicitly.`,
+    );
+    console.warn("Auto-detection will be removed in a future release.");
+  }
+  console.warn("");
 }
 
 Sentry.init({

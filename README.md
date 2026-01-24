@@ -16,7 +16,7 @@ If you're looking to contribute, learn how it works, or to run this for self-hos
 
 While this repository is focused on acting as an MCP service, we also support a `stdio` transport. This is still a work in progress, but is the easiest way to adapt run the MCP against a self-hosted Sentry install.
 
-**Note:** The AI-powered search tools (`search_events` and `search_issues`) require an OpenAI API key. These tools use natural language processing to translate queries into Sentry's query syntax. Without the API key, these specific tools will be unavailable, but all other tools will function normally.
+**Note:** The AI-powered search tools (`search_events`, `search_issues`, etc.) require an LLM provider (OpenAI or Anthropic). These tools use natural language processing to translate queries into Sentry's query syntax. Without a configured provider, these specific tools will be unavailable, but all other tools will function normally.
 
 To utilize the `stdio` transport, you'll need to create an User Auth Token in Sentry with the necessary scopes. As of writing this is:
 
@@ -38,13 +38,38 @@ npx @sentry/mcp-server@latest --access-token=sentry-user-token
 Need to connect to a self-hosted deployment? Add <code>--host</code> (hostname
 only, e.g. <code>--host=sentry.example.com</code>) when you run the command.
 
-Note: You can also use environment variables:
+#### Environment Variables
 
 ```shell
-SENTRY_ACCESS_TOKEN=
-# Optional overrides for self-hosted deployments
-SENTRY_HOST=
-OPENAI_API_KEY=  # Required for AI-powered search tools (search_events, search_issues)
+SENTRY_ACCESS_TOKEN=         # Required: Your Sentry auth token
+
+# LLM Provider Configuration (required for AI-powered search tools)
+EMBEDDED_AGENT_PROVIDER=     # Required: 'openai' or 'anthropic'
+OPENAI_API_KEY=              # Required if using OpenAI
+ANTHROPIC_API_KEY=           # Required if using Anthropic
+
+# Optional overrides
+SENTRY_HOST=                 # For self-hosted deployments
+```
+
+**Important:** Always set `EMBEDDED_AGENT_PROVIDER` to explicitly specify your LLM provider. Auto-detection based on API keys alone is deprecated and will be removed in a future release. See [docs/embedded-agents.md](docs/embedded-agents.md) for detailed configuration options.
+
+#### Example MCP Configuration
+
+```json
+{
+  "mcpServers": {
+    "sentry": {
+      "command": "npx",
+      "args": ["@sentry/mcp-server"],
+      "env": {
+        "SENTRY_ACCESS_TOKEN": "your-token",
+        "EMBEDDED_AGENT_PROVIDER": "openai",
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}
 ```
 
 If you leave the host variable unset, the CLI automatically targets the Sentry
