@@ -29,11 +29,12 @@ import type { z } from "zod";
  * ```
  */
 export function getConstraintKeysToFilter(
-  constraints: Constraints & Record<string, string | null | undefined>,
+  constraints: Constraints,
   toolInputSchema: Record<string, z.ZodType>,
 ): string[] {
   return Object.entries(constraints).flatMap(([key, value]) => {
-    if (!value) return [];
+    // Skip non-string values (e.g., projectCapabilities object)
+    if (!value || typeof value !== "string") return [];
 
     const keys: string[] = [];
 
@@ -77,12 +78,13 @@ export function getConstraintKeysToFilter(
  * ```
  */
 export function getConstraintParametersToInject(
-  constraints: Constraints & Record<string, string | null | undefined>,
+  constraints: Constraints,
   toolInputSchema: Record<string, z.ZodType>,
 ): Record<string, string> {
   return Object.fromEntries(
     Object.entries(constraints).flatMap(([key, value]) => {
-      if (!value) return [];
+      // Skip non-string values (e.g., projectCapabilities object)
+      if (!value || typeof value !== "string") return [];
 
       const entries: [string, string][] = [];
 

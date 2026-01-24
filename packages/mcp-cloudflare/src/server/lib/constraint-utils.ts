@@ -1,6 +1,33 @@
-import type { Constraints } from "@sentry/mcp-core/types";
+import type { Constraints, ProjectCapabilities } from "@sentry/mcp-core/types";
 import { SentryApiService, ApiError } from "@sentry/mcp-core/api-client";
 import { logIssue } from "@sentry/mcp-core/telem/logging";
+
+// Timeout for fetching project capabilities (5 seconds)
+const CAPABILITIES_TIMEOUT_MS = 5000;
+
+/**
+ * Helper to race a promise against a timeout with proper cleanup.
+ * Returns the result or throws a timeout error.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("CAPABILITY_TIMEOUT")),
+      timeoutMs,
+    );
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+}
 
 /**
  * Verify that provided org/project constraints exist and the user has access
@@ -68,30 +95,57 @@ export async function verifyConstraintsAccess(
   }
 
   // Verify project access if specified
+  let projectCapabilities: ProjectCapabilities | null = null;
   if (projectSlug) {
     try {
-      await api.getProject(
-        {
-          organizationSlug,
-          projectSlugOrId: projectSlug,
-        },
-        regionUrl ? { host: new URL(regionUrl).host } : undefined,
+      // Fetch project with timeout to avoid blocking on slow API responses
+      const project = await withTimeout(
+        api.getProject(
+          {
+            organizationSlug,
+            projectSlugOrId: projectSlug,
+          },
+          regionUrl ? { host: new URL(regionUrl).host } : undefined,
+        ),
+        CAPABILITIES_TIMEOUT_MS,
       );
+
+      // Extract capability flags from project response
+      // If fields are missing, === true comparison safely defaults to false
+      projectCapabilities = {
+        hasProfiles: project.hasProfiles === true,
+        hasReplays: project.hasReplays === true,
+        hasLogs: project.hasLogs === true,
+        firstTransactionEvent: project.firstTransactionEvent === true,
+      };
     } catch (error) {
-      if (error instanceof ApiError) {
+      // Check if this was a timeout
+      if (error instanceof Error && error.message === "CAPABILITY_TIMEOUT") {
+        // Timeout - log and proceed with null capabilities (fail-open for tool filtering)
+        // Note: We couldn't verify project access in time, but we allow through
+        // to avoid blocking users due to slow API responses. Tools will still
+        // require valid auth tokens to actually execute.
+        logIssue(
+          new Error(
+            `Project verification timed out after ${CAPABILITIES_TIMEOUT_MS}ms for ${projectSlug}`,
+          ),
+        );
+      } else if (error instanceof ApiError) {
+        // API errors (404, 401, 403, etc.) should fail verification
         const message =
           error.status === 404
             ? `Project '${projectSlug}' not found in organization '${organizationSlug}'`
             : error.message;
         return { ok: false, status: error.status, message };
+      } else {
+        const eventId = logIssue(error);
+        return {
+          ok: false,
+          status: 502,
+          message: "Failed to verify project",
+          eventId,
+        };
       }
-      const eventId = logIssue(error);
-      return {
-        ok: false,
-        status: 502,
-        message: "Failed to verify project",
-        eventId,
-      };
     }
   }
 
@@ -101,6 +155,7 @@ export async function verifyConstraintsAccess(
       organizationSlug,
       projectSlug: projectSlug || null,
       regionUrl: regionUrl || null,
+      projectCapabilities,
     },
   };
 }

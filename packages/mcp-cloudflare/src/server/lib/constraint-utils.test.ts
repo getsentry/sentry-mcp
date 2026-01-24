@@ -54,6 +54,7 @@ describe("verifyConstraintsAccess", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: null,
         regionUrl: "https://us.sentry.io",
+        projectCapabilities: null,
       });
     }
   });
@@ -69,6 +70,12 @@ describe("verifyConstraintsAccess", () => {
         organizationSlug: "sentry-mcp-evals",
         projectSlug: "cloudflare-mcp",
         regionUrl: "https://us.sentry.io",
+        projectCapabilities: {
+          hasProfiles: false,
+          hasReplays: false,
+          hasLogs: false,
+          firstTransactionEvent: false,
+        },
       });
     }
   });

@@ -63,6 +63,7 @@ export default defineTool({
   name: "get_profile",
   skills: ["inspect"],
   requiredScopes: ["event:read"],
+  requiredCapabilities: ["hasProfiles"],
   experimental: true,
 
   description: [

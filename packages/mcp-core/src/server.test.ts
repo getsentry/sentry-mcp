@@ -133,6 +133,149 @@ describe("buildServer", () => {
     });
   });
 
+  describe("capability-based tool filtering", () => {
+    it("hides tools when project lacks required capabilities", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: {
+              hasProfiles: false,
+              hasReplays: false,
+              hasLogs: false,
+              firstTransactionEvent: false,
+            },
+          },
+        },
+        tools: {
+          tool_with_caps: createMockTool("tool_with_caps", {
+            requiredCapabilities: ["hasProfiles"],
+          }),
+          tool_without_caps: createMockTool("tool_without_caps"),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // Tool with unmet capability requirement should be hidden
+      expect(toolNames).not.toContain("tool_with_caps");
+      // Tool without capability requirements should be visible
+      expect(toolNames).toContain("tool_without_caps");
+    });
+
+    it("shows tools when project has required capabilities", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: {
+              hasProfiles: true,
+              hasReplays: false,
+              hasLogs: false,
+              firstTransactionEvent: true,
+            },
+          },
+        },
+        tools: {
+          profile_tool: createMockTool("profile_tool", {
+            requiredCapabilities: ["hasProfiles"],
+          }),
+          trace_tool: createMockTool("trace_tool", {
+            requiredCapabilities: ["firstTransactionEvent"],
+          }),
+          replay_tool: createMockTool("replay_tool", {
+            requiredCapabilities: ["hasReplays"],
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // Tools with met capability requirements should be visible
+      expect(toolNames).toContain("profile_tool");
+      expect(toolNames).toContain("trace_tool");
+      // Tool with unmet capability requirement should be hidden
+      expect(toolNames).not.toContain("replay_tool");
+    });
+
+    it("shows all tools when capabilities are unknown (fail-open)", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: null, // Capabilities unknown
+          },
+        },
+        tools: {
+          tool_with_caps: createMockTool("tool_with_caps", {
+            requiredCapabilities: ["hasProfiles"],
+          }),
+          tool_without_caps: createMockTool("tool_without_caps"),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // All tools should be visible when capabilities are unknown (fail-open)
+      expect(toolNames).toContain("tool_with_caps");
+      expect(toolNames).toContain("tool_without_caps");
+    });
+
+    it("shows all tools when no project constraint is active", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: null, // No project constraint
+            projectCapabilities: null,
+          },
+        },
+        tools: {
+          tool_with_caps: createMockTool("tool_with_caps", {
+            requiredCapabilities: ["hasProfiles"],
+          }),
+          tool_without_caps: createMockTool("tool_without_caps"),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // All tools should be visible when no project constraint is active
+      expect(toolNames).toContain("tool_with_caps");
+      expect(toolNames).toContain("tool_without_caps");
+    });
+
+    it("requires all capabilities when tool has multiple requirements", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "test-project",
+            projectCapabilities: {
+              hasProfiles: true,
+              hasReplays: false, // One capability missing
+              hasLogs: false,
+              firstTransactionEvent: true,
+            },
+          },
+        },
+        tools: {
+          multi_cap_tool: createMockTool("multi_cap_tool", {
+            requiredCapabilities: ["hasProfiles", "hasReplays"],
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // Tool should be hidden because not all required capabilities are present
+      expect(toolNames).not.toContain("multi_cap_tool");
+    });
+  });
+
   describe("experimental tool filtering with default tools", () => {
     // Test that experimental filtering works when using default tools (no custom tools provided)
     // We verify this by checking that the default tools are filtered correctly
