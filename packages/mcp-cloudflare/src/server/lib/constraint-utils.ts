@@ -1,9 +1,84 @@
 import type { Constraints, ProjectCapabilities } from "@sentry/mcp-core/types";
 import { SentryApiService, ApiError } from "@sentry/mcp-core/api-client";
-import { logIssue } from "@sentry/mcp-core/telem/logging";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 
 // Timeout for fetching project capabilities (5 seconds)
 const CAPABILITIES_TIMEOUT_MS = 5000;
+
+// Cache configuration
+const CACHE_TTL_SECONDS = 900; // 15 minutes
+const CACHE_KEY_VERSION = "v1";
+
+/**
+ * Cached constraints data stored in KV.
+ */
+export type CachedConstraints = {
+  regionUrl: string | null;
+  projectCapabilities: ProjectCapabilities;
+  cachedAt: number;
+};
+
+/**
+ * Options for caching constraints verification results.
+ */
+export type CacheOptions = {
+  kv: KVNamespace;
+  userId: string;
+};
+
+/**
+ * Build a cache key for constraints verification.
+ * Format: caps:v1:{userId}:{sentryHost}:{organizationSlug}:{projectSlug}
+ */
+function buildCacheKey(
+  userId: string,
+  sentryHost: string,
+  organizationSlug: string,
+  projectSlug: string,
+): string {
+  return `caps:${CACHE_KEY_VERSION}:${userId}:${sentryHost}:${organizationSlug}:${projectSlug}`;
+}
+
+/**
+ * Attempt to retrieve cached constraints from KV.
+ * Returns null on cache miss or any error (fail-open).
+ */
+async function getCachedConstraints(
+  kv: KVNamespace,
+  key: string,
+): Promise<CachedConstraints | null> {
+  try {
+    const cached = await kv.get(key, "json");
+    return cached as CachedConstraints | null;
+  } catch (error) {
+    logWarn("Failed to read constraints cache", {
+      loggerScope: ["cloudflare", "constraint-utils"],
+      extra: { key, error: String(error) },
+    });
+    return null;
+  }
+}
+
+/**
+ * Store constraints in KV cache.
+ * Fire-and-forget - errors are logged but don't block the response.
+ */
+async function setCachedConstraints(
+  kv: KVNamespace,
+  key: string,
+  data: CachedConstraints,
+): Promise<void> {
+  try {
+    await kv.put(key, JSON.stringify(data), {
+      expirationTtl: CACHE_TTL_SECONDS,
+    });
+  } catch (error) {
+    logWarn("Failed to write constraints cache", {
+      loggerScope: ["cloudflare", "constraint-utils"],
+      extra: { key, error: String(error) },
+    });
+  }
+}
 
 /**
  * Helper to race a promise against a timeout with proper cleanup.
@@ -32,15 +107,20 @@ async function withTimeout<T>(
 /**
  * Verify that provided org/project constraints exist and the user has access
  * by querying Sentry's API using the provided OAuth access token.
+ *
+ * If cache options are provided with a projectSlug, results will be cached
+ * in KV to avoid repeated API calls during MCP sessions.
  */
 export async function verifyConstraintsAccess(
   { organizationSlug, projectSlug }: Constraints,
   {
     accessToken,
     sentryHost = "sentry.io",
+    cache,
   }: {
     accessToken: string | undefined | null;
     sentryHost?: string;
+    cache?: CacheOptions;
   },
 ): Promise<
   | {
@@ -67,6 +147,31 @@ export async function verifyConstraintsAccess(
       status: 401,
       message: "Missing access token for constraint verification",
     };
+  }
+
+  // Check cache if project constraints are requested and cache is available
+  // Cache key includes userId to ensure per-user isolation
+  let cacheKey: string | null = null;
+  if (projectSlug && cache) {
+    cacheKey = buildCacheKey(
+      cache.userId,
+      sentryHost,
+      organizationSlug,
+      projectSlug,
+    );
+    const cached = await getCachedConstraints(cache.kv, cacheKey);
+    if (cached) {
+      // Cache hit - return cached constraints without API calls
+      return {
+        ok: true,
+        constraints: {
+          organizationSlug,
+          projectSlug,
+          regionUrl: cached.regionUrl,
+          projectCapabilities: cached.projectCapabilities,
+        },
+      };
+    }
   }
 
   // Use shared API client for consistent behavior and error handling
@@ -147,6 +252,16 @@ export async function verifyConstraintsAccess(
         };
       }
     }
+  }
+
+  // Cache successful verification results for project constraints
+  // Fire-and-forget write - don't block response on cache update
+  if (cacheKey && projectCapabilities) {
+    void setCachedConstraints(cache!.kv, cacheKey, {
+      regionUrl: regionUrl || null,
+      projectCapabilities,
+      cachedAt: Date.now(),
+    });
   }
 
   return {
