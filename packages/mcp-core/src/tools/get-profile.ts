@@ -83,10 +83,11 @@ export default defineTool({
     "- Regression analysis when comparing periods",
     "",
     "<examples>",
-    "### Analyze from URL",
+    "### Analyze from URL (with transaction name)",
     "```",
     "get_profile(",
-    "  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=abc123'",
+    "  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=abc123',",
+    "  transactionName='/api/users'",
     ")",
     "```",
     "",
@@ -126,7 +127,7 @@ export default defineTool({
       .url()
       .optional()
       .describe(
-        "Sentry profile URL. If provided, organization and project are extracted from URL.",
+        "Sentry profile URL. If provided, organization and project are extracted from URL. transactionName is still required.",
       ),
 
     // Explicit params (fallback)

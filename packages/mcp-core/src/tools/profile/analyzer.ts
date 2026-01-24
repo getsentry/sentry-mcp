@@ -234,8 +234,11 @@ export function identifyHotspotFramesFromFlamegraph(
   const frames = flamegraph.shared.frames;
   const frameInfos = flamegraph.shared.frame_infos;
 
-  // Calculate total samples for percentage
-  const totalSamples = frameInfos.reduce((sum, info) => sum + info.count, 0);
+  // Calculate total samples from profile sample_counts (not frame_infos.count which overcounts due to overlapping stacks)
+  const totalSamples = flamegraph.profiles.reduce(
+    (sum, profile) => sum + profile.sample_counts.reduce((a, b) => a + b, 0),
+    0,
+  );
 
   // Map frames to hotspots with stats
   const hotspots = frames

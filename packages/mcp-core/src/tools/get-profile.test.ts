@@ -44,8 +44,8 @@ describe("get_profile", () => {
 
         | Function | File:Line | Samples | % Time | p75 | p95 | p99 | Insights |
         |----------|-----------|---------|--------|-----|-----|-----|----------|
-        | \`handle_request\` | main.py:10 | 80 | 38.1% | 50ms | 80ms | 120ms |  |
-        | \`fetch_data\` | utils.py:25 | 80 | 38.1% | 40ms | 70ms | 100ms |  |
+        | \`handle_request\` | main.py:10 | 80 | 100.0% | 50ms | 80ms | 120ms |  |
+        | \`fetch_data\` | utils.py:25 | 80 | 100.0% | 40ms | 70ms | 100ms |  |
 
         ## Top Hot Paths
 
@@ -89,7 +89,7 @@ describe("get_profile", () => {
         ## Actionable Next Steps
 
         ### Immediate Actions (High Impact)
-        1. **Optimize \`handle_request\` function** - Accounts for 62.5% of CPU time
+        1. **Optimize \`fetch_data\` function** - Accounts for 62.5% of CPU time
         2. **Add caching layer** - Consider caching frequently accessed data
         3. **Review query patterns** - Look for N+1 queries or inefficient data access
 

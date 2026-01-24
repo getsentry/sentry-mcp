@@ -292,9 +292,10 @@ function formatActionableSteps(
   // Suggest optimization for top path
   const topPath = hotPaths[0];
   if (topPath) {
-    // When focusOnUserCode is true, recommend the user code frame, not library code
+    // When focusOnUserCode is true, recommend the deepest user code frame (closest to bottleneck)
+    // callStack is in leaf-to-root order, so userCodeFrames[0] is the deepest user code frame
     const frameToRecommend = options.focusOnUserCode
-      ? topPath.userCodeFrames[topPath.userCodeFrames.length - 1]
+      ? topPath.userCodeFrames[0]
       : topPath.callStack[0];
     if (frameToRecommend) {
       sections.push(
