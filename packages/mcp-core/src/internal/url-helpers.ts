@@ -184,6 +184,26 @@ function identifyResource(
   pathParts: string[],
   organizationSlug: string,
 ): ParsedSentryUrl {
+  // Profile URL: /explore/profiling/profile/{project}/flamegraph/
+  // or /profiling/profile/{project}/flamegraph/
+  // Check this FIRST to avoid false positives when project names match keywords like "replays"
+  const profilingIndex = pathParts.indexOf("profiling");
+  if (profilingIndex !== -1 && pathParts[profilingIndex + 1] === "profile") {
+    const projectSlug = pathParts[profilingIndex + 2];
+    const profilerId = parsedUrl.searchParams.get("profilerId") || undefined;
+    const start = parsedUrl.searchParams.get("start") || undefined;
+    const end = parsedUrl.searchParams.get("end") || undefined;
+
+    return {
+      type: "profile",
+      organizationSlug,
+      projectSlug,
+      profilerId,
+      start,
+      end,
+    };
+  }
+
   // Replay URL: /replays/{replayId}/
   const replaysIndex = pathParts.indexOf("replays");
   if (replaysIndex !== -1) {
@@ -241,25 +261,6 @@ function identifyResource(
         releaseVersion,
       };
     }
-  }
-
-  // Profile URL: /explore/profiling/profile/{project}/flamegraph/
-  // or /profiling/profile/{project}/flamegraph/
-  const profilingIndex = pathParts.indexOf("profiling");
-  if (profilingIndex !== -1 && pathParts[profilingIndex + 1] === "profile") {
-    const projectSlug = pathParts[profilingIndex + 2];
-    const profilerId = parsedUrl.searchParams.get("profilerId") || undefined;
-    const start = parsedUrl.searchParams.get("start") || undefined;
-    const end = parsedUrl.searchParams.get("end") || undefined;
-
-    return {
-      type: "profile",
-      organizationSlug,
-      projectSlug,
-      profilerId,
-      start,
-      end,
-    };
   }
 
   // Trace URL: /explore/traces/trace/{traceId} or /performance/trace/{traceId}

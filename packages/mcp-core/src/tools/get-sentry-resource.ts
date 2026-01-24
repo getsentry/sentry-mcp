@@ -290,7 +290,11 @@ function generateUnsupportedResourceMessage(
     }
 
     case "monitor": {
-      const monitorUrl = `https://${organizationSlug}.sentry.io/crons/${resolved.monitorSlug}/`;
+      // Include projectSlug in URL when present
+      const monitorPath = resolved.projectSlug
+        ? `${resolved.projectSlug}/${resolved.monitorSlug}`
+        : resolved.monitorSlug;
+      const monitorUrl = `https://${organizationSlug}.sentry.io/crons/${monitorPath}/`;
       return [
         "# Cron Monitor Detected",
         "",
