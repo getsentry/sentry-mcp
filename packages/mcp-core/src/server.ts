@@ -227,9 +227,10 @@ function configureServer({
       continue;
     }
 
-    // Skip tools when project lacks required capabilities
+    // Skip tools when project lacks required capabilities (experimental)
     // Fail-open: if capabilities are unknown, show all tools
     if (
+      experimentalMode &&
       context.constraints.projectSlug &&
       context.constraints.projectCapabilities &&
       tool.requiredCapabilities?.length
