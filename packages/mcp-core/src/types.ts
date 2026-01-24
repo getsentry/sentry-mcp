@@ -11,10 +11,10 @@ import type { Skill } from "./skills";
  * Project capabilities indicating what data types the project has
  */
 export type ProjectCapabilities = {
-  hasProfiles?: boolean;
-  hasReplays?: boolean;
-  hasLogs?: boolean;
-  firstTransactionEvent?: boolean;
+  profiles?: boolean;
+  replays?: boolean;
+  logs?: boolean;
+  traces?: boolean;
 };
 
 /**

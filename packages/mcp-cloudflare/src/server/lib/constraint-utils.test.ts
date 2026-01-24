@@ -71,10 +71,10 @@ describe("verifyConstraintsAccess", () => {
         projectSlug: "cloudflare-mcp",
         regionUrl: "https://us.sentry.io",
         projectCapabilities: {
-          hasProfiles: false,
-          hasReplays: false,
-          hasLogs: false,
-          firstTransactionEvent: false,
+          profiles: false,
+          replays: false,
+          logs: false,
+          traces: false,
         },
       });
     }

@@ -142,16 +142,16 @@ describe("buildServer", () => {
             organizationSlug: "test-org",
             projectSlug: "test-project",
             projectCapabilities: {
-              hasProfiles: false,
-              hasReplays: false,
-              hasLogs: false,
-              firstTransactionEvent: false,
+              profiles: false,
+              replays: false,
+              logs: false,
+              traces: false,
             },
           },
         },
         tools: {
           tool_with_caps: createMockTool("tool_with_caps", {
-            requiredCapabilities: ["hasProfiles"],
+            requiredCapabilities: ["profiles"],
           }),
           tool_without_caps: createMockTool("tool_without_caps"),
         },
@@ -172,22 +172,22 @@ describe("buildServer", () => {
             organizationSlug: "test-org",
             projectSlug: "test-project",
             projectCapabilities: {
-              hasProfiles: true,
-              hasReplays: false,
-              hasLogs: false,
-              firstTransactionEvent: true,
+              profiles: true,
+              replays: false,
+              logs: false,
+              traces: true,
             },
           },
         },
         tools: {
           profile_tool: createMockTool("profile_tool", {
-            requiredCapabilities: ["hasProfiles"],
+            requiredCapabilities: ["profiles"],
           }),
           trace_tool: createMockTool("trace_tool", {
-            requiredCapabilities: ["firstTransactionEvent"],
+            requiredCapabilities: ["traces"],
           }),
           replay_tool: createMockTool("replay_tool", {
-            requiredCapabilities: ["hasReplays"],
+            requiredCapabilities: ["replays"],
           }),
         },
       });
@@ -212,7 +212,7 @@ describe("buildServer", () => {
         },
         tools: {
           tool_with_caps: createMockTool("tool_with_caps", {
-            requiredCapabilities: ["hasProfiles"],
+            requiredCapabilities: ["profiles"],
           }),
           tool_without_caps: createMockTool("tool_without_caps"),
         },
@@ -236,7 +236,7 @@ describe("buildServer", () => {
         },
         tools: {
           tool_with_caps: createMockTool("tool_with_caps", {
-            requiredCapabilities: ["hasProfiles"],
+            requiredCapabilities: ["profiles"],
           }),
           tool_without_caps: createMockTool("tool_without_caps"),
         },
@@ -256,16 +256,16 @@ describe("buildServer", () => {
             organizationSlug: "test-org",
             projectSlug: "test-project",
             projectCapabilities: {
-              hasProfiles: true,
-              hasReplays: false, // One capability missing
-              hasLogs: false,
-              firstTransactionEvent: true,
+              profiles: true,
+              replays: false, // One capability missing
+              logs: false,
+              traces: true,
             },
           },
         },
         tools: {
           multi_cap_tool: createMockTool("multi_cap_tool", {
-            requiredCapabilities: ["hasProfiles", "hasReplays"],
+            requiredCapabilities: ["profiles", "replays"],
           }),
         },
       });

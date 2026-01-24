@@ -113,10 +113,10 @@ export async function verifyConstraintsAccess(
       // Extract capability flags from project response
       // If fields are missing, === true comparison safely defaults to false
       projectCapabilities = {
-        hasProfiles: project.hasProfiles === true,
-        hasReplays: project.hasReplays === true,
-        hasLogs: project.hasLogs === true,
-        firstTransactionEvent: project.firstTransactionEvent === true,
+        profiles: project.hasProfiles === true,
+        replays: project.hasReplays === true,
+        logs: project.hasLogs === true,
+        traces: project.firstTransactionEvent === true,
       };
     } catch (error) {
       // Check if this was a timeout
