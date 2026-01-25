@@ -6,6 +6,7 @@ import type { ServerContext } from "../../types";
 import { useSentryAgent } from "./agent";
 import { buildServer } from "../../server";
 import tools, { SIMPLE_REPLACEMENT_TOOLS } from "../index";
+import { isToolVisibleInMode } from "../types";
 import type { ToolCall } from "../../internal/agents/callEmbeddedAgent";
 
 /**
@@ -94,7 +95,7 @@ export default defineTool({
 
     // Exclude use_sentry (to prevent recursion) and simple replacement tools
     // (since use_sentry only runs when an agent provider is available, list_* tools aren't needed)
-    // Also exclude experimental tools unless experimentalMode is enabled
+    // Also filter by experimental mode visibility
     const toolsToExclude = new Set<string>([
       "use_sentry",
       ...SIMPLE_REPLACEMENT_TOOLS,
@@ -103,7 +104,7 @@ export default defineTool({
       Object.entries(tools).filter(
         ([key, tool]) =>
           !toolsToExclude.has(key) &&
-          (context.experimentalMode || !tool.experimental),
+          isToolVisibleInMode(tool, context.experimentalMode ?? false),
       ),
     );
 

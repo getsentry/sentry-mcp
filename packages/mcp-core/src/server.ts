@@ -28,7 +28,11 @@ import tools, {
   AGENT_DEPENDENT_TOOLS,
   SIMPLE_REPLACEMENT_TOOLS,
 } from "./tools/index";
-import type { ToolConfig } from "./tools/types";
+import {
+  type ToolConfig,
+  resolveDescription,
+  isToolVisibleInMode,
+} from "./tools/types";
 import type { ServerContext, ProjectCapabilities } from "./types";
 import {
   setTag,
@@ -140,7 +144,7 @@ function configureServer({
     ? { use_sentry: tools.use_sentry }
     : (customTools ?? tools);
 
-  // Filter tools based on agent provider availability and experimental mode
+  // Filter tools based on agent provider availability
   // Skip filtering in agent mode (use_sentry handles all tools internally) or when custom tools are provided
   if (!agentMode && !customTools) {
     const hasAgent = hasAgentProvider();
@@ -150,8 +154,17 @@ function configureServer({
 
     toolsToRegister = Object.fromEntries(
       Object.entries(toolsToRegister).filter(
-        ([key, tool]) =>
-          !toolsToExclude.has(key) && (experimentalMode || !tool.experimental),
+        ([key]) => !toolsToExclude.has(key),
+      ),
+    ) as typeof toolsToRegister;
+  }
+
+  // Filter tools based on experimental mode (applies to all tools, including custom)
+  // Skip in agent mode (use_sentry handles filtering internally)
+  if (!agentMode) {
+    toolsToRegister = Object.fromEntries(
+      Object.entries(toolsToRegister).filter(([, tool]) =>
+        isToolVisibleInMode(tool, experimentalMode),
       ),
     ) as typeof toolsToRegister;
   }
@@ -256,9 +269,14 @@ function configureServer({
       ),
     ) as typeof tool.inputSchema;
 
+    // Resolve dynamic descriptions based on server context
+    const resolvedDescription = resolveDescription(tool.description, {
+      experimentalMode,
+    });
+
     server.tool(
       tool.name,
-      tool.description,
+      resolvedDescription,
       filteredInputSchema,
       tool.annotations,
       async (
