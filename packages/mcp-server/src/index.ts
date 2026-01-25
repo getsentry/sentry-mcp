@@ -79,22 +79,125 @@ if (cfg.anthropicModel) {
   process.env.ANTHROPIC_MODEL = cfg.anthropicModel;
 }
 
+// Helper functions for provider status messages
+function hasProviderConflict(): boolean {
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+  const hasExplicitProvider =
+    cfg.agentProvider || process.env.EMBEDDED_AGENT_PROVIDER;
+  return hasAnthropic && hasOpenAI && !hasExplicitProvider;
+}
+
+function getConfiguredProvider(): string | undefined {
+  return (
+    cfg.agentProvider || process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase()
+  );
+}
+
+function hasProviderMismatch(): {
+  mismatch: boolean;
+  configured?: string;
+  availableKey?: string;
+} {
+  const configured = getConfiguredProvider();
+  if (!configured) return { mismatch: false };
+
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+
+  // Check if configured provider's key is missing but other key is present
+  if (configured === "openai" && !hasOpenAI && hasAnthropic) {
+    return {
+      mismatch: true,
+      configured: "openai",
+      availableKey: "ANTHROPIC_API_KEY",
+    };
+  }
+  if (configured === "anthropic" && !hasAnthropic && hasOpenAI) {
+    return {
+      mismatch: true,
+      configured: "anthropic",
+      availableKey: "OPENAI_API_KEY",
+    };
+  }
+
+  return { mismatch: false };
+}
+
+function getProviderSource(): string {
+  // Check CLI flag first (cli.agentProvider is only set by --agent-provider flag)
+  if (cli.agentProvider) return "explicitly configured";
+  // Then check env var (process.env takes precedence over cfg since cfg merges both)
+  if (process.env.EMBEDDED_AGENT_PROVIDER)
+    return "from EMBEDDED_AGENT_PROVIDER";
+  return "auto-detected";
+}
+
 // Check for LLM API keys and warn if none available
 const resolvedProvider = getResolvedProviderType();
+
 if (!resolvedProvider) {
-  console.warn(
-    "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
-  );
-  console.warn("The following AI-powered search tools will be unavailable:");
-  console.warn(
-    "  - search_events, search_issues, search_issue_events, use_sentry",
-  );
-  console.warn(
-    "Use list_issues and list_events for direct Sentry query syntax instead.",
-  );
+  const mismatchInfo = hasProviderMismatch();
+  if (hasProviderConflict()) {
+    console.warn(
+      "Warning: Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set, but no provider is explicitly configured.",
+    );
+    console.warn(
+      "Please set EMBEDDED_AGENT_PROVIDER='openai' or 'anthropic' to specify which provider to use.",
+    );
+    console.warn(
+      "AI-powered search tools will be unavailable until a provider is selected.",
+    );
+  } else if (mismatchInfo.mismatch) {
+    const expectedKey =
+      mismatchInfo.configured === "openai"
+        ? "OPENAI_API_KEY"
+        : "ANTHROPIC_API_KEY";
+    const configuredViaCliFlag = Boolean(cli.agentProvider);
+    const providerSetting = configuredViaCliFlag
+      ? `--agent-provider=${mismatchInfo.configured}`
+      : `EMBEDDED_AGENT_PROVIDER='${mismatchInfo.configured}'`;
+    const changeProviderHint = configuredViaCliFlag
+      ? "Change --agent-provider to match your available API key"
+      : "Change EMBEDDED_AGENT_PROVIDER to match your available API key";
+    console.warn(`Warning: ${providerSetting} but ${expectedKey} is not set.`);
+    console.warn(`Found ${mismatchInfo.availableKey} instead. Either:`);
+    console.warn(
+      `  - Set ${expectedKey} to use the ${mismatchInfo.configured} provider, or`,
+    );
+    console.warn(`  - ${changeProviderHint}`);
+    console.warn(
+      "AI-powered search tools will be unavailable until this is resolved.",
+    );
+  } else {
+    console.warn(
+      "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
+    );
+    console.warn("The following AI-powered search tools will be unavailable:");
+    console.warn(
+      "  - search_events, search_issues, search_issue_events, use_sentry",
+    );
+    console.warn(
+      "Use list_issues and list_events for direct Sentry query syntax instead.",
+    );
+  }
   console.warn("");
 } else {
-  console.warn(`Using ${resolvedProvider} for AI-powered search tools.`);
+  const providerSource = getProviderSource();
+  console.warn(
+    `Using ${resolvedProvider} for AI-powered search tools (${providerSource}).`,
+  );
+  // Warn about auto-detection deprecation
+  if (providerSource === "auto-detected") {
+    console.warn(
+      "Deprecation warning: Auto-detection of LLM provider is deprecated.",
+    );
+    console.warn(
+      `Please set EMBEDDED_AGENT_PROVIDER='${resolvedProvider}' explicitly.`,
+    );
+    console.warn("Auto-detection will be removed in a future release.");
+  }
+  console.warn("");
 }
 
 Sentry.init({
