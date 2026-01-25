@@ -88,6 +88,42 @@ function hasProviderConflict(): boolean {
   return hasAnthropic && hasOpenAI && !hasExplicitProvider;
 }
 
+function getConfiguredProvider(): string | undefined {
+  return (
+    cfg.agentProvider || process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase()
+  );
+}
+
+function hasProviderMismatch(): {
+  mismatch: boolean;
+  configured?: string;
+  availableKey?: string;
+} {
+  const configured = getConfiguredProvider();
+  if (!configured) return { mismatch: false };
+
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+
+  // Check if configured provider's key is missing but other key is present
+  if (configured === "openai" && !hasOpenAI && hasAnthropic) {
+    return {
+      mismatch: true,
+      configured: "openai",
+      availableKey: "ANTHROPIC_API_KEY",
+    };
+  }
+  if (configured === "anthropic" && !hasAnthropic && hasOpenAI) {
+    return {
+      mismatch: true,
+      configured: "anthropic",
+      availableKey: "OPENAI_API_KEY",
+    };
+  }
+
+  return { mismatch: false };
+}
+
 function getProviderSource(): string {
   // Check CLI flag first (cli.agentProvider is only set by --agent-provider flag)
   if (cli.agentProvider) return "explicitly configured";
@@ -101,6 +137,7 @@ function getProviderSource(): string {
 const resolvedProvider = getResolvedProviderType();
 
 if (!resolvedProvider) {
+  const mismatchInfo = hasProviderMismatch();
   if (hasProviderConflict()) {
     console.warn(
       "Warning: Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set, but no provider is explicitly configured.",
@@ -110,6 +147,24 @@ if (!resolvedProvider) {
     );
     console.warn(
       "AI-powered search tools will be unavailable until a provider is selected.",
+    );
+  } else if (mismatchInfo.mismatch) {
+    const expectedKey =
+      mismatchInfo.configured === "openai"
+        ? "OPENAI_API_KEY"
+        : "ANTHROPIC_API_KEY";
+    console.warn(
+      `Warning: EMBEDDED_AGENT_PROVIDER is set to '${mismatchInfo.configured}' but ${expectedKey} is not set.`,
+    );
+    console.warn(`Found ${mismatchInfo.availableKey} instead. Either:`);
+    console.warn(
+      `  - Set ${expectedKey} to use the ${mismatchInfo.configured} provider, or`,
+    );
+    console.warn(
+      `  - Change EMBEDDED_AGENT_PROVIDER to match your available API key`,
+    );
+    console.warn(
+      "AI-powered search tools will be unavailable until this is resolved.",
     );
   } else {
     console.warn(
