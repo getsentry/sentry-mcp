@@ -153,16 +153,19 @@ if (!resolvedProvider) {
       mismatchInfo.configured === "openai"
         ? "OPENAI_API_KEY"
         : "ANTHROPIC_API_KEY";
-    console.warn(
-      `Warning: EMBEDDED_AGENT_PROVIDER is set to '${mismatchInfo.configured}' but ${expectedKey} is not set.`,
-    );
+    const configuredViaCliFlag = Boolean(cli.agentProvider);
+    const providerSetting = configuredViaCliFlag
+      ? `--agent-provider=${mismatchInfo.configured}`
+      : `EMBEDDED_AGENT_PROVIDER='${mismatchInfo.configured}'`;
+    const changeProviderHint = configuredViaCliFlag
+      ? "Change --agent-provider to match your available API key"
+      : "Change EMBEDDED_AGENT_PROVIDER to match your available API key";
+    console.warn(`Warning: ${providerSetting} but ${expectedKey} is not set.`);
     console.warn(`Found ${mismatchInfo.availableKey} instead. Either:`);
     console.warn(
       `  - Set ${expectedKey} to use the ${mismatchInfo.configured} provider, or`,
     );
-    console.warn(
-      `  - Change EMBEDDED_AGENT_PROVIDER to match your available API key`,
-    );
+    console.warn(`  - ${changeProviderHint}`);
     console.warn(
       "AI-powered search tools will be unavailable until this is resolved.",
     );
