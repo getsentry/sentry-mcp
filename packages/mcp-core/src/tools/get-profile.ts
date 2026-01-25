@@ -64,7 +64,7 @@ export default defineTool({
   skills: ["inspect"],
   requiredScopes: ["event:read"],
   requiredCapabilities: ["profiles"],
-  experimental: true,
+  hideInExperimentalMode: true, // Replaced by get_sentry_resource in experimental mode
 
   description: [
     "Analyze CPU profiling data to identify performance bottlenecks and detect regressions.",

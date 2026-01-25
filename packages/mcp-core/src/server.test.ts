@@ -56,14 +56,15 @@ describe("buildServer", () => {
   });
 
   describe("experimental tool filtering", () => {
-    // Note: When custom tools are provided, experimental filtering is intentionally skipped
-    // to give full control to the caller. These tests verify the behavior with custom tools.
+    // Note: Experimental filtering is applied consistently to both default and custom tools.
+    // Tools marked with `experimental: true` are only shown when `experimentalMode: true`.
+    // Tools marked with `hideInExperimentalMode: true` are hidden when `experimentalMode: true`.
 
-    it("does not filter experimental custom tools (by design)", () => {
-      // When custom tools are provided, the caller has full control
-      // and experimental filtering is skipped
+    it("filters experimental custom tools when experimentalMode is false", () => {
+      // Experimental filtering applies to all tools, including custom ones
       const server = buildServer({
         context: baseContext,
+        experimentalMode: false,
         tools: {
           regular_tool: createMockTool("regular_tool"),
           experimental_tool: createMockTool("experimental_tool", {
@@ -73,9 +74,9 @@ describe("buildServer", () => {
       });
 
       const toolNames = getRegisteredToolNames(server);
-      // Both tools should be registered because custom tools bypass experimental filtering
+      // Regular tool should be visible, experimental tool should be hidden
       expect(toolNames).toContain("regular_tool");
-      expect(toolNames).toContain("experimental_tool");
+      expect(toolNames).not.toContain("experimental_tool");
     });
 
     it("includes all tools with experimentalMode enabled", () => {
@@ -308,6 +309,109 @@ describe("buildServer", () => {
       // All tools should be visible when experimentalMode is false
       expect(toolNames).toContain("tool_with_caps");
       expect(toolNames).toContain("tool_without_caps");
+    });
+  });
+
+  describe("hideInExperimentalMode filtering", () => {
+    it("hides tools with hideInExperimentalMode when experimentalMode is true", () => {
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+        tools: {
+          regular_tool: createMockTool("regular_tool"),
+          hidden_in_experimental: createMockTool("hidden_in_experimental", {
+            hideInExperimentalMode: true,
+          }),
+          experimental_tool: createMockTool("experimental_tool", {
+            experimental: true,
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // Regular tool should be visible
+      expect(toolNames).toContain("regular_tool");
+      // Tool marked hideInExperimentalMode should be hidden
+      expect(toolNames).not.toContain("hidden_in_experimental");
+      // Experimental tool should be visible in experimental mode
+      expect(toolNames).toContain("experimental_tool");
+    });
+
+    it("shows tools with hideInExperimentalMode when experimentalMode is false", () => {
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: false,
+        tools: {
+          regular_tool: createMockTool("regular_tool"),
+          hidden_in_experimental: createMockTool("hidden_in_experimental", {
+            hideInExperimentalMode: true,
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // Both tools should be visible when not in experimental mode
+      expect(toolNames).toContain("regular_tool");
+      expect(toolNames).toContain("hidden_in_experimental");
+    });
+
+    it("correctly filters tools with both experimental and hideInExperimentalMode", () => {
+      // This is an edge case - a tool shouldn't have both flags, but we test the behavior anyway
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+        tools: {
+          both_flags: createMockTool("both_flags", {
+            experimental: true,
+            hideInExperimentalMode: true,
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      // hideInExperimentalMode takes precedence - tool should be hidden
+      expect(toolNames).not.toContain("both_flags");
+    });
+  });
+
+  describe("dynamic descriptions", () => {
+    it("resolves function descriptions with context", () => {
+      const dynamicDescription = vi.fn((ctx: { experimentalMode: boolean }) =>
+        ctx.experimentalMode
+          ? "Experimental description"
+          : "Normal description",
+      );
+
+      buildServer({
+        context: baseContext,
+        experimentalMode: true,
+        tools: {
+          dynamic_tool: createMockTool("dynamic_tool", {
+            description: dynamicDescription,
+          }),
+        },
+      });
+
+      // The description function should be called with the correct context
+      expect(dynamicDescription).toHaveBeenCalledWith({
+        experimentalMode: true,
+      });
+    });
+
+    it("passes static descriptions unchanged", () => {
+      // This test verifies that static string descriptions work as expected
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: false,
+        tools: {
+          static_tool: createMockTool("static_tool", {
+            description: "Static description",
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).toContain("static_tool");
     });
   });
 

@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { agentTool } from "../../internal/agents/tools/utils";
 import type { ServerContext } from "../../types";
-import type { ToolConfig } from "../types";
+import { type ToolConfig, resolveDescription } from "../types";
 
 /**
  * Options for wrapping a tool
@@ -74,8 +74,13 @@ export function wrapToolForAgent<TSchema extends Record<string, z.ZodType>>(
   tool: ToolConfig<TSchema>,
   options: WrapToolOptions,
 ) {
+  // Resolve dynamic descriptions based on context
+  const resolved = resolveDescription(tool.description, {
+    experimentalMode: options.context.experimentalMode ?? false,
+  });
+
   return agentTool({
-    description: tool.description,
+    description: resolved,
     parameters: z.object(tool.inputSchema),
     execute: async (params: unknown) => {
       // Type safety: params is validated by agentTool's Zod schema before reaching here
