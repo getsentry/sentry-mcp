@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-cloudflare",
-  "version": "0.28.0",
+  "version": "0.29.0",
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
