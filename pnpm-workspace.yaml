@@ -10,7 +10,7 @@ catalog:
   "@cloudflare/vitest-pool-workers": ^0.8.47
   "@cloudflare/workers-oauth-provider": ^0.0.12
   "@cloudflare/workers-types": ^4.20251014.0
-  "@modelcontextprotocol/sdk": ^1.21.0
+  "@modelcontextprotocol/sdk": ^1.25.2
   "@radix-ui/react-accordion": ^1.2.11
   "@radix-ui/react-slot": ^1.2.3
   "@sentry/cloudflare": 10.35.0
