@@ -76,6 +76,16 @@ const app = new Hono<{
       endpoint: `${requestUrl.protocol}//${requestUrl.host}/mcp`,
     });
   })
+  // RFC 9728: OAuth 2.0 Protected Resource Metadata
+  // ChatGPT and other clients query this to discover the authorization server
+  .get("/.well-known/oauth-protected-resource/mcp", (c) => {
+    const requestUrl = new URL(c.req.url);
+    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+    return c.json({
+      resource: `${baseUrl}/mcp`,
+      authorization_servers: [baseUrl],
+    });
+  })
   .route("/oauth", sentryOauth)
   .route("/api/auth", chatOauth)
   .route("/api/chat", chat)

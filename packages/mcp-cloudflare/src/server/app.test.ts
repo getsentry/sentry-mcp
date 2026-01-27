@@ -54,4 +54,44 @@ describe("app", () => {
       });
     });
   });
+
+  describe("GET /.well-known/oauth-protected-resource/mcp", () => {
+    it("should return RFC 9728 protected resource metadata", async () => {
+      const res = await app.request(
+        "/.well-known/oauth-protected-resource/mcp",
+        {
+          headers: {
+            "CF-Connecting-IP": "192.0.2.1",
+          },
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        resource: "http://localhost/mcp",
+        authorization_servers: ["http://localhost"],
+      });
+    });
+
+    it("should return correct URLs for custom host", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp",
+        {
+          headers: {
+            "CF-Connecting-IP": "192.0.2.1",
+          },
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        resource: "https://mcp.sentry.dev/mcp",
+        authorization_servers: ["https://mcp.sentry.dev"],
+      });
+    });
+  });
 });
