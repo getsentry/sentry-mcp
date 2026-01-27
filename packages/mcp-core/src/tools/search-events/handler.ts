@@ -83,6 +83,11 @@ export default defineTool({
     readOnlyHint: true,
     openWorldHint: true,
   },
+  // MCP Apps UI configuration for interactive chart visualization
+  // MCP Apps-capable clients will render charts for aggregate query results
+  ui: {
+    resourceUri: "ui://sentry/search-events-chart.html",
+  },
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
@@ -247,6 +252,7 @@ export default defineTool({
       sentryQuery,
       fields,
       explanation: parsed.explanation,
+      chartType: parsed.chartType ?? undefined,
     };
 
     switch (dataset) {

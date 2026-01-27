@@ -1,10 +1,21 @@
 import type { SentryApiService } from "../../api-client";
+import type {
+  TextContent,
+  EmbeddedResource,
+} from "@modelcontextprotocol/sdk/types.js";
 import { logInfo } from "../../telem/logging";
 import {
   type FlexibleEventData,
   getStringValue,
   isAggregateQuery,
 } from "./utils";
+import { type ChartType, inferChartType } from "@sentry/mcp-apps-ui";
+
+/**
+ * Return type for formatters - can be a string (for non-aggregate queries)
+ * or an array with text + chart data (for aggregate queries)
+ */
+export type FormatterResult = string | (TextContent | EmbeddedResource)[];
 
 /**
  * Format an explanation for how a natural language query was translated
@@ -26,12 +37,51 @@ export interface FormatEventResultsParams {
   sentryQuery: string;
   fields: string[];
   explanation?: string;
+  /** Optional chart type hint from the AI agent for aggregate queries */
+  chartType?: ChartType;
 }
 
 /**
- * Format error event results for display
+ * Create chart data resource for MCP Apps visualization.
+ * This embeds structured data that the UI app can parse and render as a chart.
  */
-export function formatErrorResults(params: FormatEventResultsParams): string {
+function createChartDataResource(
+  eventData: FlexibleEventData[],
+  fields: string[],
+  naturalLanguageQuery: string,
+  chartType?: ChartType,
+): EmbeddedResource {
+  // Separate fields into labels (groupBy) and values (aggregates)
+  const labels = fields.filter(
+    (field) => !field.includes("(") || !field.includes(")"),
+  );
+  const values = fields.filter(
+    (field) => field.includes("(") && field.includes(")"),
+  );
+
+  return {
+    type: "resource",
+    resource: {
+      uri: "data:application/json;chart",
+      mimeType: "application/json;chart",
+      text: JSON.stringify({
+        chartType: chartType || inferChartType(eventData, labels, values),
+        data: eventData,
+        labels,
+        values,
+        query: naturalLanguageQuery,
+      }),
+    },
+  };
+}
+
+/**
+ * Format error event results for display.
+ * Returns text for non-aggregate queries, or text + chart data for aggregate queries.
+ */
+export function formatErrorResults(
+  params: FormatEventResultsParams,
+): FormatterResult {
   const {
     eventData,
     naturalLanguageQuery,
@@ -42,6 +92,7 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
     sentryQuery,
     fields,
     explanation,
+    chartType,
   } = params;
 
   let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
@@ -147,13 +198,29 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
   output += "- View error groups: Navigate to the Issues page in Sentry\n";
   output += "- Set up alerts: Configure alert rules for these error patterns\n";
 
+  // For aggregate queries, return both text and chart data for MCP Apps visualization
+  if (isAggregateQuery(fields) && eventData.length > 0) {
+    return [
+      { type: "text", text: output },
+      createChartDataResource(
+        eventData,
+        fields,
+        naturalLanguageQuery,
+        chartType,
+      ),
+    ];
+  }
+
   return output;
 }
 
 /**
- * Format log event results for display
+ * Format log event results for display.
+ * Returns text for non-aggregate queries, or text + chart data for aggregate queries.
  */
-export function formatLogResults(params: FormatEventResultsParams): string {
+export function formatLogResults(
+  params: FormatEventResultsParams,
+): FormatterResult {
   const {
     eventData,
     naturalLanguageQuery,
@@ -164,6 +231,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
     sentryQuery,
     fields,
     explanation,
+    chartType,
   } = params;
 
   let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
@@ -293,13 +361,29 @@ export function formatLogResults(params: FormatEventResultsParams): string {
     "- Filter by severity: Adjust your query to focus on specific log levels\n";
   output += "- Export logs: Use the Sentry web interface for bulk export\n";
 
+  // For aggregate queries, return both text and chart data for MCP Apps visualization
+  if (isAggregateQuery(fields) && eventData.length > 0) {
+    return [
+      { type: "text", text: output },
+      createChartDataResource(
+        eventData,
+        fields,
+        naturalLanguageQuery,
+        chartType,
+      ),
+    ];
+  }
+
   return output;
 }
 
 /**
- * Format span/trace event results for display
+ * Format span/trace event results for display.
+ * Returns text for non-aggregate queries, or text + chart data for aggregate queries.
  */
-export function formatSpanResults(params: FormatEventResultsParams): string {
+export function formatSpanResults(
+  params: FormatEventResultsParams,
+): FormatterResult {
   const {
     eventData,
     naturalLanguageQuery,
@@ -310,6 +394,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
     sentryQuery,
     fields,
     explanation,
+    chartType,
   } = params;
 
   let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
@@ -417,6 +502,19 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
     "- Search for related spans: Modify your query to be more specific\n";
   output +=
     "- Export data: Use the Sentry web interface for advanced analysis\n";
+
+  // For aggregate queries, return both text and chart data for MCP Apps visualization
+  if (isAggregateQuery(fields) && eventData.length > 0) {
+    return [
+      { type: "text", text: output },
+      createChartDataResource(
+        eventData,
+        fields,
+        naturalLanguageQuery,
+        chartType,
+      ),
+    ];
+  }
 
   return output;
 }

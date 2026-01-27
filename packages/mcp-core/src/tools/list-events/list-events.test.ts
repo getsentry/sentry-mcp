@@ -2,6 +2,20 @@ import { describe, it, expect } from "vitest";
 import listEvents from "./index.js";
 import { getServerContext } from "../../test-setup.js";
 
+/**
+ * Helper to extract text content from a formatter result.
+ * Formatters can return a string or an array containing text + chart data.
+ */
+function getTextContent(
+  result: string | Array<{ type: string; text?: string }>,
+): string {
+  if (typeof result === "string") {
+    return result;
+  }
+  const textContent = result.find((item) => item.type === "text");
+  return textContent?.text ?? "";
+}
+
 describe("list_events", () => {
   // Note: The mock server has strict requirements for fields and sort parameters.
   // Tests use fields that match the mock's expectations.
@@ -23,8 +37,9 @@ describe("list_events", () => {
       getServerContext(),
     );
 
-    expect(result).toContain("Search Results");
-    expect(result).toContain("View these results in Sentry");
+    const textContent = getTextContent(result);
+    expect(textContent).toContain("Search Results");
+    expect(textContent).toContain("View these results in Sentry");
   });
 
   // Note: Spans test skipped because the mock requires very strict parameters (useRpc=1, specific sort)
@@ -48,7 +63,7 @@ describe("list_events", () => {
 
     // Should return results with aggregation fields
     expect(result).toBeDefined();
-    expect(typeof result).toBe("string");
-    expect(result).toContain("Search Results");
+    const textContent = getTextContent(result);
+    expect(textContent).toContain("Search Results");
   });
 });
