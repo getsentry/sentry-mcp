@@ -5,6 +5,20 @@ import searchEvents from "./search-events";
 import { generateText } from "ai";
 import { UserInputError } from "../errors";
 
+/**
+ * Helper to extract text content from a formatter result.
+ * Formatters can return a string or an array containing text + chart data.
+ */
+function getTextContent(
+  result: string | Array<{ type: string; text?: string }>,
+): string {
+  if (typeof result === "string") {
+    return result;
+  }
+  const textContent = result.find((item) => item.type === "text");
+  return textContent?.text ?? "";
+}
+
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
   const mockModel = vi.fn(() => "mocked-model");
@@ -60,6 +74,7 @@ describe("search_events", () => {
           sort: sort || defaultSorts[dataset],
           timeRange: timeRange ?? null,
           explanation: "Test query translation",
+          chartType: null, // No chart type for non-aggregate queries
         };
 
     return {
@@ -412,6 +427,7 @@ describe("search_events", () => {
         sort: "-timestamp",
         timeRange: null,
         explanation: "Self-corrected to include sort field in fields array",
+        chartType: null,
       },
     } as any);
 
@@ -525,10 +541,12 @@ describe("search_events", () => {
     );
 
     expect(mockGenerateText).toHaveBeenCalled();
-    expect(result).toContain("Mozilla/5.0");
-    expect(result).toContain("150");
-    expect(result).toContain("120");
+    // For aggregate queries, result may be an array with text + chart data
+    const textContent = getTextContent(result);
+    expect(textContent).toContain("Mozilla/5.0");
+    expect(textContent).toContain("150");
+    expect(textContent).toContain("120");
     // Should NOT contain user.id references
-    expect(result).not.toContain("user.id");
+    expect(textContent).not.toContain("user.id");
   });
 });

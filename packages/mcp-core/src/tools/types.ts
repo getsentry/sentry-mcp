@@ -49,6 +49,16 @@ export function isToolVisibleInMode(
   return true;
 }
 
+/**
+ * Configuration for MCP Apps UI visualization.
+ * When set, the tool will expose a UI resource that can be rendered
+ * by MCP Apps-capable clients.
+ */
+export interface ToolUIConfig {
+  /** URI of the UI resource for this tool (e.g., "ui://sentry/search-events-chart.html") */
+  resourceUri: string;
+}
+
 export interface ToolConfig<
   TSchema extends Record<string, z.ZodType> = Record<string, z.ZodType>,
 > {
@@ -66,6 +76,8 @@ export interface ToolConfig<
     idempotentHint?: boolean;
     openWorldHint?: boolean;
   };
+  /** Optional MCP Apps UI configuration for interactive visualizations */
+  ui?: ToolUIConfig;
   handler: (
     params: z.infer<z.ZodObject<TSchema>>,
     context: ServerContext,

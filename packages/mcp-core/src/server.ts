@@ -24,6 +24,7 @@ import type {
   ServerRequest,
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
+import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import tools, {
   AGENT_DEPENDENT_TOOLS,
   SIMPLE_REPLACEMENT_TOOLS,
@@ -50,6 +51,7 @@ import {
   getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
 import { hasAgentProvider } from "./internal/agents/provider-factory";
+import { UI_RESOURCES } from "./ui-resources";
 
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
@@ -274,11 +276,20 @@ function configureServer({
       experimentalMode,
     });
 
+    // Build tool annotations with UI metadata if the tool has UI configuration
+    // This follows MCP Apps spec: tools declare UI via _meta.ui.resourceUri
+    const toolAnnotations = tool.ui
+      ? {
+          ...tool.annotations,
+          _meta: { ui: { resourceUri: tool.ui.resourceUri } },
+        }
+      : tool.annotations;
+
     server.tool(
       tool.name,
       resolvedDescription,
       filteredInputSchema,
-      tool.annotations,
+      toolAnnotations,
       async (
         params: any,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
@@ -379,6 +390,25 @@ function configureServer({
           };
         }
       },
+    );
+  }
+
+  // Register UI resources for MCP Apps visualization
+  // These resources are served to MCP Apps-capable clients when tools with UI config are invoked
+  for (const [resourceUri, resource] of Object.entries(UI_RESOURCES)) {
+    server.resource(
+      resource.name,
+      resourceUri,
+      { mimeType: RESOURCE_MIME_TYPE },
+      async () => ({
+        contents: [
+          {
+            uri: resourceUri,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: resource.html,
+          },
+        ],
+      }),
     );
   }
 }
