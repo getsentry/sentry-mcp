@@ -17,6 +17,7 @@ import {
 import { createExecuteTool } from "./tools/special/execute-tool";
 import type { ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
+import { SEARCH_EVENTS_CHART_RESOURCE_URI } from "./ui-resource-uris";
 
 // Mock the Sentry core module
 vi.mock("@sentry/core", () => ({
@@ -188,6 +189,57 @@ describe("buildServer", () => {
       content: [{ type: "text", text: "v2:ok" }],
     });
   });
+
+  it.each(["v1", "v2"] as const)(
+    "registers search event UI metadata and resources with SDK %s",
+    async (sdkVersion) => {
+      const server =
+        sdkVersion === "v2"
+          ? buildServer({ context: baseContext, sdkVersion: "v2" })
+          : buildServer({ context: baseContext });
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      const client = new Client({
+        name: "ui-resource-test-client",
+        version: "1.0.0",
+      });
+
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+
+      try {
+        const searchEventsTool = (await client.listTools()).tools.find(
+          (tool) => tool.name === "search_events",
+        );
+        expect(searchEventsTool?._meta).toMatchObject({
+          ui: { resourceUri: SEARCH_EVENTS_CHART_RESOURCE_URI },
+          "ui/resourceUri": SEARCH_EVENTS_CHART_RESOURCE_URI,
+        });
+
+        expect((await client.listResources()).resources).toContainEqual(
+          expect.objectContaining({
+            name: "Search Events Chart",
+            uri: SEARCH_EVENTS_CHART_RESOURCE_URI,
+            mimeType: "text/html;profile=mcp-app",
+          }),
+        );
+
+        const resource = await client.readResource({
+          uri: SEARCH_EVENTS_CHART_RESOURCE_URI,
+        });
+        expect(resource.contents).toContainEqual(
+          expect.objectContaining({
+            uri: SEARCH_EVENTS_CHART_RESOURCE_URI,
+            mimeType: "text/html;profile=mcp-app",
+            text: expect.stringContaining("Sentry Search Events Chart"),
+          }),
+        );
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    },
+  );
 
   describe("telemetry context", () => {
     it("generates compatibility text for structured-only tool output", async () => {

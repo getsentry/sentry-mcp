@@ -78,6 +78,10 @@ export function isToolVisibleInMode(
   return true;
 }
 
+export interface ToolUIConfig {
+  resourceUri: string;
+}
+
 export interface ToolConfig<
   TSchema extends Record<string, z.ZodType> = Record<string, z.ZodType>,
 > {
@@ -100,6 +104,7 @@ export interface ToolConfig<
     idempotentHint?: boolean;
     openWorldHint: boolean;
   };
+  ui?: ToolUIConfig;
   handler: ToolHandler<TSchema>;
 }
 

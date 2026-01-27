@@ -50,6 +50,13 @@ export const searchEventsAgentOutputSchema = z
       .string()
       .default("")
       .describe("Brief explanation of how you translated this query."),
+    chartType: z
+      .enum(["bar", "pie", "line", "table", "number"])
+      .nullable()
+      .default(null)
+      .describe(
+        "Suggested visualization for aggregate results. Use null for individual event or replay results.",
+      ),
   })
   .refine(
     (data) => {

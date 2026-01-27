@@ -1,4 +1,9 @@
 import type { SentryApiService } from "../../../api-client";
+import type {
+  EmbeddedResource,
+  TextContent,
+} from "@modelcontextprotocol/sdk/types.js";
+import { type ChartType, inferChartType } from "@sentry/mcp-apps-ui";
 import { formatToolCallInstruction } from "../../../internal/tool-helpers/tool-call-formatting";
 import { formatUserGeoSummary } from "../../../internal/user-formatting";
 import { logInfo } from "../../../telem/logging";
@@ -108,10 +113,61 @@ export interface FormatEventResultsParams {
   sentryQuery: string;
   fields: string[];
   explanation?: string;
+  chartType?: ChartType;
   executedSearch?: ExecutedSearch;
   experimentalMode?: boolean;
   availableToolNames?: ReadonlySet<string>;
   directToolNames?: ReadonlySet<string>;
+}
+
+export type FormatterResult = string | (TextContent | EmbeddedResource)[];
+
+function createChartDataResource(
+  eventData: FlexibleEventData[],
+  fields: string[],
+  inputQuery: string,
+  chartType?: ChartType,
+): EmbeddedResource {
+  const labels = fields.filter(
+    (field) => !field.includes("(") || !field.includes(")"),
+  );
+  const values = fields.filter(
+    (field) => field.includes("(") && field.includes(")"),
+  );
+
+  return {
+    type: "resource",
+    resource: {
+      uri: "data:application/json;chart",
+      mimeType: "application/json;chart",
+      text: JSON.stringify({
+        chartType: chartType ?? inferChartType(eventData, labels, values),
+        data: eventData,
+        labels,
+        values,
+        query: inputQuery,
+      }),
+    },
+  };
+}
+
+function withChartData(
+  output: string,
+  params: FormatEventResultsParams,
+): FormatterResult {
+  if (!isAggregateQuery(params.fields) || params.eventData.length === 0) {
+    return output;
+  }
+
+  return [
+    { type: "text", text: output },
+    createChartDataResource(
+      params.eventData,
+      params.fields,
+      params.inputQuery,
+      params.chartType,
+    ),
+  ];
 }
 
 function formatUserFieldLines(
@@ -139,7 +195,9 @@ function formatUserFieldLines(
 /**
  * Format error event results for display
  */
-export function formatErrorResults(params: FormatEventResultsParams): string {
+export function formatErrorResults(
+  params: FormatEventResultsParams,
+): FormatterResult {
   const {
     eventData,
     inputQuery,
@@ -271,13 +329,15 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
   output += "- View error groups: Navigate to the Issues page in Sentry\n";
   output += "- Set up alerts: Configure alert rules for these error patterns\n";
 
-  return output;
+  return withChartData(output, params);
 }
 
 /**
  * Format log event results for display
  */
-export function formatLogResults(params: FormatEventResultsParams): string {
+export function formatLogResults(
+  params: FormatEventResultsParams,
+): FormatterResult {
   const {
     eventData,
     inputQuery,
@@ -432,13 +492,15 @@ export function formatLogResults(params: FormatEventResultsParams): string {
     "- Filter by severity: Adjust your query to focus on specific log levels\n";
   output += "- Export logs: Use the Sentry web interface for bulk export\n";
 
-  return output;
+  return withChartData(output, params);
 }
 
 /**
  * Format span/trace event results for display
  */
-export function formatSpanResults(params: FormatEventResultsParams): string {
+export function formatSpanResults(
+  params: FormatEventResultsParams,
+): FormatterResult {
   const {
     eventData,
     inputQuery,
@@ -571,7 +633,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
   output +=
     "- Export data: Use the Sentry web interface for advanced analysis\n";
 
-  return output;
+  return withChartData(output, params);
 }
 
 function getProfileDurationLabel(
@@ -630,7 +692,9 @@ function getProfileDetailUrl(
   return null;
 }
 
-export function formatProfileResults(params: FormatEventResultsParams): string {
+export function formatProfileResults(
+  params: FormatEventResultsParams,
+): FormatterResult {
   const {
     eventData,
     inputQuery,
@@ -789,7 +853,7 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
   output +=
     "- Refine the profiling search in Sentry by transaction, release, platform, or environment\n";
 
-  return output;
+  return withChartData(output, params);
 }
 
 /**
@@ -797,7 +861,7 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
  */
 export function formatTraceMetricsResults(
   params: FormatEventResultsParams,
-): string {
+): FormatterResult {
   const {
     eventData,
     inputQuery,
@@ -925,5 +989,5 @@ export function formatTraceMetricsResults(
   output +=
     "- Switch between samples and aggregates in Sentry for deeper analysis\n";
 
-  return output;
+  return withChartData(output, params);
 }

@@ -20,6 +20,10 @@ import { McpServer as LegacyMcpServer } from "@modelcontextprotocol/sdk/server/m
  * ```
  */
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  RESOURCE_MIME_TYPE,
+  RESOURCE_URI_META_KEY,
+} from "@modelcontextprotocol/ext-apps/server";
 import { McpServer as ModernMcpServer } from "@modelcontextprotocol/server";
 import {
   getActiveSpan,
@@ -44,6 +48,7 @@ import {
 import tools from "./tools/index";
 import type { StructuredToolOutput } from "./tools/types";
 import type { ServerContext } from "./types";
+import { UI_RESOURCES } from "./ui-resources";
 import { LIB_VERSION } from "./version";
 
 function getSkillGrantedAttributeName(skill: Skill): string {
@@ -131,6 +136,45 @@ type BuildServerOptions = {
   tools?: ToolRegistry;
 };
 
+function createUiResourceResult(
+  uri: URL,
+  resource: { html: string },
+): Promise<{
+  contents: Array<{ uri: string; mimeType: string; text: string }>;
+}> {
+  return Promise.resolve({
+    contents: [
+      {
+        uri: uri.href,
+        mimeType: RESOURCE_MIME_TYPE,
+        text: resource.html,
+      },
+    ],
+  });
+}
+
+function registerLegacyUiResources(server: LegacyMcpServer): void {
+  for (const [resourceUri, resource] of Object.entries(UI_RESOURCES)) {
+    server.registerResource(
+      resource.name,
+      resourceUri,
+      { mimeType: RESOURCE_MIME_TYPE },
+      (uri) => createUiResourceResult(uri, resource),
+    );
+  }
+}
+
+function registerModernUiResources(server: ModernMcpServer): void {
+  for (const [resourceUri, resource] of Object.entries(UI_RESOURCES)) {
+    server.registerResource(
+      resource.name,
+      resourceUri,
+      { mimeType: RESOURCE_MIME_TYPE },
+      (uri) => createUiResourceResult(uri, resource),
+    );
+  }
+}
+
 export function buildServer(
   options: BuildServerOptions & { sdkVersion: "v2" },
 ): ModernMcpServer;
@@ -163,6 +207,7 @@ export function buildServer({
     for (const { name, config, handler } of registrations) {
       server.registerTool(name, config, handler);
     }
+    registerModernUiResources(server);
     return wrapMcpServerWithSentry(server);
   }
 
@@ -176,6 +221,7 @@ export function buildServer({
   for (const { name, config, handler } of registrations) {
     server.registerTool(name, config, handler);
   }
+  registerLegacyUiResources(server);
   return wrapMcpServerWithSentry(server);
 }
 
@@ -253,6 +299,12 @@ function configureServer({
       inputSchema: filteredInputSchema,
       outputSchema: tool.outputSchema,
       annotations: tool.annotations,
+      _meta: tool.ui
+        ? {
+            ui: { resourceUri: tool.ui.resourceUri },
+            [RESOURCE_URI_META_KEY]: tool.ui.resourceUri,
+          }
+        : undefined,
     };
     const handleToolCall = async (params: unknown): Promise<CallToolResult> => {
       // Get the active MCP server span and attach request-scoped attributes.
