@@ -1,4 +1,8 @@
-import { UserInputError, ConfigurationError } from "../errors";
+import {
+  UserInputError,
+  ConfigurationError,
+  LLMProviderError,
+} from "../errors";
 import { ApiError, ApiClientError, ApiServerError } from "../api-client";
 import { logIssue } from "../telem/logging";
 
@@ -16,6 +20,13 @@ export function isConfigurationError(
   error: unknown,
 ): error is ConfigurationError {
   return error instanceof ConfigurationError;
+}
+
+/**
+ * Type guard to identify LLM provider errors.
+ */
+export function isLLMProviderError(error: unknown): error is LLMProviderError {
+  return error instanceof LLMProviderError;
 }
 
 /**
@@ -62,6 +73,15 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
       "There appears to be a configuration issue with your setup.",
       error.message,
       `Please check your environment configuration and try again.`,
+    ].join("\n\n");
+  }
+
+  if (isLLMProviderError(error)) {
+    return [
+      "**AI Provider Error**",
+      "The AI provider service is not available for this request.",
+      error.message,
+      `This is a service availability issue that cannot be resolved by retrying.`,
     ].join("\n\n");
   }
 
