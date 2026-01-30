@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { UserInputError } from "../../../errors";
+import { UserInputError, LLMProviderError } from "../../../errors";
 import { ApiClientError, ApiServerError } from "../../../api-client";
 import { logIssue, logWarn } from "../../../telem/logging";
 
@@ -40,6 +40,21 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     });
     return {
       error: `Input Error: ${error.message}. You may be able to resolve this by addressing the concern and trying again.`,
+    };
+  }
+
+  if (error instanceof LLMProviderError) {
+    // Log LLMProviderError for Sentry logging (as log, not exception)
+    logWarn(error, {
+      loggerScope: ["agent-tools", "llm-provider"],
+      contexts: {
+        agentTool: {
+          errorType: "LLMProviderError",
+        },
+      },
+    });
+    return {
+      error: `AI Provider Error: ${error.message}. This is a service availability issue that cannot be resolved by retrying.`,
     };
   }
 

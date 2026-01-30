@@ -20,3 +20,15 @@ export class ConfigurationError extends Error {
     this.name = "ConfigurationError";
   }
 }
+
+/**
+ * Error thrown when an LLM provider (OpenAI, Anthropic, etc.) rejects a request
+ * due to service availability issues like region restrictions.
+ * These errors should be returned to the user directly without logging to Sentry.
+ */
+export class LLMProviderError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "LLMProviderError";
+  }
+}

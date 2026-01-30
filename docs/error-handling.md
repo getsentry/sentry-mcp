@@ -25,9 +25,12 @@ ApiError (base class)
 ### Application Error Classes (from errors.ts)
 
 - `UserInputError` - User-facing error for validation failures
-  - Parameter validation failures  
+  - Parameter validation failures
   - Any user-correctable error
 - `ConfigurationError` - Missing/invalid configuration
+- `LLMProviderError` - LLM provider availability issues (e.g., region restrictions)
+  - OpenAI rejecting requests from unsupported regions
+  - Provider service availability issues that cannot be resolved by retrying
 
 ### Error Categories
 
@@ -35,9 +38,10 @@ ApiError (base class)
 - All `ApiClientError` subclasses
 - `UserInputError`
 - `ConfigurationError`
+- `LLMProviderError`
 
 **System Errors (Should be captured by Sentry):**
-- `ApiServerError` 
+- `ApiServerError`
 - Network failures
 - Unexpected runtime errors
 
@@ -309,8 +313,10 @@ When using Cloudflare Workers with Sentry integration:
 ### Error Message Formats:
 
 - **UserInputError to Agent:** `{ error: "Input Error: {message}. You may be able to resolve this by addressing the concern and trying again." }`
+- **LLMProviderError to Agent:** `{ error: "AI Provider Error: {message}. This is a service availability issue that cannot be resolved by retrying." }`
 - **ApiClientError to Agent:** `{ error: "Input Error: {toUserMessage()}. You may be able to resolve this by addressing the concern and trying again." }`
 - **ApiServerError to Agent:** `{ error: "Server Error (5xx): {message}. Event ID: {eventId}. This is a system error that cannot be resolved by retrying." }`
+- **LLMProviderError to MCP User:** Formatted with "**AI Provider Error**" header
 - **ApiClientError to MCP User:** Formatted with "**Input Error**" header and toUserMessage()
 - **ApiServerError to MCP User:** Formatted with "**Error**" header + Event ID (logged to Sentry)
 

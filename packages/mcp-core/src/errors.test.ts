@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UserInputError, ConfigurationError } from "./errors";
+import { UserInputError, ConfigurationError, LLMProviderError } from "./errors";
 
 describe("UserInputError", () => {
   it("should create a UserInputError with the correct message and name", () => {
@@ -54,6 +54,37 @@ describe("ConfigurationError", () => {
     const error = new ConfigurationError("Unable to connect to server", {
       cause,
     });
+
+    expect(error.cause).toBe(cause);
+  });
+});
+
+describe("LLMProviderError", () => {
+  it("should create an LLMProviderError with the correct message and name", () => {
+    const message = "Region not supported";
+    const error = new LLMProviderError(message);
+
+    expect(error.message).toBe(message);
+    expect(error.name).toBe("LLMProviderError");
+    expect(error instanceof Error).toBe(true);
+    expect(error instanceof LLMProviderError).toBe(true);
+  });
+
+  it("should be distinguishable from other error types", () => {
+    const llmError = new LLMProviderError("LLM provider error");
+    const configError = new ConfigurationError("Config error");
+    const userInputError = new UserInputError("User input error");
+    const regularError = new Error("Regular error");
+
+    expect(llmError instanceof LLMProviderError).toBe(true);
+    expect(configError instanceof LLMProviderError).toBe(false);
+    expect(userInputError instanceof LLMProviderError).toBe(false);
+    expect(regularError instanceof LLMProviderError).toBe(false);
+  });
+
+  it("should support error cause", () => {
+    const cause = new Error("OpenAI API rejected the request");
+    const error = new LLMProviderError("Region not supported", { cause });
 
     expect(error.cause).toBe(cause);
   });

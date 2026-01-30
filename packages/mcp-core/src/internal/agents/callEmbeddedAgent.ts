@@ -1,6 +1,6 @@
-import { generateText, Output, type Tool } from "ai";
+import { generateText, Output, type Tool, APICallError } from "ai";
 import { getAgentProvider } from "./provider-factory";
-import { UserInputError } from "../../errors";
+import { UserInputError, LLMProviderError } from "../../errors";
 import type { z } from "zod";
 
 export type ToolCall = {
@@ -68,6 +68,22 @@ export async function callEmbeddedAgent<
         }
       }
     },
+  }).catch((error: unknown) => {
+    // Handle LLM provider errors with user-friendly messages
+    if (APICallError.isInstance(error)) {
+      // OpenAI region restriction error
+      if (
+        error.message.includes("Country, region, or territory not supported")
+      ) {
+        throw new LLMProviderError(
+          "The AI provider (OpenAI) does not support requests from your region. " +
+            "This is a restriction imposed by OpenAI on certain countries and territories. " +
+            "Please contact support if you believe this is an error.",
+        );
+      }
+    }
+    // Re-throw other errors to be handled by the caller
+    throw error;
   });
 
   if (!result.experimental_output) {

@@ -360,10 +360,11 @@ function configureServer({
           // NOT thrown as exceptions. This ensures consistent error handling
           // and prevents the MCP client from receiving raw error objects.
           //
-          // The logAndFormatError function provides user-friendly error messages
+          // The formatErrorForUser function provides user-friendly error messages
           // with appropriate formatting for different error types:
           // - UserInputError: Clear guidance for fixing input problems
           // - ConfigurationError: Clear guidance for fixing configuration issues
+          // - LLMProviderError: Clear messaging for AI provider availability issues
           // - ApiError: HTTP status context with helpful messaging
           // - System errors: Sentry event IDs for debugging
           //
