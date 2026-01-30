@@ -2,7 +2,7 @@
   "mcpServers": {
     "sentry": {
       "type": "http",
-      "url": "https://mcp.sentry.dev/mcp/sentry/mcp-server?agent=1"
+      "url": "https://mcp.sentry.dev/mcp/sentry/mcp-server?experimental=1"
     },
     "sentry-dev": {
       "type": "http",
