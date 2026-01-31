@@ -127,11 +127,44 @@ const ToolPart = memo(function ToolPart({
   );
 });
 
-// Helper to check if a part is a tool part (type starts with "tool-")
+// Helper to check if a part is an AI SDK 6 tool part (type starts with "tool-")
 const isToolPart = (part: { type: string }): part is {
   type: `tool-${string}`;
 } & ChatToolInvocation => {
   return part.type.startsWith("tool-") && part.type !== "tool-invocation";
+};
+
+// Helper to check if a part is a legacy tool-invocation part (AI SDK 4/5 format)
+const isLegacyToolInvocation = (part: { type: string }): part is {
+  type: "tool-invocation";
+} & ChatToolInvocation => {
+  return part.type === "tool-invocation";
+};
+
+// Helper to convert tool output to proper content format
+const convertToolOutput = (
+  output: unknown,
+): { content: Array<{ type: "text"; text: string }> } | undefined => {
+  if (output === undefined || output === null) {
+    return undefined;
+  }
+
+  // If output is already in MCP format with content array
+  if (
+    typeof output === "object" &&
+    "content" in (output as object) &&
+    Array.isArray((output as { content: unknown }).content)
+  ) {
+    return output as { content: Array<{ type: "text"; text: string }> };
+  }
+
+  // If output is a string, wrap it
+  if (typeof output === "string") {
+    return { content: [{ type: "text", text: output }] };
+  }
+
+  // For other objects, JSON stringify
+  return { content: [{ type: "text", text: JSON.stringify(output, null, 2) }] };
 };
 
 // Main component for rendering individual message parts
@@ -158,6 +191,19 @@ const MessagePart = memo(function MessagePart({
     );
   }
 
+  // Handle legacy tool-invocation parts (AI SDK 4/5 format from persisted messages)
+  if (isLegacyToolInvocation(part)) {
+    // Legacy format already has the ChatToolInvocation structure
+    const legacyPart = part as unknown as ChatToolInvocation;
+    return (
+      <ToolPart
+        toolInvocation={legacyPart}
+        messageId={messageId}
+        partIndex={partIndex}
+      />
+    );
+  }
+
   // Handle tool parts (AI SDK 6 format: type is "tool-${toolName}")
   if (isToolPart(part)) {
     // Convert AI SDK 6 tool part to our ChatToolInvocation format
@@ -166,9 +212,7 @@ const MessagePart = memo(function MessagePart({
       toolName: part.type.replace(/^tool-/, ""),
       args: (part as any).input ?? {},
       state: (part as any).state === "result" ? "result" : "call",
-      result: (part as any).output
-        ? { content: [{ type: "text", text: String((part as any).output) }] }
-        : undefined,
+      result: convertToolOutput((part as any).output),
     };
     return (
       <ToolPart
