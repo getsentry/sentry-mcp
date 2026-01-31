@@ -6,6 +6,34 @@ const TIMESTAMP_STORAGE_KEY = "sentry_chat_timestamp";
 const MAX_STORED_MESSAGES = 100; // Limit storage size
 const CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 
+// Legacy AI SDK 4.x message format (before migration to parts-based format)
+interface LegacyMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content?: string;
+  parts?: UIMessage["parts"];
+}
+
+// Migrate legacy messages (AI SDK 4.x format with `content`) to new format (with `parts`)
+function migrateMessage(msg: LegacyMessage): UIMessage {
+  // If message already has parts, use it as-is
+  if (msg.parts && Array.isArray(msg.parts) && msg.parts.length > 0) {
+    return msg as UIMessage;
+  }
+
+  // If message has legacy content string, convert to parts format
+  if (typeof msg.content === "string" && msg.content.length > 0) {
+    return {
+      id: msg.id,
+      role: msg.role,
+      parts: [{ type: "text", text: msg.content }],
+    } as UIMessage;
+  }
+
+  // Return as-is if neither format matches (will be filtered by validation)
+  return msg as UIMessage;
+}
+
 export function usePersistedChat(isAuthenticated: boolean) {
   // Check if cache is expired
   const isCacheExpired = useCallback(() => {
@@ -87,11 +115,12 @@ export function usePersistedChat(isAuthenticated: boolean) {
     try {
       const stored = localStorage.getItem(CHAT_STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as UIMessage[];
+        const parsed = JSON.parse(stored) as LegacyMessage[];
         // Validate the data structure
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out any invalid or incomplete messages
-          const validMessages = parsed.filter(isValidMessage);
+          // Migrate legacy messages and filter out any invalid ones
+          const migratedMessages = parsed.map(migrateMessage);
+          const validMessages = migratedMessages.filter(isValidMessage);
           if (validMessages.length > 0) {
             // Update timestamp since we're loading existing messages
             updateTimestamp();
