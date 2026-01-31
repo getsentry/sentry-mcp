@@ -1,8 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
+import type { ToolExecutionOptions } from "@ai-sdk/provider-utils";
 import { wrapToolForAgent } from "./tool-wrapper";
 import type { ServerContext } from "../../types";
 import type { ToolConfig } from "../types";
+
+// Helper to create minimal ToolExecutionOptions for testing
+const createToolOptions = (): ToolExecutionOptions => ({
+  toolCallId: "test-call-id",
+  messages: [],
+});
 
 // Create a simple mock tool for testing
 const mockTool: ToolConfig<{
@@ -46,14 +53,14 @@ describe("wrapToolForAgent", () => {
     const wrappedTool = wrapToolForAgent(mockTool, { context });
 
     // Call the wrapped tool
-    // AI SDK tools expect a toolContext parameter (messages, abortSignal, etc.)
-    const result = await wrappedTool.execute(
+    // AI SDK 6: execute takes (input, options) directly
+    const result = (await wrappedTool.execute!(
       {
         organizationSlug: "my-org",
         someParam: "test-value",
       },
-      {} as any, // Empty tool context for testing
-    );
+      createToolOptions(),
+    )) as { result?: unknown; error?: string };
 
     // Verify the tool was called with correct params
     expect(result.result).toBeDefined();
@@ -76,12 +83,12 @@ describe("wrapToolForAgent", () => {
     const wrappedTool = wrapToolForAgent(mockTool, { context });
 
     // Call without providing organizationSlug
-    const result = await wrappedTool.execute(
+    const result = (await wrappedTool.execute!(
       {
         someParam: "test-value",
       },
-      {} as any,
-    );
+      createToolOptions(),
+    )) as { result?: unknown; error?: string };
 
     // Verify the constraint was injected
     expect(result.result).toBeDefined();
@@ -105,12 +112,12 @@ describe("wrapToolForAgent", () => {
     const wrappedTool = wrapToolForAgent(mockTool, { context });
 
     // Call without providing projectSlug
-    const result = await wrappedTool.execute(
+    const result = (await wrappedTool.execute!(
       {
         someParam: "test-value",
       },
-      {} as any,
-    );
+      createToolOptions(),
+    )) as { result?: unknown; error?: string };
 
     // Verify both constraints were injected
     expect(result.result).toBeDefined();
@@ -134,13 +141,13 @@ describe("wrapToolForAgent", () => {
     const wrappedTool = wrapToolForAgent(mockTool, { context });
 
     // Provide organizationSlug explicitly (should NOT override since constraint injection doesn't override)
-    const result = await wrappedTool.execute(
+    const result = (await wrappedTool.execute!(
       {
         organizationSlug: "agent-provided-org",
         someParam: "test-value",
       },
-      {} as any,
-    );
+      createToolOptions(),
+    )) as { result?: unknown; error?: string };
 
     expect(result.result).toBeDefined();
     const parsed = JSON.parse(result.result as string);
@@ -177,7 +184,10 @@ describe("wrapToolForAgent", () => {
     const wrappedTool = wrapToolForAgent(errorTool, { context });
 
     // Call the tool that throws an error
-    const result = await wrappedTool.execute({ param: "test" }, {} as any);
+    const result = (await wrappedTool.execute!(
+      { param: "test" },
+      createToolOptions(),
+    )) as { result?: unknown; error?: string };
 
     // Verify the error was caught and returned in structured format
     // Generic errors are wrapped as "System Error" by agentTool for security

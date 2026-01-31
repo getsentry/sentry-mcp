@@ -1,4 +1,4 @@
-import { generateText, Output, type Tool, APICallError } from "ai";
+import { generateText, Output, type Tool, APICallError, stepCountIs } from "ai";
 import { getAgentProvider } from "./provider-factory";
 import { UserInputError, LLMProviderError } from "../../errors";
 import type { z } from "zod";
@@ -45,7 +45,7 @@ export async function callEmbeddedAgent<
     system,
     prompt,
     tools,
-    maxSteps: 5,
+    stopWhen: stepCountIs(5),
     // Only include temperature if provider specifies one (e.g., GPT-5 requires temperature=1)
     ...(provider.getTemperature() !== undefined && {
       temperature: provider.getTemperature(),
@@ -63,7 +63,7 @@ export async function callEmbeddedAgent<
         for (const toolCall of event.toolCalls) {
           capturedToolCalls.push({
             toolName: toolCall.toolName,
-            args: toolCall.args,
+            args: toolCall.input,
           });
         }
       }

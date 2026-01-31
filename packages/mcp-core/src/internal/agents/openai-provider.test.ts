@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider.js";
 
 describe("openai-provider", () => {
@@ -21,7 +22,7 @@ describe("openai-provider", () => {
 
   describe("base URL configuration", () => {
     it("uses default base URL when not configured", () => {
-      const model = getOpenAIModel();
+      const model = getOpenAIModel() as LanguageModelV3;
 
       expect(model).toBeDefined();
       expect(model.modelId).toBe("gpt-5");
@@ -30,7 +31,7 @@ describe("openai-provider", () => {
     it("uses configured base URL", () => {
       setOpenAIBaseUrl("https://custom-openai.example.com");
 
-      const model = getOpenAIModel();
+      const model = getOpenAIModel() as LanguageModelV3;
 
       expect(model).toBeDefined();
       expect(model.modelId).toBe("gpt-5");
@@ -39,13 +40,13 @@ describe("openai-provider", () => {
 
   describe("model override", () => {
     it("uses default model when not specified", () => {
-      const model = getOpenAIModel();
+      const model = getOpenAIModel() as LanguageModelV3;
 
       expect(model.modelId).toBe("gpt-5");
     });
 
     it("uses specified model when provided", () => {
-      const model = getOpenAIModel("gpt-4");
+      const model = getOpenAIModel("gpt-4") as LanguageModelV3;
 
       expect(model.modelId).toBe("gpt-4");
     });
@@ -53,7 +54,7 @@ describe("openai-provider", () => {
     it("uses OPENAI_MODEL env var when set", () => {
       process.env.OPENAI_MODEL = "gpt-4-turbo";
 
-      const model = getOpenAIModel();
+      const model = getOpenAIModel() as LanguageModelV3;
 
       expect(model.modelId).toBe("gpt-4-turbo");
     });

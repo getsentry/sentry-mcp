@@ -1,8 +1,8 @@
 import { openai } from "@ai-sdk/openai";
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
-import { experimental_createMCPClient } from "ai";
-import { Experimental_StdioMCPTransport } from "ai/mcp-stdio";
+import { experimental_createMCPClient } from "@ai-sdk/mcp";
+import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 
 // Cache for available tools to avoid reconnecting for each test
 let cachedTools: string[] | null = null;

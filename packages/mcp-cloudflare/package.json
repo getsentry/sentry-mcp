@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -45,6 +43,7 @@
     "wrangler": "^4.45.0"
   },
   "dependencies": {
+    "@ai-sdk/mcp": "catalog:",
     "@ai-sdk/openai": "catalog:",
     "@ai-sdk/react": "catalog:",
     "@cloudflare/workers-oauth-provider": "catalog:",

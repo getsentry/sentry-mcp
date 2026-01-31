@@ -1,4 +1,4 @@
-import { experimental_createMCPClient } from "ai";
+import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { startNewTrace, startSpan } from "@sentry/core";
 import { OAuthClient } from "./auth/oauth.js";

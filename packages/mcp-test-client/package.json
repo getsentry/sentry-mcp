@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/mcp": "catalog:",
     "@ai-sdk/openai": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@sentry/core": "catalog:",

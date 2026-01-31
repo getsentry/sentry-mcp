@@ -1,5 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import type { LanguageModelV1 } from "ai";
+import type { LanguageModel } from "ai";
 import { USER_AGENT } from "../../version";
 
 // Default configuration constants
@@ -24,7 +24,7 @@ export function setAnthropicBaseUrl(baseUrl: string | undefined): void {
  * - ANTHROPIC_MODEL: Model to use (default: "claude-sonnet-4-5") - env var OK
  * - Base URL: Must be set via setAnthropicBaseUrl() - NOT from env vars (security risk)
  */
-export function getAnthropicModel(model?: string): LanguageModelV1 {
+export function getAnthropicModel(model?: string): LanguageModel {
   const defaultModel = process.env.ANTHROPIC_MODEL || DEFAULT_ANTHROPIC_MODEL;
 
   const factory = createAnthropic({

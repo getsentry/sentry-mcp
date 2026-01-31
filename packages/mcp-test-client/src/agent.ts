@@ -1,5 +1,5 @@
 import { openai } from "@ai-sdk/openai";
-import { streamText } from "ai";
+import { streamText, stepCountIs } from "ai";
 import { startNewTrace, startSpan } from "@sentry/core";
 import type { MCPConnection } from "./types.js";
 import { DEFAULT_MODEL } from "./constants.js";
@@ -73,7 +73,7 @@ export async function runAgent(
             system: SYSTEM_PROMPT,
             messages: [{ role: "user", content: userPrompt }],
             tools,
-            maxSteps,
+            stopWhen: stepCountIs(maxSteps),
             experimental_telemetry: {
               isEnabled: true,
             },

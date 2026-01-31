@@ -5,7 +5,7 @@
  * without requiring a chat stream to be initialized.
  */
 import { Hono } from "hono";
-import { experimental_createMCPClient } from "ai";
+import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Env } from "../types";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";

@@ -1,5 +1,5 @@
-import { experimental_createMCPClient } from "ai";
-import { Experimental_StdioMCPTransport } from "ai/mcp-stdio";
+import { experimental_createMCPClient } from "@ai-sdk/mcp";
+import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { startNewTrace, startSpan } from "@sentry/core";
