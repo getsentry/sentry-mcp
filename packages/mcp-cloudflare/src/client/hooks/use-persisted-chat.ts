@@ -12,12 +12,21 @@ interface LegacyMessage {
   role: "user" | "assistant" | "system";
   content?: string;
   parts?: UIMessage["parts"];
+  // Legacy used 'data', new SDK uses 'metadata'
+  data?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 // Migrate legacy messages (AI SDK 4.x format with `content`) to new format (with `parts`)
 function migrateMessage(msg: LegacyMessage): UIMessage {
-  // If message already has parts, use it as-is
+  // Preserve metadata from either 'metadata' or legacy 'data' property
+  const metadata = msg.metadata ?? msg.data;
+
+  // If message already has parts, use it as-is (but ensure metadata is preserved)
   if (msg.parts && Array.isArray(msg.parts) && msg.parts.length > 0) {
+    if (metadata) {
+      return { ...msg, metadata } as UIMessage;
+    }
     return msg as UIMessage;
   }
 
@@ -27,6 +36,7 @@ function migrateMessage(msg: LegacyMessage): UIMessage {
       id: msg.id,
       role: msg.role,
       parts: [{ type: "text", text: msg.content }],
+      ...(metadata && { metadata }),
     } as UIMessage;
   }
 

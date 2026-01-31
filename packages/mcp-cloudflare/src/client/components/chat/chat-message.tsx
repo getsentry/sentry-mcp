@@ -211,12 +211,21 @@ const MessagePart = memo(function MessagePart({
 
   // Handle tool parts (AI SDK 6 format: type is "tool-${toolName}")
   if (isToolPart(part)) {
+    // Map AI SDK 6 state to our ChatToolInvocation state
+    const partState = (part as any).state;
+    const mappedState: "partial-call" | "call" | "result" =
+      partState === "result"
+        ? "result"
+        : partState === "partial-call"
+          ? "partial-call"
+          : "call";
+
     // Convert AI SDK 6 tool part to our ChatToolInvocation format
     const toolInvocation: ChatToolInvocation = {
       toolCallId: part.toolCallId,
       toolName: part.type.replace(/^tool-/, ""),
       args: (part as any).input ?? {},
-      state: (part as any).state === "result" ? "result" : "call",
+      state: mappedState,
       result: convertToolOutput((part as any).output),
     };
     return (
