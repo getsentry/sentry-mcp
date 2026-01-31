@@ -9,8 +9,8 @@ catalog:
   "@cloudflare/vite-plugin": ^1.13.15
   "@cloudflare/vitest-pool-workers": ^0.8.47
   "@cloudflare/workers-oauth-provider": ^0.0.12
-  "@cloudflare/workers-types": ^4.20260128.0
-  "@modelcontextprotocol/sdk": ^1.25.2
+  "@cloudflare/workers-types": ^4.20251014.0
+  "@modelcontextprotocol/sdk": ^1.21.0
   "@radix-ui/react-accordion": ^1.2.11
   "@radix-ui/react-slot": ^1.2.3
   "@sentry/cloudflare": 10.35.0
@@ -34,7 +34,7 @@ catalog:
   commander: ^14.0.0
   dotenv: ^16.6.1
   dotenv-cli: ^8.0.0
-  hono: ^4.11.7
+  hono: ^4.11.4
   lint-staged: ^15.5.2
   lucide-react: ^0.503.0
   msw: ^2.10.2
@@ -42,7 +42,6 @@ catalog:
   react: ^19.1.0
   react-dom: ^19.1.0
   react-markdown: ^9.1.0
-  react-router-dom: ^7.12.0
   remark-gfm: ^4.0.1
   simple-git-hooks: ^2.13.0
   tailwind-merge: ^3.3.1
@@ -56,6 +55,6 @@ catalog:
   vitest: ^3.2.4
   vitest-evals: ^0.4.0
   workers-mcp: 0.1.0-3
-  wrangler: ^4.59.1
+  wrangler: ^4.45.0
   zod: ^3.25.67
   zod-to-json-schema: ^3.24.6
