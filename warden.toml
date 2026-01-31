@@ -1,0 +1,7 @@
+version = 1
+
+[[triggers]]
+name = "testing-guidelines"
+event = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+skill = "testing-guidelines"
