@@ -6,7 +6,7 @@
 import ScrollToBottom from "react-scroll-to-bottom";
 import { Button } from "../ui/button";
 import { ChatInput, ChatMessages } from ".";
-import type { Message } from "ai/react";
+import type { UIMessage } from "@ai-sdk/react";
 
 // Constant empty function to avoid creating new instances on every render
 const EMPTY_FUNCTION = () => {};
@@ -28,7 +28,7 @@ const SAMPLE_PROMPTS = [
 ] as const;
 
 interface ChatUIProps {
-  messages: Message[];
+  messages: UIMessage[];
   input: string;
   error?: Error | null;
   isChatLoading: boolean;

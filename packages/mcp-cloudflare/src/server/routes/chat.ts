@@ -325,7 +325,7 @@ Start conversations by exploring what's available in their account. Use tools li
 - \`get_issue_details\` to dive deep into specific errors
 
 Remember: You're a test assistant, not a general-purpose helper. Stay focused on testing the MCP integration with their real data.`,
-      maxTokens: 2000,
+      maxOutputTokens: 2000,
       stopWhen: stepCountIs(10),
       experimental_telemetry: {
         isEnabled: true,
@@ -333,7 +333,7 @@ Remember: You're a test assistant, not a general-purpose helper. Stay focused on
     });
 
     // Clean up MCP client when the response stream ends
-    const response = result.toDataStreamResponse();
+    const response = result.toUIMessageStreamResponse();
 
     // Note: In a production environment, you might want to implement proper cleanup
     // This is a simplified approach for the demo

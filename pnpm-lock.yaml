@@ -27,9 +27,6 @@ catalogs:
     '@cloudflare/workers-types':
       specifier: ^4.20251014.0
       version: 4.20251014.0
-    '@modelcontextprotocol/sdk':
-      specifier: ^1.25.3
-      version: 1.25.3
     '@radix-ui/react-accordion':
       specifier: ^1.2.11
       version: 1.2.11
@@ -169,6 +166,9 @@ catalogs:
       specifier: ^3.24.6
       version: 3.25.0
 
+overrides:
+  '@modelcontextprotocol/sdk': ^1.25.3
+
 importers:
 
   .:
@@ -232,7 +232,7 @@ importers:
         specifier: 'catalog:'
         version: 0.0.12
       '@modelcontextprotocol/sdk':
-        specifier: 'catalog:'
+        specifier: ^1.25.3
         version: 1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
       '@radix-ui/react-accordion':
         specifier: 'catalog:'
@@ -371,7 +371,7 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1(@logtape/logtape@1.1.1)
       '@modelcontextprotocol/sdk':
-        specifier: 'catalog:'
+        specifier: ^1.25.3
         version: 1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
       '@sentry/core':
         specifier: 'catalog:'
@@ -414,7 +414,7 @@ importers:
   packages/mcp-server:
     dependencies:
       '@modelcontextprotocol/sdk':
-        specifier: 'catalog:'
+        specifier: ^1.25.3
         version: 1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
       '@sentry/core':
         specifier: 'catalog:'
@@ -463,7 +463,7 @@ importers:
         specifier: 'catalog:'
         version: 3.0.23(zod@3.25.76)
       '@modelcontextprotocol/sdk':
-        specifier: 'catalog:'
+        specifier: ^1.25.3
         version: 1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
       '@sentry/mcp-core':
         specifier: workspace:*
@@ -523,7 +523,7 @@ importers:
         specifier: 'catalog:'
         version: 3.0.23(zod@3.25.76)
       '@modelcontextprotocol/sdk':
-        specifier: 'catalog:'
+        specifier: ^1.25.3
         version: 1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
       '@sentry/core':
         specifier: 'catalog:'
@@ -1400,16 +1400,6 @@ packages:
     resolution: {integrity: sha512-tAKUC9DSJ4HDDD95ZOvnpLVoMFlwBW2spw6bC6+M3bJOqBL6krk5fI5X/4jeZDXUEEZQEERBxl/fUriLOu8AYw==}
     peerDependencies:
       '@logtape/logtape': ^1.1.1
-
-  '@modelcontextprotocol/sdk@1.25.2':
-    resolution: {integrity: sha512-LZFeo4F9M5qOhC/Uc1aQSrBHxMrvxett+9KLHt7OhcExtoiRN9DKgbZffMP/nxjutWDQpfMDfP3nkHI4X9ijww==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@cfworker/json-schema': ^4.1.1
-      zod: ^3.25 || ^4.0
-    peerDependenciesMeta:
-      '@cfworker/json-schema':
-        optional: true
 
   '@modelcontextprotocol/sdk@1.25.3':
     resolution: {integrity: sha512-vsAMBMERybvYgKbg/l4L1rhS7VXV1c0CtyJg72vwxONVX0l4ZfKVAnZEWTQixJGTzKnELjQ59e4NbdFDALRiAQ==}
@@ -5660,30 +5650,6 @@ snapshots:
       '@logtape/logtape': 1.1.1
       '@sentry/core': 9.34.0
 
-  '@modelcontextprotocol/sdk@1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)':
-    dependencies:
-      '@hono/node-server': 1.19.9(hono@4.11.4)
-      ajv: 8.17.1
-      ajv-formats: 3.0.1(ajv@8.17.1)
-      content-type: 1.0.5
-      cors: 2.8.5
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.6
-      express: 5.1.0
-      express-rate-limit: 7.5.1(express@5.1.0)
-      jose: 6.1.3
-      json-schema-typed: 8.0.2
-      pkce-challenge: 5.0.0
-      raw-body: 3.0.1
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.0(zod@3.25.76)
-    optionalDependencies:
-      '@cfworker/json-schema': 4.1.1
-    transitivePeerDependencies:
-      - hono
-      - supports-color
-
   '@modelcontextprotocol/sdk@1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.9(hono@4.11.4)
@@ -6737,7 +6703,7 @@ snapshots:
       '@cfworker/json-schema': 4.1.1
       '@cloudflare/ai-chat': 0.0.4(agents@0.3.6)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
       '@cloudflare/codemode': 0.0.5(agents@0.3.6)(ai@6.0.64(zod@3.25.76))(typescript@5.8.3)(zod@3.25.76)
-      '@modelcontextprotocol/sdk': 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.25.3(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)
       ai: 6.0.64(zod@3.25.76)
       cron-schedule: 6.0.0
       json-schema: 0.4.0

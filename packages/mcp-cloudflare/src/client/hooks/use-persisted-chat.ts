@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type { Message } from "ai";
+import type { UIMessage } from "ai";
 
 const CHAT_STORAGE_KEY = "sentry_chat_messages";
 const TIMESTAMP_STORAGE_KEY = "sentry_chat_timestamp";
@@ -31,42 +31,45 @@ export function usePersistedChat(isAuthenticated: boolean) {
   }, []);
 
   // Validate a message to ensure it won't cause conversion errors
-  const isValidMessage = useCallback((msg: Message): boolean => {
-    // Check if message has parts (newer structure)
+  const isValidMessage = useCallback((msg: UIMessage): boolean => {
+    // UIMessage always has parts array in AI SDK 5+
     if (msg.parts && Array.isArray(msg.parts)) {
       // Check each part for validity
-      return msg.parts.every((part) => {
-        // Text parts are always valid
-        if (part.type === "text") {
-          return true;
-        }
-
-        // Tool invocation parts must be complete (have result) if state is "call" or "result"
-        if (part.type === "tool-invocation") {
-          const invocation = part as any;
-          // If it's in "call" or "result" state, it must have a result
-          if (invocation.state === "call" || invocation.state === "result") {
-            const content = invocation.result?.content;
-            // Ensure content exists and is not an empty array
-            return (
-              content && (Array.isArray(content) ? content.length > 0 : true)
-            );
+      return msg.parts.every(
+        (part: {
+          type: string;
+          text?: string;
+          state?: string;
+          result?: { content?: unknown };
+        }) => {
+          // Text parts are always valid
+          if (part.type === "text") {
+            return true;
           }
-          // partial-call state is okay without result
+
+          // Tool invocation parts must be complete (have result) if state is "call" or "result"
+          if (part.type === "tool-invocation") {
+            const invocation = part as any;
+            // If it's in "call" or "result" state, it must have a result
+            if (invocation.state === "call" || invocation.state === "result") {
+              const content = invocation.result?.content;
+              // Ensure content exists and is not an empty array
+              return (
+                content && (Array.isArray(content) ? content.length > 0 : true)
+              );
+            }
+            // partial-call state is okay without result
+            return true;
+          }
+
+          // Other part types are assumed valid
           return true;
-        }
-
-        // Other part types are assumed valid
-        return true;
-      });
+        },
+      );
     }
 
-    // Check if message has content (legacy structure)
-    if (msg.content && typeof msg.content === "string") {
-      return msg.content.trim() !== "";
-    }
-
-    return false;
+    // UIMessage should always have parts, but check for empty
+    return msg.parts && msg.parts.length > 0;
   }, []);
 
   // Load initial messages from localStorage
@@ -84,7 +87,7 @@ export function usePersistedChat(isAuthenticated: boolean) {
     try {
       const stored = localStorage.getItem(CHAT_STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as Message[];
+        const parsed = JSON.parse(stored) as UIMessage[];
         // Validate the data structure
         if (Array.isArray(parsed) && parsed.length > 0) {
           // Filter out any invalid or incomplete messages
@@ -108,7 +111,7 @@ export function usePersistedChat(isAuthenticated: boolean) {
 
   // Function to save messages
   const saveMessages = useCallback(
-    (messages: Message[]) => {
+    (messages: UIMessage[]) => {
       if (!isAuthenticated || messages.length === 0) return;
 
       try {
