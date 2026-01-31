@@ -146,6 +146,16 @@ const mcpHandler: ExportedHandler<Env> = {
 
     // Validate that at least one valid skill was granted
     if (validSkills.size === 0) {
+      logWarn("Authorization rejected: No valid skills in token", {
+        loggerScope: ["cloudflare", "mcp-handler"],
+        extra: {
+          clientId: oauthCtx.props.clientId,
+          userId: oauthCtx.props.id,
+          rawGrantedSkills: oauthCtx.props.grantedSkills,
+          rawGrantedSkillsType: typeof oauthCtx.props.grantedSkills,
+          rawGrantedSkillsIsArray: Array.isArray(oauthCtx.props.grantedSkills),
+        },
+      });
       return new Response(
         "Authorization failed: No valid skills were granted. Please re-authorize and select at least one permission.",
         { status: 400 },
