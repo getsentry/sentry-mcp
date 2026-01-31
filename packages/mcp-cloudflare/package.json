@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "license": "FSL-1.1-ALv2",
-  "files": ["./dist/*"],
+  "files": [
+    "./dist/*"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -40,7 +42,7 @@
     "urlpattern-polyfill": "^10.1.0",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "wrangler": "catalog:"
+    "wrangler": "^4.45.0"
   },
   "dependencies": {
     "@ai-sdk/openai": "catalog:",
@@ -62,7 +64,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-markdown": "catalog:",
-    "react-router-dom": "catalog:",
+    "react-router-dom": "^7.11.0",
     "react-scroll-to-bottom": "^4.2.0",
     "remark-gfm": "catalog:",
     "tailwind-merge": "catalog:",
