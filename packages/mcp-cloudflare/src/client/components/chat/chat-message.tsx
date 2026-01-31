@@ -127,6 +127,13 @@ const ToolPart = memo(function ToolPart({
   );
 });
 
+// Helper to check if a part is a tool part (type starts with "tool-")
+const isToolPart = (part: { type: string }): part is {
+  type: `tool-${string}`;
+} & ChatToolInvocation => {
+  return part.type.startsWith("tool-") && part.type !== "tool-invocation";
+};
+
 // Main component for rendering individual message parts
 const MessagePart = memo(function MessagePart({
   part,
@@ -137,30 +144,43 @@ const MessagePart = memo(function MessagePart({
   messageData,
   onSlashCommand,
 }: MessagePartProps) {
-  switch (part.type) {
-    case "text":
-      return (
-        <TextPart
-          text={part.text}
-          role={messageRole}
-          messageId={messageId}
-          isStreaming={isStreaming}
-          messageData={messageData}
-          onSlashCommand={onSlashCommand}
-        />
-      );
-    case "tool-invocation":
-      return (
-        <ToolPart
-          toolInvocation={part.toolInvocation as ChatToolInvocation}
-          messageId={messageId}
-          partIndex={partIndex}
-        />
-      );
-    default:
-      // Fallback for unknown part types
-      return null;
+  // Handle text parts
+  if (part.type === "text") {
+    return (
+      <TextPart
+        text={part.text}
+        role={messageRole}
+        messageId={messageId}
+        isStreaming={isStreaming}
+        messageData={messageData}
+        onSlashCommand={onSlashCommand}
+      />
+    );
   }
+
+  // Handle tool parts (AI SDK 6 format: type is "tool-${toolName}")
+  if (isToolPart(part)) {
+    // Convert AI SDK 6 tool part to our ChatToolInvocation format
+    const toolInvocation: ChatToolInvocation = {
+      toolCallId: part.toolCallId,
+      toolName: part.type.replace(/^tool-/, ""),
+      args: (part as any).input ?? {},
+      state: (part as any).state === "result" ? "result" : "call",
+      result: (part as any).output
+        ? { content: [{ type: "text", text: String((part as any).output) }] }
+        : undefined,
+    };
+    return (
+      <ToolPart
+        toolInvocation={toolInvocation}
+        messageId={messageId}
+        partIndex={partIndex}
+      />
+    );
+  }
+
+  // Fallback for unknown part types
+  return null;
 });
 
 // Export the memoized components

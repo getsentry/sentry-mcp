@@ -69,7 +69,7 @@ export function usePersistedChat(isAuthenticated: boolean) {
     }
 
     // UIMessage should always have parts, but check for empty
-    return msg.parts && msg.parts.length > 0;
+    return Boolean(msg.parts && msg.parts.length > 0);
   }, []);
 
   // Load initial messages from localStorage

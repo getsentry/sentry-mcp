@@ -10,9 +10,6 @@ import { useAuth } from "../../contexts/auth-context";
 // Import UIMessage from our types (re-exported as Message for compatibility)
 import type { UIMessage } from "@ai-sdk/react";
 
-// Cache for stable part objects to avoid recreating them
-const partCache = new WeakMap<UIMessage, { type: "text"; text: string }>();
-
 function processMessages(
   messages: UIMessage[],
   isChatLoading: boolean,
@@ -50,25 +47,6 @@ function processMessages(
           });
         },
       );
-    } else if (message.content) {
-      // Use cached part object to maintain stable references
-      let part = partCache.get(message);
-      if (!part) {
-        part = { type: "text", text: message.content };
-        partCache.set(message, part);
-      }
-
-      allParts.push({
-        part,
-        messageId: message.id,
-        messageRole: message.role,
-        partIndex: 0,
-        // Stream if it's AI response OR local streaming simulation
-        isStreaming:
-          (isLastMessage && isChatLoading) ||
-          isMessageStreaming?.(message.id) ||
-          false,
-      });
     }
   });
 
@@ -137,7 +115,7 @@ export function ChatMessages({
             const originalMessage = messages.find(
               (m) => m.id === item.messageId,
             );
-            const messageData = originalMessage?.data as any;
+            const messageData = originalMessage?.metadata as any;
             const hasToolActions =
               messageData?.type === "tools-list" &&
               messageData?.toolsDetailed &&
@@ -151,7 +129,7 @@ export function ChatMessages({
                   messageRole={item.messageRole}
                   partIndex={item.partIndex}
                   isStreaming={item.isStreaming}
-                  messageData={originalMessage?.data}
+                  messageData={originalMessage?.metadata}
                   onSlashCommand={onSlashCommand}
                 />
                 {/* Show tool actions list for tools-list messages */}

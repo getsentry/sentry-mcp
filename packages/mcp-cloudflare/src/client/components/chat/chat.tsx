@@ -256,13 +256,12 @@ Try asking me things like:
       id: string,
       role: "user" | "assistant" | "system",
       text: string,
-      data?: Record<string, unknown>,
+      metadata?: Record<string, unknown>,
     ): UIMessage => ({
       id,
       role,
       parts: [{ type: "text", text }],
-      createdAt: new Date(),
-      ...(data && { data }),
+      ...(metadata && { metadata }),
     }),
     [],
   );
