@@ -135,10 +135,16 @@ const isToolPart = (part: { type: string }): part is {
 };
 
 // Helper to check if a part is a legacy tool-invocation part (AI SDK 4/5 format)
+// Legacy format: { type: "tool-invocation", toolInvocation: ChatToolInvocation }
 const isLegacyToolInvocation = (part: { type: string }): part is {
   type: "tool-invocation";
-} & ChatToolInvocation => {
-  return part.type === "tool-invocation";
+  toolInvocation: ChatToolInvocation;
+} => {
+  return (
+    part.type === "tool-invocation" &&
+    "toolInvocation" in part &&
+    typeof (part as any).toolInvocation === "object"
+  );
 };
 
 // Helper to convert tool output to proper content format
@@ -192,12 +198,11 @@ const MessagePart = memo(function MessagePart({
   }
 
   // Handle legacy tool-invocation parts (AI SDK 4/5 format from persisted messages)
+  // Legacy format: { type: "tool-invocation", toolInvocation: {...} }
   if (isLegacyToolInvocation(part)) {
-    // Legacy format already has the ChatToolInvocation structure
-    const legacyPart = part as unknown as ChatToolInvocation;
     return (
       <ToolPart
-        toolInvocation={legacyPart}
+        toolInvocation={part.toolInvocation}
         messageId={messageId}
         partIndex={partIndex}
       />
