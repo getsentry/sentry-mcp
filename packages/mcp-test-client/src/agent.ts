@@ -90,7 +90,7 @@ export async function runAgent(
                   const toolCall = toolCalls[i];
                   const toolResult = toolResults?.[i];
 
-                  logTool(toolCall.toolName, toolCall.args);
+                  logTool(toolCall.toolName, toolCall.input);
 
                   // Show the actual tool result if available
                   if (toolResult?.result) {
