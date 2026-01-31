@@ -93,5 +93,43 @@ describe("app", () => {
         authorization_servers: ["https://mcp.sentry.dev"],
       });
     });
+
+    it("should handle dynamic subpaths", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server",
+        {
+          headers: {
+            "CF-Connecting-IP": "192.0.2.1",
+          },
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        resource: "https://mcp.sentry.dev/mcp/sentry/mcp-server",
+        authorization_servers: ["https://mcp.sentry.dev"],
+      });
+    });
+
+    it("should handle dynamic subpaths with query parameters", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server?experimental=1",
+        {
+          headers: {
+            "CF-Connecting-IP": "192.0.2.1",
+          },
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        resource: "https://mcp.sentry.dev/mcp/sentry/mcp-server",
+        authorization_servers: ["https://mcp.sentry.dev"],
+      });
+    });
   });
 });

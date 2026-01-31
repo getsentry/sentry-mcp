@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import * as Sentry from "@sentry/cloudflare";
@@ -12,6 +12,20 @@ import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { createRequestLogger } from "./logging";
 import mcpRoutes from "./routes/mcp";
 import { getClientIp } from "./utils/client-ip";
+
+// RFC 9728: OAuth 2.0 Protected Resource Metadata handler
+function handleOAuthProtectedResourceMetadata(c: Context) {
+  const requestUrl = new URL(c.req.url);
+  const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+  const resourcePath = requestUrl.pathname.replace(
+    "/.well-known/oauth-protected-resource",
+    "",
+  );
+  return c.json({
+    resource: `${baseUrl}${resourcePath}`,
+    authorization_servers: [baseUrl],
+  });
+}
 
 const app = new Hono<{
   Bindings: Env;
@@ -78,14 +92,15 @@ const app = new Hono<{
   })
   // RFC 9728: OAuth 2.0 Protected Resource Metadata
   // ChatGPT and other clients query this to discover the authorization server
-  .get("/.well-known/oauth-protected-resource/mcp", (c) => {
-    const requestUrl = new URL(c.req.url);
-    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
-    return c.json({
-      resource: `${baseUrl}/mcp`,
-      authorization_servers: [baseUrl],
-    });
-  })
+  // Handles both /mcp and /mcp/* paths (e.g., /mcp/sentry/mcp-server)
+  .get(
+    "/.well-known/oauth-protected-resource/mcp",
+    handleOAuthProtectedResourceMetadata,
+  )
+  .get(
+    "/.well-known/oauth-protected-resource/mcp/*",
+    handleOAuthProtectedResourceMetadata,
+  )
   .route("/oauth", sentryOauth)
   .route("/api/auth", chatOauth)
   .route("/api/chat", chat)
