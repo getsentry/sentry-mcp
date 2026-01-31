@@ -160,4 +160,52 @@ describe("mcp-handler", () => {
     expect(mockListUserGrants).toHaveBeenCalledWith("test-user-123");
     expect(mockRevokeGrant).toHaveBeenCalledWith("grant-123", "test-user-123");
   });
+
+  it("returns 400 when grantedSkills is empty array", async () => {
+    const emptySkillsCtx = {
+      waitUntil: vi.fn(),
+      passThroughOnException: vi.fn(),
+      props: {
+        id: "test-user-123",
+        clientId: "test-client",
+        accessToken: "test-token",
+        grantedSkills: [], // Empty array - this is the suspected issue
+      },
+    };
+
+    const request = new Request("https://test.mcp.sentry.io/mcp");
+
+    const response = await handler.fetch!(
+      request as any,
+      env,
+      emptySkillsCtx as any,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("No valid skills were granted");
+  });
+
+  it("returns 400 when grantedSkills contains only invalid skills", async () => {
+    const invalidSkillsCtx = {
+      waitUntil: vi.fn(),
+      passThroughOnException: vi.fn(),
+      props: {
+        id: "test-user-123",
+        clientId: "test-client",
+        accessToken: "test-token",
+        grantedSkills: ["nonexistent-skill", "another-bad-skill"],
+      },
+    };
+
+    const request = new Request("https://test.mcp.sentry.io/mcp");
+
+    const response = await handler.fetch!(
+      request as any,
+      env,
+      invalidSkillsCtx as any,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("No valid skills were granted");
+  });
 });
