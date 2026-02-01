@@ -38,6 +38,12 @@ export const searchEventsAgentOutputSchema = z
     explanation: z
       .string()
       .describe("Brief explanation of how you translated this query."),
+    chartType: z
+      .enum(["bar", "pie", "line", "table", "number"])
+      .nullable()
+      .describe(
+        "Suggested chart type for visualization: 'bar' (grouped data), 'pie' (distribution), 'line' (time-based), 'table' (complex multi-dimensional), 'number' (single aggregate value). Null if not an aggregate query.",
+      ),
   })
   .refine(
     (data) => {
