@@ -71,43 +71,50 @@ export function usePersistedChat(isAuthenticated: boolean) {
   // Validate a message to ensure it won't cause conversion errors
   const isValidMessage = useCallback((msg: UIMessage): boolean => {
     // UIMessage always has parts array in AI SDK 6+
-    // Check that parts exists and is non-empty
     if (!msg.parts || !Array.isArray(msg.parts) || msg.parts.length === 0) {
       return false;
     }
 
-    // Check each part for validity
-    return msg.parts.every(
-      (part: {
-        type: string;
-        text?: string;
-        state?: string;
-        result?: { content?: unknown };
-      }) => {
-        // Text parts are always valid
-        if (part.type === "text") {
-          return true;
-        }
+    // Invalid states that indicate incomplete tool calls
+    const incompleteToolStates = new Set([
+      "input-streaming",
+      "input-available",
+      "approval-requested",
+    ]);
 
-        // Tool invocation parts must be complete (have result) if state is "call" or "result"
-        if (part.type === "tool-invocation") {
-          const invocation = part as any;
-          // If it's in "call" or "result" state, it must have a result
-          if (invocation.state === "call" || invocation.state === "result") {
-            const content = invocation.result?.content;
-            // Ensure content exists and is not an empty array
-            return (
-              content && (Array.isArray(content) ? content.length > 0 : true)
-            );
-          }
-          // partial-call state is okay without result
-          return true;
-        }
-
-        // Other part types are assumed valid
+    return msg.parts.every((part) => {
+      // Text parts are always valid
+      if (part.type === "text") {
         return true;
-      },
-    );
+      }
+
+      // AI SDK 6.x uses "tool-<toolname>" format (e.g., "tool-whoami")
+      // Filter out incomplete tool calls that shouldn't be persisted
+      if (part.type.startsWith("tool-")) {
+        const { state } = part as { state?: string };
+        return !incompleteToolStates.has(state ?? "");
+      }
+
+      // Legacy "tool-invocation" format (AI SDK 4.x)
+      if (part.type === "tool-invocation") {
+        const { state, result } = part as {
+          state?: string;
+          result?: { content?: unknown };
+        };
+        // "call" or "result" state requires valid content
+        if (state === "call" || state === "result") {
+          const content = result?.content;
+          return (
+            content != null && (!Array.isArray(content) || content.length > 0)
+          );
+        }
+        // partial-call state is okay without result
+        return true;
+      }
+
+      // Other part types (reasoning, file, source-url, etc.) are valid
+      return true;
+    });
   }, []);
 
   // Load initial messages from localStorage

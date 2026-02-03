@@ -198,21 +198,23 @@ Try asking me things like:
     };
   }, []);
 
-  // Track previous auth state to detect logout events
-  const prevAuthStateRef = useRef(isAuthenticated);
+  // Track previous auth and endpoint mode to detect changes requiring message clearing
+  const prevStateRef = useRef({ isAuthenticated, endpointMode });
 
-  // Clear messages when user logs out (auth state changes from authenticated to not)
+  // Clear messages when user logs out or endpoint mode changes
   useEffect(() => {
-    const wasAuthenticated = prevAuthStateRef.current;
+    const prev = prevStateRef.current;
 
-    // Detect logout: was authenticated but now isn't
-    if (wasAuthenticated && !isAuthenticated) {
+    // Clear on logout (was authenticated but now isn't) or endpoint mode change
+    const didLogout = prev.isAuthenticated && !isAuthenticated;
+    const didChangeMode = prev.endpointMode !== endpointMode;
+
+    if (didLogout || didChangeMode) {
       clearMessages();
     }
 
-    // Update the ref for next comparison
-    prevAuthStateRef.current = isAuthenticated;
-  }, [isAuthenticated, clearMessages]);
+    prevStateRef.current = { isAuthenticated, endpointMode };
+  }, [isAuthenticated, endpointMode, clearMessages]);
 
   // Save messages when they change
   useEffect(() => {
