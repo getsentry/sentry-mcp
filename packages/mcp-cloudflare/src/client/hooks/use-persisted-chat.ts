@@ -96,14 +96,20 @@ export function usePersistedChat(isAuthenticated: boolean) {
       }
 
       // Legacy "tool-invocation" format (AI SDK 4.x)
+      // Structure: { type: "tool-invocation", toolInvocation: { state, result, ... } }
       if (part.type === "tool-invocation") {
-        const { state, result } = part as {
-          state?: string;
-          result?: { content?: unknown };
-        };
+        const invocation = (
+          part as {
+            toolInvocation?: {
+              state?: string;
+              result?: { content?: unknown };
+            };
+          }
+        ).toolInvocation;
+        if (!invocation) return true; // No invocation data, allow it
         // "call" or "result" state requires valid content
-        if (state === "call" || state === "result") {
-          const content = result?.content;
+        if (invocation.state === "call" || invocation.state === "result") {
+          const content = invocation.result?.content;
           return (
             content != null && (!Array.isArray(content) || content.length > 0)
           );
