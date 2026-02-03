@@ -1,6 +1,11 @@
 import { Hono, type Context } from "hono";
 import { openai } from "@ai-sdk/openai";
-import { streamText, type ToolSet, stepCountIs } from "ai";
+import {
+  streamText,
+  type ToolSet,
+  stepCountIs,
+  convertToModelMessages,
+} from "ai";
 import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Env } from "../types";
@@ -299,9 +304,15 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       }
     }
 
+    // Convert UIMessage[] (parts-based) to ModelMessage[] (content-based) for streamText
+    const modelMessages = await convertToModelMessages(messages, {
+      tools,
+      ignoreIncompleteToolCalls: true,
+    });
+
     const result = streamText({
       model: openai("gpt-4o"),
-      messages,
+      messages: modelMessages,
       tools,
       system: `You are an AI assistant designed EXCLUSIVELY for testing the Sentry MCP service. Your sole purpose is to help users test MCP functionality with their real Sentry account data - nothing more, nothing less.
 

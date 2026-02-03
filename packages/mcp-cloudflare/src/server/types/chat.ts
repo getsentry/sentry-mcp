@@ -2,6 +2,7 @@
  * Type definitions for Chat API
  */
 import { z } from "zod";
+import type { UIMessage } from "ai";
 
 // Shared schemas for authentication data across chat routes
 export const AuthDataSchema = z.object({
@@ -51,13 +52,9 @@ export interface ErrorResponse {
   eventId?: string;
 }
 
-// Request types
+// Request types - uses UIMessage format from AI SDK 6.x (parts-based)
 export interface ChatRequest {
-  messages: Array<{
-    role: "user" | "assistant" | "system";
-    content: string;
-    data?: any; // Additional metadata for messages
-  }>;
+  messages: UIMessage[];
 }
 
 // MCP types
