@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import type { LanguageModelV1 } from "ai";
+import type { LanguageModel } from "ai";
 import { USER_AGENT } from "../../version";
 
 // Default configuration constants
@@ -33,7 +33,7 @@ export function setOpenAIBaseUrl(baseUrl: string | undefined): void {
  * - Vercel AI Gateway: "openai/gpt-4o", "anthropic/claude-sonnet-4.5", etc.
  * - Other providers: Check their documentation
  */
-export function getOpenAIModel(model?: string): LanguageModelV1 {
+export function getOpenAIModel(model?: string): LanguageModel {
   const defaultModel = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
 
   const factory = createOpenAI({

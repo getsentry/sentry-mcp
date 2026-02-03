@@ -1,10 +1,48 @@
 import { useCallback, useMemo } from "react";
-import type { Message } from "ai";
+import type { UIMessage } from "ai";
 
 const CHAT_STORAGE_KEY = "sentry_chat_messages";
 const TIMESTAMP_STORAGE_KEY = "sentry_chat_timestamp";
 const MAX_STORED_MESSAGES = 100; // Limit storage size
 const CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+
+// Legacy AI SDK 4.x message format (before migration to parts-based format)
+interface LegacyMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content?: string;
+  parts?: UIMessage["parts"];
+  // Legacy used 'data', new SDK uses 'metadata'
+  data?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+// Migrate legacy messages (AI SDK 4.x format with `content`) to new format (with `parts`)
+function migrateMessage(msg: LegacyMessage): UIMessage {
+  // Preserve metadata from either 'metadata' or legacy 'data' property
+  const metadata = msg.metadata ?? msg.data;
+
+  // If message already has parts, use it as-is (but ensure metadata is preserved)
+  if (msg.parts && Array.isArray(msg.parts) && msg.parts.length > 0) {
+    if (metadata) {
+      return { ...msg, metadata } as UIMessage;
+    }
+    return msg as UIMessage;
+  }
+
+  // If message has legacy content string, convert to parts format
+  if (typeof msg.content === "string" && msg.content.length > 0) {
+    return {
+      id: msg.id,
+      role: msg.role,
+      parts: [{ type: "text", text: msg.content }],
+      ...(metadata && { metadata }),
+    } as UIMessage;
+  }
+
+  // Return as-is if neither format matches (will be filtered by validation)
+  return msg as UIMessage;
+}
 
 export function usePersistedChat(isAuthenticated: boolean) {
   // Check if cache is expired
@@ -31,42 +69,58 @@ export function usePersistedChat(isAuthenticated: boolean) {
   }, []);
 
   // Validate a message to ensure it won't cause conversion errors
-  const isValidMessage = useCallback((msg: Message): boolean => {
-    // Check if message has parts (newer structure)
-    if (msg.parts && Array.isArray(msg.parts)) {
-      // Check each part for validity
-      return msg.parts.every((part) => {
-        // Text parts are always valid
-        if (part.type === "text") {
-          return true;
-        }
+  const isValidMessage = useCallback((msg: UIMessage): boolean => {
+    // UIMessage always has parts array in AI SDK 6+
+    if (!msg.parts || !Array.isArray(msg.parts) || msg.parts.length === 0) {
+      return false;
+    }
 
-        // Tool invocation parts must be complete (have result) if state is "call" or "result"
-        if (part.type === "tool-invocation") {
-          const invocation = part as any;
-          // If it's in "call" or "result" state, it must have a result
-          if (invocation.state === "call" || invocation.state === "result") {
-            const content = invocation.result?.content;
-            // Ensure content exists and is not an empty array
-            return (
-              content && (Array.isArray(content) ? content.length > 0 : true)
-            );
-          }
-          // partial-call state is okay without result
-          return true;
-        }
+    // Invalid states that indicate incomplete tool calls
+    const incompleteToolStates = new Set([
+      "input-streaming",
+      "input-available",
+      "approval-requested",
+    ]);
 
-        // Other part types are assumed valid
+    return msg.parts.every((part) => {
+      // Text parts are always valid
+      if (part.type === "text") {
         return true;
-      });
-    }
+      }
 
-    // Check if message has content (legacy structure)
-    if (msg.content && typeof msg.content === "string") {
-      return msg.content.trim() !== "";
-    }
+      // AI SDK 6.x uses "tool-<toolname>" format (e.g., "tool-whoami")
+      // Filter out incomplete tool calls that shouldn't be persisted
+      if (part.type.startsWith("tool-")) {
+        const { state } = part as { state?: string };
+        return !incompleteToolStates.has(state ?? "");
+      }
 
-    return false;
+      // Legacy "tool-invocation" format (AI SDK 4.x)
+      // Structure: { type: "tool-invocation", toolInvocation: { state, result, ... } }
+      if (part.type === "tool-invocation") {
+        const invocation = (
+          part as {
+            toolInvocation?: {
+              state?: string;
+              result?: { content?: unknown };
+            };
+          }
+        ).toolInvocation;
+        if (!invocation) return true; // No invocation data, allow it
+        // "call" or "result" state requires valid content
+        if (invocation.state === "call" || invocation.state === "result") {
+          const content = invocation.result?.content;
+          return (
+            content != null && (!Array.isArray(content) || content.length > 0)
+          );
+        }
+        // partial-call state is okay without result
+        return true;
+      }
+
+      // Other part types (reasoning, file, source-url, etc.) are valid
+      return true;
+    });
   }, []);
 
   // Load initial messages from localStorage
@@ -84,11 +138,12 @@ export function usePersistedChat(isAuthenticated: boolean) {
     try {
       const stored = localStorage.getItem(CHAT_STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as Message[];
+        const parsed = JSON.parse(stored) as LegacyMessage[];
         // Validate the data structure
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out any invalid or incomplete messages
-          const validMessages = parsed.filter(isValidMessage);
+          // Migrate legacy messages and filter out any invalid ones
+          const migratedMessages = parsed.map(migrateMessage);
+          const validMessages = migratedMessages.filter(isValidMessage);
           if (validMessages.length > 0) {
             // Update timestamp since we're loading existing messages
             updateTimestamp();
@@ -108,7 +163,7 @@ export function usePersistedChat(isAuthenticated: boolean) {
 
   // Function to save messages
   const saveMessages = useCallback(
-    (messages: Message[]) => {
+    (messages: UIMessage[]) => {
       if (!isAuthenticated || messages.length === 0) return;
 
       try {

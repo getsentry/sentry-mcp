@@ -11,9 +11,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Core - Shared code for MCP transports",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -21,9 +19,7 @@
     "type": "git",
     "url": "git@github.com:getsentry/sentry-mcp.git"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     "./api-client": {
       "types": "./dist/api-client/index.ts",
@@ -144,6 +140,8 @@
     "validate-skills": "tsx scripts/validate-skills-mapping.ts"
   },
   "devDependencies": {
+    "@ai-sdk/provider": "^3.0.6",
+    "@ai-sdk/provider-utils": "^4.0.11",
     "@sentry/mcp-server-mocks": "workspace:*",
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "msw": "catalog:",
@@ -153,6 +151,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "catalog:",
+    "@ai-sdk/mcp": "catalog:",
     "@ai-sdk/openai": "catalog:",
     "@logtape/logtape": "^1.1.1",
     "@logtape/sentry": "^1.1.1",

@@ -1,7 +1,12 @@
 import { Hono, type Context } from "hono";
 import { openai } from "@ai-sdk/openai";
-import { streamText, type ToolSet } from "ai";
-import { experimental_createMCPClient } from "ai";
+import {
+  streamText,
+  type ToolSet,
+  stepCountIs,
+  convertToModelMessages,
+} from "ai";
+import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Env } from "../types";
 import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
@@ -299,9 +304,15 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
       }
     }
 
+    // Convert UIMessage[] (parts-based) to ModelMessage[] (content-based) for streamText
+    const modelMessages = await convertToModelMessages(messages, {
+      tools,
+      ignoreIncompleteToolCalls: true,
+    });
+
     const result = streamText({
       model: openai("gpt-4o"),
-      messages,
+      messages: modelMessages,
       tools,
       system: `You are an AI assistant designed EXCLUSIVELY for testing the Sentry MCP service. Your sole purpose is to help users test MCP functionality with their real Sentry account data - nothing more, nothing less.
 
@@ -325,15 +336,15 @@ Start conversations by exploring what's available in their account. Use tools li
 - \`get_issue_details\` to dive deep into specific errors
 
 Remember: You're a test assistant, not a general-purpose helper. Stay focused on testing the MCP integration with their real data.`,
-      maxTokens: 2000,
-      maxSteps: 10,
+      maxOutputTokens: 2000,
+      stopWhen: stepCountIs(10),
       experimental_telemetry: {
         isEnabled: true,
       },
     });
 
     // Clean up MCP client when the response stream ends
-    const response = result.toDataStreamResponse();
+    const response = result.toUIMessageStreamResponse();
 
     // Note: In a production environment, you might want to implement proper cleanup
     // This is a simplified approach for the demo

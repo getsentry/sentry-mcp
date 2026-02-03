@@ -15,11 +15,15 @@ vi.mock("@ai-sdk/openai", () => {
   };
 });
 
-vi.mock("ai", () => ({
-  generateText: vi.fn(),
-  tool: vi.fn(() => ({ execute: vi.fn() })),
-  Output: { object: vi.fn(() => ({})) },
-}));
+vi.mock("ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("ai")>();
+  return {
+    ...actual,
+    generateText: vi.fn(),
+    tool: vi.fn(() => ({ execute: vi.fn() })),
+    Output: { object: vi.fn(() => ({})) },
+  };
+});
 
 describe("search_issue_events", () => {
   const mockGenerateText = vi.mocked(generateText);

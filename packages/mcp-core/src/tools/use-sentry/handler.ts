@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { experimental_createMCPClient } from "ai";
+import { experimental_createMCPClient } from "@ai-sdk/mcp";
 import { defineTool } from "../../internal/tool-helpers/define";
 import type { ServerContext } from "../../types";
 import { useSentryAgent } from "./agent";

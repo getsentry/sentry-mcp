@@ -15,6 +15,7 @@
     "eval:ci": "vitest run --coverage --reporter=vitest-evals/reporter --reporter=junit --reporter=json --outputFile.json=eval-results.json --outputFile.junit=eval.junit.xml"
   },
   "dependencies": {
+    "@ai-sdk/mcp": "catalog:",
     "@ai-sdk/openai": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@sentry/mcp-core": "workspace:*",

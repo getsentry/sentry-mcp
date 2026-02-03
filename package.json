@@ -72,7 +72,10 @@
       "sharp",
       "simple-git-hooks",
       "workerd"
-    ]
+    ],
+    "overrides": {
+      "@modelcontextprotocol/sdk": "^1.25.3"
+    }
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.15"

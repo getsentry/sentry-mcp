@@ -1,7 +1,8 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useRef, useCallback } from "react";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { AuthForm, ChatUI } from ".";
 import { useAuth } from "../../contexts/auth-context";
 import { Bot, Loader2, LogOut, PanelLeftOpen, Sparkles } from "lucide-react";
@@ -42,31 +43,53 @@ export function Chat({ isOpen, onClose, onLogout }: ChatProps) {
     isMessageStreaming,
   } = useStreamingSimulation();
 
+  // Manage input state manually (AI SDK 5+ removed built-in input management)
+  const [input, setInput] = useState("");
+
+  // Create transport with endpoint mode in body - memoize to avoid recreation
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: { endpointMode },
+      }),
+    [endpointMode],
+  );
+
   const {
     messages,
-    input,
-    handleInputChange,
-    handleSubmit,
+    sendMessage,
     status,
     stop,
     error,
-    reload,
+    regenerate,
     setMessages,
-    setInput,
-    append,
   } = useChat({
-    api: "/api/chat",
     // No auth header needed - server reads from cookie
-    // No ID to disable useChat's built-in persistence
     // We handle persistence manually via usePersistedChat hook
-    initialMessages,
-    // Enable sending the data field with messages for custom message types
-    sendExtraMessageFields: true,
-    // Pass endpoint mode to the API
-    body: {
-      endpointMode,
-    },
+    messages: initialMessages,
+    transport,
   });
+
+  // Handle input change (manually managed in AI SDK 5+)
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setInput(e.target.value);
+    },
+    [],
+  );
+
+  // Handle form submission (manually managed in AI SDK 5+)
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!input.trim()) return;
+
+      sendMessage({ text: input });
+      setInput("");
+    },
+    [input, sendMessage],
+  );
 
   // No need for custom scroll handling - react-scroll-to-bottom handles it
 
@@ -175,21 +198,23 @@ Try asking me things like:
     };
   }, []);
 
-  // Track previous auth state to detect logout events
-  const prevAuthStateRef = useRef(isAuthenticated);
+  // Track previous auth and endpoint mode to detect changes requiring message clearing
+  const prevStateRef = useRef({ isAuthenticated, endpointMode });
 
-  // Clear messages when user logs out (auth state changes from authenticated to not)
+  // Clear messages when user logs out or endpoint mode changes
   useEffect(() => {
-    const wasAuthenticated = prevAuthStateRef.current;
+    const prev = prevStateRef.current;
 
-    // Detect logout: was authenticated but now isn't
-    if (wasAuthenticated && !isAuthenticated) {
+    // Clear on logout (was authenticated but now isn't) or endpoint mode change
+    const didLogout = prev.isAuthenticated && !isAuthenticated;
+    const didChangeMode = prev.endpointMode !== endpointMode;
+
+    if (didLogout || didChangeMode) {
       clearMessages();
     }
 
-    // Update the ref for next comparison
-    prevAuthStateRef.current = isAuthenticated;
-  }, [isAuthenticated, clearMessages]);
+    prevStateRef.current = { isAuthenticated, endpointMode };
+  }, [isAuthenticated, endpointMode, clearMessages]);
 
   // Save messages when they change
   useEffect(() => {
@@ -215,7 +240,7 @@ Try asking me things like:
     ) {
       hadAuthErrorRef.current = false;
       // Retry the failed message
-      reload();
+      regenerate();
     }
 
     // Reset retry state on successful completion (no error)
@@ -225,7 +250,23 @@ Try asking me things like:
 
     // Update auth state ref
     wasAuthenticatedRef.current = isAuthenticated;
-  }, [isAuthenticated, error, reload]);
+  }, [isAuthenticated, error, regenerate]);
+
+  // Helper to create a UIMessage with parts (AI SDK 5+ format)
+  const createUIMessage = useCallback(
+    (
+      id: string,
+      role: "user" | "assistant" | "system",
+      text: string,
+      metadata?: Record<string, unknown>,
+    ): UIMessage => ({
+      id,
+      role,
+      parts: [{ type: "text", text }],
+      ...(metadata && { metadata }),
+    }),
+    [],
+  );
 
   // Handle slash commands
   const handleSlashCommand = useCallback(
@@ -234,34 +275,32 @@ Try asking me things like:
       setInput("");
 
       // Add the slash command as a user message first
-      const userMessage = {
-        id: Date.now().toString(),
-        role: "user" as const,
-        content: `/${command}`,
-        createdAt: new Date(),
-      };
+      const userMessage = createUIMessage(
+        Date.now().toString(),
+        "user",
+        `/${command}`,
+      );
 
       if (command === "clear") {
         // Clear everything
         clearMessages();
       } else if (command === "logout") {
         // Add message, then logout
-        setMessages((prev: any[]) => [...prev, userMessage]);
+        setMessages((prev) => [...prev, userMessage]);
         onLogout();
       } else if (command === "help") {
         // Add user message first
-        setMessages((prev: any[]) => [...prev, userMessage]);
+        setMessages((prev) => [...prev, userMessage]);
 
         // Create help message with metadata and add after a brief delay for better UX
         setTimeout(() => {
           const helpMessageData = createHelpMessage();
-          const helpMessage = {
-            id: (Date.now() + 1).toString(),
-            role: "system" as const,
-            content: helpMessageData.content,
-            createdAt: new Date(),
-            data: { ...helpMessageData.data, simulateStreaming: true },
-          };
+          const helpMessage = createUIMessage(
+            (Date.now() + 1).toString(),
+            "system",
+            helpMessageData.content,
+            { ...helpMessageData.data, simulateStreaming: true },
+          );
           setMessages((prev) => [...prev, helpMessage]);
 
           // Start streaming simulation
@@ -269,40 +308,38 @@ Try asking me things like:
         }, 100);
       } else if (command === "tools") {
         // Add user message first
-        setMessages((prev: any[]) => [...prev, userMessage]);
+        setMessages((prev) => [...prev, userMessage]);
 
         // Create tools message
         setTimeout(() => {
           const toolsMessageData = createToolsMessage();
-          const toolsMessage = {
-            id: (Date.now() + 1).toString(),
-            role: "system" as const,
-            content: toolsMessageData.content,
-            createdAt: new Date(),
-            data: { ...toolsMessageData.data, simulateStreaming: true },
-          };
+          const toolsMessage = createUIMessage(
+            (Date.now() + 1).toString(),
+            "system",
+            toolsMessageData.content,
+            { ...toolsMessageData.data, simulateStreaming: true },
+          );
           setMessages((prev) => [...prev, toolsMessage]);
 
           startStreaming(toolsMessage.id, 600);
         }, 100);
       } else {
         // Handle unknown slash commands - add user message and error
-        const errorMessage = {
-          id: (Date.now() + 1).toString(),
-          role: "system" as const,
-          content: `Unknown command: /${command}. Available commands: /help, /tools, /clear, /logout`,
-          createdAt: new Date(),
-        };
+        const errorMessage = createUIMessage(
+          (Date.now() + 1).toString(),
+          "system",
+          `Unknown command: /${command}. Available commands: /help, /tools, /clear, /logout`,
+        );
         setMessages((prev) => [...prev, userMessage, errorMessage]);
       }
     },
     [
       clearMessages,
       onLogout,
-      setInput,
       setMessages,
       createHelpMessage,
       createToolsMessage,
+      createUIMessage,
       startStreaming,
     ],
   );
@@ -317,18 +354,10 @@ Try asking me things like:
         return;
       }
 
-      // Clear the input and directly send the message using append
-      append({ role: "user", content: prompt });
+      // Send the message using sendMessage (AI SDK 5+ API)
+      sendMessage({ text: prompt });
     },
-    [append, handleSlashCommand],
-  );
-
-  // Wrap form submission to ensure scrolling
-  const handleFormSubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
-      handleSubmit(e);
-    },
-    [handleSubmit],
+    [sendMessage, handleSlashCommand],
   );
 
   // Show loading state while checking auth session
@@ -439,9 +468,9 @@ Try asking me things like:
           isMessageStreaming={isMessageStreaming}
           isOpen={isOpen}
           onInputChange={handleInputChange}
-          onSubmit={handleFormSubmit}
+          onSubmit={handleSubmit}
           onStop={stop}
-          onRetry={reload}
+          onRetry={regenerate}
           onSlashCommand={handleSlashCommand}
           onSendPrompt={handleSendPrompt}
         />

@@ -3,13 +3,13 @@
  */
 
 import type React from "react";
-import type { Message } from "ai/react";
+import type { UIMessage } from "@ai-sdk/react";
 
-// Re-export AI SDK types for convenience
-export type { Message } from "ai/react";
+// Re-export AI SDK types for convenience - Message renamed to UIMessage in AI SDK 5+
+export type { UIMessage as Message } from "@ai-sdk/react";
 
 // Extended message type that includes our custom metadata
-export interface ExtendedMessage extends Message {
+export interface ExtendedMessage extends UIMessage {
   data?: {
     type?: string;
     prompts?: any[];
@@ -91,7 +91,7 @@ export interface ChatToolInvocation {
 
 // Message processing types
 export interface ProcessedMessagePart {
-  part: NonNullable<Message["parts"]>[number];
+  part: NonNullable<UIMessage["parts"]>[number];
   messageId: string;
   messageRole: string;
   partIndex: number;
@@ -107,7 +107,7 @@ export interface ChatProps {
 }
 
 export interface ChatUIProps {
-  messages: Message[];
+  messages: UIMessage[];
   input: string;
   error?: Error | null;
   isChatLoading: boolean;
@@ -124,7 +124,7 @@ export interface ChatUIProps {
 }
 
 export interface ChatMessagesProps {
-  messages: Message[];
+  messages: UIMessage[];
   isChatLoading: boolean;
   isLocalStreaming?: boolean;
   isMessageStreaming?: (messageId: string) => boolean;
@@ -153,7 +153,7 @@ export interface PanelBackdropProps {
 }
 
 export interface MessagePartProps {
-  part: NonNullable<Message["parts"]>[number];
+  part: NonNullable<UIMessage["parts"]>[number];
   messageId: string;
   messageRole: string;
   partIndex: number;

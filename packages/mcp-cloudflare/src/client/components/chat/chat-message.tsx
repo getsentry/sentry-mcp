@@ -127,6 +127,52 @@ const ToolPart = memo(function ToolPart({
   );
 });
 
+// Helper to check if a part is an AI SDK 6 tool part (type starts with "tool-")
+const isToolPart = (part: { type: string }): part is {
+  type: `tool-${string}`;
+} & ChatToolInvocation => {
+  return part.type.startsWith("tool-") && part.type !== "tool-invocation";
+};
+
+// Helper to check if a part is a legacy tool-invocation part (AI SDK 4/5 format)
+// Legacy format: { type: "tool-invocation", toolInvocation: ChatToolInvocation }
+const isLegacyToolInvocation = (part: { type: string }): part is {
+  type: "tool-invocation";
+  toolInvocation: ChatToolInvocation;
+} => {
+  return (
+    part.type === "tool-invocation" &&
+    "toolInvocation" in part &&
+    typeof (part as any).toolInvocation === "object"
+  );
+};
+
+// Helper to convert tool output to proper content format
+const convertToolOutput = (
+  output: unknown,
+): { content: Array<{ type: "text"; text: string }> } | undefined => {
+  if (output === undefined || output === null) {
+    return undefined;
+  }
+
+  // If output is already in MCP format with content array
+  if (
+    typeof output === "object" &&
+    "content" in (output as object) &&
+    Array.isArray((output as { content: unknown }).content)
+  ) {
+    return output as { content: Array<{ type: "text"; text: string }> };
+  }
+
+  // If output is a string, wrap it
+  if (typeof output === "string") {
+    return { content: [{ type: "text", text: output }] };
+  }
+
+  // For other objects, JSON stringify
+  return { content: [{ type: "text", text: JSON.stringify(output, null, 2) }] };
+};
+
 // Main component for rendering individual message parts
 const MessagePart = memo(function MessagePart({
   part,
@@ -137,30 +183,62 @@ const MessagePart = memo(function MessagePart({
   messageData,
   onSlashCommand,
 }: MessagePartProps) {
-  switch (part.type) {
-    case "text":
-      return (
-        <TextPart
-          text={part.text}
-          role={messageRole}
-          messageId={messageId}
-          isStreaming={isStreaming}
-          messageData={messageData}
-          onSlashCommand={onSlashCommand}
-        />
-      );
-    case "tool-invocation":
-      return (
-        <ToolPart
-          toolInvocation={part.toolInvocation as ChatToolInvocation}
-          messageId={messageId}
-          partIndex={partIndex}
-        />
-      );
-    default:
-      // Fallback for unknown part types
-      return null;
+  // Handle text parts
+  if (part.type === "text") {
+    return (
+      <TextPart
+        text={part.text}
+        role={messageRole}
+        messageId={messageId}
+        isStreaming={isStreaming}
+        messageData={messageData}
+        onSlashCommand={onSlashCommand}
+      />
+    );
   }
+
+  // Handle legacy tool-invocation parts (AI SDK 4/5 format from persisted messages)
+  // Legacy format: { type: "tool-invocation", toolInvocation: {...} }
+  if (isLegacyToolInvocation(part)) {
+    return (
+      <ToolPart
+        toolInvocation={part.toolInvocation}
+        messageId={messageId}
+        partIndex={partIndex}
+      />
+    );
+  }
+
+  // Handle tool parts (AI SDK 6 format: type is "tool-${toolName}")
+  if (isToolPart(part)) {
+    // Map AI SDK 6 state to our ChatToolInvocation state
+    const partState = (part as any).state;
+    const mappedState: "partial-call" | "call" | "result" =
+      partState === "result"
+        ? "result"
+        : partState === "partial-call"
+          ? "partial-call"
+          : "call";
+
+    // Convert AI SDK 6 tool part to our ChatToolInvocation format
+    const toolInvocation: ChatToolInvocation = {
+      toolCallId: part.toolCallId,
+      toolName: part.type.replace(/^tool-/, ""),
+      args: (part as any).input ?? {},
+      state: mappedState,
+      result: convertToolOutput((part as any).output),
+    };
+    return (
+      <ToolPart
+        toolInvocation={toolInvocation}
+        messageId={messageId}
+        partIndex={partIndex}
+      />
+    );
+  }
+
+  // Fallback for unknown part types
+  return null;
 });
 
 // Export the memoized components

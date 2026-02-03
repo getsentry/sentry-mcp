@@ -3,15 +3,15 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { MessagePart } from ".";
 import { ToolActions } from "../ui/tool-actions";
-import type { Message, ProcessedMessagePart, ChatMessagesProps } from "./types";
+import type { ProcessedMessagePart, ChatMessagesProps } from "./types";
 import { isAuthError, getErrorMessage } from "../../utils/chat-error-handler";
 import { useAuth } from "../../contexts/auth-context";
 
-// Cache for stable part objects to avoid recreating them
-const partCache = new WeakMap<Message, { type: "text"; text: string }>();
+// Import UIMessage from our types (re-exported as Message for compatibility)
+import type { UIMessage } from "@ai-sdk/react";
 
 function processMessages(
-  messages: Message[],
+  messages: UIMessage[],
   isChatLoading: boolean,
   isLocalStreaming?: boolean,
   isMessageStreaming?: (messageId: string) => boolean,
@@ -28,42 +28,25 @@ function processMessages(
     if (message.parts && message.parts.length > 0) {
       const lastPartIndex = message.parts.length - 1;
 
-      message.parts.forEach((part, partIndex) => {
-        const isLastPartOfLastMessage =
-          isLastMessage && partIndex === lastPartIndex;
+      message.parts.forEach(
+        (part: UIMessage["parts"][number], partIndex: number) => {
+          const isLastPartOfLastMessage =
+            isLastMessage && partIndex === lastPartIndex;
 
-        allParts.push({
-          part,
-          messageId: message.id,
-          messageRole: message.role,
-          partIndex,
-          // Stream if it's AI response OR local streaming simulation
-          isStreaming:
-            (isLastPartOfLastMessage &&
-              isChatLoading &&
-              part.type === "text") ||
-            (part.type === "text" && !!isMessageStreaming?.(message.id)),
-        });
-      });
-    } else if (message.content) {
-      // Use cached part object to maintain stable references
-      let part = partCache.get(message);
-      if (!part) {
-        part = { type: "text", text: message.content };
-        partCache.set(message, part);
-      }
-
-      allParts.push({
-        part,
-        messageId: message.id,
-        messageRole: message.role,
-        partIndex: 0,
-        // Stream if it's AI response OR local streaming simulation
-        isStreaming:
-          (isLastMessage && isChatLoading) ||
-          isMessageStreaming?.(message.id) ||
-          false,
-      });
+          allParts.push({
+            part,
+            messageId: message.id,
+            messageRole: message.role,
+            partIndex,
+            // Stream if it's AI response OR local streaming simulation
+            isStreaming:
+              (isLastPartOfLastMessage &&
+                isChatLoading &&
+                part.type === "text") ||
+              (part.type === "text" && !!isMessageStreaming?.(message.id)),
+          });
+        },
+      );
     }
   });
 
@@ -132,7 +115,7 @@ export function ChatMessages({
             const originalMessage = messages.find(
               (m) => m.id === item.messageId,
             );
-            const messageData = originalMessage?.data as any;
+            const messageData = originalMessage?.metadata as any;
             const hasToolActions =
               messageData?.type === "tools-list" &&
               messageData?.toolsDetailed &&
@@ -146,7 +129,7 @@ export function ChatMessages({
                   messageRole={item.messageRole}
                   partIndex={item.partIndex}
                   isStreaming={item.isStreaming}
-                  messageData={originalMessage?.data}
+                  messageData={originalMessage?.metadata}
                   onSlashCommand={onSlashCommand}
                 />
                 {/* Show tool actions list for tools-list messages */}

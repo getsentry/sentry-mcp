@@ -1,4 +1,4 @@
-import type { LanguageModelV1, JSONValue } from "ai";
+import type { LanguageModel, JSONValue } from "ai";
 
 /**
  * Provider options type matching AI SDK's ProviderOptions (LanguageModelV1ProviderMetadata)
@@ -19,7 +19,7 @@ export interface EmbeddedAgentProvider {
   readonly type: AgentProviderType;
 
   /** Get a language model instance, optionally with a model override */
-  getModel(modelOverride?: string): LanguageModelV1;
+  getModel(modelOverride?: string): LanguageModel;
 
   /** Get provider-specific options for generateText calls */
   getProviderOptions(): ProviderOptions;

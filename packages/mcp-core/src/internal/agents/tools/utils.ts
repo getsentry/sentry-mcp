@@ -126,12 +126,12 @@ export function agentTool<TParameters, TResult>(config: {
 
   return tool({
     description: config.description,
-    parameters: config.parameters,
+    inputSchema: config.parameters,
     execute: async (
-      params: TParameters,
+      input: TParameters,
     ): Promise<AgentToolResponse<InferredResult>> => {
       try {
-        const result = await config.execute(params);
+        const result = await config.execute(input);
         return { result };
       } catch (error) {
         return handleAgentToolError<InferredResult>(error);
