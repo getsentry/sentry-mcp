@@ -10,7 +10,8 @@
  * @see https://datatracker.ietf.org/doc/html/rfc8707 - Resource Indicators
  */
 
-export type { WorkerProps } from "../types";
+import type { WorkerProps } from "../types";
+export type { WorkerProps };
 
 // =============================================================================
 // Client Types (RFC 7591 - Dynamic Client Registration)

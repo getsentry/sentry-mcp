@@ -101,7 +101,12 @@ describe("token endpoint", () => {
 
       expect(response.status).toBe(200);
 
-      const body = await response.json();
+      const body = (await response.json()) as {
+        access_token: string;
+        refresh_token: string;
+        token_type: string;
+        expires_in: number;
+      };
       expect(body.access_token).toBeDefined();
       expect(body.refresh_token).toBeDefined();
       expect(body.token_type).toBe("bearer");
@@ -119,7 +124,7 @@ describe("token endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_request");
     });
 
@@ -136,7 +141,7 @@ describe("token endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_request");
     });
 
@@ -152,7 +157,7 @@ describe("token endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_grant");
     });
 
@@ -182,7 +187,7 @@ describe("token endpoint", () => {
         }),
       });
       expect(response2.status).toBe(400);
-      const body = await response2.json();
+      const body = (await response2.json()) as { error: string };
       expect(body.error).toBe("invalid_grant");
     });
 
@@ -200,7 +205,7 @@ describe("token endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_grant");
     });
   });
@@ -228,19 +233,23 @@ describe("token endpoint", () => {
       await storage.saveGrant(grant);
 
       // Create refresh token
-      await storage.saveToken({
-        id: refreshTokenId,
-        grantId,
-        userId,
-        createdAt: Math.floor(Date.now() / 1000),
-        expiresAt: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
-        wrappedEncryptionKey: wrappedKey,
-        grant: {
-          clientId: grant.clientId,
-          scope: grant.scope,
-          encryptedProps: grant.encryptedProps,
+      const refreshTokenTTL = 30 * 24 * 3600; // 30 days
+      await storage.saveToken(
+        {
+          id: refreshTokenId,
+          grantId,
+          userId,
+          createdAt: Math.floor(Date.now() / 1000),
+          expiresAt: Math.floor(Date.now() / 1000) + refreshTokenTTL,
+          wrappedEncryptionKey: wrappedKey,
+          grant: {
+            clientId: grant.clientId,
+            scope: grant.scope,
+            encryptedProps: grant.encryptedProps,
+          },
         },
-      });
+        refreshTokenTTL,
+      );
 
       return { grant, refreshToken };
     }
@@ -259,7 +268,11 @@ describe("token endpoint", () => {
 
       expect(response.status).toBe(200);
 
-      const body = await response.json();
+      const body = (await response.json()) as {
+        access_token: string;
+        refresh_token: string;
+        token_type: string;
+      };
       expect(body.access_token).toBeDefined();
       expect(body.refresh_token).toBeDefined();
       expect(body.token_type).toBe("bearer");
@@ -275,7 +288,7 @@ describe("token endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_request");
     });
 
@@ -290,7 +303,7 @@ describe("token endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_grant");
     });
   });
@@ -306,7 +319,7 @@ describe("token endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("unsupported_grant_type");
     });
 
@@ -318,7 +331,7 @@ describe("token endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("unsupported_grant_type");
     });
   });

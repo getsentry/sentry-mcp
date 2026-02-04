@@ -318,7 +318,7 @@ export class KVStorage implements OAuthStorage {
       await Promise.all(response.keys.map((key) => this.kv.delete(key.name)));
 
       complete = response.list_complete;
-      cursor = response.cursor;
+      cursor = !response.list_complete ? response.cursor : undefined;
     }
   }
 }
