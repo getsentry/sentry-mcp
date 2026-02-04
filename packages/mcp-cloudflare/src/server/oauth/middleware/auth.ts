@@ -17,6 +17,7 @@
  * @see RFC 6750 Section 2.1 - Authorization Request Header Field
  */
 
+import { logIssue } from "@sentry/mcp-core/telem/logging";
 import type { Context, MiddlewareHandler } from "hono";
 import type { Env, WorkerProps } from "../../types";
 import {
@@ -81,6 +82,9 @@ export function bearerAuth(): MiddlewareHandler<{ Bindings: Env }> {
     // Get storage from context (must be set earlier in middleware chain)
     const storage = c.get("oauthStorage") as OAuthStorage | undefined;
     if (!storage) {
+      logIssue("[oauth] OAuth storage not configured", {
+        loggerScope: ["cloudflare", "oauth", "auth"],
+      });
       return unauthorizedResponse(
         c,
         "server_error",

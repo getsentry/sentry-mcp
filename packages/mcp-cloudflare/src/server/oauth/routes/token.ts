@@ -16,6 +16,7 @@
  * @see RFC 7636 Section 4.5 - Client Sends the Authorization Code
  */
 
+import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { type Context, Hono } from "hono";
 import type { Env } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
@@ -81,7 +82,9 @@ tokenRoute.post("/", async (c) => {
   // Get storage from context (injected by middleware)
   const storage = c.get("oauthStorage") as OAuthStorage;
   if (!storage) {
-    console.error("OAuth storage not configured");
+    logIssue("[oauth] OAuth storage not configured", {
+      loggerScope: ["cloudflare", "oauth", "token"],
+    });
     return oauthError(c, "server_error", "OAuth storage not configured", 500);
   }
 
@@ -552,12 +555,16 @@ async function refreshUpstreamToken(
   });
 
   if (errorResponse || !tokenResponse) {
-    console.error("Failed to refresh upstream token");
+    logIssue("[oauth] Failed to refresh upstream token in token endpoint", {
+      loggerScope: ["cloudflare", "oauth", "token"],
+    });
     return null;
   }
 
   if (!tokenResponse.refresh_token) {
-    console.error("Upstream refresh response missing refresh_token");
+    logIssue("[oauth] Upstream refresh response missing refresh_token", {
+      loggerScope: ["cloudflare", "oauth", "token"],
+    });
     return null;
   }
 

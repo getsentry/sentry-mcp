@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/cloudflare";
-import { logIssue } from "@sentry/mcp-core/telem/logging";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import type { z } from "zod";
 import { SENTRY_TOKEN_URL, TokenResponseSchema } from "./constants";
 import {
@@ -62,7 +62,7 @@ export async function exchangeCodeForAccessToken({
   redirect_uri?: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!code) {
-    const eventId = logIssue("[oauth] Missing code in token exchange", {
+    const eventId = logWarn("[oauth] Missing code in token exchange", {
       oauth: {
         client_id,
       },
@@ -92,7 +92,8 @@ export async function exchangeCodeForAccessToken({
   });
   if (!resp.ok) {
     const responseText = await resp.text();
-    const eventId = logIssue(
+    const logFn = resp.status >= 500 ? logIssue : logWarn;
+    const eventId = logFn(
       `[oauth] Failed to exchange code for access token: ${responseText}`,
       {
         oauth: {
@@ -154,7 +155,7 @@ export async function refreshAccessToken({
   client_id: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!refresh_token) {
-    const eventId = logIssue("[oauth] Missing refresh token in token refresh", {
+    const eventId = logWarn("[oauth] Missing refresh token in token refresh", {
       oauth: {
         client_id,
       },
@@ -183,11 +184,13 @@ export async function refreshAccessToken({
   });
 
   if (!resp.ok) {
-    const eventId = logIssue(
+    const logFn = resp.status >= 500 ? logIssue : logWarn;
+    const eventId = logFn(
       `[oauth] Failed to refresh access token: ${await resp.text()}`,
       {
         oauth: {
           client_id,
+          status: resp.status,
         },
       },
     );

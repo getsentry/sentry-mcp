@@ -1,5 +1,5 @@
 import type { AuthRequest, ClientInfo } from "../oauth/types";
-import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import { logError, logWarn } from "@sentry/mcp-core/telem/logging";
 import { sanitizeHtml } from "./html-utils";
 import skillDefinitions, {
   type SkillDefinition,
@@ -144,7 +144,9 @@ async function getApprovedClientsFromCookie(
     }
     return approvedClients as string[];
   } catch (e) {
-    logIssue(new Error(`Error parsing cookie payload: ${e}`, { cause: e }));
+    logWarn(`Error parsing cookie payload: ${e}`, {
+      loggerScope: ["cloudflare", "approval-dialog"],
+    });
     return null; // JSON parsing failed
   }
 }

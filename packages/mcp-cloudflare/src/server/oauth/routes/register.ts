@@ -16,6 +16,7 @@
  * @see RFC 7591 Section 3.2 - Client Registration Response
  */
 
+import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { type Context, Hono } from "hono";
 import type { Env } from "../../types";
 import { generateClientId, generateClientSecret, hashSecret } from "../crypto";
@@ -69,6 +70,9 @@ registerRoute.post("/", async (c) => {
   // Get storage from context
   const storage = c.get("oauthStorage") as OAuthStorage;
   if (!storage) {
+    logIssue("[oauth] OAuth storage not configured", {
+      loggerScope: ["cloudflare", "oauth", "register"],
+    });
     return c.json(
       {
         error: "server_error",
@@ -332,6 +336,11 @@ function registrationError(
   description: string,
 ): Response {
   const status = error === "server_error" ? 500 : 400;
+  if (status === 500) {
+    logIssue(`[oauth] Registration error: ${description}`, {
+      loggerScope: ["cloudflare", "oauth", "register"],
+    });
+  }
   return c.json({ error, error_description: description }, status);
 }
 
