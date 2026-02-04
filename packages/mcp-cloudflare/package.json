@@ -46,7 +46,6 @@
     "@ai-sdk/mcp": "catalog:",
     "@ai-sdk/openai": "catalog:",
     "@ai-sdk/react": "catalog:",
-    "@cloudflare/workers-oauth-provider": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@radix-ui/react-accordion": "catalog:",
     "@radix-ui/react-slot": "catalog:",

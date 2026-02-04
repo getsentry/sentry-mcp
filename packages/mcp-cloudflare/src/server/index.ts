@@ -1,13 +1,17 @@
 import * as Sentry from "@sentry/cloudflare";
-import OAuthProvider from "@cloudflare/workers-oauth-provider";
+import { Hono } from "hono";
 import app from "./app";
-import { SCOPES } from "../constants";
-import type { Env } from "./types";
-import getSentryConfig from "./sentry.config";
-import { tokenExchangeCallback } from "./oauth";
 import sentryMcpHandler from "./lib/mcp-handler";
-import { checkRateLimit } from "./utils/rate-limiter";
+import {
+  bearerAuth,
+  createKVStorage,
+  createOAuthHelpers,
+  metadataRoute,
+} from "./oauth";
+import getSentryConfig from "./sentry.config";
+import type { Env, WorkerProps } from "./types";
 import { getClientIp } from "./utils/client-ip";
+import { checkRateLimit } from "./utils/rate-limiter";
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
@@ -31,60 +35,120 @@ const addCorsHeaders = (response: Response): Response => {
   return newResponse;
 };
 
-// Wrap OAuth Provider to restrict CORS headers on public metadata endpoints
-// OAuth Provider v0.0.12 adds overly permissive CORS (allows all methods/headers).
-// We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
-const wrappedOAuthProvider = {
+/**
+ * Main Hono application combining all routes.
+ *
+ * This replaces the workers-oauth-provider with our own OAuth implementation.
+ * The middleware chain:
+ * 1. Sets up OAuth storage and helpers in context
+ * 2. Handles rate limiting
+ * 3. Routes to appropriate handlers
+ */
+const mainApp = new Hono<{ Bindings: Env }>();
+
+// Middleware to set up OAuth storage and helpers
+mainApp.use("*", async (c, next) => {
+  const storage = createKVStorage(c.env.OAUTH_KV);
+  const helpers = createOAuthHelpers(storage);
+
+  // Set storage in context for routes
+  c.set("oauthStorage", storage);
+
+  // Set helpers on env for backward compatibility with existing routes
+  // This matches the OAUTH_PROVIDER pattern used by authorize.ts and callback.ts
+  c.env.OAUTH_PROVIDER = helpers;
+
+  await next();
+});
+
+// Handle CORS preflight for public metadata endpoints
+mainApp.options("*", async (c) => {
+  const url = new URL(c.req.url);
+  if (isPublicMetadataEndpoint(url.pathname)) {
+    return addCorsHeaders(new Response(null, { status: 204 }));
+  }
+  return c.text("Method Not Allowed", 405);
+});
+
+// Rate limiting for MCP and OAuth routes
+mainApp.use("/mcp/*", async (c, next) => {
+  const clientIP = getClientIp(c.req.raw);
+  if (clientIP) {
+    const rateLimitResult = await checkRateLimit(
+      clientIP,
+      c.env.MCP_RATE_LIMITER,
+      {
+        keyPrefix: "mcp",
+        errorMessage: "Rate limit exceeded. Please wait before trying again.",
+      },
+    );
+    if (!rateLimitResult.allowed) {
+      return c.text(rateLimitResult.errorMessage!, 429);
+    }
+  }
+  await next();
+});
+
+mainApp.use("/oauth/*", async (c, next) => {
+  const clientIP = getClientIp(c.req.raw);
+  if (clientIP) {
+    const rateLimitResult = await checkRateLimit(
+      clientIP,
+      c.env.MCP_RATE_LIMITER,
+      {
+        keyPrefix: "oauth",
+        errorMessage: "Rate limit exceeded. Please wait before trying again.",
+      },
+    );
+    if (!rateLimitResult.allowed) {
+      return c.text(rateLimitResult.errorMessage!, 429);
+    }
+  }
+  await next();
+});
+
+// OAuth Authorization Server Metadata (RFC 8414)
+// Must be before the general .well-known handler in app.ts
+mainApp.route("/.well-known/oauth-authorization-server", metadataRoute);
+
+// MCP API routes - require Bearer token authentication
+mainApp.use("/mcp/*", bearerAuth());
+
+// MCP handler - after auth middleware validates token and sets props
+const handleMcpRequest = async (
+  c: Parameters<Parameters<typeof mainApp.all>[1]>[0],
+) => {
+  const auth = c.get("auth");
+  if (!auth) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const ctx = {
+    props: auth.props,
+    waitUntil: c.executionCtx.waitUntil.bind(c.executionCtx),
+    passThroughOnException: c.executionCtx.passThroughOnException?.bind(
+      c.executionCtx,
+    ),
+  };
+
+  return sentryMcpHandler.fetch(
+    c.req.raw,
+    c.env,
+    ctx as ExecutionContext & { props: WorkerProps },
+  );
+};
+
+mainApp.all("/mcp", handleMcpRequest);
+mainApp.all("/mcp/*", handleMcpRequest);
+
+// Mount the main Hono app (includes OAuth routes, chat, search, etc.)
+mainApp.route("/", app);
+
+// Wrap with CORS headers for public metadata endpoints
+const wrappedApp = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     const url = new URL(request.url);
-
-    // Handle CORS preflight for public metadata endpoints
-    if (request.method === "OPTIONS") {
-      if (isPublicMetadataEndpoint(url.pathname)) {
-        return addCorsHeaders(new Response(null, { status: 204 }));
-      }
-    }
-
-    // Apply rate limiting to MCP and OAuth routes
-    // This protects against abuse at the earliest possible point
-    if (url.pathname.startsWith("/mcp") || url.pathname.startsWith("/oauth")) {
-      const clientIP = getClientIp(request);
-
-      // In local development or when IP can't be extracted, skip rate limiting
-      // Rate limiter is optional and primarily for production abuse prevention
-      if (clientIP) {
-        const rateLimitResult = await checkRateLimit(
-          clientIP,
-          env.MCP_RATE_LIMITER,
-          {
-            keyPrefix: "mcp",
-            errorMessage:
-              "Rate limit exceeded. Please wait before trying again.",
-          },
-        );
-
-        if (!rateLimitResult.allowed) {
-          return new Response(rateLimitResult.errorMessage, { status: 429 });
-        }
-      }
-      // If no clientIP, allow the request (likely local dev)
-    }
-
-    const oAuthProvider = new OAuthProvider({
-      apiRoute: "/mcp",
-      // @ts-expect-error - OAuthProvider types don't support specific Env types
-      apiHandler: sentryMcpHandler,
-      // @ts-expect-error - OAuthProvider types don't support specific Env types
-      defaultHandler: app,
-      // must match the routes registered in `app.ts`
-      authorizeEndpoint: "/oauth/authorize",
-      tokenEndpoint: "/oauth/token",
-      clientRegistrationEndpoint: "/oauth/register",
-      tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
-      scopesSupported: Object.keys(SCOPES),
-    });
-
-    const response = await oAuthProvider.fetch(request, env, ctx);
+    const response = await mainApp.fetch(request, env, ctx);
 
     // Add CORS headers to public metadata endpoints
     if (isPublicMetadataEndpoint(url.pathname)) {
@@ -97,5 +161,5 @@ const wrappedOAuthProvider = {
 
 export default Sentry.withSentry(
   getSentryConfig,
-  wrappedOAuthProvider,
+  wrappedApp,
 ) satisfies ExportedHandler<Env>;

@@ -1,7 +1,4 @@
-import type {
-  AuthRequest,
-  ClientInfo,
-} from "@cloudflare/workers-oauth-provider";
+import type { AuthRequest, ClientInfo } from "../oauth/types";
 import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { sanitizeHtml } from "./html-utils";
 import skillDefinitions, {

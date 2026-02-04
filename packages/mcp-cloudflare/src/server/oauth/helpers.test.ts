@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
-import {
-  tokenExchangeCallback,
-  refreshAccessToken,
-  validateResourceParameter,
-  createResourceValidationError,
-} from "./helpers";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerProps } from "../types";
+import {
+  createResourceValidationError,
+  refreshAccessToken,
+  tokenExchangeCallback,
+  validateResourceParameter,
+} from "./helpers";
+import type { TokenExchangeCallbackOptions } from "./types";
 
 // Mock fetch globally
 const mockFetch = vi.fn();

@@ -1,5 +1,6 @@
+import { getScopesForSkills, parseSkills } from "@sentry/mcp-core/skills";
+import { logWarn } from "@sentry/mcp-core/telem/logging";
 import { Hono } from "hono";
-import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
@@ -7,16 +8,14 @@ import {
   exchangeCodeForAccessToken,
   validateResourceParameter,
 } from "../helpers";
-import { verifyAndParseState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-core/telem/logging";
-import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
+import { type OAuthState, verifyAndParseState } from "../state";
+import type { AuthRequest } from "../types";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
  */
 interface AuthRequestWithSkills extends AuthRequest {
   skills?: unknown; // Skill-based authorization system
-  resource?: string;
 }
 
 /**

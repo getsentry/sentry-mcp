@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import oauthRoute from "./index";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../types";
-import { verifyAndParseState, signState } from "./state";
+import oauthRoute from "./index";
+import { signState, verifyAndParseState } from "./state";
 
 // Mock the OAuth provider
 const mockOAuthProvider = {

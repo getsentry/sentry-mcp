@@ -1,12 +1,24 @@
+import * as Sentry from "@sentry/cloudflare";
+import { logIssue } from "@sentry/mcp-core/telem/logging";
+import type { z } from "zod";
+import { SENTRY_TOKEN_URL, TokenResponseSchema } from "./constants";
+import {
+  encryptPropsWithNewKey,
+  generateAuthCode,
+  generateGrantId,
+  hashSecret,
+  wrapKeyWithToken,
+} from "./crypto";
+import type { OAuthStorage } from "./storage";
 import type {
+  AuthRequest,
+  ClientInfo,
+  CompleteAuthorizationOptions,
+  CompleteAuthorizationResult,
+  Grant,
   TokenExchangeCallbackOptions,
   TokenExchangeCallbackResult,
-} from "@cloudflare/workers-oauth-provider";
-import type { z } from "zod";
-import { logIssue } from "@sentry/mcp-core/telem/logging";
-import { TokenResponseSchema, SENTRY_TOKEN_URL } from "./constants";
-import type { WorkerProps } from "../types";
-import * as Sentry from "@sentry/cloudflare";
+} from "./types";
 
 /**
  * Constructs an authorization URL for Sentry.
@@ -213,6 +225,9 @@ export async function refreshAccessToken({
   }
 }
 
+/** Safety window for upstream token refresh (2 minutes) */
+const SAFE_WINDOW_MS = 2 * 60 * 1000;
+
 /**
  * Token exchange callback for handling Sentry OAuth token refreshes.
  */
@@ -224,61 +239,48 @@ export async function tokenExchangeCallback(
     SENTRY_HOST?: string;
   },
 ): Promise<TokenExchangeCallbackResult | undefined> {
-  // Only handle refresh_token grant type
   if (options.grantType !== "refresh_token") {
-    return undefined; // No-op for other grant types
+    return undefined;
   }
 
   Sentry.setUser({ id: options.props.id });
 
-  // Extract the refresh token from the stored props
-  const currentRefreshToken = options.props.refreshToken;
-  if (!currentRefreshToken) {
+  const { refreshToken, accessTokenExpiresAt } = options.props;
+  if (!refreshToken) {
     logIssue("No refresh token available in stored props", {
       loggerScope: ["cloudflare", "oauth", "refresh"],
     });
-
     return undefined;
   }
 
-  try {
-    // If we have a cached upstream expiry, and there's ample time left,
-    // avoid calling upstream to reduce unnecessary refreshes.
-    // Mint a new provider token with the remaining TTL.
-    const props = options.props as WorkerProps;
-    const maybeExpiresAt = props.accessTokenExpiresAt;
-    if (maybeExpiresAt && Number.isFinite(maybeExpiresAt)) {
-      const remainingMs = maybeExpiresAt - Date.now();
-      const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes safety window
-      if (remainingMs > SAFE_WINDOW_MS) {
-        const remainingSec = Math.floor(remainingMs / 1000);
-        return {
-          newProps: { ...options.props },
-          accessTokenTTL: remainingSec,
-        };
-      }
+  // If upstream token is still valid with safety margin, reuse it
+  if (accessTokenExpiresAt && Number.isFinite(accessTokenExpiresAt)) {
+    const remainingMs = accessTokenExpiresAt - Date.now();
+    if (remainingMs > SAFE_WINDOW_MS) {
+      return {
+        newProps: { ...options.props },
+        accessTokenTTL: Math.floor(remainingMs / 1000),
+      };
     }
+  }
 
-    // Construct the upstream token URL for Sentry
+  // Refresh upstream token
+  try {
     const upstreamTokenUrl = new URL(
       SENTRY_TOKEN_URL,
       `https://${env.SENTRY_HOST || "sentry.io"}`,
     ).href;
 
-    // Use our refresh token function to get new tokens from Sentry
     const [tokenResponse, errorResponse] = await refreshAccessToken({
       client_id: env.SENTRY_CLIENT_ID,
       client_secret: env.SENTRY_CLIENT_SECRET,
-      refresh_token: currentRefreshToken,
+      refresh_token: refreshToken,
       upstream_url: upstreamTokenUrl,
     });
 
     if (errorResponse) {
-      // Convert the Response to an Error for the OAuth provider
       const errorText = await errorResponse.text();
-      throw new Error(
-        `Failed to refresh upstream token in OAuth provider: ${errorText}`,
-      );
+      throw new Error(`Failed to refresh upstream token: ${errorText}`);
     }
 
     if (!tokenResponse.refresh_token) {
@@ -288,9 +290,7 @@ export async function tokenExchangeCallback(
       return undefined;
     }
 
-    // Return the updated props with new tokens and TTL
     return {
-      // This updates ctx.props
       newProps: {
         ...options.props,
         accessToken: tokenResponse.access_token,
@@ -388,4 +388,209 @@ export function createResourceValidationError(
       Location: redirectUrl.href,
     },
   });
+}
+
+// =============================================================================
+// OAuth Provider Helpers
+// =============================================================================
+
+/**
+ * OAuth helpers interface matching the OAUTH_PROVIDER service binding.
+ *
+ * This provides the methods needed by the authorize and callback routes
+ * to implement the OAuth authorization code flow.
+ */
+export interface OAuthHelpers {
+  /**
+   * Parse an OAuth authorization request from the HTTP request.
+   *
+   * Extracts and validates OAuth parameters from the request URL.
+   *
+   * @see RFC 6749 Section 4.1.1 - Authorization Request
+   */
+  parseAuthRequest(request: Request): Promise<AuthRequest>;
+
+  /**
+   * Look up a client by its client ID.
+   *
+   * @see RFC 7591 Section 3.2.1 - Client Information Response
+   */
+  lookupClient(clientId: string): Promise<ClientInfo | null>;
+
+  /**
+   * Complete an authorization request by creating a grant and auth code.
+   *
+   * Creates the grant, encrypts props, generates auth code, and returns
+   * the redirect URL with the authorization code.
+   *
+   * @see RFC 6749 Section 4.1.2 - Authorization Response
+   */
+  completeAuthorization(
+    options: CompleteAuthorizationOptions,
+  ): Promise<CompleteAuthorizationResult>;
+}
+
+/**
+ * Create OAuth helpers bound to a storage instance.
+ *
+ * @param storage - OAuth storage instance
+ * @returns OAuth helpers implementation
+ */
+export function createOAuthHelpers(storage: OAuthStorage): OAuthHelpers {
+  return {
+    async parseAuthRequest(request: Request): Promise<AuthRequest> {
+      const url = new URL(request.url);
+
+      // RFC 6749 Section 4.1.1: Extract authorization request parameters
+      const responseType = url.searchParams.get("response_type") || "";
+      const clientId = url.searchParams.get("client_id") || "";
+      const redirectUri = url.searchParams.get("redirect_uri") || "";
+      const scope = (url.searchParams.get("scope") || "")
+        .split(" ")
+        .filter(Boolean);
+      const state = url.searchParams.get("state") || "";
+
+      // RFC 7636: PKCE parameters
+      const codeChallenge = url.searchParams.get("code_challenge") || undefined;
+      const codeChallengeMethod =
+        url.searchParams.get("code_challenge_method") || "plain";
+
+      // RFC 8707: Resource indicator (may have multiple values)
+      const resourceParams = url.searchParams.getAll("resource");
+      const resource =
+        resourceParams.length > 0
+          ? resourceParams.length === 1
+            ? resourceParams[0]
+            : resourceParams
+          : undefined;
+
+      // Validate redirect URI scheme to prevent javascript: URIs / XSS attacks
+      if (redirectUri) {
+        try {
+          const redirectUrl = new URL(redirectUri);
+          const scheme = redirectUrl.protocol.toLowerCase();
+          if (!["http:", "https:"].includes(scheme)) {
+            throw new Error(
+              `Invalid redirect URI scheme: ${scheme}. Only http and https are allowed.`,
+            );
+          }
+        } catch (e) {
+          if (
+            e instanceof Error &&
+            e.message.includes("Invalid redirect URI")
+          ) {
+            throw e;
+          }
+          throw new Error(`Invalid redirect URI: ${redirectUri}`);
+        }
+      }
+
+      // Validate client and redirect URI if client exists
+      if (clientId) {
+        const clientInfo = await storage.getClient(clientId);
+        if (!clientInfo) {
+          throw new Error(
+            "Invalid client. The clientId provided does not match to this client.",
+          );
+        }
+
+        // Validate redirect URI against registered URIs
+        if (redirectUri && !clientInfo.redirectUris.includes(redirectUri)) {
+          throw new Error(
+            "Invalid redirect URI. The redirect URI provided does not match any registered URI for this client.",
+          );
+        }
+      }
+
+      return {
+        responseType,
+        clientId,
+        redirectUri,
+        scope,
+        state,
+        codeChallenge,
+        codeChallengeMethod,
+        resource,
+      };
+    },
+
+    async lookupClient(clientId: string): Promise<ClientInfo | null> {
+      return storage.getClient(clientId);
+    },
+
+    async completeAuthorization(
+      options: CompleteAuthorizationOptions,
+    ): Promise<CompleteAuthorizationResult> {
+      const { request, userId, scope, props, metadata } = options;
+      const {
+        clientId,
+        redirectUri,
+        state,
+        codeChallenge,
+        codeChallengeMethod,
+        resource,
+      } = request;
+
+      if (!clientId || !redirectUri) {
+        throw new Error(
+          "Client ID and Redirect URI are required in the authorization request.",
+        );
+      }
+
+      // Re-validate the redirectUri to prevent open redirect vulnerabilities
+      const clientInfo = await storage.getClient(clientId);
+      if (!clientInfo || !clientInfo.redirectUris.includes(redirectUri)) {
+        throw new Error(
+          "Invalid redirect URI. The redirect URI provided does not match any registered URI for this client.",
+        );
+      }
+
+      // Generate grant and auth code
+      const grantId = generateGrantId();
+      const authCode = generateAuthCode(userId, grantId);
+      const authCodeId = await hashSecret(authCode);
+
+      // Encrypt props with a new key
+      const { encrypted, key: encryptionKey } =
+        await encryptPropsWithNewKey(props);
+
+      // Wrap the encryption key with the auth code
+      const authCodeWrappedKey = await wrapKeyWithToken(
+        authCode,
+        encryptionKey,
+      );
+
+      const now = Math.floor(Date.now() / 1000);
+
+      // Create grant record
+      const grant: Grant = {
+        id: grantId,
+        clientId,
+        userId,
+        scope,
+        metadata,
+        encryptedProps: JSON.stringify(encrypted),
+        createdAt: now,
+        authCodeId,
+        authCodeWrappedKey,
+        codeChallenge,
+        codeChallengeMethod,
+        resource,
+      };
+
+      // Save grant with 10-minute TTL (extended when code is exchanged)
+      const codeExpiresIn = 600;
+      await storage.saveGrant(grant, codeExpiresIn);
+
+      // Build redirect URL with authorization code
+      // RFC 6749 Section 4.1.2: Authorization Response
+      const redirectUrl = new URL(redirectUri);
+      redirectUrl.searchParams.set("code", authCode);
+      if (state) {
+        redirectUrl.searchParams.set("state", state);
+      }
+
+      return { redirectTo: redirectUrl.toString() };
+    },
+  };
 }

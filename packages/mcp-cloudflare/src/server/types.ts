@@ -1,8 +1,8 @@
-import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import type {
   RateLimit,
   WorkerVersionMetadata,
 } from "@cloudflare/workers-types";
+import type { OAuthHelpers } from "./oauth/helpers";
 
 /**
  * Props passed through OAuth and available via ExecutionContext.props

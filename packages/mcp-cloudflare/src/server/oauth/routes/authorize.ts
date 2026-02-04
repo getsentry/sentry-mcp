@@ -1,26 +1,25 @@
+import { logWarn } from "@sentry/mcp-core/telem/logging";
 import { Hono } from "hono";
-import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
+import { SCOPES } from "../../../constants";
 import {
-  renderApprovalDialog,
   parseRedirectApproval,
+  renderApprovalDialog,
 } from "../../lib/approval-dialog";
 import type { Env } from "../../types";
 import { SENTRY_AUTH_URL } from "../constants";
 import {
+  createResourceValidationError,
   getUpstreamAuthorizeUrl,
   validateResourceParameter,
-  createResourceValidationError,
 } from "../helpers";
-import { SCOPES } from "../../../constants";
-import { signState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-core/telem/logging";
+import { type OAuthState, signState } from "../state";
+import type { AuthRequest } from "../types";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
  */
 interface AuthRequestWithSkills extends AuthRequest {
   skills?: unknown;
-  resource?: string;
 }
 
 async function redirectToUpstream(
