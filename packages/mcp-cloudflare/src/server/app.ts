@@ -57,11 +57,13 @@ const app = new Hono<{
     "*",
     csrf({
       origin: (origin, c) => {
-        if (!origin) {
-          return true;
-        }
+        // In hono 4.11.x+, this handler is only called when origin is defined
         const requestUrl = new URL(c.req.url);
         return origin === requestUrl.origin;
+      },
+      secFetchSite: (secFetchSite) => {
+        // Allow same-origin and same-site requests (handles requests without Origin header)
+        return secFetchSite === "same-origin" || secFetchSite === "same-site";
       },
     }),
   )
