@@ -52,9 +52,7 @@ describe("register endpoint", () => {
 
       expect(response.status).toBe(201);
 
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as RegistrationResponse;
       expect(body.client_id).toBeDefined();
       expect(body.client_id_issued_at).toBeDefined();
       expect(body.redirect_uris).toEqual(["https://example.com/callback"]);
@@ -78,9 +76,7 @@ describe("register endpoint", () => {
 
       expect(response.status).toBe(201);
 
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as RegistrationResponse;
       expect(body.client_id).toBeDefined();
       expect(body.client_secret).toBeDefined();
       expect(body.client_secret_expires_at).toBe(0); // Never expires
@@ -104,9 +100,7 @@ describe("register endpoint", () => {
 
       expect(response.status).toBe(201);
 
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as RegistrationResponse;
       expect(body.client_name).toBe("My App");
       expect(body.client_uri).toBe("https://example.com");
       expect(body.logo_uri).toBe("https://example.com/logo.png");
@@ -124,9 +118,7 @@ describe("register endpoint", () => {
         }),
       });
 
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as RegistrationResponse;
       const stored = await storage.getClient(body.client_id);
 
       expect(stored).not.toBeNull();
@@ -168,9 +160,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_request");
       expect(body.error_description).toContain("redirect_uris");
     });
@@ -185,9 +175,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_request");
     });
 
@@ -201,9 +189,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_redirect_uri");
     });
 
@@ -217,9 +203,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_redirect_uri");
     });
 
@@ -234,9 +218,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_client_metadata");
     });
 
@@ -251,9 +233,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_client_metadata");
     });
 
@@ -268,9 +248,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_client_metadata");
     });
 
@@ -285,9 +263,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_client_metadata");
     });
 
@@ -299,9 +275,7 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = (await response.json()) as
-        | RegistrationResponse
-        | ErrorResponse;
+      const body = (await response.json()) as ErrorResponse;
       expect(body.error).toBe("invalid_request");
     });
   });

@@ -1,3 +1,4 @@
+import type { IncomingRequestCfProperties } from "@cloudflare/workers-types";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -133,8 +134,12 @@ const handleMcpRequest = async (c: Context<{ Bindings: Env }>) => {
     ),
   };
 
-  return sentryMcpHandler.fetch(
-    c.req.raw,
+  // sentryMcpHandler always has a fetch handler defined
+  return sentryMcpHandler.fetch!(
+    c.req.raw as unknown as Request<
+      unknown,
+      IncomingRequestCfProperties<unknown>
+    >,
     c.env,
     ctx as ExecutionContext & { props: WorkerProps },
   );
