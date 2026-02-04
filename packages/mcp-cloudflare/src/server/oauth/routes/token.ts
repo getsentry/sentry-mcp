@@ -30,11 +30,13 @@ import {
   parseToken,
   unwrapKeyWithToken,
   verifyCodeChallenge,
+  verifySecret,
   wrapKeyWithToken,
 } from "../crypto";
 import { refreshAccessToken } from "../helpers";
 import type { OAuthStorage } from "../storage";
 import type {
+  ClientInfo,
   Grant,
   Token,
   TokenErrorResponse,
@@ -52,11 +54,134 @@ const DEFAULT_ACCESS_TOKEN_TTL = 3600;
 /** Default refresh token TTL in seconds (30 days) */
 const DEFAULT_REFRESH_TOKEN_TTL = 30 * 24 * 3600;
 
-/** Grace period for accepting old refresh tokens after rotation (60 seconds) */
-const REFRESH_TOKEN_GRACE_PERIOD = 60;
-
 /** Safety window for upstream token refresh (2 minutes) */
 const UPSTREAM_REFRESH_SAFETY_WINDOW_MS = 2 * 60 * 1000;
+
+// =============================================================================
+// Client Authentication (RFC 6749 Section 2.3)
+// =============================================================================
+
+/**
+ * Extract client credentials from the request.
+ *
+ * Supports two authentication methods:
+ * - client_secret_basic: HTTP Basic authentication (RFC 6749 Section 2.3.1)
+ * - client_secret_post: Credentials in request body (RFC 6749 Section 2.3.1)
+ *
+ * @param c - Hono context
+ * @param body - Parsed request body
+ * @returns Client ID and secret, or null if no credentials provided
+ */
+function extractClientCredentials(
+  c: Context<{ Bindings: Env }>,
+  body: Record<string, string | undefined>,
+): { clientId: string; clientSecret: string } | null {
+  // Check for HTTP Basic authentication (client_secret_basic)
+  const authHeader = c.req.header("Authorization");
+  if (authHeader?.startsWith("Basic ")) {
+    try {
+      const encoded = authHeader.slice(6);
+      const decoded = atob(encoded);
+      const colonIndex = decoded.indexOf(":");
+      if (colonIndex !== -1) {
+        return {
+          clientId: decodeURIComponent(decoded.slice(0, colonIndex)),
+          clientSecret: decodeURIComponent(decoded.slice(colonIndex + 1)),
+        };
+      }
+    } catch {
+      // Invalid base64, fall through to body check
+    }
+  }
+
+  // Check for credentials in body (client_secret_post)
+  if (body.client_id && body.client_secret) {
+    return {
+      clientId: body.client_id,
+      clientSecret: body.client_secret,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Verify client authentication for confidential clients.
+ *
+ * @see RFC 6749 Section 2.3 - Client Authentication
+ *
+ * @param c - Hono context
+ * @param body - Parsed request body
+ * @param storage - OAuth storage
+ * @returns Client info if authenticated, or error response
+ */
+async function authenticateClient(
+  c: Context<{ Bindings: Env }>,
+  body: Record<string, string | undefined>,
+  storage: OAuthStorage,
+): Promise<
+  { client: ClientInfo; error: null } | { client: null; error: Response }
+> {
+  // Get client_id from credentials or body
+  const credentials = extractClientCredentials(c, body);
+  const clientId = credentials?.clientId || body.client_id;
+
+  if (!clientId) {
+    return {
+      client: null,
+      error: oauthError(
+        c,
+        "invalid_request",
+        "Missing required parameter: client_id",
+      ),
+    };
+  }
+
+  // Look up client
+  const client = await storage.getClient(clientId);
+  if (!client) {
+    return {
+      client: null,
+      error: oauthError(c, "invalid_client", "Unknown client"),
+    };
+  }
+
+  // Check if client requires authentication
+  if (client.tokenEndpointAuthMethod === "none") {
+    // Public client - no secret required
+    return { client, error: null };
+  }
+
+  // Confidential client - must provide valid credentials
+  if (!credentials) {
+    return {
+      client: null,
+      error: oauthError(c, "invalid_client", "Client authentication required"),
+    };
+  }
+
+  // Verify client secret
+  if (!client.clientSecret) {
+    // This shouldn't happen - confidential clients should have a secret
+    return {
+      client: null,
+      error: oauthError(c, "server_error", "Client configuration error", 500),
+    };
+  }
+
+  const secretValid = await verifySecret(
+    credentials.clientSecret,
+    client.clientSecret,
+  );
+  if (!secretValid) {
+    return {
+      client: null,
+      error: oauthError(c, "invalid_client", "Invalid client credentials"),
+    };
+  }
+
+  return { client, error: null };
+}
 
 // =============================================================================
 // Route Handler
@@ -85,12 +210,19 @@ tokenRoute.post("/", async (c) => {
     return oauthError(c, "server_error", "OAuth storage not configured", 500);
   }
 
+  // Authenticate client (RFC 6749 Section 2.3)
+  const authResult = await authenticateClient(c, body, storage);
+  if (authResult.error) {
+    return authResult.error;
+  }
+  const client = authResult.client;
+
   switch (grantType) {
     case "authorization_code":
-      return handleAuthorizationCodeGrant(c, body, storage);
+      return handleAuthorizationCodeGrant(c, body, storage, client);
 
     case "refresh_token":
-      return handleRefreshTokenGrant(c, body, storage);
+      return handleRefreshTokenGrant(c, body, storage, client);
 
     default:
       // RFC 6749 Section 5.2: unsupported_grant_type
@@ -119,24 +251,15 @@ async function handleAuthorizationCodeGrant(
   c: Context<{ Bindings: Env }>,
   body: Record<string, string | undefined>,
   storage: OAuthStorage,
+  client: ClientInfo,
 ): Promise<Response> {
   const code = body.code;
-  const clientId = body.client_id;
   const redirectUri = body.redirect_uri;
   const codeVerifier = body.code_verifier;
 
   // RFC 6749 Section 4.1.3: code is REQUIRED
   if (!code) {
     return oauthError(c, "invalid_request", "Missing required parameter: code");
-  }
-
-  // RFC 6749 Section 4.1.3: client_id is REQUIRED (for public clients)
-  if (!clientId) {
-    return oauthError(
-      c,
-      "invalid_request",
-      "Missing required parameter: client_id",
-    );
   }
 
   // Parse the authorization code to extract userId and grantId
@@ -175,7 +298,7 @@ async function handleAuthorizationCodeGrant(
   }
 
   // Verify client_id matches the grant
-  if (grant.clientId !== clientId) {
+  if (grant.clientId !== client.clientId) {
     return oauthError(c, "invalid_grant", "Client ID mismatch");
   }
 
@@ -314,9 +437,9 @@ async function handleRefreshTokenGrant(
   c: Context<{ Bindings: Env }>,
   body: Record<string, string | undefined>,
   storage: OAuthStorage,
+  client: ClientInfo,
 ): Promise<Response> {
   const refreshToken = body.refresh_token;
-  const clientId = body.client_id;
 
   // RFC 6749 Section 6: refresh_token is REQUIRED
   if (!refreshToken) {
@@ -354,8 +477,8 @@ async function handleRefreshTokenGrant(
     return oauthError(c, "invalid_grant", "Refresh token has expired");
   }
 
-  // Verify client_id if provided
-  if (clientId && tokenData.grant.clientId !== clientId) {
+  // Verify client_id matches the token's grant
+  if (tokenData.grant.clientId !== client.clientId) {
     return oauthError(c, "invalid_grant", "Client ID mismatch");
   }
 

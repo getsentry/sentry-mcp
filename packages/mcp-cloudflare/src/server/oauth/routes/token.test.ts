@@ -11,7 +11,7 @@ import {
   wrapKeyWithToken,
 } from "../crypto";
 import { type InMemoryStorage, createInMemoryStorage } from "../storage";
-import type { Grant, WorkerProps } from "../types";
+import type { ClientInfo, Grant, WorkerProps } from "../types";
 import tokenRoute from "./token";
 
 // Mock fetch for upstream token refresh
@@ -39,9 +39,22 @@ describe("token endpoint", () => {
     accessTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours from now
   };
 
-  beforeEach(() => {
+  // Public test client (tokenEndpointAuthMethod: "none")
+  const testClient: ClientInfo = {
+    clientId: "test-client",
+    redirectUris: ["https://example.com/callback"],
+    tokenEndpointAuthMethod: "none",
+    grantTypes: ["authorization_code", "refresh_token"],
+    responseTypes: ["code"],
+    registrationDate: Math.floor(Date.now() / 1000),
+  };
+
+  beforeEach(async () => {
     vi.clearAllMocks();
     storage = createInMemoryStorage();
+
+    // Register the test client
+    await storage.saveClient(testClient);
 
     // Create test app with storage and env middleware
     app = new Hono<{ Bindings: Env }>();
@@ -194,6 +207,16 @@ describe("token endpoint", () => {
     it("rejects client_id mismatch", async () => {
       const { authCode } = await createTestGrant();
 
+      // Register a different client
+      await storage.saveClient({
+        clientId: "wrong-client",
+        redirectUris: ["https://wrong.example.com/callback"],
+        tokenEndpointAuthMethod: "none",
+        grantTypes: ["authorization_code", "refresh_token"],
+        responseTypes: ["code"],
+        registrationDate: Math.floor(Date.now() / 1000),
+      });
+
       const response = await makeRequest("/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -263,6 +286,7 @@ describe("token endpoint", () => {
         body: new URLSearchParams({
           grant_type: "refresh_token",
           refresh_token: refreshToken,
+          client_id: "test-client",
         }),
       });
 
@@ -284,6 +308,7 @@ describe("token endpoint", () => {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           grant_type: "refresh_token",
+          client_id: "test-client",
         }),
       });
 
@@ -299,6 +324,7 @@ describe("token endpoint", () => {
         body: new URLSearchParams({
           grant_type: "refresh_token",
           refresh_token: "invalid-token",
+          client_id: "test-client",
         }),
       });
 
@@ -315,6 +341,7 @@ describe("token endpoint", () => {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           grant_type: "client_credentials",
+          client_id: "test-client",
         }),
       });
 
@@ -327,7 +354,9 @@ describe("token endpoint", () => {
       const response = await makeRequest("/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({}),
+        body: new URLSearchParams({
+          client_id: "test-client",
+        }),
       });
 
       expect(response.status).toBe(400);

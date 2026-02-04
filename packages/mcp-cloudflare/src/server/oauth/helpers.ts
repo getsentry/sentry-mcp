@@ -494,6 +494,14 @@ export function createOAuthHelpers(storage: OAuthStorage): OAuthHelpers {
         }
       }
 
+      // RFC 6749 Section 4.1.1: Validate response_type
+      // We only support authorization code flow, not implicit grant
+      if (responseType !== "code") {
+        throw new Error(
+          `Unsupported response_type: ${responseType || "(missing)"}. Only "code" is supported.`,
+        );
+      }
+
       // Validate client and redirect URI if client exists
       if (clientId) {
         const clientInfo = await storage.getClient(clientId);

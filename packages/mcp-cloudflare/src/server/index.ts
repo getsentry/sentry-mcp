@@ -76,6 +76,25 @@ mainApp.options("*", async (c) => {
 });
 
 // Rate limiting for MCP and OAuth routes
+// Note: Use both "/mcp" and "/mcp/*" because Hono's wildcard doesn't match exact paths
+mainApp.use("/mcp", async (c, next) => {
+  const clientIP = getClientIp(c.req.raw);
+  if (clientIP) {
+    const rateLimitResult = await checkRateLimit(
+      clientIP,
+      c.env.MCP_RATE_LIMITER,
+      {
+        keyPrefix: "mcp",
+        errorMessage: "Rate limit exceeded. Please wait before trying again.",
+      },
+    );
+    if (!rateLimitResult.allowed) {
+      return c.text(rateLimitResult.errorMessage!, 429);
+    }
+  }
+  await next();
+});
+
 mainApp.use("/mcp/*", async (c, next) => {
   const clientIP = getClientIp(c.req.raw);
   if (clientIP) {
@@ -117,6 +136,8 @@ mainApp.use("/oauth/*", async (c, next) => {
 mainApp.route("/.well-known/oauth-authorization-server", metadataRoute);
 
 // MCP API routes - require Bearer token authentication
+// Note: Use both "/mcp" and "/mcp/*" because Hono's wildcard doesn't match exact paths
+mainApp.use("/mcp", bearerAuth());
 mainApp.use("/mcp/*", bearerAuth());
 
 // MCP handler - after auth middleware validates token and sets props

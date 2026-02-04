@@ -104,22 +104,7 @@ metadataRoute.get("/", (c) => {
      */
     code_challenge_methods_supported: ["plain", "S256"],
 
-    /**
-     * RFC 8414 Section 2: revocation_endpoint (OPTIONAL)
-     * URL of the token revocation endpoint.
-     * @see RFC 7009 - Token Revocation
-     */
-    revocation_endpoint: `${issuer}/oauth/revoke`,
-
-    /**
-     * RFC 8414 Section 2: revocation_endpoint_auth_methods_supported (OPTIONAL)
-     * List of supported client authentication methods at revocation endpoint.
-     */
-    revocation_endpoint_auth_methods_supported: [
-      "none",
-      "client_secret_basic",
-      "client_secret_post",
-    ],
+    // Note: revocation_endpoint not included as /oauth/revoke is not implemented
   };
 
   /**
