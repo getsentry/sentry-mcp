@@ -475,6 +475,60 @@ describe("validateResourceParameter", () => {
     });
   });
 
+  describe("array resources (RFC 8707)", () => {
+    it("should allow array of valid resources", () => {
+      const result = validateResourceParameter(
+        [
+          "https://mcp.sentry.dev/mcp",
+          "https://mcp.sentry.dev/mcp/org/project",
+        ],
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
+    it("should reject array if any resource is invalid", () => {
+      const result = validateResourceParameter(
+        [
+          "https://mcp.sentry.dev/mcp",
+          "https://attacker.com/mcp", // Different hostname - invalid
+        ],
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should reject array with one invalid path", () => {
+      const result = validateResourceParameter(
+        [
+          "https://mcp.sentry.dev/mcp",
+          "https://mcp.sentry.dev/api", // Invalid path
+        ],
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("should allow empty array", () => {
+      // Empty array should be treated as "no resource specified"
+      // which falls through to the undefined case
+      const result = validateResourceParameter(
+        [],
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      // Empty array returns true because every() returns true for empty arrays
+      expect(result).toBe(true);
+    });
+
+    it("should allow single-element array", () => {
+      const result = validateResourceParameter(
+        ["https://mcp.sentry.dev/mcp"],
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+  });
+
   describe("edge cases", () => {
     it("should reject URL with fragment (RFC 8707)", () => {
       const result = validateResourceParameter(

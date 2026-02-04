@@ -20,6 +20,7 @@ import {
   parseToken,
   unwrapKeyWithToken,
   verifyCodeChallenge,
+  verifySecret,
   wrapKeyWithToken,
 } from "./crypto";
 import type { WorkerProps } from "./types";
@@ -122,6 +123,27 @@ describe("crypto utilities", () => {
     it("produces hex string", async () => {
       const hash = await hashSecret("test");
       expect(hash).toMatch(/^[a-f0-9]+$/);
+    });
+  });
+
+  describe("verifySecret", () => {
+    it("returns true for matching secret and hash", async () => {
+      const secret = "my-secret-value";
+      const hash = await hashSecret(secret);
+      const result = await verifySecret(secret, hash);
+      expect(result).toBe(true);
+    });
+
+    it("returns false for non-matching secret", async () => {
+      const hash = await hashSecret("original-secret");
+      const result = await verifySecret("wrong-secret", hash);
+      expect(result).toBe(false);
+    });
+
+    it("returns false for empty secret against valid hash", async () => {
+      const hash = await hashSecret("original-secret");
+      const result = await verifySecret("", hash);
+      expect(result).toBe(false);
     });
   });
 
