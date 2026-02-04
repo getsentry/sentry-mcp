@@ -328,10 +328,27 @@ async function handleAuthorizationCodeGrant(
     }
   }
 
+  // Store the wrapped key before consuming the auth code
+  // This is needed to unwrap the encryption key later
+  const authCodeWrappedKey = grant.authCodeWrappedKey!;
+
+  // IMPORTANT: Atomically consume the authorization code BEFORE issuing tokens
+  // RFC 6749 Section 4.1.2: Code MUST NOT be used more than once
+  // By clearing the auth code data before issuing tokens, we prevent TOCTOU race
+  // conditions where two concurrent requests could both exchange the same code.
+  const consumedGrant: Grant = {
+    ...grant,
+    authCodeId: undefined,
+    authCodeWrappedKey: undefined,
+    codeChallenge: undefined,
+    codeChallengeMethod: undefined,
+  };
+  await storage.saveGrant(consumedGrant);
+
   // Unwrap the encryption key using the authorization code
   let encryptionKey: CryptoKey;
   try {
-    encryptionKey = await unwrapKeyWithToken(code, grant.authCodeWrappedKey!);
+    encryptionKey = await unwrapKeyWithToken(code, authCodeWrappedKey);
   } catch {
     return oauthError(
       c,
@@ -393,17 +410,6 @@ async function handleAuthorizationCodeGrant(
   // Save tokens
   await storage.saveToken(accessTokenData, DEFAULT_ACCESS_TOKEN_TTL);
   await storage.saveToken(refreshTokenData, DEFAULT_REFRESH_TOKEN_TTL);
-
-  // Mark authorization code as used by removing it from the grant
-  // RFC 6749 Section 4.1.2: Code MUST NOT be used more than once
-  const updatedGrant: Grant = {
-    ...grant,
-    authCodeId: undefined,
-    authCodeWrappedKey: undefined,
-    codeChallenge: undefined,
-    codeChallengeMethod: undefined,
-  };
-  await storage.saveGrant(updatedGrant);
 
   // Return token response (RFC 6749 Section 5.1)
   const response: TokenResponse = {
