@@ -82,9 +82,6 @@ tokenRoute.post("/", async (c) => {
   // Get storage from context (injected by middleware)
   const storage = c.get("oauthStorage") as OAuthStorage;
   if (!storage) {
-    logIssue("[oauth] OAuth storage not configured", {
-      loggerScope: ["cloudflare", "oauth", "token"],
-    });
     return oauthError(c, "server_error", "OAuth storage not configured", 500);
   }
 
@@ -594,6 +591,11 @@ function oauthError(
   description: string,
   status: 400 | 500 = 400,
 ): Response {
+  if (status === 500) {
+    logIssue(`[oauth] Token endpoint error: ${description}`, {
+      loggerScope: ["cloudflare", "oauth", "token"],
+    });
+  }
   return c.json({ error, error_description: description }, status, {
     "Cache-Control": "no-store",
     Pragma: "no-cache",

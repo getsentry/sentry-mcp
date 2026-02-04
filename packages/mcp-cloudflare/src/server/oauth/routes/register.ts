@@ -70,16 +70,7 @@ registerRoute.post("/", async (c) => {
   // Get storage from context
   const storage = c.get("oauthStorage") as OAuthStorage;
   if (!storage) {
-    logIssue("[oauth] OAuth storage not configured", {
-      loggerScope: ["cloudflare", "oauth", "register"],
-    });
-    return c.json(
-      {
-        error: "server_error",
-        error_description: "OAuth storage not configured",
-      },
-      500,
-    );
+    return registrationError(c, "server_error", "OAuth storage not configured");
   }
 
   // Parse JSON body

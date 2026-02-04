@@ -82,9 +82,6 @@ export function bearerAuth(): MiddlewareHandler<{ Bindings: Env }> {
     // Get storage from context (must be set earlier in middleware chain)
     const storage = c.get("oauthStorage") as OAuthStorage | undefined;
     if (!storage) {
-      logIssue("[oauth] OAuth storage not configured", {
-        loggerScope: ["cloudflare", "oauth", "auth"],
-      });
       return unauthorizedResponse(
         c,
         "server_error",
@@ -242,6 +239,12 @@ function unauthorizedResponse(
 ): Response {
   const wwwAuthenticate = `Bearer realm="sentry-mcp", error="${error}", error_description="${description}"`;
   const status = error === "server_error" ? 500 : 401;
+
+  if (status === 500) {
+    logIssue(`[oauth] Auth middleware error: ${description}`, {
+      loggerScope: ["cloudflare", "oauth", "auth"],
+    });
+  }
 
   return c.json({ error, error_description: description }, status, {
     "WWW-Authenticate": wwwAuthenticate,
