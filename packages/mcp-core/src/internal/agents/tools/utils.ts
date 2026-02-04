@@ -1,4 +1,4 @@
-import { tool } from "ai";
+import { tool, APICallError } from "ai";
 import { z } from "zod";
 import { UserInputError, LLMProviderError } from "../../../errors";
 import { ApiClientError, ApiServerError } from "../../../api-client";
@@ -58,6 +58,33 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     };
   }
 
+  // Handle AI SDK APICallError that wasn't converted to LLMProviderError
+  // This is a defensive layer - ideally callEmbeddedAgent converts these
+  if (APICallError.isInstance(error)) {
+    const statusCode = error.statusCode;
+    // 4xx errors are user-facing (account issues, rate limits, invalid keys)
+    if (statusCode && statusCode >= 400 && statusCode < 500) {
+      logWarn(error, {
+        loggerScope: ["agent-tools", "api-call"],
+        contexts: {
+          agentTool: {
+            errorType: "APICallError",
+            statusCode,
+          },
+        },
+      });
+      return {
+        error: `AI Provider Error: ${error.message}. This may be a configuration or account issue.`,
+      };
+    }
+    // 5xx errors - log to Sentry
+    const eventId = logIssue(error);
+    const eventIdPart = eventId ? ` Event ID: ${eventId}.` : "";
+    return {
+      error: `AI Provider Error: An unexpected error occurred with the AI provider.${eventIdPart} This is a system error that cannot be resolved by retrying.`,
+    };
+  }
+
   if (error instanceof ApiClientError) {
     // Log ApiClientError for Sentry logging (as log, not exception)
     const message = error.toUserMessage();
@@ -79,16 +106,18 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     // Log server errors to Sentry and get Event ID
     const eventId = logIssue(error);
     const statusText = error.status ? ` (${error.status})` : "";
+    const eventIdPart = eventId ? ` Event ID: ${eventId}.` : "";
     return {
-      error: `Server Error${statusText}: ${error.message}. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
+      error: `Server Error${statusText}: ${error.message}.${eventIdPart} This is a system error that cannot be resolved by retrying.`,
     };
   }
 
   // Log unexpected errors to Sentry and return safe generic message
   // SECURITY: Don't return untrusted error messages that could enable prompt injection
   const eventId = logIssue(error);
+  const eventIdPart = eventId ? ` Event ID: ${eventId}.` : "";
   return {
-    error: `System Error: An unexpected error occurred. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
+    error: `System Error: An unexpected error occurred.${eventIdPart} This is a system error that cannot be resolved by retrying.`,
   };
 }
 

@@ -66,8 +66,59 @@ describe("callEmbeddedAgent", () => {
     );
   });
 
-  it("re-throws other APICallErrors unchanged", async () => {
-    // Create an APICallError for a different error (e.g., rate limit)
+  it("throws LLMProviderError for account deactivated error (401)", async () => {
+    const deactivatedError = new APICallError({
+      message:
+        "The OpenAI account associated with this API key has been deactivated.",
+      url: "https://api.openai.com/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 401,
+      isRetryable: false,
+    });
+
+    mockGenerateText.mockRejectedValue(deactivatedError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/configuration or account issue/);
+  });
+
+  it("throws LLMProviderError for invalid API key (401)", async () => {
+    const invalidKeyError = new APICallError({
+      message: "Incorrect API key provided",
+      url: "https://api.openai.com/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 401,
+      isRetryable: false,
+    });
+
+    mockGenerateText.mockRejectedValue(invalidKeyError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(LLMProviderError);
+  });
+
+  it("throws LLMProviderError for rate limit error (429)", async () => {
     const rateLimitError = new APICallError({
       message: "Rate limit exceeded",
       url: "https://api.openai.com/v1/chat/completions",
@@ -85,6 +136,36 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
+    ).rejects.toThrow(LLMProviderError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(/configuration or account issue/);
+  });
+
+  it("re-throws 5xx APICallErrors unchanged (system errors)", async () => {
+    const serverError = new APICallError({
+      message: "Internal server error",
+      url: "https://api.openai.com/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 500,
+      isRetryable: true,
+    });
+
+    mockGenerateText.mockRejectedValue(serverError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
     ).rejects.toThrow(APICallError);
 
     await expect(
@@ -94,7 +175,28 @@ describe("callEmbeddedAgent", () => {
         tools: {},
         schema: testSchema,
       }),
-    ).rejects.toThrow("Rate limit exceeded");
+    ).rejects.toThrow("Internal server error");
+  });
+
+  it("re-throws APICallErrors without status code unchanged", async () => {
+    // Some errors may not have a status code (e.g., network errors)
+    const networkError = new APICallError({
+      message: "Network error",
+      url: "https://api.openai.com/v1/chat/completions",
+      requestBodyValues: {},
+      isRetryable: true,
+    });
+
+    mockGenerateText.mockRejectedValue(networkError);
+
+    await expect(
+      callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: testSchema,
+      }),
+    ).rejects.toThrow(APICallError);
   });
 
   it("re-throws non-APICallError errors unchanged", async () => {
