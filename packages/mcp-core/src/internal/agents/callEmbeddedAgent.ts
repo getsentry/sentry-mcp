@@ -70,8 +70,9 @@ export async function callEmbeddedAgent<
     },
   }).catch((error: unknown) => {
     // Handle LLM provider errors with user-friendly messages
+    // These are user-facing errors that should NOT be reported to Sentry
     if (APICallError.isInstance(error)) {
-      // OpenAI region restriction error
+      // OpenAI region restriction error - provide specific helpful message
       if (
         error.message.includes("Country, region, or territory not supported")
       ) {
@@ -81,8 +82,17 @@ export async function callEmbeddedAgent<
             "Please contact support if you believe this is an error.",
         );
       }
+
+      // All 4xx errors are user-facing (account issues, rate limits, invalid keys, etc.)
+      // These should be shown to the user, not reported to Sentry
+      const statusCode = error.statusCode;
+      if (statusCode && statusCode >= 400 && statusCode < 500) {
+        throw new LLMProviderError(
+          `The AI provider returned an error: ${error.message}. This may be a configuration or account issue. Please check your AI provider settings.`,
+        );
+      }
     }
-    // Re-throw other errors to be handled by the caller
+    // Re-throw 5xx and other errors to be handled by the caller (logged to Sentry)
     throw error;
   });
 

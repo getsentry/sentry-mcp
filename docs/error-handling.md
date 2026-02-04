@@ -32,6 +32,16 @@ ApiError (base class)
   - OpenAI rejecting requests from unsupported regions
   - Provider service availability issues that cannot be resolved by retrying
 
+### AI SDK Error Classes (from ai package)
+
+- `APICallError` - Errors from LLM provider API calls (OpenAI, Anthropic, etc.)
+  - 4xx errors (account issues, rate limits, invalid keys) → Converted to `LLMProviderError`, NOT sent to Sentry
+  - 5xx errors (server errors) → System errors, SENT to Sentry
+
+**Conversion Flow:**
+- `callEmbeddedAgent` converts user-facing `APICallError` (4xx) → `LLMProviderError` immediately after the AI SDK call
+- Defensive handling in `handleAgentToolError` and `formatErrorForUser` for any that slip through
+
 ### Error Categories
 
 **User-Facing Errors (Should NOT create Sentry issues):**
@@ -39,9 +49,11 @@ ApiError (base class)
 - `UserInputError`
 - `ConfigurationError`
 - `LLMProviderError`
+- `APICallError` with 4xx status codes (converted to `LLMProviderError`)
 
 **System Errors (Should be captured by Sentry):**
 - `ApiServerError`
+- `APICallError` with 5xx status codes
 - Network failures
 - Unexpected runtime errors
 

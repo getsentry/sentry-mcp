@@ -5,6 +5,7 @@ import {
 } from "../errors";
 import { ApiError, ApiClientError, ApiServerError } from "../api-client";
 import { logIssue } from "../telem/logging";
+import { APICallError } from "ai";
 
 /**
  * Type guard to identify user input validation errors.
@@ -51,6 +52,13 @@ export function isApiServerError(error: unknown): error is ApiServerError {
 }
 
 /**
+ * Type guard to identify AI SDK API call errors.
+ */
+export function isAPICallError(error: unknown): boolean {
+  return APICallError.isInstance(error);
+}
+
+/**
  * Format an error for user display with markdown formatting.
  * This is used by tool handlers to format errors for MCP responses.
  *
@@ -82,6 +90,31 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
       "The AI provider service is not available for this request.",
       error.message,
       `This is a service availability issue that cannot be resolved by retrying.`,
+    ].join("\n\n");
+  }
+
+  // Handle AI SDK APICallError that wasn't converted to LLMProviderError
+  // This is a defensive layer - ideally callEmbeddedAgent converts these
+  if (isAPICallError(error)) {
+    const statusCode = (error as APICallError).statusCode;
+    // 4xx errors are user-facing (account issues, rate limits, invalid keys)
+    // These should NOT be logged to Sentry
+    if (statusCode && statusCode >= 400 && statusCode < 500) {
+      return [
+        "**AI Provider Error**",
+        "The AI provider service returned an error.",
+        (error as APICallError).message,
+        "This may be a configuration or account issue. Please check your AI provider settings.",
+      ].join("\n\n");
+    }
+    // 5xx errors - log to Sentry
+    const eventId = logIssue(error);
+    return [
+      "**AI Provider Error**",
+      "An unexpected error occurred with the AI provider.",
+      (error as APICallError).message,
+      `**Event ID**: ${eventId}`,
+      "Please contact support with this Event ID if the problem persists.",
     ].join("\n\n");
   }
 

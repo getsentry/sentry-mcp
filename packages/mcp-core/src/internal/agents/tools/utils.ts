@@ -1,4 +1,4 @@
-import { tool } from "ai";
+import { tool, APICallError } from "ai";
 import { z } from "zod";
 import { UserInputError, LLMProviderError } from "../../../errors";
 import { ApiClientError, ApiServerError } from "../../../api-client";
@@ -55,6 +55,32 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     });
     return {
       error: `AI Provider Error: ${error.message}. This is a service availability issue that cannot be resolved by retrying.`,
+    };
+  }
+
+  // Handle AI SDK APICallError that wasn't converted to LLMProviderError
+  // This is a defensive layer - ideally callEmbeddedAgent converts these
+  if (APICallError.isInstance(error)) {
+    const statusCode = error.statusCode;
+    // 4xx errors are user-facing (account issues, rate limits, invalid keys)
+    if (statusCode && statusCode >= 400 && statusCode < 500) {
+      logWarn(error, {
+        loggerScope: ["agent-tools", "api-call"],
+        contexts: {
+          agentTool: {
+            errorType: "APICallError",
+            statusCode,
+          },
+        },
+      });
+      return {
+        error: `AI Provider Error: ${error.message}. This may be a configuration or account issue.`,
+      };
+    }
+    // 5xx errors - log to Sentry
+    const eventId = logIssue(error);
+    return {
+      error: `AI Provider Error: An unexpected error occurred with the AI provider. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
     };
   }
 
