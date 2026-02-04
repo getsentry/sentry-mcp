@@ -128,9 +128,12 @@ describeIfPreviewUrl(
       expect(response.status).toBe(401);
 
       // Should return auth error, not 404 - this proves the MCP endpoint exists
+      // RFC 6750: invalid_request for missing header, invalid_token for bad token
       if (data) {
         expect(data).toHaveProperty("error");
-        expect(data.error).toMatch(/invalid_token|unauthorized/i);
+        expect(data.error).toMatch(
+          /invalid_request|invalid_token|unauthorized/i,
+        );
       }
     });
 
@@ -201,12 +204,15 @@ describeIfPreviewUrl(
       expect(response.status).toBe(401);
 
       // Should return auth error, not 404 - this proves the constrained MCP endpoint exists
+      // RFC 6750: invalid_request for missing header, invalid_token for bad token
       const data = (response as any).testData;
       if (typeof data === "object") {
         expect(data).toHaveProperty("error");
-        expect(data.error).toMatch(/invalid_token|unauthorized/i);
+        expect(data.error).toMatch(
+          /invalid_request|invalid_token|unauthorized/i,
+        );
       } else {
-        expect(data).toMatch(/invalid_token|unauthorized/i);
+        expect(data).toMatch(/invalid_request|invalid_token|unauthorized/i);
       }
     });
 
@@ -254,12 +260,15 @@ describeIfPreviewUrl(
       expect(response.status).toBe(401);
 
       // Should return auth error, not 404 - this proves the fully constrained MCP endpoint exists
+      // RFC 6750: invalid_request for missing header, invalid_token for bad token
       const data = (response as any).testData;
       if (typeof data === "object") {
         expect(data).toHaveProperty("error");
-        expect(data.error).toMatch(/invalid_token|unauthorized/i);
+        expect(data.error).toMatch(
+          /invalid_request|invalid_token|unauthorized/i,
+        );
       } else {
-        expect(data).toMatch(/invalid_token|unauthorized/i);
+        expect(data).toMatch(/invalid_request|invalid_token|unauthorized/i);
       }
     });
 
