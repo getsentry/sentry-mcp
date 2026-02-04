@@ -79,8 +79,9 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     }
     // 5xx errors - log to Sentry
     const eventId = logIssue(error);
+    const eventIdPart = eventId ? ` Event ID: ${eventId}.` : "";
     return {
-      error: `AI Provider Error: An unexpected error occurred with the AI provider. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
+      error: `AI Provider Error: An unexpected error occurred with the AI provider.${eventIdPart} This is a system error that cannot be resolved by retrying.`,
     };
   }
 
@@ -105,16 +106,18 @@ function handleAgentToolError<T>(error: unknown): AgentToolResponse<T> {
     // Log server errors to Sentry and get Event ID
     const eventId = logIssue(error);
     const statusText = error.status ? ` (${error.status})` : "";
+    const eventIdPart = eventId ? ` Event ID: ${eventId}.` : "";
     return {
-      error: `Server Error${statusText}: ${error.message}. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
+      error: `Server Error${statusText}: ${error.message}.${eventIdPart} This is a system error that cannot be resolved by retrying.`,
     };
   }
 
   // Log unexpected errors to Sentry and return safe generic message
   // SECURITY: Don't return untrusted error messages that could enable prompt injection
   const eventId = logIssue(error);
+  const eventIdPart = eventId ? ` Event ID: ${eventId}.` : "";
   return {
-    error: `System Error: An unexpected error occurred. Event ID: ${eventId}. This is a system error that cannot be resolved by retrying.`,
+    error: `System Error: An unexpected error occurred.${eventIdPart} This is a system error that cannot be resolved by retrying.`,
   };
 }
 

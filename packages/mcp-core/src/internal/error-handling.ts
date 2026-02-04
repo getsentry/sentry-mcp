@@ -54,7 +54,7 @@ export function isApiServerError(error: unknown): error is ApiServerError {
 /**
  * Type guard to identify AI SDK API call errors.
  */
-export function isAPICallError(error: unknown): boolean {
+export function isAPICallError(error: unknown): error is APICallError {
   return APICallError.isInstance(error);
 }
 
@@ -96,26 +96,29 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
   // Handle AI SDK APICallError that wasn't converted to LLMProviderError
   // This is a defensive layer - ideally callEmbeddedAgent converts these
   if (isAPICallError(error)) {
-    const statusCode = (error as APICallError).statusCode;
+    const statusCode = error.statusCode;
     // 4xx errors are user-facing (account issues, rate limits, invalid keys)
     // These should NOT be logged to Sentry
     if (statusCode && statusCode >= 400 && statusCode < 500) {
       return [
         "**AI Provider Error**",
         "The AI provider service returned an error.",
-        (error as APICallError).message,
+        error.message,
         "This may be a configuration or account issue. Please check your AI provider settings.",
       ].join("\n\n");
     }
     // 5xx errors - log to Sentry
     const eventId = logIssue(error);
-    return [
+    const parts = [
       "**AI Provider Error**",
       "An unexpected error occurred with the AI provider.",
-      (error as APICallError).message,
-      `**Event ID**: ${eventId}`,
-      "Please contact support with this Event ID if the problem persists.",
-    ].join("\n\n");
+      error.message,
+    ];
+    if (eventId) {
+      parts.push(`**Event ID**: ${eventId}`);
+    }
+    parts.push("Please contact support if the problem persists.");
+    return parts.join("\n\n");
   }
 
   // Handle ApiClientError (4xx) - user input errors, should NOT be logged to Sentry
@@ -139,13 +142,12 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
       ? `There was an HTTP ${error.status} server error with the Sentry API.`
       : "There was a server error.";
 
-    return [
-      "**Error**",
-      statusText,
-      `${error.message}`,
-      `**Event ID**: ${eventId}`,
-      `Please contact support with this Event ID if the problem persists.`,
-    ].join("\n\n");
+    const parts = ["**Error**", statusText, `${error.message}`];
+    if (eventId) {
+      parts.push(`**Event ID**: ${eventId}`);
+    }
+    parts.push(`Please contact support if the problem persists.`);
+    return parts.join("\n\n");
   }
 
   // Handle generic ApiError (shouldn't happen with new hierarchy, but just in case)
@@ -164,17 +166,19 @@ export async function formatErrorForUser(error: unknown): Promise<string> {
 
   const eventId = logIssue(error);
 
-  return [
+  const parts = [
     "**Error**",
     "It looks like there was a problem communicating with the Sentry API.",
     "Please report the following to the user for the Sentry team:",
-    `**Event ID**: ${eventId}`,
-    process.env.NODE_ENV !== "production"
-      ? error instanceof Error
-        ? error.message
-        : String(error)
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  ];
+  if (eventId) {
+    parts.push(`**Event ID**: ${eventId}`);
+  }
+  if (process.env.NODE_ENV !== "production") {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    if (errorMsg) {
+      parts.push(errorMsg);
+    }
+  }
+  return parts.join("\n\n");
 }
