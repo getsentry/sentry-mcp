@@ -309,9 +309,10 @@ export async function tokenExchangeCallback(
 
 /**
  * Validates resource parameter per RFC 8707.
+ * Supports both single resource string and array of resource strings.
  */
 export function validateResourceParameter(
-  resource: string | undefined,
+  resource: string | string[] | undefined,
   requestUrl: string,
 ): boolean {
   if (resource === "") {
@@ -320,6 +321,11 @@ export function validateResourceParameter(
 
   if (!resource) {
     return true;
+  }
+
+  // If array, validate each resource
+  if (Array.isArray(resource)) {
+    return resource.every((r) => validateResourceParameter(r, requestUrl));
   }
 
   try {

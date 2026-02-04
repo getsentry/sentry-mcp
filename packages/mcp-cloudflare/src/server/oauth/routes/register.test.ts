@@ -4,6 +4,26 @@ import type { Env } from "../../types";
 import { type InMemoryStorage, createInMemoryStorage } from "../storage";
 import registerRoute from "./register";
 
+// Response body types for type assertions
+interface RegistrationResponse {
+  client_id: string;
+  client_id_issued_at: number;
+  client_secret?: string;
+  client_secret_expires_at?: number;
+  redirect_uris: string[];
+  client_name?: string;
+  client_uri?: string;
+  logo_uri?: string;
+  token_endpoint_auth_method: string;
+  grant_types: string[];
+  response_types: string[];
+}
+
+interface ErrorResponse {
+  error: string;
+  error_description?: string;
+}
+
 describe("register endpoint", () => {
   let app: Hono<{ Bindings: Env }>;
   let storage: InMemoryStorage;
@@ -32,7 +52,9 @@ describe("register endpoint", () => {
 
       expect(response.status).toBe(201);
 
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.client_id).toBeDefined();
       expect(body.client_id_issued_at).toBeDefined();
       expect(body.redirect_uris).toEqual(["https://example.com/callback"]);
@@ -56,7 +78,9 @@ describe("register endpoint", () => {
 
       expect(response.status).toBe(201);
 
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.client_id).toBeDefined();
       expect(body.client_secret).toBeDefined();
       expect(body.client_secret_expires_at).toBe(0); // Never expires
@@ -80,7 +104,9 @@ describe("register endpoint", () => {
 
       expect(response.status).toBe(201);
 
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.client_name).toBe("My App");
       expect(body.client_uri).toBe("https://example.com");
       expect(body.logo_uri).toBe("https://example.com/logo.png");
@@ -98,7 +124,9 @@ describe("register endpoint", () => {
         }),
       });
 
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       const stored = await storage.getClient(body.client_id);
 
       expect(stored).not.toBeNull();
@@ -140,7 +168,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_request");
       expect(body.error_description).toContain("redirect_uris");
     });
@@ -155,7 +185,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_request");
     });
 
@@ -169,7 +201,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_redirect_uri");
     });
 
@@ -183,7 +217,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_redirect_uri");
     });
 
@@ -198,7 +234,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_client_metadata");
     });
 
@@ -213,7 +251,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_client_metadata");
     });
 
@@ -228,7 +268,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_client_metadata");
     });
 
@@ -243,7 +285,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_client_metadata");
     });
 
@@ -255,7 +299,9 @@ describe("register endpoint", () => {
       });
 
       expect(response.status).toBe(400);
-      const body = await response.json();
+      const body = (await response.json()) as
+        | RegistrationResponse
+        | ErrorResponse;
       expect(body.error).toBe("invalid_request");
     });
   });

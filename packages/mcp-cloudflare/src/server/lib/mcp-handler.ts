@@ -94,30 +94,10 @@ const mcpHandler: ExportedHandler<Env> = {
       const userId = oauthCtx.props.id as string;
       const clientId = oauthCtx.props.clientId as string;
 
-      logWarn("Legacy token without grantedSkills detected - revoking grant", {
+      logWarn("Legacy token without grantedSkills detected", {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: { clientId, userId },
       });
-
-      // Revoke the grant in the background (don't block the response)
-      ctx.waitUntil(
-        (async () => {
-          try {
-            // Find the grant for this user/client combination
-            const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
-            const grant = grants.items.find((g) => g.clientId === clientId);
-
-            if (grant) {
-              await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
-            }
-          } catch (err) {
-            logWarn("Failed to revoke legacy grant", {
-              loggerScope: ["cloudflare", "mcp-handler"],
-              extra: { error: String(err), clientId, userId },
-            });
-          }
-        })(),
-      );
 
       return new Response(
         "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",

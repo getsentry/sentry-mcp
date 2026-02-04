@@ -58,7 +58,7 @@ describe("auth middleware", () => {
     };
 
     await storage.saveGrant(grant);
-    await storage.saveToken(token);
+    await storage.saveToken(token, 3600);
 
     return { accessToken, grant, token };
   }
@@ -92,7 +92,7 @@ describe("auth middleware", () => {
       });
 
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = (await response.json()) as { userId: string };
       expect(body.userId).toBe("user-123");
     });
 
@@ -121,7 +121,7 @@ describe("auth middleware", () => {
       });
 
       expect(response.status).toBe(401);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_token");
     });
 
@@ -149,7 +149,7 @@ describe("auth middleware", () => {
         },
       };
 
-      await storage.saveToken(token);
+      await storage.saveToken(token, 3600);
 
       const response = await app.request("/protected/resource", {
         headers: {
@@ -158,7 +158,7 @@ describe("auth middleware", () => {
       });
 
       expect(response.status).toBe(401);
-      const body = await response.json();
+      const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_token");
     });
 
@@ -195,7 +195,10 @@ describe("auth middleware", () => {
       });
 
       expect(response.status).toBe(200);
-      const body = await response.json();
+      const body = (await response.json()) as {
+        userId: string;
+        scope: string[];
+      };
       expect(body.userId).toBe("user-123");
       expect(body.scope).toEqual(["org:read", "project:read"]);
     });
@@ -264,7 +267,10 @@ describe("auth middleware", () => {
 
       expect(response.status).toBe(401);
 
-      const body = await response.json();
+      const body = (await response.json()) as {
+        error: string;
+        error_description: string;
+      };
       expect(body.error).toBeDefined();
       expect(body.error_description).toBeDefined();
 

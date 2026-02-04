@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/cloudflare";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import app from "./app";
 import sentryMcpHandler from "./lib/mcp-handler";
@@ -12,6 +13,9 @@ import getSentryConfig from "./sentry.config";
 import type { Env, WorkerProps } from "./types";
 import { getClientIp } from "./utils/client-ip";
 import { checkRateLimit } from "./utils/rate-limiter";
+
+// Import to ensure module augmentation for ContextVariableMap is applied
+import "./oauth/middleware/auth";
 
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
@@ -115,9 +119,7 @@ mainApp.route("/.well-known/oauth-authorization-server", metadataRoute);
 mainApp.use("/mcp/*", bearerAuth());
 
 // MCP handler - after auth middleware validates token and sets props
-const handleMcpRequest = async (
-  c: Parameters<Parameters<typeof mainApp.all>[1]>[0],
-) => {
+const handleMcpRequest = async (c: Context<{ Bindings: Env }>) => {
   const auth = c.get("auth");
   if (!auth) {
     return c.json({ error: "Unauthorized" }, 401);

@@ -206,10 +206,11 @@ export interface EncryptedData {
  * @returns CryptoKey for encryption/decryption
  */
 export async function generateEncryptionKey(): Promise<CryptoKey> {
+  // AES-GCM always returns a single CryptoKey (not CryptoKeyPair)
   return crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, [
     "encrypt",
     "decrypt",
-  ]);
+  ]) as Promise<CryptoKey>;
 }
 
 /**

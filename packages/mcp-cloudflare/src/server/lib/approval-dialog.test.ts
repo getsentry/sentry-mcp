@@ -9,7 +9,10 @@ describe("approval-dialog", () => {
     clientId: "test-client-id",
     clientName: "Test Client",
     redirectUris: ["https://example.com/callback"],
-    tokenEndpointAuthMethod: "client_secret_basic",
+    tokenEndpointAuthMethod: "client_secret_basic" as const,
+    grantTypes: ["authorization_code", "refresh_token"],
+    responseTypes: ["code"],
+    registrationDate: Date.now(),
   };
 
   beforeEach(() => {
@@ -45,7 +48,10 @@ describe("approval-dialog", () => {
           clientId: "test-client-id",
           clientName: "<script>alert('xss')</script>",
           redirectUris: ["https://example.com/callback"],
-          tokenEndpointAuthMethod: "client_secret_basic",
+          tokenEndpointAuthMethod: "client_secret_basic" as const,
+          grantTypes: ["authorization_code", "refresh_token"],
+          responseTypes: ["code"],
+          registrationDate: Date.now(),
         },
         server: { name: "Test Server" },
         state: { test: "data" },
