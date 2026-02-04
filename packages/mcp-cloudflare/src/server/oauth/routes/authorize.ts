@@ -59,14 +59,20 @@ export default new Hono<{ Bindings: Env }>()
     try {
       oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
     } catch (err) {
-      // Log invalid redirect URI errors without sending them to Sentry
+      // Log validation errors without sending them to Sentry
       const errorMessage = err instanceof Error ? err.message : String(err);
-      if (errorMessage.includes("Invalid redirect URI")) {
+
+      // These are expected client errors - return 400 without Sentry capture
+      if (
+        errorMessage.includes("Invalid redirect URI") ||
+        errorMessage.includes("Unsupported response_type") ||
+        errorMessage.includes("Invalid client")
+      ) {
         logWarn(`OAuth authorization failed: ${errorMessage}`, {
           loggerScope: ["cloudflare", "oauth", "authorize"],
           extra: { error: errorMessage },
         });
-        return c.text("Invalid redirect URI", 400);
+        return c.text(errorMessage, 400);
       }
       // Re-throw other errors to be captured by Sentry
       throw err;
