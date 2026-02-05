@@ -6,21 +6,86 @@ import {
   validateResourceParameter,
   createResourceValidationError,
 } from "./helpers";
+import type { TokenExchangeEnv } from "./helpers";
 import type { WorkerProps } from "../types";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-describe("tokenExchangeCallback", () => {
-  const mockEnv = {
-    SENTRY_CLIENT_ID: "test-client-id",
-    SENTRY_CLIENT_SECRET: "test-client-secret",
-    SENTRY_HOST: "sentry.io",
+function createMockKV(): KVNamespace {
+  const store = new Map<string, string>();
+  return {
+    get: vi.fn(async (key: string, format?: string) => {
+      const value = store.get(key);
+      if (value === undefined) return null;
+      return format === "json" ? JSON.parse(value) : value;
+    }),
+    put: vi.fn(async (key: string, value: string) => {
+      store.set(key, value);
+    }),
+    delete: vi.fn(async (key: string) => {
+      store.delete(key);
+    }),
+    list: vi.fn(),
+    getWithMetadata: vi.fn(),
+  } as unknown as KVNamespace;
+}
+
+function createMockTokenResponse(
+  overrides?: Partial<{
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  }>,
+) {
+  return {
+    ok: true,
+    json: async () => ({
+      access_token: "new-access-token",
+      refresh_token: "new-refresh-token",
+      expires_in: 3600,
+      expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      token_type: "bearer",
+      user: { id: "user-id", name: "Test User", email: "test@example.com" },
+      scope: "org:read project:read",
+      ...overrides,
+    }),
   };
+}
+
+function createRefreshOptions(
+  propsOverrides?: Partial<WorkerProps>,
+): TokenExchangeCallbackOptions {
+  return {
+    grantType: "refresh_token",
+    clientId: "test-client-id",
+    userId: "test-user-id",
+    scope: ["org:read", "project:read"],
+    props: {
+      id: "user-id",
+      clientId: "test-client-id",
+      scope: "org:read project:read",
+      accessToken: "old-access-token",
+      refreshToken: "old-refresh-token",
+      ...propsOverrides,
+    } as WorkerProps,
+  };
+}
+
+describe("tokenExchangeCallback", () => {
+  let mockKV: KVNamespace;
+  let mockEnv: TokenExchangeEnv;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockKV = createMockKV();
+    mockEnv = {
+      SENTRY_CLIENT_ID: "test-client-id",
+      SENTRY_CLIENT_SECRET: "test-client-secret",
+      SENTRY_HOST: "sentry.io",
+      OAUTH_KV: mockKV,
+    };
   });
 
   it("should skip non-refresh_token grant types", async () => {
@@ -38,19 +103,7 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should return undefined when no refresh token in props", async () => {
-    const options: TokenExchangeCallbackOptions = {
-      grantType: "refresh_token",
-      clientId: "test-client-id",
-      userId: "test-user-id",
-      scope: ["org:read", "project:read"],
-      props: {
-        id: "user-id",
-        clientId: "test-client-id",
-        scope: "org:read project:read",
-        accessToken: "old-access-token",
-        // No refreshToken
-      } as WorkerProps,
-    };
+    const options = createRefreshOptions({ refreshToken: undefined });
 
     await expect(
       tokenExchangeCallback(options, mockEnv),
@@ -60,67 +113,26 @@ describe("tokenExchangeCallback", () => {
 
   it("should reuse cached token when it has sufficient TTL remaining", async () => {
     const futureExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes from now
-    const options: TokenExchangeCallbackOptions = {
-      grantType: "refresh_token",
-      clientId: "test-client-id",
-      userId: "test-user-id",
-      scope: ["org:read", "project:read"],
-      props: {
-        id: "user-id",
-        clientId: "test-client-id",
-        scope: "org:read project:read",
-        accessToken: "cached-access-token",
-        refreshToken: "refresh-token",
-        accessTokenExpiresAt: futureExpiry,
-      } as WorkerProps,
-    };
+    const options = createRefreshOptions({
+      accessToken: "cached-access-token",
+      refreshToken: "refresh-token",
+      accessTokenExpiresAt: futureExpiry,
+    });
 
     const result = await tokenExchangeCallback(options, mockEnv);
 
-    // Should not call upstream API
     expect(mockFetch).not.toHaveBeenCalled();
-
-    // Should return existing props with calculated TTL
     expect(result).toBeDefined();
     expect(result?.newProps).toEqual(options.props);
     expect(result?.accessTokenTTL).toBeGreaterThan(0);
-    expect(result?.accessTokenTTL).toBeLessThanOrEqual(600); // Max 10 minutes
+    expect(result?.accessTokenTTL).toBeLessThanOrEqual(600);
   });
 
   it("should refresh token when cached token is close to expiry", async () => {
     const nearExpiry = Date.now() + 1 * 60 * 1000; // 1 minute from now (less than 2 min safety window)
-    const options: TokenExchangeCallbackOptions = {
-      grantType: "refresh_token",
-      clientId: "test-client-id",
-      userId: "test-user-id",
-      scope: ["org:read", "project:read"],
-      props: {
-        id: "user-id",
-        clientId: "test-client-id",
-        scope: "org:read project:read",
-        accessToken: "old-access-token",
-        refreshToken: "old-refresh-token",
-        accessTokenExpiresAt: nearExpiry,
-      } as WorkerProps,
-    };
+    const options = createRefreshOptions({ accessTokenExpiresAt: nearExpiry });
 
-    // Mock successful refresh response
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        access_token: "new-access-token",
-        refresh_token: "new-refresh-token",
-        expires_in: 3600,
-        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        token_type: "bearer",
-        user: {
-          id: "user-id",
-          name: "Test User",
-          email: "test@example.com",
-        },
-        scope: "org:read project:read",
-      }),
-    });
+    mockFetch.mockResolvedValueOnce(createMockTokenResponse());
 
     const result = await tokenExchangeCallback(options, mockEnv);
 
@@ -147,45 +159,12 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should refresh token when no cached expiry exists", async () => {
-    const options: TokenExchangeCallbackOptions = {
-      grantType: "refresh_token",
-      clientId: "test-client-id",
-      userId: "test-user-id",
-      scope: ["org:read", "project:read"],
-      props: {
-        id: "user-id",
-        clientId: "test-client-id",
-        scope: "org:read project:read",
-        accessToken: "old-access-token",
-        refreshToken: "old-refresh-token",
-        // No accessTokenExpiresAt
-      } as WorkerProps,
-    };
-
-    // Mock successful refresh response
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        access_token: "new-access-token",
-        refresh_token: "new-refresh-token",
-        expires_in: 3600,
-        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        token_type: "bearer",
-        user: {
-          id: "user-id",
-          name: "Test User",
-          email: "test@example.com",
-        },
-        scope: "org:read project:read",
-      }),
-    });
+    const options = createRefreshOptions();
+    mockFetch.mockResolvedValueOnce(createMockTokenResponse());
 
     const result = await tokenExchangeCallback(options, mockEnv);
 
-    // Should call upstream API
     expect(mockFetch).toHaveBeenCalled();
-
-    // Should return updated props
     expect(result?.newProps).toMatchObject({
       accessToken: "new-access-token",
       refreshToken: "new-refresh-token",
@@ -194,21 +173,10 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should throw error when upstream refresh fails", async () => {
-    const options: TokenExchangeCallbackOptions = {
-      grantType: "refresh_token",
-      clientId: "test-client-id",
-      userId: "test-user-id",
-      scope: ["org:read", "project:read"],
-      props: {
-        id: "user-id",
-        clientId: "test-client-id",
-        scope: "org:read project:read",
-        accessToken: "old-access-token",
-        refreshToken: "invalid-refresh-token",
-      } as WorkerProps,
-    };
+    const options = createRefreshOptions({
+      refreshToken: "invalid-refresh-token",
+    });
 
-    // Mock failed refresh response
     mockFetch.mockResolvedValueOnce({
       ok: false,
       text: async () => "Invalid refresh token",
@@ -218,6 +186,84 @@ describe("tokenExchangeCallback", () => {
       "Failed to refresh upstream token in OAuth provider",
     );
   });
+
+  it("should cache refresh result in KV and reuse it", async () => {
+    mockFetch.mockResolvedValueOnce(createMockTokenResponse());
+    const options = createRefreshOptions();
+
+    // First call: refreshes and caches
+    await tokenExchangeCallback(options, mockEnv);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockKV.put).toHaveBeenCalledWith(
+      "refresh-result:user-id",
+      expect.any(String),
+      expect.objectContaining({ expirationTtl: 60 }),
+    );
+
+    // Second call: reads from KV cache, no upstream fetch
+    const result2 = await tokenExchangeCallback(options, mockEnv);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result2?.newProps).toMatchObject({
+      accessToken: "new-access-token",
+      refreshToken: "new-refresh-token",
+    });
+  });
+
+  it("should acquire KV lock before refreshing", async () => {
+    mockFetch.mockResolvedValueOnce(createMockTokenResponse());
+    const options = createRefreshOptions();
+
+    await tokenExchangeCallback(options, mockEnv);
+
+    // Should have written and then deleted the lock
+    expect(mockKV.put).toHaveBeenCalledWith(
+      "refresh-lock:user-id",
+      expect.any(String),
+      expect.objectContaining({ expirationTtl: 30 }),
+    );
+    expect(mockKV.delete).toHaveBeenCalledWith("refresh-lock:user-id");
+  });
+
+  it("should clean up lock even when refresh fails", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      text: async () => "invalid_grant",
+    });
+    const options = createRefreshOptions();
+
+    await expect(tokenExchangeCallback(options, mockEnv)).rejects.toThrow();
+
+    // Lock should still be cleaned up in finally block
+    expect(mockKV.delete).toHaveBeenCalledWith("refresh-lock:user-id");
+  });
+
+  it("should wait and use cached result when lock is held", async () => {
+    // Pre-populate the lock (simulating another isolate holding it)
+    await mockKV.put("refresh-lock:user-id", Date.now().toString());
+
+    // Pre-populate the result (simulating the other isolate completing)
+    const cachedResult = {
+      accessToken: "other-isolate-access-token",
+      refreshToken: "other-isolate-refresh-token",
+      expiresAt: Date.now() + 3600 * 1000,
+    };
+    await mockKV.put("refresh-result:user-id", JSON.stringify(cachedResult));
+
+    const options = createRefreshOptions();
+
+    // In our mock KV both lock and result are pre-populated, so the function
+    // should find the cached result on the first check and skip upstream.
+    const result = await tokenExchangeCallback(options, mockEnv);
+
+    // Should NOT have called upstream Sentry
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    // Should return the cached result
+    expect(result?.newProps).toMatchObject({
+      accessToken: "other-isolate-access-token",
+      refreshToken: "other-isolate-refresh-token",
+    });
+  });
 });
 
 describe("refreshAccessToken", () => {
@@ -226,22 +272,7 @@ describe("refreshAccessToken", () => {
   });
 
   it("should successfully refresh access token", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        access_token: "new-access-token",
-        refresh_token: "new-refresh-token",
-        expires_in: 3600,
-        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        token_type: "bearer",
-        user: {
-          id: "user-id",
-          name: "Test User",
-          email: "test@example.com",
-        },
-        scope: "org:read project:read",
-      }),
-    });
+    mockFetch.mockResolvedValueOnce(createMockTokenResponse());
 
     const [result, error] = await refreshAccessToken({
       client_id: "test-client",
