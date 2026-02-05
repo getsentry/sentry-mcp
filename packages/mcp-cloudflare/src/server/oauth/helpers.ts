@@ -303,7 +303,8 @@ export async function tokenExchangeCallback(
       accessTokenTTL: tokenResponse.expires_in,
     };
   } catch (error) {
-    logIssue(error);
+    // Don't log here - refreshAccessToken already logs appropriately
+    // (logWarn for 4xx user errors, logIssue for 5xx system errors)
     throw new Error("Failed to refresh upstream token in OAuth provider", {
       cause: error,
     });

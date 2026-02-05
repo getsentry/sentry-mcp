@@ -16,7 +16,7 @@
  * @see RFC 7636 Section 4.5 - Client Sends the Authorization Code
  */
 
-import { logIssue } from "@sentry/mcp-core/telem/logging";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { type Context, Hono } from "hono";
 import type { Env } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
@@ -681,14 +681,15 @@ async function refreshUpstreamToken(
   });
 
   if (errorResponse || !tokenResponse) {
-    logIssue("[oauth] Failed to refresh upstream token in token endpoint", {
-      loggerScope: ["cloudflare", "oauth", "token"],
-    });
+    // Don't log here - refreshAccessToken already logs appropriately
+    // (logWarn for 4xx user errors, logIssue for 5xx system errors)
     return null;
   }
 
   if (!tokenResponse.refresh_token) {
-    logIssue("[oauth] Upstream refresh response missing refresh_token", {
+    // Use logWarn not logIssue - missing refresh_token is likely an upstream
+    // config/contract issue, not a system failure requiring alerting
+    logWarn("[oauth] Upstream refresh response missing refresh_token", {
       loggerScope: ["cloudflare", "oauth", "token"],
     });
     return null;
