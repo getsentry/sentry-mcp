@@ -518,21 +518,18 @@ async function handleRefreshTokenGrant(
   }
 
   // Decrypt props to check if upstream refresh is needed
+  // encryptedProps is stored as JSON containing { ciphertext, iv }
   let props: WorkerProps;
   try {
-    props = await decryptProps(
-      { ciphertext: tokenData.grant.encryptedProps, iv: "" },
-      encryptionKey,
-    );
+    const encrypted = JSON.parse(tokenData.grant.encryptedProps);
+    props = await decryptProps(encrypted, encryptionKey);
   } catch {
-    // Try to decrypt from the grant's encrypted props directly
-    // This handles the case where encryptedProps includes the IV
+    // Fallback: try fetching from the grant directly
     const grant = await storage.getGrant(userId, grantId);
     if (!grant) {
       return oauthError(c, "invalid_grant", "Grant not found");
     }
     try {
-      // The encryptedProps is stored as JSON with ciphertext and iv
       const encrypted = JSON.parse(grant.encryptedProps);
       props = await decryptProps(encrypted, encryptionKey);
     } catch {
