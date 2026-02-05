@@ -140,9 +140,10 @@ async function authenticateClient(
   // Look up client
   const client = await storage.getClient(clientId);
   if (!client) {
+    // RFC 6749 Section 5.2: invalid_client SHOULD return 401
     return {
       client: null,
-      error: oauthError(c, "invalid_client", "Unknown client"),
+      error: oauthError(c, "invalid_client", "Unknown client", 401),
     };
   }
 
@@ -154,9 +155,15 @@ async function authenticateClient(
 
   // Confidential client - must provide valid credentials
   if (!credentials) {
+    // RFC 6749 Section 5.2: invalid_client SHOULD return 401
     return {
       client: null,
-      error: oauthError(c, "invalid_client", "Client authentication required"),
+      error: oauthError(
+        c,
+        "invalid_client",
+        "Client authentication required",
+        401,
+      ),
     };
   }
 
@@ -174,9 +181,10 @@ async function authenticateClient(
     client.clientSecret,
   );
   if (!secretValid) {
+    // RFC 6749 Section 5.2: invalid_client SHOULD return 401
     return {
       client: null,
-      error: oauthError(c, "invalid_client", "Invalid client credentials"),
+      error: oauthError(c, "invalid_client", "Invalid client credentials", 401),
     };
   }
 
@@ -302,10 +310,20 @@ async function handleAuthorizationCodeGrant(
     return oauthError(c, "invalid_grant", "Client ID mismatch");
   }
 
-  // Verify redirect_uri if it was included in the authorization request
-  // RFC 6749 Section 4.1.3: redirect_uri REQUIRED if included in authorization request
-  // Note: We don't store redirect_uri in grant currently, but client validation
-  // happened during authorization. Skip this check for now.
+  // RFC 6749 Section 4.1.3: If redirect_uri was included in the authorization request,
+  // the value MUST be identical to the value included in the authorization request.
+  if (grant.redirectUri) {
+    if (!redirectUri) {
+      return oauthError(
+        c,
+        "invalid_grant",
+        "Missing required parameter: redirect_uri",
+      );
+    }
+    if (redirectUri !== grant.redirectUri) {
+      return oauthError(c, "invalid_grant", "redirect_uri mismatch");
+    }
+  }
 
   // RFC 7636 Section 4.6: Verify PKCE code_verifier
   if (grant.codeChallenge) {
@@ -719,17 +737,25 @@ function oauthError(
   c: Context<{ Bindings: Env }>,
   error: TokenErrorResponse["error"] | "server_error",
   description: string,
-  status: 400 | 500 = 400,
+  status: 400 | 401 | 500 = 400,
 ): Response {
   if (status === 500) {
     logIssue(`[oauth] Token endpoint error: ${description}`, {
       loggerScope: ["cloudflare", "oauth", "token"],
     });
   }
-  return c.json({ error, error_description: description }, status, {
+
+  const headers: Record<string, string> = {
     "Cache-Control": "no-store",
     Pragma: "no-cache",
-  });
+  };
+
+  // RFC 6749 Section 5.2: invalid_client SHOULD return 401 with WWW-Authenticate header
+  if (error === "invalid_client" && status === 401) {
+    headers["WWW-Authenticate"] = 'Basic realm="token"';
+  }
+
+  return c.json({ error, error_description: description }, status, headers);
 }
 
 export default tokenRoute;

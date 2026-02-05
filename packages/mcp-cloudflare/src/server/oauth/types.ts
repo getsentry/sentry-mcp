@@ -311,6 +311,14 @@ export interface Grant {
    * @see RFC 8707 Section 2
    */
   resource?: string | string[];
+
+  /**
+   * Redirect URI from the authorization request.
+   * Must be verified at token exchange per RFC 6749 Section 4.1.3.
+   *
+   * @see RFC 6749 Section 4.1.3
+   */
+  redirectUri?: string;
 }
 
 /**

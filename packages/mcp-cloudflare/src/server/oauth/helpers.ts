@@ -594,6 +594,7 @@ export function createOAuthHelpers(storage: OAuthStorage): OAuthHelpers {
         codeChallenge,
         codeChallengeMethod,
         resource,
+        redirectUri,
       };
 
       // Save grant with 10-minute TTL (extended when code is exchanged)

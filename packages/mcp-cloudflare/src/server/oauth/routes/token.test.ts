@@ -231,6 +231,288 @@ describe("token endpoint", () => {
       const body = (await response.json()) as { error: string };
       expect(body.error).toBe("invalid_grant");
     });
+
+    describe("redirect_uri verification (RFC 6749 Section 4.1.3)", () => {
+      async function createTestGrantWithRedirectUri(
+        redirectUri: string,
+      ): Promise<{
+        grant: Grant;
+        authCode: string;
+        encryptionKey: CryptoKey;
+      }> {
+        const grantId = generateGrantId();
+        const userId = "user-123";
+        const authCode = generateAuthCode(userId, grantId);
+        const authCodeId = await hashSecret(authCode);
+
+        const { encrypted, key } = await encryptPropsWithNewKey(testProps);
+        const authCodeWrappedKey = await wrapKeyWithToken(authCode, key);
+
+        const grant: Grant = {
+          id: grantId,
+          clientId: "test-client",
+          userId,
+          scope: ["org:read"],
+          encryptedProps: JSON.stringify(encrypted),
+          createdAt: Math.floor(Date.now() / 1000),
+          authCodeId,
+          authCodeWrappedKey,
+          redirectUri,
+        };
+
+        await storage.saveGrant(grant);
+        return { grant, authCode, encryptionKey: key };
+      }
+
+      it("accepts token exchange with matching redirect_uri", async () => {
+        const redirectUri = "https://example.com/callback";
+        const { authCode, grant } =
+          await createTestGrantWithRedirectUri(redirectUri);
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            redirect_uri: redirectUri,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as { access_token: string };
+        expect(body.access_token).toBeDefined();
+      });
+
+      it("rejects token exchange with different redirect_uri", async () => {
+        const redirectUri = "https://example.com/callback";
+        const { authCode, grant } =
+          await createTestGrantWithRedirectUri(redirectUri);
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            redirect_uri: "https://example.com/different-callback",
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const body = (await response.json()) as {
+          error: string;
+          error_description: string;
+        };
+        expect(body.error).toBe("invalid_grant");
+        expect(body.error_description).toBe("redirect_uri mismatch");
+      });
+
+      it("rejects token exchange without redirect_uri when one was used in authorization", async () => {
+        const redirectUri = "https://example.com/callback";
+        const { authCode, grant } =
+          await createTestGrantWithRedirectUri(redirectUri);
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            // redirect_uri intentionally omitted
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const body = (await response.json()) as {
+          error: string;
+          error_description: string;
+        };
+        expect(body.error).toBe("invalid_grant");
+        expect(body.error_description).toBe(
+          "Missing required parameter: redirect_uri",
+        );
+      });
+
+      it("accepts token exchange without redirect_uri when none was stored", async () => {
+        // Use the default createTestGrant which doesn't set redirectUri
+        const { authCode, grant } = await createTestGrant();
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            // redirect_uri intentionally omitted
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as { access_token: string };
+        expect(body.access_token).toBeDefined();
+      });
+    });
+
+    describe("PKCE verification (RFC 7636)", () => {
+      async function createTestGrantWithPKCE(
+        codeChallenge: string,
+        codeChallengeMethod: string,
+      ): Promise<{
+        grant: Grant;
+        authCode: string;
+        encryptionKey: CryptoKey;
+      }> {
+        const grantId = generateGrantId();
+        const userId = "user-123";
+        const authCode = generateAuthCode(userId, grantId);
+        const authCodeId = await hashSecret(authCode);
+
+        const { encrypted, key } = await encryptPropsWithNewKey(testProps);
+        const authCodeWrappedKey = await wrapKeyWithToken(authCode, key);
+
+        const grant: Grant = {
+          id: grantId,
+          clientId: "test-client",
+          userId,
+          scope: ["org:read"],
+          encryptedProps: JSON.stringify(encrypted),
+          createdAt: Math.floor(Date.now() / 1000),
+          authCodeId,
+          authCodeWrappedKey,
+          codeChallenge,
+          codeChallengeMethod,
+        };
+
+        await storage.saveGrant(grant);
+        return { grant, authCode, encryptionKey: key };
+      }
+
+      it("accepts token exchange with valid PKCE verifier (plain method)", async () => {
+        const codeVerifier = "test-verifier-12345";
+        const codeChallenge = codeVerifier; // plain method
+        const { authCode, grant } = await createTestGrantWithPKCE(
+          codeChallenge,
+          "plain",
+        );
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            code_verifier: codeVerifier,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as { access_token: string };
+        expect(body.access_token).toBeDefined();
+      });
+
+      it("accepts token exchange with valid PKCE verifier (S256 method)", async () => {
+        // RFC 7636 test vector
+        const codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        const codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+        const { authCode, grant } = await createTestGrantWithPKCE(
+          codeChallenge,
+          "S256",
+        );
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            code_verifier: codeVerifier,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as { access_token: string };
+        expect(body.access_token).toBeDefined();
+      });
+
+      it("rejects token exchange without code_verifier when PKCE was used", async () => {
+        const { authCode, grant } = await createTestGrantWithPKCE(
+          "some-challenge",
+          "plain",
+        );
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            // code_verifier intentionally omitted
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const body = (await response.json()) as {
+          error: string;
+          error_description: string;
+        };
+        expect(body.error).toBe("invalid_grant");
+        expect(body.error_description).toContain("code_verifier");
+      });
+
+      it("rejects token exchange with invalid PKCE verifier", async () => {
+        const { authCode, grant } = await createTestGrantWithPKCE(
+          "correct-challenge",
+          "plain",
+        );
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            code_verifier: "wrong-verifier",
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const body = (await response.json()) as {
+          error: string;
+          error_description: string;
+        };
+        expect(body.error).toBe("invalid_grant");
+        expect(body.error_description).toContain("code_verifier");
+      });
+
+      it("accepts token exchange without code_verifier when PKCE was not used", async () => {
+        // Use the default createTestGrant which doesn't set PKCE
+        const { authCode, grant } = await createTestGrant();
+
+        const response = await makeRequest("/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: authCode,
+            client_id: grant.clientId,
+            // code_verifier intentionally omitted
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as { access_token: string };
+        expect(body.access_token).toBeDefined();
+      });
+    });
   });
 
   describe("POST /token - refresh_token grant", () => {
@@ -394,6 +676,102 @@ describe("token endpoint", () => {
 
       expect(response.headers.get("Cache-Control")).toBe("no-store");
       expect(response.headers.get("Pragma")).toBe("no-cache");
+    });
+  });
+
+  describe("invalid_client errors (RFC 6749 Section 5.2)", () => {
+    it("returns 401 with WWW-Authenticate header for unknown client", async () => {
+      const { authCode } = await createTestGrant();
+
+      const response = await makeRequest("/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code: authCode,
+          client_id: "unknown-client",
+        }),
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get("WWW-Authenticate")).toBe(
+        'Basic realm="token"',
+      );
+      const body = (await response.json()) as {
+        error: string;
+        error_description: string;
+      };
+      expect(body.error).toBe("invalid_client");
+    });
+
+    it("returns 401 with WWW-Authenticate header for confidential client without credentials", async () => {
+      // Register a confidential client
+      const hashedSecret = await hashSecret("test-secret");
+      await storage.saveClient({
+        clientId: "confidential-client",
+        clientSecret: hashedSecret,
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_post",
+        grantTypes: ["authorization_code", "refresh_token"],
+        responseTypes: ["code"],
+        registrationDate: Math.floor(Date.now() / 1000),
+      });
+
+      const response = await makeRequest("/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code: "some-code",
+          client_id: "confidential-client",
+          // client_secret intentionally omitted
+        }),
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get("WWW-Authenticate")).toBe(
+        'Basic realm="token"',
+      );
+      const body = (await response.json()) as {
+        error: string;
+        error_description: string;
+      };
+      expect(body.error).toBe("invalid_client");
+    });
+
+    it("returns 401 with WWW-Authenticate header for invalid client secret", async () => {
+      // Register a confidential client
+      const hashedSecret = await hashSecret("correct-secret");
+      await storage.saveClient({
+        clientId: "confidential-client",
+        clientSecret: hashedSecret,
+        redirectUris: ["https://example.com/callback"],
+        tokenEndpointAuthMethod: "client_secret_post",
+        grantTypes: ["authorization_code", "refresh_token"],
+        responseTypes: ["code"],
+        registrationDate: Math.floor(Date.now() / 1000),
+      });
+
+      const response = await makeRequest("/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code: "some-code",
+          client_id: "confidential-client",
+          client_secret: "wrong-secret",
+        }),
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get("WWW-Authenticate")).toBe(
+        'Basic realm="token"',
+      );
+      const body = (await response.json()) as {
+        error: string;
+        error_description: string;
+      };
+      expect(body.error).toBe("invalid_client");
     });
   });
 });
