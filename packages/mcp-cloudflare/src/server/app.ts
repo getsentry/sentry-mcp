@@ -53,9 +53,21 @@ const app = new Hono<{
       strictTransportSecurity: "max-age=31536000; includeSubDomains",
     }),
   )
-  .use(
-    "*",
-    csrf({
+  .use("*", async (c, next) => {
+    // Exempt endpoints designed for cross-origin/server-to-server use.
+    // These have their own security mechanisms (PKCE, client credentials, Bearer auth).
+    // Hono's CSRF middleware rejects requests with missing Origin/Sec-Fetch-Site headers
+    // before custom callbacks run, so we must skip it entirely for these paths.
+    const path = new URL(c.req.url).pathname;
+    if (
+      path === "/oauth/token" ||
+      path === "/oauth/register" ||
+      path.startsWith("/mcp") ||
+      path.startsWith("/.mcp")
+    ) {
+      return next();
+    }
+    return csrf({
       origin: (origin, c) => {
         // In hono 4.11.x+, this handler is only called when origin is defined
         const requestUrl = new URL(c.req.url);
@@ -65,8 +77,8 @@ const app = new Hono<{
         // Allow same-origin and same-site requests (handles requests without Origin header)
         return secFetchSite === "same-origin" || secFetchSite === "same-site";
       },
-    }),
-  )
+    })(c, next);
+  })
   .get("/robots.txt", (c) => {
     return c.text(["User-agent: *", "Allow: /$", "Disallow: /"].join("\n"));
   })
