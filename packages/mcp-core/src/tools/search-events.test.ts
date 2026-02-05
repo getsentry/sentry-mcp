@@ -195,6 +195,69 @@ describe("search_events", () => {
     expect(result).toContain("PROJ-123");
   });
 
+  it("should format object fields without [object Object] output", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("errors", "issue:PROJ-123", [
+        "title",
+        "timestamp",
+        "user",
+        "tags",
+      ]),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("errors");
+          return HttpResponse.json({
+            data: [
+              {
+                id: "error1",
+                title: "WatchdogTermination",
+                timestamp: "2024-01-15T10:30:00Z",
+                user: {
+                  id: "user-123",
+                  email: "foo@example.com",
+                  ip_address: "10.0.0.1",
+                },
+                tags: [
+                  { key: "os", value: "iOS 17" },
+                  { key: "device", value: "iPhone15,3" },
+                ],
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "recent errors with user data",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("email=foo@example.com");
+    expect(result).toContain("os=iOS 17");
+    expect(result).not.toContain("[object Object]");
+  });
+
   it("should handle logs dataset queries", async () => {
     // Mock AI response for logs dataset
     mockGenerateText.mockResolvedValueOnce(
