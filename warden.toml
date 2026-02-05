@@ -1,19 +1,19 @@
 version = 1
 
-[[triggers]]
-name = "testing-guidelines"
-event = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-skill = "testing-guidelines"
-
-[triggers.filters]
-paths = ["**/*.ts", "**/*.tsx"]
-
-[[triggers]]
-name = "logging-observability"
-event = "pull_request"
-actions = ["opened", "synchronize", "reopened"]
-skill = "logging-observability"
-
-[triggers.filters]
-paths = ["**/*.ts", "**/*.tsx"]
+#[[triggers]]
+#name = "testing-guidelines"
+#event = "pull_request"
+#actions = ["opened", "synchronize", "reopened"]
+#skill = "testing-guidelines"
+#
+#[triggers.filters]
+#paths = ["**/*.ts", "**/*.tsx"]
+#
+#[[triggers]]
+#name = "logging-observability"
+#event = "pull_request"
+#actions = ["opened", "synchronize", "reopened"]
+#skill = "logging-observability"
+#
+#[triggers.filters]
+#paths = ["**/*.ts", "**/*.tsx"]
