@@ -287,7 +287,9 @@ export async function tokenExchangeCallback(
     }
 
     if (!tokenResponse.refresh_token) {
-      logIssue("[oauth] Upstream refresh response missing refresh_token", {
+      // Use logWarn not logIssue - missing refresh_token is likely an upstream
+      // config/contract issue, not a system failure requiring alerting
+      logWarn("[oauth] Upstream refresh response missing refresh_token", {
         loggerScope: ["cloudflare", "oauth", "refresh"],
       });
       return undefined;
