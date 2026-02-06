@@ -66,29 +66,23 @@ const GENERIC_CONFIG_ERROR_MESSAGE = [
 ].join("\n\n");
 
 /**
- * Check whether this is an HTTP transport where server-side config errors
- * should be hidden from the user. When true, the error is logged to Sentry
- * and a generic message is returned instead of the detailed error.
+ * Format a server-side configuration error for user display.
+ *
+ * For HTTP transport, the detailed message is hidden (the user cannot fix
+ * server-side configuration) — the error is logged to Sentry and a generic
+ * message is returned instead.
+ * For stdio/unset transport, the detailed parts are returned as-is.
  */
-function isHttpTransport(options?: { transport?: TransportType }): boolean {
-  return options?.transport === "http";
-}
-
-/**
- * For HTTP transport, log a server-side config/provider error to Sentry and
- * return a generic message (the user cannot fix server-side configuration).
- * Returns undefined for stdio/unset transport so the caller can fall through
- * to the detailed error message.
- */
-function redactForHttpTransport(
+function formatServerConfigError(
   error: Error,
+  detailedParts: string[],
   options?: { transport?: TransportType },
-): string | undefined {
-  if (!isHttpTransport(options)) {
-    return undefined;
+): string {
+  if (options?.transport === "http") {
+    logIssue(error);
+    return GENERIC_CONFIG_ERROR_MESSAGE;
   }
-  logIssue(error);
-  return GENERIC_CONFIG_ERROR_MESSAGE;
+  return detailedParts.join("\n\n");
 }
 
 /**
@@ -117,26 +111,28 @@ export async function formatErrorForUser(
   }
 
   if (isConfigurationError(error)) {
-    return (
-      redactForHttpTransport(error, options) ??
+    return formatServerConfigError(
+      error,
       [
         "**Configuration Error**",
         "There appears to be a configuration issue with your setup.",
         error.message,
         "Please check your environment configuration and try again.",
-      ].join("\n\n")
+      ],
+      options,
     );
   }
 
   if (isLLMProviderError(error)) {
-    return (
-      redactForHttpTransport(error, options) ??
+    return formatServerConfigError(
+      error,
       [
         "**AI Provider Error**",
         "The AI provider service is not available for this request.",
         error.message,
         "This is a service availability issue that cannot be resolved by retrying.",
-      ].join("\n\n")
+      ],
+      options,
     );
   }
 
@@ -146,14 +142,15 @@ export async function formatErrorForUser(
     const statusCode = error.statusCode;
     // 4xx errors are user-facing (account issues, rate limits, invalid keys)
     if (statusCode && statusCode >= 400 && statusCode < 500) {
-      return (
-        redactForHttpTransport(error, options) ??
+      return formatServerConfigError(
+        error,
         [
           "**AI Provider Error**",
           "The AI provider service returned an error.",
           error.message,
           "This may be a configuration or account issue. Please check your AI provider settings.",
-        ].join("\n\n")
+        ],
+        options,
       );
     }
     // 5xx errors - always log to Sentry regardless of transport
