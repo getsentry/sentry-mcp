@@ -284,6 +284,7 @@ const context = {
   openaiBaseUrl: cfg.openaiBaseUrl,
   agentMode: cli.agent,
   experimentalMode: cli.experimental,
+  transport: "stdio" as const,
 };
 
 // Build server with context to filter tools based on granted skills

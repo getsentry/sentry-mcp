@@ -38,6 +38,8 @@ export const CONSTRAINT_PARAMETER_KEYS = new Set<string>([
   "regionUrl",
 ]);
 
+export type TransportType = "stdio" | "http";
+
 export type ServerContext = {
   sentryHost?: string;
   mcpUrl?: string;
@@ -53,4 +55,6 @@ export type ServerContext = {
   agentMode?: boolean;
   /** Whether experimental tools are enabled */
   experimentalMode?: boolean;
+  /** Transport type - affects error message formatting */
+  transport?: TransportType;
 };

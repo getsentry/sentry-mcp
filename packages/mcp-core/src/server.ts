@@ -373,7 +373,9 @@ function configureServer({
             content: [
               {
                 type: "text" as const,
-                text: await formatErrorForUser(error),
+                text: await formatErrorForUser(error, {
+                  transport: context.transport,
+                }),
               },
             ],
             isError: true,
