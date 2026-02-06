@@ -36,7 +36,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isPrimitive(value: unknown): value is string | number | boolean | null {
+function isPrimitive(
+  value: unknown,
+): value is string | number | boolean | null {
   return (
     value === null ||
     typeof value === "string" ||
@@ -47,24 +49,30 @@ function isPrimitive(value: unknown): value is string | number | boolean | null 
 
 function isTagPair(value: unknown): value is { key: string; value: unknown } {
   return (
-    isPlainObject(value) &&
-    typeof value.key === "string" &&
-    "value" in value
+    isPlainObject(value) && typeof value.key === "string" && "value" in value
   );
 }
 
-function formatUserSummary(value: Record<string, unknown>): string | null {
-  const fields: Array<[string, unknown]> = [
-    ["id", value.id],
-    ["email", value.email],
-    ["username", value.username],
-    ["ip_address", value.ip_address],
-    ["name", value.name],
-  ];
+const USER_FIELDS = ["id", "email", "username", "ip_address", "name"] as const;
+const USER_IDENTITY_FIELDS = new Set([
+  "email",
+  "username",
+  "ip_address",
+  "name",
+]);
 
-  const parts = fields
-    .filter(([, fieldValue]) => fieldValue !== undefined && fieldValue !== null)
-    .map(([key, fieldValue]) => `${key}=${formatSimpleValue(fieldValue)}`);
+function formatUserSummary(value: Record<string, unknown>): string | null {
+  // Require at least one identity field to avoid matching arbitrary objects that just have "id"
+  const hasIdentityField = USER_FIELDS.some(
+    (f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null,
+  );
+  if (!hasIdentityField) {
+    return null;
+  }
+
+  const parts = USER_FIELDS.filter((f) => value[f] != null).map(
+    (f) => `${f}=${formatSimpleValue(value[f])}`,
+  );
 
   return parts.length > 0 ? parts.join(", ") : null;
 }
@@ -138,36 +146,33 @@ function formatArrayValue(values: unknown[], maxLength: number): string {
     );
   }
 
-  const limitedValues =
-    values.length > DEFAULT_MAX_ARRAY_ITEMS
-      ? values.slice(0, DEFAULT_MAX_ARRAY_ITEMS)
-      : values;
+  const overflow = values.length > DEFAULT_MAX_ARRAY_ITEMS;
+  const limitedValues = overflow
+    ? values.slice(0, DEFAULT_MAX_ARRAY_ITEMS)
+    : values;
   const jsonValue = safeJsonStringify(limitedValues);
-  const suffix =
-    values.length > DEFAULT_MAX_ARRAY_ITEMS
-      ? `, ...+${values.length - DEFAULT_MAX_ARRAY_ITEMS} more`
-      : "";
+  const suffix = overflow
+    ? `, ...+${values.length - DEFAULT_MAX_ARRAY_ITEMS} more`
+    : "";
 
-  return truncateString(
-    sanitizeWhitespace(`${jsonValue}${suffix}`),
-    maxLength,
-  );
+  return truncateString(sanitizeWhitespace(`${jsonValue}${suffix}`), maxLength);
 }
 
 function formatObjectValue(
   value: Record<string, unknown>,
   maxLength: number,
 ): string {
-  const userSummary = formatUserSummary(value);
-  if (userSummary) {
-    return truncateString(sanitizeWhitespace(userSummary), maxLength);
-  }
-
+  // Check tag pair first -- it's more specific than the user summary heuristic
   if (isTagPair(value)) {
     return truncateString(
       sanitizeWhitespace(`${value.key}=${formatSimpleValue(value.value)}`),
       maxLength,
     );
+  }
+
+  const userSummary = formatUserSummary(value);
+  if (userSummary) {
+    return truncateString(sanitizeWhitespace(userSummary), maxLength);
   }
 
   return truncateString(
