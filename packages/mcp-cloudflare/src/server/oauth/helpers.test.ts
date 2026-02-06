@@ -219,7 +219,7 @@ describe("tokenExchangeCallback", () => {
     expect(mockKV.put).toHaveBeenCalledWith(
       "refresh-lock:user-id",
       expect.any(String),
-      expect.objectContaining({ expirationTtl: 30 }),
+      expect.objectContaining({ expirationTtl: 60 }),
     );
     expect(mockKV.delete).toHaveBeenCalledWith("refresh-lock:user-id");
   });
