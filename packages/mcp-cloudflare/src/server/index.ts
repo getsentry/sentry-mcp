@@ -91,8 +91,10 @@ const wrappedOAuthProvider = {
         const resourceMetadataUrl = `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`;
         const existingAuth =
           headers["WWW-Authenticate"] ?? headers["www-authenticate"] ?? "";
-        const newAuth = existingAuth
-          ? `resource_metadata="${resourceMetadataUrl}", ${existingAuth}`
+        // RFC 7235: challenge = auth-scheme [ 1*SP ( token68 / #auth-param ) ]
+        // resource_metadata must appear as a param within the Bearer challenge
+        const newAuth = existingAuth.startsWith("Bearer ")
+          ? `Bearer resource_metadata="${resourceMetadataUrl}", ${existingAuth.slice("Bearer ".length)}`
           : `Bearer resource_metadata="${resourceMetadataUrl}"`;
         return new Response(
           JSON.stringify({ error: code, error_description: description }),
