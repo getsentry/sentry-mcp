@@ -2,6 +2,7 @@ import type { SentryApiService } from "../../api-client";
 import { logInfo } from "../../telem/logging";
 import {
   type FlexibleEventData,
+  formatEventValue,
   getStringValue,
   isAggregateQuery,
 } from "./utils";
@@ -120,8 +121,10 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
           if (field === "issue" && typeof value === "string") {
             output += `**Issue ID**: ${value}\n`;
             output += `**Issue URL**: ${apiService.getIssueUrl(organizationSlug, value)}\n`;
+          } else if (field === "issue") {
+            output += `**Issue ID**: ${formatEventValue(value)}\n`;
           } else {
-            output += `**${field}**: ${value}\n`;
+            output += `**${field}**: ${formatEventValue(value)}\n`;
           }
         }
       }
@@ -134,7 +137,7 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          output += `**${key}**: ${value}\n`;
+          output += `**${key}**: ${formatEventValue(value)}\n`;
         }
       }
 
@@ -266,7 +269,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
             output += `- **Trace ID**: ${value}\n`;
             output += `- **Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
           } else {
-            output += `- **${field}**: ${value}\n`;
+            output += `- **${field}**: ${formatEventValue(value)}\n`;
           }
         }
       }
@@ -279,7 +282,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          output += `- **${key}**: ${value}\n`;
+          output += `- **${key}**: ${formatEventValue(value)}\n`;
         }
       }
 
@@ -390,7 +393,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
           } else if (field === "span.duration" && typeof value === "number") {
             output += `**${field}**: ${value}ms\n`;
           } else {
-            output += `**${field}**: ${value}\n`;
+            output += `**${field}**: ${formatEventValue(value)}\n`;
           }
         }
       }
@@ -403,7 +406,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          output += `**${key}**: ${value}\n`;
+          output += `**${key}**: ${formatEventValue(value)}\n`;
         }
       }
 

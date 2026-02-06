@@ -5,6 +5,9 @@ import { agentTool } from "../../internal/agents/tools/utils";
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
 
+const DEFAULT_MAX_VALUE_LENGTH = 200;
+const DEFAULT_MAX_ARRAY_ITEMS = 20;
+
 // Helper to safely get a string value from event data
 export function getStringValue(
   event: FlexibleEventData,
@@ -27,6 +30,183 @@ export function getNumberValue(
 // Helper to check if fields contain aggregate functions
 export function isAggregateQuery(fields: string[]): boolean {
   return fields.some((field) => field.includes("(") && field.includes(")"));
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPrimitive(
+  value: unknown,
+): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+function isTagPair(value: unknown): value is { key: string; value: unknown } {
+  return (
+    isPlainObject(value) && typeof value.key === "string" && "value" in value
+  );
+}
+
+const USER_FIELDS = ["id", "email", "username", "ip_address", "name"] as const;
+const USER_IDENTITY_FIELDS = new Set([
+  "email",
+  "username",
+  "ip_address",
+  "name",
+]);
+
+function formatUserSummary(value: Record<string, unknown>): string | null {
+  // Require at least one identity field to avoid matching arbitrary objects that just have "id"
+  const hasIdentityField = USER_FIELDS.some(
+    (f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null,
+  );
+  if (!hasIdentityField) {
+    return null;
+  }
+
+  const parts = USER_FIELDS.filter((f) => value[f] != null).map(
+    (f) => `${f}=${formatSimpleValue(value[f])}`,
+  );
+
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function sanitizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function truncateString(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  if (maxLength <= 3) {
+    return value.slice(0, maxLength);
+  }
+
+  return `${value.slice(0, maxLength - 3)}...`;
+}
+
+function safeJsonStringify(value: unknown): string {
+  const seen = new WeakSet<object>();
+  return JSON.stringify(value, (_key, currentValue) => {
+    if (typeof currentValue === "bigint") {
+      return currentValue.toString();
+    }
+
+    if (typeof currentValue === "function") {
+      return "[Function]";
+    }
+
+    if (typeof currentValue === "object" && currentValue !== null) {
+      if (seen.has(currentValue)) {
+        return "[Circular]";
+      }
+      seen.add(currentValue);
+    }
+
+    return currentValue;
+  });
+}
+
+function formatSimpleValue(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return safeJsonStringify(value);
+}
+
+function formatArrayValue(values: unknown[], maxLength: number): string {
+  if (values.length === 0) {
+    return "[]";
+  }
+
+  if (values.every(isTagPair)) {
+    const pairs = values.map(
+      (tag) => `${tag.key}=${formatSimpleValue(tag.value)}`,
+    );
+    return truncateString(sanitizeWhitespace(pairs.join(", ")), maxLength);
+  }
+
+  if (values.every(isPrimitive)) {
+    return truncateString(
+      sanitizeWhitespace(values.map((value) => String(value)).join(", ")),
+      maxLength,
+    );
+  }
+
+  const overflow = values.length > DEFAULT_MAX_ARRAY_ITEMS;
+  const limitedValues = overflow
+    ? values.slice(0, DEFAULT_MAX_ARRAY_ITEMS)
+    : values;
+  const jsonValue = safeJsonStringify(limitedValues);
+  const suffix = overflow
+    ? `, ...+${values.length - DEFAULT_MAX_ARRAY_ITEMS} more`
+    : "";
+
+  return truncateString(sanitizeWhitespace(`${jsonValue}${suffix}`), maxLength);
+}
+
+function formatObjectValue(
+  value: Record<string, unknown>,
+  maxLength: number,
+): string {
+  // Check tag pair first -- it's more specific than the user summary heuristic
+  if (isTagPair(value)) {
+    return truncateString(
+      sanitizeWhitespace(`${value.key}=${formatSimpleValue(value.value)}`),
+      maxLength,
+    );
+  }
+
+  const userSummary = formatUserSummary(value);
+  if (userSummary) {
+    return truncateString(sanitizeWhitespace(userSummary), maxLength);
+  }
+
+  return truncateString(
+    sanitizeWhitespace(safeJsonStringify(value)),
+    maxLength,
+  );
+}
+
+export function formatEventValue(
+  value: unknown,
+  options: { maxLength?: number } = {},
+): string {
+  const maxLength = options.maxLength ?? DEFAULT_MAX_VALUE_LENGTH;
+
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+
+  if (typeof value === "string") {
+    return truncateString(sanitizeWhitespace(value), maxLength);
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return formatArrayValue(value, maxLength);
+  }
+
+  if (isPlainObject(value)) {
+    return formatObjectValue(value, maxLength);
+  }
+
+  return truncateString(sanitizeWhitespace(String(value)), maxLength);
 }
 
 // Helper function to fetch custom attributes for a dataset
