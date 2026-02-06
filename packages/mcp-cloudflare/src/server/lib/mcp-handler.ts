@@ -173,6 +173,7 @@ const mcpHandler: ExportedHandler<Env> = {
       mcpUrl: env.MCP_URL,
       agentMode: isAgentMode,
       experimentalMode: isExperimentalMode,
+      transport: "http",
     };
 
     // Create and configure MCP server with tools filtered by context
