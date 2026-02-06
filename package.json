@@ -74,7 +74,7 @@
       "workerd"
     ],
     "overrides": {
-      "@modelcontextprotocol/sdk": "^1.25.3"
+      "@modelcontextprotocol/sdk": "^1.26.0"
     }
   },
   "devDependencies": {
