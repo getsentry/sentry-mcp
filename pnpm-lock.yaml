@@ -21,12 +21,6 @@ catalogs:
     '@biomejs/biome':
       specifier: ^1.9.4
       version: 1.9.4
-    '@cloudflare/ai-chat':
-      specifier: ^0.0.6
-      version: 0.0.6
-    '@cloudflare/codemode':
-      specifier: ^0.0.6
-      version: 0.0.6
     '@cloudflare/workers-oauth-provider':
       specifier: ^0.0.12
       version: 0.0.12
@@ -234,12 +228,6 @@ importers:
       '@ai-sdk/react':
         specifier: 'catalog:'
         version: 3.0.66(react@19.1.0)(zod@3.25.76)
-      '@cloudflare/ai-chat':
-        specifier: 'catalog:'
-        version: 0.0.6(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
-      '@cloudflare/codemode':
-        specifier: 'catalog:'
-        version: 0.0.6(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(typescript@5.8.3)(zod@3.25.76)
       '@cloudflare/workers-oauth-provider':
         specifier: 'catalog:'
         version: 0.0.12
@@ -260,7 +248,7 @@ importers:
         version: 10.35.0(react@19.1.0)
       agents:
         specifier: 'catalog:'
-        version: 0.3.10(@ai-sdk/openai@3.0.23(zod@3.25.76))(@ai-sdk/react@3.0.66(react@19.1.0)(zod@3.25.76))(@cloudflare/ai-chat@0.0.6)(@cloudflare/codemode@0.0.6)(@cloudflare/workers-types@4.20251014.0)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
+        version: 0.3.10(@ai-sdk/openai@3.0.23(zod@3.25.76))(@ai-sdk/react@3.0.66(react@19.1.0)(zod@3.25.76))(@cloudflare/ai-chat@0.0.4)(@cloudflare/codemode@0.0.5)(@cloudflare/workers-types@4.20251014.0)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
       ai:
         specifier: 'catalog:'
         version: 6.0.64(zod@3.25.76)
@@ -810,18 +798,18 @@ packages:
   '@clack/prompts@0.8.2':
     resolution: {integrity: sha512-6b9Ab2UiZwJYA9iMyboYyW9yJvAO9V753ZhS+DHKEjZRKAxPPOb7MXXu84lsPFG+vZt6FRFniZ8rXi+zCIw4yQ==}
 
-  '@cloudflare/ai-chat@0.0.6':
-    resolution: {integrity: sha512-XDJP7ywORzQd17f09hMY1n3+bQsLw+BmXh7HzuWGb7gBBbD23OlQXccuQQqFNBYHi+IfIpe9YdGbHaUGsfCUwA==}
+  '@cloudflare/ai-chat@0.0.4':
+    resolution: {integrity: sha512-NGQRt34X/UI+mx9fss7LmTTNBDVlFrtu+7JFoaykLUI738w9gjDplsMbOenCRbSr7UW4ngHGnv3YWUmV99eEnQ==}
     peerDependencies:
-      agents: ^0.3.10
+      agents: ^0.3.4
       ai: ^6.0.0
       react: ^19.0.0
       zod: ^3.25.0 || ^4.0.0
 
-  '@cloudflare/codemode@0.0.6':
-    resolution: {integrity: sha512-P8ba7fgyeOOEODgU+lyUj82P89VfslKExsdF6nPGRebIbgiCbbpoLHBmBtdRRsIasVHUhceSazJxIS6dg70yRA==}
+  '@cloudflare/codemode@0.0.5':
+    resolution: {integrity: sha512-00KNtk0tJBkhJ+DdfDqCqWNDyQ9O3pGOrMZSutXF0MQDCjFIjLO3ZDZ5c4FlMmhsysvcj8TyJYzetaJAY4H+cA==}
     peerDependencies:
-      agents: ^0.3.7
+      agents: ^0.3.6
       ai: ^6.0.0
       zod: ^3.25.0 || ^4.0.0
 
@@ -4466,7 +4454,6 @@ packages:
   tar@7.4.3:
     resolution: {integrity: sha512-5S7Va8hKfV7W5U6g3aYxXmlPoZVAwUMy9AOKyF2fVuZa2UD3qZjg578OrLRt8PcNN1PleVaL/5/yYATNL0ICUw==}
     engines: {node: '>=18'}
-    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exhorbitant rates) by contacting i@izs.me
 
   test-exclude@7.0.1:
     resolution: {integrity: sha512-pFYqmTw68LXVjeWJMST4+borgQP2AyMNbg1BpZh9LbyhUeNkeaPF9gzfPGUAnSMV3qPYdWUwDIjjCLiSDOl7vg==}
@@ -5214,16 +5201,16 @@ snapshots:
       picocolors: 1.1.1
       sisteransi: 1.0.5
 
-  '@cloudflare/ai-chat@0.0.6(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)':
+  '@cloudflare/ai-chat@0.0.4(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)':
     dependencies:
-      agents: 0.3.10(@ai-sdk/openai@3.0.23(zod@3.25.76))(@ai-sdk/react@3.0.66(react@19.1.0)(zod@3.25.76))(@cloudflare/ai-chat@0.0.6)(@cloudflare/codemode@0.0.6)(@cloudflare/workers-types@4.20251014.0)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
+      agents: 0.3.10(@ai-sdk/openai@3.0.23(zod@3.25.76))(@ai-sdk/react@3.0.66(react@19.1.0)(zod@3.25.76))(@cloudflare/ai-chat@0.0.4)(@cloudflare/codemode@0.0.5)(@cloudflare/workers-types@4.20251014.0)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
       ai: 6.0.64(zod@3.25.76)
       react: 19.1.0
       zod: 3.25.76
 
-  '@cloudflare/codemode@0.0.6(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(typescript@5.8.3)(zod@3.25.76)':
+  '@cloudflare/codemode@0.0.5(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(typescript@5.8.3)(zod@3.25.76)':
     dependencies:
-      agents: 0.3.10(@ai-sdk/openai@3.0.23(zod@3.25.76))(@ai-sdk/react@3.0.66(react@19.1.0)(zod@3.25.76))(@cloudflare/ai-chat@0.0.6)(@cloudflare/codemode@0.0.6)(@cloudflare/workers-types@4.20251014.0)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
+      agents: 0.3.10(@ai-sdk/openai@3.0.23(zod@3.25.76))(@ai-sdk/react@3.0.66(react@19.1.0)(zod@3.25.76))(@cloudflare/ai-chat@0.0.4)(@cloudflare/codemode@0.0.5)(@cloudflare/workers-types@4.20251014.0)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
       ai: 6.0.64(zod@3.25.76)
       zod: 3.25.76
       zod-to-ts: 2.0.0(typescript@5.8.3)(zod@3.25.76)
@@ -6729,11 +6716,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  agents@0.3.10(@ai-sdk/openai@3.0.23(zod@3.25.76))(@ai-sdk/react@3.0.66(react@19.1.0)(zod@3.25.76))(@cloudflare/ai-chat@0.0.6)(@cloudflare/codemode@0.0.6)(@cloudflare/workers-types@4.20251014.0)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76):
+  agents@0.3.10(@ai-sdk/openai@3.0.23(zod@3.25.76))(@ai-sdk/react@3.0.66(react@19.1.0)(zod@3.25.76))(@cloudflare/ai-chat@0.0.4)(@cloudflare/codemode@0.0.5)(@cloudflare/workers-types@4.20251014.0)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76):
     dependencies:
       '@cfworker/json-schema': 4.1.1
-      '@cloudflare/ai-chat': 0.0.6(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
-      '@cloudflare/codemode': 0.0.6(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(typescript@5.8.3)(zod@3.25.76)
+      '@cloudflare/ai-chat': 0.0.4(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(react@19.1.0)(zod@3.25.76)
+      '@cloudflare/codemode': 0.0.5(agents@0.3.10)(ai@6.0.64(zod@3.25.76))(typescript@5.8.3)(zod@3.25.76)
       '@modelcontextprotocol/sdk': 1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
       ai: 6.0.64(zod@3.25.76)
       cron-schedule: 6.0.0

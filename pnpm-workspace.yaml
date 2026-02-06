@@ -7,8 +7,6 @@ catalog:
   "@ai-sdk/openai": ^3.0.23
   "@ai-sdk/react": ^3.0.66
   "@biomejs/biome": ^1.9.4
-  "@cloudflare/ai-chat": ^0.0.6
-  "@cloudflare/codemode": ^0.0.6
   "@cloudflare/vite-plugin": ^1.13.15
   "@cloudflare/vitest-pool-workers": ^0.8.47
   "@cloudflare/workers-oauth-provider": ^0.0.12
