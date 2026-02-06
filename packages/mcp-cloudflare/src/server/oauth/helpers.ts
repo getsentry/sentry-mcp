@@ -304,7 +304,9 @@ export async function tokenExchangeCallback(
   try {
     const result = await doUpstreamRefresh(props, env);
 
-    // Cache the result for other isolates
+    // Cache the result for other isolates (best-effort — a KV failure
+    // must not discard a successful refresh, since the upstream provider
+    // may have already rotated the refresh token).
     if (result) {
       const newProps = result.newProps as WorkerProps;
       const cacheValue: CachedRefreshResult = {
@@ -312,14 +314,22 @@ export async function tokenExchangeCallback(
         refreshToken: newProps.refreshToken!,
         expiresAt: newProps.accessTokenExpiresAt!,
       };
-      await env.OAUTH_KV.put(resultKey, JSON.stringify(cacheValue), {
-        expirationTtl: RESULT_TTL_SECONDS,
-      });
+      try {
+        await env.OAUTH_KV.put(resultKey, JSON.stringify(cacheValue), {
+          expirationTtl: RESULT_TTL_SECONDS,
+        });
+      } catch {
+        // Best-effort cache write — other isolates will refresh themselves
+      }
     }
 
     return result;
   } finally {
-    await env.OAUTH_KV.delete(lockKey);
+    try {
+      await env.OAUTH_KV.delete(lockKey);
+    } catch {
+      // Best-effort lock cleanup — the lock has a TTL and will expire
+    }
   }
 }
 

@@ -238,30 +238,88 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should wait and use cached result when lock is held", async () => {
-    // Pre-populate the lock (simulating another isolate holding it)
+    // Pre-populate only the lock (simulating another isolate holding it)
     await mockKV.put("refresh-lock:user-id", Date.now().toString());
 
-    // Pre-populate the result (simulating the other isolate completing)
+    // Simulate the other isolate writing the result while we wait.
+    // The result key does NOT exist initially, so the first check (line ~279)
+    // returns null, causing us to enter the lock-waiting branch.
     const cachedResult = {
       accessToken: "other-isolate-access-token",
       refreshToken: "other-isolate-refresh-token",
       expiresAt: Date.now() + 3600 * 1000,
     };
-    await mockKV.put("refresh-result:user-id", JSON.stringify(cachedResult));
+
+    let resultCallCount = 0;
+    // Intercept KV.get to control when the result key becomes available.
+    // We use getMockImplementation() to capture the original backing function
+    // before replacing it, avoiding infinite recursion through the spy.
+    const backingGet = (
+      mockKV.get as ReturnType<typeof vi.fn>
+    ).getMockImplementation()!;
+    (mockKV.get as ReturnType<typeof vi.fn>).mockImplementation(
+      async (key: string, format?: string) => {
+        if (key === "refresh-result:user-id") {
+          resultCallCount++;
+          if (resultCallCount === 1) {
+            // First check: result not yet available
+            return null;
+          }
+          // Second check (after lock wait): result is now available
+          return format === "json"
+            ? cachedResult
+            : JSON.stringify(cachedResult);
+        }
+        return backingGet(key, format);
+      },
+    );
 
     const options = createRefreshOptions();
-
-    // In our mock KV both lock and result are pre-populated, so the function
-    // should find the cached result on the first check and skip upstream.
     const result = await tokenExchangeCallback(options, mockEnv);
 
     // Should NOT have called upstream Sentry
     expect(mockFetch).not.toHaveBeenCalled();
 
-    // Should return the cached result
+    // Should have checked the result key twice (before and after lock wait)
+    expect(resultCallCount).toBe(2);
+
+    // Should return the cached result from the other isolate
     expect(result?.newProps).toMatchObject({
       accessToken: "other-isolate-access-token",
       refreshToken: "other-isolate-refresh-token",
+    });
+  });
+
+  it("should fall through and refresh when lock is held but no result appears", async () => {
+    // Pre-populate only the lock
+    await mockKV.put("refresh-lock:user-id", Date.now().toString());
+
+    // Intercept KV.get so the result key never becomes available.
+    const backingGet = (
+      mockKV.get as ReturnType<typeof vi.fn>
+    ).getMockImplementation()!;
+    (mockKV.get as ReturnType<typeof vi.fn>).mockImplementation(
+      async (key: string, format?: string) => {
+        if (key === "refresh-result:user-id") {
+          return null; // Never available
+        }
+        return backingGet(key, format);
+      },
+    );
+
+    // Set up upstream refresh to succeed (fall-through path)
+    mockFetch.mockResolvedValueOnce(createMockTokenResponse());
+
+    const options = createRefreshOptions();
+    const result = await tokenExchangeCallback(options, mockEnv);
+
+    // Should have called upstream Sentry as fallback
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    // Should return the upstream result
+    expect(result?.newProps).toMatchObject({
+      accessToken: "new-access-token",
+      refreshToken: "new-refresh-token",
     });
   });
 });
