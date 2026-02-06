@@ -217,7 +217,8 @@ export async function refreshAccessToken({
 // with the same refresh token, the first wins and the second gets
 // invalid_grant. The lock + result cache ensures only one isolate refreshes
 // per user; others wait and reuse the cached result.
-const LOCK_TTL_SECONDS = 30;
+// NOTE: Cloudflare KV requires expirationTtl >= 60 seconds.
+const LOCK_TTL_SECONDS = 60;
 const RESULT_TTL_SECONDS = 60;
 const LOCK_WAIT_MS = 2000;
 
