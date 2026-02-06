@@ -82,6 +82,30 @@ const wrappedOAuthProvider = {
       clientRegistrationEndpoint: "/oauth/register",
       tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
       scopesSupported: Object.keys(SCOPES),
+      // RFC 9728: Add resource_metadata to 401 responses so MCP clients can
+      // discover the OAuth protected resource metadata without an extra round-trip
+      onError: ({ status, headers, code, description }) => {
+        if (status !== 401) {
+          return;
+        }
+        const resourceMetadataUrl = `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`;
+        const existingAuth =
+          headers["WWW-Authenticate"] ?? headers["www-authenticate"] ?? "";
+        const newAuth = existingAuth
+          ? `resource_metadata="${resourceMetadataUrl}", ${existingAuth}`
+          : `Bearer resource_metadata="${resourceMetadataUrl}"`;
+        return new Response(
+          JSON.stringify({ error: code, error_description: description }),
+          {
+            status,
+            headers: {
+              ...headers,
+              "WWW-Authenticate": newAuth,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+      },
     });
 
     const response = await oAuthProvider.fetch(request, env, ctx);
