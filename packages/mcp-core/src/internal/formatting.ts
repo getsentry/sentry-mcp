@@ -13,6 +13,7 @@ import type {
   Trace,
   TraceSpan,
   GenericEvent,
+  ExternalIssueList,
 } from "../api-client/types";
 import type {
   ErrorEntrySchema,
@@ -1694,6 +1695,7 @@ export function formatIssueOutput({
   apiService,
   autofixState,
   performanceTrace,
+  externalIssues,
 }: {
   organizationSlug: string;
   issue: Issue;
@@ -1701,6 +1703,7 @@ export function formatIssueOutput({
   apiService: SentryApiService;
   autofixState?: AutofixRunState;
   performanceTrace?: Trace;
+  externalIssues?: ExternalIssueList;
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
 
@@ -1841,6 +1844,15 @@ export function formatIssueOutput({
   // Add Seer context if available
   if (autofixState) {
     output += formatSeerSummary(autofixState, organizationSlug, issue.shortId);
+  }
+
+  // Add external issue links if available
+  if (externalIssues && externalIssues.length > 0) {
+    output += "## External Issue Links\n\n";
+    for (const extIssue of externalIssues) {
+      output += `- **${extIssue.displayName}** (${extIssue.serviceType}): ${extIssue.webUrl}\n`;
+    }
+    output += "\n";
   }
 
   output += "# Using this information\n\n";

@@ -1265,6 +1265,67 @@ describe("get_issue_details", () => {
     `);
   });
 
+  it("includes external issue links when available", async () => {
+    const mockExternalIssues = [
+      {
+        id: "123",
+        issueId: "456",
+        serviceType: "jira",
+        displayName: "AMP-12345",
+        webUrl: "https://amplitude.atlassian.net/browse/AMP-12345",
+      },
+      {
+        id: "124",
+        issueId: "456",
+        serviceType: "github",
+        displayName: "getsentry/sentry#12345",
+        webUrl: "https://github.com/getsentry/sentry/issues/12345",
+      },
+    ];
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/external-issues/",
+        () => HttpResponse.json(mockExternalIssues),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("## External Issue Links");
+    expect(result).toContain(
+      "**AMP-12345** (jira): https://amplitude.atlassian.net/browse/AMP-12345",
+    );
+    expect(result).toContain(
+      "**getsentry/sentry#12345** (github): https://github.com/getsentry/sentry/issues/12345",
+    );
+  });
+
+  it("omits external issue links section when none exist", async () => {
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).not.toContain("## External Issue Links");
+  });
+
   it("handles unsupported event types gracefully", async () => {
     // This tests that unknown event types don't crash the tool
     // Instead, we should show the issue info and a warning about the unsupported event type

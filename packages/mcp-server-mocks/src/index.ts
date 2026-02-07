@@ -1046,6 +1046,12 @@ export const restHandlers = buildHandlers([
         },
       }),
   },
+  // External issue links endpoints (default: empty for most issues)
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/external-issues/",
+    fetch: () => HttpResponse.json([]),
+  },
   // Issue tag values endpoints
   {
     method: "get",
