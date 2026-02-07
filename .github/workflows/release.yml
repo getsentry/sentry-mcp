@@ -61,4 +61,4 @@ jobs:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
         with:
           version: ${{ steps.version.outputs.version }}
-          force: ${{ inputs.force }}
+          force: ${{ inputs.force && 'true' || '' }}
