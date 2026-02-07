@@ -27,7 +27,8 @@ Session constraints:
   --project-slug <slug>       Optional project constraint
 
 Skill controls:
-  --skills <list>     Specify which skills to grant (default: all skills)
+  --skills <list>           Specify which skills to grant (default: all skills)
+  --disable-skills <list>   Remove specific skills (e.g. --disable-skills=seer)
 
 All skills: ${allSkills.join(", ")}
 
@@ -36,10 +37,12 @@ Environment variables:
   OPENAI_API_KEY          OpenAI API key for AI-powered search tools
   ANTHROPIC_API_KEY       Anthropic API key for AI-powered search tools
   EMBEDDED_AGENT_PROVIDER Provider override: openai or anthropic
+  MCP_DISABLE_SKILLS      Disable specific skills (comma-separated)
 
 Examples:
   ${packageName} --access-token=TOKEN
   ${packageName} --access-token=TOKEN --skills=inspect,triage
   ${packageName} --access-token=TOKEN --host=sentry.example.com
+  ${packageName} --access-token=TOKEN --host=sentry.example.com --disable-skills=seer
   ${packageName} --access-token=TOKEN --agent-provider=anthropic`;
 }

@@ -32,6 +32,11 @@ describe("cli/parseArgv", () => {
     expect(parsed.skills).toBe("inspect,triage");
   });
 
+  it("parses --disable-skills", () => {
+    const parsed = parseArgv(["--access-token=tok", "--disable-skills=seer"]);
+    expect(parsed.disableSkills).toBe("seer");
+  });
+
   it("collects unknown args", () => {
     const parsed = parseArgv(["--unknown", "--another=1"]);
     expect(parsed.unknownArgs.length).toBeGreaterThan(0);
@@ -52,6 +57,14 @@ describe("cli/parseEnv", () => {
     expect(env.mcpUrl).toBe("envmcp");
     expect(env.sentryDsn).toBe("envdsn");
     expect(env.skills).toBe("inspect,triage");
+  });
+
+  it("reads MCP_DISABLE_SKILLS", () => {
+    const env = parseEnv({
+      SENTRY_ACCESS_TOKEN: "envtok",
+      MCP_DISABLE_SKILLS: "seer",
+    } as any);
+    expect(env.disableSkills).toBe("seer");
   });
 });
 
@@ -96,5 +109,25 @@ describe("cli/merge", () => {
     const cli = parseArgv(["--access-token=clitok"]);
     const merged = merge(cli, env);
     expect(merged.skills).toBe("inspect,triage");
+  });
+
+  it("applies precedence for disableSkills: CLI over env", () => {
+    const env = parseEnv({
+      SENTRY_ACCESS_TOKEN: "envtok",
+      MCP_DISABLE_SKILLS: "docs",
+    } as any);
+    const cli = parseArgv(["--access-token=clitok", "--disable-skills=seer"]);
+    const merged = merge(cli, env);
+    expect(merged.disableSkills).toBe("seer");
+  });
+
+  it("falls back to env when CLI disableSkills not provided", () => {
+    const env = parseEnv({
+      SENTRY_ACCESS_TOKEN: "envtok",
+      MCP_DISABLE_SKILLS: "seer",
+    } as any);
+    const cli = parseArgv(["--access-token=clitok"]);
+    const merged = merge(cli, env);
+    expect(merged.disableSkills).toBe("seer");
   });
 });

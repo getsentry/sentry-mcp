@@ -1,4 +1,4 @@
-import { parseSkills, SKILLS, type Skill } from "@sentry/mcp-core/skills";
+import { ALL_SKILLS, parseSkills, type Skill } from "@sentry/mcp-core/skills";
 import {
   validateAndParseSentryUrlThrows,
   validateOpenAiBaseUrlThrows,
@@ -8,11 +8,10 @@ import type { MergedArgs, ResolvedConfig } from "./types";
 
 export function formatInvalidSkills(
   invalid: string[],
-  envName?: string,
+  source?: string,
 ): string {
-  const where = envName ? `${envName} provided` : "Invalid skills provided";
-  const allSkills = Object.keys(SKILLS).join(", ");
-  return `Error: ${where}: ${invalid.join(", ")}\nAvailable skills: ${allSkills}`;
+  const prefix = source ? `${source} provided` : "Invalid skills provided";
+  return `Error: ${prefix}: ${invalid.join(", ")}\nAvailable skills: ${ALL_SKILLS.join(", ")}`;
 }
 
 export function finalize(input: MergedArgs): ResolvedConfig {
@@ -49,7 +48,7 @@ export function finalize(input: MergedArgs): ResolvedConfig {
   // For OAuth validation that enforces minimum 1 skill selection, see:
   // packages/mcp-cloudflare/src/server/oauth/routes/callback.ts (lines 234-248)
   //
-  let finalSkills: Set<Skill> | undefined = undefined;
+  let finalSkills: Set<Skill>;
   if (input.skills) {
     // Override: use only the specified skills
     const { valid, invalid } = parseSkills(input.skills);
@@ -62,8 +61,25 @@ export function finalize(input: MergedArgs): ResolvedConfig {
     finalSkills = valid;
   } else {
     // Default: grant ALL skills when no flag is provided (see comment block above for rationale)
-    const allSkills = Object.keys(SKILLS) as Skill[];
-    finalSkills = new Set<Skill>(allSkills);
+    finalSkills = new Set<Skill>(ALL_SKILLS);
+  }
+
+  // Disable-skills: remove specific skills from the active set
+  if (input.disableSkills) {
+    const { valid: skillsToDisable, invalid } = parseSkills(
+      input.disableSkills,
+    );
+    if (invalid.length > 0) {
+      throw new Error(formatInvalidSkills(invalid, "--disable-skills"));
+    }
+    for (const skill of skillsToDisable) {
+      finalSkills.delete(skill);
+    }
+    if (finalSkills.size === 0) {
+      throw new Error(
+        "Error: All skills have been disabled. At least one skill must remain enabled.",
+      );
+    }
   }
 
   const resolvedOpenAiBaseUrl = input.openaiBaseUrl

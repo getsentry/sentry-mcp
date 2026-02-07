@@ -16,6 +16,7 @@ export function parseArgv(argv: string[]): CliArgs {
     "organization-slug": { type: "string" as const },
     "project-slug": { type: "string" as const },
     skills: { type: "string" as const },
+    "disable-skills": { type: "string" as const },
     agent: { type: "boolean" as const },
     experimental: { type: "boolean" as const },
     help: { type: "boolean" as const, short: "h" as const },
@@ -63,6 +64,7 @@ export function parseArgv(argv: string[]): CliArgs {
     organizationSlug: values["organization-slug"] as string | undefined,
     projectSlug: values["project-slug"] as string | undefined,
     skills: values.skills as string | undefined,
+    disableSkills: values["disable-skills"] as string | undefined,
     agent: values.agent === true,
     experimental: values.experimental === true,
     help: (values.help as boolean | undefined) === true,
@@ -86,6 +88,7 @@ export function parseEnv(env: NodeJS.ProcessEnv): EnvArgs {
   if (env.EMBEDDED_AGENT_PROVIDER)
     fromEnv.agentProvider = env.EMBEDDED_AGENT_PROVIDER;
   if (env.MCP_SKILLS) fromEnv.skills = env.MCP_SKILLS;
+  if (env.MCP_DISABLE_SKILLS) fromEnv.disableSkills = env.MCP_DISABLE_SKILLS;
   return fromEnv;
 }
 
@@ -105,6 +108,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     agentProvider: cli.agentProvider ?? env.agentProvider,
     // Skills precedence: CLI skills override env
     skills: cli.skills ?? env.skills,
+    disableSkills: cli.disableSkills ?? env.disableSkills,
     agent: cli.agent === true,
     experimental: cli.experimental === true,
     organizationSlug: cli.organizationSlug,

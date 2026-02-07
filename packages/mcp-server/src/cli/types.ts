@@ -12,6 +12,7 @@ export type CliArgs = {
   anthropicModel?: string;
   agentProvider?: string;
   skills?: string;
+  disableSkills?: string;
   agent?: boolean;
   experimental?: boolean;
   organizationSlug?: string;
@@ -31,6 +32,7 @@ export type EnvArgs = {
   anthropicModel?: string;
   agentProvider?: string;
   skills?: string;
+  disableSkills?: string;
 };
 
 export type MergedArgs = {
@@ -45,6 +47,7 @@ export type MergedArgs = {
   anthropicModel?: string;
   agentProvider?: string;
   skills?: string;
+  disableSkills?: string;
   agent?: boolean;
   experimental?: boolean;
   organizationSlug?: string;
@@ -64,8 +67,8 @@ export type ResolvedConfig = {
   anthropicBaseUrl?: string;
   anthropicModel?: string;
   agentProvider?: "openai" | "anthropic";
-  /** Primary authorization method */
-  finalSkills?: Set<Skill>;
+  /** Skills granted for this session (always populated by finalize()) */
+  finalSkills: Set<Skill>;
   organizationSlug?: string;
   projectSlug?: string;
 };
