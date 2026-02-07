@@ -10,11 +10,13 @@ import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { ApiNotFoundError } from "../api-client";
 import type { SentryApiService } from "../api-client";
 import type {
+  AutofixRunState,
   Event,
   ErrorEvent,
   DefaultEvent,
   TransactionEvent,
   Trace,
+  ExternalIssueList,
 } from "../api-client/types";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
@@ -126,19 +128,11 @@ export default defineTool({
         throw error;
       }
 
-      // Try to fetch Seer analysis context (non-blocking)
-      let autofixState:
-        | Awaited<ReturnType<typeof apiService.getAutofixState>>
-        | undefined;
-      try {
-        autofixState = await apiService.getAutofixState({
-          organizationSlug: orgSlug,
-          issueId: issue.shortId,
-        });
-      } catch (error) {
-        // Silently continue if Seer analysis is not available
-        // This ensures the tool works even if Seer is not enabled
-      }
+      const { autofixState, externalIssues } = await fetchIssueEnrichmentData({
+        apiService,
+        organizationSlug: orgSlug,
+        issueId: issue.shortId,
+      });
 
       const performanceTrace = await maybeFetchPerformanceTrace({
         apiService,
@@ -153,6 +147,7 @@ export default defineTool({
         apiService,
         autofixState,
         performanceTrace,
+        externalIssues,
       });
     }
 
@@ -200,19 +195,11 @@ export default defineTool({
       issueId: issue.shortId,
     });
 
-    // Try to fetch Seer analysis context (non-blocking)
-    let autofixState:
-      | Awaited<ReturnType<typeof apiService.getAutofixState>>
-      | undefined;
-    try {
-      autofixState = await apiService.getAutofixState({
-        organizationSlug: orgSlug,
-        issueId: issue.shortId,
-      });
-    } catch (error) {
-      // Silently continue if Seer analysis is not available
-      // This ensures the tool works even if Seer is not enabled
-    }
+    const { autofixState, externalIssues } = await fetchIssueEnrichmentData({
+      apiService,
+      organizationSlug: orgSlug,
+      issueId: issue.shortId,
+    });
 
     const performanceTrace = await maybeFetchPerformanceTrace({
       apiService,
@@ -227,9 +214,39 @@ export default defineTool({
       apiService,
       autofixState,
       performanceTrace,
+      externalIssues,
     });
   },
 });
+
+/**
+ * Fetches supplementary data for an issue in parallel: Seer analysis and external links.
+ * Both calls are non-blocking -- failures are silently caught so they never
+ * prevent the primary issue details from being returned.
+ */
+async function fetchIssueEnrichmentData({
+  apiService,
+  organizationSlug,
+  issueId,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  issueId: string;
+}): Promise<{
+  autofixState: AutofixRunState | undefined;
+  externalIssues: ExternalIssueList | undefined;
+}> {
+  const [autofixState, externalIssues] = await Promise.all([
+    apiService
+      .getAutofixState({ organizationSlug, issueId })
+      .catch(() => undefined),
+    apiService
+      .getIssueExternalLinks({ organizationSlug, issueId })
+      .catch(() => undefined),
+  ]);
+
+  return { autofixState, externalIssues };
+}
 
 async function maybeFetchPerformanceTrace({
   apiService,

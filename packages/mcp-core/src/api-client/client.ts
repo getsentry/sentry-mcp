@@ -16,6 +16,7 @@ import {
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
+  ExternalIssueListSchema,
   EventSchema,
   EventAttachmentListSchema,
   ErrorsSearchResponseSchema,
@@ -46,6 +47,7 @@ import type {
   Issue,
   IssueList,
   IssueTagValues,
+  ExternalIssueList,
   OrganizationList,
   Project,
   ProjectList,
@@ -1597,6 +1599,36 @@ export class SentryApiService {
       opts,
     );
     return IssueTagValuesSchema.parse(body);
+  }
+
+  /**
+   * Retrieves external issue links for a specific issue.
+   *
+   * Returns links to external issue tracking systems (Jira, GitHub Issues,
+   * GitLab, etc.) that have been associated with this Sentry issue.
+   *
+   * @param params Query parameters
+   * @param params.organizationSlug Organization identifier
+   * @param params.issueId Issue identifier (short ID or numeric ID)
+   * @param opts Request options
+   * @returns Array of external issue links with service type and URL
+   */
+  async getIssueExternalLinks(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ExternalIssueList> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
+      undefined,
+      opts,
+    );
+    return ExternalIssueListSchema.parse(body);
   }
 
   async getEventForIssue(
