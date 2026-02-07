@@ -177,6 +177,7 @@ Return a JSON object with these fields:
 - "timeRange": Time range parameters (optional)
   - Relative: {"statsPeriod": "24h"} for last 24 hours, "7d" for last 7 days, etc.
   - Absolute: {"start": "2025-06-19T07:00:00", "end": "2025-06-20T06:59:59"} for specific date ranges
+- "explanation": Brief explanation of how you translated this query
 
 CORRECT QUERY PATTERNS (FOLLOW THESE):
 - For field existence: Use has:field_name (NOT field_name IS NOT NULL)

@@ -5,7 +5,7 @@ import {
 } from "../errors";
 import { ApiError, ApiClientError, ApiServerError } from "../api-client";
 import { logIssue } from "../telem/logging";
-import { APICallError } from "ai";
+import { APICallError, NoObjectGeneratedError } from "ai";
 import type { TransportType } from "../types";
 
 /**
@@ -165,6 +165,15 @@ export async function formatErrorForUser(
     }
     parts.push("Please contact support if the problem persists.");
     return parts.join("\n\n");
+  }
+
+  // Defensive: NoObjectGeneratedError is normally handled in callEmbeddedAgent,
+  // but catch any that escape (e.g., from future code paths).
+  if (NoObjectGeneratedError.isInstance(error)) {
+    return [
+      "**AI Processing Error**",
+      "The AI was unable to process your query. Please try rephrasing your request.",
+    ].join("\n\n");
   }
 
   // Handle ApiClientError (4xx) - user input errors, should NOT be logged to Sentry

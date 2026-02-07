@@ -6,8 +6,8 @@ import { createWhoamiTool } from "../../internal/agents/tools/whoami";
 import { createDatasetAttributesTool } from "./utils";
 import { systemPrompt } from "./config";
 
-// OpenAI structured outputs (used by GPT-5) require all properties to be in the 'required' array.
-// Avoid .optional()/.default() so the generated JSON Schema keeps every field required.
+// .default("") on explanation is safe because structuredOutputs: false is set via providerOptions.
+// If structuredOutputs is re-enabled, remove .default() calls (OpenAI requires all fields in 'required').
 // Tracking: https://github.com/getsentry/sentry-mcp/issues/623
 export const searchEventsAgentOutputSchema = z
   .object({
@@ -37,6 +37,7 @@ export const searchEventsAgentOutputSchema = z
       ),
     explanation: z
       .string()
+      .default("")
       .describe("Brief explanation of how you translated this query."),
   })
   .refine(
