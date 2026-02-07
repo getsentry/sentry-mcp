@@ -1,4 +1,5 @@
 {
+  "includeCoAuthoredBy": true,
   "permissions": {
     "allow": [
       "Bash(ls:*)",
@@ -147,12 +148,11 @@
     ],
     "deny": []
   },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["sentry"],
   "enabledPlugins": {
     "dex@dex": true,
     "sentry-skills@sentry-skills": true,
     "pr-review-toolkit@claude-plugins-official": true
-  },
-  "enableAllProjectMcpServers": true,
-  "includeCoAuthoredBy": true,
-  "enabledMcpjsonServers": ["sentry"]
+  }
 }
