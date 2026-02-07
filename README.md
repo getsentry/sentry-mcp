@@ -38,6 +38,13 @@ npx @sentry/mcp-server@latest --access-token=sentry-user-token
 Need to connect to a self-hosted deployment? Add <code>--host</code> (hostname
 only, e.g. <code>--host=sentry.example.com</code>) when you run the command.
 
+Some features (like Seer) may not be available on self-hosted instances. You can
+disable specific skills to prevent unsupported tools from being exposed:
+
+```shell
+npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com --disable-skills=seer
+```
+
 #### Environment Variables
 
 ```shell
@@ -50,6 +57,7 @@ ANTHROPIC_API_KEY=           # Required if using Anthropic
 
 # Optional overrides
 SENTRY_HOST=                 # For self-hosted deployments
+MCP_DISABLE_SKILLS=          # Disable specific skills (comma-separated, e.g. 'seer')
 ```
 
 **Important:** Always set `EMBEDDED_AGENT_PROVIDER` to explicitly specify your LLM provider. Auto-detection based on API keys alone is deprecated and will be removed in a future release. See [docs/embedded-agents.md](docs/embedded-agents.md) for detailed configuration options.
@@ -74,6 +82,24 @@ SENTRY_HOST=                 # For self-hosted deployments
 
 If you leave the host variable unset, the CLI automatically targets the Sentry
 SaaS service. Only set the override when you operate self-hosted Sentry.
+
+For self-hosted instances that don't support Seer:
+
+```json
+{
+  "mcpServers": {
+    "sentry": {
+      "command": "npx",
+      "args": ["@sentry/mcp-server"],
+      "env": {
+        "SENTRY_ACCESS_TOKEN": "your-token",
+        "SENTRY_HOST": "sentry.example.com",
+        "MCP_DISABLE_SKILLS": "seer"
+      }
+    }
+  }
+}
+```
 
 ### MCP Inspector
 

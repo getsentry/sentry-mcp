@@ -135,6 +135,7 @@ Required:
 Optional:
 - `SENTRY_ORG` - Default organization slug
 - `SENTRY_PROJECT` - Default project slug
+- `MCP_DISABLE_SKILLS` - Disable specific skills, comma-separated (e.g. `seer`)
 
 ## Version Pinning
 
