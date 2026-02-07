@@ -1860,5 +1860,6 @@ export function formatIssueOutput({
   output +=
     "- The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.\n";
   output += `- To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='${organizationSlug}', issueId='${issue.shortId}', naturalLanguageQuery='your query')\`\n`;
+  output += `- To see the trail of events leading up to this error, use \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
   return output;
 }

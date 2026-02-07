@@ -3,8 +3,11 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import { ParamOrganizationSlug } from "../schema";
 import { parseSentryUrl, type ParsedSentryUrl } from "../internal/url-helpers";
+import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { ApiNotFoundError } from "../api-client";
+import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
 import getProfile from "./get-profile";
@@ -12,24 +15,33 @@ import getProfile from "./get-profile";
 /**
  * Resource types fully supported with API integration.
  */
-const FULLY_SUPPORTED_TYPES = ["issue", "event", "trace", "profile"] as const;
-type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
+export const FULLY_SUPPORTED_TYPES = [
+  "issue",
+  "event",
+  "trace",
+  "breadcrumbs",
+] as const;
+export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
 /**
  * Resource types recognized from URLs but not yet fully supported.
+ * Profile is supported via URL mode (delegates to get_profile handler)
+ * but not in explicit mode (needs transactionName which doesn't fit resourceId).
  */
-const RECOGNIZED_TYPES = ["replay", "monitor", "release"] as const;
-type RecognizedType = (typeof RECOGNIZED_TYPES)[number];
+export type RecognizedType = "replay" | "monitor" | "release";
 
 /**
- * All resource types (supported + recognized).
+ * All resource types (supported + recognized + URL-only).
  */
-type ResolvedResourceType = FullySupportedType | RecognizedType;
+export type ResolvedResourceType =
+  | FullySupportedType
+  | RecognizedType
+  | "profile";
 
 /**
  * Resolved parameters after URL parsing or explicit params validation.
  */
-interface ResolvedResourceParams {
+export interface ResolvedResourceParams {
   type: ResolvedResourceType;
   organizationSlug: string;
   // Issue/Event params
@@ -54,16 +66,11 @@ interface ResolvedResourceParams {
 /**
  * Validates and resolves resource parameters from URL or explicit params.
  */
-function resolveResourceParams(params: {
+export function resolveResourceParams(params: {
   url?: string | null;
   resourceType?: string | null;
+  resourceId?: string | null;
   organizationSlug?: string | null;
-  issueId?: string | null;
-  eventId?: string | null;
-  traceId?: string | null;
-  projectSlug?: string | null;
-  profilerId?: string | null;
-  transactionName?: string | null;
 }): ResolvedResourceParams {
   // URL-based resolution
   if (params.url) {
@@ -97,77 +104,58 @@ function resolveResourceParams(params: {
   const resourceType = params.resourceType as FullySupportedType;
   const organizationSlug = params.organizationSlug;
 
-  // Validate type-specific required params
+  // All explicit mode types require resourceId
+  if (!params.resourceId) {
+    throw new UserInputError(
+      "`resourceId` is required when using explicit `resourceType`.",
+    );
+  }
+
+  const resourceId = params.resourceId;
+
+  // Map resourceId to type-specific fields
   switch (resourceType) {
     case "issue":
-      if (!params.issueId) {
-        throw new UserInputError(
-          "`issueId` is required for resource type 'issue'.",
-        );
-      }
       return {
         type: "issue",
         organizationSlug,
-        issueId: params.issueId,
+        issueId: resourceId.toUpperCase(),
       };
 
     case "event":
-      if (!params.issueId || !params.eventId) {
-        throw new UserInputError(
-          "`issueId` and `eventId` are required for resource type 'event'.",
-        );
-      }
       return {
         type: "event",
         organizationSlug,
-        issueId: params.issueId,
-        eventId: params.eventId,
+        eventId: resourceId,
       };
 
     case "trace":
-      if (!params.traceId) {
-        throw new UserInputError(
-          "`traceId` is required for resource type 'trace'.",
-        );
-      }
       return {
         type: "trace",
         organizationSlug,
-        traceId: params.traceId,
+        traceId: resourceId,
       };
 
-    case "profile":
-      if (!params.projectSlug) {
-        throw new UserInputError(
-          "`projectSlug` is required for resource type 'profile'.",
-        );
-      }
-      if (!params.transactionName) {
-        throw new UserInputError(
-          "`transactionName` is required for resource type 'profile'.",
-        );
-      }
+    case "breadcrumbs":
       return {
-        type: "profile",
+        type: "breadcrumbs",
         organizationSlug,
-        projectSlug: params.projectSlug,
-        profilerId: params.profilerId ?? undefined,
-        transactionName: params.transactionName,
+        issueId: resourceId.toUpperCase(),
       };
   }
 }
 
 /**
  * Resolves params from a parsed Sentry URL.
+ * When resourceType is provided alongside a URL, it overrides the auto-detected type.
  */
 function resolveFromParsedUrl(
   parsed: ParsedSentryUrl,
-  params: { transactionName?: string | null },
+  params: { resourceType?: string | null },
 ): ResolvedResourceParams {
-  const { type, organizationSlug } = parsed;
+  const { type: detectedType, organizationSlug } = parsed;
 
-  if (type === "unknown") {
-    // Check if we have a transaction from performance summary URL
+  if (detectedType === "unknown") {
     if (parsed.transaction) {
       throw new UserInputError(
         `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`get_profile\` with the transaction name to analyze performance data, or \`search_events\` to find traces for this transaction.`,
@@ -179,7 +167,26 @@ function resolveFromParsedUrl(
     );
   }
 
-  switch (type) {
+  // Handle resourceType override (only breadcrumbs is allowed as an override)
+  if (params.resourceType && params.resourceType !== detectedType) {
+    if (params.resourceType !== "breadcrumbs") {
+      throw new UserInputError(
+        `Cannot override URL type with resourceType '${params.resourceType}'. Only 'breadcrumbs' can be used as a resourceType override with a URL.`,
+      );
+    }
+    if (!parsed.issueId) {
+      throw new UserInputError(
+        "Could not extract issue ID from URL for breadcrumbs. Provide an issue URL.",
+      );
+    }
+    return {
+      type: "breadcrumbs",
+      organizationSlug,
+      issueId: parsed.issueId,
+    };
+  }
+
+  switch (detectedType) {
     case "issue":
       if (!parsed.issueId) {
         throw new UserInputError("Could not extract issue ID from URL.");
@@ -214,22 +221,18 @@ function resolveFromParsedUrl(
         spanId: parsed.spanId,
       };
 
-    case "profile": {
+    case "profile":
       if (!parsed.projectSlug) {
         throw new UserInputError(
           "Could not extract project slug from profile URL.",
         );
       }
-      // transactionName may come from explicit param since URLs don't always contain it
-      const transactionName = params.transactionName ?? undefined;
       return {
         type: "profile",
         organizationSlug,
         projectSlug: parsed.projectSlug,
         profilerId: parsed.profilerId,
-        transactionName,
       };
-    }
 
     case "replay":
       if (!parsed.replayId) {
@@ -333,6 +336,92 @@ function generateUnsupportedResourceMessage(
   }
 }
 
+/**
+ * Formats breadcrumbs from an event as a structured log.
+ */
+function formatBreadcrumbs(
+  breadcrumbs: Array<{
+    timestamp?: string | null;
+    type?: string | null;
+    category?: string | null;
+    level?: string | null;
+    message?: string | null;
+    data?: Record<string, unknown> | null;
+  }>,
+  issueId: string,
+  eventId: string,
+): string {
+  if (breadcrumbs.length === 0) {
+    return [
+      `# Breadcrumbs for ${issueId}`,
+      "",
+      `**Event ID**: ${eventId}`,
+      "",
+      "No breadcrumbs found in the latest event for this issue.",
+    ].join("\n");
+  }
+
+  const output: string[] = [
+    `# Breadcrumbs for ${issueId}`,
+    "",
+    `**Event ID**: ${eventId}`,
+    `**Total Breadcrumbs**: ${breadcrumbs.length}`,
+    "",
+    "```",
+  ];
+
+  for (const crumb of breadcrumbs) {
+    const timestamp = crumb.timestamp
+      ? new Date(crumb.timestamp).toISOString()
+      : "                        ";
+    const level = (crumb.level ?? "info").padEnd(7);
+    const category = crumb.category ?? crumb.type ?? "-";
+    const message = truncate(crumb.message ?? "", 120);
+    const data = formatBreadcrumbData(crumb.data);
+
+    let line = `${timestamp} ${level} [${category}]`;
+    if (message) {
+      line += ` ${message}`;
+    }
+    if (data) {
+      line += ` ${data}`;
+    }
+    output.push(line);
+  }
+
+  output.push("```");
+
+  output.push(
+    "",
+    "Breadcrumbs show the trail of events leading up to the error, in chronological order.",
+    `Use \`get_sentry_resource(resourceType='issue', organizationSlug='...', resourceId='${issueId}')\` for full issue details.`,
+  );
+
+  return output.join("\n");
+}
+
+/**
+ * Formats breadcrumb data as a compact inline string.
+ */
+function formatBreadcrumbData(
+  data: Record<string, unknown> | null | undefined,
+): string {
+  if (!data || Object.keys(data).length === 0) return "";
+  const json = JSON.stringify(data);
+  return truncate(json, 200);
+}
+
+/**
+ * Truncates a string to maxLen characters.
+ */
+function truncate(str: string, maxLen: number): string {
+  const clean = str.replace(/[\r\n]+/g, " ");
+  if (clean.length > maxLen) {
+    return `${clean.slice(0, maxLen)}...`;
+  }
+  return clean;
+}
+
 export default defineTool({
   name: "get_sentry_resource",
   skills: ["inspect"],
@@ -348,9 +437,10 @@ export default defineTool({
     "",
     "FULLY SUPPORTED:",
     "- **issue**: Fetch issue details by ID",
-    "- **event**: Fetch specific event within an issue",
-    "- **trace**: Fetch trace details (supports span focus from URL)",
-    "- **profile**: Fetch and analyze CPU profiling data",
+    "- **event**: Fetch specific event by event ID",
+    "- **trace**: Fetch trace details",
+    "- **breadcrumbs**: Fetch breadcrumbs for an issue (trail of events leading up to the error)",
+    "- **profile**: CPU profiling data (URL mode only)",
     "",
     "URL RECOGNIZED (returns helpful guidance):",
     "- **replay**: Session replay URLs",
@@ -358,39 +448,18 @@ export default defineTool({
     "- **release**: Release URLs",
     "",
     "<examples>",
-    "### URL mode (auto-detect type)",
     "```",
-    "get_sentry_resource(url='https://my-org.sentry.io/issues/PROJECT-123')",
-    "get_sentry_resource(url='https://my-org.sentry.io/explore/traces/trace/abc123...')",
-    "get_sentry_resource(url='https://my-org.sentry.io/replays/def456...')",
-    "```",
-    "",
-    "### Explicit mode - Issue",
-    "```",
-    "get_sentry_resource(",
-    "  resourceType='issue',",
-    "  organizationSlug='my-org',",
-    "  issueId='PROJECT-123'",
-    ")",
-    "```",
-    "",
-    "### Explicit mode - Trace",
-    "```",
-    "get_sentry_resource(",
-    "  resourceType='trace',",
-    "  organizationSlug='my-org',",
-    "  traceId='a4d1aae7216b47ff8117cf4e09ce9d0a'",
-    ")",
+    "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
+    "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')",
+    "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
+    "get_sentry_resource(resourceType='breadcrumbs', organizationSlug='my-org', resourceId='PROJECT-123')",
     "```",
     "</examples>",
     "",
     "<hints>",
     "- URL mode is simplest: just pass the Sentry URL and the tool auto-detects the resource type",
-    "- For explicit mode, required params depend on resourceType:",
-    "  - issue: organizationSlug, issueId",
-    "  - event: organizationSlug, issueId, eventId",
-    "  - trace: organizationSlug, traceId",
-    "  - profile: organizationSlug, projectSlug, transactionName",
+    "- Use `resourceType='breadcrumbs'` with an issue URL to see the trail of events leading up to the error",
+    "- For explicit mode: `resourceType` + `resourceId` + `organizationSlug`",
     "</hints>",
   ].join("\n"),
 
@@ -406,56 +475,21 @@ export default defineTool({
 
     // Mode 2: Explicit type + identifier
     resourceType: z
-      .enum(["issue", "event", "trace", "profile"])
+      .enum(["issue", "event", "trace", "breadcrumbs"])
       .optional()
       .describe(
-        "Resource type when not using URL. Required params depend on type.",
+        "Resource type. In explicit mode, used with `resourceId`. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' with an issue URL).",
+      ),
+
+    resourceId: z
+      .string()
+      .trim()
+      .optional()
+      .describe(
+        "Type-specific identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required for explicit mode.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
-    regionUrl: ParamRegionUrl.nullable().default(null),
-
-    // Issue/Event identifiers
-    issueId: z
-      .string()
-      .toUpperCase()
-      .trim()
-      .optional()
-      .describe(
-        "Issue ID (e.g., 'PROJECT-123'). Required for issue/event types.",
-      ),
-    eventId: z
-      .string()
-      .trim()
-      .optional()
-      .describe("Event ID. Required for event type."),
-
-    // Trace identifier
-    traceId: z
-      .string()
-      .trim()
-      .optional()
-      .describe("Trace ID (32-char hex string). Required for trace type."),
-
-    // Profile identifiers
-    projectSlug: z
-      .string()
-      .toLowerCase()
-      .trim()
-      .optional()
-      .describe("Project slug. Required for profile type."),
-    profilerId: z
-      .string()
-      .trim()
-      .optional()
-      .describe("Profiler ID (optional for profile type)."),
-    transactionName: z
-      .string()
-      .trim()
-      .optional()
-      .describe(
-        "Transaction name (e.g., 'GET /api/users'). Required for profile type.",
-      ),
   },
 
   annotations: { readOnlyHint: true, openWorldHint: true },
@@ -465,13 +499,8 @@ export default defineTool({
     const resolved = resolveResourceParams({
       url: params.url,
       resourceType: params.resourceType,
+      resourceId: params.resourceId,
       organizationSlug: params.organizationSlug,
-      issueId: params.issueId,
-      eventId: params.eventId,
-      traceId: params.traceId,
-      projectSlug: params.projectSlug,
-      profilerId: params.profilerId,
-      transactionName: params.transactionName,
     });
 
     setTag("resource.type", resolved.type);
@@ -487,14 +516,13 @@ export default defineTool({
     }
 
     // Dispatch to the appropriate handler for fully supported types
-    // After the above check, resolved.type is narrowed to FullySupportedType
     switch (resolved.type) {
       case "issue":
         return getIssueDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,
             issueId: resolved.issueId,
-            regionUrl: params.regionUrl,
+            regionUrl: null,
           },
           context,
         );
@@ -503,9 +531,8 @@ export default defineTool({
         return getIssueDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,
-            issueId: resolved.issueId,
             eventId: resolved.eventId,
-            regionUrl: params.regionUrl,
+            regionUrl: null,
           },
           context,
         );
@@ -515,10 +542,42 @@ export default defineTool({
           {
             organizationSlug: resolved.organizationSlug,
             traceId: resolved.traceId!,
-            regionUrl: params.regionUrl,
+            regionUrl: null,
           },
           context,
         );
+
+      case "breadcrumbs": {
+        const apiService = apiServiceFromContext(context);
+        const issueId = resolved.issueId!;
+
+        try {
+          const event = await apiService.getLatestEventForIssue({
+            organizationSlug: resolved.organizationSlug,
+            issueId,
+          });
+
+          const breadcrumbEntry = event.entries.find(
+            (e) => e.type === "breadcrumbs",
+          );
+          const breadcrumbs =
+            (
+              breadcrumbEntry?.data as
+                | { values?: Array<Record<string, unknown>> }
+                | undefined
+            )?.values ?? [];
+
+          return formatBreadcrumbs(breadcrumbs, issueId, event.id);
+        } catch (error) {
+          if (error instanceof ApiNotFoundError) {
+            throw enhanceNotFoundError(error, {
+              organizationSlug: resolved.organizationSlug,
+              issueId,
+            });
+          }
+          throw error;
+        }
+      }
 
       case "profile":
         return getProfile.handler(
@@ -526,8 +585,7 @@ export default defineTool({
             organizationSlug: resolved.organizationSlug,
             projectSlugOrId: resolved.projectSlug,
             transactionName: resolved.transactionName,
-            regionUrl: params.regionUrl,
-            // Use defaults for optional profile params
+            regionUrl: null,
             statsPeriod: "7d",
             focusOnUserCode: true,
             maxHotPaths: 10,
