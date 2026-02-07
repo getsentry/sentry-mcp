@@ -401,6 +401,7 @@ export default defineTool({
         return getIssueDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,
+            issueId: resolved.issueId,
             eventId: resolved.eventId,
             regionUrl: null,
           },
