@@ -126,7 +126,7 @@ export const ParamAssignedTo = z
   .string()
   .trim()
   .describe(
-    "The assignee in format 'user:ID' or 'team:ID' where ID is numeric. Example: 'user:123456' or 'team:789'. Use the whoami tool to find your user ID.",
+    "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use the whoami tool to find your user ID.",
   );
 
 export const ParamSentryGuide = z

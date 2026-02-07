@@ -128,6 +128,28 @@ describe("update_issue", () => {
     `);
   });
 
+  it("assigns issue to team by slug", async () => {
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: undefined,
+        assignedTo: "team:the-goats",
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: undefined,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toContain("Assigned To");
+    expect(result).toContain("team:the-goats");
+  });
+
   it("validates required parameters", async () => {
     await expect(
       updateIssue.handler(
