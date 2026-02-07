@@ -1,4 +1,11 @@
-import { generateText, Output, type Tool, APICallError, stepCountIs } from "ai";
+import {
+  generateText,
+  Output,
+  type Tool,
+  APICallError,
+  NoObjectGeneratedError,
+  stepCountIs,
+} from "ai";
 import { getAgentProvider } from "./provider-factory";
 import { UserInputError, LLMProviderError } from "../../errors";
 import type { z } from "zod";
@@ -69,6 +76,17 @@ export async function callEmbeddedAgent<
       }
     },
   }).catch((error: unknown) => {
+    // Rescue NoObjectGeneratedError: try to parse the raw LLM text through the schema
+    // (schema defaults like .default("") fill missing fields)
+    if (NoObjectGeneratedError.isInstance(error)) {
+      if (error.text) {
+        return rescueFromText(error.text, schema);
+      }
+      throw new UserInputError(
+        "The AI was unable to process your query. Please try rephrasing.",
+      );
+    }
+
     // Handle LLM provider errors with user-friendly messages
     // These are user-facing errors that should NOT be reported to Sentry
     if (APICallError.isInstance(error)) {
@@ -95,6 +113,11 @@ export async function callEmbeddedAgent<
     // Re-throw 5xx and other errors to be handled by the caller (logged to Sentry)
     throw error;
   });
+
+  // Rescued result from NoObjectGeneratedError - already validated through schema
+  if ("rescued" in result) {
+    return { result: result.rescued, toolCalls: capturedToolCalls };
+  }
 
   if (!result.experimental_output) {
     throw new Error("Failed to generate output");
@@ -123,4 +146,27 @@ export async function callEmbeddedAgent<
     result: parsedResult.data,
     toolCalls: capturedToolCalls,
   };
+}
+
+/**
+ * Attempt to rescue a failed structured output by parsing raw LLM text through the schema.
+ * Schema defaults (e.g., `.default("")`) fill missing optional fields.
+ * Throws UserInputError if the text cannot be parsed or doesn't match the schema.
+ */
+function rescueFromText<TOutput>(
+  text: string,
+  schema: z.ZodType<TOutput, z.ZodTypeDef, unknown>,
+): { rescued: TOutput } {
+  try {
+    const parsed = JSON.parse(text);
+    const result = schema.safeParse(parsed);
+    if (result.success) {
+      return { rescued: result.data };
+    }
+  } catch {
+    // JSON parse failed
+  }
+  throw new UserInputError(
+    "The AI was unable to process your query. Please try rephrasing.",
+  );
 }
