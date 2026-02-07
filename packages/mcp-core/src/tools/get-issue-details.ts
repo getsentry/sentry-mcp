@@ -148,6 +148,7 @@ export default defineTool({
         autofixState,
         performanceTrace,
         externalIssues,
+        experimentalMode: context.experimentalMode,
       });
     }
 
@@ -215,6 +216,7 @@ export default defineTool({
       autofixState,
       performanceTrace,
       externalIssues,
+      experimentalMode: context.experimentalMode,
     });
   },
 });

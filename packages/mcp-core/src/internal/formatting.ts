@@ -1696,6 +1696,7 @@ export function formatIssueOutput({
   autofixState,
   performanceTrace,
   externalIssues,
+  experimentalMode,
 }: {
   organizationSlug: string;
   issue: Issue;
@@ -1704,6 +1705,7 @@ export function formatIssueOutput({
   autofixState?: AutofixRunState;
   performanceTrace?: Trace;
   externalIssues?: ExternalIssueList;
+  experimentalMode?: boolean;
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
 
@@ -1860,6 +1862,8 @@ export function formatIssueOutput({
   output +=
     "- The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.\n";
   output += `- To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='${organizationSlug}', issueId='${issue.shortId}', naturalLanguageQuery='your query')\`\n`;
-  output += `- To see the trail of events leading up to this error, use \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
+  if (experimentalMode) {
+    output += `- To see the trail of events leading up to this error, use \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
+  }
   return output;
 }
