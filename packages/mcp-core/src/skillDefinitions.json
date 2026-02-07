@@ -49,7 +49,7 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nUSE THIS TOOL WHEN:\n- User provides a Sentry URL (issue, event, trace, profile, replay, monitor, release)\n- User wants to fetch a specific resource by type and ID\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\nget_sentry_resource(resourceType='breadcrumbs', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>\n\n<hints>\n- If user provides a Sentry URL, pass the ENTIRE URL to the `url` parameter\n- Use `resourceType='breadcrumbs'` with an issue URL to see the trail of events leading up to the error\n- For replay, monitor, and release URLs, this tool returns guidance on which tools to use instead\n</hints>",
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {

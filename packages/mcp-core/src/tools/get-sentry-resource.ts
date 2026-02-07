@@ -13,7 +13,7 @@ import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
 import getProfile from "./get-profile";
 
-/** Types available in both URL mode and explicit mode (resourceType + resourceId). */
+/** Types with full API integration. */
 export const FULLY_SUPPORTED_TYPES = [
   "issue",
   "event",
@@ -70,7 +70,7 @@ export function resolveResourceParams(params: {
   if (!params.resourceType) {
     throw new UserInputError(
       "Either `url` or `resourceType` must be provided. " +
-        "Use `url` to automatically detect the resource type, or specify `resourceType` explicitly.",
+        "Pass a `url` to auto-detect the resource type, or specify `resourceType` with `resourceId`.",
     );
   }
 
@@ -325,10 +325,6 @@ export default defineTool({
   description: [
     "Fetch a Sentry resource by URL or by type and ID.",
     "",
-    "USE THIS TOOL WHEN:",
-    "- User provides a Sentry URL (issue, event, trace, profile, replay, monitor, release)",
-    "- User wants to fetch a specific resource by type and ID",
-    "",
     "<examples>",
     "### From a Sentry URL",
     "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
@@ -338,14 +334,7 @@ export default defineTool({
     "",
     "### By type and ID",
     "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
-    "get_sentry_resource(resourceType='breadcrumbs', organizationSlug='my-org', resourceId='PROJECT-123')",
     "</examples>",
-    "",
-    "<hints>",
-    "- If user provides a Sentry URL, pass the ENTIRE URL to the `url` parameter",
-    "- Use `resourceType='breadcrumbs'` with an issue URL to see the trail of events leading up to the error",
-    "- For replay, monitor, and release URLs, this tool returns guidance on which tools to use instead",
-    "</hints>",
   ].join("\n"),
 
   inputSchema: {
