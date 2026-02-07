@@ -20,7 +20,7 @@ describe("find_teams", () => {
     expect(result).toMatchInlineSnapshot(`
       "# Teams in **sentry-mcp-evals**
 
-      - the-goats
+      - the-goats (ID: 4509106740854784)
       "
     `);
   });

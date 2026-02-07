@@ -20,7 +20,7 @@ export default defineTool({
     "",
     "Use this tool when you need to:",
     "- View teams in a Sentry organization",
-    "- Find a team's slug to aid other tool requests",
+    "- Find a team's slug and numeric ID to aid other tool requests",
     "- Search for specific teams by name or slug",
     "",
     `Returns up to ${RESULT_LIMIT} results. If you hit this limit, use the query parameter to narrow down results.`,
@@ -65,7 +65,7 @@ export default defineTool({
       return output;
     }
 
-    output += teams.map((team) => `- ${team.slug}\n`).join("");
+    output += teams.map((team) => `- ${team.slug} (ID: ${team.id})\n`).join("");
 
     if (teams.length === RESULT_LIMIT) {
       output += `\n---\n\n**Note:** Showing ${RESULT_LIMIT} results (maximum). There may be more teams available. Use the \`query\` parameter to search for specific teams.`;

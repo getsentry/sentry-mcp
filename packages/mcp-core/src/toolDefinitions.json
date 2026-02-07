@@ -324,7 +324,7 @@
   },
   {
     "name": "find_teams",
-    "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+    "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1261,7 +1261,7 @@
   },
   {
     "name": "update_issue",
-    "description": "Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.\n\nUse this tool when you need to:\n- Resolve an issue that has been fixed\n- Assign an issue to a team member or team for investigation\n- Mark an issue as ignored to reduce noise\n- Reopen a resolved issue by setting status to 'unresolved'\n\n<examples>\n### Resolve an issue\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='resolved')\n```\n\n### Assign an issue to a user (use whoami to get your user ID)\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='user:123456')\n```\n\n### Assign an issue to a team\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='team:789')\n```\n\n### Mark an issue as ignored\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='ignored')\n```\n\n</examples>\n\n<hints>\n- If the user provides the `issueUrl`, you can ignore the other required parameters and extract them from the URL.\n- At least one of `status` or `assignedTo` must be provided to update the issue.\n- assignedTo format: Use 'user:ID' for users (e.g., 'user:123456') or 'team:ID' for teams (e.g., 'team:789')\n- To find your user ID, first use the whoami tool which returns your numeric user ID\n- Valid status values are: 'resolved', 'resolvedInNextRelease', 'unresolved', 'ignored'.\n</hints>",
+    "description": "Update an issue's status or assignment in Sentry. This allows you to resolve, ignore, or reassign issues.\n\nUse this tool when you need to:\n- Resolve an issue that has been fixed\n- Assign an issue to a team member or team for investigation\n- Mark an issue as ignored to reduce noise\n- Reopen a resolved issue by setting status to 'unresolved'\n\n<examples>\n### Resolve an issue\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='resolved')\n```\n\n### Assign an issue to a user (use whoami to get your user ID)\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='user:123456')\n```\n\n### Assign an issue to a team (by ID or slug)\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='team:789')\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', assignedTo='team:my-team-slug')\n```\n\n### Mark an issue as ignored\n\n```\nupdate_issue(organizationSlug='my-organization', issueId='PROJECT-123', status='ignored')\n```\n\n</examples>\n\n<hints>\n- If the user provides the `issueUrl`, you can ignore the other required parameters and extract them from the URL.\n- At least one of `status` or `assignedTo` must be provided to update the issue.\n- assignedTo format: Use 'user:ID' for users (e.g., 'user:123456') or 'team:ID_OR_SLUG' for teams (e.g., 'team:789' or 'team:my-team-slug')\n- To find your user ID, first use the whoami tool which returns your numeric user ID\n- Valid status values are: 'resolved', 'resolvedInNextRelease', 'unresolved', 'ignored'.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1303,7 +1303,7 @@
         },
         "assignedTo": {
           "type": "string",
-          "description": "The assignee in format 'user:ID' or 'team:ID' where ID is numeric. Example: 'user:123456' or 'team:789'. Use the whoami tool to find your user ID."
+          "description": "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use the whoami tool to find your user ID."
         }
       },
       "additionalProperties": false,
