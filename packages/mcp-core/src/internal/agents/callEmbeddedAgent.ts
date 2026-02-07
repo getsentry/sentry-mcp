@@ -8,6 +8,7 @@ import {
 } from "ai";
 import { getAgentProvider } from "./provider-factory";
 import { UserInputError, LLMProviderError } from "../../errors";
+import { logWarn } from "../../telem/logging";
 import type { z } from "zod";
 
 export type ToolCall = {
@@ -80,8 +81,26 @@ export async function callEmbeddedAgent<
     // (schema defaults like .default("") fill missing fields)
     if (NoObjectGeneratedError.isInstance(error)) {
       if (error.text) {
-        return rescueFromText(error.text, schema);
+        const rescued = rescueFromText(error.text, schema);
+        if (rescued) {
+          logWarn("NoObjectGeneratedError rescued via schema defaults", {
+            loggerScope: ["agents", "embedded"],
+            extra: {
+              errorMessage: error.message,
+              finishReason: error.finishReason,
+            },
+          });
+          return rescued;
+        }
       }
+      logWarn("NoObjectGeneratedError could not be rescued", {
+        loggerScope: ["agents", "embedded"],
+        extra: {
+          errorMessage: error.message,
+          hasText: !!error.text,
+          finishReason: error.finishReason,
+        },
+      });
       throw new UserInputError(
         "The AI was unable to process your query. Please try rephrasing.",
       );
@@ -151,12 +170,12 @@ export async function callEmbeddedAgent<
 /**
  * Attempt to rescue a failed structured output by parsing raw LLM text through the schema.
  * Schema defaults (e.g., `.default("")`) fill missing optional fields.
- * Throws UserInputError if the text cannot be parsed or doesn't match the schema.
+ * Returns null if the text cannot be parsed or doesn't match the schema.
  */
 function rescueFromText<TOutput>(
   text: string,
   schema: z.ZodType<TOutput, z.ZodTypeDef, unknown>,
-): { rescued: TOutput } {
+): { rescued: TOutput } | null {
   try {
     const parsed = JSON.parse(text);
     const result = schema.safeParse(parsed);
@@ -166,7 +185,5 @@ function rescueFromText<TOutput>(
   } catch {
     // JSON parse failed
   }
-  throw new UserInputError(
-    "The AI was unable to process your query. Please try rephrasing.",
-  );
+  return null;
 }
