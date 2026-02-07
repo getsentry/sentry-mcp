@@ -482,8 +482,8 @@ describe("resolveResourceParams", () => {
     });
   });
 
-  // ─── Explicit mode ────────────────────────────────────────────────────────
-  describe("Explicit mode", () => {
+  // ─── By type and ID ─────────────────────────────────────────────────────────
+  describe("By type and ID", () => {
     it("resolves issue type", () => {
       expect(
         resolveResourceParams({
@@ -569,8 +569,8 @@ describe("resolveResourceParams", () => {
     });
   });
 
-  // ─── Explicit mode: validation errors ─────────────────────────────────────
-  describe("Explicit mode — validation errors", () => {
+  // ─── By type and ID: validation errors ──────────────────────────────────────
+  describe("By type and ID — validation errors", () => {
     it("throws when neither url nor resourceType provided", () => {
       expect(() => resolveResourceParams({})).toThrow(
         "Either `url` or `resourceType` must be provided",
@@ -583,15 +583,13 @@ describe("resolveResourceParams", () => {
       ).toThrow("Either `url` or `resourceType` must be provided");
     });
 
-    it("throws when organizationSlug missing for explicit mode", () => {
+    it("throws when organizationSlug missing", () => {
       expect(() =>
         resolveResourceParams({
           resourceType: "issue",
           resourceId: "PROJECT-123",
         }),
-      ).toThrow(
-        "`organizationSlug` is required when using explicit `resourceType`",
-      );
+      ).toThrow("`organizationSlug` is required when not using a URL");
     });
 
     it("throws when resourceId missing", () => {
@@ -600,7 +598,7 @@ describe("resolveResourceParams", () => {
           resourceType: "issue",
           organizationSlug: "my-org",
         }),
-      ).toThrow("`resourceId` is required when using explicit `resourceType`");
+      ).toThrow("`resourceId` is required when not using a URL");
     });
 
     it("throws for unsupported explicit resourceType (profile)", () => {

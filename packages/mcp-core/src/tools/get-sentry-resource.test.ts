@@ -357,8 +357,8 @@ describe("get_sentry_resource", () => {
     });
   });
 
-  // ─── Explicit mode ────────────────────────────────────────────────────────
-  describe("Explicit mode", () => {
+  // ─── By type and ID ─────────────────────────────────────────────────────────
+  describe("By type and ID", () => {
     it("fetches issue by shortId", async () => {
       const result = await callHandler({
         resourceType: "issue",
@@ -547,9 +547,7 @@ describe("get_sentry_resource", () => {
     it("throws when organizationSlug missing for explicit mode", async () => {
       await expect(
         callHandler({ resourceType: "issue", resourceId: "PROJECT-123" }),
-      ).rejects.toThrow(
-        "`organizationSlug` is required when using explicit `resourceType`",
-      );
+      ).rejects.toThrow("`organizationSlug` is required when not using a URL");
     });
 
     it("throws when resourceId missing for issue type", async () => {
@@ -558,9 +556,7 @@ describe("get_sentry_resource", () => {
           resourceType: "issue",
           organizationSlug: "my-org",
         }),
-      ).rejects.toThrow(
-        "`resourceId` is required when using explicit `resourceType`",
-      );
+      ).rejects.toThrow("`resourceId` is required when not using a URL");
     });
 
     it("throws when resourceId missing for event type", async () => {
@@ -569,9 +565,7 @@ describe("get_sentry_resource", () => {
           resourceType: "event",
           organizationSlug: "my-org",
         }),
-      ).rejects.toThrow(
-        "`resourceId` is required when using explicit `resourceType`",
-      );
+      ).rejects.toThrow("`resourceId` is required when not using a URL");
     });
 
     it("throws when resourceId missing for trace type", async () => {
@@ -580,9 +574,7 @@ describe("get_sentry_resource", () => {
           resourceType: "trace",
           organizationSlug: "my-org",
         }),
-      ).rejects.toThrow(
-        "`resourceId` is required when using explicit `resourceType`",
-      );
+      ).rejects.toThrow("`resourceId` is required when not using a URL");
     });
 
     it("throws when resourceId missing for breadcrumbs type", async () => {
@@ -591,9 +583,7 @@ describe("get_sentry_resource", () => {
           resourceType: "breadcrumbs",
           organizationSlug: "my-org",
         }),
-      ).rejects.toThrow(
-        "`resourceId` is required when using explicit `resourceType`",
-      );
+      ).rejects.toThrow("`resourceId` is required when not using a URL");
     });
 
     it("throws for unsupported explicit resourceType (profile)", async () => {
