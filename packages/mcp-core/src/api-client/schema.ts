@@ -705,8 +705,8 @@ export const IssueTagValuesSchema = z.object({
  * system like Jira, GitHub Issues, GitLab, etc.
  */
 export const ExternalIssueSchema = z.object({
-  id: z.string(),
-  issueId: z.string(),
+  id: z.union([z.string(), z.number()]),
+  issueId: z.union([z.string(), z.number()]),
   serviceType: z.string(),
   displayName: z.string(),
   webUrl: z.string(),
