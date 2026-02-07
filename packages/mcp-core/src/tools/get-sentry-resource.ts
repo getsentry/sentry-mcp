@@ -12,9 +12,7 @@ import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
 import getProfile from "./get-profile";
 
-/**
- * Resource types fully supported with API integration.
- */
+/** Types available in both URL mode and explicit mode (resourceType + resourceId). */
 export const FULLY_SUPPORTED_TYPES = [
   "issue",
   "event",
@@ -23,24 +21,18 @@ export const FULLY_SUPPORTED_TYPES = [
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
-/**
- * Resource types recognized from URLs but not yet fully supported.
- * Profile is supported via URL mode (delegates to get_profile handler)
- * but not in explicit mode (needs transactionName which doesn't fit resourceId).
- */
+/** Recognized from URLs but not yet fully supported -- return guidance messages. */
 export type RecognizedType = "replay" | "monitor" | "release";
 
 /**
- * All resource types (supported + recognized + URL-only).
+ * All resource types. Profile is URL-only (delegates to get_profile, which
+ * needs transactionName -- not expressible through a single resourceId).
  */
 export type ResolvedResourceType =
   | FullySupportedType
   | RecognizedType
   | "profile";
 
-/**
- * Resolved parameters after URL parsing or explicit params validation.
- */
 export interface ResolvedResourceParams {
   type: ResolvedResourceType;
   organizationSlug: string;
@@ -63,22 +55,17 @@ export interface ResolvedResourceParams {
   releaseVersion?: string;
 }
 
-/**
- * Validates and resolves resource parameters from URL or explicit params.
- */
 export function resolveResourceParams(params: {
   url?: string | null;
   resourceType?: string | null;
   resourceId?: string | null;
   organizationSlug?: string | null;
 }): ResolvedResourceParams {
-  // URL-based resolution
   if (params.url) {
     const parsed = parseSentryUrl(params.url);
     return resolveFromParsedUrl(parsed, params);
   }
 
-  // Explicit params resolution
   if (!params.resourceType) {
     throw new UserInputError(
       "Either `url` or `resourceType` must be provided. " +
@@ -104,7 +91,6 @@ export function resolveResourceParams(params: {
   const resourceType = params.resourceType as FullySupportedType;
   const organizationSlug = params.organizationSlug;
 
-  // All explicit mode types require resourceId
   if (!params.resourceId) {
     throw new UserInputError(
       "`resourceId` is required when using explicit `resourceType`.",
@@ -113,7 +99,6 @@ export function resolveResourceParams(params: {
 
   const resourceId = params.resourceId;
 
-  // Map resourceId to type-specific fields
   switch (resourceType) {
     case "issue":
       return {
@@ -146,8 +131,8 @@ export function resolveResourceParams(params: {
 }
 
 /**
- * Resolves params from a parsed Sentry URL.
  * When resourceType is provided alongside a URL, it overrides the auto-detected type.
+ * Only 'breadcrumbs' is allowed as an override (requires an issue URL).
  */
 function resolveFromParsedUrl(
   parsed: ParsedSentryUrl,
@@ -167,7 +152,6 @@ function resolveFromParsedUrl(
     );
   }
 
-  // Handle resourceType override (only breadcrumbs is allowed as an override)
   if (params.resourceType && params.resourceType !== detectedType) {
     if (params.resourceType !== "breadcrumbs") {
       throw new UserInputError(
@@ -267,9 +251,6 @@ function resolveFromParsedUrl(
   }
 }
 
-/**
- * Generates a helpful message for recognized but not fully supported resource types.
- */
 function generateUnsupportedResourceMessage(
   resolved: ResolvedResourceParams,
 ): string {
@@ -336,9 +317,6 @@ function generateUnsupportedResourceMessage(
   }
 }
 
-/**
- * Formats breadcrumbs from an event as a structured log.
- */
 function formatBreadcrumbs(
   breadcrumbs: Array<{
     timestamp?: string | null;
@@ -373,20 +351,16 @@ function formatBreadcrumbs(
   for (const crumb of breadcrumbs) {
     const timestamp = crumb.timestamp
       ? new Date(crumb.timestamp).toISOString()
-      : "                        ";
+      : " ".repeat(24);
     const level = (crumb.level ?? "info").padEnd(7);
     const category = crumb.category ?? crumb.type ?? "-";
-    const message = truncate(crumb.message ?? "", 120);
+    const message = cleanAndTruncate(crumb.message ?? "", 120);
     const data = formatBreadcrumbData(crumb.data);
 
-    let line = `${timestamp} ${level} [${category}]`;
-    if (message) {
-      line += ` ${message}`;
-    }
-    if (data) {
-      line += ` ${data}`;
-    }
-    output.push(line);
+    const parts = [`${timestamp} ${level} [${category}]`];
+    if (message) parts.push(message);
+    if (data) parts.push(data);
+    output.push(parts.join(" "));
   }
 
   output.push("```");
@@ -401,25 +375,22 @@ function formatBreadcrumbs(
 }
 
 /**
- * Formats breadcrumb data as a compact inline string.
+ * Formats breadcrumb data as a compact inline JSON string.
  */
 function formatBreadcrumbData(
   data: Record<string, unknown> | null | undefined,
 ): string {
   if (!data || Object.keys(data).length === 0) return "";
-  const json = JSON.stringify(data);
-  return truncate(json, 200);
+  return cleanAndTruncate(JSON.stringify(data), 200);
 }
 
 /**
- * Truncates a string to maxLen characters.
+ * Strips newlines and truncates a string to maxLen characters.
  */
-function truncate(str: string, maxLen: number): string {
+function cleanAndTruncate(str: string, maxLen: number): string {
   const clean = str.replace(/[\r\n]+/g, " ");
-  if (clean.length > maxLen) {
-    return `${clean.slice(0, maxLen)}...`;
-  }
-  return clean;
+  if (clean.length <= maxLen) return clean;
+  return `${clean.slice(0, maxLen)}...`;
 }
 
 export default defineTool({
@@ -495,7 +466,6 @@ export default defineTool({
   annotations: { readOnlyHint: true, openWorldHint: true },
 
   async handler(params, context: ServerContext) {
-    // Resolve params from URL or explicit values
     const resolved = resolveResourceParams({
       url: params.url,
       resourceType: params.resourceType,
@@ -506,7 +476,7 @@ export default defineTool({
     setTag("resource.type", resolved.type);
     setTag("organization.slug", resolved.organizationSlug);
 
-    // Handle recognized but not fully supported types
+    // Recognized but not yet fully supported types return guidance messages
     if (
       resolved.type === "replay" ||
       resolved.type === "monitor" ||
@@ -515,7 +485,6 @@ export default defineTool({
       return generateUnsupportedResourceMessage(resolved);
     }
 
-    // Dispatch to the appropriate handler for fully supported types
     switch (resolved.type) {
       case "issue":
         return getIssueDetails.handler(
@@ -560,12 +529,10 @@ export default defineTool({
           const breadcrumbEntry = event.entries.find(
             (e) => e.type === "breadcrumbs",
           );
-          const breadcrumbs =
-            (
-              breadcrumbEntry?.data as
-                | { values?: Array<Record<string, unknown>> }
-                | undefined
-            )?.values ?? [];
+          const entryData = breadcrumbEntry?.data as
+            | { values?: Array<Record<string, unknown>> }
+            | undefined;
+          const breadcrumbs = entryData?.values ?? [];
 
           return formatBreadcrumbs(breadcrumbs, issueId, event.id);
         } catch (error) {
@@ -594,7 +561,6 @@ export default defineTool({
         );
 
       default: {
-        // TypeScript exhaustiveness check - this should never be reached
         const _exhaustiveCheck: never = resolved.type;
         throw new Error(`Unhandled resource type: ${_exhaustiveCheck}`);
       }

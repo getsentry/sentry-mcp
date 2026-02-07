@@ -16,25 +16,13 @@ const baseContext = {
   userId: "1",
 };
 
-/**
- * Helper to call the handler with minimal boilerplate.
- * Only url/resourceType/resourceId/organizationSlug are needed — the simplified schema.
- */
 function callHandler(params: {
   url?: string;
   resourceType?: "issue" | "event" | "trace" | "breadcrumbs";
   resourceId?: string;
   organizationSlug?: string;
 }) {
-  return getSentryResource.handler(
-    {
-      url: params.url,
-      resourceType: params.resourceType,
-      resourceId: params.resourceId,
-      organizationSlug: params.organizationSlug,
-    },
-    baseContext,
-  );
+  return getSentryResource.handler(params, baseContext);
 }
 
 describe("get_sentry_resource", () => {
@@ -651,12 +639,6 @@ describe("get_sentry_resource", () => {
         "resourceId",
         "organizationSlug",
       ]);
-    });
-
-    it("resourceType enum includes breadcrumbs", () => {
-      // Verify the enum includes all expected explicit-mode types
-      const schema = getSentryResource.inputSchema.resourceType;
-      expect(schema).toBeDefined();
     });
   });
 });
