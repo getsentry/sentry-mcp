@@ -3,12 +3,20 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Version to release
+      bump:
+        description: Version bump type
         required: true
+        type: choice
+        default: minor
+        options:
+          - patch
+          - minor
+          - major
       force:
-        description: Force a release even when there are release-blockers (empty string == false)
+        description: Force release (bypass blockers)
         required: false
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -33,16 +41,24 @@ jobs:
         with:
           node-version: "20"
 
-      # pnpm/action-setup@v4
       - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda
         name: Install pnpm
         with:
           run_install: false
+
+      - name: Calculate version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          CURRENT=$(node -p "require('./packages/mcp-server/package.json').version")
+          NEW=$(npx semver -i "$BUMP" "$CURRENT")
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
 
       - name: Prepare release
         uses: getsentry/action-prepare-release@v1
         env:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
         with:
-          version: ${{ github.event.inputs.version }}
-          force: ${{ github.event.inputs.force }}
+          version: ${{ steps.version.outputs.version }}
+          force: ${{ inputs.force }}
