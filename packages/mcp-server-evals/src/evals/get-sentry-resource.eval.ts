@@ -40,6 +40,17 @@ describeEval("get-sentry-resource", {
           },
         ],
       },
+      {
+        input: `Show me what happened in this trace: ${FIXTURES.traceUrl}`,
+        expectedTools: [
+          {
+            name: "get_sentry_resource",
+            arguments: {
+              url: FIXTURES.traceUrl,
+            },
+          },
+        ],
+      },
     ];
   },
   task: NoOpTaskRunner(),

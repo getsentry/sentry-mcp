@@ -26,8 +26,8 @@ export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 export type RecognizedType = "replay" | "monitor" | "release";
 
 /**
- * All resource types. Profile is URL-only (delegates to get_profile, which
- * needs transactionName -- not expressible through a single resourceId).
+ * All resource types. Profile is URL-only (requires transactionName,
+ * which is not expressible through a single resourceId).
  */
 export type ResolvedResourceType =
   | FullySupportedType
@@ -142,7 +142,7 @@ function resolveFromParsedUrl(
   if (detectedType === "unknown") {
     if (parsed.transaction) {
       throw new UserInputError(
-        `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`get_profile\` with the transaction name to analyze performance data, or \`search_events\` to find traces for this transaction.`,
+        `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`search_events\` to find traces and performance data for this transaction.`,
       );
     }
     throw new UserInputError(
