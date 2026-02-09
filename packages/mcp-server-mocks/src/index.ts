@@ -1473,6 +1473,7 @@ export const mswServer = setupServer(
 // Export fixtures for use in tests
 export {
   autofixStateFixture,
+  eventsFixture as eventFixture,
   traceMetaFixture,
   traceMetaWithNullsFixture,
   performanceEventFixture,

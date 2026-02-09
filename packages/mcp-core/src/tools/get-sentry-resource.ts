@@ -3,33 +3,38 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import { ParamOrganizationSlug } from "../schema";
 import { parseSentryUrl, type ParsedSentryUrl } from "../internal/url-helpers";
+import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { ApiNotFoundError } from "../api-client";
+import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
+import { fetchAndFormatBreadcrumbs } from "../internal/tool-helpers/breadcrumbs";
 import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
 import getProfile from "./get-profile";
 
-/**
- * Resource types fully supported with API integration.
- */
-const FULLY_SUPPORTED_TYPES = ["issue", "event", "trace", "profile"] as const;
-type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
+/** Types with full API integration. */
+export const FULLY_SUPPORTED_TYPES = [
+  "issue",
+  "event",
+  "trace",
+  "breadcrumbs",
+] as const;
+export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
+
+/** Recognized from URLs but not yet fully supported -- return guidance messages. */
+export type RecognizedType = "replay" | "monitor" | "release";
 
 /**
- * Resource types recognized from URLs but not yet fully supported.
+ * All resource types. Profile is URL-only (requires transactionName,
+ * which is not expressible through a single resourceId).
  */
-const RECOGNIZED_TYPES = ["replay", "monitor", "release"] as const;
-type RecognizedType = (typeof RECOGNIZED_TYPES)[number];
+export type ResolvedResourceType =
+  | FullySupportedType
+  | RecognizedType
+  | "profile";
 
-/**
- * All resource types (supported + recognized).
- */
-type ResolvedResourceType = FullySupportedType | RecognizedType;
-
-/**
- * Resolved parameters after URL parsing or explicit params validation.
- */
-interface ResolvedResourceParams {
+export interface ResolvedResourceParams {
   type: ResolvedResourceType;
   organizationSlug: string;
   // Issue/Event params
@@ -51,31 +56,21 @@ interface ResolvedResourceParams {
   releaseVersion?: string;
 }
 
-/**
- * Validates and resolves resource parameters from URL or explicit params.
- */
-function resolveResourceParams(params: {
+export function resolveResourceParams(params: {
   url?: string | null;
   resourceType?: string | null;
+  resourceId?: string | null;
   organizationSlug?: string | null;
-  issueId?: string | null;
-  eventId?: string | null;
-  traceId?: string | null;
-  projectSlug?: string | null;
-  profilerId?: string | null;
-  transactionName?: string | null;
 }): ResolvedResourceParams {
-  // URL-based resolution
   if (params.url) {
     const parsed = parseSentryUrl(params.url);
     return resolveFromParsedUrl(parsed, params);
   }
 
-  // Explicit params resolution
   if (!params.resourceType) {
     throw new UserInputError(
       "Either `url` or `resourceType` must be provided. " +
-        "Use `url` to automatically detect the resource type, or specify `resourceType` explicitly.",
+        "Pass a `url` to auto-detect the resource type, or specify `resourceType` with `resourceId`.",
     );
   }
 
@@ -90,87 +85,64 @@ function resolveResourceParams(params: {
 
   if (!params.organizationSlug) {
     throw new UserInputError(
-      "`organizationSlug` is required when using explicit `resourceType`.",
+      "`organizationSlug` is required when not using a URL.",
     );
   }
 
   const resourceType = params.resourceType as FullySupportedType;
   const organizationSlug = params.organizationSlug;
 
-  // Validate type-specific required params
+  if (!params.resourceId) {
+    throw new UserInputError("`resourceId` is required when not using a URL.");
+  }
+
+  const resourceId = params.resourceId;
+
   switch (resourceType) {
     case "issue":
-      if (!params.issueId) {
-        throw new UserInputError(
-          "`issueId` is required for resource type 'issue'.",
-        );
-      }
       return {
         type: "issue",
         organizationSlug,
-        issueId: params.issueId,
+        issueId: resourceId.toUpperCase(),
       };
 
     case "event":
-      if (!params.issueId || !params.eventId) {
-        throw new UserInputError(
-          "`issueId` and `eventId` are required for resource type 'event'.",
-        );
-      }
       return {
         type: "event",
         organizationSlug,
-        issueId: params.issueId,
-        eventId: params.eventId,
+        eventId: resourceId,
       };
 
     case "trace":
-      if (!params.traceId) {
-        throw new UserInputError(
-          "`traceId` is required for resource type 'trace'.",
-        );
-      }
       return {
         type: "trace",
         organizationSlug,
-        traceId: params.traceId,
+        traceId: resourceId,
       };
 
-    case "profile":
-      if (!params.projectSlug) {
-        throw new UserInputError(
-          "`projectSlug` is required for resource type 'profile'.",
-        );
-      }
-      if (!params.transactionName) {
-        throw new UserInputError(
-          "`transactionName` is required for resource type 'profile'.",
-        );
-      }
+    case "breadcrumbs":
       return {
-        type: "profile",
+        type: "breadcrumbs",
         organizationSlug,
-        projectSlug: params.projectSlug,
-        profilerId: params.profilerId ?? undefined,
-        transactionName: params.transactionName,
+        issueId: resourceId.toUpperCase(),
       };
   }
 }
 
 /**
- * Resolves params from a parsed Sentry URL.
+ * When resourceType is provided alongside a URL, it overrides the auto-detected type.
+ * Only 'breadcrumbs' is allowed as an override (requires an issue URL).
  */
 function resolveFromParsedUrl(
   parsed: ParsedSentryUrl,
-  params: { transactionName?: string | null },
+  params: { resourceType?: string | null },
 ): ResolvedResourceParams {
-  const { type, organizationSlug } = parsed;
+  const { type: detectedType, organizationSlug } = parsed;
 
-  if (type === "unknown") {
-    // Check if we have a transaction from performance summary URL
+  if (detectedType === "unknown") {
     if (parsed.transaction) {
       throw new UserInputError(
-        `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`get_profile\` with the transaction name to analyze performance data, or \`search_events\` to find traces for this transaction.`,
+        `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`search_events\` to find traces and performance data for this transaction.`,
       );
     }
     throw new UserInputError(
@@ -179,7 +151,25 @@ function resolveFromParsedUrl(
     );
   }
 
-  switch (type) {
+  if (params.resourceType && params.resourceType !== detectedType) {
+    if (params.resourceType !== "breadcrumbs") {
+      throw new UserInputError(
+        `Cannot override URL type with resourceType '${params.resourceType}'. Only 'breadcrumbs' can be used as a resourceType override with a URL.`,
+      );
+    }
+    if (!parsed.issueId) {
+      throw new UserInputError(
+        "Could not extract issue ID from URL for breadcrumbs. Provide an issue URL.",
+      );
+    }
+    return {
+      type: "breadcrumbs",
+      organizationSlug,
+      issueId: parsed.issueId,
+    };
+  }
+
+  switch (detectedType) {
     case "issue":
       if (!parsed.issueId) {
         throw new UserInputError("Could not extract issue ID from URL.");
@@ -214,22 +204,18 @@ function resolveFromParsedUrl(
         spanId: parsed.spanId,
       };
 
-    case "profile": {
+    case "profile":
       if (!parsed.projectSlug) {
         throw new UserInputError(
           "Could not extract project slug from profile URL.",
         );
       }
-      // transactionName may come from explicit param since URLs don't always contain it
-      const transactionName = params.transactionName ?? undefined;
       return {
         type: "profile",
         organizationSlug,
         projectSlug: parsed.projectSlug,
         profilerId: parsed.profilerId,
-        transactionName,
       };
-    }
 
     case "replay":
       if (!parsed.replayId) {
@@ -264,9 +250,6 @@ function resolveFromParsedUrl(
   }
 }
 
-/**
- * Generates a helpful message for recognized but not fully supported resource types.
- */
 function generateUnsupportedResourceMessage(
   resolved: ResolvedResourceParams,
 ): string {
@@ -340,144 +323,61 @@ export default defineTool({
   experimental: true,
 
   description: [
-    "Unified entry point for fetching Sentry resources. Auto-detects resource type from URL or accepts explicit type and identifiers.",
-    "",
-    "USE THIS TOOL WHEN:",
-    "- User provides a Sentry URL (any type: issue, event, trace, profile, replay, monitor, release)",
-    "- User wants to fetch a specific resource by type and ID",
-    "",
-    "FULLY SUPPORTED:",
-    "- **issue**: Fetch issue details by ID",
-    "- **event**: Fetch specific event within an issue",
-    "- **trace**: Fetch trace details (supports span focus from URL)",
-    "- **profile**: Fetch and analyze CPU profiling data",
-    "",
-    "URL RECOGNIZED (returns helpful guidance):",
-    "- **replay**: Session replay URLs",
-    "- **monitor**: Cron monitor URLs",
-    "- **release**: Release URLs",
+    "Fetch a Sentry resource by URL or by type and ID.",
     "",
     "<examples>",
-    "### URL mode (auto-detect type)",
-    "```",
-    "get_sentry_resource(url='https://my-org.sentry.io/issues/PROJECT-123')",
-    "get_sentry_resource(url='https://my-org.sentry.io/explore/traces/trace/abc123...')",
-    "get_sentry_resource(url='https://my-org.sentry.io/replays/def456...')",
-    "```",
+    "### From a Sentry URL",
+    "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
     "",
-    "### Explicit mode - Issue",
-    "```",
-    "get_sentry_resource(",
-    "  resourceType='issue',",
-    "  organizationSlug='my-org',",
-    "  issueId='PROJECT-123'",
-    ")",
-    "```",
+    "### Breadcrumbs from a Sentry URL",
+    "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')",
     "",
-    "### Explicit mode - Trace",
-    "```",
-    "get_sentry_resource(",
-    "  resourceType='trace',",
-    "  organizationSlug='my-org',",
-    "  traceId='a4d1aae7216b47ff8117cf4e09ce9d0a'",
-    ")",
-    "```",
+    "### By type and ID",
+    "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
     "</examples>",
-    "",
-    "<hints>",
-    "- URL mode is simplest: just pass the Sentry URL and the tool auto-detects the resource type",
-    "- For explicit mode, required params depend on resourceType:",
-    "  - issue: organizationSlug, issueId",
-    "  - event: organizationSlug, issueId, eventId",
-    "  - trace: organizationSlug, traceId",
-    "  - profile: organizationSlug, projectSlug, transactionName",
-    "</hints>",
   ].join("\n"),
 
   inputSchema: {
-    // Mode 1: URL-based (auto-detect type)
     url: z
       .string()
       .url()
       .optional()
       .describe(
-        "Sentry URL. Auto-detects resource type (issue, event, trace, profile, replay, monitor, release) from URL pattern.",
+        "Sentry URL. The resource type is auto-detected from the URL pattern.",
       ),
 
-    // Mode 2: Explicit type + identifier
     resourceType: z
-      .enum(["issue", "event", "trace", "profile"])
+      .enum(["issue", "event", "trace", "breadcrumbs"])
       .optional()
       .describe(
-        "Resource type when not using URL. Required params depend on type.",
+        "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL).",
+      ),
+
+    resourceId: z
+      .string()
+      .trim()
+      .optional()
+      .describe(
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
-    regionUrl: ParamRegionUrl.nullable().default(null),
-
-    // Issue/Event identifiers
-    issueId: z
-      .string()
-      .toUpperCase()
-      .trim()
-      .optional()
-      .describe(
-        "Issue ID (e.g., 'PROJECT-123'). Required for issue/event types.",
-      ),
-    eventId: z
-      .string()
-      .trim()
-      .optional()
-      .describe("Event ID. Required for event type."),
-
-    // Trace identifier
-    traceId: z
-      .string()
-      .trim()
-      .optional()
-      .describe("Trace ID (32-char hex string). Required for trace type."),
-
-    // Profile identifiers
-    projectSlug: z
-      .string()
-      .toLowerCase()
-      .trim()
-      .optional()
-      .describe("Project slug. Required for profile type."),
-    profilerId: z
-      .string()
-      .trim()
-      .optional()
-      .describe("Profiler ID (optional for profile type)."),
-    transactionName: z
-      .string()
-      .trim()
-      .optional()
-      .describe(
-        "Transaction name (e.g., 'GET /api/users'). Required for profile type.",
-      ),
   },
 
   annotations: { readOnlyHint: true, openWorldHint: true },
 
   async handler(params, context: ServerContext) {
-    // Resolve params from URL or explicit values
     const resolved = resolveResourceParams({
       url: params.url,
       resourceType: params.resourceType,
+      resourceId: params.resourceId,
       organizationSlug: params.organizationSlug,
-      issueId: params.issueId,
-      eventId: params.eventId,
-      traceId: params.traceId,
-      projectSlug: params.projectSlug,
-      profilerId: params.profilerId,
-      transactionName: params.transactionName,
     });
 
     setTag("resource.type", resolved.type);
     setTag("organization.slug", resolved.organizationSlug);
 
-    // Handle recognized but not fully supported types
+    // Recognized but not yet fully supported types return guidance messages
     if (
       resolved.type === "replay" ||
       resolved.type === "monitor" ||
@@ -486,15 +386,13 @@ export default defineTool({
       return generateUnsupportedResourceMessage(resolved);
     }
 
-    // Dispatch to the appropriate handler for fully supported types
-    // After the above check, resolved.type is narrowed to FullySupportedType
     switch (resolved.type) {
       case "issue":
         return getIssueDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,
             issueId: resolved.issueId,
-            regionUrl: params.regionUrl,
+            regionUrl: null,
           },
           context,
         );
@@ -505,7 +403,7 @@ export default defineTool({
             organizationSlug: resolved.organizationSlug,
             issueId: resolved.issueId,
             eventId: resolved.eventId,
-            regionUrl: params.regionUrl,
+            regionUrl: null,
           },
           context,
         );
@@ -515,10 +413,29 @@ export default defineTool({
           {
             organizationSlug: resolved.organizationSlug,
             traceId: resolved.traceId!,
-            regionUrl: params.regionUrl,
+            regionUrl: null,
           },
           context,
         );
+
+      case "breadcrumbs": {
+        const apiService = apiServiceFromContext(context);
+        try {
+          return await fetchAndFormatBreadcrumbs(
+            apiService,
+            resolved.organizationSlug,
+            resolved.issueId!,
+          );
+        } catch (error) {
+          if (error instanceof ApiNotFoundError) {
+            throw enhanceNotFoundError(error, {
+              organizationSlug: resolved.organizationSlug,
+              issueId: resolved.issueId,
+            });
+          }
+          throw error;
+        }
+      }
 
       case "profile":
         return getProfile.handler(
@@ -526,8 +443,7 @@ export default defineTool({
             organizationSlug: resolved.organizationSlug,
             projectSlugOrId: resolved.projectSlug,
             transactionName: resolved.transactionName,
-            regionUrl: params.regionUrl,
-            // Use defaults for optional profile params
+            regionUrl: null,
             statsPeriod: "7d",
             focusOnUserCode: true,
             maxHotPaths: 10,
@@ -536,7 +452,6 @@ export default defineTool({
         );
 
       default: {
-        // TypeScript exhaustiveness check - this should never be reached
         const _exhaustiveCheck: never = resolved.type;
         throw new Error(`Unhandled resource type: ${_exhaustiveCheck}`);
       }
