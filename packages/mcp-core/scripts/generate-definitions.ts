@@ -204,14 +204,17 @@ function buildAgentDescription(
   toolNames: string[],
   isExperimental: boolean,
 ): string {
-  const base =
-    "Interact with Sentry for error tracking and performance monitoring. " +
-    "Delegate to this agent when the user wants to search errors, analyze " +
-    "issues, view traces, get AI root cause analysis, or manage projects.";
-  if (isExperimental) {
-    return `${base} Includes experimental features and bleeding-edge capabilities. Available tools: ${toolNames.join(", ")}`;
-  }
-  return `${base} Available tools: ${toolNames.join(", ")}`;
+  const triggers =
+    "Sentry expert agent for error tracking and performance monitoring. " +
+    "Use when the user mentions Sentry issues, errors, exceptions, stack traces, " +
+    "performance traces, releases, or provides a Sentry URL. " +
+    "Capabilities: search and analyze issues, AI root cause analysis via Seer, " +
+    "trace exploration, event aggregation, tag distribution, SDK docs, " +
+    "project and team management.";
+  const experimental = isExperimental
+    ? " Includes experimental and bleeding-edge features."
+    : "";
+  return `${triggers}${experimental} Tools(${toolNames.length}): ${toolNames.join(", ")}`;
 }
 
 function syncAgentFrontmatter(
