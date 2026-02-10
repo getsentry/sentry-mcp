@@ -7,6 +7,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import YAML from "yaml";
 import { z, type ZodTypeAny } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
@@ -25,26 +26,23 @@ function ensureDirExists(dir: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-// Shared helpers for Zod parameter maps
-function zodFieldMapToDescriptions(
-  fieldMap: Record<string, ZodTypeAny>,
-): Record<string, { description: string }> {
-  const out: Record<string, { description: string }> = {};
-  for (const [key, schema] of Object.entries(fieldMap)) {
-    const js = zodToJsonSchema(schema, { $refStrategy: "none" }) as {
-      description?: string;
-    };
-    out[key] = { description: js.description || "" };
-  }
-  return out;
-}
-
 function zodFieldMapToJsonSchema(
   fieldMap: Record<string, ZodTypeAny>,
 ): unknown {
   if (!fieldMap || Object.keys(fieldMap).length === 0) return {};
   const obj = z.object(fieldMap);
   return zodToJsonSchema(obj, { $refStrategy: "none" });
+}
+
+// Plugin variants whose agent frontmatter gets synced by this script.
+// Add new entries here when creating a new plugin variant.
+const PLUGIN_AGENT_DIRS = ["sentry-mcp", "sentry-mcp-experimental"];
+const PLUGINS_DIR = path.join(__dirname, "../../../plugins");
+
+function agentPaths(): string[] {
+  return PLUGIN_AGENT_DIRS.map((dir) =>
+    path.join(PLUGINS_DIR, dir, "agents/sentry-mcp.md"),
+  );
 }
 
 function byName<T extends { name: string }>(a: T, b: T) {
@@ -169,10 +167,21 @@ function isUpToDate(outDir: string): boolean {
     return false;
   }
 
-  // Get oldest output modification time
-  const toolDefsMtime = fs.statSync(toolDefsPath).mtimeMs;
-  const skillDefsMtime = fs.statSync(skillDefsPath).mtimeMs;
-  const oldestOutputMtime = Math.min(toolDefsMtime, skillDefsMtime);
+  // Check agent frontmatter files exist
+  const agents = agentPaths();
+  for (const agentPath of agents) {
+    if (!fs.existsSync(agentPath)) {
+      return false;
+    }
+  }
+
+  // Get oldest output modification time (JSON files + agent files)
+  const outputMtimes = [
+    fs.statSync(toolDefsPath).mtimeMs,
+    fs.statSync(skillDefsPath).mtimeMs,
+    ...agents.map((p) => fs.statSync(p).mtimeMs),
+  ];
+  const oldestOutputMtime = Math.min(...outputMtimes);
 
   // Check if any input files are newer than outputs
   const toolsDir = path.join(__dirname, "../src/tools");
@@ -212,6 +221,26 @@ function isUpToDate(outDir: string): boolean {
   return true;
 }
 
+// Agent frontmatter sync — updates the allowedTools list in agent .md files
+function syncAgentFrontmatter(agentPath: string, toolNames: string[]) {
+  const content = fs.readFileSync(agentPath, "utf-8");
+  const parts = content.split("---");
+  if (parts.length < 3) {
+    console.warn(`⚠️  Skipping ${agentPath}: no valid YAML frontmatter found`);
+    return;
+  }
+
+  // parts[0] is empty (before first ---), parts[1] is frontmatter, rest is body
+  const frontmatterStr = parts[1];
+  const body = parts.slice(2).join("---");
+
+  const frontmatter = YAML.parse(frontmatterStr) as Record<string, unknown>;
+  frontmatter.allowedTools = toolNames;
+
+  const updated = `---\n${YAML.stringify(frontmatter)}---${body}`;
+  fs.writeFileSync(agentPath, updated);
+}
+
 async function main() {
   try {
     const outDir = path.join(__dirname, "../src");
@@ -231,8 +260,19 @@ async function main() {
     writeJson(path.join(outDir, "toolDefinitions.json"), tools);
     writeJson(path.join(outDir, "skillDefinitions.json"), skills);
 
+    // Sync allowedTools in agent frontmatter
+    const toolNames = tools.map((t) => t.name);
+
+    let agentsSynced = 0;
+    for (const agentPath of agentPaths()) {
+      if (fs.existsSync(agentPath)) {
+        syncAgentFrontmatter(agentPath, toolNames);
+        agentsSynced++;
+      }
+    }
+
     console.log(
-      `✅ Generated: tools(${tools.length}), skills(${skills.length})`,
+      `✅ Generated: tools(${tools.length}), skills(${skills.length}), agents(${agentsSynced})`,
     );
   } catch (error) {
     const err = error as Error;
