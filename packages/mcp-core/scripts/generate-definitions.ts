@@ -34,6 +34,17 @@ function zodFieldMapToJsonSchema(
   return zodToJsonSchema(obj, { $refStrategy: "none" });
 }
 
+// Plugin variants whose agent frontmatter gets synced by this script.
+// Add new entries here when creating a new plugin variant.
+const PLUGIN_AGENT_DIRS = ["sentry-mcp", "sentry-mcp-experimental"];
+const PLUGINS_DIR = path.join(__dirname, "../../../plugins");
+
+function agentPaths(): string[] {
+  return PLUGIN_AGENT_DIRS.map((dir) =>
+    path.join(PLUGINS_DIR, dir, "agents/sentry-mcp.md"),
+  );
+}
+
 function byName<T extends { name: string }>(a: T, b: T) {
   return a.name.localeCompare(b.name);
 }
@@ -157,12 +168,8 @@ function isUpToDate(outDir: string): boolean {
   }
 
   // Check agent frontmatter files exist
-  const pluginsDir = path.join(__dirname, "../../../plugins");
-  const agentDirs = ["sentry-mcp", "sentry-mcp-experimental"];
-  const agentPaths = agentDirs.map((dir) =>
-    path.join(pluginsDir, dir, "agents/sentry-mcp.md"),
-  );
-  for (const agentPath of agentPaths) {
+  const agents = agentPaths();
+  for (const agentPath of agents) {
     if (!fs.existsSync(agentPath)) {
       return false;
     }
@@ -172,7 +179,7 @@ function isUpToDate(outDir: string): boolean {
   const outputMtimes = [
     fs.statSync(toolDefsPath).mtimeMs,
     fs.statSync(skillDefsPath).mtimeMs,
-    ...agentPaths.map((p) => fs.statSync(p).mtimeMs),
+    ...agents.map((p) => fs.statSync(p).mtimeMs),
   ];
   const oldestOutputMtime = Math.min(...outputMtimes);
 
@@ -255,12 +262,9 @@ async function main() {
 
     // Sync allowedTools in agent frontmatter
     const toolNames = tools.map((t) => t.name);
-    const pluginsDir = path.join(__dirname, "../../../plugins");
-    const agentDirs = ["sentry-mcp", "sentry-mcp-experimental"];
 
     let agentsSynced = 0;
-    for (const dir of agentDirs) {
-      const agentPath = path.join(pluginsDir, dir, "agents/sentry-mcp.md");
+    for (const agentPath of agentPaths()) {
       if (fs.existsSync(agentPath)) {
         syncAgentFrontmatter(agentPath, toolNames);
         agentsSynced++;
