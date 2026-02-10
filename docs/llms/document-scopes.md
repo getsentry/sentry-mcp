@@ -196,6 +196,21 @@ Defines the specific purpose and content for each documentation file.
 - Development setup (link to relevant docs)
 - Integration instructions (keep minimal)
 
+### claude-code-plugin.md
+**Purpose**: Claude Code plugin structure and maintenance
+
+**Must Include**:
+- Plugin directory layout and file roles
+- Agent frontmatter fields (`description`, `mcpServers`, `allowedTools`)
+- How `generate-definitions.ts` syncs `allowedTools`
+- How to modify agent prompts
+- Difference between stable and experimental variants
+
+**Must Exclude**:
+- User installation instructions (covered in README.md)
+- Claude Code plugin system documentation
+- Tool implementation details (link to adding-tools.md)
+
 ## Optimization Strategy
 
 Focus on clarity and usefulness, not arbitrary line counts.
