@@ -199,29 +199,8 @@ function isUpToDate(outDir: string): boolean {
   return true;
 }
 
-// Agent frontmatter sync
-function buildAgentDescription(
-  toolNames: string[],
-  isExperimental: boolean,
-): string {
-  const triggers =
-    "Sentry expert agent for error tracking and performance monitoring. " +
-    "Use when the user mentions Sentry issues, errors, exceptions, stack traces, " +
-    "performance traces, releases, or provides a Sentry URL. " +
-    "Capabilities: search and analyze issues, AI root cause analysis via Seer, " +
-    "trace exploration, event aggregation, tag distribution, SDK docs, " +
-    "project and team management.";
-  const experimental = isExperimental
-    ? " Includes experimental and bleeding-edge features."
-    : "";
-  return `${triggers}${experimental} Tools(${toolNames.length}): ${toolNames.join(", ")}`;
-}
-
-function syncAgentFrontmatter(
-  agentPath: string,
-  toolNames: string[],
-  variant: "stable" | "experimental",
-) {
+// Agent frontmatter sync — updates the allowedTools list in agent .md files
+function syncAgentFrontmatter(agentPath: string, toolNames: string[]) {
   const content = fs.readFileSync(agentPath, "utf-8");
   const parts = content.split("---");
   if (parts.length < 3) {
@@ -234,10 +213,7 @@ function syncAgentFrontmatter(
   const body = parts.slice(2).join("---");
 
   const frontmatter = YAML.parse(frontmatterStr) as Record<string, unknown>;
-  frontmatter.description = buildAgentDescription(
-    toolNames,
-    variant === "experimental",
-  );
+  frontmatter.allowedTools = toolNames;
 
   const updated = `---\n${YAML.stringify(frontmatter)}---${body}`;
   fs.writeFileSync(agentPath, updated);
@@ -262,19 +238,16 @@ async function main() {
     writeJson(path.join(outDir, "toolDefinitions.json"), tools);
     writeJson(path.join(outDir, "skillDefinitions.json"), skills);
 
-    // Sync agent frontmatter descriptions
+    // Sync allowedTools in agent frontmatter
     const toolNames = tools.map((t) => t.name);
     const pluginsDir = path.join(__dirname, "../../../plugins");
-    const agentVariants = [
-      { dir: "sentry-mcp", variant: "stable" as const },
-      { dir: "sentry-mcp-experimental", variant: "experimental" as const },
-    ];
+    const agentDirs = ["sentry-mcp", "sentry-mcp-experimental"];
 
     let agentsSynced = 0;
-    for (const { dir, variant } of agentVariants) {
+    for (const dir of agentDirs) {
       const agentPath = path.join(pluginsDir, dir, "agents/sentry-mcp.md");
       if (fs.existsSync(agentPath)) {
-        syncAgentFrontmatter(agentPath, toolNames, variant);
+        syncAgentFrontmatter(agentPath, toolNames);
         agentsSynced++;
       }
     }

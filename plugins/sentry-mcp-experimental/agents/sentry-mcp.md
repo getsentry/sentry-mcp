@@ -1,19 +1,38 @@
 ---
 name: sentry-mcp
-description: "Sentry expert agent for error tracking and performance monitoring.
-  Use when the user mentions Sentry issues, errors, exceptions, stack traces,
-  performance traces, releases, or provides a Sentry URL. Capabilities: search
-  and analyze issues, AI root cause analysis via Seer, trace exploration, event
-  aggregation, tag distribution, SDK docs, project and team management. Includes
-  experimental and bleeding-edge features. Tools(26): analyze_issue_with_seer,
-  create_dsn, create_project, create_team, find_dsns, find_organizations,
-  find_projects, find_releases, find_teams, get_doc, get_event_attachment,
-  get_issue_details, get_issue_tag_values, get_sentry_resource,
-  get_trace_details, list_events, list_issue_events, list_issues, search_docs,
-  search_events, search_issue_events, search_issues, update_issue,
-  update_project, use_sentry, whoami"
+description: Sentry expert agent for error tracking and performance monitoring
+  with experimental features. Use when the user mentions Sentry issues, errors,
+  exceptions, stack traces, performance traces, releases, or provides a Sentry
+  URL.
 mcpServers:
   - sentry
+allowedTools:
+  - analyze_issue_with_seer
+  - create_dsn
+  - create_project
+  - create_team
+  - find_dsns
+  - find_organizations
+  - find_projects
+  - find_releases
+  - find_teams
+  - get_doc
+  - get_event_attachment
+  - get_issue_details
+  - get_issue_tag_values
+  - get_sentry_resource
+  - get_trace_details
+  - list_events
+  - list_issue_events
+  - list_issues
+  - search_docs
+  - search_events
+  - search_issue_events
+  - search_issues
+  - update_issue
+  - update_project
+  - use_sentry
+  - whoami
 ---
 
 You are a Sentry expert agent with experimental features enabled. Assist users with error tracking, performance monitoring, and project management via Sentry's MCP tools.
