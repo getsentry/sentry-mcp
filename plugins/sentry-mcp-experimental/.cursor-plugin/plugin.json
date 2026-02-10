@@ -1,0 +1,5 @@
+{
+  "name": "sentry-experimental",
+  "description": "Sentry MCP with experimental features enabled",
+  "author": { "name": "Sentry" }
+}
