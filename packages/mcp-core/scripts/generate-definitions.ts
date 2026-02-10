@@ -156,10 +156,25 @@ function isUpToDate(outDir: string): boolean {
     return false;
   }
 
-  // Get oldest output modification time
-  const toolDefsMtime = fs.statSync(toolDefsPath).mtimeMs;
-  const skillDefsMtime = fs.statSync(skillDefsPath).mtimeMs;
-  const oldestOutputMtime = Math.min(toolDefsMtime, skillDefsMtime);
+  // Check agent frontmatter files exist
+  const pluginsDir = path.join(__dirname, "../../../plugins");
+  const agentDirs = ["sentry-mcp", "sentry-mcp-experimental"];
+  const agentPaths = agentDirs.map((dir) =>
+    path.join(pluginsDir, dir, "agents/sentry-mcp.md"),
+  );
+  for (const agentPath of agentPaths) {
+    if (!fs.existsSync(agentPath)) {
+      return false;
+    }
+  }
+
+  // Get oldest output modification time (JSON files + agent files)
+  const outputMtimes = [
+    fs.statSync(toolDefsPath).mtimeMs,
+    fs.statSync(skillDefsPath).mtimeMs,
+    ...agentPaths.map((p) => fs.statSync(p).mtimeMs),
+  ];
+  const oldestOutputMtime = Math.min(...outputMtimes);
 
   // Check if any input files are newer than outputs
   const toolsDir = path.join(__dirname, "../src/tools");
