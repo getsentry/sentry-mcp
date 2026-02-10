@@ -7,6 +7,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import YAML from "yaml";
 import { z, type ZodTypeAny } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
@@ -23,20 +24,6 @@ function writeJson(file: string, data: unknown) {
 
 function ensureDirExists(dir: string) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-}
-
-// Shared helpers for Zod parameter maps
-function zodFieldMapToDescriptions(
-  fieldMap: Record<string, ZodTypeAny>,
-): Record<string, { description: string }> {
-  const out: Record<string, { description: string }> = {};
-  for (const [key, schema] of Object.entries(fieldMap)) {
-    const js = zodToJsonSchema(schema, { $refStrategy: "none" }) as {
-      description?: string;
-    };
-    out[key] = { description: js.description || "" };
-  }
-  return out;
 }
 
 function zodFieldMapToJsonSchema(
@@ -212,6 +199,47 @@ function isUpToDate(outDir: string): boolean {
   return true;
 }
 
+// Agent frontmatter sync
+function buildAgentDescription(
+  toolNames: string[],
+  isExperimental: boolean,
+): string {
+  const base =
+    "Interact with Sentry for error tracking and performance monitoring. " +
+    "Delegate to this agent when the user wants to search errors, analyze " +
+    "issues, view traces, get AI root cause analysis, or manage projects.";
+  if (isExperimental) {
+    return `${base} Includes experimental features and bleeding-edge capabilities. Available tools: ${toolNames.join(", ")}`;
+  }
+  return `${base} Available tools: ${toolNames.join(", ")}`;
+}
+
+function syncAgentFrontmatter(
+  agentPath: string,
+  toolNames: string[],
+  variant: "stable" | "experimental",
+) {
+  const content = fs.readFileSync(agentPath, "utf-8");
+  const parts = content.split("---");
+  if (parts.length < 3) {
+    console.warn(`⚠️  Skipping ${agentPath}: no valid YAML frontmatter found`);
+    return;
+  }
+
+  // parts[0] is empty (before first ---), parts[1] is frontmatter, rest is body
+  const frontmatterStr = parts[1];
+  const body = parts.slice(2).join("---");
+
+  const frontmatter = YAML.parse(frontmatterStr) as Record<string, unknown>;
+  frontmatter.description = buildAgentDescription(
+    toolNames,
+    variant === "experimental",
+  );
+
+  const updated = `---\n${YAML.stringify(frontmatter)}---${body}`;
+  fs.writeFileSync(agentPath, updated);
+}
+
 async function main() {
   try {
     const outDir = path.join(__dirname, "../src");
@@ -231,8 +259,25 @@ async function main() {
     writeJson(path.join(outDir, "toolDefinitions.json"), tools);
     writeJson(path.join(outDir, "skillDefinitions.json"), skills);
 
+    // Sync agent frontmatter descriptions
+    const toolNames = tools.map((t) => t.name);
+    const pluginsDir = path.join(__dirname, "../../../plugins");
+    const agentVariants = [
+      { dir: "sentry-mcp", variant: "stable" as const },
+      { dir: "sentry-mcp-experimental", variant: "experimental" as const },
+    ];
+
+    let agentsSynced = 0;
+    for (const { dir, variant } of agentVariants) {
+      const agentPath = path.join(pluginsDir, dir, "agents/sentry-mcp.md");
+      if (fs.existsSync(agentPath)) {
+        syncAgentFrontmatter(agentPath, toolNames, variant);
+        agentsSynced++;
+      }
+    }
+
     console.log(
-      `✅ Generated: tools(${tools.length}), skills(${skills.length})`,
+      `✅ Generated: tools(${tools.length}), skills(${skills.length}), agents(${agentsSynced})`,
     );
   } catch (error) {
     const err = error as Error;
