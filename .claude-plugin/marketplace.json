@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sentry-mcp",
+  "owner": { "name": "Sentry", "email": "oss@sentry.io" },
+  "plugins": [
+    {
+      "name": "sentry-mcp",
+      "description": "Sentry error tracking and performance monitoring - search issues, analyze errors, explore traces, and get AI-powered root cause analysis",
+      "author": { "name": "Sentry" },
+      "source": "./plugins/sentry-mcp",
+      "category": "monitoring"
+    },
+    {
+      "name": "sentry-mcp-experimental",
+      "description": "Sentry MCP with experimental features enabled - includes all stable tools plus bleeding-edge capabilities",
+      "author": { "name": "Sentry" },
+      "source": "./plugins/sentry-mcp-experimental",
+      "category": "monitoring"
+    }
+  ]
+}

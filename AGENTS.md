@@ -49,6 +49,7 @@ sentry-mcp/
 - docs/embedded-agents.md — LLM provider configuration for AI-powered tools
 - docs/releases/stdio.md — npm package release
 - docs/releases/cloudflare.md — Cloudflare deployment
+- docs/claude-code-plugin.md — Plugin structure and agent prompts
 
 ## Commands
 
@@ -67,6 +68,9 @@ pnpm run tsc && pnpm run lint && pnpm run test
 
 # Token overhead
 pnpm run measure-tokens                   # Check tool definition size
+
+# Definitions (run after changing tools, skills, or agent prompts)
+pnpm run --filter @sentry/mcp-core generate-definitions
 ```
 
 ## Task Management

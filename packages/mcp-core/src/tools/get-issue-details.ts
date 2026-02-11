@@ -100,13 +100,22 @@ export default defineTool({
       }
 
       setTag("organization.slug", orgSlug);
-      // API client will throw ApiClientError/ApiServerError which the MCP server wrapper handles
-      const [issue] = await apiService.listIssues({
-        organizationSlug: orgSlug,
-        query: eventId,
-      });
-      if (!issue) {
-        return `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`;
+      // Use issueId directly if provided (e.g., from URL parsing), otherwise search by eventId
+      let issue: Awaited<ReturnType<typeof apiService.getIssue>>;
+      if (params.issueId) {
+        issue = await apiService.getIssue({
+          organizationSlug: orgSlug,
+          issueId: params.issueId,
+        });
+      } else {
+        const [found] = await apiService.listIssues({
+          organizationSlug: orgSlug,
+          query: eventId,
+        });
+        if (!found) {
+          return `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`;
+        }
+        issue = found;
       }
       // For this call, we might want to provide context if it fails
       let event: Awaited<ReturnType<typeof apiService.getEventForIssue>>;
@@ -148,6 +157,7 @@ export default defineTool({
         autofixState,
         performanceTrace,
         externalIssues,
+        experimentalMode: context.experimentalMode,
       });
     }
 
@@ -215,6 +225,7 @@ export default defineTool({
       autofixState,
       performanceTrace,
       externalIssues,
+      experimentalMode: context.experimentalMode,
     });
   },
 });

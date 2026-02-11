@@ -14,7 +14,14 @@ describe("app", () => {
 
       const text = await res.text();
       expect(text).toBe(
-        ["User-agent: *", "Allow: /$", "Disallow: /"].join("\n"),
+        [
+          "User-agent: *",
+          "Allow: /$",
+          "Allow: /.well-known/",
+          "Allow: /mcp.json",
+          "Allow: /llms.txt",
+          "Disallow: /",
+        ].join("\n"),
       );
     });
   });
@@ -51,6 +58,27 @@ describe("app", () => {
         message:
           "The SSE transport endpoint is no longer supported. Please use the HTTP transport at /mcp instead.",
         migrationGuide: "https://mcp.sentry.dev",
+      });
+    });
+  });
+
+  describe("GET /.well-known/oauth-protected-resource", () => {
+    it("should return RFC 9728 protected resource metadata for root", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource",
+        {
+          headers: {
+            "CF-Connecting-IP": "192.0.2.1",
+          },
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        resource: "https://mcp.sentry.dev",
+        authorization_servers: ["https://mcp.sentry.dev"],
       });
     });
   });

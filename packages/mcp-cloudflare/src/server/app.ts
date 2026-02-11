@@ -68,7 +68,16 @@ const app = new Hono<{
     }),
   )
   .get("/robots.txt", (c) => {
-    return c.text(["User-agent: *", "Allow: /$", "Disallow: /"].join("\n"));
+    return c.text(
+      [
+        "User-agent: *",
+        "Allow: /$",
+        "Allow: /.well-known/",
+        "Allow: /mcp.json",
+        "Allow: /llms.txt",
+        "Disallow: /",
+      ].join("\n"),
+    );
   })
   .get("/llms.txt", (c) => {
     return c.text(
@@ -94,6 +103,11 @@ const app = new Hono<{
   })
   // RFC 9728: OAuth 2.0 Protected Resource Metadata
   // ChatGPT and other clients query this to discover the authorization server
+  // Root endpoint for clients that try /.well-known/oauth-protected-resource first
+  .get(
+    "/.well-known/oauth-protected-resource",
+    handleOAuthProtectedResourceMetadata,
+  )
   // Handles both /mcp and /mcp/* paths (e.g., /mcp/sentry/mcp-server)
   .get(
     "/.well-known/oauth-protected-resource/mcp",

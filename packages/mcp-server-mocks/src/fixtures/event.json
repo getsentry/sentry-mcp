@@ -193,6 +193,52 @@
         "inferredContentType": null
       },
       "type": "request"
+    },
+    {
+      "data": {
+        "values": [
+          {
+            "timestamp": "2025-04-08T21:14:50.000Z",
+            "type": "http",
+            "category": "fetch",
+            "level": "info",
+            "message": "GET /api/0/organizations/ [200]",
+            "data": {
+              "method": "GET",
+              "url": "/api/0/organizations/",
+              "status_code": 200
+            }
+          },
+          {
+            "timestamp": "2025-04-08T21:14:52.000Z",
+            "type": "default",
+            "category": "console",
+            "level": "warning",
+            "message": "Deprecation warning: use v2 endpoint",
+            "data": null
+          },
+          {
+            "timestamp": "2025-04-08T21:14:55.000Z",
+            "type": "navigation",
+            "category": "navigation",
+            "level": "info",
+            "message": null,
+            "data": {
+              "from": "/dashboard",
+              "to": "/settings"
+            }
+          },
+          {
+            "timestamp": "2025-04-08T21:15:04.000Z",
+            "type": "error",
+            "category": "console",
+            "level": "error",
+            "message": "Tool list_organizations is already registered",
+            "data": null
+          }
+        ]
+      },
+      "type": "breadcrumbs"
     }
   ],
   "dist": null,

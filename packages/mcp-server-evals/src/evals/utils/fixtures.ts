@@ -19,5 +19,7 @@ export const FIXTURES = {
   issueUrl: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41/",
   testIssueUrl: "https://sentry-mcp-evals.sentry.io/issues/PEATED-A8",
   traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+  traceUrl:
+    "https://sentry-mcp-evals.sentry.io/explore/traces/trace/a4d1aae7216b47ff8117cf4e09ce9d0a/",
   dsn: "https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945",
 };

@@ -1,0 +1,5 @@
+{
+  "name": "sentry",
+  "description": "Sentry error tracking and performance monitoring via MCP",
+  "author": { "name": "Sentry" }
+}

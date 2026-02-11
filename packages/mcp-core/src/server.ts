@@ -309,6 +309,8 @@ function configureServer({
         if (context.clientId) {
           setTag("client.id", context.clientId);
         }
+        setTag("mode.agent", agentMode);
+        setTag("mode.experimental", experimentalMode);
 
         try {
           // Apply constraints as parameters, handling aliases (e.g., projectSlug → projectSlugOrId)

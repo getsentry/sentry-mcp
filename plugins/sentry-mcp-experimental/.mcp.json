@@ -1,0 +1,6 @@
+{
+  "sentry": {
+    "type": "http",
+    "url": "https://mcp.sentry.dev/mcp?experimental=1"
+  }
+}

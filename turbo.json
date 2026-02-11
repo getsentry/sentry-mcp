@@ -13,9 +13,16 @@
         "src/tools/**/*.ts",
         "src/skills.ts",
         "scripts/generate-definitions.ts",
-        "!src/**/*.test.ts"
+        "!src/**/*.test.ts",
+        "../../plugins/sentry-mcp/agents/sentry-mcp.md",
+        "../../plugins/sentry-mcp-experimental/agents/sentry-mcp.md"
       ],
-      "outputs": ["src/toolDefinitions.json", "src/skillDefinitions.json"],
+      "outputs": [
+        "src/toolDefinitions.json",
+        "src/skillDefinitions.json",
+        "../../plugins/sentry-mcp/agents/sentry-mcp.md",
+        "../../plugins/sentry-mcp-experimental/agents/sentry-mcp.md"
+      ],
       "cache": true
     },
     "dev": {

@@ -86,6 +86,22 @@ const wrappedOAuthProvider = {
 
     const response = await oAuthProvider.fetch(request, env, ctx);
 
+    // RFC 9728 §3.1: Add resource_metadata to 401 WWW-Authenticate for MCP routes
+    if (response.status === 401 && url.pathname.startsWith("/mcp")) {
+      const prmUrl = `${url.protocol}//${url.host}/.well-known/oauth-protected-resource/mcp`;
+      const newResponse = new Response(response.body, response);
+      const existing = newResponse.headers.get("WWW-Authenticate");
+      if (existing) {
+        // RFC 7235: first param is space-separated from scheme, subsequent params are comma-separated
+        const separator = existing.includes(" ") ? "," : "";
+        newResponse.headers.set(
+          "WWW-Authenticate",
+          `${existing}${separator} resource_metadata="${prmUrl}"`,
+        );
+      }
+      return newResponse;
+    }
+
     // Add CORS headers to public metadata endpoints
     if (isPublicMetadataEndpoint(url.pathname)) {
       return addCorsHeaders(response);

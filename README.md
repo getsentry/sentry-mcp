@@ -12,6 +12,23 @@ You'll find everything you need to know by visiting the deployed service in prod
 
 If you're looking to contribute, learn how it works, or to run this for self-hosted Sentry, continue below.
 
+### Claude Code Plugin
+
+Install as a Claude Code plugin for automatic subagent delegation:
+
+```shell
+claude plugin marketplace add getsentry/sentry-mcp
+claude plugin install sentry-mcp@sentry-mcp
+```
+
+This provides a `sentry-mcp` subagent that Claude automatically delegates to when you ask about Sentry errors, issues, traces, or performance.
+
+For experimental features:
+
+```shell
+claude plugin install sentry-mcp@sentry-mcp-experimental
+```
+
 ### Stdio vs Remote
 
 While this repository is focused on acting as an MCP service, we also support a `stdio` transport. This is still a work in progress, but is the easiest way to adapt run the MCP against a self-hosted Sentry install.
