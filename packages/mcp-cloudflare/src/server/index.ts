@@ -120,15 +120,9 @@ const wrappedOAuthProvider = {
       return addCorsHeaders(response);
     }
 
-    // With run_worker_first, unmatched routes (404) fall through to static assets (SPA)
-    // Exclude API-like paths so they return proper error responses
-    if (
-      response.status === 404 &&
-      !url.pathname.startsWith("/mcp") &&
-      !url.pathname.startsWith("/api") &&
-      !url.pathname.startsWith("/oauth") &&
-      !url.pathname.startsWith("/.mcp")
-    ) {
+    // With run_worker_first enabled (for homepage content negotiation),
+    // all unmatched requests need to fall through to static assets (SPA)
+    if (response.status === 404) {
       return env.ASSETS.fetch(request);
     }
 
