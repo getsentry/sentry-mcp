@@ -18,7 +18,7 @@ function getBaseUrl(c: Context): string {
   return new URL(c.req.url).origin;
 }
 
-export function generateLlmsTxt(baseUrl: string): string {
+function generateLlmsTxt(baseUrl: string): string {
   return `# Sentry MCP Server
 
 Connects AI assistants to Sentry for searching errors, analyzing performance, triaging issues, reading documentation, and managing projects — all via the Model Context Protocol.

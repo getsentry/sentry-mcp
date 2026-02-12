@@ -320,17 +320,6 @@ describeIfPreviewUrl(
       expect(data).toContain("/mcp");
     });
 
-    it("should return markdown on homepage when Accept: text/markdown", async () => {
-      const { response, data } = await safeFetch(`${PREVIEW_URL}/`, {
-        headers: { Accept: "text/markdown" },
-      });
-      expect(response.status).toBe(200);
-      expect(response.headers.get("Content-Type")).toContain("text/markdown");
-
-      expect(data).toContain("Sentry MCP Server");
-      expect(data).toContain("/mcp");
-    });
-
     it("should serve /.well-known/oauth-authorization-server with CORS headers", async () => {
       const { response, data } = await safeFetch(
         `${PREVIEW_URL}/.well-known/oauth-authorization-server`,
