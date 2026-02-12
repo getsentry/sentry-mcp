@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/cloudflare";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
-import app from "./app";
+import app, { generateLlmsTxt } from "./app";
 import { SCOPES } from "../constants";
 import type { Env } from "./types";
 import getSentryConfig from "./sentry.config";
@@ -37,6 +37,19 @@ const addCorsHeaders = (response: Response): Response => {
 const wrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     const url = new URL(request.url);
+
+    // Content negotiation: return llms.txt markdown on homepage for AI agents
+    // Must be handled here before Cloudflare's static asset serving intercepts /
+    if (
+      request.method === "GET" &&
+      url.pathname === "/" &&
+      request.headers.get("Accept")?.includes("text/markdown")
+    ) {
+      return new Response(generateLlmsTxt(url.origin), {
+        status: 200,
+        headers: { "Content-Type": "text/markdown; charset=utf-8" },
+      });
+    }
 
     // Handle CORS preflight for public metadata endpoints
     if (request.method === "OPTIONS") {

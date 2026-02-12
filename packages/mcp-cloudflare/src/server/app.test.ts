@@ -46,34 +46,6 @@ describe("app", () => {
     });
   });
 
-  describe("GET / with Accept: text/markdown", () => {
-    it("should return llms.txt content when Accept includes text/markdown", async () => {
-      const res = await app.request("https://mcp.sentry.dev/", {
-        headers: { ...TEST_HEADERS, Accept: "text/markdown" },
-      });
-
-      expect(res.status).toBe(200);
-      expect(res.headers.get("Content-Type")).toContain("text/markdown");
-
-      const text = await res.text();
-      expect(text).toContain("# Sentry MCP Server");
-      expect(text).toContain("https://mcp.sentry.dev/mcp");
-      expect(text).toContain("{organizationSlug}");
-      expect(text).toContain("claude mcp add");
-    });
-
-    it("should fall through when Accept does not include text/markdown", async () => {
-      const res = await app.request("https://mcp.sentry.dev/", {
-        headers: { ...TEST_HEADERS, Accept: "text/html" },
-      });
-
-      // Falls through to SPA asset serving — in tests there's no static asset handler,
-      // so we just verify it did NOT return the markdown content
-      const text = await res.text();
-      expect(text).not.toContain("# Sentry MCP Server");
-    });
-  });
-
   describe("GET /sse", () => {
     it("should return deprecation message with 410 status", async () => {
       const res = await app.request("/sse", {

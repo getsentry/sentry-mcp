@@ -18,7 +18,7 @@ function getBaseUrl(c: Context): string {
   return new URL(c.req.url).origin;
 }
 
-function generateLlmsTxt(baseUrl: string): string {
+export function generateLlmsTxt(baseUrl: string): string {
   return `# Sentry MCP Server
 
 Connects AI assistants to Sentry for searching errors, analyzing performance, triaging issues, reading documentation, and managing projects — all via the Model Context Protocol.
@@ -133,15 +133,6 @@ const app = new Hono<{
       },
     }),
   )
-  .get("/", async (c, next) => {
-    const accept = c.req.header("Accept") || "";
-    if (accept.includes("text/markdown")) {
-      return c.text(generateLlmsTxt(getBaseUrl(c)), 200, {
-        "Content-Type": "text/markdown; charset=utf-8",
-      });
-    }
-    await next();
-  })
   .get("/robots.txt", (c) => {
     return c.text(
       [
