@@ -121,7 +121,14 @@ const wrappedOAuthProvider = {
     }
 
     // With run_worker_first, unmatched routes (404) fall through to static assets (SPA)
-    if (response.status === 404 && !url.pathname.startsWith("/mcp")) {
+    // Exclude API-like paths so they return proper error responses
+    if (
+      response.status === 404 &&
+      !url.pathname.startsWith("/mcp") &&
+      !url.pathname.startsWith("/api") &&
+      !url.pathname.startsWith("/oauth") &&
+      !url.pathname.startsWith("/.mcp")
+    ) {
       return env.ASSETS.fetch(request);
     }
 
