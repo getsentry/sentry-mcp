@@ -120,6 +120,11 @@ const wrappedOAuthProvider = {
       return addCorsHeaders(response);
     }
 
+    // With run_worker_first, unmatched routes (404) fall through to static assets (SPA)
+    if (response.status === 404 && !url.pathname.startsWith("/mcp")) {
+      return env.ASSETS.fetch(request);
+    }
+
     return response;
   },
 };
