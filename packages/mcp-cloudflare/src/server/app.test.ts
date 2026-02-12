@@ -1,13 +1,14 @@
 import { describe, it, expect } from "vitest";
 import app from "./app";
 
+// RFC 5737 TEST-NET-1 address; required by the IP-extraction middleware
+const TEST_HEADERS = { "CF-Connecting-IP": "192.0.2.1" } as const;
+
 describe("app", () => {
   describe("GET /robots.txt", () => {
     it("should return correct robots.txt content", async () => {
       const res = await app.request("/robots.txt", {
-        headers: {
-          "CF-Connecting-IP": "192.0.2.1",
-        },
+        headers: TEST_HEADERS,
       });
 
       expect(res.status).toBe(200);
@@ -27,27 +28,28 @@ describe("app", () => {
   });
 
   describe("GET /llms.txt", () => {
-    it("should return correct llms.txt content", async () => {
-      const res = await app.request("/llms.txt", {
-        headers: {
-          "CF-Connecting-IP": "192.0.2.1",
-        },
+    it("should return comprehensive llms.txt content", async () => {
+      const res = await app.request("https://mcp.sentry.dev/llms.txt", {
+        headers: TEST_HEADERS,
       });
 
       expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toContain("text/plain");
 
       const text = await res.text();
-      expect(text).toContain("# sentry-mcp");
-      expect(text).toContain("Model Context Protocol");
+      expect(text).toContain("# Sentry MCP Server");
+      expect(text).toContain("https://mcp.sentry.dev/mcp");
+      expect(text).toContain("{organizationSlug}");
+      expect(text).toContain("{projectSlug}");
+      expect(text).toContain("claude mcp add");
+      expect(text).toContain("?experimental=1");
     });
   });
 
   describe("GET /sse", () => {
     it("should return deprecation message with 410 status", async () => {
       const res = await app.request("/sse", {
-        headers: {
-          "CF-Connecting-IP": "192.0.2.1",
-        },
+        headers: TEST_HEADERS,
       });
 
       expect(res.status).toBe(410);
@@ -66,11 +68,7 @@ describe("app", () => {
     it("should return RFC 9728 protected resource metadata for root", async () => {
       const res = await app.request(
         "https://mcp.sentry.dev/.well-known/oauth-protected-resource",
-        {
-          headers: {
-            "CF-Connecting-IP": "192.0.2.1",
-          },
-        },
+        { headers: TEST_HEADERS },
       );
 
       expect(res.status).toBe(200);
@@ -87,11 +85,7 @@ describe("app", () => {
     it("should return RFC 9728 protected resource metadata", async () => {
       const res = await app.request(
         "/.well-known/oauth-protected-resource/mcp",
-        {
-          headers: {
-            "CF-Connecting-IP": "192.0.2.1",
-          },
-        },
+        { headers: TEST_HEADERS },
       );
 
       expect(res.status).toBe(200);
@@ -106,11 +100,7 @@ describe("app", () => {
     it("should return correct URLs for custom host", async () => {
       const res = await app.request(
         "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp",
-        {
-          headers: {
-            "CF-Connecting-IP": "192.0.2.1",
-          },
-        },
+        { headers: TEST_HEADERS },
       );
 
       expect(res.status).toBe(200);
@@ -125,11 +115,7 @@ describe("app", () => {
     it("should handle dynamic subpaths", async () => {
       const res = await app.request(
         "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server",
-        {
-          headers: {
-            "CF-Connecting-IP": "192.0.2.1",
-          },
-        },
+        { headers: TEST_HEADERS },
       );
 
       expect(res.status).toBe(200);
@@ -144,11 +130,7 @@ describe("app", () => {
     it("should handle dynamic subpaths with query parameters", async () => {
       const res = await app.request(
         "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server?experimental=1",
-        {
-          headers: {
-            "CF-Connecting-IP": "192.0.2.1",
-          },
-        },
+        { headers: TEST_HEADERS },
       );
 
       expect(res.status).toBe(200);
