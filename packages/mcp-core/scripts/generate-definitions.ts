@@ -261,7 +261,20 @@ async function main() {
     writeJson(path.join(outDir, "skillDefinitions.json"), skills);
 
     // Sync allowedTools in agent frontmatter
-    const toolNames = tools.map((t) => t.name);
+    // Exclude agent-only tools (e.g., use_sentry) since plugins don't use agent mode
+    const agentOnlyToolNames = new Set(
+      Object.values(
+        toolsModule.default as Record<
+          string,
+          { name: string; agentOnly?: boolean }
+        >,
+      )
+        .filter((t) => t.agentOnly)
+        .map((t) => t.name),
+    );
+    const toolNames = tools
+      .map((t) => t.name)
+      .filter((name) => !agentOnlyToolNames.has(name));
 
     let agentsSynced = 0;
     for (const agentPath of agentPaths()) {
