@@ -59,6 +59,7 @@ export interface ToolConfig<
   requiredScopes: Scope[]; // LEGACY: Which API scopes needed (deprecated, for backward compatibility)
   experimental?: boolean; // Mark tool as experimental (only shown in experimental mode)
   hideInExperimentalMode?: boolean; // Hide tool when experimental mode is active (for tools replaced by unified tools)
+  agentOnly?: boolean; // Tool is only available in agent mode (excluded from plugin allowedTools)
   requiredCapabilities?: (keyof ProjectCapabilities)[]; // Project capabilities required for this tool
   annotations: {
     readOnlyHint?: boolean;

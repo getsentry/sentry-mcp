@@ -31,7 +31,6 @@ allowedTools:
   - search_issues
   - update_issue
   - update_project
-  - use_sentry
   - whoami
 ---
 

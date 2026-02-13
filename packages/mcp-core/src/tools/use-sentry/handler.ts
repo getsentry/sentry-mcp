@@ -39,6 +39,7 @@ export default defineTool({
   name: "use_sentry",
   skills: [], // Only available in agent mode - bypasses authorization
   requiredScopes: [], // No specific scopes - uses authentication token
+  agentOnly: true,
   description: [
     "Natural language interface to Sentry via an embedded AI agent.",
     "",

@@ -13,10 +13,76 @@ import { createRequestLogger } from "./logging";
 import mcpRoutes from "./routes/mcp";
 import { getClientIp } from "./utils/client-ip";
 
+/** Derive the base URL (origin) from the current request. */
+function getBaseUrl(c: Context): string {
+  return new URL(c.req.url).origin;
+}
+
+function generateLlmsTxt(baseUrl: string): string {
+  return `# Sentry MCP Server
+
+Connects AI assistants to Sentry for searching errors, analyzing performance, triaging issues, reading documentation, and managing projects — all via the Model Context Protocol.
+
+All connections use OAuth. The first connection will trigger an authentication flow to connect to your Sentry account.
+
+## Connecting
+
+The base MCP server address is: \`${baseUrl}/mcp\`
+
+You can optionally scope the connection to an organization or project:
+
+- \`${baseUrl}/mcp/{organizationSlug}\` — scoped to one organization
+- \`${baseUrl}/mcp/{organizationSlug}/{projectSlug}\` — scoped to one project
+
+When scoped, tools automatically default to the constrained org/project and unnecessary discovery tools are hidden. Scoping to a project is recommended when possible.
+
+### Query Parameters
+
+- \`?experimental=1\` — Enable experimental, forward-looking features and tools
+- \`?agent=1\` — Agent mode: exposes a single \`use_sentry\` tool that handles natural language requests via an embedded AI agent (roughly doubles response time)
+
+Parameters can be combined: \`${baseUrl}/mcp/my-org/my-project?experimental=1\`
+
+## Setup Instructions
+
+### Claude Code
+
+\`\`\`bash
+claude mcp add --transport http sentry ${baseUrl}/mcp/{organizationSlug}/{projectSlug}
+\`\`\`
+
+### Cursor
+
+Use the "Install MCP Server" button, or manually add to MCP settings:
+
+\`\`\`json
+{
+  "mcpServers": {
+    "sentry": {
+      "url": "${baseUrl}/mcp/{organizationSlug}/{projectSlug}"
+    }
+  }
+}
+\`\`\`
+
+### VSCode
+
+Command Palette → "MCP: Add Server" → HTTP → enter the endpoint:
+
+\`\`\`
+${baseUrl}/mcp/{organizationSlug}/{projectSlug}
+\`\`\`
+
+### Other Clients
+
+Any MCP-compatible client can connect using the HTTP transport at the endpoint URL above.
+`;
+}
+
 // RFC 9728: OAuth 2.0 Protected Resource Metadata handler
-function handleOAuthProtectedResourceMetadata(c: Context) {
+function handleOAuthProtectedResourceMetadata(c: Context): Response {
   const requestUrl = new URL(c.req.url);
-  const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+  const baseUrl = requestUrl.origin;
   const resourcePath = requestUrl.pathname.replace(
     "/.well-known/oauth-protected-resource",
     "",
@@ -80,25 +146,18 @@ const app = new Hono<{
     );
   })
   .get("/llms.txt", (c) => {
-    return c.text(
-      [
-        "# sentry-mcp",
-        "",
-        "This service implements the Model Context Protocol for interacting with Sentry (https://sentry.io/welcome/).",
-        "",
-        `The MCP's server address is: ${new URL("/mcp", c.req.url).href}`,
-        "",
-      ].join("\n"),
-    );
+    return c.text(generateLlmsTxt(getBaseUrl(c)), 200, {
+      "Content-Type": "text/plain; charset=utf-8",
+    });
   })
   .get("/mcp.json", (c) => {
-    const requestUrl = new URL(c.req.url);
+    const baseUrl = getBaseUrl(c);
     return c.json({
       name: "Sentry",
       description:
         "Connect your Sentry account to search, analyze, and manage errors and performance issues across your applications.",
-      icon: `${requestUrl.protocol}//${requestUrl.host}/favicon.ico`,
-      endpoint: `${requestUrl.protocol}//${requestUrl.host}/mcp`,
+      icon: `${baseUrl}/favicon.ico`,
+      endpoint: `${baseUrl}/mcp`,
     });
   })
   // RFC 9728: OAuth 2.0 Protected Resource Metadata

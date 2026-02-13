@@ -315,7 +315,7 @@ describeIfPreviewUrl(
       const { response, data } = await safeFetch(`${PREVIEW_URL}/llms.txt`, {});
       expect(response.status).toBe(200);
 
-      expect(data).toContain("sentry-mcp");
+      expect(data).toContain("Sentry MCP Server");
       expect(data).toContain("Model Context Protocol");
       expect(data).toContain("/mcp");
     });
