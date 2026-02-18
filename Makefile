@@ -66,6 +66,11 @@ setup-env:
 		echo "✅ packages/mcp-cloudflare/.env already exists"; \
 	fi
 	@echo ""
+	@# Install shared agent skills via dotagents
+	@echo "Installing shared agent skills..."
+	@npx -y @sentry/dotagents install
+	@echo "✅ Agent skills installed"
+	@echo ""
 	@echo "🎉 Environment setup complete!"
 	@echo ""
 	@echo "Next steps:"
