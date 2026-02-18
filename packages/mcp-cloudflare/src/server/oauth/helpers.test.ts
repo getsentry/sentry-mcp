@@ -365,6 +365,8 @@ describe("refreshAccessToken", () => {
   it("should return error when upstream returns non-OK status", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
+      status: 400,
+      statusText: "Bad Request",
       text: async () => "Invalid token",
     });
 
@@ -378,6 +380,28 @@ describe("refreshAccessToken", () => {
     expect(result).toBeNull();
     expect(error).toBeDefined();
     expect(error?.status).toBe(400);
+    const text = await error?.text();
+    expect(text).toBe("Invalid token");
+  });
+
+  it("should use fallback message when upstream returns empty body", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      text: async () => "",
+    });
+
+    const [result, error] = await refreshAccessToken({
+      client_id: "test-client",
+      client_secret: "test-secret",
+      refresh_token: "invalid-token",
+      upstream_url: "https://sentry.io/oauth/token/",
+    });
+
+    expect(result).toBeNull();
+    expect(error).toBeDefined();
+    expect(error?.status).toBe(502);
     const text = await error?.text();
     expect(text).toContain("issue refreshing your access token");
   });
