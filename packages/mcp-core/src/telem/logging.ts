@@ -358,7 +358,17 @@ function buildLogProperties(
   }
 
   if (options.extra) {
-    Object.assign(properties, options.extra);
+    // Sanitize extra properties to prevent injection of protected properties
+    const protectedKeys = new Set(["severity", "error", "sentryContexts"]);
+    const sanitizedExtra: LogContext = {};
+
+    for (const [key, value] of Object.entries(options.extra)) {
+      if (!protectedKeys.has(key)) {
+        sanitizedExtra[key] = value;
+      }
+    }
+
+    Object.assign(properties, sanitizedExtra);
   }
 
   if (options.contexts) {
