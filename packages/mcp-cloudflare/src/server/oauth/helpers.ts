@@ -174,11 +174,14 @@ export async function refreshAccessToken({
     const eventId = logIssue(
       `[oauth] Failed to refresh access token: ${responseText}`,
       {
-        oauth: {
-          client_id,
-          status: resp.status,
-          statusText: resp.statusText,
-          upstreamResponse: responseText,
+        loggerScope: ["cloudflare", "oauth", "refresh"],
+        contexts: {
+          oauth: {
+            client_id,
+            status: resp.status,
+            statusText: resp.statusText,
+            upstreamResponse: responseText,
+          },
         },
       },
     );
