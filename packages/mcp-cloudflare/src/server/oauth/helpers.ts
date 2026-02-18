@@ -170,19 +170,24 @@ export async function refreshAccessToken({
   });
 
   if (!resp.ok) {
+    const responseText = await resp.text();
     const eventId = logIssue(
-      `[oauth] Failed to refresh access token: ${await resp.text()}`,
+      `[oauth] Failed to refresh access token: ${responseText}`,
       {
         oauth: {
           client_id,
+          status: resp.status,
+          statusText: resp.statusText,
+          upstreamResponse: responseText,
         },
       },
     );
     return [
       null,
       new Response(
-        "There was an issue refreshing your access token. Please re-authenticate.",
-        { status: 400, headers: { "X-Event-ID": eventId ?? "" } },
+        responseText ||
+          "There was an issue refreshing your access token. Please re-authenticate.",
+        { status: resp.status, headers: { "X-Event-ID": eventId ?? "" } },
       ),
     ];
   }
@@ -370,11 +375,11 @@ async function doUpstreamRefresh(
 
   if (errorResponse) {
     const errorText = await errorResponse.text();
-    logIssue(`[oauth] Failed to refresh upstream token: ${errorText}`, {
-      loggerScope: ["cloudflare", "oauth", "refresh"],
-    });
+    // Note: refreshAccessToken already logged this to Sentry with full context
+    // (status, statusText, upstreamResponse). Throw with the actual upstream
+    // error so it propagates to the client instead of a generic message.
     throw new Error(
-      `Failed to refresh upstream token in OAuth provider: ${errorText}`,
+      `Failed to refresh upstream token in OAuth provider (${errorResponse.status}): ${errorText}`,
     );
   }
 
