@@ -134,10 +134,16 @@ Note: If you have issues with your OAuth flow when accessing the inspector on `1
 
 To contribute changes, you'll need to set up your local environment:
 
-1. **Set up environment files:**
+1. **Set up environment and agent skills:**
 
    ```shell
-   make setup-env  # Creates both .env files from examples
+   make setup-env  # Creates .env files and installs shared agent skills
+   ```
+
+   This also runs `npx @sentry/dotagents install` to install shared skills from [getsentry/skills](https://github.com/getsentry/skills) into `.agents/skills/` (symlinked into `.claude/skills` and `.cursor/skills`). If you need to update skills later, run it directly:
+
+   ```shell
+   npx @sentry/dotagents install
    ```
 
 2. **Create an OAuth App in Sentry** (Settings => API => [Applications](https://sentry.io/settings/account/api/applications/)):
