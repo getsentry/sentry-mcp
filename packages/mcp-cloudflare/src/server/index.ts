@@ -83,7 +83,7 @@ const wrappedOAuthProvider = {
           `${existing}${separator} resource_metadata="${prmUrl}"`,
         );
       }
-      return newResponse;
+      return stripCorsHeaders(newResponse);
     }
 
     // Add CORS headers to public metadata endpoints; strip from everything else
