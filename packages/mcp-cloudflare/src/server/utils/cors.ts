@@ -1,6 +1,7 @@
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
   "/.well-known/",
+  "/.mcp/",
   "/robots.txt",
   "/llms.txt",
   "/mcp.json",
@@ -20,8 +21,7 @@ export const addCorsHeaders = (response: Response): Response => {
   return newResponse;
 };
 
-// Strip reflected-origin CORS headers the OAuth library
-// adds adds to all endpoints in v0.0.12
+// Strip reflected-origin CORS headers the OAuth library (v0.0.12) adds to all endpoints.
 export const stripCorsHeaders = (response: Response): Response => {
   if (!response.headers.has("Access-Control-Allow-Origin")) {
     return response;

@@ -15,6 +15,11 @@ describe("isPublicMetadataEndpoint", () => {
     ).toBe(true);
   });
 
+  it("should match .mcp metadata paths", () => {
+    expect(isPublicMetadataEndpoint("/.mcp/")).toBe(true);
+    expect(isPublicMetadataEndpoint("/.mcp/tools.json")).toBe(true);
+  });
+
   it("should match exact metadata file paths", () => {
     expect(isPublicMetadataEndpoint("/robots.txt")).toBe(true);
     expect(isPublicMetadataEndpoint("/llms.txt")).toBe(true);
