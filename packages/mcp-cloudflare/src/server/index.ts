@@ -14,10 +14,9 @@ import {
 } from "./utils/cors";
 import { checkRateLimit } from "./utils/rate-limiter";
 
-// Wrap OAuth Provider to control CORS headers.
-// OAuth Provider v0.0.12 reflects the request Origin on all endpoints (token, register, etc.),
-// which would allow any website to perform cross-origin token exchanges.
-// We strip those headers and only add CORS explicitly on public metadata endpoints.
+// Wrap OAuth Provider to restrict CORS headers on public metadata endpoints
+// OAuth Provider v0.0.12 adds overly permissive CORS (allows all methods/headers).
+// We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
 const wrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     const url = new URL(request.url);

@@ -20,10 +20,8 @@ export const addCorsHeaders = (response: Response): Response => {
   return newResponse;
 };
 
-// Strip permissive CORS headers added by the OAuth library in v0.0.12
-// The library reflects the request Origin on all OAuth endpoints, which allows
-// any website to make cross-origin token exchanges. We remove these and only
-// add CORS explicitly on public metadata endpoints via addCorsHeaders above.
+// Strip reflected-origin CORS headers the OAuth library
+// adds adds to all endpoints in v0.0.12
 export const stripCorsHeaders = (response: Response): Response => {
   if (!response.headers.has("Access-Control-Allow-Origin")) {
     return response;
