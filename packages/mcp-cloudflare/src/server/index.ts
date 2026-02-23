@@ -1,48 +1,33 @@
-import * as Sentry from "@sentry/cloudflare";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
-import app from "./app";
+import * as Sentry from "@sentry/cloudflare";
 import { SCOPES } from "../constants";
-import type { Env } from "./types";
-import getSentryConfig from "./sentry.config";
-import { tokenExchangeCallback } from "./oauth";
+import app from "./app";
 import sentryMcpHandler from "./lib/mcp-handler";
-import { checkRateLimit } from "./utils/rate-limiter";
+import { tokenExchangeCallback } from "./oauth";
+import getSentryConfig from "./sentry.config";
+import type { Env } from "./types";
 import { getClientIp } from "./utils/client-ip";
+import {
+  addCorsHeaders,
+  isPublicMetadataEndpoint,
+  stripCorsHeaders,
+} from "./utils/cors";
+import { checkRateLimit } from "./utils/rate-limiter";
 
-// Public metadata endpoints that should be accessible from any origin
-const PUBLIC_METADATA_PATHS = [
-  "/.well-known/", // OAuth discovery endpoints
-  "/robots.txt", // Search engine directives
-  "/llms.txt", // LLM/AI agent directives
-  "/mcp.json", // MCP server metadata
-];
-
-const isPublicMetadataEndpoint = (pathname: string): boolean => {
-  return PUBLIC_METADATA_PATHS.some((path) =>
-    path.endsWith("/") ? pathname.startsWith(path) : pathname === path,
-  );
-};
-
-const addCorsHeaders = (response: Response): Response => {
-  const newResponse = new Response(response.body, response);
-  newResponse.headers.set("Access-Control-Allow-Origin", "*");
-  newResponse.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-  newResponse.headers.set("Access-Control-Allow-Headers", "Content-Type");
-  return newResponse;
-};
-
-// Wrap OAuth Provider to restrict CORS headers on public metadata endpoints
-// OAuth Provider v0.0.12 adds overly permissive CORS (allows all methods/headers).
-// We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
+// Wrap OAuth Provider to control CORS headers.
+// OAuth Provider v0.0.12 reflects the request Origin on all endpoints (token, register, etc.),
+// which would allow any website to perform cross-origin token exchanges.
+// We strip those headers and only add CORS explicitly on public metadata endpoints.
 const wrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     const url = new URL(request.url);
 
-    // Handle CORS preflight for public metadata endpoints
+    // Handle CORS preflight: allow public metadata endpoints, deny everything else
     if (request.method === "OPTIONS") {
       if (isPublicMetadataEndpoint(url.pathname)) {
         return addCorsHeaders(new Response(null, { status: 204 }));
       }
+      return new Response(null, { status: 204 });
     }
 
     // Apply rate limiting to MCP and OAuth routes
@@ -102,12 +87,12 @@ const wrappedOAuthProvider = {
       return newResponse;
     }
 
-    // Add CORS headers to public metadata endpoints
+    // Add CORS headers to public metadata endpoints; strip from everything else
     if (isPublicMetadataEndpoint(url.pathname)) {
       return addCorsHeaders(response);
     }
 
-    return response;
+    return stripCorsHeaders(response);
   },
 };
 
