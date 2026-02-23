@@ -1,9 +1,9 @@
 // Public metadata endpoints that should be accessible from any origin
 const PUBLIC_METADATA_PATHS = [
-  "/.well-known/", // OAuth discovery endpoints
-  "/robots.txt", // Search engine directives
-  "/llms.txt", // LLM/AI agent directives
-  "/mcp.json", // MCP server metadata
+  "/.well-known/",
+  "/robots.txt",
+  "/llms.txt",
+  "/mcp.json",
 ];
 
 export const isPublicMetadataEndpoint = (pathname: string): boolean => {
