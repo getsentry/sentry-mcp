@@ -18,11 +18,11 @@
 
 /** Paths that should be accessible from any origin (read-only metadata). */
 const PUBLIC_METADATA_PATHS = [
-  "/.well-known/",
-  "/.mcp/",
-  "/robots.txt",
-  "/llms.txt",
-  "/mcp.json",
+  "/.well-known/", // OAuth/resource discovery (RFC 8414, RFC 9728)
+  "/.mcp/", // MCP tool definitions for documentation sites
+  "/robots.txt", // Search engine directives
+  "/llms.txt", // LLM/AI agent directives
+  "/mcp.json", // MCP server metadata
 ];
 
 /**
@@ -40,12 +40,20 @@ export const isPublicMetadataEndpoint = (pathname: string): boolean => {
  * Apply restrictive CORS headers suitable for public metadata endpoints.
  * Only allows GET and OPTIONS with Content-Type — no credentials, no mutation.
  * Uses `*` origin since these endpoints serve non-sensitive, publicly-available data.
+ *
+ * Also removes any leftover CORS headers the OAuth library may have added
+ * (e.g. Max-Age, Expose-Headers, Allow-Credentials) to prevent contradictory
+ * or overly permissive combinations.
  */
 export const addCorsHeaders = (response: Response): Response => {
   const newResponse = new Response(response.body, response);
   newResponse.headers.set("Access-Control-Allow-Origin", "*");
   newResponse.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
   newResponse.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  // Remove headers the OAuth library may have set that we don't want
+  newResponse.headers.delete("Access-Control-Max-Age");
+  newResponse.headers.delete("Access-Control-Expose-Headers");
+  newResponse.headers.delete("Access-Control-Allow-Credentials");
   return newResponse;
 };
 

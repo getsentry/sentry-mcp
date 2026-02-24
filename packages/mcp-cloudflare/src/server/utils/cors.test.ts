@@ -58,13 +58,16 @@ describe("addCorsHeaders", () => {
     expect(result.headers.has("Access-Control-Max-Age")).toBe(false);
   });
 
-  it("should overwrite existing CORS headers from the OAuth library", () => {
+  it("should overwrite and strip leftover CORS headers from the OAuth library", () => {
     const response = new Response("ok", {
       status: 200,
       headers: {
         "Access-Control-Allow-Origin": "https://evil.com",
         "Access-Control-Allow-Methods": "*",
         "Access-Control-Allow-Headers": "Authorization, *",
+        "Access-Control-Max-Age": "86400",
+        "Access-Control-Expose-Headers": "X-Custom",
+        "Access-Control-Allow-Credentials": "true",
       },
     });
     const result = addCorsHeaders(response);
@@ -76,6 +79,9 @@ describe("addCorsHeaders", () => {
     expect(result.headers.get("Access-Control-Allow-Headers")).toBe(
       "Content-Type",
     );
+    expect(result.headers.has("Access-Control-Max-Age")).toBe(false);
+    expect(result.headers.has("Access-Control-Expose-Headers")).toBe(false);
+    expect(result.headers.has("Access-Control-Allow-Credentials")).toBe(false);
   });
 });
 
