@@ -10,7 +10,7 @@
  *
  * This catches issues like:
  * - #623: structuredOutputs causing validation errors with nullable fields
- * - 405 errors from unsupported parameters (reasoningEffort, temperature)
+ * - 405 errors from unsupported parameters (reasoningEffort)
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { http, HttpResponse } from "msw";
