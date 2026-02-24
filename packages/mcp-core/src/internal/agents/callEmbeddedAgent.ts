@@ -54,10 +54,6 @@ export async function callEmbeddedAgent<
     prompt,
     tools,
     stopWhen: stepCountIs(5),
-    // Only include temperature if provider specifies one (e.g., GPT-5 requires temperature=1)
-    ...(provider.getTemperature() !== undefined && {
-      temperature: provider.getTemperature(),
-    }),
     experimental_output: Output.object({ schema }),
     experimental_telemetry: {
       isEnabled: true,
