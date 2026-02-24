@@ -57,6 +57,26 @@ describe("addCorsHeaders", () => {
 
     expect(result.headers.has("Access-Control-Max-Age")).toBe(false);
   });
+
+  it("should overwrite existing CORS headers from the OAuth library", () => {
+    const response = new Response("ok", {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "https://evil.com",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "Authorization, *",
+      },
+    });
+    const result = addCorsHeaders(response);
+
+    expect(result.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(result.headers.get("Access-Control-Allow-Methods")).toBe(
+      "GET, OPTIONS",
+    );
+    expect(result.headers.get("Access-Control-Allow-Headers")).toBe(
+      "Content-Type",
+    );
+  });
 });
 
 describe("stripCorsHeaders", () => {
@@ -68,6 +88,7 @@ describe("stripCorsHeaders", () => {
         "Access-Control-Allow-Methods": "*",
         "Access-Control-Allow-Headers": "Authorization, *",
         "Access-Control-Max-Age": "86400",
+        "Access-Control-Expose-Headers": "X-Custom",
         "Content-Type": "application/json",
       },
     });
@@ -78,6 +99,7 @@ describe("stripCorsHeaders", () => {
     expect(result.headers.has("Access-Control-Allow-Methods")).toBe(false);
     expect(result.headers.has("Access-Control-Allow-Headers")).toBe(false);
     expect(result.headers.has("Access-Control-Max-Age")).toBe(false);
+    expect(result.headers.has("Access-Control-Expose-Headers")).toBe(false);
     expect(result.headers.get("Content-Type")).toBe("application/json");
   });
 
