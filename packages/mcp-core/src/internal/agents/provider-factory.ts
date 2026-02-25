@@ -72,8 +72,6 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
         getModel: getAnthropicModel,
         // Anthropic doesn't need the structuredOutputs workaround
         getProviderOptions: () => ({}),
-        // Anthropic supports flexible temperature values, use default
-        getTemperature: () => undefined,
       };
     case "openai":
       return {
@@ -87,8 +85,6 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
             strictJsonSchema: false,
           },
         }),
-        // GPT-5 only supports temperature=1 (AI SDK defaults to 0)
-        getTemperature: () => 1,
       };
   }
 }
