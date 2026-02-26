@@ -118,36 +118,39 @@ export default defineTool({
         issue = found;
       }
       // For this call, we might want to provide context if it fails
-      let event: Awaited<ReturnType<typeof apiService.getEventForIssue>>;
-      try {
-        event = await apiService.getEventForIssue({
-          organizationSlug: orgSlug,
-          issueId: issue.shortId,
-          eventId,
-        });
-      } catch (error) {
-        // Optionally enhance 404 errors with parameter context
-        if (error instanceof ApiNotFoundError) {
-          throw enhanceNotFoundError(error, {
+      const [{ event, performanceTrace }, { autofixState, externalIssues }] =
+        await Promise.all([
+          apiService
+            .getEventForIssue({
+              organizationSlug: orgSlug,
+              issueId: issue.shortId,
+              eventId,
+            })
+            // Optionally enhance 404 errors with parameter context
+            .catch((error) => {
+              if (error instanceof ApiNotFoundError) {
+                throw enhanceNotFoundError(error, {
+                  organizationSlug: orgSlug,
+                  issueId: issue.shortId,
+                  eventId,
+                });
+              }
+              throw error;
+            })
+            .then(async (event) => ({
+              event,
+              performanceTrace: await maybeFetchPerformanceTrace({
+                apiService,
+                organizationSlug: orgSlug,
+                event,
+              }),
+            })),
+          fetchIssueEnrichmentData({
+            apiService,
             organizationSlug: orgSlug,
             issueId: issue.shortId,
-            eventId,
-          });
-        }
-        throw error;
-      }
-
-      const { autofixState, externalIssues } = await fetchIssueEnrichmentData({
-        apiService,
-        organizationSlug: orgSlug,
-        issueId: issue.shortId,
-      });
-
-      const performanceTrace = await maybeFetchPerformanceTrace({
-        apiService,
-        organizationSlug: orgSlug,
-        event,
-      });
+          }),
+        ]);
 
       return formatIssueOutput({
         organizationSlug: orgSlug,
@@ -200,22 +203,27 @@ export default defineTool({
       throw error;
     }
 
-    const event = await apiService.getLatestEventForIssue({
-      organizationSlug: orgSlug,
-      issueId: issue.shortId,
-    });
-
-    const { autofixState, externalIssues } = await fetchIssueEnrichmentData({
-      apiService,
-      organizationSlug: orgSlug,
-      issueId: issue.shortId,
-    });
-
-    const performanceTrace = await maybeFetchPerformanceTrace({
-      apiService,
-      organizationSlug: orgSlug,
-      event,
-    });
+    const [{ event, performanceTrace }, { autofixState, externalIssues }] =
+      await Promise.all([
+        apiService
+          .getLatestEventForIssue({
+            organizationSlug: orgSlug,
+            issueId: issue.shortId,
+          })
+          .then(async (event) => ({
+            event,
+            performanceTrace: await maybeFetchPerformanceTrace({
+              apiService,
+              organizationSlug: orgSlug,
+              event,
+            }),
+          })),
+        fetchIssueEnrichmentData({
+          apiService,
+          organizationSlug: orgSlug,
+          issueId: issue.shortId,
+        }),
+      ]);
 
     return formatIssueOutput({
       organizationSlug: orgSlug,
