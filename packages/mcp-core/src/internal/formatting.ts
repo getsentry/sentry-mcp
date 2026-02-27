@@ -1672,12 +1672,6 @@ function formatSeerSummary(
     }
   }
 
-  // Always suggest using analyze_issue_with_seer for more details
-  parts.push("");
-  parts.push(
-    `**Note:** For detailed root cause analysis and solutions, call \`analyze_issue_with_seer(organizationSlug='${organizationSlug}', issueId='${issueId}')\``,
-  );
-
   return `${parts.join("\n")}\n\n`;
 }
 
