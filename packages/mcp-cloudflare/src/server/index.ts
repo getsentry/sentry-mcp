@@ -1,57 +1,71 @@
-import * as Sentry from "@sentry/cloudflare";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
-import app from "./app";
+import * as Sentry from "@sentry/cloudflare";
 import { SCOPES } from "../constants";
-import type { Env } from "./types";
-import getSentryConfig from "./sentry.config";
-import { tokenExchangeCallback } from "./oauth";
+import app from "./app";
 import sentryMcpHandler from "./lib/mcp-handler";
-import { checkRateLimit } from "./utils/rate-limiter";
+import { tokenExchangeCallback } from "./oauth";
+import getSentryConfig from "./sentry.config";
+import type { Env } from "./types";
 import { getClientIp } from "./utils/client-ip";
+import {
+  addCorsHeaders,
+  isPublicMetadataEndpoint,
+  stripCorsHeaders,
+} from "./utils/cors";
+import { checkRateLimit } from "./utils/rate-limiter";
 
-// Public metadata endpoints that should be accessible from any origin
-const PUBLIC_METADATA_PATHS = [
-  "/.well-known/", // OAuth discovery endpoints
-  "/robots.txt", // Search engine directives
-  "/llms.txt", // LLM/AI agent directives
-  "/mcp.json", // MCP server metadata
-];
-
-const isPublicMetadataEndpoint = (pathname: string): boolean => {
-  return PUBLIC_METADATA_PATHS.some((path) =>
-    path.endsWith("/") ? pathname.startsWith(path) : pathname === path,
-  );
-};
-
-const addCorsHeaders = (response: Response): Response => {
+/**
+ * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
+ * `resource_metadata` parameter in the WWW-Authenticate header so
+ * clients can discover the protected-resource metadata endpoint.
+ */
+function patchWwwAuthenticate(response: Response, url: URL): Response {
+  if (response.status !== 401 || !url.pathname.startsWith("/mcp")) {
+    return response;
+  }
+  const existing = response.headers.get("WWW-Authenticate");
+  if (!existing) {
+    return response;
+  }
+  const prmUrl = `${url.protocol}//${url.host}/.well-known/oauth-protected-resource/mcp`;
   const newResponse = new Response(response.body, response);
-  newResponse.headers.set("Access-Control-Allow-Origin", "*");
-  newResponse.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-  newResponse.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  // RFC 7235: first param is space-separated from scheme, subsequent params are comma-separated
+  const separator = existing.includes(" ") ? "," : "";
+  newResponse.headers.set(
+    "WWW-Authenticate",
+    `${existing}${separator} resource_metadata="${prmUrl}"`,
+  );
   return newResponse;
-};
+}
 
-// Wrap OAuth Provider to restrict CORS headers on public metadata endpoints
-// OAuth Provider v0.0.12 adds overly permissive CORS (allows all methods/headers).
-// We override with secure headers for .well-known endpoints and add CORS to robots.txt/llms.txt.
+// Wrap OAuth Provider to take control of CORS.
+//
+// @cloudflare/workers-oauth-provider v0.0.12 reflects the request Origin on
+// every response it handles, effectively allowing any website to call our
+// OAuth and MCP endpoints cross-origin. We wrap it to:
+//   1. Intercept OPTIONS before the library — return our own preflight response.
+//   2. Let the library handle the actual request normally.
+//   3. On the way out, apply our CORS policy:
+//      - Public metadata endpoints → restrictive read-only CORS (`*`, GET only)
+//      - Everything else → strip all CORS headers the library added
 const wrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     const url = new URL(request.url);
 
-    // Handle CORS preflight for public metadata endpoints
+    // --- Phase 1: Intercept preflight before the library can respond ---
+    // Public metadata gets restrictive CORS; everything else gets a bare 204
+    // with no CORS headers so the browser blocks the cross-origin request.
     if (request.method === "OPTIONS") {
       if (isPublicMetadataEndpoint(url.pathname)) {
         return addCorsHeaders(new Response(null, { status: 204 }));
       }
+      return new Response(null, { status: 204 });
     }
 
-    // Apply rate limiting to MCP and OAuth routes
-    // This protects against abuse at the earliest possible point
+    // --- Rate limiting (before any OAuth/MCP processing) ---
     if (url.pathname.startsWith("/mcp") || url.pathname.startsWith("/oauth")) {
       const clientIP = getClientIp(request);
 
-      // In local development or when IP can't be extracted, skip rate limiting
-      // Rate limiter is optional and primarily for production abuse prevention
       if (clientIP) {
         const rateLimitResult = await checkRateLimit(
           clientIP,
@@ -67,9 +81,10 @@ const wrappedOAuthProvider = {
           return new Response(rateLimitResult.errorMessage, { status: 429 });
         }
       }
-      // If no clientIP, allow the request (likely local dev)
     }
 
+    // --- Phase 2: Let the OAuth library handle the request ---
+    // The library will add reflected-origin CORS headers to its responses.
     const oAuthProvider = new OAuthProvider({
       apiRoute: "/mcp",
       // @ts-expect-error - OAuthProvider types don't support specific Env types
@@ -86,28 +101,13 @@ const wrappedOAuthProvider = {
 
     const response = await oAuthProvider.fetch(request, env, ctx);
 
-    // RFC 9728 §3.1: Add resource_metadata to 401 WWW-Authenticate for MCP routes
-    if (response.status === 401 && url.pathname.startsWith("/mcp")) {
-      const prmUrl = `${url.protocol}//${url.host}/.well-known/oauth-protected-resource/mcp`;
-      const newResponse = new Response(response.body, response);
-      const existing = newResponse.headers.get("WWW-Authenticate");
-      if (existing) {
-        // RFC 7235: first param is space-separated from scheme, subsequent params are comma-separated
-        const separator = existing.includes(" ") ? "," : "";
-        newResponse.headers.set(
-          "WWW-Authenticate",
-          `${existing}${separator} resource_metadata="${prmUrl}"`,
-        );
-      }
-      return newResponse;
-    }
+    // --- Phase 3: Patch headers, then apply our CORS policy ---
+    const patched = patchWwwAuthenticate(response, url);
 
-    // Add CORS headers to public metadata endpoints
     if (isPublicMetadataEndpoint(url.pathname)) {
-      return addCorsHeaders(response);
+      return addCorsHeaders(patched);
     }
-
-    return response;
+    return stripCorsHeaders(patched);
   },
 };
 
