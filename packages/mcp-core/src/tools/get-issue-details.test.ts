@@ -787,7 +787,6 @@ describe("get_issue_details", () => {
     );
     // When Seer data is available, these would pass:
     // expect(result).toContain("## Seer AI Analysis");
-    // expect(result).toContain("For detailed root cause analysis and solutions, call `analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')`");
   });
 
   it.skip("includes Seer analysis when in progress - PROCESSING state", async () => {
@@ -863,9 +862,6 @@ describe("get_issue_details", () => {
     expect(result).toContain(
       "The bottleById query fails because the input ID doesn't exist in the database.",
     );
-    expect(result).toContain(
-      "For detailed root cause analysis and solutions, call `analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')`",
-    );
   });
 
   it.skip("includes Seer analysis when failed - FAILED state", async () => {
@@ -906,9 +902,6 @@ describe("get_issue_details", () => {
 
     expect(result).toContain("## Seer Analysis");
     expect(result).toContain("**Status:** Analysis failed.");
-    expect(result).toContain(
-      "For detailed root cause analysis and solutions, call `analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')`",
-    );
   });
 
   it.skip("includes Seer analysis when needs information - NEED_MORE_INFORMATION state", async () => {
@@ -973,9 +966,6 @@ describe("get_issue_details", () => {
     );
     expect(result).toContain(
       "**Status:** Analysis paused - additional information needed.",
-    );
-    expect(result).toContain(
-      "For detailed root cause analysis and solutions, call `analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')`",
     );
   });
 
