@@ -471,13 +471,16 @@ function formatTraceOutput({
   sections.push("");
   sections.push("## Find Related Events");
   sections.push("");
-  sections.push(`Use this search query to find all events in this trace:`);
-  sections.push("```");
-  sections.push(`trace:${traceId}`);
-  sections.push("```");
-  sections.push("");
   sections.push(
-    "You can use this query with the `search_events` tool to get detailed event data from this trace.",
+    "To list all spans in this trace, use `list_events` with cursor pagination:",
+  );
+  sections.push("```");
+  sections.push(
+    `list_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}', sort='-timestamp', limit=100)`,
+  );
+  sections.push("```");
+  sections.push(
+    "Use the returned `cursor` value to fetch subsequent pages until all spans are retrieved.",
   );
 
   return sections.join("\n");
