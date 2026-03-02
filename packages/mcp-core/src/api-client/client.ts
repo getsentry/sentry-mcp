@@ -100,6 +100,34 @@ type RequestOptions = {
 };
 
 /**
+ * Parses Sentry's Link header to extract the next page cursor.
+ *
+ * Sentry uses Link headers in the format:
+ *   <url>; rel="previous"; results="false"; cursor="..."
+ *   <url>; rel="next"; results="true"; cursor="..."
+ *
+ * Returns the cursor when rel="next" and results="true", else null.
+ */
+export function parseLinkCursor(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+
+  // Split on comma to get individual link entries
+  const parts = linkHeader.split(",");
+  for (const part of parts) {
+    // Check for rel="next" and results="true"
+    if (!part.includes('rel="next"') || !part.includes('results="true"')) {
+      continue;
+    }
+    // Extract cursor value
+    const cursorMatch = part.match(/cursor="([^"]+)"/);
+    if (cursorMatch) {
+      return cursorMatch[1];
+    }
+  }
+  return null;
+}
+
+/**
  * Sentry API client service for interacting with Sentry's REST API.
  *
  * This service provides a comprehensive interface to Sentry's API endpoints,
@@ -470,6 +498,22 @@ export class SentryApiService {
   ): Promise<unknown> {
     const response = await this.request(path, options, requestOptions);
     return this.parseJsonResponse(response);
+  }
+
+  /**
+   * Makes a request to the Sentry API, parses the JSON response,
+   * and extracts the next pagination cursor from the Link header.
+   */
+  private async requestJSONWithPagination(
+    path: string,
+    options: RequestInit = {},
+    requestOptions?: { host?: string },
+  ): Promise<{ body: unknown; nextCursor: string | null }> {
+    const response = await this.request(path, options, requestOptions);
+    const body = await this.parseJsonResponse(response);
+    const linkHeader = response.headers?.get("link");
+    const nextCursor = parseLinkCursor(linkHeader);
+    return { body, nextCursor };
   }
 
   /**
@@ -2174,6 +2218,7 @@ export class SentryApiService {
       start,
       end,
       sort = "-timestamp",
+      cursor,
     }: {
       organizationSlug: string;
       query: string;
@@ -2185,9 +2230,10 @@ export class SentryApiService {
       start?: string;
       end?: string;
       sort?: string;
+      cursor?: string;
     },
     opts?: RequestOptions,
-  ) {
+  ): Promise<{ body: unknown; nextCursor: string | null }> {
     let queryParams: URLSearchParams;
 
     if (dataset === "errors") {
@@ -2217,8 +2263,12 @@ export class SentryApiService {
       });
     }
 
+    if (cursor) {
+      queryParams.set("cursor", cursor);
+    }
+
     const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
-    return await this.requestJSON(apiUrl, undefined, opts);
+    return await this.requestJSONWithPagination(apiUrl, undefined, opts);
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/

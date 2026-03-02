@@ -119,6 +119,7 @@ describe("search_events", () => {
         projectSlug: null,
         naturalLanguageQuery: "database queries",
         limit: 10,
+        cursor: null,
         includeExplanation: false,
       },
       {
@@ -177,6 +178,7 @@ describe("search_events", () => {
         projectSlug: null,
         naturalLanguageQuery: "database errors",
         limit: 10,
+        cursor: null,
         includeExplanation: false,
       },
       {
@@ -240,6 +242,7 @@ describe("search_events", () => {
         projectSlug: null,
         naturalLanguageQuery: "recent errors with user data",
         limit: 10,
+        cursor: null,
         includeExplanation: false,
       },
       {
@@ -296,6 +299,7 @@ describe("search_events", () => {
         projectSlug: null,
         naturalLanguageQuery: "error logs",
         limit: 10,
+        cursor: null,
         includeExplanation: false,
       },
       {
@@ -327,6 +331,7 @@ describe("search_events", () => {
         projectSlug: null,
         naturalLanguageQuery: "some impossible query !@#$%",
         limit: 10,
+        cursor: null,
         includeExplanation: false,
       },
       {
@@ -362,6 +367,7 @@ describe("search_events", () => {
         projectSlug: null,
         naturalLanguageQuery: "show me errors over time",
         limit: 10,
+        cursor: null,
         includeExplanation: false,
       },
       {
@@ -408,6 +414,7 @@ describe("search_events", () => {
           projectSlug: null,
           naturalLanguageQuery: "any query",
           limit: 10,
+          cursor: null,
           includeExplanation: false,
         },
         {
@@ -447,6 +454,7 @@ describe("search_events", () => {
           projectSlug: null,
           naturalLanguageQuery: "any query",
           limit: 10,
+          cursor: null,
           includeExplanation: false,
         },
         {
@@ -504,6 +512,7 @@ describe("search_events", () => {
         projectSlug: null,
         naturalLanguageQuery: "recent errors",
         limit: 10,
+        cursor: null,
         includeExplanation: false,
       },
       {
@@ -578,6 +587,7 @@ describe("search_events", () => {
         naturalLanguageQuery:
           "which user agents have the most tool calls yesterday",
         limit: 10,
+        cursor: null,
         includeExplanation: false,
       },
       {

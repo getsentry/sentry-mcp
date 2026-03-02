@@ -71,9 +71,16 @@ export default defineTool({
     limit: z
       .number()
       .min(1)
-      .max(100)
+      .max(1000)
       .default(10)
       .describe("Maximum number of results to return"),
+    cursor: z
+      .string()
+      .nullable()
+      .default(null)
+      .describe(
+        "Pagination cursor from a previous response to fetch the next page of results.",
+      ),
     includeExplanation: z
       .boolean()
       .default(false)
@@ -177,7 +184,7 @@ export default defineTool({
       timeParams.statsPeriod = "14d";
     }
 
-    const eventsResponse = await apiService.searchEvents({
+    const { body: eventsResponse, nextCursor } = await apiService.searchEvents({
       organizationSlug,
       query: sentryQuery,
       fields,
@@ -185,6 +192,7 @@ export default defineTool({
       projectId, // API requires numeric project ID, not slug
       dataset, // API now accepts "logs" directly (no longer needs "ourlogs")
       sort: sortParam,
+      cursor: params.cursor ?? undefined,
       ...timeParams, // Spread the time parameters
     });
 
@@ -247,6 +255,7 @@ export default defineTool({
       sentryQuery,
       fields,
       explanation: parsed.explanation,
+      nextCursor,
     };
 
     switch (dataset) {

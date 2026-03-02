@@ -18,6 +18,7 @@ describe("list_events", () => {
         projectSlug: null,
         statsPeriod: "14d",
         limit: 10,
+        cursor: null,
         regionUrl: null,
       },
       getServerContext(),
@@ -41,6 +42,7 @@ describe("list_events", () => {
         projectSlug: null,
         statsPeriod: "7d",
         limit: 10,
+        cursor: null,
         regionUrl: null,
       },
       getServerContext(),
@@ -50,5 +52,48 @@ describe("list_events", () => {
     expect(result).toBeDefined();
     expect(typeof result).toBe("string");
     expect(result).toContain("Search Results");
+  });
+
+  it("includes pagination section when more results are available", async () => {
+    // No cursor = first page, mock returns a next cursor
+    const result = await listEvents.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        dataset: "errors",
+        query: "",
+        fields: ["issue", "title", "project", "last_seen()", "count()"],
+        sort: "-count",
+        projectSlug: null,
+        statsPeriod: "14d",
+        limit: 10,
+        cursor: null,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain("More results available");
+    expect(result).toContain("cursor");
+  });
+
+  it("does not include pagination section on last page", async () => {
+    // Passing a cursor = simulates fetching second page, mock returns no next cursor
+    const result = await listEvents.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        dataset: "errors",
+        query: "",
+        fields: ["issue", "title", "project", "last_seen()", "count()"],
+        sort: "-count",
+        projectSlug: null,
+        statsPeriod: "14d",
+        limit: 10,
+        cursor: "1735689600:0:0",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    expect(result).not.toContain("More results available");
   });
 });

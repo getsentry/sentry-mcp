@@ -27,6 +27,15 @@ export interface FormatEventResultsParams {
   sentryQuery: string;
   fields: string[];
   explanation?: string;
+  nextCursor?: string | null;
+}
+
+/**
+ * Format a pagination section when more results are available.
+ */
+function formatPaginationSection(nextCursor?: string | null): string {
+  if (!nextCursor) return "";
+  return `\n---\n**More results available.** Use \`cursor\` parameter to fetch the next page:\n\`cursor: "${nextCursor}"\`\n\n`;
 }
 
 /**
@@ -43,6 +52,7 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
     sentryQuery,
     fields,
     explanation,
+    nextCursor,
   } = params;
 
   let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
@@ -145,6 +155,8 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
     }
   }
 
+  output += formatPaginationSection(nextCursor);
+
   output += "## Next Steps\n\n";
   output += "- Get more details about a specific error: Use the Issue ID\n";
   output += "- View error groups: Navigate to the Issues page in Sentry\n";
@@ -167,6 +179,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
     sentryQuery,
     fields,
     explanation,
+    nextCursor,
   } = params;
 
   let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
@@ -290,6 +303,8 @@ export function formatLogResults(params: FormatEventResultsParams): string {
     }
   }
 
+  output += formatPaginationSection(nextCursor);
+
   output += "## Next Steps\n\n";
   output += "- View related traces: Click on the Trace URL if available\n";
   output +=
@@ -313,6 +328,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
     sentryQuery,
     fields,
     explanation,
+    nextCursor,
   } = params;
 
   let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
@@ -413,6 +429,8 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
       output += "\n";
     }
   }
+
+  output += formatPaginationSection(nextCursor);
 
   output += "## Next Steps\n\n";
   output += "- View the full trace: Click on the Trace URL above\n";
