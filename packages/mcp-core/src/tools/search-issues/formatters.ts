@@ -2,6 +2,7 @@ import type { Issue } from "../../api-client";
 import { logInfo } from "../../telem/logging";
 import { getIssueUrl, getIssuesSearchUrl } from "../../utils/url-utils";
 import { getSeerActionabilityLabel } from "../../internal/formatting";
+import { getEventsToolName } from "../../internal/tool-helpers/tool-names";
 
 /**
  * Format an explanation for how a natural language query was translated
@@ -134,8 +135,7 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
     "- Get more details about a specific issue: Use the Issue ID with get_issue_details\n";
   output +=
     "- Update issue status: Use update_issue to resolve or assign issues\n";
-  output +=
-    "- View event counts: Use search_events for aggregated statistics\n";
+  output += `- View event counts: Use ${getEventsToolName()} for aggregated statistics\n`;
 
   // Add feedback-specific guidance if results contain feedback
   const hasFeedback = issues.some((i) => i.issueCategory === "feedback");

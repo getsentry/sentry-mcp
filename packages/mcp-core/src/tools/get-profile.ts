@@ -12,6 +12,7 @@ import {
 } from "./profile/formatter";
 import { hasProfileData } from "./profile/analyzer";
 import { parseSentryUrl, isProfileUrl } from "../internal/url-helpers";
+import { getEventsToolName } from "../internal/tool-helpers/tool-names";
 
 interface ResolvedProfileParams {
   organizationSlug: string;
@@ -264,7 +265,7 @@ export default defineTool({
           "- Profiling may not be enabled for this project",
           "",
           "**Suggestions:**",
-          "- Verify the exact transaction name using search_events",
+          `- Verify the exact transaction name using ${getEventsToolName()}`,
           "- Check if profiling is enabled for this project",
         ].join("\n");
       }
@@ -325,7 +326,7 @@ export default defineTool({
         "- Transaction may not have been executed recently",
         "",
         "**Suggestions:**",
-        "- Verify the exact transaction name using search_events",
+        `- Verify the exact transaction name using ${getEventsToolName()}`,
         "- Try a longer time period (e.g., '30d')",
         "- Check if profiling is enabled for this project",
       ].join("\n");

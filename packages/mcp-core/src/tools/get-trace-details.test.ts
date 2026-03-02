@@ -59,9 +59,9 @@ describe("get_trace_details", () => {
 
       ## Find Related Events
 
-      To list all spans in this trace, use \`list_events\` with cursor pagination:
+      To list all spans in this trace, use \`search_events\` with cursor pagination:
       \`\`\`
-      list_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:a4d1aae7216b47ff8117cf4e09ce9d0a', sort='-timestamp', limit=100)
+      search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:a4d1aae7216b47ff8117cf4e09ce9d0a', sort='-timestamp', limit=100)
       \`\`\`
       Use the returned \`cursor\` value to fetch subsequent pages until all spans are retrieved."
     `);
@@ -360,9 +360,9 @@ describe("get_trace_details", () => {
 
       ## Find Related Events
 
-      To list all spans in this trace, use \`list_events\` with cursor pagination:
+      To list all spans in this trace, use \`search_events\` with cursor pagination:
       \`\`\`
-      list_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b', sort='-timestamp', limit=100)
+      search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b', sort='-timestamp', limit=100)
       \`\`\`
       Use the returned \`cursor\` value to fetch subsequent pages until all spans are retrieved."
     `);
