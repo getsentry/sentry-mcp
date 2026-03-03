@@ -1546,15 +1546,9 @@ function formatContexts(contexts: z.infer<typeof EventSchema>["contexts"]) {
  * Shows current status and high-level insights, prompting to use analyze_issue_with_seer for full details.
  *
  * @param autofixState - The autofix state containing Seer analysis data
- * @param organizationSlug - The organization slug for the issue
- * @param issueId - The issue ID (shortId)
  * @returns Formatted markdown string with Seer summary, or empty string if no analysis exists
  */
-function formatSeerSummary(
-  autofixState: AutofixRunState | undefined,
-  organizationSlug: string,
-  issueId: string,
-): string {
+function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
   if (!autofixState || !autofixState.autofix) {
     return "";
   }
@@ -1671,12 +1665,6 @@ function formatSeerSummary(
       );
     }
   }
-
-  // Always suggest using analyze_issue_with_seer for more details
-  parts.push("");
-  parts.push(
-    `**Note:** For detailed root cause analysis and solutions, call \`analyze_issue_with_seer(organizationSlug='${organizationSlug}', issueId='${issueId}')\``,
-  );
 
   return `${parts.join("\n")}\n\n`;
 }
@@ -1845,7 +1833,7 @@ export function formatIssueOutput({
 
   // Add Seer context if available
   if (autofixState) {
-    output += formatSeerSummary(autofixState, organizationSlug, issue.shortId);
+    output += formatSeerSummary(autofixState);
   }
 
   // Add external issue links if available
