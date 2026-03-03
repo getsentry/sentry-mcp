@@ -293,10 +293,7 @@ function userIdHash(userId: string): string {
 }
 
 function createRefreshAttemptId(userId: string): string {
-  if (typeof globalThis.crypto?.randomUUID !== "function") {
-    throw new Error("randomUUID is not available for refresh attempt IDs");
-  }
-  const uuidPart = globalThis.crypto.randomUUID();
+  const uuidPart = crypto.randomUUID();
   return `${Date.now().toString(36)}-${userIdHash(userId)}-${uuidPart}`;
 }
 
