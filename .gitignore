@@ -1,3 +1,5 @@
+agents.lock
+
 # At this time we're not going to commit Dex tasks
 .dex/
 
