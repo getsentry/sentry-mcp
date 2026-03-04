@@ -237,6 +237,39 @@ describe("tokenExchangeCallback", () => {
     expect(mockKV.delete).toHaveBeenCalledWith("refresh-lock:user-id");
   });
 
+  it("should not delete lock when ownership changes before cleanup", async () => {
+    mockFetch.mockResolvedValueOnce(createMockTokenResponse());
+    const options = createRefreshOptions();
+
+    const backingGet = (
+      mockKV.get as ReturnType<typeof vi.fn>
+    ).getMockImplementation()!;
+    let lockGetCount = 0;
+    (mockKV.get as ReturnType<typeof vi.fn>).mockImplementation(
+      async (key: string, format?: string) => {
+        if (key === "refresh-lock:user-id") {
+          lockGetCount++;
+          // 1st call: pre-lock check -> no lock
+          if (lockGetCount === 1) {
+            return null;
+          }
+          // 2nd call: post-put ownership check -> keep current lock value
+          if (lockGetCount === 2) {
+            return backingGet(key, format);
+          }
+          // 3rd call: finally cleanup check -> lock now belongs to another request
+          return "another-attempt-id";
+        }
+        return backingGet(key, format);
+      },
+    );
+
+    const result = await tokenExchangeCallback(options, mockEnv);
+    expect(result).toBeDefined();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockKV.delete).not.toHaveBeenCalledWith("refresh-lock:user-id");
+  });
+
   it("should wait and use cached result when lock is held", async () => {
     // Pre-populate only the lock (simulating another isolate holding it)
     await mockKV.put("refresh-lock:user-id", Date.now().toString());
@@ -291,36 +324,43 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should fall through and refresh when lock is held but no result appears", async () => {
-    // Pre-populate only the lock
-    await mockKV.put("refresh-lock:user-id", Date.now().toString());
+    vi.useFakeTimers();
+    try {
+      // Pre-populate only the lock
+      await mockKV.put("refresh-lock:user-id", Date.now().toString());
 
-    // Intercept KV.get so the result key never becomes available.
-    const backingGet = (
-      mockKV.get as ReturnType<typeof vi.fn>
-    ).getMockImplementation()!;
-    (mockKV.get as ReturnType<typeof vi.fn>).mockImplementation(
-      async (key: string, format?: string) => {
-        if (key === "refresh-result:user-id") {
-          return null; // Never available
-        }
-        return backingGet(key, format);
-      },
-    );
+      // Intercept KV.get so the result key never becomes available.
+      const backingGet = (
+        mockKV.get as ReturnType<typeof vi.fn>
+      ).getMockImplementation()!;
+      (mockKV.get as ReturnType<typeof vi.fn>).mockImplementation(
+        async (key: string, format?: string) => {
+          if (key === "refresh-result:user-id") {
+            return null; // Never available
+          }
+          return backingGet(key, format);
+        },
+      );
 
-    // Set up upstream refresh to succeed (fall-through path)
-    mockFetch.mockResolvedValueOnce(createMockTokenResponse());
+      // Set up upstream refresh to succeed (fall-through path)
+      mockFetch.mockResolvedValueOnce(createMockTokenResponse());
 
-    const options = createRefreshOptions();
-    const result = await tokenExchangeCallback(options, mockEnv);
+      const options = createRefreshOptions();
+      const resultPromise = tokenExchangeCallback(options, mockEnv);
+      await vi.advanceTimersByTimeAsync(6000);
+      const result = await resultPromise;
 
-    // Should have called upstream Sentry as fallback
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+      // Should have called upstream Sentry as fallback
+      expect(mockFetch).toHaveBeenCalledTimes(1);
 
-    // Should return the upstream result
-    expect(result?.newProps).toMatchObject({
-      accessToken: "new-access-token",
-      refreshToken: "new-refresh-token",
-    });
+      // Should return the upstream result
+      expect(result?.newProps).toMatchObject({
+        accessToken: "new-access-token",
+        refreshToken: "new-refresh-token",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -3,7 +3,7 @@ import type {
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
 import type { z } from "zod";
-import { logIssue } from "@sentry/mcp-core/telem/logging";
+import { logInfo, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { TokenResponseSchema, SENTRY_TOKEN_URL } from "./constants";
 import type { WorkerProps } from "../types";
 import * as Sentry from "@sentry/cloudflare";
@@ -228,12 +228,26 @@ export async function refreshAccessToken({
 // NOTE: Cloudflare KV requires expirationTtl >= 60 seconds.
 const LOCK_TTL_SECONDS = 60;
 const RESULT_TTL_SECONDS = 60;
-const LOCK_WAIT_MS = 2000;
+const LOCK_WAIT_MAX_MS = 5000;
+const LOCK_WAIT_POLL_MS = 100;
 
 interface CachedRefreshResult {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+}
+
+class UpstreamRefreshError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly upstreamErrorCode: string | undefined,
+    public readonly upstreamResponse: string,
+  ) {
+    super(
+      `Failed to refresh upstream token in OAuth provider (${status}): ${upstreamResponse}`,
+    );
+    this.name = "UpstreamRefreshError";
+  }
 }
 
 export type TokenExchangeEnv = {
@@ -242,6 +256,69 @@ export type TokenExchangeEnv = {
   SENTRY_HOST?: string;
   OAUTH_KV: KVNamespace;
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeUpstreamErrorCode(responseText: string): string | undefined {
+  const trimmed = responseText.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: unknown };
+    if (typeof parsed.error === "string" && parsed.error.length > 0) {
+      return parsed.error;
+    }
+  } catch {
+    // Non-JSON responses are expected from some upstream errors.
+  }
+
+  if (trimmed.includes("invalid_grant")) {
+    return "invalid_grant";
+  }
+
+  return undefined;
+}
+
+function userIdHash(userId: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < userId.length; i++) {
+    hash ^= userId.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function createRefreshAttemptId(userId: string): string {
+  const uuidPart = crypto.randomUUID();
+  return `${Date.now().toString(36)}-${userIdHash(userId)}-${uuidPart}`;
+}
+
+async function waitForCachedRefreshResult(
+  env: TokenExchangeEnv,
+  resultKey: string,
+  maxWaitMs: number,
+): Promise<{ result: CachedRefreshResult | null; waitedMs: number }> {
+  let waitedMs = 0;
+
+  while (waitedMs < maxWaitMs) {
+    const result = await env.OAUTH_KV.get<CachedRefreshResult>(
+      resultKey,
+      "json",
+    );
+    if (result) {
+      return { result, waitedMs };
+    }
+
+    await sleep(LOCK_WAIT_POLL_MS);
+    waitedMs += LOCK_WAIT_POLL_MS;
+  }
+
+  return { result: null, waitedMs };
+}
 
 /**
  * Token exchange callback for handling Sentry OAuth token refreshes.
@@ -256,6 +333,8 @@ export async function tokenExchangeCallback(
   }
 
   const props = options.props as WorkerProps;
+  const refreshAttemptId = createRefreshAttemptId(props.id);
+  const userHash = userIdHash(props.id);
 
   Sentry.setUser({ id: props.id });
 
@@ -273,6 +352,19 @@ export async function tokenExchangeCallback(
   if (expiresAt && Number.isFinite(expiresAt)) {
     const remainingMs = expiresAt - Date.now();
     if (remainingMs > SAFE_WINDOW_MS) {
+      logInfo("Skipping upstream refresh; cached upstream token still valid", {
+        loggerScope: ["cloudflare", "oauth", "refresh"],
+        contexts: {
+          oauth: {
+            grant_type: options.grantType,
+            refresh_attempt_id: refreshAttemptId,
+            user_id_hash: userHash,
+            token_age_ms: remainingMs,
+            used_cached_result: false,
+            refresh_path: "oauth_provider",
+          },
+        },
+      });
       return {
         newProps: props,
         accessTokenTTL: Math.floor(remainingMs / 1000),
@@ -287,30 +379,110 @@ export async function tokenExchangeCallback(
   // Check for a recently cached refresh result from another isolate
   const cached = await env.OAUTH_KV.get<CachedRefreshResult>(resultKey, "json");
   if (cached) {
+    logInfo("Using cached refresh result", {
+      loggerScope: ["cloudflare", "oauth", "refresh"],
+      contexts: {
+        oauth: {
+          grant_type: options.grantType,
+          refresh_attempt_id: refreshAttemptId,
+          user_id_hash: userHash,
+          used_cached_result: true,
+          refresh_path: "oauth_provider",
+        },
+      },
+    });
     return buildResultFromCache(props, cached);
   }
 
-  // Check if another isolate is already refreshing
+  // Check if another isolate is already refreshing.
+  // If so, poll for the cached result before attempting our own refresh.
   const lockHolder = await env.OAUTH_KV.get(lockKey);
   if (lockHolder) {
-    // Wait for the other isolate to finish, then check for its result
-    await new Promise((resolve) => setTimeout(resolve, LOCK_WAIT_MS));
-    const result = await env.OAUTH_KV.get<CachedRefreshResult>(
+    const { result, waitedMs } = await waitForCachedRefreshResult(
+      env,
       resultKey,
-      "json",
+      LOCK_WAIT_MAX_MS,
     );
+
     if (result) {
+      logInfo("Using cached refresh result after lock contention", {
+        loggerScope: ["cloudflare", "oauth", "refresh"],
+        contexts: {
+          oauth: {
+            grant_type: options.grantType,
+            refresh_attempt_id: refreshAttemptId,
+            user_id_hash: userHash,
+            has_lock_key: true,
+            used_cached_result: true,
+            waited_for_lock_ms: waitedMs,
+            refresh_path: "oauth_provider",
+          },
+        },
+      });
       return buildResultFromCache(props, result);
     }
+
+    logWarn("No cached refresh result found after waiting on lock", {
+      loggerScope: ["cloudflare", "oauth", "refresh"],
+      contexts: {
+        oauth: {
+          grant_type: options.grantType,
+          refresh_attempt_id: refreshAttemptId,
+          user_id_hash: userHash,
+          has_lock_key: true,
+          used_cached_result: false,
+          waited_for_lock_ms: waitedMs,
+          refresh_path: "oauth_provider",
+        },
+      },
+    });
+
     // Lock holder may have failed — fall through and try ourselves
   }
 
+  // Double-check cache right before trying to acquire lock
+  const preLockCached = await env.OAUTH_KV.get<CachedRefreshResult>(
+    resultKey,
+    "json",
+  );
+  if (preLockCached) {
+    return buildResultFromCache(props, preLockCached);
+  }
+
   // Acquire lock and perform the upstream refresh
-  await env.OAUTH_KV.put(lockKey, Date.now().toString(), {
+  await env.OAUTH_KV.put(lockKey, refreshAttemptId, {
     expirationTtl: LOCK_TTL_SECONDS,
   });
 
   try {
+    // Best-effort ownership check; if another isolate appears to hold the lock,
+    // wait for its result before attempting upstream refresh ourselves.
+    const observedLockHolder = await env.OAUTH_KV.get(lockKey);
+    if (observedLockHolder && observedLockHolder !== refreshAttemptId) {
+      const { result, waitedMs } = await waitForCachedRefreshResult(
+        env,
+        resultKey,
+        LOCK_WAIT_MAX_MS,
+      );
+      if (result) {
+        return buildResultFromCache(props, result);
+      }
+      logWarn("Lock ownership changed before refresh attempt", {
+        loggerScope: ["cloudflare", "oauth", "refresh"],
+        contexts: {
+          oauth: {
+            grant_type: options.grantType,
+            refresh_attempt_id: refreshAttemptId,
+            user_id_hash: userHash,
+            has_lock_key: true,
+            used_cached_result: false,
+            waited_for_lock_ms: waitedMs,
+            refresh_path: "oauth_provider",
+          },
+        },
+      });
+    }
+
     const result = await doUpstreamRefresh(props, env);
 
     // Cache the result for other isolates (best-effort — a KV failure
@@ -335,7 +507,12 @@ export async function tokenExchangeCallback(
     return result;
   } finally {
     try {
-      await env.OAUTH_KV.delete(lockKey);
+      // Only release the lock if we still appear to own it.
+      // This avoids deleting a newer lock holder when our own lock expires.
+      const currentLockHolder = await env.OAUTH_KV.get(lockKey);
+      if (currentLockHolder === refreshAttemptId) {
+        await env.OAUTH_KV.delete(lockKey);
+      }
     } catch {
       // Best-effort lock cleanup — the lock has a TTL and will expire
     }
@@ -378,11 +555,10 @@ async function doUpstreamRefresh(
 
   if (errorResponse) {
     const errorText = await errorResponse.text();
-    // Note: refreshAccessToken already logged this to Sentry with full context
-    // (status, statusText, upstreamResponse). Throw with the actual upstream
-    // error so it propagates to the client instead of a generic message.
-    throw new Error(
-      `Failed to refresh upstream token in OAuth provider (${errorResponse.status}): ${errorText}`,
+    throw new UpstreamRefreshError(
+      errorResponse.status,
+      normalizeUpstreamErrorCode(errorText),
+      errorText,
     );
   }
 

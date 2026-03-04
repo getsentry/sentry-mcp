@@ -33,3 +33,7 @@ source = "getsentry/skills"
 [[skills]]
 name = "skill-creator"
 source = "getsentry/skills"
+
+[[skills]]
+name = "iterate-pr"
+source = "getsentry/skills"
