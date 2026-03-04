@@ -371,4 +371,25 @@ describe("EventSchema", () => {
     const result = EventSchema.parse(transactionEvent);
     expect(result.type).toBe("transaction");
   });
+
+  it("should ignore malformed tags with null keys", () => {
+    const eventWithMalformedTag = {
+      id: "abc123",
+      title: "TypeError: Cannot read property 'x'",
+      message: "Cannot read property 'x' of undefined",
+      platform: "javascript",
+      type: "error",
+      entries: [],
+      contexts: {},
+      tags: [
+        { key: null, value: "production" },
+        { key: "level", value: "error" },
+      ],
+      culprit: "app.js",
+      dateCreated: "2025-01-01T00:00:00Z",
+    };
+
+    const result = EventSchema.parse(eventWithMalformedTag);
+    expect(result.tags).toEqual([{ key: "level", value: "error" }]);
+  });
 });

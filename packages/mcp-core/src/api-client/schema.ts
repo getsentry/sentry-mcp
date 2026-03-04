@@ -327,6 +327,32 @@ export const BreadcrumbsEntrySchema = z
   })
   .partial();
 
+const EventTagSchema = z.object({
+  key: z.string(),
+  value: z.string().nullable(),
+});
+
+const EventTagsSchema = z.preprocess((value) => {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  // Sentry can occasionally return malformed tag entries (e.g. null keys).
+  // Drop invalid tags so event parsing can still succeed.
+  return value.filter((tag) => {
+    if (typeof tag !== "object" || tag === null) {
+      return false;
+    }
+
+    const maybeTag = tag as { key?: unknown; value?: unknown };
+    const hasValidKey = typeof maybeTag.key === "string";
+    const hasValidValue =
+      typeof maybeTag.value === "string" || maybeTag.value === null;
+
+    return hasValidKey && hasValidValue;
+  });
+}, z.array(EventTagSchema));
+
 const BaseEventSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -384,14 +410,7 @@ const BaseEventSchema = z.object({
   // "context" (singular) is the legacy "extra" field for arbitrary user-defined data
   // This is different from "contexts" (plural) which are structured contexts
   context: z.record(z.string(), z.unknown()).optional(),
-  tags: z
-    .array(
-      z.object({
-        key: z.string(),
-        value: z.string().nullable(),
-      }),
-    )
-    .optional(),
+  tags: EventTagsSchema.optional(),
   // The _meta field contains metadata about fields in the response
   // It's safer to type as unknown since its structure varies
   _meta: z.unknown().optional(),

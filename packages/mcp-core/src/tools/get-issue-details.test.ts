@@ -1071,6 +1071,80 @@ describe("get_issue_details", () => {
     expect(result).toContain("**Document URI**: https://blog.sentry.io");
   });
 
+  it("handles malformed event tags with null keys", async () => {
+    const eventWithMalformedTags = {
+      id: "abc123def456",
+      type: "error",
+      title: "TypeError",
+      culprit: "app.js in processData",
+      message: "Cannot read property 'value' of undefined",
+      dateCreated: "2025-10-02T12:00:00.000Z",
+      platform: "javascript",
+      entries: [
+        {
+          type: "message",
+          data: {
+            formatted: "Cannot read property 'value' of undefined",
+          },
+        },
+      ],
+      contexts: {},
+      tags: [
+        { key: null, value: "production" },
+        { key: "level", value: "error" },
+      ],
+    };
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MALFORMED-TAGS-001/",
+        () =>
+          HttpResponse.json({
+            id: "123456",
+            shortId: "MALFORMED-TAGS-001",
+            title: "TypeError",
+            firstSeen: "2025-10-02T10:00:00.000Z",
+            lastSeen: "2025-10-02T12:00:00.000Z",
+            count: "5",
+            userCount: 2,
+            permalink: "https://sentry-mcp-evals.sentry.io/issues/123456/",
+            project: {
+              id: "4509062593708032",
+              name: "TEST-PROJECT",
+              slug: "test-project",
+              platform: "javascript",
+            },
+            status: "unresolved",
+            culprit: "app.js in processData",
+            type: "error",
+            platform: "javascript",
+          }),
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/MALFORMED-TAGS-001/events/latest/",
+        () => HttpResponse.json(eventWithMalformedTags),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "MALFORMED-TAGS-001",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain(
+      "# Issue MALFORMED-TAGS-001 in **sentry-mcp-evals**",
+    );
+    expect(result).toContain("### Tags");
+    expect(result).toContain("**level**: error");
+    expect(result).not.toContain("**null**");
+  });
+
   it("displays context (extra) data when present", async () => {
     const eventWithContext = {
       id: "abc123def456",
