@@ -9,8 +9,17 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { ApiNotFoundError } from "../api-client";
 import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { fetchAndFormatBreadcrumbs } from "../internal/tool-helpers/breadcrumbs";
+import {
+  getEventsToolName,
+  getIssuesToolName,
+} from "../internal/tool-helpers/tool-names";
+import {
+  type SelectedSpan,
+  buildFullSpanTree,
+  renderSpanTree,
+} from "../internal/tool-helpers/trace-rendering";
 import getIssueDetails from "./get-issue-details";
-import getTraceDetails from "./get-trace-details";
+import { formatTraceOutput } from "./get-trace-details";
 import getProfile from "./get-profile";
 
 /** Types with full API integration. */
@@ -18,6 +27,7 @@ export const FULLY_SUPPORTED_TYPES = [
   "issue",
   "event",
   "trace",
+  "spans",
   "breadcrumbs",
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
@@ -120,6 +130,13 @@ export function resolveResourceParams(params: {
         traceId: resourceId,
       };
 
+    case "spans":
+      return {
+        type: "spans",
+        organizationSlug,
+        traceId: resourceId,
+      };
+
     case "breadcrumbs":
       return {
         type: "breadcrumbs",
@@ -142,7 +159,7 @@ function resolveFromParsedUrl(
   if (detectedType === "unknown") {
     if (parsed.transaction) {
       throw new UserInputError(
-        `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`search_events\` to find traces and performance data for this transaction.`,
+        `Detected a performance summary URL for transaction "${parsed.transaction}". Use \`${getEventsToolName()}\` to find traces and performance data for this transaction.`,
       );
     }
     throw new UserInputError(
@@ -267,8 +284,8 @@ function generateUnsupportedResourceMessage(
         "Session replay support is coming soon. In the meantime:",
         "",
         `- **View in Sentry**: [Open Replay](${replayUrl})`,
-        "- **Find related issues**: Use `search_issues` with the replay's time range",
-        `- **Search events**: Use \`search_events\` with query \`replay_id:${resolved.replayId}\` to find events associated with this replay`,
+        `- **Find related issues**: Use \`${getIssuesToolName()}\` with the replay's time range`,
+        `- **Search events**: Use \`${getEventsToolName()}\` with query \`replay_id:${resolved.replayId}\` to find events associated with this replay`,
       ].join("\n");
     }
 
@@ -288,7 +305,7 @@ function generateUnsupportedResourceMessage(
         "Cron monitor support is coming soon. In the meantime:",
         "",
         `- **View in Sentry**: [Open Monitor](${monitorUrl})`,
-        `- **Search issues**: Use \`search_issues\` with query \`monitor.slug:${resolved.monitorSlug}\` to find issues from this monitor`,
+        `- **Search issues**: Use \`${getIssuesToolName()}\` with query \`monitor.slug:${resolved.monitorSlug}\` to find issues from this monitor`,
       ]
         .filter(Boolean)
         .join("\n");
@@ -306,7 +323,7 @@ function generateUnsupportedResourceMessage(
         "",
         `- **View in Sentry**: [Open Release](${releaseUrl})`,
         `- **Find releases**: Use \`find_releases(organizationSlug='${organizationSlug}')\` to list releases and their details`,
-        `- **Search issues**: Use \`search_issues\` with query \`release:${resolved.releaseVersion}\` to find issues in this release`,
+        `- **Search issues**: Use \`${getIssuesToolName()}\` with query \`release:${resolved.releaseVersion}\` to find issues in this release`,
       ].join("\n");
     }
 
@@ -347,10 +364,10 @@ export default defineTool({
       ),
 
     resourceType: z
-      .enum(["issue", "event", "trace", "breadcrumbs"])
+      .enum(["issue", "event", "trace", "spans", "breadcrumbs"])
       .optional()
       .describe(
-        "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL).",
+        "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL). Use 'spans' with a trace ID to get the complete span tree.",
       ),
 
     resourceId: z
@@ -358,7 +375,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. For 'spans', pass the trace ID. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
@@ -408,15 +425,99 @@ export default defineTool({
           context,
         );
 
-      case "trace":
-        return getTraceDetails.handler(
-          {
+      case "trace": {
+        const traceApiService = apiServiceFromContext(context);
+        const [traceTraceMeta, traceTraceData] = await Promise.all([
+          traceApiService.getTraceMeta({
             organizationSlug: resolved.organizationSlug,
             traceId: resolved.traceId!,
-            regionUrl: null,
-          },
-          context,
+            statsPeriod: "14d",
+          }),
+          traceApiService.getTrace({
+            organizationSlug: resolved.organizationSlug,
+            traceId: resolved.traceId!,
+            limit: 10,
+            statsPeriod: "14d",
+          }),
+        ]);
+        return formatTraceOutput({
+          organizationSlug: resolved.organizationSlug,
+          traceId: resolved.traceId!,
+          traceMeta: traceTraceMeta,
+          trace: traceTraceData,
+          apiService: traceApiService,
+          suggestSpansResource: true,
+        });
+      }
+
+      case "spans": {
+        const spansApiService = apiServiceFromContext(context);
+        const traceId = resolved.traceId!;
+
+        if (!/^[0-9a-fA-F]{32}$/.test(traceId)) {
+          throw new UserInputError(
+            "Trace ID must be a 32-character hexadecimal string",
+          );
+        }
+
+        const [spansMeta, spansTrace] = await Promise.all([
+          spansApiService.getTraceMeta({
+            organizationSlug: resolved.organizationSlug,
+            traceId,
+            statsPeriod: "14d",
+          }),
+          spansApiService.getTrace({
+            organizationSlug: resolved.organizationSlug,
+            traceId,
+            limit: 1000,
+            statsPeriod: "14d",
+          }),
+        ]);
+
+        const sections: string[] = [];
+        sections.push(
+          `# Span Tree for Trace \`${traceId}\` in **${resolved.organizationSlug}**`,
         );
+        sections.push("");
+        sections.push(`**Total Spans**: ${spansMeta.span_count}`);
+        sections.push(`**Errors**: ${spansMeta.errors}`);
+        sections.push("");
+
+        if (spansTrace.length > 0) {
+          const fullTree = buildFullSpanTree(spansTrace, traceId);
+          const treeLines = renderSpanTree(fullTree);
+          sections.push(...treeLines);
+
+          // Count rendered spans (excludes the fake trace root)
+          function countSpans(spans: SelectedSpan[]): number {
+            let count = 0;
+            for (const span of spans) {
+              if (span.op !== "trace") count++;
+              count += countSpans(span.children);
+            }
+            return count;
+          }
+          const renderedCount = countSpans(fullTree);
+
+          if (spansMeta.span_count > renderedCount) {
+            sections.push("");
+            sections.push(
+              `*Showing ${renderedCount} of ${spansMeta.span_count} total spans. The trace has more spans than could be loaded in a single request.*`,
+            );
+          }
+        } else {
+          sections.push("No spans found in this trace.");
+        }
+
+        const traceUrl = spansApiService.getTraceUrl(
+          resolved.organizationSlug,
+          traceId,
+        );
+        sections.push("");
+        sections.push(`**View in Sentry**: ${traceUrl}`);
+
+        return sections.join("\n");
+      }
 
       case "breadcrumbs": {
         const apiService = apiServiceFromContext(context);

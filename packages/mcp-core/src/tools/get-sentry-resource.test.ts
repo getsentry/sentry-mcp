@@ -18,7 +18,7 @@ const baseContext = {
 
 function callHandler(params: {
   url?: string;
-  resourceType?: "issue" | "event" | "trace" | "breadcrumbs";
+  resourceType?: "issue" | "event" | "trace" | "spans" | "breadcrumbs";
   resourceId?: string;
   organizationSlug?: string;
 }) {
@@ -419,6 +419,38 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
       expect(result).toContain("**Total Spans**: 112");
       expect(result).toContain("**Errors**: 0");
+      // trace via get_sentry_resource should suggest spans resource type
+      expect(result).toContain("get_sentry_resource(resourceType='spans'");
+    });
+
+    it("fetches spans by traceId", async () => {
+      const traceId = "a4d1aae7216b47ff8117cf4e09ce9d0a";
+
+      mswServer.use(
+        http.get(
+          `https://sentry.io/api/0/organizations/test-org/trace-meta/${traceId}/`,
+          () => HttpResponse.json(traceMetaFixture),
+          { once: true },
+        ),
+        http.get(
+          `https://sentry.io/api/0/organizations/test-org/trace/${traceId}/`,
+          () => HttpResponse.json(traceFixture),
+          { once: true },
+        ),
+      );
+
+      const result = await callHandler({
+        resourceType: "spans",
+        organizationSlug: "test-org",
+        resourceId: traceId,
+      });
+      expect(result).toContain(
+        `# Span Tree for Trace \`${traceId}\` in **test-org**`,
+      );
+      expect(result).toContain("**Total Spans**: 112");
+      expect(result).toContain("**Errors**: 0");
+      // Should render actual span tree
+      expect(result).toContain("trace [a4d1aae7]");
     });
 
     it("fetches breadcrumbs by issueId", async () => {
@@ -581,6 +613,15 @@ describe("get_sentry_resource", () => {
       await expect(
         callHandler({
           resourceType: "breadcrumbs",
+          organizationSlug: "my-org",
+        }),
+      ).rejects.toThrow("`resourceId` is required when not using a URL");
+    });
+
+    it("throws when resourceId missing for spans type", async () => {
+      await expect(
+        callHandler({
+          resourceType: "spans",
           organizationSlug: "my-org",
         }),
       ).rejects.toThrow("`resourceId` is required when not using a URL");

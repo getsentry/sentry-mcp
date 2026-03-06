@@ -4,12 +4,13 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl, ParamTraceId } from "../schema";
-
-// Constants for span filtering and tree rendering
-const MAX_DEPTH = 2;
-const MINIMUM_DURATION_THRESHOLD_MS = 10;
-const MIN_MEANINGFUL_CHILD_DURATION = 5;
-const MIN_AVG_DURATION_MS = 5;
+import {
+  MIN_AVG_DURATION_MS,
+  selectInterestingSpans,
+  getAllSpansFlattened,
+  renderSpanTree,
+} from "../internal/tool-helpers/trace-rendering";
+import { getEventsToolName } from "../internal/tool-helpers/tool-names";
 
 export default defineTool({
   name: "get_trace_details",
@@ -95,222 +96,6 @@ export default defineTool({
   },
 });
 
-interface SelectedSpan {
-  event_id: string;
-  op: string;
-  name: string | null;
-  description: string;
-  duration: number;
-  is_transaction: boolean;
-  children: SelectedSpan[];
-  level: number;
-}
-
-/**
- * Selects a subset of "interesting" spans from a trace for display in the overview.
- *
- * Creates a fake root span representing the entire trace, with selected interesting
- * spans as children. This provides a unified tree view of the trace.
- *
- * The goal is to provide a meaningful sample of the trace that highlights the most
- * important operations while staying within display limits. Selection prioritizes:
- *
- * 1. **Transactions** - Top-level operations that represent complete user requests
- * 2. **Error spans** - Any spans that contain errors (critical for debugging)
- * 3. **Long-running spans** - Operations >= 10ms duration (performance bottlenecks)
- * 4. **Hierarchical context** - Maintains parent-child relationships for understanding
- *
- * Span inclusion rules:
- * - All transactions are included (they're typically root-level operations)
- * - Spans with errors are always included (debugging importance)
- * - Spans with duration >= 10ms are included (performance relevance)
- * - Children are recursively added up to 2 levels deep:
- *   - Transactions can have up to 2 children each
- *   - Regular spans can have up to 1 child each
- * - Total output is capped at maxSpans to prevent overwhelming display
- *
- * @param spans - Complete array of trace spans with nested children
- * @param traceId - Trace ID to display in the fake root span
- * @param maxSpans - Maximum number of spans to include in output (default: 20)
- * @returns Single-element array containing fake root span with selected spans as children
- */
-function selectInterestingSpans(
-  spans: any[],
-  traceId: string,
-  maxSpans = 20,
-): SelectedSpan[] {
-  const selected: SelectedSpan[] = [];
-  let spanCount = 0;
-
-  // Filter out non-span items (issues) from the trace data
-  // Spans must have children array, duration, and other span-specific fields
-  const actualSpans = spans.filter(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      "children" in item &&
-      Array.isArray(item.children) &&
-      "duration" in item,
-  );
-
-  function addSpan(span: any, level: number): boolean {
-    if (spanCount >= maxSpans || level > MAX_DEPTH) return false;
-
-    const duration = span.duration || 0;
-    const isTransaction = span.is_transaction;
-    const hasErrors = span.errors?.length > 0;
-
-    // Always include transactions and spans with errors
-    // For regular spans, include if they have reasonable duration or are at root level
-    const shouldInclude =
-      isTransaction ||
-      hasErrors ||
-      level === 0 ||
-      duration >= MINIMUM_DURATION_THRESHOLD_MS;
-
-    if (!shouldInclude) return false;
-
-    const selectedSpan: SelectedSpan = {
-      event_id: span.event_id,
-      op: span.op || "unknown",
-      name: span.name || null,
-      description: span.description || span.transaction || "unnamed",
-      duration,
-      is_transaction: isTransaction,
-      children: [],
-      level,
-    };
-
-    spanCount++;
-
-    // Add up to one interesting child per span, up to MAX_DEPTH levels deep
-    if (level < MAX_DEPTH && span.children?.length > 0) {
-      // Sort children by duration (descending) and take the most interesting ones
-      const sortedChildren = span.children
-        .filter((child: any) => child.duration > MIN_MEANINGFUL_CHILD_DURATION) // Only children with meaningful duration
-        .sort((a: any, b: any) => (b.duration || 0) - (a.duration || 0));
-
-      // Add up to 2 children for transactions, 1 for regular spans
-      const maxChildren = isTransaction ? 2 : 1;
-      let addedChildren = 0;
-
-      for (const child of sortedChildren) {
-        if (addedChildren >= maxChildren || spanCount >= maxSpans) break;
-
-        if (addSpan(child, level + 1)) {
-          const childSpan = selected[selected.length - 1];
-          selectedSpan.children.push(childSpan);
-          addedChildren++;
-        }
-      }
-    }
-
-    selected.push(selectedSpan);
-    return true;
-  }
-
-  // Sort root spans by duration and select the most interesting ones
-  const sortedRoots = actualSpans
-    .sort((a, b) => (b.duration || 0) - (a.duration || 0))
-    .slice(0, 5); // Start with top 5 root spans
-
-  for (const root of sortedRoots) {
-    if (spanCount >= maxSpans) break;
-    addSpan(root, 0);
-  }
-
-  const rootSpans = selected.filter((span) => span.level === 0);
-
-  // Create fake root span representing the entire trace (no duration - traces are unbounded)
-  const fakeRoot: SelectedSpan = {
-    event_id: traceId,
-    op: "trace",
-    name: null,
-    description: `Trace ${traceId.substring(0, 8)}`,
-    duration: 0, // Traces don't have duration
-    is_transaction: false,
-    children: rootSpans,
-    level: -1, // Mark as fake root
-  };
-
-  return [fakeRoot];
-}
-
-/**
- * Formats a span display name for the tree view.
- *
- * Uses span.name if available (OTEL-native), otherwise falls back to span.description.
- *
- * @param span - The span to format
- * @returns A formatted display name for the span
- */
-function formatSpanDisplayName(span: SelectedSpan): string {
-  // For the fake trace root, just return "trace"
-  if (span.op === "trace") {
-    return "trace";
-  }
-
-  // Use span.name if available (OTEL-native), otherwise use description
-  return span.name?.trim() || span.description || "unnamed";
-}
-
-/**
- * Renders a hierarchical tree structure of spans using Unicode box-drawing characters.
- *
- * Creates a visual tree representation showing parent-child relationships between spans,
- * with proper indentation and connecting lines. Each span shows its operation, short ID,
- * description, duration, and type (transaction vs span).
- *
- * Tree format:
- * - Root spans have no prefix
- * - Child spans use ├─ for intermediate children, └─ for last child
- * - Continuation lines use │ for vertical connections
- * - Proper spacing maintains visual alignment
- *
- * @param spans - Array of selected spans with their nested children structure
- * @returns Array of formatted markdown strings representing the tree structure
- */
-function renderSpanTree(spans: SelectedSpan[]): string[] {
-  const lines: string[] = [];
-
-  function renderSpan(span: SelectedSpan, prefix = "", isLast = true): void {
-    const shortId = span.event_id.substring(0, 8);
-    const connector = prefix === "" ? "" : isLast ? "└─ " : "├─ ";
-    const displayName = formatSpanDisplayName(span);
-
-    // Don't show duration for the fake trace root span
-    if (span.op === "trace") {
-      lines.push(`${prefix}${connector}${displayName} [${shortId}]`);
-    } else {
-      const duration = span.duration
-        ? `${Math.round(span.duration)}ms`
-        : "unknown";
-
-      // Don't show 'default' operations as they're not meaningful
-      const opDisplay = span.op === "default" ? "" : ` · ${span.op}`;
-      lines.push(
-        `${prefix}${connector}${displayName} [${shortId}${opDisplay} · ${duration}]`,
-      );
-    }
-
-    // Render children with proper tree indentation
-    for (let i = 0; i < span.children.length; i++) {
-      const child = span.children[i];
-      const isLastChild = i === span.children.length - 1;
-      const childPrefix = prefix + (isLast ? "   " : "│  ");
-      renderSpan(child, childPrefix, isLastChild);
-    }
-  }
-
-  for (let i = 0; i < spans.length; i++) {
-    const span = spans[i];
-    const isLastRoot = i === spans.length - 1;
-    renderSpan(span, "", isLastRoot);
-  }
-
-  return lines;
-}
-
 function calculateOperationStats(spans: any[]): Record<
   string,
   {
@@ -368,45 +153,20 @@ function calculateOperationStats(spans: any[]): Record<
   return stats;
 }
 
-function getAllSpansFlattened(spans: any[]): any[] {
-  const result: any[] = [];
-
-  // Filter out non-span items (issues) from the trace data
-  // Spans must have children array and duration
-  const actualSpans = spans.filter(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      "children" in item &&
-      Array.isArray(item.children) &&
-      "duration" in item,
-  );
-
-  function collectSpans(spanList: any[]) {
-    for (const span of spanList) {
-      result.push(span);
-      if (span.children && span.children.length > 0) {
-        collectSpans(span.children);
-      }
-    }
-  }
-
-  collectSpans(actualSpans);
-  return result;
-}
-
-function formatTraceOutput({
+export function formatTraceOutput({
   organizationSlug,
   traceId,
   traceMeta,
   trace,
   apiService,
+  suggestSpansResource = false,
 }: {
   organizationSlug: string;
   traceId: string;
   traceMeta: any;
   trace: any[];
   apiService: any;
+  suggestSpansResource?: boolean;
 }): string {
   const sections: string[] = [];
 
@@ -471,14 +231,30 @@ function formatTraceOutput({
   sections.push("");
   sections.push("## Find Related Events");
   sections.push("");
-  sections.push(`Use this search query to find all events in this trace:`);
-  sections.push("```");
-  sections.push(`trace:${traceId}`);
-  sections.push("```");
-  sections.push("");
-  sections.push(
-    "You can use this query with the `search_events` tool to get detailed event data from this trace.",
-  );
+
+  if (suggestSpansResource) {
+    sections.push(
+      "To view the complete span tree for this trace, use `get_sentry_resource`:",
+    );
+    sections.push("```");
+    sections.push(
+      `get_sentry_resource(resourceType='spans', organizationSlug='${organizationSlug}', resourceId='${traceId}')`,
+    );
+    sections.push("```");
+  } else {
+    const eventsToolName = getEventsToolName();
+    sections.push(
+      `To list all spans in this trace, use \`${eventsToolName}\` with cursor pagination:`,
+    );
+    sections.push("```");
+    sections.push(
+      `${eventsToolName}(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}', sort='-timestamp', limit=100)`,
+    );
+    sections.push("```");
+    sections.push(
+      "Use the returned `cursor` value to fetch subsequent pages until all spans are retrieved.",
+    );
+  }
 
   return sections.join("\n");
 }

@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { SentryApiService } from "./client";
+import { SentryApiService, parseLinkCursor } from "./client";
 import { ConfigurationError } from "../errors";
 
 describe("getIssueUrl", () => {
@@ -1162,5 +1162,164 @@ describe("API query builders", () => {
         );
       });
     });
+  });
+});
+
+describe("parseLinkCursor", () => {
+  it("should return cursor when next has results=true", () => {
+    const header = [
+      '<https://sentry.io/api/0/organizations/test/events/?cursor=0:0:1>; rel="previous"; results="false"; cursor="0:0:1"',
+      '<https://sentry.io/api/0/organizations/test/events/?cursor=0:10:0>; rel="next"; results="true"; cursor="1735689600:0:0"',
+    ].join(", ");
+    expect(parseLinkCursor(header)).toBe("1735689600:0:0");
+  });
+
+  it("should return null when next has results=false", () => {
+    const header = [
+      '<https://sentry.io/api/0/organizations/test/events/?cursor=0:0:1>; rel="previous"; results="true"; cursor="0:0:1"',
+      '<https://sentry.io/api/0/organizations/test/events/?cursor=0:10:0>; rel="next"; results="false"; cursor="0:10:0"',
+    ].join(", ");
+    expect(parseLinkCursor(header)).toBeNull();
+  });
+
+  it("should return null when there is no next rel", () => {
+    const header =
+      '<https://sentry.io/api/0/organizations/test/events/?cursor=0:0:1>; rel="previous"; results="false"; cursor="0:0:1"';
+    expect(parseLinkCursor(header)).toBeNull();
+  });
+
+  it("should return null for null input", () => {
+    expect(parseLinkCursor(null)).toBeNull();
+  });
+
+  it("should return null for empty string", () => {
+    expect(parseLinkCursor("")).toBeNull();
+  });
+
+  it("should return null for malformed header without cursor", () => {
+    const header = '<https://sentry.io/api/0/test>; rel="next"; results="true"';
+    expect(parseLinkCursor(header)).toBeNull();
+  });
+});
+
+describe("searchEvents pagination", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("should pass cursor parameter to API URL", async () => {
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({
+        "content-type": "application/json",
+      }),
+      json: () => Promise.resolve({ data: [] }),
+    });
+
+    await apiService.searchEvents({
+      organizationSlug: "test-org",
+      query: "level:error",
+      fields: ["title"],
+      dataset: "errors",
+      cursor: "1735689600:0:0",
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("cursor=1735689600%3A0%3A0"),
+      expect.any(Object),
+    );
+  });
+
+  it("should not include cursor param when not provided", async () => {
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({
+        "content-type": "application/json",
+      }),
+      json: () => Promise.resolve({ data: [] }),
+    });
+
+    await apiService.searchEvents({
+      organizationSlug: "test-org",
+      query: "level:error",
+      fields: ["title"],
+      dataset: "errors",
+    });
+
+    const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string;
+    expect(calledUrl).not.toContain("cursor=");
+  });
+
+  it("should return nextCursor from Link header", async () => {
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const linkHeader = [
+      '<https://sentry.io/api/0/test?cursor=0:0:1>; rel="previous"; results="false"; cursor="0:0:1"',
+      '<https://sentry.io/api/0/test?cursor=0:10:0>; rel="next"; results="true"; cursor="1735689600:0:0"',
+    ].join(", ");
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({
+        "content-type": "application/json",
+        Link: linkHeader,
+      }),
+      json: () => Promise.resolve({ data: [] }),
+    });
+
+    const result = await apiService.searchEvents({
+      organizationSlug: "test-org",
+      query: "level:error",
+      fields: ["title"],
+      dataset: "errors",
+    });
+
+    expect(result.nextCursor).toBe("1735689600:0:0");
+    expect(result.body).toEqual({ data: [] });
+  });
+
+  it("should return null nextCursor when no more pages", async () => {
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({
+        "content-type": "application/json",
+      }),
+      json: () => Promise.resolve({ data: [] }),
+    });
+
+    const result = await apiService.searchEvents({
+      organizationSlug: "test-org",
+      query: "level:error",
+      fields: ["title"],
+      dataset: "errors",
+    });
+
+    expect(result.nextCursor).toBeNull();
+    expect(result.body).toEqual({ data: [] });
   });
 });

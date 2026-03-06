@@ -602,11 +602,30 @@ export const restHandlers = buildHandlers([
       const dataset = url.searchParams.get("dataset");
       const query = url.searchParams.get("query");
       const fields = url.searchParams.getAll("field");
+      const cursor = url.searchParams.get("cursor");
+
+      // Build Link header for pagination simulation
+      // When no cursor: include a next cursor (simulating first page)
+      // When cursor is present: no next cursor (simulating last page)
+      const linkHeaders: Record<string, string> = {};
+      if (!cursor) {
+        linkHeaders.Link = [
+          `<${request.url}&cursor=0:10:0>; rel="previous"; results="false"; cursor="0:0:1"`,
+          `<${request.url}&cursor=0:10:0>; rel="next"; results="true"; cursor="1735689600:0:0"`,
+        ].join(", ");
+      } else {
+        linkHeaders.Link = [
+          `<${request.url}&cursor=0:0:1>; rel="previous"; results="true"; cursor="0:0:1"`,
+          `<${request.url}&cursor=0:20:0>; rel="next"; results="false"; cursor="0:20:0"`,
+        ].join(", ");
+      }
 
       if (dataset === "spans") {
         //[sentryApi] GET https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=spans&per_page=10&referrer=sentry-mcp&sort=-span.duration&allowAggregateConditions=0&useRpc=1&field=id&field=trace&field=span.op&field=span.description&field=span.duration&field=transaction&field=project&field=timestamp&query=is_transaction%3Atrue
         if (query !== "is_transaction:true") {
-          return HttpResponse.json(EmptyEventsSpansPayload);
+          return HttpResponse.json(EmptyEventsSpansPayload, {
+            headers: linkHeaders,
+          });
         }
 
         if (url.searchParams.get("useRpc") !== "1") {
@@ -622,7 +641,9 @@ export const restHandlers = buildHandlers([
         ) {
           return HttpResponse.json("Invalid fields", { status: 400 });
         }
-        return HttpResponse.json(EventsSpansPayload);
+        return HttpResponse.json(EventsSpansPayload, {
+          headers: linkHeaders,
+        });
       }
       if (dataset === "errors") {
         //https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=errors&per_page=10&referrer=sentry-mcp&sort=-count&statsPeriod=1w&field=issue&field=title&field=project&field=last_seen%28%29&field=count%28%29&query=
@@ -660,10 +681,14 @@ export const restHandlers = buildHandlers([
             "user.email:david@sentry.io",
           ].includes(sortedQuery)
         ) {
-          return HttpResponse.json(EmptyEventsErrorsPayload);
+          return HttpResponse.json(EmptyEventsErrorsPayload, {
+            headers: linkHeaders,
+          });
         }
 
-        return HttpResponse.json(EventsErrorsPayload);
+        return HttpResponse.json(EventsErrorsPayload, {
+          headers: linkHeaders,
+        });
       }
 
       return HttpResponse.json("Invalid dataset", { status: 400 });

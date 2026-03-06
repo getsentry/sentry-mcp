@@ -532,12 +532,12 @@
         },
         "resourceType": {
           "type": "string",
-          "enum": ["issue", "event", "trace", "breadcrumbs"],
-          "description": "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL)."
+          "enum": ["issue", "event", "trace", "spans", "breadcrumbs"],
+          "description": "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL). Use 'spans' with a trace ID to get the complete span tree."
         },
         "resourceId": {
           "type": "string",
-          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL."
+          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. For 'spans', pass the trace ID. Required when not using a URL."
         },
         "organizationSlug": {
           "type": "string",
@@ -646,9 +646,14 @@
         "limit": {
           "type": "number",
           "minimum": 1,
-          "maximum": 100,
+          "maximum": 1000,
           "default": 10,
-          "description": "Maximum number of results to return (1-100)"
+          "description": "Maximum number of results to return (1-1000)"
+        },
+        "cursor": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Pagination cursor from a previous response to fetch the next page of results."
         },
         "regionUrl": {
           "anyOf": [

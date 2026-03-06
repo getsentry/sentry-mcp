@@ -95,9 +95,16 @@ export default defineTool({
     limit: z
       .number()
       .min(1)
-      .max(100)
+      .max(1000)
       .default(10)
-      .describe("Maximum number of results to return (1-100)"),
+      .describe("Maximum number of results to return (1-1000)"),
+    cursor: z
+      .string()
+      .nullable()
+      .default(null)
+      .describe(
+        "Pagination cursor from a previous response to fetch the next page of results.",
+      ),
     regionUrl: ParamRegionUrl.nullable().default(null),
   },
   annotations: {
@@ -125,7 +132,7 @@ export default defineTool({
     // Use provided fields or defaults for the dataset
     const fields = params.fields ?? DEFAULT_FIELDS[params.dataset];
 
-    const eventsResponse = await apiService.searchEvents({
+    const { body: eventsResponse, nextCursor } = await apiService.searchEvents({
       organizationSlug: params.organizationSlug,
       query: params.query,
       fields,
@@ -134,6 +141,7 @@ export default defineTool({
       dataset: params.dataset,
       sort: params.sort,
       statsPeriod: params.statsPeriod,
+      cursor: params.cursor ?? undefined,
     });
 
     // Type validation
@@ -190,6 +198,7 @@ export default defineTool({
       explorerUrl,
       sentryQuery: params.query,
       fields,
+      nextCursor,
     };
 
     switch (params.dataset) {

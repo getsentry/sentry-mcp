@@ -177,7 +177,7 @@ export default defineTool({
       timeParams.statsPeriod = "14d";
     }
 
-    const eventsResponse = await apiService.searchEvents({
+    const { body: eventsResponse } = await apiService.searchEvents({
       organizationSlug,
       query: sentryQuery,
       fields,
