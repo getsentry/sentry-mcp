@@ -2,8 +2,5 @@
   "name": "@sentry/mcp-server-tsconfig",
   "version": "0.29.0",
   "private": true,
-  "files": [
-    "tsconfig.base.json",
-    "tsconfig.vite.json"
-  ]
+  "files": ["better-sqlite3.d.ts", "tsconfig.base.json", "tsconfig.vite.json"]
 }
