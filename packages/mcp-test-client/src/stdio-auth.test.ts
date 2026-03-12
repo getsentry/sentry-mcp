@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
@@ -12,7 +12,9 @@ function createCliDb({
   token?: string | null;
   expiresAt?: number | null;
 }) {
-  const configDir = mkdtempSync(join(tmpdir(), "sentry-mcp-client-auth-"));
+  const homeDir = mkdtempSync(join(tmpdir(), "sentry-mcp-client-auth-"));
+  const configDir = join(homeDir, ".sentry");
+  mkdirSync(configDir);
   const dbPath = join(configDir, "cli.db");
   const db = new Database(dbPath);
 
@@ -33,7 +35,7 @@ function createCliDb({
   );
   db.close();
 
-  return configDir;
+  return homeDir;
 }
 
 const tempDirs: string[] = [];
@@ -55,22 +57,7 @@ describe("resolveSentryHost", () => {
 });
 
 describe("resolveLocalAuth", () => {
-  it("uses SENTRY_AUTH_TOKEN for local stdio mode", () => {
-    const result = resolveLocalAuth({
-      env: {
-        SENTRY_AUTH_TOKEN: "env-auth-token",
-        SENTRY_HOST: "sentry.example.com",
-      },
-    });
-
-    expect(result).toEqual({
-      accessToken: "env-auth-token",
-      accessTokenSource: "sentry_auth_token",
-      host: "sentry.example.com",
-    });
-  });
-
-  it("uses cli.db when explicit and env tokens are missing", () => {
+  it("uses cli.db when explicit token is missing", () => {
     const nowMs = Date.now();
     const configDir = createCliDb({
       token: "db-token",
@@ -80,10 +67,10 @@ describe("resolveLocalAuth", () => {
 
     const result = resolveLocalAuth({
       env: {
-        SENTRY_CONFIG_DIR: configDir,
         SENTRY_HOST: "sentry.example.com",
       },
       nowMs,
+      homeDir: configDir,
     });
 
     expect(result).toEqual({
@@ -103,24 +90,25 @@ describe("resolveLocalAuth", () => {
 
     const result = resolveLocalAuth({
       env: {
-        SENTRY_CONFIG_DIR: configDir,
         SENTRY_HOST: "sentry.example.com",
       },
       nowMs,
+      homeDir: configDir,
     });
 
     expect(result).toEqual({});
   });
 
   it("ignores unreadable cli.db state", () => {
-    const configDir = mkdtempSync(join(tmpdir(), "sentry-mcp-client-auth-"));
-    tempDirs.push(configDir);
+    const homeDir = mkdtempSync(join(tmpdir(), "sentry-mcp-client-auth-"));
+    const configDir = join(homeDir, ".sentry");
+    mkdirSync(configDir);
+    tempDirs.push(homeDir);
     writeFileSync(join(configDir, "cli.db"), "not-a-sqlite-db");
 
     const result = resolveLocalAuth({
-      env: {
-        SENTRY_CONFIG_DIR: configDir,
-      },
+      env: {},
+      homeDir,
     });
 
     expect(result).toEqual({});

@@ -94,7 +94,7 @@ pnpm start --access-token=YOUR_TOKEN
 If you've already authenticated with the
 [Sentry CLI](https://cli.sentry.dev/commands/auth/), you can omit
 `--access-token` and the stdio server will reuse the token stored in
-`${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db`.
+`~/.sentry/cli.db`.
 
 This uses `tsx` to run TypeScript directly without building.
 
@@ -529,9 +529,6 @@ pnpm start --access-token=YOUR_TOKEN
 export SENTRY_ACCESS_TOKEN=YOUR_TOKEN
 pnpm start
 
-# Option 4: Sentry CLI-compatible environment variable
-export SENTRY_AUTH_TOKEN=YOUR_TOKEN
-pnpm start
 ```
 
 ### "AI-powered search tools unavailable"

@@ -54,7 +54,7 @@ npx @sentry/mcp-server@latest --access-token=sentry-user-token
 
 If you've already authenticated with the [Sentry CLI](https://cli.sentry.dev/),
 you can omit the token and the stdio server will reuse the token from
-`${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db`:
+`~/.sentry/cli.db`:
 
 ```shell
 sentry auth
@@ -75,8 +75,6 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com --d
 
 ```shell
 SENTRY_ACCESS_TOKEN=         # Optional: explicit auth token override
-SENTRY_AUTH_TOKEN=           # Optional: Sentry CLI-compatible auth token alias
-SENTRY_CONFIG_DIR=           # Optional: override Sentry CLI config dir
 
 # LLM Provider Configuration (required for AI-powered search tools)
 EMBEDDED_AGENT_PROVIDER=     # Required: 'openai' or 'anthropic'

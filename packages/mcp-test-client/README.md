@@ -56,8 +56,6 @@ OPENAI_API_KEY=your_openai_api_key
 
 # Optional - explicit auth token override
 SENTRY_ACCESS_TOKEN=your_sentry_access_token
-SENTRY_AUTH_TOKEN=your_sentry_cli_token
-SENTRY_CONFIG_DIR=~/.sentry
 
 # Optional (self-hosted only)
 # Leave unset to target the SaaS host
@@ -86,9 +84,8 @@ The client automatically determines the connection mode:
 
 1. Command-line flag (`--access-token`)
 2. Environment variable (`SENTRY_ACCESS_TOKEN`)
-3. Environment variable (`SENTRY_AUTH_TOKEN`)
-4. [Sentry CLI](https://cli.sentry.dev/) auth state in `${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db`
-5. `.env` file
+3. [Sentry CLI](https://cli.sentry.dev/) auth state in `~/.sentry/cli.db`
+4. `.env` file
 
 **Remote Mode (HTTP streaming)**: Used when no access token is provided, prompts for OAuth authentication
 
@@ -216,7 +213,7 @@ If you see "Failed to connect to MCP server":
 If you get authentication errors:
 
 1. Verify your OPENAI_API_KEY is set correctly
-2. Check that your token source (`SENTRY_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN`, or [Sentry CLI](https://cli.sentry.dev/commands/auth/) auth) has the required permissions
+2. Check that your token source (`SENTRY_ACCESS_TOKEN` or [Sentry CLI](https://cli.sentry.dev/commands/auth/) auth) has the required permissions
 3. For self-hosted Sentry, ensure `SENTRY_HOST` is set
 
 ### Tool Errors

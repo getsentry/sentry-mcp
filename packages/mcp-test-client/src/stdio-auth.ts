@@ -1,14 +1,11 @@
 import Database from "better-sqlite3";
-import { homedir } from "node:os";
+import * as os from "node:os";
 import { join } from "node:path";
 import { validateSentryHostThrows } from "@sentry/mcp-core/utils/url-utils";
 
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
-export type AccessTokenSource =
-  | "flag-or-env"
-  | "sentry_auth_token"
-  | "sentry_cli_db";
+export type AccessTokenSource = "flag-or-env" | "sentry_cli_db";
 
 export type ResolvedLocalAuth = {
   accessToken?: string;
@@ -26,16 +23,15 @@ function normalizeToken(token?: string | null): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function getCliDbPath(env: NodeJS.ProcessEnv): string {
-  const configDir = env.SENTRY_CONFIG_DIR?.trim() || join(homedir(), ".sentry");
-  return join(configDir, "cli.db");
+function getCliDbPath(homeDir = os.homedir()): string {
+  return join(homeDir, ".sentry", "cli.db");
 }
 
 function readTokenFromCliDb(
-  env: NodeJS.ProcessEnv,
   nowMs: number,
+  homeDir?: string,
 ): string | undefined {
-  const cliDbPath = getCliDbPath(env);
+  const cliDbPath = getCliDbPath(homeDir);
 
   try {
     const db = new Database(cliDbPath, {
@@ -83,10 +79,12 @@ export function resolveLocalAuth({
   accessToken,
   env,
   nowMs = Date.now(),
+  homeDir,
 }: {
   accessToken?: string;
   env: NodeJS.ProcessEnv;
   nowMs?: number;
+  homeDir?: string;
 }): ResolvedLocalAuth {
   const normalizedAccessToken = normalizeToken(accessToken);
   if (normalizedAccessToken) {
@@ -97,16 +95,7 @@ export function resolveLocalAuth({
     };
   }
 
-  const authToken = normalizeToken(env.SENTRY_AUTH_TOKEN);
-  if (authToken) {
-    return {
-      accessToken: authToken,
-      accessTokenSource: "sentry_auth_token",
-      host: resolveSentryHost(env),
-    };
-  }
-
-  const cliDbToken = readTokenFromCliDb(env, nowMs);
+  const cliDbToken = readTokenFromCliDb(nowMs, homeDir);
   if (cliDbToken) {
     return {
       accessToken: cliDbToken,

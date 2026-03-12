@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
@@ -12,7 +12,9 @@ function createCliDb({
   token?: string | null;
   expiresAt?: number | null;
 }) {
-  const configDir = mkdtempSync(join(tmpdir(), "sentry-mcp-auth-"));
+  const homeDir = mkdtempSync(join(tmpdir(), "sentry-mcp-auth-"));
+  const configDir = join(homeDir, ".sentry");
+  mkdirSync(configDir);
   const dbPath = join(configDir, "cli.db");
   const db = new Database(dbPath);
 
@@ -33,7 +35,7 @@ function createCliDb({
   );
   db.close();
 
-  return configDir;
+  return homeDir;
 }
 
 const tempDirs: string[] = [];
@@ -54,10 +56,7 @@ describe("resolveAccessToken", () => {
 
     const result = resolveAccessToken({
       accessToken: "flag-token",
-      env: {
-        SENTRY_AUTH_TOKEN: "env-auth-token",
-        SENTRY_CONFIG_DIR: configDir,
-      },
+      homeDir: configDir,
     });
 
     expect(result).toEqual({
@@ -66,20 +65,7 @@ describe("resolveAccessToken", () => {
     });
   });
 
-  it("uses SENTRY_AUTH_TOKEN when no explicit token is provided", () => {
-    const result = resolveAccessToken({
-      env: {
-        SENTRY_AUTH_TOKEN: "env-auth-token",
-      },
-    });
-
-    expect(result).toEqual({
-      accessToken: "env-auth-token",
-      source: "sentry_auth_token",
-    });
-  });
-
-  it("falls back to cli.db when env tokens are missing", () => {
+  it("uses cli.db when explicit token is not provided", () => {
     const nowMs = Date.now();
     const configDir = createCliDb({
       token: "db-token",
@@ -88,10 +74,8 @@ describe("resolveAccessToken", () => {
     tempDirs.push(configDir);
 
     const result = resolveAccessToken({
-      env: {
-        SENTRY_CONFIG_DIR: configDir,
-      },
       nowMs,
+      homeDir: configDir,
     });
 
     expect(result).toEqual({
@@ -109,24 +93,22 @@ describe("resolveAccessToken", () => {
     tempDirs.push(configDir);
 
     const result = resolveAccessToken({
-      env: {
-        SENTRY_CONFIG_DIR: configDir,
-      },
       nowMs,
+      homeDir: configDir,
     });
 
     expect(result).toEqual({});
   });
 
   it("ignores missing or unreadable cli.db state", () => {
-    const configDir = mkdtempSync(join(tmpdir(), "sentry-mcp-auth-"));
-    tempDirs.push(configDir);
+    const homeDir = mkdtempSync(join(tmpdir(), "sentry-mcp-auth-"));
+    const configDir = join(homeDir, ".sentry");
+    mkdirSync(configDir);
+    tempDirs.push(homeDir);
     writeFileSync(join(configDir, "cli.db"), "not-a-sqlite-db");
 
     const result = resolveAccessToken({
-      env: {
-        SENTRY_CONFIG_DIR: configDir,
-      },
+      homeDir,
     });
 
     expect(result).toEqual({});

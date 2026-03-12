@@ -62,12 +62,11 @@ const cfg = (() => {
     const merged = merge(cli, env);
     const resolvedAccessToken = resolveAccessToken({
       accessToken: merged.accessToken,
-      env: process.env,
     });
 
     if (resolvedAccessToken.source === "sentry_cli_db") {
       console.warn(
-        `Using access token from Sentry CLI auth state in ${getCliDbPath(process.env)}.`,
+        `Using access token from Sentry CLI auth state in ${getCliDbPath()}.`,
       );
       console.warn("");
     }

@@ -9,7 +9,7 @@ export function buildUsage(
 Authentication:
   --access-token <token>  Sentry User Auth Token with API access
                          If omitted, falls back to SENTRY_ACCESS_TOKEN,
-                         SENTRY_AUTH_TOKEN, or \`sentry auth\` state.
+                         or \`sentry auth\` state.
 
 Common optional flags:
   --host <host>           Change Sentry host (self-hosted)
@@ -36,8 +36,6 @@ All skills: ${allSkills.join(", ")}
 
 Environment variables:
   SENTRY_ACCESS_TOKEN     Sentry auth token (alternative to --access-token)
-  SENTRY_AUTH_TOKEN       Sentry CLI-compatible auth token alias
-  SENTRY_CONFIG_DIR       Override Sentry CLI config dir (for cli.db lookup)
   SENTRY_URL              Full Sentry HTTPS URL (alternative to SENTRY_HOST)
   OPENAI_API_KEY          OpenAI API key for AI-powered search tools
   ANTHROPIC_API_KEY       Anthropic API key for AI-powered search tools

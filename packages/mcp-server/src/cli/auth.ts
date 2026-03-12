@@ -1,13 +1,10 @@
 import Database from "better-sqlite3";
-import { homedir } from "node:os";
+import * as os from "node:os";
 import { join } from "node:path";
 
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
-export type AccessTokenSource =
-  | "flag-or-env"
-  | "sentry_auth_token"
-  | "sentry_cli_db";
+export type AccessTokenSource = "flag-or-env" | "sentry_cli_db";
 
 export type ResolvedAccessToken = {
   accessToken?: string;
@@ -24,16 +21,15 @@ function normalizeToken(token?: string | null): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-export function getCliDbPath(env: NodeJS.ProcessEnv): string {
-  const configDir = env.SENTRY_CONFIG_DIR?.trim() || join(homedir(), ".sentry");
-  return join(configDir, "cli.db");
+export function getCliDbPath(homeDir = os.homedir()): string {
+  return join(homeDir, ".sentry", "cli.db");
 }
 
 function readTokenFromCliDb(
-  env: NodeJS.ProcessEnv,
   nowMs: number,
+  homeDir?: string,
 ): string | undefined {
-  const cliDbPath = getCliDbPath(env);
+  const cliDbPath = getCliDbPath(homeDir);
 
   try {
     const db = new Database(cliDbPath, {
@@ -69,12 +65,12 @@ function readTokenFromCliDb(
 
 export function resolveAccessToken({
   accessToken,
-  env,
   nowMs = Date.now(),
+  homeDir,
 }: {
   accessToken?: string;
-  env: NodeJS.ProcessEnv;
   nowMs?: number;
+  homeDir?: string;
 }): ResolvedAccessToken {
   const normalizedAccessToken = normalizeToken(accessToken);
   if (normalizedAccessToken) {
@@ -84,15 +80,7 @@ export function resolveAccessToken({
     };
   }
 
-  const authToken = normalizeToken(env.SENTRY_AUTH_TOKEN);
-  if (authToken) {
-    return {
-      accessToken: authToken,
-      source: "sentry_auth_token",
-    };
-  }
-
-  const cliDbToken = readTokenFromCliDb(env, nowMs);
+  const cliDbToken = readTokenFromCliDb(nowMs, homeDir);
   if (cliDbToken) {
     return {
       accessToken: cliDbToken,

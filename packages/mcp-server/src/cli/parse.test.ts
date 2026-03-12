@@ -66,13 +66,6 @@ describe("cli/parseEnv", () => {
     } as any);
     expect(env.disableSkills).toBe("seer");
   });
-
-  it("does not consume SENTRY_AUTH_TOKEN directly", () => {
-    const env = parseEnv({
-      SENTRY_AUTH_TOKEN: "authenvtok",
-    } as any);
-    expect(env.accessToken).toBeUndefined();
-  });
 });
 
 describe("cli/merge", () => {
