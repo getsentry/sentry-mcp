@@ -48,14 +48,16 @@ afterEach(() => {
 
 describe("resolveAccessToken", () => {
   it("prefers explicit access token over env and cli db", () => {
+    const nowMs = Date.now();
     const configDir = createCliDb({
       token: "db-token",
-      expiresAt: Date.now() + 60_000,
+      expiresAt: nowMs + 10 * 60_000,
     });
     tempDirs.push(configDir);
 
     const result = resolveAccessToken({
       accessToken: "flag-token",
+      nowMs,
       homeDir: configDir,
     });
 
