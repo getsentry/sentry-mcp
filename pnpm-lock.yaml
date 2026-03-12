@@ -379,6 +379,9 @@ importers:
       ai:
         specifier: 'catalog:'
         version: 6.0.64(zod@3.25.76)
+      better-sqlite3:
+        specifier: 'catalog:'
+        version: 11.10.0
       dotenv:
         specifier: 'catalog:'
         version: 16.6.1
