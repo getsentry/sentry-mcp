@@ -21,7 +21,7 @@ import { LIB_VERSION } from "@sentry/mcp-core/version";
 import { buildUsage } from "./cli/usage";
 import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
-import { resolveAccessToken } from "./cli/auth";
+import { getCliDbPath, resolveAccessToken } from "./cli/auth";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
 import { SKILLS } from "@sentry/mcp-core/skills";
 import {
@@ -67,7 +67,7 @@ const cfg = (() => {
 
     if (resolvedAccessToken.source === "sentry_cli_db") {
       console.warn(
-        "Using access token from Sentry CLI auth state in ~/.sentry/cli.db.",
+        `Using access token from Sentry CLI auth state in ${getCliDbPath(process.env)}.`,
       );
       console.warn("");
     }

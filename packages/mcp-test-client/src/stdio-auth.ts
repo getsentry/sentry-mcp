@@ -1,10 +1,7 @@
 import Database from "better-sqlite3";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import {
-  validateAndParseSentryUrlThrows,
-  validateSentryHostThrows,
-} from "@sentry/mcp-core/utils/url-utils";
+import { validateSentryHostThrows } from "@sentry/mcp-core/utils/url-utils";
 
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
@@ -73,11 +70,6 @@ function readTokenFromCliDb(
 }
 
 export function resolveSentryHost(env: NodeJS.ProcessEnv): string | undefined {
-  const sentryUrl = env.SENTRY_URL?.trim();
-  if (sentryUrl) {
-    return validateAndParseSentryUrlThrows(sentryUrl);
-  }
-
   const sentryHost = env.SENTRY_HOST?.trim();
   if (sentryHost) {
     validateSentryHostThrows(sentryHost);

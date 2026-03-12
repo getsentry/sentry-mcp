@@ -45,15 +45,6 @@ afterEach(() => {
 });
 
 describe("resolveSentryHost", () => {
-  it("prefers SENTRY_URL when present", () => {
-    expect(
-      resolveSentryHost({
-        SENTRY_URL: "https://sentry.example.com",
-        SENTRY_HOST: "ignored.example.com",
-      }),
-    ).toBe("sentry.example.com");
-  });
-
   it("falls back to SENTRY_HOST", () => {
     expect(
       resolveSentryHost({
@@ -90,7 +81,7 @@ describe("resolveLocalAuth", () => {
     const result = resolveLocalAuth({
       env: {
         SENTRY_CONFIG_DIR: configDir,
-        SENTRY_URL: "https://sentry.example.com",
+        SENTRY_HOST: "sentry.example.com",
       },
       nowMs,
     });

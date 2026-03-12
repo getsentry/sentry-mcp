@@ -67,11 +67,11 @@ describe("cli/parseEnv", () => {
     expect(env.disableSkills).toBe("seer");
   });
 
-  it("falls back to SENTRY_AUTH_TOKEN when SENTRY_ACCESS_TOKEN is missing", () => {
+  it("does not consume SENTRY_AUTH_TOKEN directly", () => {
     const env = parseEnv({
       SENTRY_AUTH_TOKEN: "authenvtok",
     } as any);
-    expect(env.accessToken).toBe("authenvtok");
+    expect(env.accessToken).toBeUndefined();
   });
 });
 

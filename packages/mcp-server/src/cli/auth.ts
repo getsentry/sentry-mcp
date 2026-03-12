@@ -24,7 +24,7 @@ function normalizeToken(token?: string | null): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function getCliDbPath(env: NodeJS.ProcessEnv): string {
+export function getCliDbPath(env: NodeJS.ProcessEnv): string {
   const configDir = env.SENTRY_CONFIG_DIR?.trim() || join(homedir(), ".sentry");
   return join(configDir, "cli.db");
 }
