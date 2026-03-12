@@ -130,8 +130,13 @@ Add to `.cursor/mcp.json`:
 
 Authentication:
 - `SENTRY_ACCESS_TOKEN` - Explicit Sentry API access token
-- `SENTRY_AUTH_TOKEN` - Sentry CLI-compatible auth token alias
-- `SENTRY_CONFIG_DIR` - Override Sentry CLI config dir for `cli.db` lookup
+- `SENTRY_AUTH_TOKEN` - [Sentry CLI](https://cli.sentry.dev/)-compatible auth token alias
+- `SENTRY_CONFIG_DIR` - Override the [Sentry CLI](https://cli.sentry.dev/) config dir for `cli.db` lookup
+
+If the user has already authenticated with the
+[Sentry CLI](https://cli.sentry.dev/commands/auth/), the stdio server can reuse
+the token stored in `${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db` without requiring
+`SENTRY_ACCESS_TOKEN`.
 
 Host:
 - `SENTRY_HOST` - Sentry instance hostname (default: `sentry.io`)

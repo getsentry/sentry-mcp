@@ -87,7 +87,7 @@ The client automatically determines the connection mode:
 1. Command-line flag (`--access-token`)
 2. Environment variable (`SENTRY_ACCESS_TOKEN`)
 3. Environment variable (`SENTRY_AUTH_TOKEN`)
-4. Sentry CLI auth state in `${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db`
+4. [Sentry CLI](https://cli.sentry.dev/) auth state in `${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db`
 5. `.env` file
 
 **Remote Mode (HTTP streaming)**: Used when no access token is provided, prompts for OAuth authentication
@@ -121,8 +121,9 @@ pnpm mcp-test-client --mcp-host http://localhost:8787
 
 ### Local Mode
 
-Use the local stdio transport by providing a Sentry access token, or by running
-`sentry auth` first:
+Use the local stdio transport by providing a Sentry access token, or by
+authenticating with the [Sentry CLI](https://cli.sentry.dev/commands/auth/)
+first:
 
 ```bash
 # Using environment variable
@@ -215,7 +216,7 @@ If you see "Failed to connect to MCP server":
 If you get authentication errors:
 
 1. Verify your OPENAI_API_KEY is set correctly
-2. Check that your token source (`SENTRY_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN`, or `sentry auth`) has the required permissions
+2. Check that your token source (`SENTRY_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN`, or [Sentry CLI](https://cli.sentry.dev/commands/auth/) auth) has the required permissions
 3. For self-hosted Sentry, ensure `SENTRY_HOST` is set
 
 ### Tool Errors

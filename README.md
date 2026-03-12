@@ -52,8 +52,9 @@ Launch the transport:
 npx @sentry/mcp-server@latest --access-token=sentry-user-token
 ```
 
-If you've already authenticated with the Sentry CLI, you can omit the token and
-the stdio server will reuse the token from `${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db`:
+If you've already authenticated with the [Sentry CLI](https://cli.sentry.dev/),
+you can omit the token and the stdio server will reuse the token from
+`${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db`:
 
 ```shell
 sentry auth
@@ -223,7 +224,7 @@ pnpm -w run cli --agent "who am I?"
 # Test against production
 pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
 
-# Test with local stdio mode (explicit token or sentry auth)
+# Test with local stdio mode (explicit token or Sentry CLI auth)
 pnpm -w run cli --access-token=TOKEN "query"
 ```
 
