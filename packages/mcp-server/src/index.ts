@@ -21,6 +21,7 @@ import { LIB_VERSION } from "@sentry/mcp-core/version";
 import { buildUsage } from "./cli/usage";
 import { parseArgv, parseEnv, merge } from "./cli/parse";
 import { finalize } from "./cli/resolve";
+import { resolveAccessToken } from "./cli/auth";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
 import { SKILLS } from "@sentry/mcp-core/skills";
 import {
@@ -58,7 +59,23 @@ if (cli.unknownArgs.length > 0) {
 const env = parseEnv(process.env);
 const cfg = (() => {
   try {
-    return finalize(merge(cli, env));
+    const merged = merge(cli, env);
+    const resolvedAccessToken = resolveAccessToken({
+      accessToken: merged.accessToken,
+      env: process.env,
+    });
+
+    if (resolvedAccessToken.source === "sentry_cli_db") {
+      console.warn(
+        "Using access token from Sentry CLI auth state in ~/.sentry/cli.db.",
+      );
+      console.warn("");
+    }
+
+    return finalize({
+      ...merged,
+      accessToken: resolvedAccessToken.accessToken,
+    });
   } catch (err) {
     die(err instanceof Error ? err.message : String(err));
   }

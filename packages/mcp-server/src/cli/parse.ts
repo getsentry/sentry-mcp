@@ -77,6 +77,7 @@ export function parseArgv(argv: string[]): CliArgs {
 export function parseEnv(env: NodeJS.ProcessEnv): EnvArgs {
   const fromEnv: EnvArgs = {};
   if (env.SENTRY_ACCESS_TOKEN) fromEnv.accessToken = env.SENTRY_ACCESS_TOKEN;
+  else if (env.SENTRY_AUTH_TOKEN) fromEnv.accessToken = env.SENTRY_AUTH_TOKEN;
   if (env.SENTRY_URL) fromEnv.url = env.SENTRY_URL;
   if (env.SENTRY_HOST) fromEnv.host = env.SENTRY_HOST;
   if (env.MCP_URL) fromEnv.mcpUrl = env.MCP_URL;

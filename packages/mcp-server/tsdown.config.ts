@@ -9,6 +9,7 @@ export default defineConfig({
   external: [
     // Only mark test-only packages as external
     "@sentry/mcp-server-mocks",
+    "better-sqlite3",
     // Everything else (including @sentry/mcp-core) will be bundled
   ],
   env: {

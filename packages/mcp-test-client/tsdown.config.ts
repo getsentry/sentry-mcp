@@ -7,6 +7,7 @@ const packageVersion =
 
 export default defineConfig({
   entry: ["src/index.ts"],
+  external: ["better-sqlite3"],
   format: ["esm"],
   clean: true,
   platform: "node",

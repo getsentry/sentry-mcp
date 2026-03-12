@@ -54,8 +54,10 @@ Create a `.env` file in the package directory:
 # Required
 OPENAI_API_KEY=your_openai_api_key
 
-# Required - Sentry access token with appropriate permissions
+# Optional - explicit auth token override
 SENTRY_ACCESS_TOKEN=your_sentry_access_token
+SENTRY_AUTH_TOKEN=your_sentry_cli_token
+SENTRY_CONFIG_DIR=~/.sentry
 
 # Optional (self-hosted only)
 # Leave unset to target the SaaS host
@@ -84,7 +86,9 @@ The client automatically determines the connection mode:
 
 1. Command-line flag (`--access-token`)
 2. Environment variable (`SENTRY_ACCESS_TOKEN`)
-3. `.env` file
+3. Environment variable (`SENTRY_AUTH_TOKEN`)
+4. Sentry CLI auth state in `${SENTRY_CONFIG_DIR:-~/.sentry}/cli.db`
+5. `.env` file
 
 **Remote Mode (HTTP streaming)**: Used when no access token is provided, prompts for OAuth authentication
 
@@ -101,7 +105,7 @@ Your Sentry access token needs the following scopes:
 
 ## Usage
 
-### Remote Mode (Default)
+### Remote Mode
 
 Connect to the remote MCP server via HTTP streaming (uses OAuth for authentication):
 
@@ -117,7 +121,8 @@ pnpm mcp-test-client --mcp-host http://localhost:8787
 
 ### Local Mode
 
-Use the local stdio transport by providing a Sentry access token:
+Use the local stdio transport by providing a Sentry access token, or by running
+`sentry auth` first:
 
 ```bash
 # Using environment variable
@@ -125,6 +130,10 @@ SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client
 
 # Using command line flag
 pnpm mcp-test-client --access-token your_token
+
+# Using stored Sentry CLI auth state
+sentry auth
+pnpm mcp-test-client
 ```
 
 ### Interactive Mode (Default)
@@ -206,8 +215,8 @@ If you see "Failed to connect to MCP server":
 If you get authentication errors:
 
 1. Verify your OPENAI_API_KEY is set correctly
-2. Check that your SENTRY_ACCESS_TOKEN has the required permissions
-3. For self-hosted Sentry, ensure SENTRY_HOST is set
+2. Check that your token source (`SENTRY_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN`, or `sentry auth`) has the required permissions
+3. For self-hosted Sentry, ensure `SENTRY_HOST` is set
 
 ### Tool Errors
 
