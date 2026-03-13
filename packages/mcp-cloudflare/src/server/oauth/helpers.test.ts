@@ -9,6 +9,12 @@ import {
 import type { TokenExchangeEnv } from "./helpers";
 import type { WorkerProps } from "../types";
 
+const GRANT_TYPES = {
+  AUTHORIZATION_CODE:
+    "authorization_code" as TokenExchangeCallbackOptions["grantType"],
+  REFRESH_TOKEN: "refresh_token" as TokenExchangeCallbackOptions["grantType"],
+};
+
 // Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -58,10 +64,11 @@ function createRefreshOptions(
   propsOverrides?: Partial<WorkerProps>,
 ): TokenExchangeCallbackOptions {
   return {
-    grantType: "refresh_token",
+    grantType: GRANT_TYPES.REFRESH_TOKEN,
     clientId: "test-client-id",
     userId: "test-user-id",
     scope: ["org:read", "project:read"],
+    requestedScope: ["org:read", "project:read"],
     props: {
       id: "user-id",
       clientId: "test-client-id",
@@ -90,10 +97,11 @@ describe("tokenExchangeCallback", () => {
 
   it("should skip non-refresh_token grant types", async () => {
     const options: TokenExchangeCallbackOptions = {
-      grantType: "authorization_code",
+      grantType: GRANT_TYPES.AUTHORIZATION_CODE,
       clientId: "test-client-id",
       userId: "test-user-id",
       scope: ["org:read", "project:read"],
+      requestedScope: ["org:read", "project:read"],
       props: {} as WorkerProps,
     };
 

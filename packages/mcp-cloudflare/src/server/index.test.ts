@@ -55,9 +55,10 @@ describe("worker entrypoint", () => {
     MCP_RATE_LIMITER: {},
   } as Env;
   const ctx = {
+    props: undefined,
     waitUntil: vi.fn(),
     passThroughOnException: vi.fn(),
-  } as ExecutionContext;
+  } as unknown as ExecutionContext;
 
   beforeEach(() => {
     vi.clearAllMocks();

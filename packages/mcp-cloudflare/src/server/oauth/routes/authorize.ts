@@ -80,16 +80,19 @@ export default new Hono<{ Bindings: Env }>()
 
     // Validate resource parameter per RFC 8707
     const requestUrl = new URL(c.req.url);
-    const resourceParam = requestUrl.searchParams.get("resource");
+    const resourceParams = requestUrl.searchParams.getAll("resource");
+    const resourceParam =
+      resourceParams.length <= 1 ? (resourceParams[0] ?? null) : undefined;
+    const hasInvalidResourceParam =
+      resourceParams.length > 1 ||
+      (resourceParam !== null &&
+        !validateResourceParameter(resourceParam, c.req.url));
 
-    if (
-      resourceParam !== null &&
-      !validateResourceParameter(resourceParam, c.req.url)
-    ) {
+    if (hasInvalidResourceParam) {
       logWarn("Invalid resource parameter in authorization request", {
         loggerScope: ["cloudflare", "oauth", "authorize"],
         extra: {
-          resource: resourceParam,
+          resource: resourceParams,
           requestUrl: c.req.url,
           clientId,
         },
@@ -107,9 +110,12 @@ export default new Hono<{ Bindings: Env }>()
       return c.text("Invalid resource parameter", 400);
     }
 
+    const { resource: _resource, ...oauthReqInfoWithoutResource } =
+      oauthReqInfo as AuthRequestWithSkills;
+
     // Preserve resource in state (library's AuthRequest doesn't include it)
     const oauthReqInfoWithResource: AuthRequestWithSkills = {
-      ...oauthReqInfo,
+      ...oauthReqInfoWithoutResource,
       ...(resourceParam ? { resource: resourceParam } : {}),
     };
 
