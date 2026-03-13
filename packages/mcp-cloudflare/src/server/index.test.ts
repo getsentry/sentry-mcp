@@ -1,0 +1,138 @@
+import type { ExecutionContext } from "@cloudflare/workers-types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Env } from "./types";
+
+const { MockOAuthProvider, mockOAuthProviderFetch, mockGetClientIp } =
+  vi.hoisted(() => {
+    const mockOAuthProviderFetch = vi.fn();
+    const MockOAuthProvider = vi
+      .fn()
+      .mockImplementation(() => ({ fetch: mockOAuthProviderFetch }));
+
+    return {
+      MockOAuthProvider,
+      mockOAuthProviderFetch,
+      mockGetClientIp: vi.fn(() => null),
+    };
+  });
+
+vi.mock("@cloudflare/workers-oauth-provider", () => ({
+  default: MockOAuthProvider,
+}));
+
+vi.mock("@sentry/cloudflare", () => ({
+  withSentry: vi.fn((_config, handler) => handler),
+}));
+
+vi.mock("./app", () => ({
+  default: { fetch: vi.fn() },
+}));
+
+vi.mock("./lib/mcp-handler", () => ({
+  default: { fetch: vi.fn() },
+}));
+
+vi.mock("./oauth", () => ({
+  tokenExchangeCallback: vi.fn(),
+}));
+
+vi.mock("./sentry.config", () => ({
+  default: vi.fn(() => ({})),
+}));
+
+vi.mock("./utils/client-ip", () => ({
+  getClientIp: mockGetClientIp,
+}));
+
+vi.mock("./utils/rate-limiter", () => ({
+  checkRateLimit: vi.fn(),
+}));
+
+import handler from "./index";
+
+describe("worker entrypoint", () => {
+  const env = {
+    MCP_RATE_LIMITER: {},
+  } as Env;
+  const ctx = {
+    waitUntil: vi.fn(),
+    passThroughOnException: vi.fn(),
+  } as ExecutionContext;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetClientIp.mockReturnValue(null);
+  });
+
+  it("returns restrictive preflight CORS for public metadata endpoints", async () => {
+    const response = await handler.fetch!(
+      new Request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp",
+        { method: "OPTIONS" },
+      ),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(response.headers.get("Access-Control-Allow-Methods")).toBe(
+      "GET, OPTIONS",
+    );
+    expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
+      "Content-Type",
+    );
+    expect(MockOAuthProvider).not.toHaveBeenCalled();
+  });
+
+  it("strips CORS headers from non-public OAuth endpoints", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("ok", {
+        headers: {
+          "Access-Control-Allow-Origin": "https://evil.com",
+          "Access-Control-Allow-Methods": "*",
+          "Access-Control-Allow-Headers": "Authorization, *",
+          "Access-Control-Max-Age": "86400",
+          "Access-Control-Expose-Headers": "X-Trace-Id",
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/token"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
+    expect(response.headers.has("Access-Control-Allow-Methods")).toBe(false);
+    expect(response.headers.has("Access-Control-Allow-Headers")).toBe(false);
+    expect(response.headers.has("Access-Control-Max-Age")).toBe(false);
+    expect(response.headers.has("Access-Control-Expose-Headers")).toBe(false);
+  });
+
+  it("patches MCP 401 responses with protected resource metadata", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Bearer error="invalid_token"',
+          "Access-Control-Allow-Origin": "https://evil.com",
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toBe(
+      'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp"',
+    );
+    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
+  });
+});

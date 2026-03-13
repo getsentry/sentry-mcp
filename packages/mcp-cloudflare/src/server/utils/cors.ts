@@ -2,11 +2,10 @@
  * CORS utilities for the Cloudflare worker entry point.
  *
  * Why this exists:
- * @cloudflare/workers-oauth-provider v0.0.12 adds reflected-origin CORS headers
- * to every response it handles (token, register, MCP API, well-known). Its
- * `addCorsHeaders` reflects the request's `Origin` header verbatim and allows
- * all methods/headers — effectively disabling the same-origin policy for those
- * endpoints. We can't configure or disable this behavior in the library.
+ * The OAuth provider manages several routes directly (token, register, MCP API,
+ * well-known metadata) and may attach permissive CORS headers to the responses
+ * it handles. We can't configure that behavior in the library, so the worker
+ * normalizes CORS at the edge.
  *
  * Our strategy (implemented in the wrappedOAuthProvider in index.ts):
  * 1. Intercept OPTIONS before the library runs — return our own preflight.
@@ -60,11 +59,9 @@ export const addCorsHeaders = (response: Response): Response => {
 /**
  * Remove all CORS headers from a response.
  *
- * This undoes the reflected-origin CORS that @cloudflare/workers-oauth-provider
- * adds automatically. Without stripping, endpoints like /oauth/token and
- * /oauth/register would be callable cross-origin from any website — an attacker
- * could phish a user into visiting a malicious page that silently exchanges
- * tokens against our server.
+ * This removes any CORS headers the OAuth provider added automatically.
+ * Without stripping, endpoints like /oauth/token and /oauth/register could be
+ * callable cross-origin from any website.
  *
  * Returns the original response unchanged if no CORS headers are present
  * (e.g. when the request had no Origin header so the library skipped CORS).

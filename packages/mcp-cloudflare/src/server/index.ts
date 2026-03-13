@@ -40,9 +40,8 @@ function patchWwwAuthenticate(response: Response, url: URL): Response {
 
 // Wrap OAuth Provider to take control of CORS.
 //
-// @cloudflare/workers-oauth-provider v0.0.12 reflects the request Origin on
-// every response it handles, effectively allowing any website to call our
-// OAuth and MCP endpoints cross-origin. We wrap it to:
+// The OAuth provider manages several routes directly and may attach its own
+// CORS headers to the responses it handles. We wrap it to:
 //   1. Intercept OPTIONS before the library — return our own preflight response.
 //   2. Let the library handle the actual request normally.
 //   3. On the way out, apply our CORS policy:
@@ -84,7 +83,7 @@ const wrappedOAuthProvider = {
     }
 
     // --- Phase 2: Let the OAuth library handle the request ---
-    // The library will add reflected-origin CORS headers to its responses.
+    // We normalize any CORS headers it returns in the response handling below.
     const oAuthProvider = new OAuthProvider({
       apiRoute: "/mcp",
       // @ts-expect-error - OAuthProvider types don't support specific Env types
