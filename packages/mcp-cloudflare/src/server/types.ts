@@ -49,8 +49,11 @@ export interface Env {
   OAUTH_PROVIDER: OAuthHelpers;
   AI: Ai;
   CF_VERSION_METADATA: WorkerVersionMetadata;
-  CHAT_RATE_LIMITER: RateLimit;
-  SEARCH_RATE_LIMITER: RateLimit;
-  MCP_RATE_LIMITER: RateLimit;
+  CHAT_RATE_LIMITER?: RateLimit;
+  SEARCH_RATE_LIMITER?: RateLimit;
+  MCP_IP_RATE_LIMITER?: RateLimit;
+  MCP_USER_RATE_LIMITER?: RateLimit;
+  // Backward-compatible fallback while deployments roll out dedicated MCP limiters.
+  MCP_RATE_LIMITER?: RateLimit;
   AUTORAG_INDEX_NAME?: string;
 }

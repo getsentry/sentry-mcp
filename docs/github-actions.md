@@ -43,7 +43,7 @@ Canary and production use separate resources for complete isolation:
 | Resource | Production | Canary |
 |----------|------------|---------|
 | KV Namespace | `8dd5e9bafe1945298e2d5ca3b408a553` | `a3fe0d23b2d34416930e284362a88a3b` |
-| Rate Limiter IDs | `1001`, `1002` | `2001`, `2002` |
+| Rate Limiter IDs | `1001`, `1002`, `1003`, `1004` | `2001`, `2002`, `2003`, `2004` |
 | Wrangler Config | `wrangler.jsonc` | `wrangler.canary.jsonc` |
 
 ### Deployment Flow

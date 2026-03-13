@@ -1,5 +1,8 @@
 import type { RateLimit } from "@cloudflare/workers-types";
 
+export const MCP_RATE_LIMIT_EXCEEDED_MESSAGE =
+  "Rate limit exceeded. Please wait before trying again.";
+
 /**
  * Result from rate limit check
  */
@@ -44,10 +47,10 @@ async function hashValue(value: string): Promise<string> {
  * ```typescript
  * const result = await checkRateLimit(
  *   clientIP,
- *   env.MCP_RATE_LIMITER,
+ *   env.MCP_IP_RATE_LIMITER,
  *   {
  *     keyPrefix: "mcp:ip",
- *     errorMessage: "Rate limit exceeded. Please wait before trying again."
+ *     errorMessage: MCP_RATE_LIMIT_EXCEEDED_MESSAGE
  *   }
  * );
  *

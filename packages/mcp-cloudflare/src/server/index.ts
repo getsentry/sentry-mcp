@@ -12,7 +12,10 @@ import {
   isPublicMetadataEndpoint,
   stripCorsHeaders,
 } from "./utils/cors";
-import { checkRateLimit } from "./utils/rate-limiter";
+import {
+  checkRateLimit,
+  MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
+} from "./utils/rate-limiter";
 
 /**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
@@ -68,11 +71,10 @@ const wrappedOAuthProvider = {
       if (clientIP) {
         const rateLimitResult = await checkRateLimit(
           clientIP,
-          env.MCP_RATE_LIMITER,
+          env.MCP_IP_RATE_LIMITER ?? env.MCP_RATE_LIMITER,
           {
-            keyPrefix: "mcp",
-            errorMessage:
-              "Rate limit exceeded. Please wait before trying again.",
+            keyPrefix: "mcp:ip",
+            errorMessage: MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
           },
         );
 

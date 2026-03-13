@@ -8,14 +8,18 @@
  * - No session state required - each request is independent
  */
 
-import { createMcpHandler } from "agents/mcp";
+import type { ExportedHandler } from "@cloudflare/workers-types";
 import { buildServer } from "@sentry/mcp-core/server";
 import { parseSkills } from "@sentry/mcp-core/skills";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
+import { createMcpHandler } from "agents/mcp";
 import type { Env } from "../types";
+import {
+  checkRateLimit,
+  MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
+} from "../utils/rate-limiter";
 import { verifyConstraintsAccess } from "./constraint-utils";
-import type { ExportedHandler } from "@cloudflare/workers-types";
 
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
@@ -27,11 +31,12 @@ type OAuthExecutionContext = ExecutionContext & {
 /**
  * Main request handler that:
  * 1. Extracts auth props from ExecutionContext
- * 2. Parses org/project constraints from URL
- * 3. Verifies user has access to the constraints
- * 4. Builds complete ServerContext
- * 5. Creates and configures MCP server per-request (context captured in closures)
- * 6. Runs MCP handler
+ * 2. Applies per-user rate limiting for authenticated traffic
+ * 3. Parses org/project constraints from URL
+ * 4. Verifies user has access to the constraints
+ * 5. Builds complete ServerContext
+ * 6. Creates and configures MCP server per-request (context captured in closures)
+ * 7. Runs MCP handler
  */
 const mcpHandler: ExportedHandler<Env> = {
   async fetch(
@@ -66,34 +71,14 @@ const mcpHandler: ExportedHandler<Env> = {
       throw new Error("No authentication context available");
     }
 
+    const userId = oauthCtx.props.id as string;
+    const accessToken = oauthCtx.props.accessToken as string;
+    const clientId = oauthCtx.props.clientId as string;
     const sentryHost = env.SENTRY_HOST || "sentry.io";
-
-    // Verify user has access to the requested org/project
-    // Cache verification results in KV to avoid repeated API calls
-    const verification = await verifyConstraintsAccess(
-      { organizationSlug, projectSlug },
-      {
-        accessToken: oauthCtx.props.accessToken as string,
-        sentryHost,
-        cache: {
-          kv: env.MCP_CACHE,
-          userId: oauthCtx.props.id as string,
-        },
-      },
-    );
-
-    if (!verification.ok) {
-      return new Response(verification.message, {
-        status: verification.status ?? 500,
-      });
-    }
 
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported
     if (!oauthCtx.props.grantedSkills) {
-      const userId = oauthCtx.props.id as string;
-      const clientId = oauthCtx.props.clientId as string;
-
       logWarn("Legacy token without grantedSkills detected - revoking grant", {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: { clientId, userId },
@@ -162,11 +147,44 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
+    const rateLimitResult = await checkRateLimit(
+      userId,
+      env.MCP_USER_RATE_LIMITER ?? env.MCP_RATE_LIMITER,
+      {
+        keyPrefix: "mcp:user",
+        errorMessage: MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
+      },
+    );
+
+    if (!rateLimitResult.allowed) {
+      return new Response(rateLimitResult.errorMessage, { status: 429 });
+    }
+
+    // Verify user has access to the requested org/project
+    // Cache verification results in KV to avoid repeated API calls
+    const verification = await verifyConstraintsAccess(
+      { organizationSlug, projectSlug },
+      {
+        accessToken,
+        sentryHost,
+        cache: {
+          kv: env.MCP_CACHE,
+          userId,
+        },
+      },
+    );
+
+    if (!verification.ok) {
+      return new Response(verification.message, {
+        status: verification.status ?? 500,
+      });
+    }
+
     // Build complete ServerContext from OAuth props + verified constraints
     const serverContext: ServerContext = {
-      userId: oauthCtx.props.id as string | undefined,
-      clientId: oauthCtx.props.clientId as string,
-      accessToken: oauthCtx.props.accessToken as string,
+      userId,
+      clientId,
+      accessToken,
       grantedSkills: validSkills,
       constraints: verification.constraints,
       sentryHost,

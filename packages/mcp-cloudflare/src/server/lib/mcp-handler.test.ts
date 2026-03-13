@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import "urlpattern-polyfill";
 import type { Env } from "../types";
-import type { ExecutionContext } from "@cloudflare/workers-types";
 import handler from "./mcp-handler.js";
 
 // Mock Sentry to avoid actual telemetry
@@ -41,6 +41,34 @@ describe("mcp-handler", () => {
         grantedSkills: ["inspect", "docs"],
       },
     };
+  });
+
+  it("applies the authenticated MCP rate limit per user", async () => {
+    const mockUserRateLimiter = {
+      limit: vi.fn().mockResolvedValue({ success: true }),
+    } as unknown as RateLimit;
+
+    env.MCP_USER_RATE_LIMITER = mockUserRateLimiter;
+
+    const request = new Request("https://test.mcp.sentry.io/mcp");
+    const response = await handler.fetch!(request as any, env, ctx);
+
+    expect(response.status).toBe(200);
+    expect(mockUserRateLimiter.limit).toHaveBeenCalledWith({
+      key: expect.stringMatching(/^mcp:user:[0-9a-f]{16}$/),
+    });
+  });
+
+  it("returns 429 when the authenticated user exceeds the MCP rate limit", async () => {
+    env.MCP_USER_RATE_LIMITER = {
+      limit: vi.fn().mockResolvedValue({ success: false }),
+    } as unknown as RateLimit;
+
+    const request = new Request("https://test.mcp.sentry.io/mcp");
+    const response = await handler.fetch!(request as any, env, ctx);
+
+    expect(response.status).toBe(429);
+    expect(await response.text()).toContain("Rate limit exceeded");
   });
 
   it("successfully handles request with org constraint", async () => {
