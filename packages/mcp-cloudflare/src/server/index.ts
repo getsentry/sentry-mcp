@@ -12,10 +12,10 @@ import {
   isPublicMetadataEndpoint,
   stripCorsHeaders,
 } from "./utils/cors";
-import { checkRateLimit } from "./utils/rate-limiter";
-
-const MCP_RATE_LIMIT_EXCEEDED_MESSAGE =
-  "Rate limit exceeded. Please wait before trying again.";
+import {
+  checkRateLimit,
+  MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
+} from "./utils/rate-limiter";
 
 /**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a

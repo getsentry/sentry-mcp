@@ -15,11 +15,11 @@ import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp";
 import type { Env } from "../types";
-import { checkRateLimit } from "../utils/rate-limiter";
+import {
+  checkRateLimit,
+  MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
+} from "../utils/rate-limiter";
 import { verifyConstraintsAccess } from "./constraint-utils";
-
-const MCP_RATE_LIMIT_EXCEEDED_MESSAGE =
-  "Rate limit exceeded. Please wait before trying again.";
 
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
