@@ -44,7 +44,7 @@ async function hashValue(value: string): Promise<string> {
  * ```typescript
  * const result = await checkRateLimit(
  *   clientIP,
- *   env.MCP_RATE_LIMITER,
+ *   env.MCP_IP_RATE_LIMITER,
  *   {
  *     keyPrefix: "mcp:ip",
  *     errorMessage: "Rate limit exceeded. Please wait before trying again."
