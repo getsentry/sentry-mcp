@@ -598,6 +598,10 @@ export function validateResourceParameter(
   try {
     const resourceUrl = new URL(resource);
     const requestUrlObj = new URL(requestUrl);
+    const rawPath =
+      resource
+        .replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, "")
+        .split(/[?#]/, 1)[0] || "/";
 
     // RFC 8707: resource URI must not include fragment
     if (resourceUrl.hash) {
@@ -621,16 +625,19 @@ export function validateResourceParameter(
       return false;
     }
 
-    // Reject url-encoded characters in pathname
-    if (resourceUrl.pathname.includes("%")) {
+    // Reject any encoded path characters before URL normalization can collapse them.
+    if (rawPath.includes("%")) {
       return false;
     }
 
+    // Allow the origin-only resource for backward compatibility with clients
+    // that cached older protected-resource metadata.
+    if (rawPath === "/" || rawPath === "") {
+      return true;
+    }
+
     // Validate path is exactly /mcp or starts with /mcp/
-    return (
-      resourceUrl.pathname === "/mcp" ||
-      resourceUrl.pathname.startsWith("/mcp/")
-    );
+    return rawPath === "/mcp" || rawPath.startsWith("/mcp/");
   } catch {
     return false;
   }

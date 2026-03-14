@@ -278,6 +278,28 @@ describe("oauth authorize routes", () => {
         expect(response.status).toBe(200);
       });
 
+      it("should allow request with origin-only resource parameter", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost",
+        });
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId: "test-client",
+          clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+        });
+
+        const request = new Request(
+          "http://localhost/oauth/authorize?resource=http://localhost",
+          { method: "GET" },
+        );
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(200);
+      });
+
       it("should reject request with invalid resource hostname", async () => {
         mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
           clientId: "test-client",
@@ -408,6 +430,35 @@ describe("oauth authorize routes", () => {
         const response = await app.fetch(request, testEnv as Env);
 
         // Should proceed normally
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toContain("sentry.io");
+      });
+
+      it("should allow request with origin-only resource parameter", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
         expect(response.status).toBe(302);
         const location = response.headers.get("location");
         expect(location).toContain("sentry.io");
