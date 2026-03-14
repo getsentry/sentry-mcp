@@ -439,6 +439,29 @@ describe("oauth authorize routes", () => {
         expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
       });
 
+      it("should reject request with empty fragment resource", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          state: "test-state",
+        });
+
+        const url = new URL("http://localhost/oauth/authorize");
+        url.searchParams.set("resource", "http://localhost#");
+        url.searchParams.set("redirect_uri", "https://example.com/callback");
+        url.searchParams.set("state", "test-state");
+
+        const request = new Request(url, { method: "GET" });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+        expect(locationUrl.searchParams.get("state")).toBe("test-state");
+      });
+
       it("should return 400 if invalid resource but no redirect_uri", async () => {
         mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
           clientId: "test-client",
@@ -707,6 +730,38 @@ describe("oauth authorize routes", () => {
         const location = response.headers.get("location");
         const locationUrl = new URL(location!);
         expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+      });
+
+      it("should reject request with empty fragment resource", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost#",
+          state: "test-state",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
+        expect(locationUrl.searchParams.get("state")).toBe("test-state");
       });
 
       it("should prevent open redirect with unregistered redirectUri and invalid resource", async () => {

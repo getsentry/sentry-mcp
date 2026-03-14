@@ -669,6 +669,14 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(false);
     });
 
+    it("should reject URL with empty fragment (RFC 8707)", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev#",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(false);
+    });
+
     it("should handle URL with trailing slash", () => {
       const result = validateResourceParameter(
         "https://mcp.sentry.dev/mcp/",

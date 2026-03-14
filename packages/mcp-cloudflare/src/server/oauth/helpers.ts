@@ -595,6 +595,13 @@ export function validateResourceParameter(
     return true;
   }
 
+  // RFC 8707 forbids fragment components entirely. `URL.hash` does not
+  // distinguish an empty fragment (`https://host#`) from no fragment, so we
+  // reject any raw `#` before parsing.
+  if (resource.includes("#")) {
+    return false;
+  }
+
   try {
     const resourceUrl = new URL(resource);
     const requestUrlObj = new URL(requestUrl);
@@ -602,11 +609,6 @@ export function validateResourceParameter(
       resource
         .replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, "")
         .split(/[?#]/, 1)[0] || "/";
-
-    // RFC 8707: resource URI must not include fragment
-    if (resourceUrl.hash) {
-      return false;
-    }
 
     // Must use same protocol
     if (resourceUrl.protocol !== requestUrlObj.protocol) {
