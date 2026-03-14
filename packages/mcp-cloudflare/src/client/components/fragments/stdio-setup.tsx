@@ -44,6 +44,12 @@ export default function StdioSetup() {
           scopes:
         </p>
         <p>
+          If you've already authenticated with the{" "}
+          <Link href="https://cli.sentry.dev/commands/auth/">Sentry CLI</Link>,
+          you can skip the explicit token and the stdio server will reuse the
+          token stored in <code>~/.sentry/cli.db</code>.
+        </p>
+        <p>
           <strong>AI-powered search:</strong> If you want the
           <code>search_events</code> and <code>search_issues</code> tools to
           translate natural language queries, add an
@@ -89,7 +95,11 @@ export default function StdioSetup() {
               <dt className="font-medium text-slate-100">
                 <code>--access-token</code> / <code>SENTRY_ACCESS_TOKEN</code>
               </dt>
-              <dd className="text-slate-300">Required user auth token.</dd>
+              <dd className="text-slate-300">
+                Explicit user auth token override. If omitted, the stdio server
+                falls back to Sentry CLI auth from <code>~/.sentry/cli.db</code>
+                when available.
+              </dd>
 
               <dt className="font-medium text-slate-100">
                 <code>--host</code> / <code>SENTRY_HOST</code>

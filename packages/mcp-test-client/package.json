@@ -24,6 +24,7 @@
     "@sentry/mcp-core": "workspace:*",
     "@sentry/node": "catalog:",
     "ai": "catalog:",
+    "better-sqlite3": "catalog:",
     "chalk": "catalog:",
     "commander": "catalog:",
     "dotenv": "catalog:",

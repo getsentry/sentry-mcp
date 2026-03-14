@@ -128,8 +128,14 @@ Add to `.cursor/mcp.json`:
 
 ## Environment Variables
 
-Required:
-- `SENTRY_ACCESS_TOKEN` - Sentry API access token
+Authentication:
+- `SENTRY_ACCESS_TOKEN` - Explicit Sentry API access token
+
+If the user has already authenticated with the
+[Sentry CLI](https://cli.sentry.dev/commands/auth/), the stdio server can reuse
+the token stored in `~/.sentry/cli.db` without requiring `SENTRY_ACCESS_TOKEN`.
+
+Host:
 - `SENTRY_HOST` - Sentry instance hostname (default: `sentry.io`)
 
 Optional:
@@ -162,7 +168,7 @@ npm pack
 npm install -g ./sentry-mcp-server-1.2.3.tgz
 
 # Run stdio server
-SENTRY_ACCESS_TOKEN=... @sentry/mcp-server
+@sentry/mcp-server
 ```
 
 ### Beta Releases

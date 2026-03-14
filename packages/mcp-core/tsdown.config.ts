@@ -14,6 +14,7 @@ export default defineConfig({
   external: [
     // Keep workspace dependencies external (don't bundle them)
     "@sentry/mcp-server-mocks",
+    "better-sqlite3",
   ],
   env: {
     DEFAULT_SENTRY_DSN:

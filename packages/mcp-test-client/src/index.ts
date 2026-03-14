@@ -13,6 +13,7 @@ import { connectToRemoteMCPServer } from "./mcp-test-client-remote.js";
 import { runAgent } from "./agent.js";
 import { logError, logInfo } from "./logger.js";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
+import { resolveLocalAuth } from "./stdio-auth.js";
 import type { MCPConnection } from "./types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,17 +81,17 @@ program
             : "production"),
       });
 
-      // Check for access token in priority order
-      const accessToken =
-        options.accessToken || process.env.SENTRY_ACCESS_TOKEN;
-      const sentryHost = process.env.SENTRY_HOST;
+      const localAuth = resolveLocalAuth({
+        accessToken: options.accessToken || process.env.SENTRY_ACCESS_TOKEN,
+        env: process.env,
+      });
 
       const openaiKey = process.env.OPENAI_API_KEY;
 
       // Determine mode based on access token availability
       // Local mode (stdio transport) when access token is provided
       // Remote mode (SSE transport with OAuth) when no access token
-      const useLocalMode = !!accessToken;
+      const useLocalMode = !!localAuth.accessToken;
 
       if (!openaiKey) {
         logError("OPENAI_API_KEY environment variable is required");
@@ -105,9 +106,13 @@ program
       let connection: MCPConnection;
       if (useLocalMode) {
         // Use local stdio transport when access token is provided
+        if (localAuth.accessTokenSource === "sentry_cli_db") {
+          logInfo("Authenticated with Sentry", "using Sentry CLI auth state");
+        }
+
         connection = await connectToMCPServer({
-          accessToken,
-          host: sentryHost || process.env.SENTRY_HOST,
+          accessToken: localAuth.accessToken,
+          host: localAuth.host,
           sentryDsn: sentryDsn,
           useAgentEndpoint: options.agent,
           useExperimental: options.experimental,
@@ -116,7 +121,7 @@ program
         // Use remote SSE transport when no access token
         connection = await connectToRemoteMCPServer({
           mcpHost: options.mcpHost,
-          accessToken: accessToken,
+          accessToken: localAuth.accessToken,
           useAgentEndpoint: options.agent,
           useExperimental: options.experimental,
         });

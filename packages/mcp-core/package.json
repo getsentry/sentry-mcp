@@ -121,6 +121,10 @@
       "types": "./dist/internal/agents/types.ts",
       "default": "./dist/internal/agents/types.js"
     },
+    "./internal/sentry-cli-auth": {
+      "types": "./dist/internal/sentry-cli-auth.ts",
+      "default": "./dist/internal/sentry-cli-auth.js"
+    },
     "./utils/url-utils": {
       "types": "./dist/utils/url-utils.ts",
       "default": "./dist/utils/url-utils.js"
@@ -157,6 +161,7 @@
     "@logtape/sentry": "^1.1.1",
     "@modelcontextprotocol/sdk": "catalog:",
     "@sentry/core": "catalog:",
+    "better-sqlite3": "catalog:",
     "ai": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"

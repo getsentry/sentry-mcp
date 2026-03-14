@@ -91,6 +91,11 @@ cd packages/mcp-server
 pnpm start --access-token=YOUR_TOKEN
 ```
 
+If you've already authenticated with the
+[Sentry CLI](https://cli.sentry.dev/commands/auth/), you can omit
+`--access-token` and the stdio server will reuse the token stored in
+`~/.sentry/cli.db`.
+
 This uses `tsx` to run TypeScript directly without building.
 
 ### Option 2: Using the Built Package (Production-like)
@@ -103,6 +108,9 @@ node packages/mcp-server/dist/index.js --access-token=YOUR_TOKEN
 
 # Or use the workspace command
 pnpm -w run mcp-server --access-token=YOUR_TOKEN
+
+# Or reuse stored Sentry CLI auth
+node packages/mcp-server/dist/index.js
 ```
 
 ### Option 3: Using npx (End-user Experience)
@@ -117,6 +125,9 @@ npx @sentry/mcp-server@latest --access-token=YOUR_TOKEN
 cd packages/mcp-server
 pnpm pack
 npx ./sentry-mcp-server-*.tgz --access-token=YOUR_TOKEN
+
+# Or reuse stored Sentry CLI auth
+npx @sentry/mcp-server@latest
 ```
 
 ## Testing with MCP Inspector
@@ -206,7 +217,8 @@ The `mcp-test-client` package provides a CLI-based way to test the stdio transpo
 
 The CLI client automatically selects the transport based on flags:
 
-- **Stdio transport**: `--access-token` flag provided
+- **Stdio transport**: explicit token provided or
+  [Sentry CLI](https://cli.sentry.dev/commands/auth/)-managed auth state available
 - **Remote HTTP transport**: `--mcp-host` flag or no access token
 
 ### Basic Usage
@@ -374,7 +386,7 @@ Add to `.vscode/settings.json`:
 
 ```bash
 # Basic usage
---access-token=TOKEN              # Sentry access token (required)
+--access-token=TOKEN              # Optional explicit Sentry access token
 
 # Host configuration
 --host=sentry.example.com         # Self-hosted Sentry (hostname only)
@@ -497,18 +509,26 @@ pnpm build
 node dist/index.js --access-token=TOKEN
 ```
 
-### "Missing required parameter: access-token"
+### "No access token was provided"
 
 **Cause:** No authentication provided.
 
+Reuse stored auth by running
+[Sentry CLI auth](https://cli.sentry.dev/commands/auth/) first:
+
 **Solution:**
 ```bash
-# Option 1: CLI flag
+# Option 1: Reuse stored Sentry CLI auth
+sentry auth
+pnpm start
+
+# Option 2: CLI flag
 pnpm start --access-token=YOUR_TOKEN
 
-# Option 2: Environment variable
+# Option 3: Environment variable
 export SENTRY_ACCESS_TOKEN=YOUR_TOKEN
 pnpm start
+
 ```
 
 ### "AI-powered search tools unavailable"

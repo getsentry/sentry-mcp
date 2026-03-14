@@ -52,6 +52,15 @@ Launch the transport:
 npx @sentry/mcp-server@latest --access-token=sentry-user-token
 ```
 
+If you've already authenticated with the [Sentry CLI](https://cli.sentry.dev/),
+you can omit the token and the stdio server will reuse the token from
+`~/.sentry/cli.db`:
+
+```shell
+sentry auth
+npx @sentry/mcp-server@latest
+```
+
 Need to connect to a self-hosted deployment? Add <code>--host</code> (hostname
 only, e.g. <code>--host=sentry.example.com</code>) when you run the command.
 
@@ -65,7 +74,7 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com --d
 #### Environment Variables
 
 ```shell
-SENTRY_ACCESS_TOKEN=         # Required: Your Sentry auth token
+SENTRY_ACCESS_TOKEN=         # Optional: explicit auth token override
 
 # LLM Provider Configuration (required for AI-powered search tools)
 EMBEDDED_AGENT_PROVIDER=     # Required: 'openai' or 'anthropic'
@@ -213,7 +222,7 @@ pnpm -w run cli --agent "who am I?"
 # Test against production
 pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
 
-# Test with local stdio mode (requires SENTRY_ACCESS_TOKEN)
+# Test with local stdio mode (explicit token or Sentry CLI auth)
 pnpm -w run cli --access-token=TOKEN "query"
 ```
 

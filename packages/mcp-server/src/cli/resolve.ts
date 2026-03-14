@@ -18,7 +18,7 @@ export function finalize(input: MergedArgs): ResolvedConfig {
   // Access token required
   if (!input.accessToken) {
     throw new Error(
-      "Error: No access token was provided. Pass one with `--access-token` or via `SENTRY_ACCESS_TOKEN`.",
+      "Error: No access token was provided. Pass one with `--access-token`, via `SENTRY_ACCESS_TOKEN`, or authenticate with `sentry auth`.",
     );
   }
 
