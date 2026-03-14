@@ -473,6 +473,14 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(true);
     });
 
+    it("should allow same hostname with origin-only resource", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
     it("should allow same hostname with nested /mcp path", () => {
       const result = validateResourceParameter(
         "https://mcp.sentry.dev/mcp/org/project",

@@ -16,6 +16,7 @@ import {
   checkRateLimit,
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
 } from "./utils/rate-limiter";
+import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
 
 /**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
@@ -30,7 +31,7 @@ function patchWwwAuthenticate(response: Response, url: URL): Response {
   if (!existing) {
     return response;
   }
-  const prmUrl = `${url.protocol}//${url.host}/.well-known/oauth-protected-resource/mcp`;
+  const prmUrl = `${url.protocol}//${url.host}/.well-known/oauth-protected-resource${url.pathname}${url.search}`;
   const newResponse = new Response(response.body, response);
   // RFC 7235: first param is space-separated from scheme, subsequent params are comma-separated
   const separator = existing.includes(" ") ? "," : "";
@@ -62,6 +63,10 @@ const wrappedOAuthProvider = {
         return addCorsHeaders(new Response(null, { status: 204 }));
       }
       return new Response(null, { status: 204 });
+    }
+
+    if (url.pathname === "/.well-known/oauth-protected-resource") {
+      return addCorsHeaders(createProtectedResourceMetadataResponse(url));
     }
 
     // --- Rate limiting (before any OAuth/MCP processing) ---

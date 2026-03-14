@@ -12,6 +12,7 @@ import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { createRequestLogger } from "./logging";
 import mcpRoutes from "./routes/mcp";
 import { getClientIp } from "./utils/client-ip";
+import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
 
 /** Derive the base URL (origin) from the current request. */
 function getBaseUrl(c: Context): string {
@@ -81,16 +82,7 @@ Any MCP-compatible client can connect using the HTTP transport at the endpoint U
 
 // RFC 9728: OAuth 2.0 Protected Resource Metadata handler
 function handleOAuthProtectedResourceMetadata(c: Context): Response {
-  const requestUrl = new URL(c.req.url);
-  const baseUrl = requestUrl.origin;
-  const resourcePath = requestUrl.pathname.replace(
-    "/.well-known/oauth-protected-resource",
-    "",
-  );
-  return c.json({
-    resource: `${baseUrl}${resourcePath}`,
-    authorization_servers: [baseUrl],
-  });
+  return createProtectedResourceMetadataResponse(new URL(c.req.url));
 }
 
 const app = new Hono<{
