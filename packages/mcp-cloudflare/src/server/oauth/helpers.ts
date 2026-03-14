@@ -595,14 +595,20 @@ export function validateResourceParameter(
     return true;
   }
 
+  // RFC 8707 forbids fragment components entirely. `URL.hash` does not
+  // distinguish an empty fragment (`https://host#`) from no fragment, so we
+  // reject any raw `#` before parsing.
+  if (resource.includes("#")) {
+    return false;
+  }
+
   try {
     const resourceUrl = new URL(resource);
     const requestUrlObj = new URL(requestUrl);
-
-    // RFC 8707: resource URI must not include fragment
-    if (resourceUrl.hash) {
-      return false;
-    }
+    const rawPath =
+      resource
+        .replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, "")
+        .split(/[?#]/, 1)[0] || "/";
 
     // Must use same protocol
     if (resourceUrl.protocol !== requestUrlObj.protocol) {
@@ -621,12 +627,21 @@ export function validateResourceParameter(
       return false;
     }
 
-    // Reject url-encoded characters in pathname
-    if (resourceUrl.pathname.includes("%")) {
+    // Reject any encoded path characters before URL normalization can collapse them.
+    if (rawPath.includes("%")) {
       return false;
     }
 
-    // Validate path is exactly /mcp or starts with /mcp/
+    // Allow the origin-only resource as a compatibility alias for clients
+    // that cached older protected-resource metadata before we served exact
+    // path-specific RFC 9728 resource identifiers. The canonical resource
+    // shape is still `/mcp...`; this keeps older clients working.
+    if (rawPath === "/" || rawPath === "") {
+      return true;
+    }
+
+    // Use the normalized pathname for the /mcp check so dot segments like
+    // /mcp/../evil cannot bypass the prefix validation.
     return (
       resourceUrl.pathname === "/mcp" ||
       resourceUrl.pathname.startsWith("/mcp/")

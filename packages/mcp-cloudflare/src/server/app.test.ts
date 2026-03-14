@@ -77,6 +77,13 @@ describe("app", () => {
       expect(json).toEqual({
         resource: "https://mcp.sentry.dev",
         authorization_servers: ["https://mcp.sentry.dev"],
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        bearer_methods_supported: ["header"],
       });
     });
   });
@@ -94,6 +101,13 @@ describe("app", () => {
       expect(json).toEqual({
         resource: "http://localhost/mcp",
         authorization_servers: ["http://localhost"],
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        bearer_methods_supported: ["header"],
       });
     });
 
@@ -109,6 +123,13 @@ describe("app", () => {
       expect(json).toEqual({
         resource: "https://mcp.sentry.dev/mcp",
         authorization_servers: ["https://mcp.sentry.dev"],
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        bearer_methods_supported: ["header"],
       });
     });
 
@@ -124,6 +145,35 @@ describe("app", () => {
       expect(json).toEqual({
         resource: "https://mcp.sentry.dev/mcp/sentry/mcp-server",
         authorization_servers: ["https://mcp.sentry.dev"],
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        bearer_methods_supported: ["header"],
+      });
+    });
+
+    it("should handle organization-scoped subpaths", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry",
+        { headers: TEST_HEADERS },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        resource: "https://mcp.sentry.dev/mcp/sentry",
+        authorization_servers: ["https://mcp.sentry.dev"],
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        bearer_methods_supported: ["header"],
       });
     });
 
@@ -137,8 +187,15 @@ describe("app", () => {
 
       const json = await res.json();
       expect(json).toEqual({
-        resource: "https://mcp.sentry.dev/mcp/sentry/mcp-server",
+        resource: "https://mcp.sentry.dev/mcp/sentry/mcp-server?experimental=1",
         authorization_servers: ["https://mcp.sentry.dev"],
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        bearer_methods_supported: ["header"],
       });
     });
   });
