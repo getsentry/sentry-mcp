@@ -355,6 +355,130 @@ describe("oauth callback routes", () => {
       }
     });
 
+    it("should allow callback with origin-only resource parameter and trailing slash", async () => {
+      mockOAuthProvider.lookupClient.mockResolvedValue({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+      });
+
+      const approvalFormData = new FormData();
+      const approvalState = await signState(
+        {
+          req: {
+            oauthReqInfo: {
+              clientId: "test-client",
+              redirectUri: "https://example.com/callback",
+              scope: ["read"],
+              resource: "http://localhost/",
+            },
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      approvalFormData.append("state", approvalState);
+      const approvalRequest = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: approvalFormData,
+      });
+      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
+      const setCookie = approvalResponse.headers.get("Set-Cookie");
+
+      const now = Date.now();
+      const payload: OAuthState = {
+        req: {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/",
+        },
+        iat: now,
+        exp: now + 10 * 60 * 1000,
+      } as unknown as OAuthState;
+      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
+
+      const request = new Request(
+        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
+        {
+          method: "GET",
+          headers: {
+            Cookie: setCookie!.split(";")[0],
+          },
+        },
+      );
+
+      const response = await app.fetch(request, testEnv as Env);
+
+      if (response.status === 400) {
+        const text = await response.text();
+        expect(text).not.toContain("Invalid resource parameter");
+      }
+    });
+
+    it("should allow callback with path-specific query resource parameter", async () => {
+      mockOAuthProvider.lookupClient.mockResolvedValue({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: ["https://example.com/callback"],
+      });
+
+      const approvalFormData = new FormData();
+      const approvalState = await signState(
+        {
+          req: {
+            oauthReqInfo: {
+              clientId: "test-client",
+              redirectUri: "https://example.com/callback",
+              scope: ["read"],
+              resource: "http://localhost/mcp?experimental=1",
+            },
+          },
+          iat: Date.now(),
+          exp: Date.now() + 10 * 60 * 1000,
+        },
+        testEnv.COOKIE_SECRET!,
+      );
+      approvalFormData.append("state", approvalState);
+      const approvalRequest = new Request("http://localhost/oauth/authorize", {
+        method: "POST",
+        body: approvalFormData,
+      });
+      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
+      const setCookie = approvalResponse.headers.get("Set-Cookie");
+
+      const now = Date.now();
+      const payload: OAuthState = {
+        req: {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp?experimental=1",
+        },
+        iat: now,
+        exp: now + 10 * 60 * 1000,
+      } as unknown as OAuthState;
+      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
+
+      const request = new Request(
+        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
+        {
+          method: "GET",
+          headers: {
+            Cookie: setCookie!.split(";")[0],
+          },
+        },
+      );
+
+      const response = await app.fetch(request, testEnv as Env);
+
+      if (response.status === 400) {
+        const text = await response.text();
+        expect(text).not.toContain("Invalid resource parameter");
+      }
+    });
+
     it("should reject callback with invalid resource hostname", async () => {
       mockOAuthProvider.lookupClient.mockResolvedValue({
         clientId: "test-client",

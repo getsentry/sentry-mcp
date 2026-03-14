@@ -636,8 +636,12 @@ export function validateResourceParameter(
       return true;
     }
 
-    // Validate path is exactly /mcp or starts with /mcp/
-    return rawPath === "/mcp" || rawPath.startsWith("/mcp/");
+    // Use the normalized pathname for the /mcp check so dot segments like
+    // /mcp/../evil cannot bypass the prefix validation.
+    return (
+      resourceUrl.pathname === "/mcp" ||
+      resourceUrl.pathname.startsWith("/mcp/")
+    );
   } catch {
     return false;
   }
