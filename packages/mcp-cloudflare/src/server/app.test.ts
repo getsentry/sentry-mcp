@@ -155,6 +155,28 @@ describe("app", () => {
       });
     });
 
+    it("should handle organization-scoped subpaths", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry",
+        { headers: TEST_HEADERS },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        resource: "https://mcp.sentry.dev/mcp/sentry",
+        authorization_servers: ["https://mcp.sentry.dev"],
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        bearer_methods_supported: ["header"],
+      });
+    });
+
     it("should handle dynamic subpaths with query parameters", async () => {
       const res = await app.request(
         "https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server?experimental=1",

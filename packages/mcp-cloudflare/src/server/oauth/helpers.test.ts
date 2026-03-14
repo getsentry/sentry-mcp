@@ -497,6 +497,14 @@ describe("validateResourceParameter", () => {
       expect(result).toBe(true);
     });
 
+    it("should allow same hostname with organization-scoped /mcp path", () => {
+      const result = validateResourceParameter(
+        "https://mcp.sentry.dev/mcp/org",
+        "https://mcp.sentry.dev/oauth/authorize",
+      );
+      expect(result).toBe(true);
+    });
+
     it("should allow localhost with /mcp path", () => {
       const result = validateResourceParameter(
         "http://localhost:8787/mcp",

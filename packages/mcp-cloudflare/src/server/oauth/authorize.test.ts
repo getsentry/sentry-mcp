@@ -344,6 +344,53 @@ describe("oauth authorize routes", () => {
         expect(response.status).toBe(200);
       });
 
+      it("should allow request with organization-scoped resource parameter", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp/test-org",
+        });
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId: "test-client",
+          clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+        });
+
+        const url = new URL("http://localhost/oauth/authorize");
+        url.searchParams.set("resource", "http://localhost/mcp/test-org");
+
+        const request = new Request(url, { method: "GET" });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(200);
+      });
+
+      it("should allow request with project-scoped resource parameter", async () => {
+        mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp/test-org/test-project",
+        });
+        mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+          clientId: "test-client",
+          clientName: "Test Client",
+          redirectUris: ["https://example.com/callback"],
+        });
+
+        const url = new URL("http://localhost/oauth/authorize");
+        url.searchParams.set(
+          "resource",
+          "http://localhost/mcp/test-org/test-project",
+        );
+
+        const request = new Request(url, { method: "GET" });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(200);
+      });
+
       it("should reject request with invalid resource hostname", async () => {
         mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
           clientId: "test-client",
@@ -514,6 +561,64 @@ describe("oauth authorize routes", () => {
           redirectUri: "https://example.com/callback",
           scope: ["read"],
           resource: "http://localhost/mcp?experimental=1",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toContain("sentry.io");
+      });
+
+      it("should allow request with organization-scoped resource parameter", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp/test-org",
+        };
+        const formData = new FormData();
+        const signedState = await signState(
+          {
+            req: { oauthReqInfo },
+            iat: Date.now(),
+            exp: Date.now() + 10 * 60 * 1000,
+          },
+          testEnv.COOKIE_SECRET!,
+        );
+        formData.append("state", signedState);
+
+        const request = new Request("http://localhost/oauth/authorize", {
+          method: "POST",
+          body: formData,
+        });
+        const response = await app.fetch(request, testEnv as Env);
+
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        expect(location).toContain("sentry.io");
+      });
+
+      it("should allow request with project-scoped resource parameter", async () => {
+        const oauthReqInfo = {
+          clientId: "test-client",
+          redirectUri: "https://example.com/callback",
+          scope: ["read"],
+          resource: "http://localhost/mcp/test-org/test-project",
         };
         const formData = new FormData();
         const signedState = await signState(

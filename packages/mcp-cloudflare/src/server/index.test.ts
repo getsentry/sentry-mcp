@@ -185,4 +185,26 @@ describe("worker entrypoint", () => {
       'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry/mcp-server?experimental=1"',
     );
   });
+
+  it("patches organization-scoped MCP 401 responses with path-specific protected resource metadata", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Bearer error="invalid_token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp/sentry"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toBe(
+      'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry"',
+    );
+  });
 });
