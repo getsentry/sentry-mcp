@@ -1,0 +1,23 @@
+{
+  "name": "getsentry/sentry-mcp",
+  "description": "Sentry MCP Server",
+  "accepts": [
+    {
+      "network": "eip155:8453",
+      "asset": "USDC",
+      "address": "YOUR_WALLET_ADDRESS"
+    }
+  ],
+  "resources": [
+    {
+      "path": "/sentry",
+      "price": "0.01",
+      "description": "Pay-per-call access to sentry"
+    },
+    {
+      "path": "/model-context-protocol",
+      "price": "0.01",
+      "description": "Pay-per-call access to model-context-protocol"
+    }
+  ]
+}
