@@ -372,6 +372,28 @@ describe("callEmbeddedAgent", () => {
       });
     });
 
+    it("rescues NoObjectGeneratedError when prose has unmatched quotes before the JSON object", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'The 5" pipe needs attention. Actual output: {"query": "is:unresolved", "explanation": "valid JSON"}',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "valid JSON",
+      });
+    });
+
     it("throws UserInputError when text is not parseable JSON", async () => {
       const error = new NoObjectGeneratedError({
         ...noObjectErrorOpts,

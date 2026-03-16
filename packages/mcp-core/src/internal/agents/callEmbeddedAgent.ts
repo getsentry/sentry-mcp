@@ -171,6 +171,16 @@ function extractBalancedJsonObjects(text: string): string[] {
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
 
+    if (depth === 0) {
+      if (ch === "{") {
+        start = i;
+        depth = 1;
+        inString = false;
+        escaped = false;
+      }
+      continue;
+    }
+
     if (escaped) {
       escaped = false;
       continue;
@@ -188,18 +198,17 @@ function extractBalancedJsonObjects(text: string): string[] {
     }
 
     if (ch === "{") {
-      if (depth === 0) {
-        start = i;
-      }
       depth++;
       continue;
     }
 
-    if (ch === "}" && depth > 0) {
+    if (ch === "}") {
       depth--;
       if (depth === 0 && start !== -1) {
         objects.push(text.slice(start, i + 1));
         start = -1;
+        inString = false;
+        escaped = false;
       }
     }
   }
