@@ -18,7 +18,14 @@ describe("static routes", () => {
       expect(res.status).toBe(200);
       const text = await res.text();
       expect(text).toBe(
-        ["User-agent: *", "Allow: /$", "Disallow: /"].join("\n"),
+        [
+          "User-agent: *",
+          "Allow: /$",
+          "Allow: /.well-known/",
+          "Allow: /mcp.json",
+          "Allow: /llms.txt",
+          "Disallow: /",
+        ].join("\n"),
       );
     });
   });
@@ -37,8 +44,9 @@ describe("static routes", () => {
 
       expect(res.status).toBe(200);
       const text = await res.text();
-      expect(text).toContain("# sentry-mcp");
+      expect(text).toContain("# Sentry MCP Server");
       expect(text).toContain("Model Context Protocol");
+      expect(text).toContain("http://localhost/mcp");
     });
   });
 

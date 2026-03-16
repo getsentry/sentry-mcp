@@ -64,6 +64,12 @@ import traceMixedFixture from "./fixtures/trace-mixed.json" with {
 import traceEventFixture from "./fixtures/trace-event.json" with {
   type: "json",
 };
+import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
+  type: "json",
+};
+import flamegraphFixture from "./fixtures/flamegraph.json" with {
+  type: "json",
+};
 import organizationFixture from "./fixtures/organization.json" with {
   type: "json",
 };

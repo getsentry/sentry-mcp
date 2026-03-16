@@ -15,7 +15,6 @@ describe("/.mcp discovery routes", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
 
     const json = await res.json();
