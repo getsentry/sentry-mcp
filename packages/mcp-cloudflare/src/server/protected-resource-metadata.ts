@@ -4,11 +4,8 @@ const PROTECTED_RESOURCE_METADATA_PREFIX =
   "/.well-known/oauth-protected-resource";
 
 export function getProtectedResourceMetadata(requestUrl: URL) {
-  // RFC 9728 path-specific metadata should round-trip the exact protected
-  // resource path and query. The root metadata endpoint is less precise:
-  // `https://host` and `https://host/` both arrive here as `/`, so we
-  // normalize that case to the bare origin and rely on `/.well-known/
-  // oauth-protected-resource/mcp...` for exact MCP resource identifiers.
+  // RFC 9728 path-specific metadata must round-trip the exact protected
+  // resource path and query.
   const resourcePath = requestUrl.pathname.replace(
     PROTECTED_RESOURCE_METADATA_PREFIX,
     "",

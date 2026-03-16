@@ -65,26 +65,13 @@ describe("app", () => {
   });
 
   describe("GET /.well-known/oauth-protected-resource", () => {
-    it("should return RFC 9728 protected resource metadata for root", async () => {
+    it("should not expose origin-level protected resource metadata", async () => {
       const res = await app.request(
         "https://mcp.sentry.dev/.well-known/oauth-protected-resource",
         { headers: TEST_HEADERS },
       );
 
-      expect(res.status).toBe(200);
-
-      const json = await res.json();
-      expect(json).toEqual({
-        resource: "https://mcp.sentry.dev",
-        authorization_servers: ["https://mcp.sentry.dev"],
-        scopes_supported: [
-          "org:read",
-          "project:write",
-          "team:write",
-          "event:write",
-        ],
-        bearer_methods_supported: ["header"],
-      });
+      expect(res.status).toBe(404);
     });
   });
 

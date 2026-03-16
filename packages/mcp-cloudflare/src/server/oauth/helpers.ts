@@ -632,14 +632,6 @@ export function validateResourceParameter(
       return false;
     }
 
-    // Allow the origin-only resource as a compatibility alias for clients
-    // that cached older protected-resource metadata before we served exact
-    // path-specific RFC 9728 resource identifiers. The canonical resource
-    // shape is still `/mcp...`; this keeps older clients working.
-    if (rawPath === "/" || rawPath === "") {
-      return true;
-    }
-
     // Use the normalized pathname for the /mcp check so dot segments like
     // /mcp/../evil cannot bypass the prefix validation.
     return (

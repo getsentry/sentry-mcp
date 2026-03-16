@@ -232,7 +232,7 @@ describe("oauth authorize routes", () => {
 
   describe("Resource parameter validation (RFC 8707)", () => {
     describe("GET /oauth/authorize", () => {
-      it("should allow request without resource parameter (backward compatibility)", async () => {
+      it("should allow request without resource parameter", async () => {
         mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
           clientId: "test-client",
           redirectUri: "https://example.com/callback",
@@ -278,7 +278,7 @@ describe("oauth authorize routes", () => {
         expect(response.status).toBe(200);
       });
 
-      it("should allow request with origin-only resource parameter", async () => {
+      it("should reject request with origin-only resource parameter", async () => {
         mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
           clientId: "test-client",
           redirectUri: "https://example.com/callback",
@@ -297,10 +297,13 @@ describe("oauth authorize routes", () => {
         );
         const response = await app.fetch(request, testEnv as Env);
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
       });
 
-      it("should allow request with origin-only resource parameter and trailing slash", async () => {
+      it("should reject request with origin-only resource parameter and trailing slash", async () => {
         mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
           clientId: "test-client",
           redirectUri: "https://example.com/callback",
@@ -319,7 +322,10 @@ describe("oauth authorize routes", () => {
         const request = new Request(url, { method: "GET" });
         const response = await app.fetch(request, testEnv as Env);
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(302);
+        const location = response.headers.get("location");
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
       });
 
       it("should allow request with path-specific query resource parameter", async () => {
@@ -549,7 +555,7 @@ describe("oauth authorize routes", () => {
         expect(location).toContain("sentry.io");
       });
 
-      it("should allow request with origin-only resource parameter", async () => {
+      it("should reject request with origin-only resource parameter", async () => {
         const oauthReqInfo = {
           clientId: "test-client",
           redirectUri: "https://example.com/callback",
@@ -575,7 +581,8 @@ describe("oauth authorize routes", () => {
 
         expect(response.status).toBe(302);
         const location = response.headers.get("location");
-        expect(location).toContain("sentry.io");
+        const locationUrl = new URL(location!);
+        expect(locationUrl.searchParams.get("error")).toBe("invalid_target");
       });
 
       it("should allow request with path-specific query resource parameter", async () => {

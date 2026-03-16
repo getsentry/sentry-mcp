@@ -355,22 +355,21 @@ describe("oauth callback routes", () => {
       }
     });
 
-    it("should allow callback with origin-only resource parameter and trailing slash", async () => {
+    it("should reject callback with origin-only resource parameter and trailing slash", async () => {
       mockOAuthProvider.lookupClient.mockResolvedValue({
         clientId: "test-client",
         clientName: "Test Client",
         redirectUris: ["https://example.com/callback"],
       });
 
-      const approvalFormData = new FormData();
-      const approvalState = await signState(
+      const validApprovalFormData = new FormData();
+      const validApprovalState = await signState(
         {
           req: {
             oauthReqInfo: {
               clientId: "test-client",
               redirectUri: "https://example.com/callback",
               scope: ["read"],
-              resource: "http://localhost/",
             },
           },
           iat: Date.now(),
@@ -378,13 +377,19 @@ describe("oauth callback routes", () => {
         },
         testEnv.COOKIE_SECRET!,
       );
-      approvalFormData.append("state", approvalState);
-      const approvalRequest = new Request("http://localhost/oauth/authorize", {
-        method: "POST",
-        body: approvalFormData,
-      });
-      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
-      const setCookie = approvalResponse.headers.get("Set-Cookie");
+      validApprovalFormData.append("state", validApprovalState);
+      const validApprovalRequest = new Request(
+        "http://localhost/oauth/authorize",
+        {
+          method: "POST",
+          body: validApprovalFormData,
+        },
+      );
+      const validApprovalResponse = await app.fetch(
+        validApprovalRequest,
+        testEnv as Env,
+      );
+      const setCookie = validApprovalResponse.headers.get("Set-Cookie");
 
       const now = Date.now();
       const payload: OAuthState = {
@@ -411,10 +416,9 @@ describe("oauth callback routes", () => {
 
       const response = await app.fetch(request, testEnv as Env);
 
-      if (response.status === 400) {
-        const text = await response.text();
-        expect(text).not.toContain("Invalid resource parameter");
-      }
+      expect(response.status).toBe(400);
+      const text = await response.text();
+      expect(text).toContain("Invalid resource parameter");
     });
 
     it("should allow callback with path-specific query resource parameter", async () => {
