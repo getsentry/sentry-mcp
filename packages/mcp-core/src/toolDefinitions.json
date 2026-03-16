@@ -520,6 +520,31 @@
     "requiredScopes": ["event:read"]
   },
   {
+    "name": "get_replay_details",
+    "description": "Get detailed information about a specific Sentry replay by URL or replay ID.\n\nUSE THIS TOOL WHEN USERS:\n- Share a replay URL\n- Ask what happened in a specific replay\n- Want replay overview details and a concise activity timeline\n\n<examples>\n### With replay URL\n```\nget_replay_details(replayUrl='https://my-organization.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\n```\n\n### With organization and replay ID\n```\nget_replay_details(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f')\n```\n</examples>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "replayUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL of the replay. e.g. https://my-organization.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/"
+        },
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "replayId": {
+          "type": "string",
+          "description": "The replay ID. e.g. `7e07485f-12f9-416b-8b14-26260799b51f`"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
     "name": "get_sentry_resource",
     "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
     "inputSchema": {
@@ -532,7 +557,7 @@
         },
         "resourceType": {
           "type": "string",
-          "enum": ["issue", "event", "trace", "breadcrumbs"],
+          "enum": ["issue", "event", "trace", "breadcrumbs", "replay"],
           "description": "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL)."
         },
         "resourceId": {

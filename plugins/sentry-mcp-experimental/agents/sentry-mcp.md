@@ -20,6 +20,7 @@ allowedTools:
   - get_event_attachment
   - get_issue_details
   - get_issue_tag_values
+  - get_replay_details
   - get_sentry_resource
   - get_trace_details
   - list_events

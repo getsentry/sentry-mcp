@@ -6,6 +6,7 @@ import findReleases from "./find-releases";
 import getIssueDetails from "./get-issue-details";
 import getIssueTagValues from "./get-issue-tag-values";
 import getTraceDetails from "./get-trace-details";
+import getReplayDetails from "./get-replay-details";
 import getEventAttachment from "./get-event-attachment";
 import updateIssue from "./update-issue";
 import searchEvents from "./search-events";
@@ -56,6 +57,7 @@ export default {
   get_issue_details: getIssueDetails,
   get_issue_tag_values: getIssueTagValues,
   get_trace_details: getTraceDetails,
+  get_replay_details: getReplayDetails,
   get_event_attachment: getEventAttachment,
   update_issue: updateIssue,
   search_events: searchEvents,
