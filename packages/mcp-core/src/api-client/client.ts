@@ -1,5 +1,7 @@
+import { z } from "zod";
 import {
   getIssueUrl as getIssueUrlUtil,
+  getReplayUrl as getReplayUrlUtil,
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
 } from "../utils/url-utils";
@@ -32,6 +34,8 @@ import {
   UserRegionsSchema,
   FlamegraphSchema,
   ProfileChunkResponseSchema,
+  ReplayDetailsSchema,
+  ReplayRecordingSegmentsSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
 import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
@@ -60,6 +64,8 @@ import type {
   User,
   Flamegraph,
   ProfileChunk,
+  ReplayDetails,
+  ReplayRecordingSegments,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -512,6 +518,10 @@ export class SentryApiService {
    */
   getTraceUrl(organizationSlug: string, traceId: string): string {
     return getTraceUrlUtil(this.host, organizationSlug, traceId);
+  }
+
+  getReplayUrl(organizationSlug: string, replayId: string): string {
+    return getReplayUrlUtil(this.host, organizationSlug, replayId);
   }
 
   // ================================================================================
@@ -1865,6 +1875,44 @@ export class SentryApiService {
       filename: attachment.name,
       blob: await downloadResponse.blob(),
     };
+  }
+
+  async getReplayDetails(
+    {
+      organizationSlug,
+      replayId,
+    }: {
+      organizationSlug: string;
+      replayId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayDetails> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/replays/${replayId}/`,
+      undefined,
+      opts,
+    );
+    return z.object({ data: ReplayDetailsSchema }).parse(body).data;
+  }
+
+  async getReplayRecordingSegments(
+    {
+      organizationSlug,
+      projectSlugOrId,
+      replayId,
+    }: {
+      organizationSlug: string;
+      projectSlugOrId: string;
+      replayId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayRecordingSegments> {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/?download=true`,
+      undefined,
+      opts,
+    );
+    return ReplayRecordingSegmentsSchema.parse(body);
   }
 
   async updateIssue(
