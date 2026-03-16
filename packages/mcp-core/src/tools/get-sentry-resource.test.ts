@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   mswServer,
+  replayDetailsFixture,
   traceMetaFixture,
   traceFixture,
   eventFixture,
@@ -186,63 +187,13 @@ describe("get_sentry_resource", () => {
   // ─── URL mode: recognized-only types (guidance messages) ──────────────────
   describe("URL mode — recognized types (guidance messages)", () => {
     it("delegates replay URL to get_replay_details", async () => {
-      mswServer.use(
-        http.get(
-          "https://sentry.io/api/0/organizations/my-org/replays/abc123def456/",
-          () =>
-            HttpResponse.json({
-              data: {
-                id: "abc123def456",
-                project_id: "123",
-                started_at: "2025-04-07T12:00:00.000Z",
-                finished_at: "2025-04-07T12:05:00.000Z",
-                duration: 300,
-                is_archived: false,
-                environment: "production",
-                platform: "javascript",
-                count_errors: 0,
-                count_warnings: 0,
-                count_infos: 0,
-                count_dead_clicks: 0,
-                count_rage_clicks: 0,
-                count_segments: 1,
-                count_urls: 1,
-                urls: ["/login"],
-                trace_ids: [],
-                error_ids: [],
-                browser: { name: "Chrome", version: "123.0" },
-                os: { name: "macOS", version: "14.4" },
-                device: { name: "MacBook Pro" },
-                sdk: { name: "@sentry/browser", version: "8.0.0" },
-                user: { display_name: "Taylor Example" },
-              },
-            }),
-          { once: true },
-        ),
-        http.get(
-          "https://sentry.io/api/0/projects/my-org/123/replays/abc123def456/recording-segments/",
-          () =>
-            HttpResponse.json([
-              [
-                {
-                  type: 5,
-                  timestamp: 1744027220,
-                  data: {
-                    tag: "ui.click",
-                    payload: { message: "Clicked login" },
-                  },
-                },
-              ],
-            ]),
-          { once: true },
-        ),
-      );
-
       const result = await callHandler({
-        url: "https://my-org.sentry.io/replays/abc123def456/",
+        url: `https://sentry-mcp-evals.sentry.io/replays/${replayDetailsFixture.id}/`,
       });
-      expect(result).toContain("# Replay abc123def456 in **my-org**");
-      expect(result).toContain("Clicked login");
+      expect(result).toContain(
+        `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
+      );
+      expect(result).toContain("Clicked submit order");
     });
 
     it("returns guidance for monitor URL (simple slug)", async () => {
@@ -488,65 +439,15 @@ describe("get_sentry_resource", () => {
     });
 
     it("fetches replay by replayId", async () => {
-      mswServer.use(
-        http.get(
-          "https://sentry.io/api/0/organizations/test-org/replays/replay-123/",
-          () =>
-            HttpResponse.json({
-              data: {
-                id: "replay-123",
-                project_id: "123",
-                started_at: "2025-04-07T12:00:00.000Z",
-                finished_at: "2025-04-07T12:05:00.000Z",
-                duration: 300,
-                is_archived: false,
-                environment: "production",
-                platform: "javascript",
-                count_errors: 1,
-                count_warnings: 0,
-                count_infos: 0,
-                count_dead_clicks: 0,
-                count_rage_clicks: 0,
-                count_segments: 1,
-                count_urls: 1,
-                urls: ["/checkout"],
-                trace_ids: ["trace-1"],
-                error_ids: ["error-1"],
-                browser: { name: "Chrome", version: "123.0" },
-                os: { name: "macOS", version: "14.4" },
-                device: { name: "MacBook Pro" },
-                sdk: { name: "@sentry/browser", version: "8.0.0" },
-                user: { display_name: "Taylor Example" },
-              },
-            }),
-          { once: true },
-        ),
-        http.get(
-          "https://sentry.io/api/0/projects/test-org/123/replays/replay-123/recording-segments/",
-          () =>
-            HttpResponse.json([
-              [
-                {
-                  type: 5,
-                  timestamp: 1744027220,
-                  data: {
-                    tag: "ui.click",
-                    payload: { message: "Submitted order" },
-                  },
-                },
-              ],
-            ]),
-          { once: true },
-        ),
-      );
-
       const result = await callHandler({
         resourceType: "replay",
-        organizationSlug: "test-org",
-        resourceId: "replay-123",
+        organizationSlug: "sentry-mcp-evals",
+        resourceId: replayDetailsFixture.id,
       });
-      expect(result).toContain("# Replay replay-123 in **test-org**");
-      expect(result).toContain("Submitted order");
+      expect(result).toContain(
+        `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
+      );
+      expect(result).toContain("Clicked submit order");
     });
   });
 

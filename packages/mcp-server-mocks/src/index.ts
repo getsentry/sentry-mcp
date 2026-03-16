@@ -67,6 +67,12 @@ import traceEventFixture from "./fixtures/trace-event.json" with {
 import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
 };
+import replayDetailsFixture from "./fixtures/replay-details.json" with {
+  type: "json",
+};
+import replayRecordingSegmentsFixture from "./fixtures/replay-recording-segments.json" with {
+  type: "json",
+};
 import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
@@ -806,6 +812,16 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
     fetch: () => HttpResponse.json(issueFixture2),
   },
+  {
+    method: "get",
+    path: `/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
+    fetch: () => HttpResponse.json({ data: replayDetailsFixture }),
+  },
+  {
+    method: "get",
+    path: `/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+    fetch: () => HttpResponse.json(replayRecordingSegmentsFixture),
+  },
 
   // Trace endpoints
   {
@@ -1474,6 +1490,8 @@ export const mswServer = setupServer(
 export {
   autofixStateFixture,
   eventsFixture as eventFixture,
+  replayDetailsFixture,
+  replayRecordingSegmentsFixture,
   traceMetaFixture,
   traceMetaWithNullsFixture,
   performanceEventFixture,
