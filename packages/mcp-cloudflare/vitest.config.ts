@@ -15,6 +15,9 @@ export default defineWorkersConfig({
   test: {
     include: ["src/**/*.test.ts"],
     setupFiles: ["src/test-setup.ts"],
+    fileParallelism: false,
+    minWorkers: 1,
+    maxWorkers: 1,
     poolOptions: {
       workers: {
         wrangler: { configPath: "./wrangler.test.jsonc" },
