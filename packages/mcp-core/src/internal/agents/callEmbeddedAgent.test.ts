@@ -262,6 +262,138 @@ describe("callEmbeddedAgent", () => {
       });
     });
 
+    it("rescues NoObjectGeneratedError when text is JSON in markdown code block", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'Based on the available fields, here is the query:\n\n```json\n{"query": "is:unresolved", "explanation": "Unresolved issues"}\n```',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "Unresolved issues",
+      });
+    });
+
+    it("rescues NoObjectGeneratedError when text is JSON in plain code block", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'Here is the translated query:\n\n```\n{"query": "is:unresolved"}\n```',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "",
+      });
+    });
+
+    it("rescues NoObjectGeneratedError when JSON object is embedded in prose", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'I can translate this to Sentry query syntax. {"query": "is:unresolved", "explanation": "Shows all unresolved issues"} This should work well.',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "Shows all unresolved issues",
+      });
+    });
+
+    it("rescues NoObjectGeneratedError when JSON is followed by prose containing }", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'Here is the query: {"query": "is:unresolved", "explanation": "done"} See /api/{id}/results for details.',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "done",
+      });
+    });
+
+    it("rescues NoObjectGeneratedError when prose contains braces before the JSON object", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'Use the {field} syntax for examples. The actual query is {"query": "is:unresolved", "explanation": "valid JSON"}',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "valid JSON",
+      });
+    });
+
+    it("rescues NoObjectGeneratedError when prose has unmatched quotes before the JSON object", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'The 5" pipe needs attention. Actual output: {"query": "is:unresolved", "explanation": "valid JSON"}',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "valid JSON",
+      });
+    });
+
     it("throws UserInputError when text is not parseable JSON", async () => {
       const error = new NoObjectGeneratedError({
         ...noObjectErrorOpts,
