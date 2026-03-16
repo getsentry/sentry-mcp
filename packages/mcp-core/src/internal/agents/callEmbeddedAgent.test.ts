@@ -350,6 +350,28 @@ describe("callEmbeddedAgent", () => {
       });
     });
 
+    it("rescues NoObjectGeneratedError when prose contains braces before the JSON object", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'Use the {field} syntax for examples. The actual query is {"query": "is:unresolved", "explanation": "valid JSON"}',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "valid JSON",
+      });
+    });
+
     it("throws UserInputError when text is not parseable JSON", async () => {
       const error = new NoObjectGeneratedError({
         ...noObjectErrorOpts,
