@@ -164,6 +164,47 @@ export async function callEmbeddedAgent<
 }
 
 /**
+ * Find the first top-level JSON object in text using balanced brace matching.
+ * Unlike a greedy regex, this stops at the correct closing } even when prose
+ * after the object contains } characters (e.g. URL path params, code snippets).
+ * Returns null if no balanced object is found.
+ */
+function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && inString) {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+
+  return null;
+}
+
+/**
  * Extract candidate JSON strings from text using multiple strategies.
  * Handles plain JSON, markdown code blocks, and embedded JSON objects.
  */
@@ -177,10 +218,12 @@ function extractJsonCandidates(text: string): string[] {
     candidates.push(match[1].trim());
   }
 
-  // Strategy 2: Find the first top-level JSON object in text
-  const jsonObjectMatch = text.match(/\{[\s\S]*\}/);
-  if (jsonObjectMatch) {
-    candidates.push(jsonObjectMatch[0]);
+  // Strategy 2: Find the first top-level JSON object using balanced brace matching.
+  // A greedy regex like /\{[\s\S]*\}/ would stretch to the *last* } in the text,
+  // breaking when prose after the JSON contains any } (e.g. code snippets, URL paths).
+  const jsonObject = extractFirstJsonObject(text);
+  if (jsonObject) {
+    candidates.push(jsonObject);
   }
 
   return candidates;

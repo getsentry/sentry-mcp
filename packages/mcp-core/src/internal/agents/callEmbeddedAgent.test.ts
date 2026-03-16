@@ -328,6 +328,28 @@ describe("callEmbeddedAgent", () => {
       });
     });
 
+    it("rescues NoObjectGeneratedError when JSON is followed by prose containing }", async () => {
+      const error = new NoObjectGeneratedError({
+        ...noObjectErrorOpts,
+        message: "response did not match schema",
+        text: 'Here is the query: {"query": "is:unresolved", "explanation": "done"} See /api/{id}/results for details.',
+      });
+
+      mockGenerateText.mockRejectedValue(error);
+
+      const result = await callEmbeddedAgent({
+        system: "You are a test agent",
+        prompt: "Test prompt",
+        tools: {},
+        schema: schemaWithDefault,
+      });
+
+      expect(result.result).toEqual({
+        query: "is:unresolved",
+        explanation: "done",
+      });
+    });
+
     it("throws UserInputError when text is not parseable JSON", async () => {
       const error = new NoObjectGeneratedError({
         ...noObjectErrorOpts,
