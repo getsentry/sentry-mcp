@@ -164,22 +164,48 @@ export async function callEmbeddedAgent<
 }
 
 /**
+ * Extract candidate JSON strings from text using multiple strategies.
+ * Handles plain JSON, markdown code blocks, and embedded JSON objects.
+ */
+function extractJsonCandidates(text: string): string[] {
+  const candidates: string[] = [text];
+
+  // Strategy 1: Extract from markdown code blocks (```json ... ``` or ``` ... ```)
+  const codeBlockRegex = /```(?:json)?\s*\n?([\s\S]*?)\n?```/g;
+  const allMatches = Array.from(text.matchAll(codeBlockRegex));
+  for (const match of allMatches) {
+    candidates.push(match[1].trim());
+  }
+
+  // Strategy 2: Find the first top-level JSON object in text
+  const jsonObjectMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonObjectMatch) {
+    candidates.push(jsonObjectMatch[0]);
+  }
+
+  return candidates;
+}
+
+/**
  * Attempt to rescue a failed structured output by parsing raw LLM text through the schema.
  * Schema defaults (e.g., `.default("")`) fill missing optional fields.
- * Returns null if the text cannot be parsed or doesn't match the schema.
+ * Handles plain JSON, markdown code blocks, and JSON embedded in prose (e.g., Anthropic responses).
+ * Returns null if no candidate can be parsed or matched against the schema.
  */
 function rescueFromText<TOutput>(
   text: string,
   schema: z.ZodType<TOutput, z.ZodTypeDef, unknown>,
 ): { rescued: TOutput } | null {
-  try {
-    const parsed = JSON.parse(text);
-    const result = schema.safeParse(parsed);
-    if (result.success) {
-      return { rescued: result.data };
+  for (const candidate of extractJsonCandidates(text)) {
+    try {
+      const parsed = JSON.parse(candidate);
+      const result = schema.safeParse(parsed);
+      if (result.success) {
+        return { rescued: result.data };
+      }
+    } catch {
+      // Try next candidate
     }
-  } catch {
-    // JSON parse failed
   }
   return null;
 }
