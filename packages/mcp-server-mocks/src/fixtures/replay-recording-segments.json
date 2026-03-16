@@ -1,0 +1,39 @@
+[
+  [
+    {
+      "type": 4,
+      "timestamp": 1744027200000,
+      "data": {
+        "href": "https://example.com/login",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "type": 5,
+      "timestamp": 1744027210,
+      "data": {
+        "tag": "performanceSpan",
+        "payload": {
+          "op": "navigation.navigate",
+          "description": "https://example.com/checkout",
+          "data": {
+            "duration": 710
+          }
+        }
+      }
+    }
+  ],
+  [
+    {
+      "type": 5,
+      "timestamp": 1744027220,
+      "data": {
+        "tag": "ui.click",
+        "payload": {
+          "message": "Clicked submit order"
+        }
+      }
+    }
+  ]
+]
