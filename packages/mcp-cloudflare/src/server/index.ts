@@ -16,7 +16,6 @@ import {
   checkRateLimit,
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
 } from "./utils/rate-limiter";
-import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
 
 /**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
@@ -65,8 +64,10 @@ const wrappedOAuthProvider = {
       return new Response(null, { status: 204 });
     }
 
+    // RFC 9728 metadata must be derived from the exact protected resource
+    // identifier. We expose only path-specific metadata for `/mcp...`.
     if (url.pathname === "/.well-known/oauth-protected-resource") {
-      return addCorsHeaders(createProtectedResourceMetadataResponse(url));
+      return addCorsHeaders(new Response("Not Found", { status: 404 }));
     }
 
     // --- Rate limiting (before any OAuth/MCP processing) ---

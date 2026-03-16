@@ -86,7 +86,7 @@ describe("worker entrypoint", () => {
     expect(MockOAuthProvider).not.toHaveBeenCalled();
   });
 
-  it("serves root protected resource metadata before the OAuth provider", async () => {
+  it("does not expose root protected resource metadata", async () => {
     const response = await handler.fetch!(
       new Request(
         "https://mcp.sentry.dev/.well-known/oauth-protected-resource",
@@ -95,19 +95,8 @@ describe("worker entrypoint", () => {
       ctx,
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    expect(await response.json()).toEqual({
-      resource: "https://mcp.sentry.dev",
-      authorization_servers: ["https://mcp.sentry.dev"],
-      scopes_supported: [
-        "org:read",
-        "project:write",
-        "team:write",
-        "event:write",
-      ],
-      bearer_methods_supported: ["header"],
-    });
     expect(MockOAuthProvider).not.toHaveBeenCalled();
   });
 

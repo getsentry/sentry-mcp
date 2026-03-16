@@ -152,14 +152,7 @@ const app = new Hono<{
       endpoint: `${baseUrl}/mcp`,
     });
   })
-  // RFC 9728: OAuth 2.0 Protected Resource Metadata
-  // ChatGPT and other clients query this to discover the authorization server
-  // Root endpoint for clients that try /.well-known/oauth-protected-resource first
-  .get(
-    "/.well-known/oauth-protected-resource",
-    handleOAuthProtectedResourceMetadata,
-  )
-  // Handles both /mcp and /mcp/* paths (e.g., /mcp/sentry/mcp-server)
+  // RFC 9728: OAuth 2.0 Protected Resource Metadata for /mcp resources.
   .get(
     "/.well-known/oauth-protected-resource/mcp",
     handleOAuthProtectedResourceMetadata,
