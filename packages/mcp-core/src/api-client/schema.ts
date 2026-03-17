@@ -196,19 +196,6 @@ export const ReplayDetailsSchema = z
   })
   .passthrough();
 
-export const ReplayRecordingSegmentMetadataSchema = z
-  .object({
-    replayId: z.string(),
-    segmentId: z.number(),
-    projectId: z.union([z.string(), z.number()]),
-    dateAdded: z.string().nullable().optional(),
-  })
-  .passthrough();
-
-export const ReplayRecordingSegmentMetadataListSchema = z.array(
-  ReplayRecordingSegmentMetadataSchema,
-);
-
 export const ReplayRecordingSegmentsSchema = z.array(z.array(z.unknown()));
 
 export const ClientKeySchema = z
