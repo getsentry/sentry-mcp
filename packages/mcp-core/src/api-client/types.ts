@@ -59,8 +59,6 @@ import type {
   ExternalIssueSchema,
   ExternalIssueListSchema,
   ReplayDetailsSchema,
-  ReplayRecordingSegmentMetadataSchema,
-  ReplayRecordingSegmentMetadataListSchema,
   ReplayRecordingSegmentsSchema,
   OrganizationListSchema,
   OrganizationSchema,
@@ -118,12 +116,6 @@ export type AutofixRun = z.infer<typeof AutofixRunSchema>;
 export type AutofixRunState = z.infer<typeof AutofixRunStateSchema>;
 export type AssignedTo = z.infer<typeof AssignedToSchema>;
 export type ReplayDetails = z.infer<typeof ReplayDetailsSchema>;
-export type ReplayRecordingSegmentMetadata = z.infer<
-  typeof ReplayRecordingSegmentMetadataSchema
->;
-export type ReplayRecordingSegmentMetadataList = z.infer<
-  typeof ReplayRecordingSegmentMetadataListSchema
->;
 export type ReplayRecordingSegments = z.infer<
   typeof ReplayRecordingSegmentsSchema
 >;
