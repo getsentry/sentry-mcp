@@ -231,4 +231,77 @@ describe("approval-dialog", () => {
       );
     });
   });
+
+  describe("XSS prevention for URI fields", () => {
+    const renderDialog = async (clientOverrides: Record<string, unknown>) => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: { ...mockClient, ...clientOverrides },
+          server: { name: "Sentry MCP" },
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+      return response.text();
+    };
+
+    it("should strip javascript: clientUri and render name as plain text", async () => {
+      const html = await renderDialog({
+        clientUri: "javascript:alert(document.domain)",
+      });
+
+      expect(html).not.toContain('href="javascript:');
+      expect(html).toContain("Test Client");
+      // Name should NOT be wrapped in an anchor tag
+      expect(html).not.toMatch(/<a [^>]*>Test Client<\/a>/);
+    });
+
+    it("should strip javascript: policyUri and omit policy link", async () => {
+      const html = await renderDialog({
+        policyUri: "javascript:alert(1)",
+      });
+
+      expect(html).not.toContain('href="javascript:');
+      expect(html).not.toContain("Privacy Policy");
+    });
+
+    it("should strip javascript: tosUri and omit ToS link", async () => {
+      const html = await renderDialog({
+        tosUri: "javascript:alert(1)",
+      });
+
+      expect(html).not.toContain('href="javascript:');
+      expect(html).not.toContain("Terms of Service");
+    });
+
+    it("should strip data: URI from clientUri", async () => {
+      const html = await renderDialog({
+        clientUri: "data:text/html,<script>alert(1)</script>",
+      });
+
+      expect(html).not.toContain('href="data:');
+    });
+
+    it("should render valid https clientUri as a link", async () => {
+      const html = await renderDialog({
+        clientUri: "https://github.com/getsentry/sentry-mcp",
+      });
+
+      expect(html).toContain('href="https://github.com/getsentry/sentry-mcp"');
+      expect(html).toContain("Test Client</a>");
+    });
+
+    it("should render valid https policyUri and tosUri as links", async () => {
+      const html = await renderDialog({
+        policyUri: "https://example.com/privacy",
+        tosUri: "https://example.com/tos",
+      });
+
+      expect(html).toContain('href="https://example.com/privacy"');
+      expect(html).toContain("Privacy Policy");
+      expect(html).toContain('href="https://example.com/tos"');
+      expect(html).toContain("Terms of Service");
+    });
+  });
 });

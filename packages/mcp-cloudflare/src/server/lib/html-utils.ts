@@ -3,6 +3,23 @@
  */
 
 /**
+ * Sanitizes a URL for safe use in href attributes.
+ * Only allows http: and https: schemes; returns empty string for
+ * dangerous schemes (javascript:, data:, vbscript:, etc.) or invalid URLs.
+ */
+export function sanitizeHrefUrl(url: string): string {
+  try {
+    const parsed = new URL(url.trim());
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      return url.trim();
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Sanitizes HTML content to prevent XSS attacks
  */
 export function sanitizeHtml(unsafe: string): string {

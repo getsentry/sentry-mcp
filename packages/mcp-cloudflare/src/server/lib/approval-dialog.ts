@@ -3,7 +3,7 @@ import type {
   ClientInfo,
 } from "@cloudflare/workers-oauth-provider";
 import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import { sanitizeHtml } from "./html-utils";
+import { sanitizeHtml, sanitizeHrefUrl } from "./html-utils";
 import skillDefinitions, {
   type SkillDefinition,
 } from "@sentry/mcp-core/skillDefinitions";
@@ -300,10 +300,15 @@ export async function renderApprovalDialog(
     ? sanitizeHtml(client.clientName)
     : "Unknown MCP Client";
 
-  // Safe URLs
-  const clientUri = client?.clientUri ? sanitizeHtml(client.clientUri) : "";
-  const policyUri = client?.policyUri ? sanitizeHtml(client.policyUri) : "";
-  const tosUri = client?.tosUri ? sanitizeHtml(client.tosUri) : "";
+  const clientUri = client?.clientUri
+    ? sanitizeHtml(sanitizeHrefUrl(client.clientUri))
+    : "";
+  const policyUri = client?.policyUri
+    ? sanitizeHtml(sanitizeHrefUrl(client.policyUri))
+    : "";
+  const tosUri = client?.tosUri
+    ? sanitizeHtml(sanitizeHrefUrl(client.tosUri))
+    : "";
 
   // Get redirect URIs
   const redirectUris =
