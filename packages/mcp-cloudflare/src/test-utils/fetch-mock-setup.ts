@@ -36,6 +36,24 @@ const SENTRY_HOSTS = ["https://sentry.io", "https://us.sentry.io"];
 // Standard JSON response headers
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
+function normalizeQuery(query: string | null): string | null {
+  return query ? query.split(" ").sort().join(" ") : query;
+}
+
+const VALID_ERROR_EVENT_QUERIES = new Set<string | null>(
+  [
+    null,
+    "",
+    "error.handled:false",
+    "error.unhandled:true",
+    "error.handled:false is:unresolved",
+    "error.unhandled:true is:unresolved",
+    "is:unresolved project:cloudflare-mcp",
+    "project:cloudflare-mcp",
+    "user.email:david@sentry.io",
+  ].map((query) => normalizeQuery(query)),
+);
+
 let fetchMockConfigured = false;
 
 /**
@@ -368,7 +386,7 @@ export function setupFetchMock() {
       .reply((req) => {
         const url = new URL(req.path, "https://sentry.io");
         const dataset = url.searchParams.get("dataset");
-        const query = url.searchParams.get("query") || "";
+        const query = url.searchParams.get("query");
 
         if (dataset === "spans") {
           if (query !== "is_transaction:true") {
@@ -386,19 +404,34 @@ export function setupFetchMock() {
         }
 
         if (dataset === "errors") {
-          // Return empty for queries that don't match expected patterns
-          const validQueries = [
-            "",
-            "error.handled:false",
-            "error.unhandled:true",
-            "error.handled:false is:unresolved",
-            "error.unhandled:true is:unresolved",
-            "is:unresolved project:cloudflare-mcp",
-            "project:cloudflare-mcp",
-            "user.email:david@sentry.io",
-          ];
-          const sortedQuery = query.split(" ").sort().join(" ");
-          if (!validQueries.includes(sortedQuery)) {
+          const fields = url.searchParams.getAll("field");
+          if (
+            !fields.includes("issue") ||
+            !fields.includes("title") ||
+            !fields.includes("project") ||
+            !fields.includes("last_seen()") ||
+            !fields.includes("count()")
+          ) {
+            return {
+              statusCode: 400,
+              data: "Invalid fields",
+              responseOptions: { headers: JSON_HEADERS },
+            };
+          }
+
+          if (
+            !["-count", "-last_seen"].includes(
+              url.searchParams.get("sort") ?? "",
+            )
+          ) {
+            return {
+              statusCode: 400,
+              data: "Invalid sort",
+              responseOptions: { headers: JSON_HEADERS },
+            };
+          }
+
+          if (!VALID_ERROR_EVENT_QUERIES.has(normalizeQuery(query))) {
             return {
               statusCode: 200,
               data: eventsErrorsEmptyFixture,
