@@ -1196,6 +1196,7 @@ export {
   traceFixture,
   traceMixedFixture,
   traceEventFixture,
+  flamegraphFixture,
   organizationFixture,
   releaseFixture,
   clientKeyFixture,

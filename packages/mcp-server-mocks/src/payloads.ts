@@ -26,6 +26,9 @@ import eventsSpansEmptyFixture from "./fixtures/events-spans-empty.json" with {
 import eventsSpansFixture from "./fixtures/events-spans.json" with {
   type: "json",
 };
+import flamegraphFixture from "./fixtures/flamegraph.json" with {
+  type: "json",
+};
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
 import organizationFixture from "./fixtures/organization.json" with {
   type: "json",
@@ -83,6 +86,7 @@ export {
   eventsFixture,
   performanceEventFixture,
   eventAttachmentsFixture,
+  flamegraphFixture,
   tagsFixture,
   projectFixture,
   teamFixture,
