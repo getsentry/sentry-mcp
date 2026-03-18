@@ -117,6 +117,7 @@ export {
   createUnknownEvent,
   createPerformanceEvent,
   createPerformanceIssue,
+  createFeedbackIssue,
   createRegressedIssue,
   createUnsupportedIssue,
   createCspIssue,
