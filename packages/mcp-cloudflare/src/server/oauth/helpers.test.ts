@@ -16,7 +16,16 @@ const GRANT_TYPES = {
 };
 
 const mockFetch = vi.fn();
-const originalFetch = global.fetch;
+const originalFetch = globalThis.fetch;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
 
 function createMockKV(): KVNamespace {
   const store = new Map<string, string>();
@@ -84,8 +93,6 @@ describe("tokenExchangeCallback", () => {
   let mockEnv: TokenExchangeEnv;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    global.fetch = mockFetch as typeof fetch;
     mockKV = createMockKV();
     mockEnv = {
       SENTRY_CLIENT_ID: "test-client-id",
@@ -93,10 +100,6 @@ describe("tokenExchangeCallback", () => {
       SENTRY_HOST: "sentry.io",
       OAUTH_KV: mockKV,
     };
-  });
-
-  afterEach(() => {
-    global.fetch = originalFetch;
   });
 
   it("should skip non-refresh_token grant types", async () => {
@@ -377,10 +380,6 @@ describe("tokenExchangeCallback", () => {
 });
 
 describe("refreshAccessToken", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("should successfully refresh access token", async () => {
     mockFetch.mockResolvedValueOnce(createMockTokenResponse());
 

@@ -14,6 +14,7 @@ import {
   eventsSpansEmptyFixture,
   eventsSpansFixture,
   issueFixture,
+  issueFixture2,
   organizationFixture,
   performanceEventFixture,
   projectFixture,
@@ -28,17 +29,6 @@ import {
   traceMetaFixture,
   userFixture,
 } from "@sentry/mcp-server-mocks/payloads";
-
-// Second issue fixture for tests that need multiple issues
-const issueFixture2 = {
-  ...issueFixture,
-  id: 6507376926,
-  shortId: "CLOUDFLARE-MCP-42",
-  count: 1,
-  title: "Error: Tool list_issues is already registered",
-  firstSeen: "2025-04-11T22:51:19.403000Z",
-  lastSeen: "2025-04-12T11:34:11Z",
-};
 
 // Sentry hosts to mock
 const SENTRY_HOSTS = ["https://sentry.io", "https://us.sentry.io"];
