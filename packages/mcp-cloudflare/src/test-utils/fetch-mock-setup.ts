@@ -6,27 +6,27 @@
  */
 import { fetchMock } from "cloudflare:test";
 import {
-  organizationFixture,
-  releaseFixture,
-  clientKeyFixture,
-  userFixture,
-  eventsErrorsFixture,
-  eventsErrorsEmptyFixture,
-  eventsSpansFixture,
-  eventsSpansEmptyFixture,
-  issueFixture,
-  eventsFixture,
-  projectFixture,
-  teamFixture,
-  tagsFixture,
-  traceMetaFixture,
-  traceFixture,
-  performanceEventFixture,
   autofixStateFixture,
-  traceItemsAttributesSpansStringFixture,
-  traceItemsAttributesSpansNumberFixture,
-  traceItemsAttributesLogsStringFixture,
+  clientKeyFixture,
+  eventsErrorsEmptyFixture,
+  eventsErrorsFixture,
+  eventsFixture,
+  eventsSpansEmptyFixture,
+  eventsSpansFixture,
+  issueFixture,
+  organizationFixture,
+  performanceEventFixture,
+  projectFixture,
+  releaseFixture,
+  tagsFixture,
+  teamFixture,
+  traceFixture,
   traceItemsAttributesLogsNumberFixture,
+  traceItemsAttributesLogsStringFixture,
+  traceItemsAttributesSpansNumberFixture,
+  traceItemsAttributesSpansStringFixture,
+  traceMetaFixture,
+  userFixture,
 } from "@sentry/mcp-server-mocks/payloads";
 
 // Second issue fixture for tests that need multiple issues
@@ -46,6 +46,8 @@ const SENTRY_HOSTS = ["https://sentry.io", "https://us.sentry.io"];
 // Standard JSON response headers
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
+let fetchMockConfigured = false;
+
 /**
  * Set up fetchMock for Sentry API mocking in Cloudflare Workers tests.
  *
@@ -53,11 +55,17 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
  * (first match wins). Always register specific path handlers BEFORE
  * general pattern handlers to ensure correct matching.
  *
- * Call this in beforeAll() and call resetFetchMock() in afterEach().
+ * Safe to call before each test; interceptors are only registered once.
  */
 export function setupFetchMock() {
   fetchMock.activate();
   fetchMock.disableNetConnect();
+
+  if (fetchMockConfigured) {
+    return;
+  }
+
+  fetchMockConfigured = true;
 
   for (const host of SENTRY_HOSTS) {
     const pool = fetchMock.get(host);

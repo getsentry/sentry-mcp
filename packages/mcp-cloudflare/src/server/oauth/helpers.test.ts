@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { WorkerProps } from "../types";
 import {
-  tokenExchangeCallback,
-  refreshAccessToken,
-  validateResourceParameter,
   createResourceValidationError,
+  refreshAccessToken,
+  tokenExchangeCallback,
+  validateResourceParameter,
 } from "./helpers";
 import type { TokenExchangeEnv } from "./helpers";
-import type { WorkerProps } from "../types";
 
 const GRANT_TYPES = {
   AUTHORIZATION_CODE:
@@ -15,9 +15,8 @@ const GRANT_TYPES = {
   REFRESH_TOKEN: "refresh_token" as TokenExchangeCallbackOptions["grantType"],
 };
 
-// Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+const originalFetch = global.fetch;
 
 function createMockKV(): KVNamespace {
   const store = new Map<string, string>();
@@ -86,6 +85,7 @@ describe("tokenExchangeCallback", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    global.fetch = mockFetch as typeof fetch;
     mockKV = createMockKV();
     mockEnv = {
       SENTRY_CLIENT_ID: "test-client-id",
@@ -93,6 +93,10 @@ describe("tokenExchangeCallback", () => {
       SENTRY_HOST: "sentry.io",
       OAUTH_KV: mockKV,
     };
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
   });
 
   it("should skip non-refresh_token grant types", async () => {
