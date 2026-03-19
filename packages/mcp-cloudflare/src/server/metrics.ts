@@ -15,18 +15,34 @@ type ResponseMetricOptions = {
   responseReason?: ResponseReason;
 };
 
+function isRoutePrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function normalizeOAuthRoute(pathname: string): string {
+  switch (pathname) {
+    case "/oauth/authorize":
+    case "/oauth/callback":
+    case "/oauth/token":
+    case "/oauth/register":
+      return pathname;
+    default:
+      return "/oauth/:action";
+  }
+}
+
 export function classifyTrackedRoute(pathname: string): TrackedRoute | null {
-  if (pathname.startsWith("/mcp")) {
+  if (isRoutePrefix(pathname, "/mcp")) {
     return {
       group: "mcp",
       route: "/mcp/:organizationSlug?/:projectSlug?",
     };
   }
 
-  if (pathname.startsWith("/oauth/")) {
+  if (isRoutePrefix(pathname, "/oauth")) {
     return {
       group: "oauth",
-      route: pathname,
+      route: normalizeOAuthRoute(pathname),
     };
   }
 
