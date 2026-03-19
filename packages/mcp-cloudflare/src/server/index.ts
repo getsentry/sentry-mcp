@@ -16,7 +16,12 @@ import {
   checkRateLimit,
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
 } from "./utils/rate-limiter";
-import { recordResponseMetric, type RateLimitScope } from "./metrics";
+import {
+  extractResponseMetricOptions,
+  recordResponseMetric,
+  stripResponseMetricHeaders,
+  type RateLimitScope,
+} from "./metrics";
 
 /**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
@@ -51,11 +56,16 @@ function finalizeResponse(
     responseReason?: "local_rate_limit";
   },
 ): Response {
+  const responseMetricOptions = extractResponseMetricOptions(response);
+  const responseWithoutMetricHeaders = stripResponseMetricHeaders(response);
   const finalized = isPublicMetadataEndpoint(url.pathname)
-    ? addCorsHeaders(response)
-    : stripCorsHeaders(response);
+    ? addCorsHeaders(responseWithoutMetricHeaders)
+    : stripCorsHeaders(responseWithoutMetricHeaders);
 
-  recordResponseMetric(request, finalized, options);
+  recordResponseMetric(request, finalized, {
+    ...responseMetricOptions,
+    ...options,
+  });
   return finalized;
 }
 

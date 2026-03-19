@@ -9,6 +9,8 @@ type TrackedRoute = {
 };
 
 const RESPONSE_METRIC_NAME = "mcp.server.response";
+const RESPONSE_REASON_HEADER = "x-sentry-response-reason";
+const RATE_LIMIT_SCOPE_HEADER = "x-sentry-rate-limit-scope";
 
 type ResponseMetricOptions = {
   rateLimitScope?: RateLimitScope;
@@ -88,6 +90,63 @@ function getMetricAttributes(
     "http.route": trackedRoute.route,
     "sentry.route.group": trackedRoute.group,
   };
+}
+
+export function annotateResponseMetric(
+  response: Response,
+  options: ResponseMetricOptions,
+): Response {
+  if (!options.responseReason && !options.rateLimitScope) {
+    return response;
+  }
+
+  const annotatedResponse = new Response(response.body, response);
+
+  if (options.responseReason) {
+    annotatedResponse.headers.set(
+      RESPONSE_REASON_HEADER,
+      options.responseReason,
+    );
+  }
+
+  if (options.rateLimitScope) {
+    annotatedResponse.headers.set(
+      RATE_LIMIT_SCOPE_HEADER,
+      options.rateLimitScope,
+    );
+  }
+
+  return annotatedResponse;
+}
+
+export function extractResponseMetricOptions(
+  response: Response,
+): ResponseMetricOptions {
+  const responseReason = response.headers.get(RESPONSE_REASON_HEADER);
+  const rateLimitScope = response.headers.get(RATE_LIMIT_SCOPE_HEADER);
+
+  return {
+    responseReason:
+      responseReason === "local_rate_limit" ? responseReason : undefined,
+    rateLimitScope:
+      rateLimitScope === "ip" || rateLimitScope === "user"
+        ? rateLimitScope
+        : undefined,
+  };
+}
+
+export function stripResponseMetricHeaders(response: Response): Response {
+  if (
+    !response.headers.has(RESPONSE_REASON_HEADER) &&
+    !response.headers.has(RATE_LIMIT_SCOPE_HEADER)
+  ) {
+    return response;
+  }
+
+  const sanitizedResponse = new Response(response.body, response);
+  sanitizedResponse.headers.delete(RESPONSE_REASON_HEADER);
+  sanitizedResponse.headers.delete(RATE_LIMIT_SCOPE_HEADER);
+  return sanitizedResponse;
 }
 
 export function recordResponseMetric(
