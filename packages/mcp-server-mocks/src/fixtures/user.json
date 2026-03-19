@@ -1,0 +1,22 @@
+{
+  "id": "123456",
+  "name": "Test User",
+  "email": "test@example.com",
+  "username": "testuser",
+  "avatarUrl": "https://example.com/avatar.jpg",
+  "dateJoined": "2024-01-01T00:00:00Z",
+  "isActive": true,
+  "isManaged": false,
+  "isStaff": false,
+  "isSuperuser": false,
+  "lastLogin": "2024-12-01T00:00:00Z",
+  "has2fa": false,
+  "hasPasswordAuth": true,
+  "emails": [
+    {
+      "id": "1",
+      "email": "test@example.com",
+      "is_verified": true
+    }
+  ]
+}

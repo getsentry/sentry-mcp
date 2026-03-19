@@ -1,0 +1,40 @@
+{
+  "data": [],
+  "meta": {
+    "fields": {
+      "id": "string",
+      "span.op": "string",
+      "span.description": "string",
+      "span.duration": "duration",
+      "transaction": "string",
+      "timestamp": "string",
+      "is_transaction": "boolean",
+      "project": "string",
+      "trace": "string",
+      "transaction.span_id": "string",
+      "project.name": "string"
+    },
+    "units": {
+      "id": null,
+      "span.op": null,
+      "span.description": null,
+      "span.duration": "millisecond",
+      "transaction": null,
+      "timestamp": null,
+      "is_transaction": null,
+      "project": null,
+      "trace": null,
+      "transaction.span_id": null,
+      "project.name": null
+    },
+    "isMetricsData": false,
+    "isMetricsExtractedData": false,
+    "tips": {},
+    "datasetReason": "unchanged",
+    "dataset": "spans",
+    "dataScanned": "full",
+    "accuracy": {
+      "confidence": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
+    }
+  }
+}

@@ -43,7 +43,6 @@
   "dependencies": {
     "@biomejs/biome": "catalog:",
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
     "dotenv": "catalog:",
     "dotenv-cli": "catalog:",
     "lint-staged": "catalog:",
@@ -74,7 +73,8 @@
       "workerd"
     ],
     "overrides": {
-      "@modelcontextprotocol/sdk": "^1.26.0"
+      "@modelcontextprotocol/sdk": "^1.26.0",
+      "undici": "^7.24.4"
     }
   },
   "devDependencies": {

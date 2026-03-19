@@ -1,3 +1,4 @@
+import { http, HttpResponse } from "msw";
 /**
  * MSW-based Mock Server for Sentry MCP Development and Testing.
  *
@@ -22,336 +23,72 @@
  * ```
  */
 import { setupServer } from "msw/node";
-import { http, HttpResponse } from "msw";
 
 import autofixStateFixture from "./fixtures/autofix-state.json" with {
   type: "json",
 };
-import issueFixture from "./fixtures/issue.json" with { type: "json" };
-import eventsFixture from "./fixtures/event.json" with { type: "json" };
-import performanceEventFixture from "./fixtures/performance-event.json" with {
-  type: "json",
-};
+import clientKeyFixture from "./fixtures/client-key.json" with { type: "json" };
 import eventAttachmentsFixture from "./fixtures/event-attachments.json" with {
   type: "json",
 };
-import tagsFixture from "./fixtures/tags.json" with { type: "json" };
-import projectFixture from "./fixtures/project.json" with { type: "json" };
-import teamFixture from "./fixtures/team.json" with { type: "json" };
-import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json" with {
+import eventsFixture from "./fixtures/event.json" with { type: "json" };
+import eventsErrorsEmptyFixture from "./fixtures/events-errors-empty.json" with {
   type: "json",
 };
-import traceItemsAttributesSpansStringFixture from "./fixtures/trace-items-attributes-spans-string.json" with {
+import eventsErrorsFixture from "./fixtures/events-errors.json" with {
   type: "json",
 };
-import traceItemsAttributesSpansNumberFixture from "./fixtures/trace-items-attributes-spans-number.json" with {
+import eventsSpansEmptyFixture from "./fixtures/events-spans-empty.json" with {
   type: "json",
 };
-import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json" with {
-  type: "json",
-};
-import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json" with {
-  type: "json",
-};
-import traceMetaFixture from "./fixtures/trace-meta.json" with { type: "json" };
-import traceMetaWithNullsFixture from "./fixtures/trace-meta-with-nulls.json" with {
-  type: "json",
-};
-import traceFixture from "./fixtures/trace.json" with { type: "json" };
-import traceMixedFixture from "./fixtures/trace-mixed.json" with {
-  type: "json",
-};
-import traceEventFixture from "./fixtures/trace-event.json" with {
-  type: "json",
-};
-import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
+import eventsSpansFixture from "./fixtures/events-spans.json" with {
   type: "json",
 };
 import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
-
-/**
- * Standard organization payload for mock responses.
- * Used across multiple endpoints for consistency.
- */
-const OrganizationPayload = {
-  id: "4509106740723712",
-  slug: "sentry-mcp-evals",
-  name: "sentry-mcp-evals",
-  links: {
-    regionUrl: "https://us.sentry.io",
-    organizationUrl: "https://sentry.io/sentry-mcp-evals",
-  },
+import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
+  type: "json",
 };
-
-/**
- * Standard release payload for mock responses.
- * Includes typical metadata and project associations.
- */
-const ReleasePayload = {
-  id: 1402755016,
-  version: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
-  status: "open",
-  shortVersion: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
-  versionInfo: {
-    package: null,
-    version: { raw: "8ce89484-0fec-4913-a2cd-e8e2d41dee36" },
-    description: "8ce89484-0fec-4913-a2cd-e8e2d41dee36",
-    buildHash: null,
-  },
-  ref: null,
-  url: null,
-  dateReleased: null,
-  dateCreated: "2025-04-13T19:54:21.764000Z",
-  data: {},
-  newGroups: 0,
-  owner: null,
-  commitCount: 0,
-  lastCommit: null,
-  deployCount: 0,
-  lastDeploy: null,
-  authors: [],
-  projects: [
-    {
-      id: 4509062593708032,
-      slug: "cloudflare-mcp",
-      name: "cloudflare-mcp",
-      newGroups: 0,
-      platform: "bun",
-      platforms: ["javascript"],
-      hasHealthData: false,
-    },
-  ],
-  firstEvent: "2025-04-13T19:54:21Z",
-  lastEvent: "2025-04-13T20:28:23Z",
-  currentProjectMeta: {},
-  userAgent: null,
+import issueFixture from "./fixtures/issue.json" with { type: "json" };
+import organizationFixture from "./fixtures/organization.json" with {
+  type: "json",
 };
-
-const ClientKeyPayload = {
-  id: "d20df0a1ab5031c7f3c7edca9c02814d",
-  name: "Default",
-  label: "Default",
-  public: "d20df0a1ab5031c7f3c7edca9c02814d",
-  secret: "154001fd3dfe38130e1c7948a323fad8",
-  projectId: 4509109104082945,
-  isActive: true,
-  rateLimit: null,
-  dsn: {
-    secret:
-      "https://d20df0a1ab5031c7f3c7edca9c02814d:154001fd3dfe38130e1c7948a323fad8@o4509106732793856.ingest.us.sentry.io/4509109104082945",
-    public:
-      "https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945",
-    csp: "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/csp-report/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
-    security:
-      "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/security/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
-    minidump:
-      "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/minidump/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
-    nel: "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/nel/?sentry_key=d20df0a1ab5031c7f3c7edca9c02814d",
-    unreal:
-      "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/unreal/d20df0a1ab5031c7f3c7edca9c02814d/",
-    crons:
-      "https://o4509106732793856.ingest.us.sentry.io/api/4509109104082945/cron/___MONITOR_SLUG___/d20df0a1ab5031c7f3c7edca9c02814d/",
-    cdn: "https://js.sentry-cdn.com/d20df0a1ab5031c7f3c7edca9c02814d.min.js",
-  },
-  browserSdkVersion: "8.x",
-  browserSdk: {
-    choices: [
-      ["9.x", "9.x"],
-      ["8.x", "8.x"],
-      ["7.x", "7.x"],
-    ],
-  },
-  dateCreated: "2025-04-07T00:12:25.139394Z",
-  dynamicSdkLoaderOptions: {
-    hasReplay: true,
-    hasPerformance: true,
-    hasDebug: false,
-  },
+import performanceEventFixture from "./fixtures/performance-event.json" with {
+  type: "json",
 };
-
-// a newer issue, seen less recently
-const issueFixture2 = {
-  ...issueFixture,
-  id: 6507376926,
-  shortId: "CLOUDFLARE-MCP-42",
-  count: 1,
-  title: "Error: Tool list_issues is already registered",
-  firstSeen: "2025-04-11T22:51:19.403000Z",
-  lastSeen: "2025-04-12T11:34:11Z",
+import projectFixture from "./fixtures/project.json" with { type: "json" };
+import releaseFixture from "./fixtures/release.json" with { type: "json" };
+import tagsFixture from "./fixtures/tags.json" with { type: "json" };
+import teamFixture from "./fixtures/team.json" with { type: "json" };
+import traceEventFixture from "./fixtures/trace-event.json" with {
+  type: "json",
 };
-
-const EventsErrorsMeta = {
-  fields: {
-    "issue.id": "integer",
-    title: "string",
-    project: "string",
-    "count()": "integer",
-    "last_seen()": "date",
-  },
-  units: {
-    "issue.id": null,
-    title: null,
-    project: null,
-    "count()": null,
-    "last_seen()": null,
-  },
-  isMetricsData: false,
-  isMetricsExtractedData: false,
-  tips: { query: null, columns: null },
-  datasetReason: "unchanged",
-  dataset: "errors",
+import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json" with {
+  type: "json",
 };
-
-const EmptyEventsErrorsPayload = {
-  data: [],
-  meta: EventsErrorsMeta,
+import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json" with {
+  type: "json",
 };
-
-const EventsErrorsPayload = {
-  data: [
-    {
-      "issue.id": 6114575469,
-      title: "Error: Tool list_organizations is already registered",
-      project: "test-suite",
-      "count()": 2,
-      "last_seen()": "2025-04-07T12:23:39+00:00",
-      issue: "CLOUDFLARE-MCP-41",
-    },
-  ],
-  meta: EventsErrorsMeta,
+import traceItemsAttributesSpansNumberFixture from "./fixtures/trace-items-attributes-spans-number.json" with {
+  type: "json",
 };
-
-const EventsSpansMeta = {
-  fields: {
-    id: "string",
-    "span.op": "string",
-    "span.description": "string",
-    "span.duration": "duration",
-    transaction: "string",
-    timestamp: "string",
-    is_transaction: "boolean",
-    project: "string",
-    trace: "string",
-    "transaction.span_id": "string",
-    "project.name": "string",
-  },
-  units: {
-    id: null,
-    "span.op": null,
-    "span.description": null,
-    "span.duration": "millisecond",
-    transaction: null,
-    timestamp: null,
-    is_transaction: null,
-    project: null,
-    trace: null,
-    "transaction.span_id": null,
-    "project.name": null,
-  },
-  isMetricsData: false,
-  isMetricsExtractedData: false,
-  tips: {},
-  datasetReason: "unchanged",
-  dataset: "spans",
-  dataScanned: "full",
-  accuracy: {
-    confidence: [
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-    ],
-  },
+import traceItemsAttributesSpansStringFixture from "./fixtures/trace-items-attributes-spans-string.json" with {
+  type: "json",
 };
-
-const EmptyEventsSpansPayload = {
-  data: [],
-  meta: EventsSpansMeta,
+import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json" with {
+  type: "json",
 };
-
-const EventsSpansPayload = {
-  data: [
-    {
-      id: "07752c6aeb027c8f",
-      "span.op": "http.server",
-      "span.description": "GET /trpc/bottleList",
-      "span.duration": 12.0,
-      transaction: "GET /trpc/bottleList",
-      timestamp: "2025-04-13T14:19:18+00:00",
-      is_transaction: true,
-      project: "peated",
-      trace: "6a477f5b0f31ef7b6b9b5e1dea66c91d",
-      "transaction.span_id": "07752c6aeb027c8f",
-      "project.name": "peated",
-    },
-    {
-      id: "7ab5edf5b3ba42c9",
-      "span.op": "http.server",
-      "span.description": "GET /trpc/bottleList",
-      "span.duration": 18.0,
-      transaction: "GET /trpc/bottleList",
-      timestamp: "2025-04-13T14:19:17+00:00",
-      is_transaction: true,
-      project: "peated",
-      trace: "54177131c7b192a446124daba3136045",
-      "transaction.span_id": "7ab5edf5b3ba42c9",
-      "project.name": "peated",
-    },
-  ],
-  meta: EventsSpansMeta,
-  confidence: [
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-  ],
+import traceMetaWithNullsFixture from "./fixtures/trace-meta-with-nulls.json" with {
+  type: "json",
 };
+import traceMetaFixture from "./fixtures/trace-meta.json" with { type: "json" };
+import traceMixedFixture from "./fixtures/trace-mixed.json" with {
+  type: "json",
+};
+import traceFixture from "./fixtures/trace.json" with { type: "json" };
+import userFixture from "./fixtures/user.json" with { type: "json" };
+import { issueFixture2 } from "./payloads";
 
 /**
  * Builds MSW handlers for both SaaS and self-hosted Sentry instances.
@@ -424,28 +161,7 @@ export const restHandlers = buildHandlers([
     path: "/api/0/auth/",
     controlOnly: true,
     fetch: () => {
-      return HttpResponse.json({
-        id: "123456",
-        name: "Test User",
-        email: "test@example.com",
-        username: "testuser",
-        avatarUrl: "https://example.com/avatar.jpg",
-        dateJoined: "2024-01-01T00:00:00Z",
-        isActive: true,
-        isManaged: false,
-        isStaff: false,
-        isSuperuser: false,
-        lastLogin: "2024-12-01T00:00:00Z",
-        has2fa: false,
-        hasPasswordAuth: true,
-        emails: [
-          {
-            id: "1",
-            email: "test@example.com",
-            is_verified: true,
-          },
-        ],
-      });
+      return HttpResponse.json(userFixture);
     },
   },
   {
@@ -463,14 +179,14 @@ export const restHandlers = buildHandlers([
     method: "get",
     path: "/api/0/organizations/",
     fetch: () => {
-      return HttpResponse.json([OrganizationPayload]);
+      return HttpResponse.json([organizationFixture]);
     },
   },
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/",
     fetch: () => {
-      return HttpResponse.json(OrganizationPayload);
+      return HttpResponse.json(organizationFixture);
     },
   },
   // 404 handlers for test scenarios
@@ -584,14 +300,14 @@ export const restHandlers = buildHandlers([
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
     fetch: () => {
       // TODO: validate payload (only accept 'Default' for key name)
-      return HttpResponse.json(ClientKeyPayload);
+      return HttpResponse.json(clientKeyFixture);
     },
   },
   {
     method: "get",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/keys/",
     fetch: () => {
-      return HttpResponse.json([ClientKeyPayload]);
+      return HttpResponse.json([clientKeyFixture]);
     },
   },
   {
@@ -606,7 +322,7 @@ export const restHandlers = buildHandlers([
       if (dataset === "spans") {
         //[sentryApi] GET https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=spans&per_page=10&referrer=sentry-mcp&sort=-span.duration&allowAggregateConditions=0&useRpc=1&field=id&field=trace&field=span.op&field=span.description&field=span.duration&field=transaction&field=project&field=timestamp&query=is_transaction%3Atrue
         if (query !== "is_transaction:true") {
-          return HttpResponse.json(EmptyEventsSpansPayload);
+          return HttpResponse.json(eventsSpansEmptyFixture);
         }
 
         if (url.searchParams.get("useRpc") !== "1") {
@@ -622,7 +338,7 @@ export const restHandlers = buildHandlers([
         ) {
           return HttpResponse.json("Invalid fields", { status: 400 });
         }
-        return HttpResponse.json(EventsSpansPayload);
+        return HttpResponse.json(eventsSpansFixture);
       }
       if (dataset === "errors") {
         //https://sentry.io/api/0/organizations/sentry-mcp-evals/events/?dataset=errors&per_page=10&referrer=sentry-mcp&sort=-count&statsPeriod=1w&field=issue&field=title&field=project&field=last_seen%28%29&field=count%28%29&query=
@@ -660,10 +376,10 @@ export const restHandlers = buildHandlers([
             "user.email:david@sentry.io",
           ].includes(sortedQuery)
         ) {
-          return HttpResponse.json(EmptyEventsErrorsPayload);
+          return HttpResponse.json(eventsErrorsEmptyFixture);
         }
 
-        return HttpResponse.json(EventsErrorsPayload);
+        return HttpResponse.json(eventsErrorsFixture);
       }
 
       return HttpResponse.json("Invalid dataset", { status: 400 });
@@ -889,12 +605,12 @@ export const restHandlers = buildHandlers([
   {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/releases/",
-    fetch: () => HttpResponse.json([ReleasePayload]),
+    fetch: () => HttpResponse.json([releaseFixture]),
   },
   {
     method: "get",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/releases/",
-    fetch: () => HttpResponse.json([ReleasePayload]),
+    fetch: () => HttpResponse.json([releaseFixture]),
   },
   {
     method: "get",
@@ -1481,6 +1197,24 @@ export {
   traceMixedFixture,
   traceEventFixture,
   flamegraphFixture,
+  organizationFixture,
+  releaseFixture,
+  clientKeyFixture,
+  userFixture,
+  eventsErrorsFixture,
+  eventsErrorsEmptyFixture,
+  eventsSpansFixture,
+  eventsSpansEmptyFixture,
+  issueFixture,
+  eventsFixture,
+  projectFixture,
+  teamFixture,
+  tagsFixture,
+  traceItemsAttributesSpansStringFixture,
+  traceItemsAttributesSpansNumberFixture,
+  traceItemsAttributesLogsStringFixture,
+  traceItemsAttributesLogsNumberFixture,
+  eventAttachmentsFixture,
 };
 
 // Export fixture factories

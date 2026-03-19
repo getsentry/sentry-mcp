@@ -19,6 +19,7 @@
  * ```
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
   ServerRequest,
@@ -78,10 +79,15 @@ import { hasAgentProvider } from "./internal/agents/provider-factory";
  * ```typescript
  * import { buildServer } from "@sentry/mcp-core/server";
  * import { createMcpHandler } from "agents/mcp";
+ * import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
  *
  * const serverContext = buildContextFromOAuth();
  * // Context is captured in closures during buildServer()
- * const server = buildServer({ context: serverContext });
+ * // Use CfWorkerJsonSchemaValidator for Cloudflare Workers (ajv is not compatible)
+ * const server = buildServer({
+ *   context: serverContext,
+ *   jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
+ * });
  *
  * // Context already available to tool handlers via closures
  * return createMcpHandler(server, { route: "/mcp" })(request, env, ctx);
@@ -92,16 +98,32 @@ export function buildServer({
   agentMode = false,
   experimentalMode = false,
   tools: customTools,
+  jsonSchemaValidator,
 }: {
   context: ServerContext;
   agentMode?: boolean;
   experimentalMode?: boolean;
   tools?: Record<string, ToolConfig<any>>;
+  /**
+   * JSON Schema validator for MCP protocol validation.
+   *
+   * By default, uses AjvJsonSchemaValidator which requires Node.js.
+   * For Cloudflare Workers or other edge runtimes, use CfWorkerJsonSchemaValidator:
+   *
+   * ```typescript
+   * import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
+   * buildServer({ context, jsonSchemaValidator: new CfWorkerJsonSchemaValidator() });
+   * ```
+   */
+  jsonSchemaValidator?: ServerOptions["jsonSchemaValidator"];
 }): McpServer {
-  const server = new McpServer({
-    name: MCP_SERVER_NAME,
-    version: LIB_VERSION,
-  });
+  const server = new McpServer(
+    {
+      name: MCP_SERVER_NAME,
+      version: LIB_VERSION,
+    },
+    { jsonSchemaValidator },
+  );
 
   configureServer({
     server,

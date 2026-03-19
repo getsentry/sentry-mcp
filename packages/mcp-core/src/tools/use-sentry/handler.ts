@@ -109,8 +109,12 @@ export default defineTool({
       ),
     );
 
-    // Build internal MCP server with the provided context
-    // Context is captured in tool handler closures during buildServer()
+    // Build internal MCP server with the provided context.
+    // Context is captured in tool handler closures during buildServer().
+    // We do not thread a jsonSchemaValidator here because the current SDK only
+    // uses it for elicitation responses, and use_sentry does not use elicitation
+    // today. If embedded-agent flows add elicitation later, Cloudflare agent mode
+    // will need to pass CfWorkerJsonSchemaValidator through this path as well.
     const server = buildServer({
       context,
       tools: toolsForAgent,

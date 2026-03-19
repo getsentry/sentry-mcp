@@ -1,818 +1,314 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { env } from "cloudflare:test";
+import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SCOPES } from "../../constants";
+import app from "../app";
+import mcpHandler from "../lib/mcp-handler";
+import type { Env } from "../types";
 import oauthRoute from "./index";
 import { signState, type OAuthState } from "./state";
-import type { Env } from "../types";
 
-// Mock the OAuth provider
-const mockOAuthProvider = {
-  parseAuthRequest: vi.fn(),
-  lookupClient: vi.fn(),
-  completeAuthorization: vi.fn(),
-};
+const { exchangeCodeForAccessToken } = vi.hoisted(() => ({
+  exchangeCodeForAccessToken: vi.fn(),
+}));
 
-function createTestApp(env: Partial<Env> = {}) {
-  const app = new Hono<{ Bindings: Env }>();
-  app.route("/oauth", oauthRoute);
-  return app;
+vi.mock("./helpers", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./helpers")>();
+
+  return {
+    ...actual,
+    exchangeCodeForAccessToken,
+  };
+});
+
+const REDIRECT_URI = "https://example.com/callback";
+const COOKIE_SECRET = "test-cookie-secret-key-for-hmac";
+
+function createTestApp() {
+  const hono = new Hono<{ Bindings: Env }>();
+  hono.route("/oauth", oauthRoute);
+  return hono;
+}
+
+function createOAuthApi(testEnv: Env) {
+  return getOAuthApi(
+    {
+      apiRoute: "/mcp",
+      apiHandler: mcpHandler,
+      defaultHandler: app,
+      authorizeEndpoint: "/oauth/authorize",
+      tokenEndpoint: "/oauth/token",
+      clientRegistrationEndpoint: "/oauth/register",
+      scopesSupported: Object.keys(SCOPES),
+    },
+    testEnv,
+  );
+}
+
+function createTestEnv(): Env {
+  const baseEnv = {
+    ...(env as Record<string, unknown>),
+    COOKIE_SECRET,
+    SENTRY_CLIENT_ID: "test-client-id",
+    SENTRY_CLIENT_SECRET: "test-client-secret",
+    SENTRY_HOST: "sentry.io",
+  } as Env;
+
+  return {
+    ...baseEnv,
+    OAUTH_PROVIDER: createOAuthApi(baseEnv),
+  };
+}
+
+async function createClient(testEnv: Env, name = "Test Client") {
+  return testEnv.OAUTH_PROVIDER.createClient({
+    clientName: name,
+    redirectUris: [REDIRECT_URI],
+    tokenEndpointAuthMethod: "none",
+  });
+}
+
+async function createSignedCallbackState(
+  clientId: string,
+  resource?: string,
+): Promise<string> {
+  const now = Date.now();
+  const payload: OAuthState = {
+    req: {
+      clientId,
+      redirectUri: REDIRECT_URI,
+      scope: ["org:read"],
+      skills: ["inspect"],
+      ...(resource ? { resource } : {}),
+    },
+    iat: now,
+    exp: now + 10 * 60 * 1000,
+  } as unknown as OAuthState;
+
+  return signState(payload, COOKIE_SECRET);
+}
+
+async function approveClient(
+  oauthApp: ReturnType<typeof createTestApp>,
+  testEnv: Env,
+  clientId: string,
+  resource?: string,
+) {
+  const approvalState = await signState(
+    {
+      req: {
+        oauthReqInfo: {
+          clientId,
+          redirectUri: REDIRECT_URI,
+          scope: ["org:read"],
+          ...(resource ? { resource } : {}),
+        },
+      },
+      iat: Date.now(),
+      exp: Date.now() + 10 * 60 * 1000,
+    },
+    COOKIE_SECRET,
+  );
+  const formData = new FormData();
+  formData.append("state", approvalState);
+  formData.append("skill", "inspect");
+
+  const response = await oauthApp.fetch(
+    new Request("http://localhost/oauth/authorize", {
+      method: "POST",
+      body: formData,
+    }),
+    testEnv,
+  );
+
+  expect(response.status).toBe(302);
+
+  return response.headers.get("Set-Cookie")?.split(";")[0];
+}
+
+async function callCallback(
+  oauthApp: ReturnType<typeof createTestApp>,
+  testEnv: Env,
+  options: {
+    state: string;
+    cookie?: string;
+    code?: string;
+  },
+) {
+  const url = new URL("http://localhost/oauth/callback");
+  url.searchParams.set("state", options.state);
+  if (options.code) {
+    url.searchParams.set("code", options.code);
+  }
+
+  return oauthApp.fetch(
+    new Request(url, {
+      method: "GET",
+      headers: options.cookie ? { Cookie: options.cookie } : undefined,
+    }),
+    testEnv,
+  );
 }
 
 describe("oauth callback routes", () => {
-  let app: ReturnType<typeof createTestApp>;
-  let testEnv: Partial<Env>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    testEnv = {
-      OAUTH_PROVIDER: mockOAuthProvider as unknown as Env["OAUTH_PROVIDER"],
-      COOKIE_SECRET: "test-cookie-secret-key-for-hmac",
-      SENTRY_CLIENT_ID: "test-client-id",
-      SENTRY_CLIENT_SECRET: "test-client-secret",
-      SENTRY_HOST: "sentry.io",
-    };
-    app = createTestApp(testEnv);
+    exchangeCodeForAccessToken.mockResolvedValue([
+      {
+        access_token: "sentry-access-token",
+        refresh_token: "sentry-refresh-token",
+        expires_in: 3600,
+        user: {
+          id: "user-123",
+          name: "Test User",
+        },
+      },
+      null,
+    ]);
   });
 
   describe("GET /oauth/callback", () => {
-    it("should reject callback with invalid state param", async () => {
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=%%%INVALID%%%`,
-        { method: "GET" },
+    it("rejects callback with invalid state param", async () => {
+      const oauthApp = createTestApp();
+      const response = await oauthApp.fetch(
+        new Request(
+          "http://localhost/oauth/callback?code=test-code&state=%%%INVALID%%%",
+        ),
+        createTestEnv(),
       );
-      const response = await app.fetch(request, testEnv as Env);
+
       expect(response.status).toBe(400);
-      const text = await response.text();
-      expect(text).toBe("Invalid state");
+      expect(await response.text()).toBe("Invalid state");
     });
 
-    it("should reject callback without approved client cookie", async () => {
-      // Build signed state matching what /oauth/authorize issues
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
+    it("rejects callback without approved client cookie", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const state = await createSignedCallbackState(client.clientId);
 
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {},
-        },
-      );
-      const response = await app.fetch(request, testEnv as Env);
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+      });
+
       expect(response.status).toBe(403);
-      const text = await response.text();
-      expect(text).toBe("Authorization failed: Client not approved");
+      expect(await response.text()).toBe(
+        "Authorization failed: Client not approved",
+      );
     });
 
-    it("should reject callback with invalid client approval cookie", async () => {
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
+    it("rejects callback with invalid client approval cookie", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const state = await createSignedCallbackState(client.clientId);
 
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: "mcp-approved-clients=invalid-cookie-value",
-          },
-        },
-      );
-      const response = await app.fetch(request, testEnv as Env);
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie: "mcp-approved-clients=invalid-cookie-value",
+      });
+
       expect(response.status).toBe(403);
-      const text = await response.text();
-      expect(text).toBe("Authorization failed: Client not approved");
+      expect(await response.text()).toBe(
+        "Authorization failed: Client not approved",
+      );
     });
 
-    it("should reject callback with cookie for different client", async () => {
-      // Ensure authorize POST accepts the redirectUri
-      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
-        clientId: "different-client",
-        clientName: "Other Client",
-        redirectUris: ["https://example.com/callback"],
-        tokenEndpointAuthMethod: "client_secret_basic",
+    it("rejects callback with cookie for different client", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const approvedClient = await createClient(testEnv, "Approved Client");
+      const otherClient = await createClient(testEnv, "Other Client");
+      const cookie = await approveClient(
+        oauthApp,
+        testEnv,
+        approvedClient.clientId,
+      );
+      const state = await createSignedCallbackState(otherClient.clientId);
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie,
       });
 
-      const approvalFormData = new FormData();
-      const approvalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "different-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      approvalFormData.append("state", approvalState);
-      const approvalRequest = new Request("http://localhost/oauth/authorize", {
-        method: "POST",
-        body: approvalFormData,
-      });
-      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
-      expect(approvalResponse.status).toBe(302);
-      const setCookie = approvalResponse.headers.get("Set-Cookie");
-      expect(setCookie).toBeTruthy();
-
-      // Build a signed state for a different client than the approved one
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-      const response = await app.fetch(request, testEnv as Env);
       expect(response.status).toBe(403);
-      const text = await response.text();
-      expect(text).toBe("Authorization failed: Client not approved");
+      expect(await response.text()).toBe(
+        "Authorization failed: Client not approved",
+      );
     });
 
-    it("should reject callback when state signature is tampered", async () => {
-      // Ensure client redirectUri is registered
-      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
-        tokenEndpointAuthMethod: "client_secret_basic",
+    it("rejects callback when state signature is tampered", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(oauthApp, testEnv, client.clientId);
+      const signedState = await createSignedCallbackState(client.clientId);
+      const [signature, payload] = signedState.split(".");
+      const tamperedState = `${signature === "" ? "a" : `${signature.slice(0, -1)}a`}.${payload}`;
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state: tamperedState,
+        code: "test-code",
+        cookie,
       });
-
-      // Prepare approval POST to generate a signed state
-      const oauthReqInfo = {
-        clientId: "test-client",
-        redirectUri: "https://example.com/callback",
-        scope: ["read"],
-      };
-      const approvalFormData = new FormData();
-      const approvalState = await signState(
-        {
-          req: { oauthReqInfo },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      approvalFormData.append("state", approvalState);
-      const approvalRequest = new Request("http://localhost/oauth/authorize", {
-        method: "POST",
-        body: approvalFormData,
-      });
-      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
-      expect(approvalResponse.status).toBe(302);
-      const setCookie = approvalResponse.headers.get("Set-Cookie");
-      const location = approvalResponse.headers.get("location");
-      expect(location).toBeTruthy();
-      const redirectUrl = new URL(location!);
-      const signedState = redirectUrl.searchParams.get("state")!;
-
-      // Tamper with the signature portion (hex) without breaking payload parsing
-      const [sig, b64] = signedState.split(".");
-      const badSig = (sig[0] === "a" ? "b" : "a") + sig.slice(1);
-      const tamperedState = `${badSig}.${b64}`;
-
-      // Call callback with tampered state and valid approval cookie
-      const callbackRequest = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${tamperedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-      const response = await app.fetch(callbackRequest, testEnv as Env);
-      expect(response.status).toBe(400);
-      const text = await response.text();
-      expect(text).toBe("Invalid state");
-    });
-  });
-
-  describe("Resource parameter validation (RFC 8707)", () => {
-    it("should allow callback without resource parameter", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
-      });
-
-      // Submit approval to get approval cookie
-      const approvalFormData = new FormData();
-      const approvalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      approvalFormData.append("state", approvalState);
-      const approvalRequest = new Request("http://localhost/oauth/authorize", {
-        method: "POST",
-        body: approvalFormData,
-      });
-      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
-      const setCookie = approvalResponse.headers.get("Set-Cookie");
-
-      // Build signed state without resource
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      // Should NOT call exchangeCodeForAccessToken in this test (we're just checking validation passes)
-      // but if it were called, mock it to avoid actual network requests
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      // This will fail at token exchange since we didn't mock it, but that's after validation
-      // We just need to ensure it doesn't fail with "Invalid resource parameter"
-      const response = await app.fetch(request, testEnv as Env);
-
-      // Should not be 400 with "Invalid resource parameter"
-      // It might be 500 or another error from token exchange, but that's OK
-      if (response.status === 400) {
-        const text = await response.text();
-        expect(text).not.toContain("Invalid resource parameter");
-      }
-    });
-
-    it("should allow callback with valid resource parameter", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
-      });
-
-      // Submit approval to get approval cookie
-      const approvalFormData = new FormData();
-      const approvalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-              resource: "http://localhost/mcp",
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      approvalFormData.append("state", approvalState);
-      const approvalRequest = new Request("http://localhost/oauth/authorize", {
-        method: "POST",
-        body: approvalFormData,
-      });
-      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
-      const setCookie = approvalResponse.headers.get("Set-Cookie");
-
-      // Build signed state with valid resource
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-          resource: "http://localhost/mcp",
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      const response = await app.fetch(request, testEnv as Env);
-
-      // Should not be rejected for resource validation
-      if (response.status === 400) {
-        const text = await response.text();
-        expect(text).not.toContain("Invalid resource parameter");
-      }
-    });
-
-    it("should reject callback with origin-only resource parameter and trailing slash", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
-      });
-
-      const validApprovalFormData = new FormData();
-      const validApprovalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      validApprovalFormData.append("state", validApprovalState);
-      const validApprovalRequest = new Request(
-        "http://localhost/oauth/authorize",
-        {
-          method: "POST",
-          body: validApprovalFormData,
-        },
-      );
-      const validApprovalResponse = await app.fetch(
-        validApprovalRequest,
-        testEnv as Env,
-      );
-      const setCookie = validApprovalResponse.headers.get("Set-Cookie");
-
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-          resource: "http://localhost/",
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      const response = await app.fetch(request, testEnv as Env);
 
       expect(response.status).toBe(400);
-      const text = await response.text();
-      expect(text).toContain("Invalid resource parameter");
+      expect(await response.text()).toBe("Invalid state");
     });
 
-    it("should allow callback with path-specific query resource parameter", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
+    it.each([
+      undefined,
+      "http://localhost/mcp",
+      "http://localhost/mcp?experimental=1",
+      "http://localhost/mcp/test-org",
+      "http://localhost/mcp/test-org/test-project",
+    ])("accepts callback with resource %s", async (resource) => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(
+        oauthApp,
+        testEnv,
+        client.clientId,
+        resource,
+      );
+      const state = await createSignedCallbackState(client.clientId, resource);
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie,
       });
 
-      const approvalFormData = new FormData();
-      const approvalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-              resource: "http://localhost/mcp?experimental=1",
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      approvalFormData.append("state", approvalState);
-      const approvalRequest = new Request("http://localhost/oauth/authorize", {
-        method: "POST",
-        body: approvalFormData,
-      });
-      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
-      const setCookie = approvalResponse.headers.get("Set-Cookie");
-
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-          resource: "http://localhost/mcp?experimental=1",
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      const response = await app.fetch(request, testEnv as Env);
-
-      if (response.status === 400) {
-        const text = await response.text();
-        expect(text).not.toContain("Invalid resource parameter");
-      }
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toContain(REDIRECT_URI);
+      expect(response.headers.get("location")).toContain("code=");
     });
 
-    it("should allow callback with organization-scoped resource parameter", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
+    it.each([
+      "http://localhost/",
+      "https://attacker.com/mcp",
+      "http://localhost/api",
+      "http://localhost#",
+    ])("rejects callback with invalid resource %s", async (resource) => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(oauthApp, testEnv, client.clientId);
+      const state = await createSignedCallbackState(client.clientId, resource);
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie,
       });
-
-      const approvalFormData = new FormData();
-      const approvalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-              resource: "http://localhost/mcp/test-org",
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      approvalFormData.append("state", approvalState);
-      const approvalRequest = new Request("http://localhost/oauth/authorize", {
-        method: "POST",
-        body: approvalFormData,
-      });
-      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
-      const setCookie = approvalResponse.headers.get("Set-Cookie");
-
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-          resource: "http://localhost/mcp/test-org",
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      const response = await app.fetch(request, testEnv as Env);
-
-      if (response.status === 400) {
-        const text = await response.text();
-        expect(text).not.toContain("Invalid resource parameter");
-      }
-    });
-
-    it("should allow callback with project-scoped resource parameter", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
-      });
-
-      const approvalFormData = new FormData();
-      const approvalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-              resource: "http://localhost/mcp/test-org/test-project",
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      approvalFormData.append("state", approvalState);
-      const approvalRequest = new Request("http://localhost/oauth/authorize", {
-        method: "POST",
-        body: approvalFormData,
-      });
-      const approvalResponse = await app.fetch(approvalRequest, testEnv as Env);
-      const setCookie = approvalResponse.headers.get("Set-Cookie");
-
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-          resource: "http://localhost/mcp/test-org/test-project",
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      const response = await app.fetch(request, testEnv as Env);
-
-      if (response.status === 400) {
-        const text = await response.text();
-        expect(text).not.toContain("Invalid resource parameter");
-      }
-    });
-
-    it("should reject callback with invalid resource hostname", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
-      });
-
-      // Build signed state with invalid resource
-      // Note: We don't go through approval because it would reject the invalid resource
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-          resource: "https://attacker.com/mcp",
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      // First approve a valid client to get the cookie
-      const validApprovalFormData = new FormData();
-      const validApprovalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-              // No resource parameter for the approval
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      validApprovalFormData.append("state", validApprovalState);
-      const validApprovalRequest = new Request(
-        "http://localhost/oauth/authorize",
-        {
-          method: "POST",
-          body: validApprovalFormData,
-        },
-      );
-      const validApprovalResponse = await app.fetch(
-        validApprovalRequest,
-        testEnv as Env,
-      );
-      const setCookie = validApprovalResponse.headers.get("Set-Cookie");
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      const response = await app.fetch(request, testEnv as Env);
-
-      // Should be rejected with 400 error
-      expect(response.status).toBe(400);
-      const text = await response.text();
-      expect(text).toContain("Invalid resource parameter");
-    });
-
-    it("should reject callback with invalid resource path", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
-      });
-
-      // Build signed state with invalid resource path
-      // Note: We don't go through approval because it would reject the invalid resource
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-          resource: "http://localhost/api",
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      // First approve a valid client to get the cookie
-      const validApprovalFormData = new FormData();
-      const validApprovalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-              // No resource parameter for the approval
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      validApprovalFormData.append("state", validApprovalState);
-      const validApprovalRequest = new Request(
-        "http://localhost/oauth/authorize",
-        {
-          method: "POST",
-          body: validApprovalFormData,
-        },
-      );
-      const validApprovalResponse = await app.fetch(
-        validApprovalRequest,
-        testEnv as Env,
-      );
-      const setCookie = validApprovalResponse.headers.get("Set-Cookie");
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      const response = await app.fetch(request, testEnv as Env);
-
-      // Should be rejected with 400 error
-      expect(response.status).toBe(400);
-      const text = await response.text();
-      expect(text).toContain("Invalid resource parameter");
-    });
-
-    it("should reject callback with empty fragment resource", async () => {
-      mockOAuthProvider.lookupClient.mockResolvedValue({
-        clientId: "test-client",
-        clientName: "Test Client",
-        redirectUris: ["https://example.com/callback"],
-      });
-
-      const now = Date.now();
-      const payload: OAuthState = {
-        req: {
-          clientId: "test-client",
-          redirectUri: "https://example.com/callback",
-          scope: ["read"],
-          resource: "http://localhost#",
-        },
-        iat: now,
-        exp: now + 10 * 60 * 1000,
-      } as unknown as OAuthState;
-      const signedState = await signState(payload, testEnv.COOKIE_SECRET!);
-
-      const validApprovalFormData = new FormData();
-      const validApprovalState = await signState(
-        {
-          req: {
-            oauthReqInfo: {
-              clientId: "test-client",
-              redirectUri: "https://example.com/callback",
-              scope: ["read"],
-            },
-          },
-          iat: Date.now(),
-          exp: Date.now() + 10 * 60 * 1000,
-        },
-        testEnv.COOKIE_SECRET!,
-      );
-      validApprovalFormData.append("state", validApprovalState);
-      const validApprovalRequest = new Request(
-        "http://localhost/oauth/authorize",
-        {
-          method: "POST",
-          body: validApprovalFormData,
-        },
-      );
-      const validApprovalResponse = await app.fetch(
-        validApprovalRequest,
-        testEnv as Env,
-      );
-      const setCookie = validApprovalResponse.headers.get("Set-Cookie");
-
-      const request = new Request(
-        `http://localhost/oauth/callback?code=test-code&state=${signedState}`,
-        {
-          method: "GET",
-          headers: {
-            Cookie: setCookie!.split(";")[0],
-          },
-        },
-      );
-
-      const response = await app.fetch(request, testEnv as Env);
 
       expect(response.status).toBe(400);
-      const text = await response.text();
-      expect(text).toContain("Invalid resource parameter");
+      expect(await response.text()).toContain("Invalid resource parameter");
     });
   });
 });
