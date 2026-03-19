@@ -19,7 +19,7 @@ import {
   checkRateLimit,
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
 } from "../utils/rate-limiter";
-import { recordRateLimitedMetric } from "../metrics";
+import { recordResponseMetric } from "../metrics";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
 /**
@@ -158,8 +158,14 @@ const mcpHandler: ExportedHandler<Env> = {
     );
 
     if (!rateLimitResult.allowed) {
-      recordRateLimitedMetric(request, "user");
-      return new Response(rateLimitResult.errorMessage, { status: 429 });
+      const response = new Response(rateLimitResult.errorMessage, {
+        status: 429,
+      });
+      recordResponseMetric(request, response, {
+        responseReason: "local_rate_limit",
+        rateLimitScope: "user",
+      });
+      return response;
     }
 
     // Verify user has access to the requested org/project

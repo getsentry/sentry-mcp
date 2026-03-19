@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/cloudflare";
 
 export type RateLimitScope = "ip" | "user";
+type ResponseReason = "local_rate_limit";
 
 type TrackedRoute = {
   group: "mcp" | "oauth" | "chat" | "search";
@@ -8,7 +9,11 @@ type TrackedRoute = {
 };
 
 const RESPONSE_METRIC_NAME = "mcp.server.response";
-const RATE_LIMIT_METRIC_NAME = "mcp.server.rate_limited";
+
+type ResponseMetricOptions = {
+  rateLimitScope?: RateLimitScope;
+  responseReason?: ResponseReason;
+};
 
 export function classifyTrackedRoute(pathname: string): TrackedRoute | null {
   if (pathname.startsWith("/mcp")) {
@@ -72,38 +77,31 @@ function getMetricAttributes(
 export function recordResponseMetric(
   request: Request,
   response: Response,
+  options?: ResponseMetricOptions,
 ): void {
   const attributes = getMetricAttributes(request);
 
   if (!attributes) {
     return;
+  }
+
+  const responseAttributes: Record<string, string | number> = {
+    "http.response.status_code": response.status,
+    "http.status_class": getStatusClass(response.status),
+  };
+
+  if (options?.responseReason) {
+    responseAttributes["sentry.response.reason"] = options.responseReason;
+  }
+
+  if (options?.rateLimitScope) {
+    responseAttributes["sentry.rate_limit.scope"] = options.rateLimitScope;
   }
 
   Sentry.metrics.count(RESPONSE_METRIC_NAME, 1, {
     attributes: {
       ...attributes,
-      "http.response.status_code": response.status,
-      "http.status_class": getStatusClass(response.status),
-    },
-  });
-}
-
-export function recordRateLimitedMetric(
-  request: Request,
-  rateLimitScope: RateLimitScope,
-): void {
-  const attributes = getMetricAttributes(request);
-
-  if (!attributes) {
-    return;
-  }
-
-  Sentry.metrics.count(RATE_LIMIT_METRIC_NAME, 1, {
-    attributes: {
-      ...attributes,
-      "http.response.status_code": 429,
-      "http.status_class": "4xx",
-      "sentry.rate_limit.scope": rateLimitScope,
+      ...responseAttributes,
     },
   });
 }

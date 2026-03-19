@@ -16,7 +16,7 @@ import {
   checkRateLimit,
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
 } from "./utils/rate-limiter";
-import { recordResponseMetric, recordRateLimitedMetric } from "./metrics";
+import { recordResponseMetric, type RateLimitScope } from "./metrics";
 
 /**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
@@ -46,12 +46,16 @@ function finalizeResponse(
   request: Request,
   url: URL,
   response: Response,
+  options?: {
+    rateLimitScope?: RateLimitScope;
+    responseReason?: "local_rate_limit";
+  },
 ): Response {
   const finalized = isPublicMetadataEndpoint(url.pathname)
     ? addCorsHeaders(response)
     : stripCorsHeaders(response);
 
-  recordResponseMetric(request, finalized);
+  recordResponseMetric(request, finalized, options);
   return finalized;
 }
 
@@ -111,11 +115,14 @@ const wrappedOAuthProvider = {
         );
 
         if (!rateLimitResult.allowed) {
-          recordRateLimitedMetric(request, "ip");
           return finalizeResponse(
             request,
             url,
             new Response(rateLimitResult.errorMessage, { status: 429 }),
+            {
+              responseReason: "local_rate_limit",
+              rateLimitScope: "ip",
+            },
           );
         }
       }

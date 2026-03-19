@@ -242,7 +242,6 @@ For Cloudflare HTTP traffic we send custom Metrics product counters through the
 JavaScript SDK metrics API:
 
 - `mcp.server.response` - Count of tracked HTTP responses
-- `mcp.server.rate_limited` - Count of local rate-limit denials only
 
 Shared low-cardinality attributes:
 
@@ -252,18 +251,20 @@ Shared low-cardinality attributes:
 - `http.status_class` - Status family such as `2xx` or `4xx`
 - `sentry.route.group` - Coarse route family: `mcp`, `oauth`, `chat`, or `search`
 
-Local rate-limit metric only:
+Optional local rate-limit attributes:
 
+- `sentry.response.reason` - `local_rate_limit`
 - `sentry.rate_limit.scope` - `ip` or `user`
 
 Interpretation:
 
 - Use `sum(mcp.server.response)` grouped by `http.route` and
   `http.response.status_code` for response rates
-- Use `sum(mcp.server.rate_limited)` to measure when we rate-limited the
+- Use `sum(mcp.server.response)` filtered by
+  `sentry.response.reason=local_rate_limit` to measure when we rate-limited the
   customer
 - Upstream/provider 429s increment `mcp.server.response` with status `429`, but
-  do NOT increment `mcp.server.rate_limited`
+  do not include `sentry.response.reason`
 
 ### Traces Configuration
 ```typescript
