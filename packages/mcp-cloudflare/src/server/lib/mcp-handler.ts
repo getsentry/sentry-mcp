@@ -19,6 +19,7 @@ import {
   checkRateLimit,
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
 } from "../utils/rate-limiter";
+import { recordRateLimitedMetric } from "../metrics";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
 /**
@@ -157,6 +158,7 @@ const mcpHandler: ExportedHandler<Env> = {
     );
 
     if (!rateLimitResult.allowed) {
+      recordRateLimitedMetric(request, "user");
       return new Response(rateLimitResult.errorMessage, { status: 429 });
     }
 

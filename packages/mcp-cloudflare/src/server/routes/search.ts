@@ -12,6 +12,7 @@ import type {
 } from "@cloudflare/workers-types";
 import { logger } from "@sentry/cloudflare";
 import { getClientIp } from "../utils/client-ip";
+import { recordRateLimitedMetric } from "../metrics";
 
 // Request schema matching the MCP tool parameters
 const SearchRequestSchema = z.object({
@@ -48,6 +49,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             key: rateLimitKey,
           });
         if (!success) {
+          recordRateLimitedMetric(c.req.raw, "ip");
           return c.json(
             {
               error:

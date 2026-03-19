@@ -4,11 +4,6 @@ import "urlpattern-polyfill";
 import type { Env } from "../types";
 import handler from "./mcp-handler.js";
 
-// Mock Sentry to avoid actual telemetry
-vi.mock("@sentry/cloudflare", () => ({
-  flush: vi.fn(() => Promise.resolve(true)),
-}));
-
 // Mock the MCP handler creation - we're testing the wrapper logic, not the MCP protocol
 vi.mock("agents/mcp", () => ({
   createMcpHandler: vi.fn(() => {

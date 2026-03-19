@@ -236,6 +236,35 @@ Follows the format: `{mcp.method.name} {target}` per OpenTelemetry MCP semantic 
 
 ## Performance Monitoring
 
+### Metrics Product For HTTP Responses
+
+For Cloudflare HTTP traffic we send custom Metrics product counters through the
+JavaScript SDK metrics API:
+
+- `mcp.server.response` - Count of tracked HTTP responses
+- `mcp.server.rate_limited` - Count of local rate-limit denials only
+
+Shared low-cardinality attributes:
+
+- `http.request.method` - HTTP method
+- `http.route` - Normalized route template
+- `http.response.status_code` - Final HTTP status code
+- `http.status_class` - Status family such as `2xx` or `4xx`
+- `sentry.route.group` - Coarse route family: `mcp`, `oauth`, `chat`, or `search`
+
+Local rate-limit metric only:
+
+- `sentry.rate_limit.scope` - `ip` or `user`
+
+Interpretation:
+
+- Use `sum(mcp.server.response)` grouped by `http.route` and
+  `http.response.status_code` for response rates
+- Use `sum(mcp.server.rate_limited)` to measure when we rate-limited the
+  customer
+- Upstream/provider 429s increment `mcp.server.response` with status `429`, but
+  do NOT increment `mcp.server.rate_limited`
+
 ### Traces Configuration
 ```typescript
 {

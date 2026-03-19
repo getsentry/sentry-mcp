@@ -16,6 +16,7 @@ import {
   checkRateLimit,
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
 } from "./utils/rate-limiter";
+import { recordResponseMetric, recordRateLimitedMetric } from "./metrics";
 
 /**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
@@ -41,6 +42,19 @@ function patchWwwAuthenticate(response: Response, url: URL): Response {
   return newResponse;
 }
 
+function finalizeResponse(
+  request: Request,
+  url: URL,
+  response: Response,
+): Response {
+  const finalized = isPublicMetadataEndpoint(url.pathname)
+    ? addCorsHeaders(response)
+    : stripCorsHeaders(response);
+
+  recordResponseMetric(request, finalized);
+  return finalized;
+}
+
 // Wrap OAuth Provider to take control of CORS.
 //
 // The OAuth provider manages several routes directly and may attach its own
@@ -59,15 +73,27 @@ const wrappedOAuthProvider = {
     // with no CORS headers so the browser blocks the cross-origin request.
     if (request.method === "OPTIONS") {
       if (isPublicMetadataEndpoint(url.pathname)) {
-        return addCorsHeaders(new Response(null, { status: 204 }));
+        return finalizeResponse(
+          request,
+          url,
+          new Response(null, { status: 204 }),
+        );
       }
-      return new Response(null, { status: 204 });
+      return finalizeResponse(
+        request,
+        url,
+        new Response(null, { status: 204 }),
+      );
     }
 
     // RFC 9728 metadata must be derived from the exact protected resource
     // identifier. We expose only path-specific metadata for `/mcp...`.
     if (url.pathname === "/.well-known/oauth-protected-resource") {
-      return addCorsHeaders(new Response("Not Found", { status: 404 }));
+      return finalizeResponse(
+        request,
+        url,
+        new Response("Not Found", { status: 404 }),
+      );
     }
 
     // --- Rate limiting (before any OAuth/MCP processing) ---
@@ -85,7 +111,12 @@ const wrappedOAuthProvider = {
         );
 
         if (!rateLimitResult.allowed) {
-          return new Response(rateLimitResult.errorMessage, { status: 429 });
+          recordRateLimitedMetric(request, "ip");
+          return finalizeResponse(
+            request,
+            url,
+            new Response(rateLimitResult.errorMessage, { status: 429 }),
+          );
         }
       }
     }
@@ -109,11 +140,7 @@ const wrappedOAuthProvider = {
 
     // --- Phase 3: Patch headers, then apply our CORS policy ---
     const patched = patchWwwAuthenticate(response, url);
-
-    if (isPublicMetadataEndpoint(url.pathname)) {
-      return addCorsHeaders(patched);
-    }
-    return stripCorsHeaders(patched);
+    return finalizeResponse(request, url, patched);
   },
 };
 

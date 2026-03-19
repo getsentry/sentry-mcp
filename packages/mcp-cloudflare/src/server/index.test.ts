@@ -2,26 +2,27 @@ import type { ExecutionContext } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "./types";
 
-const { MockOAuthProvider, mockOAuthProviderFetch, mockGetClientIp } =
-  vi.hoisted(() => {
-    const mockOAuthProviderFetch = vi.fn();
-    const MockOAuthProvider = vi
-      .fn()
-      .mockImplementation(() => ({ fetch: mockOAuthProviderFetch }));
+const {
+  MockOAuthProvider,
+  mockOAuthProviderFetch,
+  mockGetClientIp,
+  mockCheckRateLimit,
+} = vi.hoisted(() => {
+  const mockOAuthProviderFetch = vi.fn();
+  const MockOAuthProvider = vi
+    .fn()
+    .mockImplementation(() => ({ fetch: mockOAuthProviderFetch }));
 
-    return {
-      MockOAuthProvider,
-      mockOAuthProviderFetch,
-      mockGetClientIp: vi.fn(() => null),
-    };
-  });
+  return {
+    MockOAuthProvider,
+    mockOAuthProviderFetch,
+    mockGetClientIp: vi.fn(() => null),
+    mockCheckRateLimit: vi.fn(),
+  };
+});
 
 vi.mock("@cloudflare/workers-oauth-provider", () => ({
   default: MockOAuthProvider,
-}));
-
-vi.mock("@sentry/cloudflare", () => ({
-  withSentry: vi.fn((_config, handler) => handler),
 }));
 
 vi.mock("./app", () => ({
@@ -45,7 +46,9 @@ vi.mock("./utils/client-ip", () => ({
 }));
 
 vi.mock("./utils/rate-limiter", () => ({
-  checkRateLimit: vi.fn(),
+  checkRateLimit: mockCheckRateLimit,
+  MCP_RATE_LIMIT_EXCEEDED_MESSAGE:
+    "Rate limit exceeded. Please wait before trying again.",
 }));
 
 import handler from "./index";
@@ -63,6 +66,7 @@ describe("worker entrypoint", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetClientIp.mockReturnValue(null);
+    mockCheckRateLimit.mockResolvedValue({ allowed: true });
   });
 
   it("returns restrictive preflight CORS for public metadata endpoints", async () => {
@@ -149,6 +153,34 @@ describe("worker entrypoint", () => {
       'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp"',
     );
     expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
+  });
+
+  it("passes tracked app responses through the default handler", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(new Response("ok"));
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/api/chat", { method: "POST" }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it("returns 429 when MCP/OAuth IP limiting blocks the request", async () => {
+    mockGetClientIp.mockReturnValue("192.0.2.1");
+    mockCheckRateLimit.mockResolvedValueOnce({
+      allowed: false,
+      errorMessage: "Rate limit exceeded. Please wait before trying again.",
+    });
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/oauth/token", { method: "POST" }),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(429);
   });
 
   it("patches scoped MCP 401 responses with path-specific protected resource metadata", async () => {

@@ -24,6 +24,7 @@ export default function getSentryConfig(env: Env): SentryConfig {
       env.SENTRY_ENVIRONMENT ??
       (process.env.NODE_ENV !== "production" ? "development" : "production"),
     enableLogs: true,
+    enableMetrics: true,
     integrations: [
       Sentry.consoleLoggingIntegration(),
       Sentry.zodErrorsIntegration(),

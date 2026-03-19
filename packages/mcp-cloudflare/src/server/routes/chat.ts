@@ -18,6 +18,7 @@ import {
   type RateLimitResult,
 } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
+import { recordRateLimitedMetric } from "../metrics";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
@@ -153,6 +154,7 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
         key: rateLimitKey,
       });
       if (!success) {
+        recordRateLimitedMetric(c.req.raw, "user");
         return c.json(
           {
             error:
