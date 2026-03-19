@@ -12,6 +12,7 @@ import type {
 } from "@cloudflare/workers-types";
 import { logger } from "@sentry/cloudflare";
 import { getClientIp } from "../utils/client-ip";
+import { annotateResponseMetric } from "../metrics";
 
 // Request schema matching the MCP tool parameters
 const SearchRequestSchema = z.object({
@@ -48,13 +49,19 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
             key: rateLimitKey,
           });
         if (!success) {
-          return c.json(
+          return annotateResponseMetric(
+            c.json(
+              {
+                error:
+                  "Rate limit exceeded. You can perform up to 20 documentation searches per minute. Please wait before searching again.",
+                name: "RATE_LIMIT_EXCEEDED",
+              },
+              429,
+            ),
             {
-              error:
-                "Rate limit exceeded. You can perform up to 20 documentation searches per minute. Please wait before searching again.",
-              name: "RATE_LIMIT_EXCEEDED",
+              responseReason: "local_rate_limit",
+              rateLimitScope: "ip",
             },
-            429,
           );
         }
       } catch (error) {

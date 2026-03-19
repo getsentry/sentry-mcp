@@ -18,6 +18,7 @@ import {
   type RateLimitResult,
 } from "../types/chat";
 import { analyzeAuthError, getAuthErrorResponse } from "../utils/auth-errors";
+import { annotateResponseMetric } from "../metrics";
 
 type MCPClient = Awaited<ReturnType<typeof experimental_createMCPClient>>;
 
@@ -153,13 +154,19 @@ export default new Hono<{ Bindings: Env }>().post("/", async (c) => {
         key: rateLimitKey,
       });
       if (!success) {
-        return c.json(
+        return annotateResponseMetric(
+          c.json(
+            {
+              error:
+                "Rate limit exceeded. You can send up to 10 messages per minute. Please wait before sending another message.",
+              name: "RATE_LIMIT_EXCEEDED",
+            },
+            429,
+          ),
           {
-            error:
-              "Rate limit exceeded. You can send up to 10 messages per minute. Please wait before sending another message.",
-            name: "RATE_LIMIT_EXCEEDED",
+            responseReason: "local_rate_limit",
+            rateLimitScope: "user",
           },
-          429,
         );
       }
     } catch (error) {
