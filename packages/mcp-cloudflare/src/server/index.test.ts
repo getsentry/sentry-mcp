@@ -12,11 +12,14 @@ const {
   const MockOAuthProvider = vi
     .fn()
     .mockImplementation(() => ({ fetch: mockOAuthProviderFetch }));
+  const mockGetClientIp = vi.fn<(request: Request) => string | null>(
+    () => null,
+  );
 
   return {
     MockOAuthProvider,
     mockOAuthProviderFetch,
-    mockGetClientIp: vi.fn(() => null),
+    mockGetClientIp,
     mockCheckRateLimit: vi.fn(),
   };
 });
