@@ -79,6 +79,10 @@ function getStatusClass(status: number): string {
 function getMetricAttributes(
   request: Request,
 ): Record<string, string | number> | null {
+  if (request.method === "OPTIONS") {
+    return null;
+  }
+
   const trackedRoute = classifyTrackedRoute(new URL(request.url).pathname);
 
   if (!trackedRoute) {
