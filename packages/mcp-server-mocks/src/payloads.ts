@@ -13,7 +13,7 @@ import clientKeyFixture from "./fixtures/client-key.json" with { type: "json" };
 import eventAttachmentsFixture from "./fixtures/event-attachments.json" with {
   type: "json",
 };
-import eventsFixture from "./fixtures/event.json" with { type: "json" };
+import eventFixture from "./fixtures/event.json" with { type: "json" };
 import eventsErrorsEmptyFixture from "./fixtures/events-errors-empty.json" with {
   type: "json",
 };
@@ -30,6 +30,9 @@ import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
+import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
+  type: "json",
+};
 import organizationFixture from "./fixtures/organization.json" with {
   type: "json",
 };
@@ -38,6 +41,12 @@ import performanceEventFixture from "./fixtures/performance-event.json" with {
 };
 import projectFixture from "./fixtures/project.json" with { type: "json" };
 import releaseFixture from "./fixtures/release.json" with { type: "json" };
+import replayDetailsFixture from "./fixtures/replay-details.json" with {
+  type: "json",
+};
+import replayRecordingSegmentsFixture from "./fixtures/replay-recording-segments.json" with {
+  type: "json",
+};
 import tagsFixture from "./fixtures/tags.json" with { type: "json" };
 import teamFixture from "./fixtures/team.json" with { type: "json" };
 import traceEventFixture from "./fixtures/trace-event.json" with {
@@ -81,15 +90,26 @@ const issueFixture2 = {
 // Export all fixtures
 export {
   autofixStateFixture,
+  clientKeyFixture,
+  eventAttachmentsFixture,
+  eventFixture,
+  eventsErrorsEmptyFixture,
+  eventsErrorsFixture,
+  eventsSpansEmptyFixture,
+  eventsSpansFixture,
+  flamegraphFixture,
   issueFixture,
   issueFixture2,
-  eventsFixture,
+  issueTagValuesFixture,
+  organizationFixture,
   performanceEventFixture,
-  eventAttachmentsFixture,
-  flamegraphFixture,
-  tagsFixture,
   projectFixture,
+  releaseFixture,
+  replayDetailsFixture,
+  replayRecordingSegmentsFixture,
+  tagsFixture,
   teamFixture,
+  traceEventFixture,
   traceItemsAttributesFixture,
   traceItemsAttributesSpansStringFixture,
   traceItemsAttributesSpansNumberFixture,
@@ -99,15 +119,7 @@ export {
   traceMetaWithNullsFixture,
   traceFixture,
   traceMixedFixture,
-  traceEventFixture,
-  organizationFixture,
-  releaseFixture,
-  clientKeyFixture,
   userFixture,
-  eventsErrorsFixture,
-  eventsErrorsEmptyFixture,
-  eventsSpansFixture,
-  eventsSpansEmptyFixture,
 };
 
 // Re-export fixture factories

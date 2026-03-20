@@ -265,4 +265,49 @@ describe("get_replay_details", () => {
       `[UserInputError: Provide either \`replayUrl\` or both \`organizationSlug\` and \`replayId\`.]`,
     );
   });
+
+  it("does not repeat explicit payload fields in generic replay events", async () => {
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () =>
+          HttpResponse.json([
+            [
+              {
+                type: 5,
+                timestamp: 1744027205000,
+                data: {
+                  tag: "console",
+                  payload: {
+                    message: "Payment request failed",
+                    description: "POST /api/orders returned 500",
+                    category: "network",
+                    type: "error",
+                    endpoint: "/api/orders",
+                    status: 500,
+                  },
+                },
+              },
+            ],
+          ]),
+        { once: true },
+      ),
+    );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain(
+      '- T+0s · `console` · message="Payment request failed" · description="POST /api/orders returned 500" · category="network" · type="error" · payload="endpoint=/api/orders, status=500"',
+    );
+    expect(result).not.toContain('payload="message=Payment request failed');
+    expect(result).not.toContain(
+      'payload="description=POST /api/orders returned 500',
+    );
+  });
 });

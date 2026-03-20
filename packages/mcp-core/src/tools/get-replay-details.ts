@@ -635,7 +635,10 @@ function summarizeTaggedReplayEvent(
     firstString(payload?.type)
       ? `type=${quoteDetail(firstString(payload?.type)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
       : null,
-    summarizeObject(payload),
+    summarizeObject(
+      payload,
+      new Set(["message", "description", "category", "type"]),
+    ),
   ].filter((value): value is string => value !== null);
 
   return details.length > 0 ? { label: tag, details } : null;
@@ -747,14 +750,19 @@ function truncateSummary(value: string, maxLength = 220): string {
   return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
-function summarizeObject(value: unknown): string | null {
+function summarizeObject(
+  value: unknown,
+  excludedKeys: ReadonlySet<string> = new Set(),
+): string | null {
   if (!isRecord(value)) {
     return null;
   }
 
   const entries = Object.entries(value)
     .filter(
-      ([, nested]) => typeof nested === "string" || typeof nested === "number",
+      ([key, nested]) =>
+        !excludedKeys.has(key) &&
+        (typeof nested === "string" || typeof nested === "number"),
     )
     .slice(0, 3)
     .map(([key, nested]) => `${key}=${nested}`);
