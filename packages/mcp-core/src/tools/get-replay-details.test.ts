@@ -310,4 +310,37 @@ describe("get_replay_details", () => {
       'payload="description=POST /api/orders returned 500',
     );
   });
+
+  it("ignores array payloads instead of rendering numeric keys", async () => {
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () =>
+          HttpResponse.json([
+            [
+              {
+                type: 5,
+                timestamp: 1744027205000,
+                data: {
+                  tag: "console",
+                  payload: ["alpha", "beta"],
+                },
+              },
+            ],
+          ]),
+        { once: true },
+      ),
+    );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+      },
+      getServerContext(),
+    );
+
+    expect(result).not.toContain("- T+0s · `console`");
+    expect(result).not.toContain('payload="0=');
+  });
 });
