@@ -1,7 +1,15 @@
 import { setTag } from "@sentry/core";
-import type { ReplayDetails, ReplayRecordingSegments } from "../api-client";
+import type {
+  AutofixRunState,
+  Issue,
+  ReplayDetails,
+  ReplayRecordingSegments,
+  SentryApiService,
+  TraceMeta,
+} from "../api-client";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { getSeerActionabilityLabel } from "../internal/formatting";
 import { parseSentryUrl } from "../internal/url-helpers";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
@@ -16,6 +24,29 @@ interface ResolvedReplayParams {
   replayId: string;
 }
 
+interface ReplayActivityEvent {
+  timestampMs: number | null;
+  label: string;
+  details: string[];
+}
+
+interface RelatedReplayIssue {
+  eventId: string;
+  issue: Issue | null;
+  seerSummary: string | null;
+}
+
+interface RelatedReplayTrace {
+  traceId: string;
+  traceMeta: TraceMeta | null;
+}
+
+type AutofixStep = NonNullable<AutofixRunState["autofix"]>["steps"][number];
+
+const MAX_ACTIVITY_EVENTS = 6;
+const MAX_RELATED_ERRORS = 3;
+const MAX_RELATED_TRACES = 2;
+
 export default defineTool({
   name: "get_replay_details",
   skills: ["inspect"],
@@ -23,12 +54,12 @@ export default defineTool({
   requiredCapabilities: ["replays"],
   hideInExperimentalMode: true,
   description: [
-    "Get detailed information about a specific Sentry replay by URL or replay ID.",
+    "Get high-level information about a specific Sentry replay by URL or replay ID.",
     "",
     "USE THIS TOOL WHEN USERS:",
     "- Share a replay URL",
     "- Ask what happened in a specific replay",
-    "- Want replay overview details and a concise activity timeline",
+    "- Want a concise replay summary plus the next issue or trace lookups to run",
     "",
     "<examples>",
     "### With replay URL",
@@ -63,9 +94,6 @@ export default defineTool({
       replayId: resolved.replayId,
     });
 
-    let segments: ReplayRecordingSegments | null = null;
-    let segmentsError: string | null = null;
-
     const isArchived = replay.is_archived === true;
     const projectId =
       replay.project_id !== null && replay.project_id !== undefined
@@ -73,20 +101,27 @@ export default defineTool({
         : null;
     const hasSegments = (replay.count_segments ?? 0) > 0;
 
-    if (!isArchived && projectId && hasSegments) {
-      try {
-        segments = await apiService.getReplayRecordingSegments({
+    const [{ segments, segmentsError }, relatedIssues, relatedTraces] =
+      await Promise.all([
+        fetchReplaySegments({
+          apiService,
           organizationSlug: resolved.organizationSlug,
-          projectSlugOrId: projectId,
           replayId: resolved.replayId,
-        });
-      } catch (error) {
-        segmentsError =
-          error instanceof Error
-            ? error.message
-            : "Unknown segment download error";
-      }
-    }
+          projectId,
+          isArchived,
+          hasSegments,
+        }),
+        fetchReplayIssues({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          errorIds: replay.error_ids,
+        }),
+        fetchReplayTraces({
+          apiService,
+          organizationSlug: resolved.organizationSlug,
+          traceIds: replay.trace_ids,
+        }),
+      ]);
 
     return formatReplayOutput({
       replay,
@@ -96,6 +131,8 @@ export default defineTool({
         apiService.getReplayUrl(resolved.organizationSlug, replay.id),
       segments,
       segmentsError,
+      relatedIssues,
+      relatedTraces,
     });
   },
 });
@@ -136,12 +173,16 @@ function formatReplayOutput({
   replayUrl,
   segments,
   segmentsError,
+  relatedIssues,
+  relatedTraces,
 }: {
   replay: ReplayDetails;
   organizationSlug: string;
   replayUrl: string;
   segments: ReplayRecordingSegments | null;
   segmentsError: string | null;
+  relatedIssues: RelatedReplayIssue[];
+  relatedTraces: RelatedReplayTrace[];
 }): string {
   const lines: string[] = [];
   const isArchived = replay.is_archived === true;
@@ -156,94 +197,126 @@ function formatReplayOutput({
     replay.device?.model ??
     replay.device?.family ??
     "Unknown";
+  const activityEvents = extractReplayActivityEvents(segments);
+  const metadataEvents = buildReplayMetadataEvents({
+    replay,
+    relatedIssues,
+    isArchived,
+    segmentsError,
+  });
 
   lines.push(`# Replay ${replay.id} in **${organizationSlug}**`);
   lines.push("");
-  lines.push(`**Replay URL**: ${replayUrl}`);
-  lines.push(`**Project ID**: ${replay.project_id ?? "Unknown"}`);
-  lines.push(`**Started**: ${replay.started_at ?? "Unknown"}`);
-  lines.push(`**Finished**: ${replay.finished_at ?? "Unknown"}`);
-  if (replay.duration !== null && replay.duration !== undefined) {
-    lines.push(`**Duration**: ${formatDurationSeconds(replay.duration)}`);
-  }
-  lines.push(`**Archived**: ${isArchived ? "Yes" : "No"}`);
+  lines.push("## Summary");
   lines.push("");
-
-  lines.push("## Session");
-  lines.push("");
-  lines.push(`- **User**: ${user}`);
+  lines.push(`- **Replay URL**: ${replayUrl}`);
+  lines.push(`- **Started**: ${replay.started_at ?? "Unknown"}`);
+  lines.push(`- **Finished**: ${replay.finished_at ?? "Unknown"}`);
+  lines.push(
+    `- **Duration**: ${
+      replay.duration !== null && replay.duration !== undefined
+        ? formatDurationSeconds(replay.duration)
+        : "Unknown"
+    }`,
+  );
+  lines.push(`- **Archived**: ${isArchived ? "Yes" : "No"}`);
   lines.push(`- **Environment**: ${replay.environment ?? "Unknown"}`);
   lines.push(`- **Platform**: ${replay.platform ?? "Unknown"}`);
   lines.push(
     `- **Browser**: ${formatNameVersion(replay.browser?.name, replay.browser?.version)}`,
   );
-  lines.push(
-    `- **OS**: ${formatNameVersion(replay.os?.name, replay.os?.version)}`,
-  );
-  lines.push(`- **Device**: ${device}`);
-  lines.push(
-    `- **SDK**: ${formatNameVersion(replay.sdk?.name, replay.sdk?.version)}`,
-  );
-
-  lines.push("");
-  lines.push("## Signals");
-  lines.push("");
-  lines.push(`- **Errors**: ${replay.count_errors ?? 0}`);
-  lines.push(`- **Warnings**: ${replay.count_warnings ?? 0}`);
-  lines.push(`- **Infos**: ${replay.count_infos ?? 0}`);
-  lines.push(`- **Dead Clicks**: ${replay.count_dead_clicks ?? 0}`);
-  lines.push(`- **Rage Clicks**: ${replay.count_rage_clicks ?? 0}`);
-  lines.push(`- **Segments**: ${replay.count_segments ?? 0}`);
-  lines.push(`- **URLs Visited**: ${replay.count_urls ?? replay.urls.length}`);
-
+  lines.push(`- **User**: ${user}`);
   if (replay.urls.length > 0) {
-    lines.push("");
-    lines.push("## URLs");
-    lines.push("");
-    for (const url of replay.urls.slice(0, 5)) {
-      lines.push(`- ${url}`);
+    lines.push(`- **URLs**: ${replay.urls.slice(0, 3).join(", ")}`);
+  }
+  if (device !== "Unknown") {
+    lines.push(`- **Device**: ${device}`);
+  }
+  lines.push(
+    `- **Signal Counts**: errors=${replay.count_errors ?? 0}, warnings=${replay.count_warnings ?? 0}, infos=${replay.count_infos ?? 0}, dead_clicks=${replay.count_dead_clicks ?? 0}, rage_clicks=${replay.count_rage_clicks ?? 0}, segments=${replay.count_segments ?? 0}`,
+  );
+
+  lines.push("");
+  lines.push("## Events");
+  lines.push("");
+
+  if (activityEvents.length > 0) {
+    const startTime = activityEvents[0]?.timestampMs ?? null;
+    for (const event of activityEvents) {
+      const prefix =
+        event.timestampMs !== null && startTime !== null
+          ? `${formatRelativeTime(event.timestampMs - startTime)} · `
+          : "";
+      const details =
+        event.details.length > 0 ? ` · ${event.details.join(" · ")}` : "";
+      lines.push(`- ${prefix}\`${event.label}\`${details}`);
     }
   }
 
-  if (replay.trace_ids.length > 0 || replay.error_ids.length > 0) {
-    lines.push("");
-    lines.push("## Related IDs");
-    lines.push("");
-    if (replay.trace_ids.length > 0) {
-      lines.push(`- **Trace IDs**: ${replay.trace_ids.join(", ")}`);
+  if (metadataEvents.length > 0) {
+    for (const metadataEvent of metadataEvents) {
+      lines.push(metadataEvent);
     }
-    if (replay.error_ids.length > 0) {
-      lines.push(`- **Error IDs**: ${replay.error_ids.join(", ")}`);
-    }
-  }
-
-  lines.push("");
-  lines.push("## What Happened");
-  lines.push("");
-
-  if (isArchived) {
-    lines.push(
-      "Replay recording data is archived, so no segment timeline is available.",
-    );
-  } else if (segments && segments.length > 0) {
-    const highlights = summarizeReplaySegments(segments);
-    if (highlights.length > 0) {
-      for (const highlight of highlights) {
-        lines.push(`- ${highlight}`);
-      }
-    } else {
-      lines.push(
-        `Downloaded ${segments.length} replay segment(s), but they did not contain recognizable high-signal events.`,
-      );
-    }
-  } else if (segmentsError) {
-    lines.push(
-      `Replay details loaded, but the deeper recording data could not be fetched: ${segmentsError}`,
-    );
   } else if ((replay.count_segments ?? 0) === 0) {
-    lines.push("This replay does not have any recording segments.");
-  } else {
-    lines.push("Replay details loaded, but no segment data was available.");
+    lines.push("- `recording_segments` · count=0");
+  }
+
+  if (replay.error_ids.length > 0 || replay.trace_ids.length > 0) {
+    lines.push("");
+    lines.push("## Related");
+    lines.push("");
+  }
+
+  if (replay.error_ids.length > 0) {
+    for (const relatedIssue of relatedIssues) {
+      lines.push(`### Error Event \`${relatedIssue.eventId}\``);
+      if (relatedIssue.issue) {
+        lines.push(`**Issue ID**: ${relatedIssue.issue.shortId}`);
+        lines.push(`**Summary**: ${relatedIssue.issue.title}`);
+        lines.push(`**Status**: ${relatedIssue.issue.status}`);
+        if (relatedIssue.issue.seerFixabilityScore != null) {
+          lines.push(
+            `**Seer Actionability**: ${getSeerActionabilityLabel(relatedIssue.issue.seerFixabilityScore)}`,
+          );
+        }
+        if (relatedIssue.seerSummary) {
+          lines.push(`**Cached Seer Summary**: ${relatedIssue.seerSummary}`);
+        }
+        lines.push(
+          `**Next Step**: \`get_issue_details(organizationSlug='${organizationSlug}', eventId='${relatedIssue.eventId}')\``,
+        );
+        lines.push(
+          `**Root Cause Analysis**: \`analyze_issue_with_seer(organizationSlug='${organizationSlug}', issueId='${relatedIssue.issue.shortId}')\``,
+        );
+      } else {
+        lines.push(
+          "**Summary**: Replay metadata references this error, but issue details were not resolved from the replay payload alone.",
+        );
+        lines.push(
+          `**Next Step**: \`get_issue_details(organizationSlug='${organizationSlug}', eventId='${relatedIssue.eventId}')\``,
+        );
+      }
+      lines.push("");
+    }
+  }
+
+  if (replay.trace_ids.length > 0) {
+    for (const relatedTrace of relatedTraces) {
+      lines.push(`### Trace \`${relatedTrace.traceId}\``);
+      if (relatedTrace.traceMeta) {
+        lines.push(
+          `**High-level Stats**: ${formatTraceMetaSummary(relatedTrace.traceMeta)}`,
+        );
+      } else {
+        lines.push(
+          "**High-level Stats**: Trace metadata was not available from this replay lookup.",
+        );
+      }
+      lines.push(
+        `**Next Step**: \`get_trace_details(organizationSlug='${organizationSlug}', traceId='${relatedTrace.traceId}')\``,
+      );
+      lines.push("");
+    }
   }
 
   return lines.join("\n");
@@ -259,6 +332,198 @@ function formatDurationSeconds(durationSeconds: number): string {
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }
 
+function buildReplayMetadataEvents({
+  replay,
+  relatedIssues,
+  isArchived,
+  segmentsError,
+}: {
+  replay: ReplayDetails;
+  relatedIssues: RelatedReplayIssue[];
+  isArchived: boolean;
+  segmentsError: string | null;
+}): string[] {
+  const lines: string[] = [];
+
+  if (isArchived) {
+    lines.push("- `recording_segments` · status=archived");
+  } else if (segmentsError) {
+    lines.push(
+      `- \`recording_segments\` · status=unavailable · detail=${quoteDetail(segmentsError)}`,
+    );
+  } else if ((replay.count_segments ?? 0) === 0) {
+    lines.push("- `recording_segments` · count=0");
+  }
+
+  if (relatedIssues.length > 0) {
+    for (const relatedIssue of relatedIssues) {
+      const details = [`event_id=${relatedIssue.eventId}`];
+      if (relatedIssue.issue) {
+        details.push(`issue_id=${relatedIssue.issue.shortId}`);
+        details.push(`title=${quoteDetail(relatedIssue.issue.title)}`);
+      }
+      lines.push(`- metadata · \`error\` · ${details.join(" · ")}`);
+    }
+  } else if ((replay.count_errors ?? 0) > 0) {
+    lines.push(`- metadata · \`error\` · count=${replay.count_errors}`);
+  }
+
+  if ((replay.count_dead_clicks ?? 0) > 0) {
+    lines.push(
+      `- metadata · \`dead_click\` · count=${replay.count_dead_clicks}`,
+    );
+  }
+
+  if ((replay.count_rage_clicks ?? 0) > 0) {
+    lines.push(
+      `- metadata · \`rage_click\` · count=${replay.count_rage_clicks}`,
+    );
+  }
+
+  if ((replay.count_warnings ?? 0) > 0) {
+    lines.push(`- metadata · \`warning\` · count=${replay.count_warnings}`);
+  }
+
+  if ((replay.count_infos ?? 0) > 0) {
+    lines.push(`- metadata · \`info\` · count=${replay.count_infos}`);
+  }
+
+  return lines;
+}
+
+async function fetchReplaySegments({
+  apiService,
+  organizationSlug,
+  replayId,
+  projectId,
+  isArchived,
+  hasSegments,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  replayId: string;
+  projectId: string | null;
+  isArchived: boolean;
+  hasSegments: boolean;
+}): Promise<{
+  segments: ReplayRecordingSegments | null;
+  segmentsError: string | null;
+}> {
+  if (isArchived || !projectId || !hasSegments) {
+    return { segments: null, segmentsError: null };
+  }
+
+  try {
+    const segments = await apiService.getReplayRecordingSegments({
+      organizationSlug,
+      projectSlugOrId: projectId,
+      replayId,
+    });
+    return { segments, segmentsError: null };
+  } catch (error) {
+    return {
+      segments: null,
+      segmentsError:
+        error instanceof Error
+          ? error.message
+          : "Unknown segment download error",
+    };
+  }
+}
+
+async function fetchReplayIssues({
+  apiService,
+  organizationSlug,
+  errorIds,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  errorIds: string[];
+}): Promise<RelatedReplayIssue[]> {
+  const ids = errorIds.slice(0, MAX_RELATED_ERRORS);
+
+  return Promise.all(
+    ids.map(async (eventId) => {
+      try {
+        const [issue] = await apiService.listIssues({
+          organizationSlug,
+          query: eventId,
+          limit: 1,
+        });
+
+        const resolvedIssue =
+          issue ??
+          (await maybeGetIssueById(apiService, organizationSlug, eventId));
+        const autofixState = resolvedIssue
+          ? await apiService
+              .getAutofixState({
+                organizationSlug,
+                issueId: resolvedIssue.shortId,
+              })
+              .catch(() => undefined)
+          : undefined;
+
+        return {
+          eventId,
+          issue: resolvedIssue ?? null,
+          seerSummary: getCachedSeerSummary(autofixState),
+        };
+      } catch {
+        return {
+          eventId,
+          issue: null,
+          seerSummary: null,
+        };
+      }
+    }),
+  );
+}
+
+async function maybeGetIssueById(
+  apiService: SentryApiService,
+  organizationSlug: string,
+  errorId: string,
+): Promise<Issue | null> {
+  if (!looksLikeDirectIssueId(errorId)) {
+    return null;
+  }
+
+  try {
+    return await apiService.getIssue({
+      organizationSlug,
+      issueId: errorId,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function fetchReplayTraces({
+  apiService,
+  organizationSlug,
+  traceIds,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  traceIds: string[];
+}): Promise<RelatedReplayTrace[]> {
+  const ids = traceIds.slice(0, MAX_RELATED_TRACES);
+
+  return Promise.all(
+    ids.map(async (traceId) => {
+      try {
+        const traceMeta = await apiService.getTraceMeta({
+          organizationSlug,
+          traceId,
+        });
+        return { traceId, traceMeta };
+      } catch {
+        return { traceId, traceMeta: null };
+      }
+    }),
+  );
+}
+
 function formatNameVersion(
   name?: string | null,
   version?: string | null,
@@ -269,91 +534,234 @@ function formatNameVersion(
   return name ?? version ?? "Unknown";
 }
 
-function summarizeReplaySegments(segments: ReplayRecordingSegments): string[] {
-  const highlights: string[] = [];
+function extractReplayActivityEvents(
+  segments: ReplayRecordingSegments | null,
+): ReplayActivityEvent[] {
+  if (!segments) {
+    return [];
+  }
 
-  for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
-    const segment = segments[segmentIndex]!;
+  const events: ReplayActivityEvent[] = [];
+
+  for (const segment of segments) {
     for (const event of segment) {
-      const highlight = summarizeReplayEvent(event, segmentIndex);
-      if (highlight) {
-        highlights.push(highlight);
+      const replayEvent = summarizeReplayEvent(event);
+      if (replayEvent) {
+        events.push(replayEvent);
       }
-      if (highlights.length >= 12) {
-        return highlights;
+      if (events.length >= MAX_ACTIVITY_EVENTS) {
+        return events;
       }
     }
   }
 
-  return highlights;
+  return events;
 }
 
-function summarizeReplayEvent(
-  event: unknown,
-  segmentIndex: number,
-): string | null {
+function summarizeReplayEvent(event: unknown): ReplayActivityEvent | null {
   if (!isRecord(event)) {
     return null;
   }
 
-  const timestamp = formatEventTimestamp(event.timestamp);
+  const timestampMs = getEventTimestampMillis(event.timestamp);
   const data = isRecord(event.data) ? event.data : null;
   const tag = typeof data?.tag === "string" ? data.tag : "";
   const payload = isRecord(data?.payload) ? data.payload : null;
 
   if (tag) {
-    const primary =
-      tag === "performanceSpan"
-        ? (firstString(payload?.op, payload?.description) ?? "operation")
-        : tag;
-    const detail =
-      tag === "performanceSpan"
-        ? firstString(payload?.description)
-        : (firstString(
-            payload?.message,
-            payload?.description,
-            payload?.category,
-            payload?.type,
-          ) ?? summarizeObject(payload));
-    const duration =
-      tag === "performanceSpan" &&
-      isRecord(payload?.data) &&
-      typeof payload.data.duration === "number"
-        ? ` (${payload.data.duration}ms)`
-        : "";
-
-    return `${timestamp} segment ${segmentIndex}: ${primary}${detail && detail !== primary ? ` - ${detail}` : ""}${duration}`;
+    const replayEvent = summarizeTaggedReplayEvent(tag, payload);
+    if (replayEvent) {
+      return { timestampMs, ...replayEvent };
+    }
   }
 
   if (typeof event.type === "number" && data) {
     const href = typeof data.href === "string" ? data.href : null;
     if (href) {
-      return `${timestamp} segment ${segmentIndex}: view loaded ${href}`;
+      return {
+        timestampMs,
+        label: "page.view",
+        details: [`href=${href}`],
+      };
     }
   }
 
   return null;
 }
 
-function formatEventTimestamp(value: unknown): string {
-  if (typeof value !== "number") {
-    return "Unknown time";
+function summarizeTaggedReplayEvent(
+  tag: string,
+  payload: Record<string, unknown> | null,
+): Omit<ReplayActivityEvent, "timestampMs"> | null {
+  if (tag === "performanceSpan") {
+    const op = firstString(payload?.op);
+    const description = firstString(payload?.description);
+    const durationMs =
+      isRecord(payload?.data) && typeof payload.data.duration === "number"
+        ? payload.data.duration
+        : null;
+
+    if (description || op) {
+      return {
+        label: op ?? "performanceSpan",
+        details: [
+          description ? `description=${description}` : null,
+          durationMs !== null ? `duration_ms=${durationMs}` : null,
+        ].filter((value): value is string => value !== null),
+      };
+    }
   }
-  const millis = value > 1e12 ? value : value * 1000;
-  return new Date(millis).toISOString();
+
+  if (tag === "ui.click") {
+    const message = firstString(payload?.message, payload?.description);
+    if (message) {
+      return {
+        label: tag,
+        details: [`message=${quoteDetail(message)}`],
+      };
+    }
+  }
+
+  const details = [
+    firstString(payload?.message)
+      ? `message=${quoteDetail(firstString(payload?.message)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
+      : null,
+    firstString(payload?.description)
+      ? `description=${quoteDetail(firstString(payload?.description)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
+      : null,
+    firstString(payload?.category)
+      ? `category=${quoteDetail(firstString(payload?.category)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
+      : null,
+    firstString(payload?.type)
+      ? `type=${quoteDetail(firstString(payload?.type)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
+      : null,
+    summarizeObject(payload),
+  ].filter((value): value is string => value !== null);
+
+  return details.length > 0 ? { label: tag, details } : null;
+}
+
+function getEventTimestampMillis(value: unknown): number | null {
+  if (typeof value !== "number") {
+    return null;
+  }
+  return value > 1e12 ? value : value * 1000;
+}
+
+function formatRelativeTime(offsetMs: number): string {
+  const offsetSeconds = Math.max(0, Math.round(offsetMs / 1000));
+  if (offsetSeconds < 60) {
+    return `T+${offsetSeconds}s`;
+  }
+
+  const minutes = Math.floor(offsetSeconds / 60);
+  const seconds = offsetSeconds % 60;
+  return seconds > 0 ? `T+${minutes}m ${seconds}s` : `T+${minutes}m`;
+}
+
+function formatTraceMetaSummary(traceMeta: TraceMeta): string {
+  return [
+    `${traceMeta.span_count} spans`,
+    `${traceMeta.errors} errors`,
+    `${traceMeta.performance_issues} performance issues`,
+    `${traceMeta.logs} logs`,
+  ].join(", ");
+}
+
+function getCachedSeerSummary(
+  autofixState: AutofixRunState | undefined,
+): string | null {
+  const autofix = autofixState?.autofix;
+  if (!autofix) {
+    return null;
+  }
+
+  const completedSteps = autofix.steps.filter(
+    (step) => step.status === "COMPLETED",
+  );
+  const rootCauseStep = completedSteps.find(
+    (step) => step.type === "root_cause_analysis",
+  );
+  if (rootCauseStep && hasRootCauseCauses(rootCauseStep)) {
+    const description = rootCauseStep.causes.find((cause) =>
+      cause.description.trim(),
+    )?.description;
+    if (description) {
+      return truncateSummary(description);
+    }
+  }
+
+  const solutionStep = completedSteps.find((step) => step.type === "solution");
+  if (solutionStep && hasSolutionDescription(solutionStep)) {
+    return truncateSummary(solutionStep.description);
+  }
+
+  const insightStep = completedSteps.find(hasInsights);
+  if (insightStep) {
+    const insight = insightStep.insights.find((entry) =>
+      entry.insight.trim(),
+    )?.insight;
+    if (insight) {
+      return truncateSummary(insight);
+    }
+  }
+
+  return null;
+}
+
+function hasRootCauseCauses(step: AutofixStep): step is AutofixStep & {
+  type: "root_cause_analysis";
+  causes: Array<{ description: string }>;
+} {
+  return (
+    step.type === "root_cause_analysis" &&
+    Array.isArray((step as { causes?: unknown }).causes)
+  );
+}
+
+function hasSolutionDescription(step: AutofixStep): step is AutofixStep & {
+  type: "solution";
+  description: string;
+} {
+  return (
+    step.type === "solution" &&
+    typeof (step as { description?: unknown }).description === "string"
+  );
+}
+
+function hasInsights(step: AutofixStep): step is AutofixStep & {
+  type: "default";
+  insights: Array<{ insight: string }>;
+} {
+  return (
+    step.type === "default" &&
+    Array.isArray((step as { insights?: unknown }).insights)
+  );
+}
+
+function truncateSummary(value: string, maxLength = 220): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
 function summarizeObject(value: unknown): string | null {
   if (!isRecord(value)) {
     return null;
   }
+
   const entries = Object.entries(value)
     .filter(
       ([, nested]) => typeof nested === "string" || typeof nested === "number",
     )
     .slice(0, 3)
     .map(([key, nested]) => `${key}=${nested}`);
-  return entries.length > 0 ? entries.join(", ") : null;
+
+  return entries.length > 0
+    ? `payload=${quoteDetail(entries.join(", "))}`
+    : null;
 }
 
 function firstString(...values: unknown[]): string | null {
@@ -365,6 +773,17 @@ function firstString(...values: unknown[]): string | null {
   return null;
 }
 
-function isRecord(value: unknown): value is Record<string, any> {
+function looksLikeDirectIssueId(value: string): boolean {
+  return (
+    /^\d+$/.test(value) ||
+    (value.includes("-") && value === value.toUpperCase())
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function quoteDetail(value: string): string {
+  return JSON.stringify(value.trim());
 }

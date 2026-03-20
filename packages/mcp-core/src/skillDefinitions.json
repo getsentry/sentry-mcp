@@ -44,7 +44,7 @@
       },
       {
         "name": "get_replay_details",
-        "description": "Get detailed information about a specific Sentry replay by URL or replay ID.\n\nUSE THIS TOOL WHEN USERS:\n- Share a replay URL\n- Ask what happened in a specific replay\n- Want replay overview details and a concise activity timeline\n\n<examples>\n### With replay URL\n```\nget_replay_details(replayUrl='https://my-organization.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\n```\n\n### With organization and replay ID\n```\nget_replay_details(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f')\n```\n</examples>",
+        "description": "Get high-level information about a specific Sentry replay by URL or replay ID.\n\nUSE THIS TOOL WHEN USERS:\n- Share a replay URL\n- Ask what happened in a specific replay\n- Want a concise replay summary plus the next issue or trace lookups to run\n\n<examples>\n### With replay URL\n```\nget_replay_details(replayUrl='https://my-organization.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\n```\n\n### With organization and replay ID\n```\nget_replay_details(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f')\n```\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
