@@ -21,11 +21,14 @@ pnpm test               # Run all tests
 - **Input validation** - Required/optional parameters, type checking, edge cases
 - **Output formatting** - Markdown structure, content accuracy, error messages
 - **API integration** - Mock server responses, error handling, parameter passing
-- **Snapshot testing** - Use inline snapshots to verify formatted output
+- **Snapshot testing** - Use inline snapshots to verify formatted output, with
+  at least one full happy-path response snapshot per tool
 
 **Required test patterns:**
 - Unit tests in individual `{tool-name}.test.ts` files using Vitest and MSW mocks
 - Input/output validation with inline snapshots
+- At least one `toMatchInlineSnapshot()` assertion that captures the complete
+  formatted response for a representative successful tool call
 - Error case testing (API failures, invalid params)
 - Mock server setup in `packages/mcp-server-mocks`
 
