@@ -5,7 +5,7 @@
     "description": "Search for errors, analyze traces, and explore event details",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 16,
+    "toolCount": 17,
     "tools": [
       {
         "name": "find_organizations",
@@ -40,6 +40,11 @@
       {
         "name": "get_issue_tag_values",
         "description": "Get tag value distribution for a specific Sentry issue.\n\nUse this tool when you need to:\n- Understand how an issue is distributed across different tag values\n- Get aggregate counts of unique tag values (e.g., 'how many unique URLs are affected')\n- Analyze which browsers, environments, or URLs are most impacted by an issue\n- View the tag distributions page data programmatically\n\nCommon tag keys:\n- `url`: Request URLs affected by the issue\n- `browser`: Browser types and versions\n- `browser.name`: Browser names only\n- `os`: Operating systems\n- `environment`: Deployment environments (production, staging, etc.)\n- `release`: Software releases\n- `device`: Device types\n- `user`: Affected users\n\n<examples>\n### Get URL distribution for an issue\n```\nget_issue_tag_values(organizationSlug='my-organization', issueId='PROJECT-123', tagKey='url')\n```\n\n### Get browser distribution using issue URL\n```\nget_issue_tag_values(issueUrl='https://sentry.io/issues/PROJECT-123/', tagKey='browser')\n```\n\n### Get environment distribution\n```\nget_issue_tag_values(organizationSlug='my-organization', issueId='PROJECT-123', tagKey='environment')\n```\n</examples>\n\n<hints>\n- If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- Common tag keys: url, browser, browser.name, os, environment, release, device, user\n- Tag keys are case-sensitive\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "get_replay_details",
+        "description": "Get high-level information about a specific Sentry replay by URL or replay ID.\n\nUSE THIS TOOL WHEN USERS:\n- Share a replay URL\n- Ask what happened in a specific replay\n- Want a concise replay summary plus the next issue or trace lookups to run\n\n<examples>\n### With replay URL\n```\nget_replay_details(replayUrl='https://my-organization.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/')\n```\n\n### With organization and replay ID\n```\nget_replay_details(organizationSlug='my-organization', replayId='7e07485f-12f9-416b-8b14-26260799b51f')\n```\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {

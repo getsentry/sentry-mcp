@@ -75,6 +75,10 @@ Fast, focused tests of actual functionality:
 - Mock external APIs only (Sentry API, OpenAI) with MSW
 - Use real implementations for internal code
 - Test through public APIs rather than implementation details
+- For tools, include at least one happy-path test that snapshots the full
+  formatted handler response with `toMatchInlineSnapshot()`. Supplemental
+  `toContain()` assertions are fine, but they do not replace a full-response
+  snapshot.
 
 ### 2. Evaluation Tests
 Real-world scenarios with LLM:
@@ -192,6 +196,12 @@ Use inline snapshots for:
 - Error message text
 - Markdown responses
 - JSON structure validation
+
+For MCP tools specifically:
+- Every tool test suite must include at least one representative successful call
+  that snapshots the full handler response.
+- Use targeted substring assertions only for additional branch-specific checks,
+  not as the only output coverage.
 
 ### Updating Snapshots
 

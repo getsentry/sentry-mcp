@@ -190,6 +190,9 @@ describe("your_tool_name", () => {
 - Input validation (see `testing.md#testing-error-cases`)
 - Error handling (use patterns from `common-patterns.md#error-handling`)
 - Output formatting with snapshots
+- At least one happy-path test must snapshot the full formatted handler
+  response with `toMatchInlineSnapshot()`; partial `toContain()` assertions are
+  supplemental only
 - API integration with MSW mocks
 
 **After changing output, update snapshots:**

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   mswServer,
+  replayDetailsFixture,
   traceMetaFixture,
   traceFixture,
   eventFixture,
@@ -18,7 +19,7 @@ const baseContext = {
 
 function callHandler(params: {
   url?: string;
-  resourceType?: "issue" | "event" | "trace" | "breadcrumbs";
+  resourceType?: "issue" | "event" | "trace" | "breadcrumbs" | "replay";
   resourceId?: string;
   organizationSlug?: string;
 }) {
@@ -185,22 +186,14 @@ describe("get_sentry_resource", () => {
 
   // ─── URL mode: recognized-only types (guidance messages) ──────────────────
   describe("URL mode — recognized types (guidance messages)", () => {
-    it("returns guidance for replay URL", async () => {
+    it("delegates replay URL to get_replay_details", async () => {
       const result = await callHandler({
-        url: "https://my-org.sentry.io/replays/abc123def456/",
+        url: `https://sentry-mcp-evals.sentry.io/replays/${replayDetailsFixture.id}/`,
       });
-      expect(result).toMatchInlineSnapshot(`
-        "# Replay Detected
-
-        **Organization**: my-org
-        **Replay ID**: abc123def456
-
-        Session replay support is coming soon. In the meantime:
-
-        - **View in Sentry**: [Open Replay](https://my-org.sentry.io/replays/abc123def456/)
-        - **Find related issues**: Use \`search_issues\` with the replay's time range
-        - **Search events**: Use \`search_events\` with query \`replay_id:abc123def456\` to find events associated with this replay"
-      `);
+      expect(result).toContain(
+        `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
+      );
+      expect(result).toContain("Clicked submit order");
     });
 
     it("returns guidance for monitor URL (simple slug)", async () => {
@@ -444,6 +437,18 @@ describe("get_sentry_resource", () => {
       });
       expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
     });
+
+    it("fetches replay by replayId", async () => {
+      const result = await callHandler({
+        resourceType: "replay",
+        organizationSlug: "sentry-mcp-evals",
+        resourceId: replayDetailsFixture.id,
+      });
+      expect(result).toContain(
+        `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
+      );
+      expect(result).toContain("Clicked submit order");
+    });
   });
 
   // ─── Breadcrumbs output formatting ────────────────────────────────────────
@@ -596,14 +601,46 @@ describe("get_sentry_resource", () => {
       ).rejects.toThrow("Invalid resourceType: profile");
     });
 
-    it("throws for unsupported explicit resourceType (replay)", async () => {
-      await expect(
-        callHandler({
-          resourceType: "replay" as "issue",
-          organizationSlug: "my-org",
-          resourceId: "something",
-        }),
-      ).rejects.toThrow("Invalid resourceType: replay");
+    it("accepts replay as explicit resourceType", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/my-org/replays/something/",
+          () =>
+            HttpResponse.json({
+              data: {
+                id: "something",
+                project_id: "123",
+                started_at: "2025-04-07T12:00:00.000Z",
+                finished_at: "2025-04-07T12:05:00.000Z",
+                duration: 300,
+                is_archived: true,
+                count_segments: 0,
+                count_errors: 0,
+                count_warnings: 0,
+                count_infos: 0,
+                count_dead_clicks: 0,
+                count_rage_clicks: 0,
+                count_urls: 0,
+                urls: [],
+                trace_ids: [],
+                error_ids: [],
+                browser: {},
+                os: {},
+                device: {},
+                sdk: {},
+                user: {},
+              },
+            }),
+          { once: true },
+        ),
+      );
+
+      const result = await callHandler({
+        resourceType: "replay",
+        organizationSlug: "my-org",
+        resourceId: "something",
+      });
+      expect(result).toContain("# Replay something in **my-org**");
     });
   });
 

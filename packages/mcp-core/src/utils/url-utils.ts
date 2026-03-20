@@ -88,6 +88,25 @@ export function getTraceUrl(
 }
 
 /**
+ * Generates a Sentry replay URL.
+ * @param host The Sentry host (may include regional subdomain for API access)
+ * @param organizationSlug Organization identifier
+ * @param replayId Replay identifier
+ * @returns The complete replay URL
+ */
+export function getReplayUrl(
+  host: string,
+  organizationSlug: string,
+  replayId: string,
+): string {
+  const isSaas = isSentryHost(host);
+  const webHost = isSaas ? "sentry.io" : host;
+  return isSaas
+    ? `https://${organizationSlug}.${webHost}/replays/${replayId}/`
+    : `https://${host}/organizations/${organizationSlug}/replays/${replayId}/`;
+}
+
+/**
  * Generates a Sentry events explorer URL.
  * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier
