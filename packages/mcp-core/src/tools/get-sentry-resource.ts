@@ -320,7 +320,6 @@ export default defineTool({
   name: "get_sentry_resource",
   skills: ["inspect"],
   requiredScopes: ["event:read"],
-  experimental: true,
 
   description: [
     "Fetch a Sentry resource by URL or by type and ID.",

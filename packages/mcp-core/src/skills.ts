@@ -82,6 +82,9 @@ export async function getSkillsArrayWithCounts(): Promise<SkillDefinition[]> {
 
   // Count tools for each skill
   for (const tool of Object.values(tools)) {
+    if (tool.internalOnly) {
+      continue;
+    }
     if (Array.isArray(tool.skills)) {
       for (const skill of tool.skills) {
         counts.set(skill as Skill, (counts.get(skill as Skill) || 0) + 1);
@@ -160,6 +163,9 @@ export async function getScopesForSkills(
 
   // Iterate through all tools and collect required scopes for tools enabled by granted skills
   for (const tool of Object.values(tools)) {
+    if (tool.internalOnly) {
+      continue;
+    }
     // Check if any of the tool's skills are granted
     const toolEnabled = tool.skills.some((skill) => grantedSkills.has(skill));
 

@@ -38,7 +38,7 @@ describe("get_issue_tag_values", () => {
 
       ## Using this information
 
-      - Use \`get_issue_details(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')\` to see the full issue details
+      - Use \`get_sentry_resource(resourceType='issue', organizationSlug='sentry-mcp-evals', resourceId='CLOUDFLARE-MCP-41')\` to see the full issue details
       - Try other tag keys like: url, browser, environment, release, os, device, user
       "
     `);

@@ -34,7 +34,7 @@ export default defineTool({
     "- The user explicitly asks for root cause analysis, Seer analysis, or help fixing/debugging an issue",
     "- You are unable to accurately determine the root cause from the issue details alone",
     "",
-    "Do NOT call this tool as an automatic follow-up to get_issue_details.",
+    "Do NOT call this tool as an automatic follow-up to get_sentry_resource.",
     "",
     "What this tool provides:",
     "- Root cause analysis with code-level explanations",

@@ -150,7 +150,7 @@ export default defineTool({
 
     output += "\n# Using this information\n\n";
     output += `- The issue has been successfully updated in Sentry\n`;
-    output += `- You can view the issue details using: \`get_issue_details(organizationSlug="${orgSlug}", issueId="${updatedIssue.shortId}")\`\n`;
+    output += `- You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
 
     if (params.status === "resolved") {
       output += `- The issue is now marked as resolved and will no longer generate alerts\n`;

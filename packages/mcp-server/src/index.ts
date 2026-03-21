@@ -240,7 +240,9 @@ if (cli.agent) {
 
 // Log experimental mode status
 if (cli.experimental) {
-  console.warn("Experimental mode enabled: Experimental tools are available.");
+  console.warn(
+    "Experimental mode enabled: Forward-looking tool variants and experimental features are available.",
+  );
   console.warn("");
 }
 
@@ -289,7 +291,7 @@ const context = {
 
 // Build server with context to filter tools based on granted skills
 // Use agentMode when --agent flag is set (only exposes use_sentry tool)
-// Use experimentalMode when --experimental flag is set (includes experimental tools)
+// Use experimentalMode when --experimental flag is set (enables forward-looking variants)
 const server = buildServer({
   context,
   agentMode: cli.agent,

@@ -18,10 +18,8 @@ allowedTools:
   - find_teams
   - get_doc
   - get_event_attachment
-  - get_issue_details
   - get_issue_tag_values
   - get_sentry_resource
-  - get_trace_details
   - list_events
   - list_issue_events
   - list_issues
@@ -47,7 +45,7 @@ You are a Sentry expert. Investigate errors, analyze performance, and manage pro
 ## Key Tool Distinctions
 
 - `search_issues` returns grouped issue lists. `search_events` returns counts, aggregations, or individual event rows.
-- `get_issue_details` fetches a known issue. `analyze_issue_with_seer` provides AI root cause analysis with code fixes.
+- `get_sentry_resource` fetches a known issue, event, trace, or breadcrumbs from a Sentry URL or resource ID. `analyze_issue_with_seer` provides AI root cause analysis with code fixes.
 - `list_events` accepts raw Sentry query syntax. `search_events` accepts natural language.
 
 ## Output
