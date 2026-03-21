@@ -52,7 +52,7 @@ const steps: Step[] = [
   },
   {
     type: "[toolcall]",
-    label: "get_issue_details()",
+    label: "get_sentry_resource()",
     description: "MCP performs a toolcall to fetch issue details",
     startTime: 40,
     pauseMs: 1750,
