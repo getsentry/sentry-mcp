@@ -480,5 +480,20 @@ describe("buildServer", () => {
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
     });
+
+    it("keeps get_sentry_resource available for legacy triage and seer skills", () => {
+      for (const grantedSkills of [["triage"], ["seer"]] as const) {
+        const server = buildServer({
+          context: {
+            ...baseContext,
+            grantedSkills: new Set(grantedSkills),
+          },
+        });
+
+        const toolNames = getRegisteredToolNames(server);
+        expect(toolNames).toContain("get_sentry_resource");
+        expect(toolNames).not.toContain("get_issue_details");
+      }
+    });
   });
 });

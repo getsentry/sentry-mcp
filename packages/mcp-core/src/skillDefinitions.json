@@ -85,7 +85,7 @@
     "description": "Sentry's AI debugger that helps you analyze, root cause, and fix issues",
     "defaultEnabled": true,
     "order": 2,
-    "toolCount": 8,
+    "toolCount": 9,
     "tools": [
       {
         "name": "analyze_issue_with_seer",
@@ -101,6 +101,11 @@
         "name": "find_projects",
         "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
         "requiredScopes": ["project:read"]
+      },
+      {
+        "name": "get_sentry_resource",
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "list_events",
@@ -170,7 +175,7 @@
     "description": "Resolve, assign, and update issues",
     "defaultEnabled": false,
     "order": 4,
-    "toolCount": 11,
+    "toolCount": 12,
     "tools": [
       {
         "name": "find_organizations",
@@ -186,6 +191,11 @@
         "name": "find_teams",
         "description": "Find teams in an organization in Sentry.\n\nUse this tool when you need to:\n- View teams in a Sentry organization\n- Find a team's slug and numeric ID to aid other tool requests\n- Search for specific teams by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
         "requiredScopes": ["team:read"]
+      },
+      {
+        "name": "get_sentry_resource",
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
+        "requiredScopes": ["event:read"]
       },
       {
         "name": "list_events",
