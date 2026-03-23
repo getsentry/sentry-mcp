@@ -3,6 +3,7 @@ import type {
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
 import type { z } from "zod";
+import { SentryApiService } from "@sentry/mcp-core/api-client";
 import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { TokenResponseSchema } from "./constants";
 import type { WorkerProps } from "../types";
@@ -173,25 +174,21 @@ export async function tokenExchangeCallback(
   }
 
   // Probe upstream to check if the token is actually still valid
-  const sentryHost = env.SENTRY_HOST || "https://sentry.io";
   try {
-    const probe = await fetch(`${sentryHost}/api/0/users/me/`, {
-      headers: {
-        Authorization: `Bearer ${props.accessToken}`,
-        "User-Agent": "Sentry MCP Cloudflare",
-      },
+    const api = new SentryApiService({
+      accessToken: props.accessToken,
+      host: env.SENTRY_HOST || "sentry.io",
     });
-    if (probe.ok) {
-      Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
-        attributes: { outcome: "success_probed" },
-      });
-      return {
-        newProps: props,
-        accessTokenTTL: 5 * 60,
-      };
-    }
+    await api.getAuthenticatedUser();
+    Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
+      attributes: { outcome: "success" },
+    });
+    return {
+      newProps: props,
+      accessTokenTTL: 60 * 60,
+    };
   } catch {
-    // Network error — fail closed
+    // Auth failed or network error — force re-auth
   }
 
   Sentry.metrics.count("mcp.oauth.token_exchange", 1, {

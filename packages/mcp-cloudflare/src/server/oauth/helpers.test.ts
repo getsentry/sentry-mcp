@@ -33,7 +33,7 @@ function createRefreshOptions(
   };
 }
 
-const TEST_ENV = { SENTRY_HOST: "https://sentry.io" };
+const TEST_ENV = { SENTRY_HOST: "sentry.io" };
 
 describe("tokenExchangeCallback", () => {
   beforeEach(() => {
@@ -84,34 +84,34 @@ describe("tokenExchangeCallback", () => {
     });
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("Unauthorized", { status: 401 }),
+      new Response(JSON.stringify({ detail: "Invalid token" }), {
+        status: 401,
+      }),
     );
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeUndefined();
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      "https://sentry.io/api/0/users/me/",
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer old-access-token",
-        }),
-      }),
-    );
   });
 
-  it("should probe upstream and re-issue with short TTL when token is still valid", async () => {
+  it("should probe upstream and re-issue with 1h TTL when token is still valid", async () => {
     const pastExpiry = Date.now() - 60 * 1000; // 1 minute ago
     const options = createRefreshOptions({
       accessTokenExpiresAt: pastExpiry,
     });
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("{}", { status: 200 }),
+      new Response(
+        JSON.stringify({ id: "1", name: "Test", email: "test@test.com" }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
     );
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeDefined();
-    expect(result?.accessTokenTTL).toBe(300); // 5 minutes
+    expect(result?.accessTokenTTL).toBe(3600);
     expect(result?.newProps).toEqual(options.props);
   });
 
@@ -134,7 +134,9 @@ describe("tokenExchangeCallback", () => {
     });
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("Unauthorized", { status: 401 }),
+      new Response(JSON.stringify({ detail: "Invalid token" }), {
+        status: 401,
+      }),
     );
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
@@ -147,7 +149,9 @@ describe("tokenExchangeCallback", () => {
     });
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("Unauthorized", { status: 401 }),
+      new Response(JSON.stringify({ detail: "Invalid token" }), {
+        status: 401,
+      }),
     );
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
