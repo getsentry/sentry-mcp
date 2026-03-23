@@ -11,5 +11,4 @@ export {
 export {
   getUpstreamAuthorizeUrl,
   exchangeCodeForAccessToken,
-  refreshAccessToken,
 } from "./helpers";
