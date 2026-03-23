@@ -1,5 +1,5 @@
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerProps } from "../types";
 import {
   createResourceValidationError,
@@ -33,7 +33,13 @@ function createRefreshOptions(
   };
 }
 
+const TEST_ENV = { SENTRY_HOST: "https://sentry.io" };
+
 describe("tokenExchangeCallback", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("should return undefined for non-refresh_token grant types", async () => {
     const options: TokenExchangeCallbackOptions = {
       grantType: GRANT_TYPES.AUTHORIZATION_CODE,
@@ -44,14 +50,14 @@ describe("tokenExchangeCallback", () => {
       props: {} as WorkerProps,
     };
 
-    const result = await tokenExchangeCallback(options);
+    const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeUndefined();
   });
 
   it("should return undefined when no refresh token in props", async () => {
     const options = createRefreshOptions({ refreshToken: undefined });
 
-    const result = await tokenExchangeCallback(options);
+    const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeUndefined();
   });
 
@@ -63,7 +69,7 @@ describe("tokenExchangeCallback", () => {
       accessTokenExpiresAt: futureExpiry,
     });
 
-    const result = await tokenExchangeCallback(options);
+    const result = await tokenExchangeCallback(options, TEST_ENV);
 
     expect(result).toBeDefined();
     expect(result?.newProps).toEqual(options.props);
@@ -71,33 +77,82 @@ describe("tokenExchangeCallback", () => {
     expect(result?.accessTokenTTL).toBeLessThanOrEqual(600);
   });
 
-  it("should return undefined when upstream token is expired", async () => {
+  it("should probe upstream and return undefined when token is truly expired", async () => {
     const pastExpiry = Date.now() - 60 * 1000; // 1 minute ago
     const options = createRefreshOptions({
       accessTokenExpiresAt: pastExpiry,
     });
 
-    const result = await tokenExchangeCallback(options);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Unauthorized", { status: 401 }),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toBeUndefined();
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://sentry.io/api/0/users/me/",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer old-access-token",
+        }),
+      }),
+    );
+  });
+
+  it("should probe upstream and re-issue with short TTL when token is still valid", async () => {
+    const pastExpiry = Date.now() - 60 * 1000; // 1 minute ago
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: pastExpiry,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("{}", { status: 200 }),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toBeDefined();
+    expect(result?.accessTokenTTL).toBe(300); // 5 minutes
+    expect(result?.newProps).toEqual(options.props);
+  });
+
+  it("should return undefined when upstream probe fails with network error", async () => {
+    const pastExpiry = Date.now() - 60 * 1000;
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: pastExpiry,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeUndefined();
   });
 
-  it("should return undefined when upstream token is within safety window", async () => {
+  it("should probe upstream when token is within safety window", async () => {
     const nearExpiry = Date.now() + 1 * 60 * 1000; // 1 minute from now (< 2 min safety window)
     const options = createRefreshOptions({
       accessTokenExpiresAt: nearExpiry,
     });
 
-    const result = await tokenExchangeCallback(options);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Unauthorized", { status: 401 }),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeUndefined();
   });
 
-  it("should return undefined when no expiry is set", async () => {
+  it("should probe upstream when no expiry is set", async () => {
     const options = createRefreshOptions({
       accessTokenExpiresAt: undefined,
     });
 
-    const result = await tokenExchangeCallback(options);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Unauthorized", { status: 401 }),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeUndefined();
+    expect(globalThis.fetch).toHaveBeenCalled();
   });
 });
 

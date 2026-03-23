@@ -126,19 +126,22 @@ export async function exchangeCodeForAccessToken({
   }
 }
 
+export type TokenExchangeEnv = {
+  SENTRY_HOST?: string;
+};
+
 /**
- * Token exchange callback for handling Sentry OAuth token refreshes.
+ * Handles Sentry OAuth token refreshes without ever refreshing upstream
+ * (Sentry rotates both tokens on refresh, and the 30-day access token
+ * lifetime makes re-auth acceptable).
  *
- * When the Sentry access token is still valid, re-issues a provider token
- * with the remaining TTL. When expired, returns `undefined` to force
- * re-authentication. We intentionally never refresh upstream — Sentry
- * rotates both tokens on refresh, and the 30-day access token lifetime
- * is long enough that re-auth is acceptable.
+ * When the token looks valid locally, re-issues with remaining TTL.
+ * When the clock says expired, probes upstream to verify before forcing re-auth.
  */
 export async function tokenExchangeCallback(
   options: TokenExchangeCallbackOptions,
+  env: TokenExchangeEnv,
 ): Promise<TokenExchangeCallbackResult | undefined> {
-  // Only handle refresh_token grant type
   if (options.grantType !== "refresh_token") {
     return undefined;
   }
@@ -154,8 +157,6 @@ export async function tokenExchangeCallback(
     return undefined;
   }
 
-  // If the upstream token has ample time left, skip the refresh and
-  // mint a new provider token with the remaining TTL.
   const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
   const expiresAt = props.accessTokenExpiresAt;
   if (expiresAt && Number.isFinite(expiresAt)) {
@@ -171,7 +172,28 @@ export async function tokenExchangeCallback(
     }
   }
 
-  // Upstream token is expired or missing expiry — force re-authentication
+  // Probe upstream to check if the token is actually still valid
+  const sentryHost = env.SENTRY_HOST || "https://sentry.io";
+  try {
+    const probe = await fetch(`${sentryHost}/api/0/users/me/`, {
+      headers: {
+        Authorization: `Bearer ${props.accessToken}`,
+        "User-Agent": "Sentry MCP Cloudflare",
+      },
+    });
+    if (probe.ok) {
+      Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
+        attributes: { outcome: "success_probed" },
+      });
+      return {
+        newProps: props,
+        accessTokenTTL: 5 * 60,
+      };
+    }
+  } catch {
+    // Network error — fail closed
+  }
+
   Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
     attributes: { outcome: "expired" },
   });
