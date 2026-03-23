@@ -1,12 +1,11 @@
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { WorkerProps } from "../types";
 import {
   createResourceValidationError,
   tokenExchangeCallback,
   validateResourceParameter,
 } from "./helpers";
-import type { TokenExchangeEnv } from "./helpers";
 
 const GRANT_TYPES = {
   AUTHORIZATION_CODE:
@@ -35,17 +34,6 @@ function createRefreshOptions(
 }
 
 describe("tokenExchangeCallback", () => {
-  let mockEnv: TokenExchangeEnv;
-
-  beforeEach(() => {
-    mockEnv = {
-      SENTRY_CLIENT_ID: "test-client-id",
-      SENTRY_CLIENT_SECRET: "test-client-secret",
-      SENTRY_HOST: "sentry.io",
-      OAUTH_KV: {} as KVNamespace,
-    };
-  });
-
   it("should return undefined for non-refresh_token grant types", async () => {
     const options: TokenExchangeCallbackOptions = {
       grantType: GRANT_TYPES.AUTHORIZATION_CODE,
@@ -56,14 +44,14 @@ describe("tokenExchangeCallback", () => {
       props: {} as WorkerProps,
     };
 
-    const result = await tokenExchangeCallback(options, mockEnv);
+    const result = await tokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 
   it("should return undefined when no refresh token in props", async () => {
     const options = createRefreshOptions({ refreshToken: undefined });
 
-    const result = await tokenExchangeCallback(options, mockEnv);
+    const result = await tokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 
@@ -75,7 +63,7 @@ describe("tokenExchangeCallback", () => {
       accessTokenExpiresAt: futureExpiry,
     });
 
-    const result = await tokenExchangeCallback(options, mockEnv);
+    const result = await tokenExchangeCallback(options);
 
     expect(result).toBeDefined();
     expect(result?.newProps).toEqual(options.props);
@@ -89,7 +77,7 @@ describe("tokenExchangeCallback", () => {
       accessTokenExpiresAt: pastExpiry,
     });
 
-    const result = await tokenExchangeCallback(options, mockEnv);
+    const result = await tokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 
@@ -99,7 +87,7 @@ describe("tokenExchangeCallback", () => {
       accessTokenExpiresAt: nearExpiry,
     });
 
-    const result = await tokenExchangeCallback(options, mockEnv);
+    const result = await tokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 
@@ -108,7 +96,7 @@ describe("tokenExchangeCallback", () => {
       accessTokenExpiresAt: undefined,
     });
 
-    const result = await tokenExchangeCallback(options, mockEnv);
+    const result = await tokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 });

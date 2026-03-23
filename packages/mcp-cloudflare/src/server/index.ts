@@ -149,7 +149,7 @@ const wrappedOAuthProvider = {
       authorizeEndpoint: "/oauth/authorize",
       tokenEndpoint: "/oauth/token",
       clientRegistrationEndpoint: "/oauth/register",
-      tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
+      tokenExchangeCallback,
       scopesSupported: Object.keys(SCOPES),
     });
 

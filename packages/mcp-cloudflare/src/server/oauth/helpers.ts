@@ -126,13 +126,6 @@ export async function exchangeCodeForAccessToken({
   }
 }
 
-export type TokenExchangeEnv = {
-  SENTRY_CLIENT_ID: string;
-  SENTRY_CLIENT_SECRET: string;
-  SENTRY_HOST?: string;
-  OAUTH_KV: KVNamespace;
-};
-
 /**
  * Token exchange callback for handling Sentry OAuth token refreshes.
  *
@@ -144,7 +137,6 @@ export type TokenExchangeEnv = {
  */
 export async function tokenExchangeCallback(
   options: TokenExchangeCallbackOptions,
-  env: TokenExchangeEnv,
 ): Promise<TokenExchangeCallbackResult | undefined> {
   // Only handle refresh_token grant type
   if (options.grantType !== "refresh_token") {

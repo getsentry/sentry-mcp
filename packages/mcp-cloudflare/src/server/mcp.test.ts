@@ -34,8 +34,7 @@ function createOAuthApi() {
       authorizeEndpoint: "/oauth/authorize",
       tokenEndpoint: "/oauth/token",
       clientRegistrationEndpoint: "/oauth/register",
-      tokenExchangeCallback: (options) =>
-        tokenExchangeCallback(options, workerEnv),
+      tokenExchangeCallback,
       scopesSupported: Object.keys(SCOPES),
     },
     workerEnv,
