@@ -1,5 +1,5 @@
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { WorkerProps } from "../types";
 import {
   createResourceValidationError,
@@ -13,16 +13,6 @@ const GRANT_TYPES = {
     "authorization_code" as TokenExchangeCallbackOptions["grantType"],
   REFRESH_TOKEN: "refresh_token" as TokenExchangeCallbackOptions["grantType"],
 };
-
-function createMockKV(): KVNamespace {
-  return {
-    get: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    list: vi.fn(),
-    getWithMetadata: vi.fn(),
-  } as unknown as KVNamespace;
-}
 
 function createRefreshOptions(
   propsOverrides?: Partial<WorkerProps>,
@@ -52,7 +42,7 @@ describe("tokenExchangeCallback", () => {
       SENTRY_CLIENT_ID: "test-client-id",
       SENTRY_CLIENT_SECRET: "test-client-secret",
       SENTRY_HOST: "sentry.io",
-      OAUTH_KV: createMockKV(),
+      OAUTH_KV: {} as KVNamespace,
     };
   });
 
