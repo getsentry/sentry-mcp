@@ -7,10 +7,142 @@ import {
   ApiAuthenticationError,
   SentryApiService,
 } from "@sentry/mcp-core/api-client";
-import { logIssue } from "@sentry/mcp-core/telem/logging";
+import { logError, logIssue } from "@sentry/mcp-core/telem/logging";
 import { TokenResponseSchema } from "./constants";
 import type { WorkerProps } from "../types";
 import * as Sentry from "@sentry/cloudflare";
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function createOAuthErrorMessage(oauthError?: string): string {
+  switch (oauthError) {
+    case "access_denied":
+      return "Authorization was denied. Please try again if you want to continue connecting your account.";
+    case "temporarily_unavailable":
+      return "Sentry OAuth is temporarily unavailable. Please try again shortly.";
+    case "server_error":
+      return "Sentry OAuth encountered an internal error. Please try again.";
+    case "invalid_request":
+      return "The authorization request was rejected. Please try again.";
+    default:
+      return "There was an issue authenticating your account. Please try again.";
+  }
+}
+
+export function createOAuthFailureResponse({
+  title = "Authentication Failed",
+  message,
+  status,
+  eventId,
+  oauthError,
+}: {
+  title?: string;
+  message: string;
+  status: number;
+  eventId?: string;
+  oauthError?: string;
+}): Response {
+  const details = [
+    oauthError
+      ? `<p><strong>OAuth Error:</strong> ${escapeHtml(oauthError)}</p>`
+      : "",
+    eventId ? `<p><strong>Event ID:</strong> ${escapeHtml(eventId)}</p>` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      main {
+        max-width: 640px;
+        margin: 10vh auto;
+        padding: 32px 24px;
+        background: #111827;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+      }
+      h1 {
+        margin: 0 0 16px;
+        font-size: 1.75rem;
+      }
+      p {
+        line-height: 1.6;
+      }
+      .details {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid #334155;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>${escapeHtml(title)}</h1>
+      <p>${escapeHtml(message)}</p>
+      <p>If the issue persists, try again or contact support.</p>
+      <div class="details">${details}</div>
+    </main>
+  </body>
+</html>`;
+
+  return new Response(html, {
+    status,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      ...(eventId ? { "X-Event-ID": eventId } : {}),
+    },
+  });
+}
+
+type ParsedUpstreamOAuthError = {
+  error?: string;
+  errorDescription?: string;
+};
+
+function parseUpstreamOAuthError(
+  responseText: string,
+  contentType: string | null,
+): ParsedUpstreamOAuthError {
+  if (!contentType?.includes("application/json")) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(responseText) as {
+      error?: unknown;
+      error_description?: unknown;
+    };
+
+    return {
+      error: typeof parsed.error === "string" ? parsed.error : undefined,
+      errorDescription:
+        typeof parsed.error_description === "string"
+          ? parsed.error_description
+          : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Constructs an authorization URL for Sentry.
@@ -54,18 +186,25 @@ export async function exchangeCodeForAccessToken({
   redirect_uri?: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!code) {
-    const eventId = logIssue("[oauth] Missing code in token exchange", {
-      oauth: {
-        client_id,
+    logError("[oauth] Missing code in token exchange", {
+      contexts: {
+        oauth: {
+          client_id,
+          hasRedirectUri: !!redirect_uri,
+          redirectUri: redirect_uri,
+        },
       },
+      loggerScope: ["cloudflare", "oauth", "callback"],
     });
     return [
       null,
-      new Response("Invalid request: missing authorization code", {
+      createOAuthFailureResponse({
+        title: "Authentication Failed",
+        message:
+          "The authorization callback did not include an authorization code.",
         status: 400,
-        headers: { "X-Event-ID": eventId ?? "" },
       }),
-    ];
+    ] as const;
   }
 
   const resp = await fetch(upstream_url, {
@@ -84,25 +223,35 @@ export async function exchangeCodeForAccessToken({
   });
   if (!resp.ok) {
     const responseText = await resp.text();
-    const eventId = logIssue(
-      `[oauth] Failed to exchange code for access token: ${responseText}`,
-      {
+    const contentType = resp.headers.get("Content-Type");
+    const upstreamError = parseUpstreamOAuthError(responseText, contentType);
+    logError("[oauth] Failed to exchange code for access token", {
+      contexts: {
         oauth: {
           client_id,
           status: resp.status,
           statusText: resp.statusText,
           hasRedirectUri: !!redirect_uri,
           redirectUri: redirect_uri,
+          upstreamError: upstreamError.error,
+          hasUpstreamErrorDescription: !!upstreamError.errorDescription,
+          contentType,
         },
       },
-    );
+      extra: {
+        responseBodyPreview: responseText.slice(0, 1000),
+      },
+      loggerScope: ["cloudflare", "oauth", "callback"],
+    });
     return [
       null,
-      new Response(
-        "There was an issue authenticating your account and retrieving an access token. Please try again.",
-        { status: 400, headers: { "X-Event-ID": eventId ?? "" } },
-      ),
-    ];
+      createOAuthFailureResponse({
+        title: "Authentication Failed",
+        message: createOAuthErrorMessage(upstreamError.error),
+        status: 400,
+        oauthError: upstreamError.error,
+      }),
+    ] as const;
   }
 
   try {
@@ -110,23 +259,28 @@ export async function exchangeCodeForAccessToken({
     const output = TokenResponseSchema.parse(body);
     return [output, null];
   } catch (e) {
-    const eventId = logIssue(
+    logError(
       new Error("Failed to parse token response", {
         cause: e,
       }),
       {
-        oauth: {
-          client_id,
+        contexts: {
+          oauth: {
+            client_id,
+          },
         },
+        loggerScope: ["cloudflare", "oauth", "callback"],
       },
     );
     return [
       null,
-      new Response(
-        "There was an issue authenticating your account and retrieving an access token. Please try again.",
-        { status: 500, headers: { "X-Event-ID": eventId ?? "" } },
-      ),
-    ];
+      createOAuthFailureResponse({
+        title: "Authentication Failed",
+        message:
+          "There was an issue authenticating your account and retrieving an access token. Please try again.",
+        status: 500,
+      }),
+    ] as const;
   }
 }
 
