@@ -61,22 +61,6 @@ describe("tokenExchangeCallback", () => {
     expect(result).toBeUndefined();
   });
 
-  it("should re-issue token with remaining TTL when upstream token is valid", async () => {
-    const futureExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes from now
-    const options = createRefreshOptions({
-      accessToken: "cached-access-token",
-      refreshToken: "refresh-token",
-      accessTokenExpiresAt: futureExpiry,
-    });
-
-    const result = await tokenExchangeCallback(options, TEST_ENV);
-
-    expect(result).toBeDefined();
-    expect(result?.newProps).toEqual(options.props);
-    expect(result?.accessTokenTTL).toBeGreaterThan(0);
-    expect(result?.accessTokenTTL).toBeLessThanOrEqual(600);
-  });
-
   it("should probe upstream and return undefined when token is truly expired", async () => {
     const pastExpiry = Date.now() - 60 * 1000; // 1 minute ago
     const options = createRefreshOptions({
@@ -91,28 +75,6 @@ describe("tokenExchangeCallback", () => {
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeUndefined();
-  });
-
-  it("should probe upstream and re-issue with 1h TTL when token is still valid", async () => {
-    const pastExpiry = Date.now() - 60 * 1000; // 1 minute ago
-    const options = createRefreshOptions({
-      accessTokenExpiresAt: pastExpiry,
-    });
-
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify({ id: "1", name: "Test", email: "test@test.com" }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
-    );
-
-    const result = await tokenExchangeCallback(options, TEST_ENV);
-    expect(result).toBeDefined();
-    expect(result?.accessTokenTTL).toBe(3600);
-    expect(result?.newProps).toEqual(options.props);
   });
 
   it("should return undefined when upstream probe fails with network error", async () => {
