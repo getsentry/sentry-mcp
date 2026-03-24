@@ -184,7 +184,7 @@ export async function tokenExchangeCallback(
     });
     await api.getAuthenticatedUser();
     Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
-      attributes: { outcome: "success" },
+      attributes: { outcome: "success_probed" },
     });
     return {
       newProps: props,
