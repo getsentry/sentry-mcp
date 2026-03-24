@@ -19,6 +19,7 @@ const REDIRECT_URI = "https://example.com/callback";
 const DEFAULT_WORKER_PROPS: WorkerProps = {
   id: "test-user-123",
   accessToken: "upstream-access-token",
+  refreshToken: "upstream-refresh-token",
   accessTokenExpiresAt: Date.now() + 10 * 60 * 1000,
   clientId: "",
   scope: "org:read",
@@ -307,6 +308,19 @@ describe("/mcp", () => {
 
     const refreshed = (await refreshResponse.json()) as TokenResponse;
     expect(refreshed.access_token).toBeTruthy();
+
+    // Verify the upstream probe was actually called
+    const fetchCalls = vi.mocked(globalThis.fetch).mock.calls;
+    const probeCalled = fetchCalls.some(([input]) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      return url.includes("/api/0/");
+    });
+    expect(probeCalled).toBe(true);
 
     // Restore fetch so MCP request works normally
     vi.restoreAllMocks();
