@@ -3,7 +3,10 @@ import type {
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
 import type { z } from "zod";
-import { SentryApiService } from "@sentry/mcp-core/api-client";
+import {
+  ApiAuthenticationError,
+  SentryApiService,
+} from "@sentry/mcp-core/api-client";
 import { logIssue } from "@sentry/mcp-core/telem/logging";
 import { TokenResponseSchema } from "./constants";
 import type { WorkerProps } from "../types";
@@ -187,8 +190,13 @@ export async function tokenExchangeCallback(
       newProps: props,
       accessTokenTTL: 60 * 60,
     };
-  } catch {
-    // Auth failed or network error — force re-auth
+  } catch (error) {
+    if (!(error instanceof ApiAuthenticationError)) {
+      logIssue("Unexpected error probing upstream token validity", {
+        loggerScope: ["cloudflare", "oauth", "refresh"],
+        extra: { error },
+      });
+    }
   }
 
   Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
