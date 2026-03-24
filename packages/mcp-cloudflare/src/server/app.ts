@@ -125,6 +125,17 @@ const app = new Hono<{
       },
     }),
   )
+  // Content-negotiated homepage: serve markdown to agents, SPA to browsers
+  .get("/", async (c, next) => {
+    const accept = c.req.header("Accept") ?? "";
+    if (!accept.includes("text/markdown")) {
+      return next();
+    }
+    return c.text(generateLlmsTxt(getBaseUrl(c)), 200, {
+      "Content-Type": "text/markdown; charset=utf-8",
+      Vary: "Accept",
+    });
+  })
   .get("/robots.txt", (c) => {
     return c.text(
       [

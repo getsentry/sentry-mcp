@@ -5,6 +5,41 @@ import app from "./app";
 const TEST_HEADERS = { "CF-Connecting-IP": "192.0.2.1" } as const;
 
 describe("app", () => {
+  describe("GET /", () => {
+    it("should return markdown when Accept includes text/markdown", async () => {
+      const res = await app.request("https://mcp.sentry.dev/", {
+        headers: { ...TEST_HEADERS, Accept: "text/markdown" },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toContain("text/markdown");
+      expect(res.headers.get("Vary")).toBe("Accept");
+
+      const text = await res.text();
+      expect(text).toContain("# Sentry MCP Server");
+      expect(text).toContain("https://mcp.sentry.dev/mcp");
+      expect(text).toContain("{organizationSlug}");
+      expect(text).toContain("{projectSlug}");
+    });
+
+    it("should fall through when Accept is text/html", async () => {
+      const res = await app.request("/", {
+        headers: { ...TEST_HEADERS, Accept: "text/html" },
+      });
+
+      // Falls through to static assets / 404 since no SPA in test env
+      expect(res.status).not.toBe(200);
+    });
+
+    it("should fall through when no Accept header", async () => {
+      const res = await app.request("/", {
+        headers: TEST_HEADERS,
+      });
+
+      expect(res.status).not.toBe(200);
+    });
+  });
+
   describe("GET /robots.txt", () => {
     it("should return correct robots.txt content", async () => {
       const res = await app.request("/robots.txt", {
