@@ -13,6 +13,7 @@ describe("app", () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toContain("text/markdown");
+      expect(res.headers.get("Vary")).toBe("Accept");
 
       const text = await res.text();
       expect(text).toContain("# Sentry MCP Server");

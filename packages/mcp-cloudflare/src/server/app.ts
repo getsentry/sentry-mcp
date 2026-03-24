@@ -133,6 +133,7 @@ const app = new Hono<{
     }
     return c.text(generateLlmsTxt(getBaseUrl(c)), 200, {
       "Content-Type": "text/markdown; charset=utf-8",
+      Vary: "Accept",
     });
   })
   .get("/robots.txt", (c) => {
