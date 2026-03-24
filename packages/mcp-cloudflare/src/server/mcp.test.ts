@@ -1,6 +1,6 @@
 import { createExecutionContext, env } from "cloudflare:test";
 import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SCOPES } from "../constants";
 import app from "./app";
 import handler from "./index";
@@ -69,6 +69,20 @@ function createTokenExchangeRequest(clientId: string, code: string) {
   });
 }
 
+function createRefreshTokenRequest(clientId: string, refreshToken: string) {
+  return new Request("https://mcp.sentry.dev/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: clientId,
+      refresh_token: refreshToken,
+    }).toString(),
+  });
+}
+
 function createMcpRequest(
   path: string,
   accessToken: string,
@@ -92,7 +106,17 @@ function createMcpRequest(
   });
 }
 
-async function issueAccessToken(resource: string) {
+interface TokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  token_type: string;
+  resource?: string;
+}
+
+async function issueTokens(
+  resource: string,
+  propsOverrides?: Partial<WorkerProps>,
+): Promise<{ clientId: string; tokens: TokenResponse }> {
   const oauthApi = createOAuthApi();
   const client = await oauthApi.createClient({
     clientName: "MCP Integration Test Client",
@@ -104,6 +128,7 @@ async function issueAccessToken(resource: string) {
   );
   const props: WorkerProps = {
     ...DEFAULT_WORKER_PROPS,
+    ...propsOverrides,
     clientId: client.clientId,
   };
   const { redirectTo } = await oauthApi.completeAuthorization({
@@ -129,16 +154,17 @@ async function issueAccessToken(resource: string) {
 
   expect(tokenResponse.status).toBe(200);
 
-  const tokenJson = (await tokenResponse.json()) as {
-    access_token: string;
-    token_type: string;
-    resource?: string;
-  };
+  const tokens = (await tokenResponse.json()) as TokenResponse;
 
-  expect(tokenJson.token_type).toBe("bearer");
-  expect(tokenJson.resource).toBe(resource);
+  expect(tokens.token_type).toBe("bearer");
+  expect(tokens.resource).toBe(resource);
 
-  return tokenJson.access_token;
+  return { clientId: client.clientId, tokens };
+}
+
+async function issueAccessToken(resource: string) {
+  const { tokens } = await issueTokens(resource);
+  return tokens.access_token;
 }
 
 async function parseSseJson<T>(response: Response): Promise<T> {
@@ -175,6 +201,10 @@ describe("/mcp", () => {
     expect(body.result?.protocolVersion).toBeDefined();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("authenticates through /oauth/token and serves scoped MCP requests", async () => {
     const accessToken = await issueAccessToken(
       "https://mcp.sentry.dev/mcp/sentry-mcp-evals",
@@ -193,5 +223,111 @@ describe("/mcp", () => {
       result?: { tools: Array<{ name: string }> };
     }>(response);
     expect(body.result?.tools.length).toBeGreaterThan(0);
+  });
+
+  it("refreshes token and serves MCP requests when upstream token is valid", async () => {
+    const { clientId, tokens } = await issueTokens(
+      "https://mcp.sentry.dev/mcp",
+      { accessTokenExpiresAt: Date.now() + 10 * 60 * 1000 },
+    );
+
+    expect(tokens.refresh_token).toBeTruthy();
+
+    // Refresh the token
+    const refreshCtx = createExecutionContext();
+    const refreshResponse = await handler.fetch!(
+      createRefreshTokenRequest(clientId, tokens.refresh_token!),
+      workerEnv,
+      refreshCtx,
+    );
+
+    expect(refreshResponse.status).toBe(200);
+
+    const refreshed = (await refreshResponse.json()) as TokenResponse;
+    expect(refreshed.access_token).toBeTruthy();
+    expect(refreshed.access_token).not.toBe(tokens.access_token);
+
+    // Use the refreshed token for an MCP request
+    const mcpCtx = createExecutionContext();
+    const mcpResponse = await handler.fetch!(
+      createMcpRequest("/mcp", refreshed.access_token, "initialize", {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "integration-test-client", version: "1.0.0" },
+      }),
+      workerEnv,
+      mcpCtx,
+    );
+
+    expect(mcpResponse.status).toBe(200);
+
+    const body = await parseSseJson<{
+      result?: { protocolVersion: string };
+    }>(mcpResponse);
+    expect(body.result?.protocolVersion).toBeDefined();
+  });
+
+  it("refreshes via upstream probe and serves MCP requests when clock says expired", async () => {
+    const { clientId, tokens } = await issueTokens(
+      "https://mcp.sentry.dev/mcp",
+      { accessTokenExpiresAt: Date.now() - 60 * 1000 },
+    );
+
+    expect(tokens.refresh_token).toBeTruthy();
+
+    // Mock only Sentry API calls, let everything else through
+    const originalFetch = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (url.includes("/api/0/")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ id: "1", name: "Test", email: "test@test.com" }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      return originalFetch(input, init);
+    });
+
+    // Refresh the token (probe succeeds)
+    const refreshCtx = createExecutionContext();
+    const refreshResponse = await handler.fetch!(
+      createRefreshTokenRequest(clientId, tokens.refresh_token!),
+      workerEnv,
+      refreshCtx,
+    );
+
+    expect(refreshResponse.status).toBe(200);
+
+    const refreshed = (await refreshResponse.json()) as TokenResponse;
+    expect(refreshed.access_token).toBeTruthy();
+
+    // Restore fetch so MCP request works normally
+    vi.restoreAllMocks();
+
+    // Use the refreshed token for an MCP request
+    const mcpCtx = createExecutionContext();
+    const mcpResponse = await handler.fetch!(
+      createMcpRequest("/mcp", refreshed.access_token, "initialize", {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "integration-test-client", version: "1.0.0" },
+      }),
+      workerEnv,
+      mcpCtx,
+    );
+
+    expect(mcpResponse.status).toBe(200);
+
+    const body = await parseSseJson<{
+      result?: { protocolVersion: string };
+    }>(mcpResponse);
+    expect(body.result?.protocolVersion).toBeDefined();
   });
 });
