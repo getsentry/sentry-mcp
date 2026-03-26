@@ -12,6 +12,7 @@ export default defineTool({
   skills: ["inspect"],
   requiredScopes: ["event:read"],
   requiredCapabilities: ["profiles"],
+  hideInExperimentalMode: true,
 
   description: [
     "Retrieve raw profile chunk data to inspect individual function calls, threads, and stack traces.",
