@@ -1,3 +1,8 @@
+/**
+ * Persistent token cache for device code auth.
+ * Tokens are stored at ~/.sentry/mcp.json, keyed by {host}:{clientId}.
+ * See docs/stdio-auth.md for cache format and security details.
+ */
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
