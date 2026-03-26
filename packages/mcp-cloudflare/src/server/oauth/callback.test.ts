@@ -221,7 +221,7 @@ describe("oauth callback routes", () => {
       expect(body).toContain("OAuth Error:</strong> access_denied");
       expect(body).toContain("Authorization was denied");
       expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
-      expect(logError).toHaveBeenCalledWith(
+      expect(logIssue).toHaveBeenCalledWith(
         "[oauth] Upstream authorization callback error",
         expect.objectContaining({
           loggerScope: ["cloudflare", "oauth", "callback"],
