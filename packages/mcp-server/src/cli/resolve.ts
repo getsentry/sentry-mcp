@@ -4,7 +4,8 @@ import {
   validateOpenAiBaseUrlThrows,
   validateSentryHostThrows,
 } from "@sentry/mcp-core/utils/url-utils";
-import type { MergedArgs, ResolvedConfig } from "./types";
+import { DEFAULT_SENTRY_CLIENT_ID } from "../auth/constants";
+import type { MergedArgs, PartiallyResolvedConfig } from "./types";
 
 export function formatInvalidSkills(
   invalid: string[],
@@ -14,14 +15,7 @@ export function formatInvalidSkills(
   return `Error: ${prefix}: ${invalid.join(", ")}\nAvailable skills: ${ALL_SKILLS.join(", ")}`;
 }
 
-export function finalize(input: MergedArgs): ResolvedConfig {
-  // Access token required
-  if (!input.accessToken) {
-    throw new Error(
-      "Error: No access token was provided. Pass one with `--access-token` or via `SENTRY_ACCESS_TOKEN`.",
-    );
-  }
-
+export function finalize(input: MergedArgs): PartiallyResolvedConfig {
   // Determine host from url/host with validation
   let sentryHost = "sentry.io";
   if (input.url) {
@@ -105,6 +99,7 @@ export function finalize(input: MergedArgs): ResolvedConfig {
 
   return {
     accessToken: input.accessToken,
+    clientId: input.clientId || DEFAULT_SENTRY_CLIENT_ID,
     sentryHost,
     mcpUrl: input.mcpUrl,
     sentryDsn: input.sentryDsn,

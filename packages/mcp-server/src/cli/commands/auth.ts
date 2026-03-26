@@ -1,0 +1,113 @@
+import { parseEnv } from "../parse";
+import { DEFAULT_SENTRY_CLIENT_ID, isSentryIo } from "../../auth/constants";
+import { authenticate, DeviceCodeError } from "../../auth/device-code-flow";
+import {
+  readCachedToken,
+  writeCachedToken,
+  clearCachedToken,
+} from "../../auth/token-cache";
+import { toCachedToken } from "../../auth/types";
+import {
+  validateAndParseSentryUrlThrows,
+  validateSentryHostThrows,
+} from "@sentry/mcp-core/utils/url-utils";
+
+type AuthContext = {
+  sentryHost: string;
+  clientId: string;
+};
+
+function resolveAuthContext(argv: string[]): AuthContext {
+  const env = parseEnv(process.env);
+
+  let sentryHost = "sentry.io";
+  for (const arg of argv) {
+    if (arg.startsWith("--host=")) {
+      const host = arg.slice("--host=".length);
+      validateSentryHostThrows(host);
+      sentryHost = host;
+    } else if (arg.startsWith("--url=")) {
+      sentryHost = validateAndParseSentryUrlThrows(arg.slice("--url=".length));
+    }
+  }
+  if (sentryHost === "sentry.io") {
+    if (env.url) {
+      sentryHost = validateAndParseSentryUrlThrows(env.url);
+    } else if (env.host) {
+      validateSentryHostThrows(env.host);
+      sentryHost = env.host;
+    }
+  }
+
+  return { sentryHost, clientId: env.clientId || DEFAULT_SENTRY_CLIENT_ID };
+}
+
+async function login(argv: string[]): Promise<void> {
+  const { sentryHost, clientId } = resolveAuthContext(argv);
+
+  if (!isSentryIo(sentryHost)) {
+    console.error(
+      "Error: Device code authentication is only supported for sentry.io.",
+    );
+    process.exit(1);
+  }
+
+  try {
+    const tokenResponse = await authenticate({ clientId, host: sentryHost });
+    await writeCachedToken(toCachedToken(tokenResponse, sentryHost, clientId));
+  } catch (err) {
+    if (err instanceof DeviceCodeError) {
+      console.error(err.message);
+    } else {
+      console.error(
+        `Authentication failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    process.exit(1);
+  }
+}
+
+async function logout(argv: string[]): Promise<void> {
+  const { sentryHost, clientId } = resolveAuthContext(argv);
+
+  const cached = await readCachedToken(sentryHost, clientId);
+  if (cached) {
+    await clearCachedToken(sentryHost, clientId);
+    console.log(`Logged out (removed cached token for ${cached.user_email}).`);
+  } else {
+    console.log("No cached authentication found.");
+  }
+}
+
+async function status(argv: string[]): Promise<void> {
+  const { sentryHost, clientId } = resolveAuthContext(argv);
+
+  const cached = await readCachedToken(sentryHost, clientId);
+  if (cached) {
+    const expiresAt = new Date(cached.expires_at);
+    console.log(`Authenticated as ${cached.user_email}`);
+    console.log(`  Host:    ${cached.sentry_host}`);
+    console.log(`  Scopes:  ${cached.scope}`);
+    console.log(`  Expires: ${expiresAt.toLocaleString()}`);
+  } else {
+    console.log("Not authenticated. Run `sentry-mcp auth login` to sign in.");
+  }
+}
+
+export async function authCommand(argv: string[]): Promise<void> {
+  const sub = argv[0] ?? "login";
+  const rest = argv.slice(1);
+
+  switch (sub) {
+    case "login":
+      return login(rest);
+    case "logout":
+      return logout(rest);
+    case "status":
+      return status(rest);
+    default:
+      console.error(`Unknown auth command: ${sub}`);
+      console.error("Available: auth login, auth logout, auth status");
+      process.exit(1);
+  }
+}

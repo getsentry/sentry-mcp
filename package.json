@@ -31,6 +31,7 @@
     "lint": "biome lint",
     "lint:fix": "biome lint --fix",
     "inspector": "pnpx @modelcontextprotocol/inspector@latest",
+    "inspector:stdio": "pnpx @modelcontextprotocol/inspector@latest -- tsx packages/mcp-server/src/index.ts",
     "measure-tokens": "pnpm run --filter ./packages/mcp-core measure-tokens",
     "prepare": "simple-git-hooks",
     "cli": "pnpm run --filter ./packages/mcp-test-client start",

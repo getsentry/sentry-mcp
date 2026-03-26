@@ -87,6 +87,7 @@ export function parseEnv(env: NodeJS.ProcessEnv): EnvArgs {
   if (env.ANTHROPIC_MODEL) fromEnv.anthropicModel = env.ANTHROPIC_MODEL;
   if (env.EMBEDDED_AGENT_PROVIDER)
     fromEnv.agentProvider = env.EMBEDDED_AGENT_PROVIDER;
+  if (env.SENTRY_CLIENT_ID) fromEnv.clientId = env.SENTRY_CLIENT_ID;
   if (env.MCP_SKILLS) fromEnv.skills = env.MCP_SKILLS;
   if (env.MCP_DISABLE_SKILLS) fromEnv.disableSkills = env.MCP_DISABLE_SKILLS;
   return fromEnv;
@@ -106,6 +107,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     anthropicBaseUrl: cli.anthropicBaseUrl,
     anthropicModel: cli.anthropicModel ?? env.anthropicModel,
     agentProvider: cli.agentProvider ?? env.agentProvider,
+    clientId: cli.clientId ?? env.clientId,
     // Skills precedence: CLI skills override env
     skills: cli.skills ?? env.skills,
     disableSkills: cli.disableSkills ?? env.disableSkills,

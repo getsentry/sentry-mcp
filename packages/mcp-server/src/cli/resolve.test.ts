@@ -2,10 +2,24 @@ import { describe, it, expect } from "vitest";
 import { finalize } from "./resolve";
 
 describe("cli/finalize", () => {
-  it("throws on missing access token", () => {
-    expect(() => finalize({ unknownArgs: [] } as any)).toThrow(
-      /No access token was provided/,
-    );
+  it("returns undefined accessToken when none provided", () => {
+    const cfg = finalize({ unknownArgs: [] } as any);
+    expect(cfg.accessToken).toBeUndefined();
+  });
+
+  it("uses DEFAULT_SENTRY_CLIENT_ID when no clientId provided", () => {
+    const cfg = finalize({ accessToken: "tok", unknownArgs: [] });
+    expect(cfg.clientId).toBeDefined();
+    expect(typeof cfg.clientId).toBe("string");
+  });
+
+  it("uses provided clientId over default", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      clientId: "custom-client-id",
+      unknownArgs: [],
+    });
+    expect(cfg.clientId).toBe("custom-client-id");
   });
 
   it("normalizes host from URL", () => {

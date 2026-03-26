@@ -4,10 +4,18 @@ export function buildUsage(
   packageName: string,
   allSkills: ReadonlyArray<Skill>,
 ): string {
-  return `Usage: ${packageName} --access-token=<token> [--host=<host>]
+  return `Usage: ${packageName} [--access-token=<token>] [--host=<host>]
+       ${packageName} auth [login|logout|status]
 
-Required:
+Commands:
+  auth login              Authenticate via device code flow (sentry.io only)
+  auth logout             Clear cached authentication
+  auth status             Show current authentication state
+
+Authentication:
   --access-token <token>  Sentry User Auth Token with API access
+                          Optional for sentry.io (device code flow is used if omitted)
+                          Required for self-hosted instances
 
 Common optional flags:
   --host <host>           Change Sentry host (self-hosted)
@@ -34,12 +42,14 @@ All skills: ${allSkills.join(", ")}
 
 Environment variables:
   SENTRY_ACCESS_TOKEN     Sentry auth token (alternative to --access-token)
+  SENTRY_CLIENT_ID        Override OAuth client ID for device code flow
   OPENAI_API_KEY          OpenAI API key for AI-powered search tools
   ANTHROPIC_API_KEY       Anthropic API key for AI-powered search tools
   EMBEDDED_AGENT_PROVIDER Provider override: openai or anthropic
   MCP_DISABLE_SKILLS      Disable specific skills (comma-separated)
 
 Examples:
+  ${packageName}                                        # device code auth (sentry.io only)
   ${packageName} --access-token=TOKEN
   ${packageName} --access-token=TOKEN --skills=inspect,triage
   ${packageName} --access-token=TOKEN --host=sentry.example.com
