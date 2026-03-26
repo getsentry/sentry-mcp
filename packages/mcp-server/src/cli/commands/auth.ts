@@ -17,7 +17,7 @@ type AuthContext = {
   clientId: string;
 };
 
-function parseFlag(argv: string[], name: string): string | undefined {
+export function parseFlag(argv: string[], name: string): string | undefined {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     // --flag=value
