@@ -3,10 +3,7 @@ import type {
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
 import type { z } from "zod";
-import {
-  ApiAuthenticationError,
-  SentryApiService,
-} from "@sentry/mcp-core/api-client";
+import { ApiClientError, SentryApiService } from "@sentry/mcp-core/api-client";
 import { logError, logIssue } from "@sentry/mcp-core/telem/logging";
 import { TokenResponseSchema } from "./constants";
 import type { WorkerProps } from "../types";
@@ -319,7 +316,10 @@ export async function tokenExchangeCallback(
     }
   }
 
-  // Probe upstream to check if the token is actually still valid
+  // Probe upstream to check if the token is actually still valid. Sentry can
+  // report invalid/expired bearer tokens here as 400 or 401, so treat any 4xx
+  // as an expected probe failure and fall back to re-auth without creating an
+  // issue.
   try {
     const api = new SentryApiService({
       accessToken: props.accessToken,
@@ -334,7 +334,7 @@ export async function tokenExchangeCallback(
       accessTokenTTL: 60 * 60,
     };
   } catch (error) {
-    if (!(error instanceof ApiAuthenticationError)) {
+    if (!(error instanceof ApiClientError)) {
       logIssue(error, {
         loggerScope: ["cloudflare", "oauth", "refresh"],
       });
