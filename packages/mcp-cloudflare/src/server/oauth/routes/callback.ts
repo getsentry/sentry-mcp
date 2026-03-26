@@ -100,6 +100,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
         },
       },
       extra: {
+        errorDescription: c.req.query("error_description"),
         queryKeys: Array.from(new URL(c.req.url).searchParams.keys()),
       },
       loggerScope: ["cloudflare", "oauth", "callback"],
