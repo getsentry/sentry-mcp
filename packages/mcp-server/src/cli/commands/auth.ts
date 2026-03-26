@@ -17,26 +17,37 @@ type AuthContext = {
   clientId: string;
 };
 
+function parseFlag(argv: string[], name: string): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    // --flag=value
+    if (arg.startsWith(`--${name}=`)) {
+      return arg.slice(`--${name}=`.length);
+    }
+    // --flag value
+    if (arg === `--${name}` && i + 1 < argv.length) {
+      return argv[i + 1];
+    }
+  }
+  return undefined;
+}
+
 function resolveAuthContext(argv: string[]): AuthContext {
   const env = parseEnv(process.env);
 
   let sentryHost = "sentry.io";
-  for (const arg of argv) {
-    if (arg.startsWith("--host=")) {
-      const host = arg.slice("--host=".length);
-      validateSentryHostThrows(host);
-      sentryHost = host;
-    } else if (arg.startsWith("--url=")) {
-      sentryHost = validateAndParseSentryUrlThrows(arg.slice("--url=".length));
-    }
-  }
-  if (sentryHost === "sentry.io") {
-    if (env.url) {
-      sentryHost = validateAndParseSentryUrlThrows(env.url);
-    } else if (env.host) {
-      validateSentryHostThrows(env.host);
-      sentryHost = env.host;
-    }
+  const hostFlag = parseFlag(argv, "host");
+  const urlFlag = parseFlag(argv, "url");
+  if (urlFlag) {
+    sentryHost = validateAndParseSentryUrlThrows(urlFlag);
+  } else if (hostFlag) {
+    validateSentryHostThrows(hostFlag);
+    sentryHost = hostFlag;
+  } else if (env.url) {
+    sentryHost = validateAndParseSentryUrlThrows(env.url);
+  } else if (env.host) {
+    validateSentryHostThrows(env.host);
+    sentryHost = env.host;
   }
 
   return { sentryHost, clientId: env.clientId || DEFAULT_SENTRY_CLIENT_ID };

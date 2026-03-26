@@ -9,7 +9,7 @@ import { toCachedToken } from "./types";
  *
  * If an access token is already provided, returns immediately.
  * If the host is sentry.io, attempts to use a cached token or
- * initiates the device code flow.
+ * initiates the device code flow (only when stderr is a TTY).
  * For non-sentry.io hosts, throws an error requiring --access-token.
  */
 export async function resolveAccessToken(
@@ -28,7 +28,7 @@ export async function resolveAccessToken(
 
   const { clientId, sentryHost } = partial;
 
-  // Try cached token first
+  // Try cached token first (works in both interactive and non-interactive contexts)
   try {
     const cached = await readCachedToken(sentryHost, clientId);
     if (cached) {
@@ -41,7 +41,17 @@ export async function resolveAccessToken(
     // Cache read failure is non-fatal — fall through to device code flow
   }
 
-  // Run device code flow
+  // Device code flow requires a human to visit a URL and authorize.
+  // In non-interactive contexts (CI, piped stdio), fail immediately
+  // instead of hanging on the polling loop until expiry.
+  if (!process.stderr.isTTY) {
+    throw new Error(
+      "Error: No access token was provided.\n" +
+        "Run `sentry-mcp auth login` interactively first, or pass `--access-token` / `SENTRY_ACCESS_TOKEN`.",
+    );
+  }
+
+  // Run device code flow (interactive only)
   try {
     const tokenResponse = await authenticate({ clientId, host: sentryHost });
 
