@@ -77,6 +77,23 @@ describe("tokenExchangeCallback", () => {
     expect(result).toBeUndefined();
   });
 
+  it("should treat 400 probe failures as expired", async () => {
+    const pastExpiry = Date.now() - 60 * 1000;
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: pastExpiry,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Invalid token" }), {
+        status: 400,
+        statusText: "Bad Request",
+      }),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toBeUndefined();
+  });
+
   it("should return undefined when upstream probe fails with network error", async () => {
     const pastExpiry = Date.now() - 60 * 1000;
     const options = createRefreshOptions({
