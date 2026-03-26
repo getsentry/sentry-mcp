@@ -4,6 +4,7 @@ import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
+  createOAuthErrorMessage,
   createOAuthFailureResponse,
   exchangeCodeForAccessToken,
   validateResourceParameter,
@@ -105,10 +106,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     });
 
     return createOAuthFailureResponse({
-      message:
-        oauthError === "access_denied"
-          ? "Authorization was denied. Please try again if you want to continue connecting your account."
-          : "The authorization callback returned an error. Please try again.",
+      message: createOAuthErrorMessage(oauthError),
       status: 400,
       oauthError,
     });

@@ -21,7 +21,7 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function createOAuthErrorMessage(oauthError?: string): string {
+export function createOAuthErrorMessage(oauthError?: string): string {
   switch (oauthError) {
     case "access_denied":
       return "Authorization was denied. Please try again if you want to continue connecting your account.";
