@@ -609,8 +609,8 @@ describe("get_sentry_resource", () => {
 
   // ─── Tool metadata ────────────────────────────────────────────────────────
   describe("Tool metadata", () => {
-    it("is marked as experimental", () => {
-      expect(getSentryResource.experimental).toBe(true);
+    it("is stable by default", () => {
+      expect(getSentryResource.experimental).toBeUndefined();
     });
 
     it("has read-only annotation", () => {

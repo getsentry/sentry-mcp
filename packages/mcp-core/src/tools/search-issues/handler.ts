@@ -33,7 +33,7 @@ export default defineTool({
     "",
     "ALSO DO NOT USE FOR:",
     "- Individual error events with timestamps → use search_events",
-    "- Details about a specific issue ID → use get_issue_details",
+    "- Details about a specific issue ID or Sentry issue URL → use get_sentry_resource",
     "",
     "REMEMBER: This tool returns a LIST of issues, not counts or statistics!",
     "",

@@ -318,9 +318,8 @@ function generateUnsupportedResourceMessage(
 
 export default defineTool({
   name: "get_sentry_resource",
-  skills: ["inspect"],
+  skills: ["inspect", "triage", "seer"], // Preserve legacy issue-detail access for triage and Seer workflows.
   requiredScopes: ["event:read"],
-  experimental: true,
 
   description: [
     "Fetch a Sentry resource by URL or by type and ID.",

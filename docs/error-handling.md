@@ -187,7 +187,7 @@ return agentTool({
 #### Example 2: Server Error
 
 ```
-1. User calls get_issue_details tool
+1. User calls get_sentry_resource for an issue
 2. Tool calls apiService.getIssue() directly (no withApiErrorHandling)
 3. API returns 502 Bad Gateway  
 4. API client creates ApiServerError via createApiError factory and throws

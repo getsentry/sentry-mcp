@@ -132,6 +132,22 @@ describe("buildServer", () => {
       expect(toolNames).toContain("tool_with_false");
       expect(toolNames).toContain("tool_without_flag");
     });
+
+    it("filters internal-only tools regardless of mode", () => {
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          public_tool: createMockTool("public_tool"),
+          internal_tool: createMockTool("internal_tool", {
+            internalOnly: true,
+          }),
+        },
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).toContain("public_tool");
+      expect(toolNames).not.toContain("internal_tool");
+    });
   });
 
   describe("capability-based tool filtering (experimental)", () => {
@@ -427,7 +443,10 @@ describe("buildServer", () => {
       const toolNames = getRegisteredToolNames(server);
       // Should have standard tools like whoami
       expect(toolNames).toContain("whoami");
-      // Currently no tools are marked as experimental, so all should be present
+      expect(toolNames).toContain("get_sentry_resource");
+      expect(toolNames).not.toContain("get_issue_details");
+      expect(toolNames).not.toContain("get_trace_details");
+      // Currently no default tools are gated behind experimental visibility
       expect(toolNames.length).toBeGreaterThan(0);
     });
 
@@ -441,8 +460,11 @@ describe("buildServer", () => {
       });
 
       const toolNames = getRegisteredToolNames(server);
-      // Should still have tools (none are currently experimental)
+      // Should still have tools, including get_sentry_resource in stable mode
       expect(toolNames).toContain("whoami");
+      expect(toolNames).toContain("get_sentry_resource");
+      expect(toolNames).not.toContain("get_issue_details");
+      expect(toolNames).not.toContain("get_trace_details");
     });
 
     it("includes all default tools when experimentalMode is true", () => {
@@ -454,6 +476,24 @@ describe("buildServer", () => {
       const toolNames = getRegisteredToolNames(server);
       // Should have the standard tools
       expect(toolNames).toContain("whoami");
+      expect(toolNames).toContain("get_sentry_resource");
+      expect(toolNames).not.toContain("get_issue_details");
+      expect(toolNames).not.toContain("get_trace_details");
+    });
+
+    it("keeps get_sentry_resource available for legacy triage and seer skills", () => {
+      for (const grantedSkills of [["triage"], ["seer"]] as const) {
+        const server = buildServer({
+          context: {
+            ...baseContext,
+            grantedSkills: new Set(grantedSkills),
+          },
+        });
+
+        const toolNames = getRegisteredToolNames(server);
+        expect(toolNames).toContain("get_sentry_resource");
+        expect(toolNames).not.toContain("get_issue_details");
+      }
     });
   });
 });

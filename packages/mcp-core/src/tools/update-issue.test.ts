@@ -38,7 +38,7 @@ describe("update_issue", () => {
       # Using this information
 
       - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_issue_details(organizationSlug="sentry-mcp-evals", issueId="CLOUDFLARE-MCP-41")\`
+      - You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       - The issue is now marked as resolved and will no longer generate alerts
       "
     `);
@@ -80,7 +80,7 @@ describe("update_issue", () => {
       # Using this information
 
       - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_issue_details(organizationSlug="sentry-mcp-evals", issueId="CLOUDFLARE-MCP-41")\`
+      - You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       "
     `);
   });
@@ -122,7 +122,7 @@ describe("update_issue", () => {
       # Using this information
 
       - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_issue_details(organizationSlug="sentry-mcp-evals", issueId="CLOUDFLARE-MCP-41")\`
+      - You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       - The issue is now marked as resolved and will no longer generate alerts
       "
     `);

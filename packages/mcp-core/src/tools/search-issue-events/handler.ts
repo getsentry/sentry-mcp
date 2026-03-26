@@ -23,7 +23,7 @@ export default defineTool({
     "",
     "Use this to filter events by time, environment, release, user, trace ID, or other tags. The tool automatically constrains results to the specified issue.",
     "",
-    "For cross-issue searches use search_issues, for single event details use get_issue_details.",
+    "For cross-issue searches use search_issues. For single issue or event details use get_sentry_resource.",
     "",
     "<examples>",
     "search_issue_events(issueId='MCP-41', organizationSlug='my-org', naturalLanguageQuery='from last hour')",

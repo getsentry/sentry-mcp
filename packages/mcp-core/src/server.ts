@@ -181,7 +181,8 @@ function configureServer({
     ) as typeof toolsToRegister;
   }
 
-  // Filter tools based on experimental mode (applies to all tools, including custom)
+  // Filter tools based on public visibility and experimental mode
+  // (applies to all tools, including custom)
   // Skip in agent mode (use_sentry handles filtering internally)
   if (!agentMode) {
     toolsToRegister = Object.fromEntries(

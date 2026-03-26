@@ -44,7 +44,9 @@ describe("/.mcp discovery routes", () => {
     // Verify tool structure
     const toolNames = json.map((t) => t.name);
     expect(toolNames).toContain("find_organizations");
-    expect(toolNames).toContain("get_issue_details");
+    expect(toolNames).toContain("get_sentry_resource");
+    expect(toolNames).not.toContain("get_issue_details");
+    expect(toolNames).not.toContain("get_trace_details");
     expect(toolNames).toContain("search_events");
   });
 });

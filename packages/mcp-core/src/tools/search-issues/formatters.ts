@@ -131,7 +131,7 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
   // Add next steps section (like search_events)
   output += "## Next Steps\n\n";
   output +=
-    "- Get more details about a specific issue: Use the Issue ID with get_issue_details\n";
+    "- Get more details about a specific issue: Use get_sentry_resource with the issue ID or issue URL\n";
   output +=
     "- Update issue status: Use update_issue to resolve or assign issues\n";
   output +=
@@ -141,7 +141,7 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
   const hasFeedback = issues.some((i) => i.issueCategory === "feedback");
   if (hasFeedback) {
     output +=
-      "- View feedback details: Use get_issue_details to see full feedback content and linked error events\n";
+      "- View feedback details: Use get_sentry_resource to see full feedback content and linked error events\n";
   }
 
   return output;

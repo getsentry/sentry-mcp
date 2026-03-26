@@ -248,7 +248,8 @@ describe("oauth callback routes", () => {
       const cookie = await approveClient(oauthApp, testEnv, client.clientId);
       const signedState = await createSignedCallbackState(client.clientId);
       const [signature, payload] = signedState.split(".");
-      const tamperedState = `${signature === "" ? "a" : `${signature.slice(0, -1)}a`}.${payload}`;
+      const tamperedDigit = signature.endsWith("a") ? "b" : "a";
+      const tamperedState = `${signature.slice(0, -1)}${tamperedDigit}.${payload}`;
 
       const response = await callCallback(oauthApp, testEnv, {
         state: tamperedState,

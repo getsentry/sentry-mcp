@@ -23,7 +23,7 @@ claude plugin install sentry-mcp@sentry-mcp
 
 This provides a `sentry-mcp` subagent that Claude automatically delegates to when you ask about Sentry errors, issues, traces, or performance.
 
-For experimental features:
+For forward-looking tool variants and features:
 
 ```shell
 claude plugin install sentry-mcp@sentry-mcp-experimental

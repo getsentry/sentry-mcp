@@ -107,7 +107,7 @@ describe("formatIssueResults", () => {
       });
 
       expect(result).toContain(
-        "View feedback details: Use get_issue_details to see full feedback content and linked error events",
+        "View feedback details: Use get_sentry_resource to see full feedback content and linked error events",
       );
     });
 
@@ -266,10 +266,10 @@ describe("formatIssueResults", () => {
 
         ## Next Steps
 
-        - Get more details about a specific issue: Use the Issue ID with get_issue_details
+        - Get more details about a specific issue: Use get_sentry_resource with the issue ID or issue URL
         - Update issue status: Use update_issue to resolve or assign issues
         - View event counts: Use search_events for aggregated statistics
-        - View feedback details: Use get_issue_details to see full feedback content and linked error events
+        - View feedback details: Use get_sentry_resource to see full feedback content and linked error events
         "
       `);
     });

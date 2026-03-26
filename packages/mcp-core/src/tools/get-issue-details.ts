@@ -32,7 +32,7 @@ export default defineTool({
   name: "get_issue_details",
   skills: ["inspect", "triage", "seer"], // Available in inspect, triage, and seer skills
   requiredScopes: ["event:read"],
-  hideInExperimentalMode: true, // Replaced by get_sentry_resource in experimental mode
+  internalOnly: true, // Retained as a composition primitive behind get_sentry_resource. Do not expose directly via MCP.
   description: [
     "Get detailed information about a specific Sentry issue by ID.",
     "",

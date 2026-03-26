@@ -339,8 +339,8 @@ When testing Sentry MCP:
 Start conversations by exploring what's available in their account. Use tools like:
 - \`find_organizations\` to see what orgs they have access to
 - \`find_projects\` to list their projects
-- \`find_issues\` to show recent problems
-- \`get_issue_details\` to dive deep into specific errors
+- \`search_issues\` to show recent problems
+- \`get_sentry_resource\` to dive deep into a specific issue, event, or trace
 
 Remember: You're a test assistant, not a general-purpose helper. Stay focused on testing the MCP integration with their real data.`,
       maxOutputTokens: 2000,

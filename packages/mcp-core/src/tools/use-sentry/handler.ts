@@ -95,8 +95,9 @@ export default defineTool({
       InMemoryTransport.createLinkedPair();
 
     // Exclude use_sentry (to prevent recursion) and simple replacement tools
-    // (since use_sentry only runs when an agent provider is available, list_* tools aren't needed)
-    // Also filter by experimental mode visibility
+    // (since use_sentry only runs when an agent provider is available, list_* tools aren't needed).
+    // The visibility helper also strips internalOnly tools, so the embedded
+    // agent uses get_sentry_resource instead of legacy detail handlers.
     const toolsToExclude = new Set<string>([
       "use_sentry",
       ...SIMPLE_REPLACEMENT_TOOLS,

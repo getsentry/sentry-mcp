@@ -53,6 +53,8 @@ export default {
   find_teams: findTeams,
   find_projects: findProjects,
   find_releases: findReleases,
+  // Legacy detail handlers stay available for internal composition behind
+  // get_sentry_resource, but are filtered from all external MCP surfaces.
   get_issue_details: getIssueDetails,
   get_issue_tag_values: getIssueTagValues,
   get_trace_details: getTraceDetails,

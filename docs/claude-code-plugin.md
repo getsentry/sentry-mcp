@@ -10,8 +10,8 @@ Two variants are published:
 
 | Plugin | MCP URL | Purpose |
 |--------|---------|---------|
-| `sentry-mcp` | `https://mcp.sentry.dev/mcp` | Stable tools only |
-| `sentry-mcp-experimental` | `https://mcp.sentry.dev/mcp?experimental=1` | Includes experimental tools |
+| `sentry-mcp` | `https://mcp.sentry.dev/mcp` | Stable tool defaults |
+| `sentry-mcp-experimental` | `https://mcp.sentry.dev/mcp?experimental=1` | Forward-looking tool variants and experimental features |
 
 ## Directory Layout
 

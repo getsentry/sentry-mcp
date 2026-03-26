@@ -49,6 +49,10 @@ function byName<T extends { name: string }>(a: T, b: T) {
   return a.name.localeCompare(b.name);
 }
 
+function isNonNull<T>(value: T | null): value is T {
+  return value !== null;
+}
+
 // Tools
 function generateToolDefinitions() {
   const toolsDefault = toolsModule.default as
@@ -66,7 +70,11 @@ function generateToolDefinitions() {
       description: string;
       inputSchema: Record<string, ZodTypeAny>;
       requiredScopes: string[]; // must exist on all tools (can be empty)
+      internalOnly?: boolean;
     };
+    if (t.internalOnly) {
+      return null;
+    }
     if (!Array.isArray(t.requiredScopes)) {
       throw new Error(`Tool '${t.name}' is missing requiredScopes array`);
     }
@@ -80,7 +88,7 @@ function generateToolDefinitions() {
       requiredScopes: t.requiredScopes,
     };
   });
-  return defs.sort(byName);
+  return defs.filter(isNonNull).sort(byName);
 }
 
 // Skills
@@ -131,7 +139,12 @@ async function generateSkillDefinitions() {
         description: string;
         skills: string[];
         requiredScopes: string[];
+        internalOnly?: boolean;
       };
+
+      if (t.internalOnly) {
+        continue;
+      }
 
       // Check if this tool is enabled by this skill
       if (Array.isArray(t.skills) && t.skills.includes(skill.id)) {
@@ -266,10 +279,10 @@ async function main() {
       Object.values(
         toolsModule.default as Record<
           string,
-          { name: string; agentOnly?: boolean }
+          { name: string; agentOnly?: boolean; internalOnly?: boolean }
         >,
       )
-        .filter((t) => t.agentOnly)
+        .filter((t) => t.agentOnly || t.internalOnly)
         .map((t) => t.name),
     );
     const toolNames = tools

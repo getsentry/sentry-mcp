@@ -36,14 +36,20 @@ export function resolveDescription(
 }
 
 /**
- * Determines if a tool should be visible based on experimental mode.
+ * Determines if a tool should be externally visible through MCP surfaces.
+ * - Tools with `internalOnly: true` are never exposed through server registration
  * - Tools with `experimental: true` are only visible when experimentalMode is true
  * - Tools with `hideInExperimentalMode: true` are hidden when experimentalMode is true
  */
 export function isToolVisibleInMode(
-  tool: { experimental?: boolean; hideInExperimentalMode?: boolean },
+  tool: {
+    experimental?: boolean;
+    hideInExperimentalMode?: boolean;
+    internalOnly?: boolean;
+  },
   experimentalMode: boolean,
 ): boolean {
+  if (tool.internalOnly) return false;
   if (tool.experimental && !experimentalMode) return false;
   if (tool.hideInExperimentalMode && experimentalMode) return false;
   return true;
@@ -60,6 +66,7 @@ export interface ToolConfig<
   experimental?: boolean; // Mark tool as experimental (only shown in experimental mode)
   hideInExperimentalMode?: boolean; // Hide tool when experimental mode is active (for tools replaced by unified tools)
   agentOnly?: boolean; // Tool is only available in agent mode (excluded from plugin allowedTools)
+  internalOnly?: boolean; // Tool is retained as an implementation detail and never exposed as an MCP tool
   requiredCapabilities?: (keyof ProjectCapabilities)[]; // Project capabilities required for this tool
   annotations: {
     readOnlyHint?: boolean;
