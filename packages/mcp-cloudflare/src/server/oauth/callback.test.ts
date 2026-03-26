@@ -13,14 +13,16 @@ const { exchangeCodeForAccessToken } = vi.hoisted(() => ({
   exchangeCodeForAccessToken: vi.fn(),
 }));
 
-const { logError, logWarn } = vi.hoisted(() => ({
+const { logError, logWarn, logIssue } = vi.hoisted(() => ({
   logError: vi.fn(),
   logWarn: vi.fn(),
+  logIssue: vi.fn(),
 }));
 
 vi.mock("@sentry/mcp-core/telem/logging", () => ({
   logError,
   logWarn,
+  logIssue,
 }));
 
 vi.mock("./helpers", async (importOriginal) => {

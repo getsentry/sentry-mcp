@@ -40,23 +40,16 @@ export function createOAuthFailureResponse({
   title = "Authentication Failed",
   message,
   status,
-  eventId,
   oauthError,
 }: {
   title?: string;
   message: string;
   status: number;
-  eventId?: string;
   oauthError?: string;
 }): Response {
-  const details = [
-    oauthError
-      ? `<p><strong>OAuth Error:</strong> ${escapeHtml(oauthError)}</p>`
-      : "",
-    eventId ? `<p><strong>Event ID:</strong> ${escapeHtml(eventId)}</p>` : "",
-  ]
-    .filter(Boolean)
-    .join("");
+  const details = oauthError
+    ? `<p><strong>OAuth Error:</strong> ${escapeHtml(oauthError)}</p>`
+    : "";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -108,7 +101,6 @@ export function createOAuthFailureResponse({
     status,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      ...(eventId ? { "X-Event-ID": eventId } : {}),
     },
   });
 }
@@ -199,7 +191,6 @@ export async function exchangeCodeForAccessToken({
     return [
       null,
       createOAuthFailureResponse({
-        title: "Authentication Failed",
         message:
           "The authorization callback did not include an authorization code.",
         status: 400,
@@ -246,7 +237,6 @@ export async function exchangeCodeForAccessToken({
     return [
       null,
       createOAuthFailureResponse({
-        title: "Authentication Failed",
         message: createOAuthErrorMessage(upstreamError.error),
         status: 400,
         oauthError: upstreamError.error,
@@ -275,7 +265,6 @@ export async function exchangeCodeForAccessToken({
     return [
       null,
       createOAuthFailureResponse({
-        title: "Authentication Failed",
         message:
           "There was an issue authenticating your account and retrieving an access token. Please try again.",
         status: 500,

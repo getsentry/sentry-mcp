@@ -105,7 +105,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     });
 
     return createOAuthFailureResponse({
-      title: "Authentication Failed",
       message:
         oauthError === "access_denied"
           ? "Authorization was denied. Please try again if you want to continue connecting your account."
@@ -129,7 +128,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     });
 
     return createOAuthFailureResponse({
-      title: "Authentication Failed",
       message:
         "The authorization callback did not include an authorization code.",
       status: 400,
@@ -178,7 +176,6 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       loggerScope: ["cloudflare", "oauth", "callback"],
     });
     return createOAuthFailureResponse({
-      title: "Authentication Failed",
       message:
         "There was an internal error validating the callback redirect URL.",
       status: 500,
