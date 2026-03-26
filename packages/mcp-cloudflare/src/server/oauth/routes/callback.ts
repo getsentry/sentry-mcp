@@ -4,11 +4,13 @@ import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
+  createOAuthErrorMessage,
+  createOAuthFailureResponse,
   exchangeCodeForAccessToken,
   validateResourceParameter,
 } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
-import { logWarn } from "@sentry/mcp-core/telem/logging";
+import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
 
 /**
@@ -87,6 +89,49 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     return c.text("Authorization failed: Invalid resource parameter", 400);
   }
 
+  const oauthError = c.req.query("error") ?? undefined;
+  if (oauthError) {
+    logIssue("[oauth] Upstream authorization callback error", {
+      contexts: {
+        oauth: {
+          clientId: oauthReqInfo.clientId,
+          oauthError,
+          errorDescription: c.req.query("error_description"),
+        },
+      },
+      extra: {
+        queryKeys: Array.from(new URL(c.req.url).searchParams.keys()),
+      },
+      loggerScope: ["cloudflare", "oauth", "callback"],
+    });
+
+    return createOAuthFailureResponse({
+      message: createOAuthErrorMessage(oauthError),
+      status: 400,
+      oauthError,
+    });
+  }
+
+  if (!c.req.query("code")) {
+    logError("[oauth] Callback reached without code or upstream error", {
+      contexts: {
+        oauth: {
+          clientId: oauthReqInfo.clientId,
+        },
+      },
+      extra: {
+        queryKeys: Array.from(new URL(c.req.url).searchParams.keys()),
+      },
+      loggerScope: ["cloudflare", "oauth", "callback"],
+    });
+
+    return createOAuthFailureResponse({
+      message:
+        "The authorization callback did not include an authorization code.",
+      status: 400,
+    });
+  }
+
   // because we share a clientId with the upstream provider, we need to ensure that the
   // downstream client has been approved by the end-user (e.g. for a new client)
   // https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/265
@@ -118,11 +163,21 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       return c.text("Authorization failed: Invalid redirect URL", 400);
     }
   } catch (lookupErr) {
-    logWarn("Failed to validate client redirect URI on callback", {
-      loggerScope: ["cloudflare", "oauth", "callback"],
+    logError("Failed to validate client redirect URI on callback", {
+      contexts: {
+        oauth: {
+          clientId: oauthReqInfo.clientId,
+          redirectUri: oauthReqInfo.redirectUri,
+        },
+      },
       extra: { error: String(lookupErr) },
+      loggerScope: ["cloudflare", "oauth", "callback"],
     });
-    return c.text("Authorization failed: Invalid redirect URL", 400);
+    return createOAuthFailureResponse({
+      message:
+        "There was an internal error validating the callback redirect URL.",
+      status: 500,
+    });
   }
 
   // Exchange the code for an access token

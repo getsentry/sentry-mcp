@@ -13,6 +13,12 @@ const { exchangeCodeForAccessToken } = vi.hoisted(() => ({
   exchangeCodeForAccessToken: vi.fn(),
 }));
 
+vi.mock("@sentry/mcp-core/telem/logging", () => ({
+  logError: vi.fn(),
+  logWarn: vi.fn(),
+  logIssue: vi.fn(),
+}));
+
 vi.mock("./helpers", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./helpers")>();
 
@@ -134,12 +140,20 @@ async function callCallback(
     state: string;
     cookie?: string;
     code?: string;
+    error?: string;
+    errorDescription?: string;
   },
 ) {
   const url = new URL("http://localhost/oauth/callback");
   url.searchParams.set("state", options.state);
   if (options.code) {
     url.searchParams.set("code", options.code);
+  }
+  if (options.error) {
+    url.searchParams.set("error", options.error);
+  }
+  if (options.errorDescription) {
+    url.searchParams.set("error_description", options.errorDescription);
   }
 
   return oauthApp.fetch(
@@ -180,6 +194,45 @@ describe("oauth callback routes", () => {
 
       expect(response.status).toBe(400);
       expect(await response.text()).toBe("Invalid state");
+    });
+
+    it("renders a safe upstream oauth error page and skips token exchange", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(oauthApp, testEnv, client.clientId);
+      const state = await createSignedCallbackState(client.clientId);
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        cookie,
+        error: "access_denied",
+        errorDescription: "The user denied access",
+      });
+
+      const body = await response.text();
+      expect(response.status).toBe(400);
+      expect(body).toContain("OAuth Error:</strong> access_denied");
+      expect(body).toContain("Authorization was denied");
+      expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
+    });
+
+    it("renders a safe error page when the callback is missing a code", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(oauthApp, testEnv, client.clientId);
+      const state = await createSignedCallbackState(client.clientId);
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        cookie,
+      });
+
+      const body = await response.text();
+      expect(response.status).toBe(400);
+      expect(body).toContain("did not include an authorization code");
+      expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
     });
 
     it("rejects callback without approved client cookie", async () => {
