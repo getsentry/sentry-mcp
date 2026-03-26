@@ -23,6 +23,7 @@ import useSentry from "./use-sentry";
 import listIssues from "./list-issues";
 import listEvents from "./list-events";
 import listIssueEvents from "./list-issue-events";
+import getProfileDetails from "./get-profile-details";
 import getSentryResource from "./get-sentry-resource";
 
 /**
@@ -75,6 +76,7 @@ export default {
   list_issues: listIssues,
   list_events: listEvents,
   list_issue_events: listIssueEvents,
+  get_profile_details: getProfileDetails,
   get_sentry_resource: getSentryResource,
 } as const;
 

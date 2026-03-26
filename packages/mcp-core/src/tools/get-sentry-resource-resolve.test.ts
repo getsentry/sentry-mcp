@@ -601,28 +601,14 @@ describe("resolveResourceParams", () => {
       ).toThrow("`resourceId` is required when not using a URL");
     });
 
-    it("resolves profile with projectSlug", () => {
-      const result = resolveResourceParams({
-        resourceType: "profile",
-        organizationSlug: "my-org",
-        projectSlug: "backend",
-        transactionName: "/api/users",
-      });
-      expect(result).toEqual({
-        type: "profile",
-        organizationSlug: "my-org",
-        projectSlug: "backend",
-        transactionName: "/api/users",
-      });
-    });
-
-    it("throws when projectSlug missing for profile", () => {
+    it("throws for unsupported explicit resourceType (profile)", () => {
       expect(() =>
         resolveResourceParams({
           resourceType: "profile",
           organizationSlug: "my-org",
+          resourceId: "something",
         }),
-      ).toThrow("`projectSlug` is required for profile resources");
+      ).toThrow("Invalid resourceType: profile");
     });
 
     it("throws for unsupported explicit resourceType (replay)", () => {
