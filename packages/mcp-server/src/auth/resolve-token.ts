@@ -1,5 +1,5 @@
 import type { PartiallyResolvedConfig, ResolvedConfig } from "../cli/types";
-import { isSentryIo } from "./constants";
+import { isSentryIo, OAUTH_HOST } from "./constants";
 import { authenticate } from "./device-code-flow";
 import { readCachedToken, writeCachedToken } from "./token-cache";
 import { toCachedToken } from "./types";
@@ -58,7 +58,7 @@ export async function resolveAccessToken(
     );
   }
 
-  const tokenResponse = await authenticate({ clientId, host: sentryHost });
+  const tokenResponse = await authenticate({ clientId, host: OAUTH_HOST });
 
   try {
     await writeCachedToken(toCachedToken(tokenResponse, sentryHost, clientId));

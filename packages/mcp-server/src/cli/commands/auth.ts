@@ -1,5 +1,9 @@
 import { parseEnv } from "../parse";
-import { DEFAULT_SENTRY_CLIENT_ID, isSentryIo } from "../../auth/constants";
+import {
+  DEFAULT_SENTRY_CLIENT_ID,
+  isSentryIo,
+  OAUTH_HOST,
+} from "../../auth/constants";
 import { authenticate } from "../../auth/device-code-flow";
 import {
   readCachedToken,
@@ -33,19 +37,17 @@ export function parseFlag(argv: string[], name: string): string | undefined {
 function resolveAuthContext(argv: string[]): AuthContext {
   const env = parseEnv(process.env);
 
+  // Match the precedence of the server's merge() + finalize() path:
+  // merged url (CLI --url ?? env SENTRY_URL) beats merged host (CLI --host ?? env SENTRY_HOST)
+  const url = parseFlag(argv, "url") ?? env.url;
+  const host = parseFlag(argv, "host") ?? env.host;
+
   let sentryHost = "sentry.io";
-  const urlFlag = parseFlag(argv, "url");
-  const hostFlag = parseFlag(argv, "host");
-  if (urlFlag) {
-    sentryHost = validateAndParseSentryUrlThrows(urlFlag);
-  } else if (hostFlag) {
-    validateSentryHostThrows(hostFlag);
-    sentryHost = hostFlag;
-  } else if (env.url) {
-    sentryHost = validateAndParseSentryUrlThrows(env.url);
-  } else if (env.host) {
-    validateSentryHostThrows(env.host);
-    sentryHost = env.host;
+  if (url) {
+    sentryHost = validateAndParseSentryUrlThrows(url);
+  } else if (host) {
+    validateSentryHostThrows(host);
+    sentryHost = host;
   }
 
   return { sentryHost, clientId: env.clientId || DEFAULT_SENTRY_CLIENT_ID };
@@ -62,7 +64,7 @@ async function login(argv: string[]): Promise<void> {
   }
 
   try {
-    const tokenResponse = await authenticate({ clientId, host: sentryHost });
+    const tokenResponse = await authenticate({ clientId, host: OAUTH_HOST });
     await writeCachedToken(toCachedToken(tokenResponse, sentryHost, clientId));
   } catch (err) {
     console.error(

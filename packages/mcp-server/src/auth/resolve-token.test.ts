@@ -116,4 +116,32 @@ describe("resolveAccessToken", () => {
       host: "sentry.io",
     });
   });
+
+  it("accepts regional sentry.io subdomains", async () => {
+    Object.defineProperty(process.stderr, "isTTY", {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
+
+    const { authenticate } = await import("./device-code-flow");
+    vi.mocked(authenticate).mockResolvedValueOnce({
+      access_token: "regional-token",
+      refresh_token: "refresh",
+      token_type: "bearer",
+      expires_in: 2592000,
+      expires_at: new Date(Date.now() + 2592000000).toISOString(),
+      user: { email: "test@example.com", id: "1", name: "Test" },
+      scope: "org:read",
+    });
+
+    const cfg = makePartialConfig({ sentryHost: "us.sentry.io" });
+    const result = await resolveAccessToken(cfg);
+    expect(result.accessToken).toBe("regional-token");
+    // OAuth endpoints always use sentry.io, not the regional subdomain
+    expect(authenticate).toHaveBeenCalledWith({
+      clientId: "test-client-id",
+      host: "sentry.io",
+    });
+  });
 });

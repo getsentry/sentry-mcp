@@ -329,7 +329,7 @@ async function main() {
   startStdio(server, context).catch(async (err) => {
     console.error("Server error:", err);
     Sentry.captureException(err);
-    await Sentry.flush(5000);
+    await Sentry.flush(SENTRY_TIMEOUT);
     process.exit(1);
   });
 }
