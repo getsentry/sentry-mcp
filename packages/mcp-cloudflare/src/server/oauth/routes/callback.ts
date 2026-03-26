@@ -10,7 +10,7 @@ import {
   validateResourceParameter,
 } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
-import { logError, logWarn } from "@sentry/mcp-core/telem/logging";
+import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
 
 /**
@@ -91,16 +91,15 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
   const oauthError = c.req.query("error") ?? undefined;
   if (oauthError) {
-    logError("[oauth] Upstream authorization callback error", {
+    logIssue("[oauth] Upstream authorization callback error", {
       contexts: {
         oauth: {
           clientId: oauthReqInfo.clientId,
           oauthError,
-          hasErrorDescription: !!c.req.query("error_description"),
+          errorDescription: c.req.query("error_description"),
         },
       },
       extra: {
-        errorDescription: c.req.query("error_description"),
         queryKeys: Array.from(new URL(c.req.url).searchParams.keys()),
       },
       loggerScope: ["cloudflare", "oauth", "callback"],
