@@ -150,7 +150,7 @@
     "@sentry/mcp-server-tsconfig": "workspace:*",
     "msw": "catalog:",
     "tiktoken": "^1.0.18",
-    "yaml": "^2.6.1",
+    "yaml": "^2.8.3",
     "zod-to-json-schema": "catalog:"
   },
   "dependencies": {
