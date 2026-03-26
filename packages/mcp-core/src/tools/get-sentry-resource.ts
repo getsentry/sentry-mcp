@@ -19,6 +19,7 @@ export const FULLY_SUPPORTED_TYPES = [
   "event",
   "trace",
   "breadcrumbs",
+  "profile",
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
@@ -26,13 +27,9 @@ export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 export type RecognizedType = "replay" | "monitor" | "release";
 
 /**
- * All resource types. Profile is URL-only (requires transactionName,
- * which is not expressible through a single resourceId).
+ * All resource types.
  */
-export type ResolvedResourceType =
-  | FullySupportedType
-  | RecognizedType
-  | "profile";
+export type ResolvedResourceType = FullySupportedType | RecognizedType;
 
 export interface ResolvedResourceParams {
   type: ResolvedResourceType;
@@ -61,6 +58,8 @@ export function resolveResourceParams(params: {
   resourceType?: string | null;
   resourceId?: string | null;
   organizationSlug?: string | null;
+  projectSlug?: string | null;
+  transactionName?: string | null;
 }): ResolvedResourceParams {
   if (params.url) {
     const parsed = parseSentryUrl(params.url);
@@ -91,6 +90,21 @@ export function resolveResourceParams(params: {
 
   const resourceType = params.resourceType as FullySupportedType;
   const organizationSlug = params.organizationSlug;
+
+  // Profile uses projectSlug + transactionName instead of resourceId
+  if (resourceType === "profile") {
+    if (!params.projectSlug) {
+      throw new UserInputError(
+        "`projectSlug` is required for profile resources.",
+      );
+    }
+    return {
+      type: "profile",
+      organizationSlug,
+      projectSlug: params.projectSlug,
+      transactionName: params.transactionName ?? undefined,
+    };
+  }
 
   if (!params.resourceId) {
     throw new UserInputError("`resourceId` is required when not using a URL.");
@@ -333,6 +347,9 @@ export default defineTool({
     "",
     "### By type and ID",
     "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
+    "",
+    "### Profile analysis (CPU profiling)",
+    "get_sentry_resource(resourceType='profile', organizationSlug='my-org', projectSlug='backend', transactionName='/api/users')",
     "</examples>",
   ].join("\n"),
 
@@ -346,7 +363,7 @@ export default defineTool({
       ),
 
     resourceType: z
-      .enum(["issue", "event", "trace", "breadcrumbs"])
+      .enum(["issue", "event", "trace", "breadcrumbs", "profile"])
       .optional()
       .describe(
         "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL).",
@@ -357,10 +374,26 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL (except for profile).",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
+
+    projectSlug: z
+      .string()
+      .trim()
+      .optional()
+      .describe(
+        "Project slug. Required for profile resources when not using a URL.",
+      ),
+
+    transactionName: z
+      .string()
+      .trim()
+      .optional()
+      .describe(
+        "Transaction name (e.g., '/api/users'). Used for profile resources to identify the endpoint to analyze.",
+      ),
   },
 
   annotations: { readOnlyHint: true, openWorldHint: true },
@@ -371,6 +404,8 @@ export default defineTool({
       resourceType: params.resourceType,
       resourceId: params.resourceId,
       organizationSlug: params.organizationSlug,
+      projectSlug: params.projectSlug,
+      transactionName: params.transactionName,
     });
 
     setTag("resource.type", resolved.type);

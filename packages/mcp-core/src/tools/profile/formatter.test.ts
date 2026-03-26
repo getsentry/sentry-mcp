@@ -363,6 +363,53 @@ describe("formatter", () => {
       // Library frame should not appear in table
       expect(output).not.toContain("`execute`");
     });
+
+    it("shows class_name.function for Java/Android frames", () => {
+      const chunk = createMockProfileChunk();
+      chunk.profile.frames.push({
+        filename: "UserService.java",
+        function: "getUsers",
+        in_app: true,
+        lineno: 87,
+        class_name: "UserService",
+      });
+      // Add a stack referencing the new frame
+      chunk.profile.stacks.push([3]);
+      chunk.profile.samples.push({
+        stack_id: 2,
+        thread_id: "1",
+        timestamp: 4000,
+      });
+
+      const output = formatProfileChunkAnalysis(chunk, {
+        focusOnUserCode: false,
+      });
+
+      expect(output).toContain("`UserService.getUsers`");
+    });
+
+    it("falls back to module when filename is absent", () => {
+      const chunk = createMockProfileChunk();
+      chunk.profile.frames.push({
+        filename: null,
+        function: "native_call",
+        in_app: false,
+        lineno: null,
+        module: "libc.so",
+      });
+      chunk.profile.stacks.push([3]);
+      chunk.profile.samples.push({
+        stack_id: 2,
+        thread_id: "1",
+        timestamp: 4000,
+      });
+
+      const output = formatProfileChunkAnalysis(chunk, {
+        focusOnUserCode: false,
+      });
+
+      expect(output).toContain("libc.so");
+    });
   });
 
   describe("edge cases", () => {

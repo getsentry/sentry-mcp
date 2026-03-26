@@ -18,9 +18,11 @@ const baseContext = {
 
 function callHandler(params: {
   url?: string;
-  resourceType?: "issue" | "event" | "trace" | "breadcrumbs";
+  resourceType?: "issue" | "event" | "trace" | "breadcrumbs" | "profile";
   resourceId?: string;
   organizationSlug?: string;
+  projectSlug?: string;
+  transactionName?: string;
 }) {
   return getSentryResource.handler(params, baseContext);
 }
@@ -444,6 +446,35 @@ describe("get_sentry_resource", () => {
       });
       expect(result).toContain("# Breadcrumbs for CLOUDFLARE-MCP-41");
     });
+
+    it("fetches profile by projectSlug and transactionName", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/projects/sentry-mcp-evals/backend/",
+          () =>
+            HttpResponse.json({ id: 12345, slug: "backend", name: "Backend" }),
+          { once: true },
+        ),
+      );
+
+      const result = await callHandler({
+        resourceType: "profile",
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "backend",
+        transactionName: "/api/users",
+      });
+      expect(result).toContain("Profile Analysis:");
+    });
+
+    it("fetches profile without transactionName (returns helpful error)", async () => {
+      await expect(
+        callHandler({
+          resourceType: "profile",
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: "backend",
+        }),
+      ).rejects.toThrow("Transaction name is required");
+    });
   });
 
   // ─── Breadcrumbs output formatting ────────────────────────────────────────
@@ -586,14 +617,13 @@ describe("get_sentry_resource", () => {
       ).rejects.toThrow("`resourceId` is required when not using a URL");
     });
 
-    it("throws for unsupported explicit resourceType (profile)", async () => {
+    it("throws when projectSlug missing for profile type", async () => {
       await expect(
         callHandler({
-          resourceType: "profile" as "issue",
+          resourceType: "profile",
           organizationSlug: "my-org",
-          resourceId: "something",
         }),
-      ).rejects.toThrow("Invalid resourceType: profile");
+      ).rejects.toThrow("`projectSlug` is required for profile resources");
     });
 
     it("throws for unsupported explicit resourceType (replay)", async () => {
@@ -621,13 +651,15 @@ describe("get_sentry_resource", () => {
       expect(getSentryResource.skills).toContain("inspect");
     });
 
-    it("has simplified 4-param schema", () => {
+    it("has expected param schema", () => {
       const schemaKeys = Object.keys(getSentryResource.inputSchema);
       expect(schemaKeys).toEqual([
         "url",
         "resourceType",
         "resourceId",
         "organizationSlug",
+        "projectSlug",
+        "transactionName",
       ]);
     });
   });

@@ -1,0 +1,103 @@
+{
+  "chunks": [
+    {
+      "chunk_id": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+      "profiler_id": "041bde57b9844e36b8b7e5734efae5f7",
+      "event_id": "f8e7d6c5b4a3f8e7d6c5b4a3f8e7d6c5",
+      "environment": "production",
+      "platform": "python",
+      "release": "backend@1.2.3",
+      "version": "2",
+      "profile": {
+        "frames": [
+          {
+            "filename": "main.py",
+            "function": "handle_request",
+            "in_app": true,
+            "lineno": 42,
+            "colno": 8,
+            "module": "app.main",
+            "abs_path": "/app/src/main.py",
+            "platform": "python",
+            "lang": "python"
+          },
+          {
+            "filename": "db.py",
+            "function": "execute_query",
+            "in_app": true,
+            "lineno": 118,
+            "colno": 12,
+            "module": "app.db",
+            "abs_path": "/app/src/db.py",
+            "platform": "python",
+            "lang": "python"
+          },
+          {
+            "filename": "serializers.py",
+            "function": "serialize_response",
+            "in_app": true,
+            "lineno": 55,
+            "colno": 4,
+            "module": "app.serializers",
+            "abs_path": "/app/src/serializers.py",
+            "platform": "python",
+            "lang": "python"
+          },
+          {
+            "filename": null,
+            "function": "PyObject_Call",
+            "in_app": false,
+            "lineno": null,
+            "module": "cpython",
+            "abs_path": null,
+            "platform": "python",
+            "instruction_addr": "0x7f3a2b1c4d5e",
+            "symbol": "PyObject_Call"
+          },
+          {
+            "filename": "connection.py",
+            "function": "cursor.execute",
+            "in_app": false,
+            "lineno": 230,
+            "module": "psycopg2.extensions",
+            "abs_path": "/usr/lib/python3.11/site-packages/psycopg2/extensions.py",
+            "platform": "python",
+            "lang": "python"
+          },
+          {
+            "filename": "UserService.java",
+            "function": "getUsers",
+            "in_app": true,
+            "lineno": 87,
+            "module": "com.example.service",
+            "abs_path": "com/example/service/UserService.java",
+            "platform": "java",
+            "class_name": "UserService",
+            "raw_function": "com.example.service.UserService.getUsers",
+            "lang": "java"
+          }
+        ],
+        "samples": [
+          { "stack_id": 0, "thread_id": "1", "timestamp": 1700000000.0 },
+          { "stack_id": 1, "thread_id": "1", "timestamp": 1700000000.01 },
+          { "stack_id": 2, "thread_id": "1", "timestamp": 1700000000.02 },
+          { "stack_id": 1, "thread_id": "1", "timestamp": 1700000000.03 },
+          { "stack_id": 3, "thread_id": "2", "timestamp": 1700000000.0 },
+          { "stack_id": 0, "thread_id": "1", "timestamp": 1700000000.04 },
+          { "stack_id": 1, "thread_id": "1", "timestamp": 1700000000.05 },
+          { "stack_id": 2, "thread_id": "1", "timestamp": 1700000000.06 }
+        ],
+        "stacks": [
+          [0, 3],
+          [0, 1, 4],
+          [0, 2],
+          [0, 1, 4, 3]
+        ],
+        "thread_metadata": {
+          "1": { "name": "MainThread", "priority": 10 },
+          "2": { "name": "BackgroundWorker", "priority": 5 }
+        }
+      }
+    }
+  ]
+}

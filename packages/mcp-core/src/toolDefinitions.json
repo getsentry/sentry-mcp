@@ -479,7 +479,7 @@
   },
   {
     "name": "get_sentry_resource",
-    "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
+    "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Profile analysis (CPU profiling)\nget_sentry_resource(resourceType='profile', organizationSlug='my-org', projectSlug='backend', transactionName='/api/users')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -490,16 +490,24 @@
         },
         "resourceType": {
           "type": "string",
-          "enum": ["issue", "event", "trace", "breadcrumbs"],
+          "enum": ["issue", "event", "trace", "breadcrumbs", "profile"],
           "description": "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL)."
         },
         "resourceId": {
           "type": "string",
-          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL."
+          "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL (except for profile)."
         },
         "organizationSlug": {
           "type": "string",
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "projectSlug": {
+          "type": "string",
+          "description": "Project slug. Required for profile resources when not using a URL."
+        },
+        "transactionName": {
+          "type": "string",
+          "description": "Transaction name (e.g., '/api/users'). Used for profile resources to identify the endpoint to analyze."
         }
       },
       "additionalProperties": false,
