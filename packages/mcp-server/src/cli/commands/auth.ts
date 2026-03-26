@@ -1,6 +1,6 @@
 import { parseEnv } from "../parse";
 import { DEFAULT_SENTRY_CLIENT_ID, isSentryIo } from "../../auth/constants";
-import { authenticate, DeviceCodeError } from "../../auth/device-code-flow";
+import { authenticate } from "../../auth/device-code-flow";
 import {
   readCachedToken,
   writeCachedToken,
@@ -20,11 +20,9 @@ type AuthContext = {
 export function parseFlag(argv: string[], name: string): string | undefined {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    // --flag=value
     if (arg.startsWith(`--${name}=`)) {
       return arg.slice(`--${name}=`.length);
     }
-    // --flag value
     if (arg === `--${name}` && i + 1 < argv.length) {
       return argv[i + 1];
     }
@@ -36,8 +34,8 @@ function resolveAuthContext(argv: string[]): AuthContext {
   const env = parseEnv(process.env);
 
   let sentryHost = "sentry.io";
-  const hostFlag = parseFlag(argv, "host");
   const urlFlag = parseFlag(argv, "url");
+  const hostFlag = parseFlag(argv, "host");
   if (urlFlag) {
     sentryHost = validateAndParseSentryUrlThrows(urlFlag);
   } else if (hostFlag) {
@@ -67,13 +65,9 @@ async function login(argv: string[]): Promise<void> {
     const tokenResponse = await authenticate({ clientId, host: sentryHost });
     await writeCachedToken(toCachedToken(tokenResponse, sentryHost, clientId));
   } catch (err) {
-    if (err instanceof DeviceCodeError) {
-      console.error(err.message);
-    } else {
-      console.error(
-        `Authentication failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+    console.error(
+      err instanceof Error ? err.message : `Authentication failed: ${err}`,
+    );
     process.exit(1);
   }
 }

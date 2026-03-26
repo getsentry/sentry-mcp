@@ -1,8 +1,15 @@
 import type { PartiallyResolvedConfig, ResolvedConfig } from "../cli/types";
 import { isSentryIo } from "./constants";
-import { authenticate, DeviceCodeError } from "./device-code-flow";
+import { authenticate } from "./device-code-flow";
 import { readCachedToken, writeCachedToken } from "./token-cache";
 import { toCachedToken } from "./types";
+
+function withToken(
+  partial: PartiallyResolvedConfig,
+  accessToken: string,
+): ResolvedConfig {
+  return { ...partial, accessToken };
+}
 
 /**
  * Resolves the access token for the session.
@@ -16,7 +23,7 @@ export async function resolveAccessToken(
   partial: PartiallyResolvedConfig,
 ): Promise<ResolvedConfig> {
   if (partial.accessToken) {
-    return { ...partial, accessToken: partial.accessToken };
+    return withToken(partial, partial.accessToken);
   }
 
   if (!isSentryIo(partial.sentryHost)) {
@@ -35,10 +42,10 @@ export async function resolveAccessToken(
       process.stderr.write(
         `Using cached authentication for ${cached.user_email}\n`,
       );
-      return { ...partial, accessToken: cached.access_token };
+      return withToken(partial, cached.access_token);
     }
   } catch {
-    // Cache read failure is non-fatal — fall through to device code flow
+    // Cache read failure is non-fatal
   }
 
   // Device code flow requires a human to visit a URL and authorize.
@@ -51,25 +58,13 @@ export async function resolveAccessToken(
     );
   }
 
-  // Run device code flow (interactive only)
+  const tokenResponse = await authenticate({ clientId, host: sentryHost });
+
   try {
-    const tokenResponse = await authenticate({ clientId, host: sentryHost });
-
-    try {
-      await writeCachedToken(
-        toCachedToken(tokenResponse, sentryHost, clientId),
-      );
-    } catch {
-      process.stderr.write("Warning: Could not cache authentication token.\n");
-    }
-
-    return { ...partial, accessToken: tokenResponse.access_token };
-  } catch (err) {
-    if (err instanceof DeviceCodeError) {
-      throw new Error(err.message);
-    }
-    throw new Error(
-      `Device code authentication failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    await writeCachedToken(toCachedToken(tokenResponse, sentryHost, clientId));
+  } catch {
+    process.stderr.write("Warning: Could not cache authentication token.\n");
   }
+
+  return withToken(partial, tokenResponse.access_token);
 }

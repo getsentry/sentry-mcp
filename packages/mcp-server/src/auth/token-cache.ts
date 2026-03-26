@@ -48,7 +48,8 @@ export async function readCachedToken(
   clientId: string,
 ): Promise<CachedToken | null> {
   const data = await readCacheFile();
-  const entry = data[cacheKey(host, clientId)];
+  const key = cacheKey(host, clientId);
+  const entry = data[key];
   if (!entry) return null;
 
   const expiresAt = new Date(entry.expires_at).getTime();
@@ -56,8 +57,8 @@ export async function readCachedToken(
     !Number.isFinite(expiresAt) ||
     expiresAt - Date.now() <= EXPIRY_SAFETY_MS
   ) {
-    // Token expired or about to expire — clear it
-    await clearCachedToken(host, clientId);
+    delete data[key];
+    await writeCacheFile(data);
     return null;
   }
 

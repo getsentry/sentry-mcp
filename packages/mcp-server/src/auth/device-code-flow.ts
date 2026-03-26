@@ -42,7 +42,7 @@ export async function requestDeviceCode(
     body: new URLSearchParams({
       client_id: clientId,
       scope: scopes,
-    }).toString(),
+    }),
   });
 
   if (!resp.ok) {
@@ -90,7 +90,7 @@ export async function pollForToken({
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
         device_code: deviceCode,
         client_id: clientId,
-      }).toString(),
+      }),
     });
 
     if (resp.ok) {
@@ -98,7 +98,6 @@ export async function pollForToken({
       return TokenResponseSchema.parse(body);
     }
 
-    // Parse error response
     const errorBody = await resp.json().catch(() => null);
     const parsed = DeviceCodeErrorSchema.safeParse(errorBody);
     const errorCode = parsed.success ? parsed.data.error : undefined;

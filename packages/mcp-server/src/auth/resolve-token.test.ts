@@ -5,9 +5,6 @@ import type { PartiallyResolvedConfig } from "../cli/types";
 // Mock the auth modules so we never make real network calls or touch disk
 vi.mock("./device-code-flow", () => ({
   authenticate: vi.fn(),
-  DeviceCodeError: class DeviceCodeError extends Error {
-    code?: string;
-  },
 }));
 
 vi.mock("./token-cache", () => ({
