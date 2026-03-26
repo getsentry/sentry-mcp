@@ -335,9 +335,8 @@ export async function tokenExchangeCallback(
     };
   } catch (error) {
     if (!(error instanceof ApiAuthenticationError)) {
-      logIssue("Unexpected error probing upstream token validity", {
+      logIssue(error, {
         loggerScope: ["cloudflare", "oauth", "refresh"],
-        extra: { error },
       });
     }
   }
