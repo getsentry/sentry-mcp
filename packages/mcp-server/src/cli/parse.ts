@@ -107,7 +107,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     anthropicBaseUrl: cli.anthropicBaseUrl,
     anthropicModel: cli.anthropicModel ?? env.anthropicModel,
     agentProvider: cli.agentProvider ?? env.agentProvider,
-    clientId: cli.clientId ?? env.clientId,
+    clientId: env.clientId,
     // Skills precedence: CLI skills override env
     skills: cli.skills ?? env.skills,
     disableSkills: cli.disableSkills ?? env.disableSkills,

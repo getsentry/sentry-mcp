@@ -160,9 +160,9 @@ function openBrowser(url: string): void {
     } else if (platform === "win32") {
       exec(`start "" ${JSON.stringify(url)}`);
     } else if (isWSL()) {
-      // WSL: cmd.exe needs ^& escaping for unquoted ampersands.
-      // Pass URL without shell quoting so cmd.exe sees it directly.
-      exec(`cmd.exe /c start "" "${url.replace(/&/g, "^&")}"`);
+      // WSL: invoke cmd.exe to open the default browser.
+      // URL is double-quoted so & is safe without escaping.
+      exec(`cmd.exe /c start "" "${url}"`);
     } else {
       exec(`xdg-open ${JSON.stringify(url)}`);
     }
