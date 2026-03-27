@@ -2,7 +2,6 @@ import { setTag } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 import { isNumericId } from "../utils/slug-validation";
@@ -96,12 +95,6 @@ export default defineTool({
       end,
       focusOnUserCode,
     } = params;
-
-    if (!profilerId) {
-      throw new UserInputError(
-        "profilerId is required. This is the profiler session UUID found in Sentry profile URLs or event data.",
-      );
-    }
 
     setTag("organization.slug", organizationSlug);
     setTag("profiler.id", profilerId);
