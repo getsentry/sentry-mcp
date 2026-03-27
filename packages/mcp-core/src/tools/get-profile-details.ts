@@ -5,6 +5,7 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import { isNumericId } from "../utils/slug-validation";
 import { formatProfileChunkAnalysis } from "./profile/formatter";
 
 export default defineTool({
@@ -105,10 +106,28 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     setTag("profiler.id", profilerId);
 
+    // Resolve project slug to numeric ID (profiling API requires numeric IDs)
+    let projectId: string | number;
+    if (
+      typeof projectSlugOrId === "number" ||
+      isNumericId(String(projectSlugOrId))
+    ) {
+      projectId = projectSlugOrId;
+      setTag("project.id", String(projectSlugOrId));
+    } else {
+      const project = await apiService.getProject({
+        organizationSlug,
+        projectSlugOrId: String(projectSlugOrId),
+      });
+      projectId = project.id;
+      setTag("project.slug", String(projectSlugOrId));
+      setTag("project.id", String(project.id));
+    }
+
     const chunk = await apiService.getProfileChunk({
       organizationSlug,
       profilerId,
-      projectId: projectSlugOrId,
+      projectId,
       start,
       end,
     });

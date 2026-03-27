@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { http, HttpResponse } from "msw";
+import { mswServer } from "@sentry/mcp-server-mocks";
 import getProfileDetails from "./get-profile-details";
 
 const baseContext = {
@@ -26,7 +28,16 @@ function callHandler(params: {
 
 describe("get_profile_details", () => {
   describe("handler", () => {
-    it("fetches and formats a profile chunk", async () => {
+    it("fetches and formats a profile chunk with slug resolution", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/projects/sentry-mcp-evals/backend/",
+          () =>
+            HttpResponse.json({ id: 12345, slug: "backend", name: "Backend" }),
+          { once: true },
+        ),
+      );
+
       const result = await callHandler({
         organizationSlug: "sentry-mcp-evals",
         projectSlugOrId: "backend",
@@ -42,10 +53,22 @@ describe("get_profile_details", () => {
       expect(result).toContain("## Top Frames by Occurrence");
     });
 
+    it("skips slug resolution for numeric project IDs", async () => {
+      const result = await callHandler({
+        organizationSlug: "sentry-mcp-evals",
+        projectSlugOrId: 12345,
+        profilerId: "041bde57b9844e36b8b7e5734efae5f7",
+        start: "2024-01-01T00:00:00",
+        end: "2024-01-01T01:00:00",
+      });
+
+      expect(result).toContain("# Profile Chunk Details");
+    });
+
     it("respects focusOnUserCode option", async () => {
       const resultAll = await callHandler({
         organizationSlug: "sentry-mcp-evals",
-        projectSlugOrId: "backend",
+        projectSlugOrId: 12345,
         profilerId: "041bde57b9844e36b8b7e5734efae5f7",
         start: "2024-01-01T00:00:00",
         end: "2024-01-01T01:00:00",
