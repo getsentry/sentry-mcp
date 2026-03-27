@@ -161,8 +161,7 @@ function openBrowser(url: string): void {
       exec(`start "" ${JSON.stringify(url)}`);
     } else if (isWSL()) {
       // WSL: invoke cmd.exe to open the default browser.
-      // URL is double-quoted so & is safe without escaping.
-      exec(`cmd.exe /c start "" "${url}"`);
+      exec(`cmd.exe /c start "" ${JSON.stringify(url)}`);
     } else {
       exec(`xdg-open ${JSON.stringify(url)}`);
     }
