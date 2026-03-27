@@ -931,9 +931,15 @@ export const ProfileFrameSchema = z
     function: z.string(),
     in_app: z.boolean(),
     lineno: z.number().nullable().optional(),
+    colno: z.number().nullable().optional(),
     module: z.string().nullable().optional(),
     abs_path: z.string().nullable().optional(),
     platform: z.string().nullable().optional(),
+    instruction_addr: z.string().nullable().optional(),
+    class_name: z.string().nullable().optional(),
+    raw_function: z.string().nullable().optional(),
+    symbol: z.string().nullable().optional(),
+    lang: z.string().nullable().optional(),
     data: z.record(z.unknown()).optional(),
   })
   .passthrough();
@@ -949,6 +955,7 @@ export const ProfileSampleSchema = z
     stack_id: z.number(),
     thread_id: z.string(),
     timestamp: z.number(),
+    queue_address: z.string().optional(),
   })
   .passthrough();
 
@@ -967,6 +974,7 @@ export const ProfileChunkSchema = z
   .object({
     chunk_id: z.string(),
     profiler_id: z.string(),
+    event_id: z.string().optional(),
     environment: z.string().nullable(),
     platform: z.string(),
     release: z.string(),
@@ -979,6 +987,7 @@ export const ProfileChunkSchema = z
         z
           .object({
             name: z.string().nullable(),
+            priority: z.number().nullable().optional(),
           })
           .passthrough(),
       ),

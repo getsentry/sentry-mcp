@@ -47,6 +47,9 @@ import eventsSpansFixture from "./fixtures/events-spans.json" with {
 import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
+import profileChunkFixture from "./fixtures/profile-chunk.json" with {
+  type: "json",
+};
 import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
 };
@@ -880,6 +883,13 @@ export const restHandlers = buildHandlers([
       return HttpResponse.json(flamegraphFixture);
     },
   },
+  {
+    method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/profiling/chunks/",
+    fetch: () => {
+      return HttpResponse.json(profileChunkFixture);
+    },
+  },
   // Event attachment endpoints
   {
     method: "get",
@@ -1215,6 +1225,7 @@ export {
   traceItemsAttributesLogsStringFixture,
   traceItemsAttributesLogsNumberFixture,
   eventAttachmentsFixture,
+  profileChunkFixture,
 };
 
 // Export fixture factories

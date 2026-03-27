@@ -5,7 +5,7 @@
     "description": "Search for errors, analyze traces, and explore event details",
     "defaultEnabled": true,
     "order": 1,
-    "toolCount": 14,
+    "toolCount": 15,
     "tools": [
       {
         "name": "find_organizations",
@@ -35,6 +35,11 @@
       {
         "name": "get_issue_tag_values",
         "description": "Get tag value distribution for a specific Sentry issue.\n\nUse this tool when you need to:\n- Understand how an issue is distributed across different tag values\n- Get aggregate counts of unique tag values (e.g., 'how many unique URLs are affected')\n- Analyze which browsers, environments, or URLs are most impacted by an issue\n- View the tag distributions page data programmatically\n\nCommon tag keys:\n- `url`: Request URLs affected by the issue\n- `browser`: Browser types and versions\n- `browser.name`: Browser names only\n- `os`: Operating systems\n- `environment`: Deployment environments (production, staging, etc.)\n- `release`: Software releases\n- `device`: Device types\n- `user`: Affected users\n\n<examples>\n### Get URL distribution for an issue\n```\nget_issue_tag_values(organizationSlug='my-organization', issueId='PROJECT-123', tagKey='url')\n```\n\n### Get browser distribution using issue URL\n```\nget_issue_tag_values(issueUrl='https://sentry.io/issues/PROJECT-123/', tagKey='browser')\n```\n\n### Get environment distribution\n```\nget_issue_tag_values(organizationSlug='my-organization', issueId='PROJECT-123', tagKey='environment')\n```\n</examples>\n\n<hints>\n- If user provides a Sentry URL, pass the ENTIRE URL to issueUrl parameter unchanged\n- Common tag keys: url, browser, browser.name, os, environment, release, device, user\n- Tag keys are case-sensitive\n</hints>",
+        "requiredScopes": ["event:read"]
+      },
+      {
+        "name": "get_profile_details",
+        "description": "Retrieve raw profile chunk data to inspect individual function calls, threads, and stack traces.\n\nUSE THIS TOOL WHEN:\n- User wants to inspect raw profiling samples for a specific profiler session\n- User needs to see individual thread activity and stack traces\n- User wants detailed frame-level data (function names, file locations, call counts)\n\nRETURNS:\n- Profile chunk metadata (platform, release, environment)\n- Per-thread sample counts and names\n- Top frames by occurrence with file locations\n- User code vs library code breakdown\n\nNOTE: This tool requires a `profilerId` which identifies a specific profiling session.\nUse `get_profile` for aggregated flamegraph analysis by transaction name.\n\n<examples>\n### Inspect a profiler session\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profilerId='041bde57b9844e36b8b7e5734efae5f7',\n  start='2024-01-01T00:00:00',\n  end='2024-01-01T01:00:00'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library/system frames\n- The profilerId can be found in Sentry profile URLs or event data\n</hints>",
         "requiredScopes": ["event:read"]
       },
       {

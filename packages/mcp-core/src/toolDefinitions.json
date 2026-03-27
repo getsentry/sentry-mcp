@@ -478,6 +478,63 @@
     "requiredScopes": ["event:read"]
   },
   {
+    "name": "get_profile_details",
+    "description": "Retrieve raw profile chunk data to inspect individual function calls, threads, and stack traces.\n\nUSE THIS TOOL WHEN:\n- User wants to inspect raw profiling samples for a specific profiler session\n- User needs to see individual thread activity and stack traces\n- User wants detailed frame-level data (function names, file locations, call counts)\n\nRETURNS:\n- Profile chunk metadata (platform, release, environment)\n- Per-thread sample counts and names\n- Top frames by occurrence with file locations\n- User code vs library code breakdown\n\nNOTE: This tool requires a `profilerId` which identifies a specific profiling session.\nUse `get_profile` for aggregated flamegraph analysis by transaction name.\n\n<examples>\n### Inspect a profiler session\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profilerId='041bde57b9844e36b8b7e5734efae5f7',\n  start='2024-01-01T00:00:00',\n  end='2024-01-01T01:00:00'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library/system frames\n- The profilerId can be found in Sentry profile URLs or event data\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        },
+        "projectSlugOrId": {
+          "type": ["string", "number"],
+          "description": "Project slug or numeric ID"
+        },
+        "profilerId": {
+          "type": "string",
+          "description": "Profiler session ID (UUID from Sentry profile data)"
+        },
+        "start": {
+          "type": "string",
+          "description": "Start time for the profile chunk query (ISO 8601 format, e.g., '2024-01-01T00:00:00')"
+        },
+        "end": {
+          "type": "string",
+          "description": "End time for the profile chunk query (ISO 8601 format, e.g., '2024-01-01T01:00:00')"
+        },
+        "focusOnUserCode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show only user code (in_app: true). Set to false to include library code."
+        }
+      },
+      "required": [
+        "organizationSlug",
+        "projectSlugOrId",
+        "profilerId",
+        "start",
+        "end"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["event:read"]
+  },
+  {
     "name": "get_sentry_resource",
     "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
     "inputSchema": {

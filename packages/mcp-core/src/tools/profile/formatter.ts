@@ -496,16 +496,19 @@ export function formatProfileChunkAnalysis(
 
       if (options.focusOnUserCode && !frame.in_app) continue;
 
+      // Show class_name.function for Java/Android frames
+      const funcName = frame.class_name
+        ? `${frame.class_name}.${frame.function}`
+        : frame.function;
+
       const rawLocation =
         frame.filename && frame.lineno
           ? `${frame.filename}:${frame.lineno}`
-          : frame.abs_path || "unknown";
+          : frame.module || frame.abs_path || "unknown";
       const location = truncateLocation(rawLocation, 40);
       const type = frame.in_app ? "User Code" : "Library";
 
-      sections.push(
-        `| \`${frame.function}\` | ${location} | ${count} | ${type} |`,
-      );
+      sections.push(`| \`${funcName}\` | ${location} | ${count} | ${type} |`);
     }
   }
 
