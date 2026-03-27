@@ -31,6 +31,7 @@ export type EnvArgs = {
   openaiModel?: string;
   anthropicModel?: string;
   agentProvider?: string;
+  clientId?: string;
   skills?: string;
   disableSkills?: string;
 };
@@ -46,6 +47,7 @@ export type MergedArgs = {
   anthropicBaseUrl?: string;
   anthropicModel?: string;
   agentProvider?: string;
+  clientId?: string; // env-only, carried from EnvArgs
   skills?: string;
   disableSkills?: string;
   agent?: boolean;
@@ -57,8 +59,13 @@ export type MergedArgs = {
   unknownArgs: string[];
 };
 
-export type ResolvedConfig = {
-  accessToken: string;
+/**
+ * Partially resolved config — accessToken may not yet be available
+ * (will be resolved via device code flow or cache).
+ */
+export type PartiallyResolvedConfig = {
+  accessToken?: string;
+  clientId: string;
   sentryHost: string;
   mcpUrl?: string;
   sentryDsn?: string;
@@ -71,4 +78,8 @@ export type ResolvedConfig = {
   finalSkills: Set<Skill>;
   organizationSlug?: string;
   projectSlug?: string;
+};
+
+export type ResolvedConfig = Omit<PartiallyResolvedConfig, "accessToken"> & {
+  accessToken: string;
 };

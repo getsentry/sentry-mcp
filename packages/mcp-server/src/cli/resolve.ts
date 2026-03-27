@@ -4,7 +4,8 @@ import {
   validateOpenAiBaseUrlThrows,
   validateSentryHostThrows,
 } from "@sentry/mcp-core/utils/url-utils";
-import type { MergedArgs, ResolvedConfig } from "./types";
+import { DEFAULT_SENTRY_CLIENT_ID } from "../auth/constants";
+import type { MergedArgs, PartiallyResolvedConfig } from "./types";
 
 export function formatInvalidSkills(
   invalid: string[],
@@ -14,22 +15,24 @@ export function formatInvalidSkills(
   return `Error: ${prefix}: ${invalid.join(", ")}\nAvailable skills: ${ALL_SKILLS.join(", ")}`;
 }
 
-export function finalize(input: MergedArgs): ResolvedConfig {
-  // Access token required
-  if (!input.accessToken) {
-    throw new Error(
-      "Error: No access token was provided. Pass one with `--access-token` or via `SENTRY_ACCESS_TOKEN`.",
-    );
+/**
+ * Resolves the Sentry host from url/host inputs with validation.
+ * Used by both the server flow (finalize) and auth commands (resolveAuthContext)
+ * to ensure cache keys always match.
+ */
+export function resolveHost(url?: string, host?: string): string {
+  if (url) {
+    return validateAndParseSentryUrlThrows(url);
   }
+  if (host) {
+    validateSentryHostThrows(host);
+    return host;
+  }
+  return "sentry.io";
+}
 
-  // Determine host from url/host with validation
-  let sentryHost = "sentry.io";
-  if (input.url) {
-    sentryHost = validateAndParseSentryUrlThrows(input.url);
-  } else if (input.host) {
-    validateSentryHostThrows(input.host);
-    sentryHost = input.host;
-  }
+export function finalize(input: MergedArgs): PartiallyResolvedConfig {
+  const sentryHost = resolveHost(input.url, input.host);
 
   // Skills resolution
   //
@@ -105,6 +108,7 @@ export function finalize(input: MergedArgs): ResolvedConfig {
 
   return {
     accessToken: input.accessToken,
+    clientId: input.clientId || DEFAULT_SENTRY_CLIENT_ID,
     sentryHost,
     mcpUrl: input.mcpUrl,
     sentryDsn: input.sentryDsn,
