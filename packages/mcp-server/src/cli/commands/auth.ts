@@ -1,4 +1,5 @@
 import { parseEnv } from "../parse";
+import { resolveHost } from "../resolve";
 import {
   DEFAULT_SENTRY_CLIENT_ID,
   isSentryIo,
@@ -11,10 +12,6 @@ import {
   clearCachedToken,
 } from "../../auth/token-cache";
 import { toCachedToken } from "../../auth/types";
-import {
-  validateAndParseSentryUrlThrows,
-  validateSentryHostThrows,
-} from "@sentry/mcp-core/utils/url-utils";
 
 type AuthContext = {
   sentryHost: string;
@@ -41,14 +38,7 @@ function resolveAuthContext(argv: string[]): AuthContext {
   // merged url (CLI --url ?? env SENTRY_URL) beats merged host (CLI --host ?? env SENTRY_HOST)
   const url = parseFlag(argv, "url") ?? env.url;
   const host = parseFlag(argv, "host") ?? env.host;
-
-  let sentryHost = "sentry.io";
-  if (url) {
-    sentryHost = validateAndParseSentryUrlThrows(url);
-  } else if (host) {
-    validateSentryHostThrows(host);
-    sentryHost = host;
-  }
+  const sentryHost = resolveHost(url, host);
 
   return { sentryHost, clientId: env.clientId || DEFAULT_SENTRY_CLIENT_ID };
 }

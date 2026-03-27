@@ -15,15 +15,24 @@ export function formatInvalidSkills(
   return `Error: ${prefix}: ${invalid.join(", ")}\nAvailable skills: ${ALL_SKILLS.join(", ")}`;
 }
 
-export function finalize(input: MergedArgs): PartiallyResolvedConfig {
-  // Determine host from url/host with validation
-  let sentryHost = "sentry.io";
-  if (input.url) {
-    sentryHost = validateAndParseSentryUrlThrows(input.url);
-  } else if (input.host) {
-    validateSentryHostThrows(input.host);
-    sentryHost = input.host;
+/**
+ * Resolves the Sentry host from url/host inputs with validation.
+ * Used by both the server flow (finalize) and auth commands (resolveAuthContext)
+ * to ensure cache keys always match.
+ */
+export function resolveHost(url?: string, host?: string): string {
+  if (url) {
+    return validateAndParseSentryUrlThrows(url);
   }
+  if (host) {
+    validateSentryHostThrows(host);
+    return host;
+  }
+  return "sentry.io";
+}
+
+export function finalize(input: MergedArgs): PartiallyResolvedConfig {
+  const sentryHost = resolveHost(input.url, input.host);
 
   // Skills resolution
   //
