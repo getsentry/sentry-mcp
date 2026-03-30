@@ -4,6 +4,10 @@ Sentry's MCP service is primarily designed for human-in-the-loop coding agents. 
 
 This remote MCP server acts as middleware to the upstream Sentry API, optimized for coding assistants like Cursor, Claude Code, and similar development tools. It's based on [Cloudflare's work towards remote MCPs](https://blog.cloudflare.com/remote-model-context-protocol-servers-mcp/).
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/getsentry-sentry-mcp).
+
 ## Getting Started
 
 You'll find everything you need to know by visiting the deployed service in production:
