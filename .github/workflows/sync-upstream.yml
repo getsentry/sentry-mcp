@@ -105,53 +105,64 @@ jobs:
             git merge --abort || true
           fi
 
+      - name: Install OpenCode
+        if: steps.check.outputs.has_changes == 'true' && steps.merge.outputs.merge_success == 'false'
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> $GITHUB_PATH
+
       - name: Use OpenCode to resolve conflicts
         if: steps.check.outputs.has_changes == 'true' && steps.merge.outputs.merge_success == 'false'
-        uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-        with:
-          model: opencode/claude-opus-4-5
-          prompt: |
-            There are merge conflicts when trying to sync this fork with upstream getsentry/sentry-mcp.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          opencode run \
+            --model opencode/claude-opus-4-5 \
+            --print-logs \
+            -p "$(cat <<'PROMPT'
+          There are merge conflicts when trying to sync this fork with upstream getsentry/sentry-mcp.
 
-            Please help resolve the merge conflicts:
+          Please help resolve the merge conflicts:
 
-            1. First, run these commands to set up the merge:
-               ```bash
-               git remote add upstream https://github.com/getsentry/sentry-mcp.git || true
-               git fetch upstream main
-               BRANCH_NAME="sync-upstream-$(date +%Y%m%d)-resolved"
-               # Delete remote branch if it exists from a previous run
-               git push origin --delete "$BRANCH_NAME" 2>/dev/null || true
-               git checkout -b "$BRANCH_NAME"
-               git merge upstream/main || true
-               ```
+          1. First, run these commands to set up the merge:
+             ```bash
+             git remote add upstream https://github.com/getsentry/sentry-mcp.git || true
+             git fetch upstream main
+             BRANCH_NAME="sync-upstream-$(date +%Y%m%d)-resolved"
+             # Delete remote branch if it exists from a previous run
+             git push origin --delete "$BRANCH_NAME" 2>/dev/null || true
+             git checkout -b "$BRANCH_NAME"
+             git merge upstream/main || true
+             ```
 
-            2. Review the conflicts. Key context for this fork:
-               - This is the Fields Education fork deployed to Cloudflare
-               - `packages/mcp-cloudflare-fields/` is OUR package (symlinks to mcp-cloudflare source)
-               - `.github/workflows/deploy-fields.yml` is OUR workflow - DO NOT modify
-               - `.github/workflows/sync-upstream.yml` is OUR workflow - DO NOT modify
+          2. Review the conflicts. Key context for this fork:
+             - This is the Fields Education fork deployed to Cloudflare
+             - `packages/mcp-cloudflare-fields/` is OUR package (symlinks to mcp-cloudflare source)
+             - `.github/workflows/deploy-fields.yml` is OUR workflow - DO NOT modify
+             - `.github/workflows/sync-upstream.yml` is OUR workflow - DO NOT modify
 
-            3. IMPORTANT - Keep these Sentry workflows DISABLED:
-               - If `deploy.yml` appears, rename it to `deploy.yml.disabled`
-               - If `release.yml` appears, rename it to `release.yml.disabled`
-               - Our `.disabled` suffix prevents them from running
+          3. IMPORTANT - Keep these Sentry workflows DISABLED:
+             - If `deploy.yml` appears, rename it to `deploy.yml.disabled`
+             - If `release.yml` appears, rename it to `release.yml.disabled`
+             - Our `.disabled` suffix prevents them from running
 
-            4. Resolve conflicts by:
-               - Accepting upstream changes for source code in `packages/mcp-cloudflare/src/`
-               - Accepting upstream changes for `packages/mcp-core/`
-               - Preserving our `.disabled` workflow files (rename any restored ones)
-               - Keeping our `packages/mcp-cloudflare-fields/` configs unchanged
-               - For `pnpm-lock.yaml`, delete it and run `pnpm install` to regenerate
+          4. Resolve conflicts by:
+             - Accepting upstream changes for source code in `packages/mcp-cloudflare/src/`
+             - Accepting upstream changes for `packages/mcp-core/`
+             - Preserving our `.disabled` workflow files (rename any restored ones)
+             - Keeping our `packages/mcp-cloudflare-fields/` configs unchanged
+             - For `pnpm-lock.yaml`, delete it and run `pnpm install` to regenerate
 
-            5. If `index.html` in `packages/mcp-cloudflare/` changed:
-               - Copy the updated version to `packages/mcp-cloudflare-fields/index.html`
-               - (It can't be symlinked due to Vite build path resolution issues)
+          5. If `index.html` in `packages/mcp-cloudflare/` changed:
+             - Copy the updated version to `packages/mcp-cloudflare-fields/index.html`
+             - (It can't be symlinked due to Vite build path resolution issues)
 
-            6. After resolving all conflicts:
-               - Stage all changes: `git add -A`
-               - Commit: `git commit -m "chore: sync with upstream sentry-mcp (resolved conflicts)"`
-               - Push: `git push -u origin HEAD`
-               - Create a PR to main branch
+          6. After resolving all conflicts:
+             - Stage all changes: `git add -A`
+             - Commit: `git commit -m "chore: sync with upstream sentry-mcp (resolved conflicts)"`
+             - Push: `git push -u origin HEAD`
+             - Create a PR to main branch using `gh pr create`
+          PROMPT
+          )"
