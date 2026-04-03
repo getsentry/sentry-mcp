@@ -76,9 +76,6 @@ import replayDetailsFixture from "./fixtures/replay-details.json" with {
 import replayRecordingSegmentsFixture from "./fixtures/replay-recording-segments.json" with {
   type: "json",
 };
-import flamegraphFixture from "./fixtures/flamegraph.json" with {
-  type: "json",
-};
 import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json" with {
   type: "json",
 };
