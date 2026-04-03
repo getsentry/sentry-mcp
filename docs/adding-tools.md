@@ -2,17 +2,25 @@
 
 Step-by-step guide for adding new tools to the Sentry MCP server.
 
+## Tool Visibility & Selection
+
+Not every tool is exposed to every consumer. We rely on several mechanisms to keep the active tool set manageable:
+
+- **`requiredCapabilities`** — Tools declare which project capabilities they need (e.g. `profiles`, `replays`, `traces`). If the upstream project doesn't have a capability enabled, the tool is automatically hidden.
+- **`internalOnly`** — Composition primitives (e.g. `get_issue_details`, `get_trace_details`) that are only called by other tools like `get_sentry_resource`, never exposed directly via MCP.
+- **`experimental` / `hideInExperimentalMode`** — Feature flags for tools that are being tested or replaced.
+- **Skills & constraints** — The server filters tools based on granted skills and org/project constraints.
+
+We also expect upstream consumers (Claude Code plugins, Cursor, etc.) to use **tool selection** or **progressive disclosure** on their end. The total registered tool count can exceed what any single session needs because consumers pick a relevant subset.
+
 ## Tool Count Limits
 
-**IMPORTANT**: AI agents have a hard cap of 45 total tools available. Since Sentry MCP cannot consume all available tool slots:
-- **Target**: Keep total tool count around 20
-- **Maximum**: Absolutely no more than 25 tools
-- **Constraint**: This limit exists in Cursor and possibly other tools
+Target ~20 publicly visible tools. Never exceed 25. AI agents have limited tool slots (Cursor caps at 45 total across all providers), so Sentry MCP cannot consume all available slots.
 
 Before adding a new tool, consider if it could be:
 1. Combined with an existing tool
 2. Implemented as a parameter variant
-3. Truly necessary for core functionality
+3. Gated behind `requiredCapabilities` if only relevant to some projects
 
 ## Tool Structure
 
