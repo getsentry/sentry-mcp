@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchIssueEvents from "./search-issue-events";
 import { generateText } from "ai";
-import { UserInputError } from "../errors";
+import { UserInputError, ConfigurationError } from "../errors";
 import type { ServerContext } from "../types";
 
 // Mock the AI SDK
@@ -113,6 +113,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "from last hour",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -226,6 +229,9 @@ describe("search_issue_events", () => {
         organizationSlug: null,
         issueUrl: "https://sentry.io/organizations/my-org/issues/123/",
         naturalLanguageQuery: "all events",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -285,6 +291,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "production with release v1.0",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -314,6 +323,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "from last hour",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -345,6 +357,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "from Jan 15 2025",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -372,6 +387,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "all events",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -393,6 +411,9 @@ describe("search_issue_events", () => {
           organizationSlug: "test-org",
           issueId: "MCP-41",
           naturalLanguageQuery: "test query",
+          query: "",
+          sort: "-timestamp",
+          statsPeriod: "14d",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -417,6 +438,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "from last hour",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -434,6 +458,9 @@ describe("search_issue_events", () => {
         {
           organizationSlug: "test-org",
           naturalLanguageQuery: "test",
+          query: "",
+          sort: "-timestamp",
+          statsPeriod: "14d",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -451,6 +478,9 @@ describe("search_issue_events", () => {
           organizationSlug: null,
           issueId: "MCP-41",
           naturalLanguageQuery: "test",
+          query: "",
+          sort: "-timestamp",
+          statsPeriod: "14d",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -468,6 +498,9 @@ describe("search_issue_events", () => {
           organizationSlug: null,
           issueUrl: "https://invalid-url.com",
           naturalLanguageQuery: "test",
+          query: "",
+          sort: "-timestamp",
+          statsPeriod: "14d",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -503,6 +536,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "production events",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -528,6 +564,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "test",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 25,
@@ -558,6 +597,9 @@ describe("search_issue_events", () => {
         organizationSlug: "test-org",
         issueId: "MCP-41",
         naturalLanguageQuery: "production events",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -587,6 +629,9 @@ describe("search_issue_events", () => {
         organizationSlug: null,
         issueUrl: "https://my-org.sentry.io/issues/456/",
         naturalLanguageQuery: "test",
+        query: "",
+        sort: "-timestamp",
+        statsPeriod: "14d",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -594,5 +639,78 @@ describe("search_issue_events", () => {
       },
       mockContext,
     );
+  });
+
+  it("should search events with direct query syntax (no agent)", async () => {
+    mswServer.use(
+      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("query")).toBe("environment:production");
+        expect(url.searchParams.get("sort")).toBe("-timestamp");
+        expect(url.searchParams.get("statsPeriod")).toBe("7d");
+        return HttpResponse.json([
+          {
+            id: "event1",
+            timestamp: "2025-01-15T10:00:00Z",
+            title: "Test Error",
+            message: "Something went wrong",
+            level: "error",
+            environment: "production",
+            release: "v1.0",
+            "user.display": "alice",
+            trace: "abc123",
+            url: "/api/endpoint",
+          },
+        ]);
+      }),
+    );
+
+    const result = await searchIssueEvents.handler(
+      {
+        organizationSlug: "test-org",
+        issueId: "MCP-41",
+        query: "environment:production",
+        sort: "-timestamp",
+        statsPeriod: "7d",
+        projectSlug: null,
+        regionUrl: null,
+        limit: 50,
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    // Should NOT have called the AI agent
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(result).toContain("Events in issue MCP-41");
+    expect(result).toContain("Test Error");
+  });
+
+  it("should throw ConfigurationError when naturalLanguageQuery provided without agent", async () => {
+    const savedKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+
+    try {
+      await expect(
+        searchIssueEvents.handler(
+          {
+            organizationSlug: "test-org",
+            issueId: "MCP-41",
+            naturalLanguageQuery: "from last hour",
+            query: "",
+            sort: "-timestamp",
+            statsPeriod: "14d",
+            projectSlug: null,
+            regionUrl: null,
+            limit: 50,
+            includeExplanation: false,
+          },
+          mockContext,
+        ),
+      ).rejects.toThrow(ConfigurationError);
+    } finally {
+      process.env.OPENAI_API_KEY = savedKey;
+    }
   });
 });

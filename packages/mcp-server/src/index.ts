@@ -229,13 +229,10 @@ async function main() {
         "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
       );
       console.warn(
-        "The following AI-powered search tools will be unavailable:",
+        "The naturalLanguageQuery feature and use_sentry tool will be unavailable.",
       );
       console.warn(
-        "  - search_events, search_issues, search_issue_events, use_sentry",
-      );
-      console.warn(
-        "Use list_issues and list_events for direct Sentry query syntax instead.",
+        "Search tools still work with direct Sentry query syntax via the 'query' parameter.",
       );
     }
     console.warn("");

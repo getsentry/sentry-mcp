@@ -9,10 +9,11 @@ import {
   ParamRegionUrl,
   ParamProjectSlug,
 } from "../../schema";
+import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import { ConfigurationError, UserInputError } from "../../errors";
 import { searchIssueEventsAgent } from "./agent";
 import { formatErrorResults } from "../search-events/formatters";
 import { RECOMMENDED_FIELDS } from "./config";
-import { UserInputError } from "../../errors";
 import { parseIssueParams } from "./utils";
 
 export default defineTool({
@@ -20,15 +21,25 @@ export default defineTool({
   skills: ["inspect", "triage"], // Available in inspect and triage skills
   requiredScopes: ["event:read"],
   description: [
-    "Search and filter events within a specific issue using natural language queries.",
+    "Search and filter events within a specific issue.",
     "",
-    "Use this to filter events by time, environment, release, user, trace ID, or other tags. The tool automatically constrains results to the specified issue.",
+    "Provide `naturalLanguageQuery` to let an embedded agent determine the correct filters,",
+    "or use `query` and `sort` directly with Sentry search syntax.",
+    "",
+    "The tool automatically constrains results to the specified issue.",
+    "",
+    "Common Query Filters:",
+    "- environment:production - Filter by environment",
+    "- release:1.0.0 - Filter by release version",
+    "- user.email:alice@example.com - Filter by user",
+    "- trace:TRACE_ID - Filter by trace ID",
     "",
     "For cross-issue searches use search_issues. For single issue or event details use get_sentry_resource.",
     "",
     "<examples>",
     "search_issue_events(issueId='MCP-41', organizationSlug='my-org', naturalLanguageQuery='from last hour')",
-    "search_issue_events(issueUrl='https://sentry.io/.../issues/123/', naturalLanguageQuery='production with release v1.0')",
+    "search_issue_events(issueId='MCP-41', organizationSlug='my-org', query='environment:production')",
+    "search_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', statsPeriod='7d')",
     "</examples>",
   ].join("\n"),
   inputSchema: {
@@ -52,13 +63,35 @@ export default defineTool({
         "Full Sentry issue URL (e.g., 'https://sentry.io/organizations/my-org/issues/123/'). Includes both organization and issue ID.",
       ),
 
-    // Natural language query for filtering
+    // Natural language query for filtering (optional)
     naturalLanguageQuery: z
       .string()
       .trim()
       .min(1)
+      .optional()
       .describe(
-        "Natural language description of what events you want to find within this issue. Examples: 'from last hour', 'production with release v1.0', 'affecting user alice@example.com', 'with trace ID abc123'",
+        "Natural language description of what events to find within this issue. When provided, an embedded agent determines the correct filters, fields, sort, and time range.",
+      ),
+
+    // Direct Sentry syntax parameters
+    query: z
+      .string()
+      .trim()
+      .default("")
+      .describe(
+        "Sentry event search query syntax for filtering within the issue. Used when naturalLanguageQuery is not provided.",
+      ),
+    sort: z
+      .string()
+      .default("-timestamp")
+      .describe(
+        "Sort field (prefix with - for descending). Default: -timestamp",
+      ),
+    statsPeriod: z
+      .string()
+      .default("14d")
+      .describe(
+        "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided.",
       ),
 
     // Optional context parameters
@@ -82,7 +115,7 @@ export default defineTool({
       .boolean()
       .default(false)
       .describe(
-        "Include explanation of how the natural language query was translated to Sentry syntax",
+        "Include explanation of how the query was translated (only applies with naturalLanguageQuery)",
       ),
   },
   annotations: {
@@ -90,19 +123,16 @@ export default defineTool({
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
-    // 1. Parse and validate issue parameters
     const { organizationSlug, issueId } = parseIssueParams({
       organizationSlug: params.organizationSlug,
       issueId: params.issueId,
       issueUrl: params.issueUrl,
     });
 
-    // 2. Initialize API service with region support
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    // 3. Set monitoring tags for observability
     setTag("organization.slug", organizationSlug);
     setTag("issue.id", issueId);
     if (params.projectSlug) {
@@ -116,7 +146,7 @@ export default defineTool({
       projectSlug: context.constraints.projectSlug,
     });
 
-    // 4. Resolve project ID if project slug provided (for better tag discovery)
+    // Resolve project ID if project slug provided (for better tag discovery in NL mode)
     let projectId: string | undefined;
     if (params.projectSlug) {
       try {
@@ -126,57 +156,61 @@ export default defineTool({
         });
         projectId = String(project.id);
       } catch (error) {
-        // Non-fatal error - continue without project ID
-        // Tag discovery will be less specific but still work
+        // Non-fatal - continue without project ID
         console.warn(`Could not resolve project ${params.projectSlug}:`, error);
       }
     }
 
-    // 5. Call embedded AI agent to translate natural language query
-    // Agent will determine filters, fields, sort, and time range
-    const agentResult = await searchIssueEventsAgent({
-      query: params.naturalLanguageQuery,
-      organizationSlug,
-      apiService,
-      projectId,
-    });
+    let query: string;
+    let fields: string[];
+    let sortParam: string;
+    let timeParams: { statsPeriod?: string; start?: string; end?: string };
+    let explanation: string | undefined;
 
-    const parsed = agentResult.result;
-
-    // 6. Validate that sort parameter was provided
-    if (!parsed.sort) {
-      throw new UserInputError(
-        `Search Issue Events Agent response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}. The agent must specify how to sort results (e.g., '-timestamp' for newest first).`,
-      );
-    }
-
-    // 7. Extract query from agent response (no issue: prefix needed)
-    // The listEventsForIssue endpoint already filters by issue ID
-    const query = parsed.query || "";
-
-    // 8. Extract fields and sort from agent response
-    const requestedFields = parsed.fields || [];
-    const fields =
-      requestedFields.length > 0 ? requestedFields : RECOMMENDED_FIELDS;
-    const sortParam = parsed.sort;
-
-    // 9. Build time range parameters from agent response
-    const timeParams: { statsPeriod?: string; start?: string; end?: string } =
-      {};
-    if (parsed.timeRange) {
-      if ("statsPeriod" in parsed.timeRange) {
-        timeParams.statsPeriod = parsed.timeRange.statsPeriod;
-      } else if ("start" in parsed.timeRange && "end" in parsed.timeRange) {
-        timeParams.start = parsed.timeRange.start;
-        timeParams.end = parsed.timeRange.end;
+    if (params.naturalLanguageQuery) {
+      // NL mode: use embedded agent to determine filters
+      if (!hasAgentProvider()) {
+        throw new ConfigurationError(
+          "Natural language search requires an AI provider (OPENAI_API_KEY or ANTHROPIC_API_KEY). " +
+            "Use the 'query' parameter with Sentry search syntax instead.",
+        );
       }
+
+      const agentResult = await searchIssueEventsAgent({
+        query: params.naturalLanguageQuery,
+        organizationSlug,
+        apiService,
+        projectId,
+      });
+
+      const parsed = agentResult.result;
+
+      if (!parsed.sort) {
+        throw new UserInputError(
+          `Search Issue Events Agent response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}. The agent must specify how to sort results (e.g., '-timestamp' for newest first).`,
+        );
+      }
+
+      query = parsed.query || "";
+      sortParam = parsed.sort;
+      explanation = parsed.explanation;
+
+      const requestedFields = parsed.fields || [];
+      fields =
+        requestedFields.length > 0 ? requestedFields : RECOMMENDED_FIELDS;
+
+      timeParams = parsed.timeRange
+        ? { ...parsed.timeRange }
+        : { statsPeriod: "14d" };
     } else {
-      // Default time window if not specified
-      timeParams.statsPeriod = "14d";
+      // Direct mode: use provided params as-is
+      query = params.query;
+      fields = RECOMMENDED_FIELDS;
+      sortParam = params.sort;
+      timeParams = { statsPeriod: params.statsPeriod };
     }
 
-    // 10. Execute search using issue-specific endpoint
-    // This endpoint is already scoped to the issue, so we don't need to add issue: to the query
+    // Execute search using issue-specific endpoint
     const eventsResponse = await apiService.listEventsForIssue({
       organizationSlug,
       issueId,
@@ -186,8 +220,7 @@ export default defineTool({
       ...timeParams,
     });
 
-    // 11. Generate Sentry explorer URL for user to view results in UI
-    // For the explorer URL, we DO need to include issue: in the query
+    // Generate explorer URL (include issue: prefix for the explorer)
     const explorerQuery = query
       ? `issue:${issueId} ${query}`
       : `issue:${issueId}`;
@@ -195,18 +228,17 @@ export default defineTool({
       organizationSlug,
       explorerQuery,
       projectId,
-      "errors", // dataset
+      "errors",
       fields,
       sortParam,
-      [], // No aggregate functions for individual event queries
-      [], // No groupBy fields
+      [],
+      [],
       timeParams.statsPeriod,
       timeParams.start,
       timeParams.end,
     );
 
-    // 12. Validate response structure
-    // The /issues/:issueId/events/ endpoint returns an array directly, not wrapped in {data: [...]}
+    // Validate response structure
     function isValidEventArray(
       data: unknown,
     ): data is Record<string, unknown>[] {
@@ -222,13 +254,12 @@ export default defineTool({
       );
     }
 
-    const eventData = eventsResponse;
-
-    // 13. Format results using shared error formatter from search-events
-    const naturalLanguageContext = `Events in issue ${issueId}: ${params.naturalLanguageQuery}`;
+    const naturalLanguageContext = params.naturalLanguageQuery
+      ? `Events in issue ${issueId}: ${params.naturalLanguageQuery}`
+      : `Events in issue ${issueId}`;
 
     return formatErrorResults({
-      eventData,
+      eventData: eventsResponse,
       naturalLanguageQuery: naturalLanguageContext,
       includeExplanation: params.includeExplanation,
       apiService,
@@ -236,7 +267,7 @@ export default defineTool({
       explorerUrl,
       sentryQuery: explorerQuery,
       fields,
-      explanation: parsed.explanation,
+      explanation,
     });
   },
 });

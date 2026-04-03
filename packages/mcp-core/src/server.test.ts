@@ -13,11 +13,6 @@ vi.mock("@sentry/core", () => ({
   wrapMcpServerWithSentry: vi.fn((server) => server),
 }));
 
-// Mock the agent provider factory
-vi.mock("./internal/agents/provider-factory", () => ({
-  hasAgentProvider: vi.fn(() => false),
-}));
-
 /**
  * Helper to get registered tool names from an McpServer.
  * Uses the internal _registeredTools object which exists directly on McpServer instances.

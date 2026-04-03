@@ -5,6 +5,8 @@ import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import { validateSlugOrId, isNumericId } from "../../utils/slug-validation";
+import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import { ConfigurationError } from "../../errors";
 import { searchIssuesAgent } from "./agent";
 import { formatIssueResults, formatExplanation } from "./formatters";
 
@@ -15,33 +17,28 @@ export default defineTool({
   description: [
     "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.",
     "",
-    "Uses AI to translate natural language queries into Sentry issue search syntax.",
+    "Provide `naturalLanguageQuery` to let an embedded agent determine the correct query and sort params,",
+    "or use `query` and `sort` directly with Sentry search syntax.",
+    "",
     "Returns grouped issues with metadata like title, status, and user count.",
     "",
-    "USE THIS TOOL WHEN USERS WANT:",
-    "- A LIST of issues: 'show me issues', 'what problems do we have'",
-    "- Filtered issue lists: 'unresolved issues', 'critical bugs'",
-    "- Issues by impact: 'errors affecting more than 100 users'",
-    "- Issues by assignment: 'issues assigned to me'",
-    "- User feedback: 'show me user feedback', 'feedback from last week'",
+    "Common Query Syntax:",
+    "- is:unresolved / is:resolved / is:ignored",
+    "- level:error / level:warning",
+    "- firstSeen:-24h / lastSeen:-7d",
+    "- assigned:me / assignedOrSuggested:me",
+    "- issueCategory:feedback",
+    "- environment:production",
+    "- userCount:>100",
     "",
-    "DO NOT USE FOR COUNTS/AGGREGATIONS:",
-    "- 'how many errors' → use search_events",
-    "- 'count of issues' → use search_events",
-    "- 'total number of errors today' → use search_events",
-    "- 'sum/average/statistics' → use search_events",
-    "",
-    "ALSO DO NOT USE FOR:",
-    "- Individual error events with timestamps → use search_events",
-    "- Details about a specific issue ID or Sentry issue URL → use get_sentry_resource",
-    "",
-    "REMEMBER: This tool returns a LIST of issues, not counts or statistics!",
+    "DO NOT USE FOR COUNTS/AGGREGATIONS → use search_events",
+    "DO NOT USE FOR individual events with timestamps → use search_events",
+    "DO NOT USE FOR details about a specific issue → use get_sentry_resource",
     "",
     "<examples>",
     "search_issues(organizationSlug='my-org', naturalLanguageQuery='critical bugs from last week')",
-    "search_issues(organizationSlug='my-org', naturalLanguageQuery='unhandled errors affecting 100+ users')",
-    "search_issues(organizationSlug='my-org', naturalLanguageQuery='issues assigned to me')",
-    "search_issues(organizationSlug='my-org', naturalLanguageQuery='user feedback from production')",
+    "search_issues(organizationSlug='my-org', query='is:unresolved is:unassigned', sort='freq')",
+    "search_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', projectSlugOrId='my-project')",
     "</examples>",
     "",
     "<hints>",
@@ -56,7 +53,23 @@ export default defineTool({
       .string()
       .trim()
       .min(1)
-      .describe("Natural language description of issues to search for"),
+      .optional()
+      .describe(
+        "Natural language description of issues to search for. When provided, an embedded agent translates this into the correct query and sort params.",
+      ),
+    query: z
+      .string()
+      .trim()
+      .default("is:unresolved")
+      .describe(
+        "Sentry issue search query syntax. Used when naturalLanguageQuery is not provided.",
+      ),
+    sort: z
+      .enum(["date", "freq", "new", "user"])
+      .default("date")
+      .describe(
+        "Sort order: date (last seen), freq (frequency), new (first seen), user (user count)",
+      ),
     projectSlugOrId: z
       .string()
       .toLowerCase()
@@ -71,11 +84,13 @@ export default defineTool({
       .min(1)
       .max(100)
       .default(10)
-      .describe("Maximum number of issues to return"),
+      .describe("Maximum number of issues to return (1-100)"),
     includeExplanation: z
       .boolean()
       .default(false)
-      .describe("Include explanation of how the query was translated"),
+      .describe(
+        "Include explanation of how the query was translated (only applies with naturalLanguageQuery)",
+      ),
   },
   annotations: {
     readOnlyHint: true,
@@ -88,7 +103,6 @@ export default defineTool({
 
     setTag("organization.slug", params.organizationSlug);
     if (params.projectSlugOrId) {
-      // Check if it's a numeric ID or a slug and tag appropriately
       if (isNumericId(params.projectSlugOrId)) {
         setTag("project.id", params.projectSlugOrId);
       } else {
@@ -96,69 +110,81 @@ export default defineTool({
       }
     }
 
-    // Convert project slug to ID if needed - required for the agent's field discovery
-    let projectId: string | undefined;
-    if (params.projectSlugOrId) {
-      // Check if it's already a numeric ID
-      if (isNumericId(params.projectSlugOrId)) {
-        projectId = params.projectSlugOrId;
-      } else {
-        // It's a slug, convert to ID
-        const project = await apiService.getProject({
-          organizationSlug: params.organizationSlug,
-          projectSlugOrId: params.projectSlugOrId!,
-        });
-        projectId = String(project.id);
+    let query: string;
+    let sort: "date" | "freq" | "new" | "user";
+    let explanation: string | undefined;
+
+    if (params.naturalLanguageQuery) {
+      // NL mode: use embedded agent to refine params
+      if (!hasAgentProvider()) {
+        throw new ConfigurationError(
+          "Natural language search requires an AI provider (OPENAI_API_KEY or ANTHROPIC_API_KEY). " +
+            "Use the 'query' parameter with Sentry search syntax instead.",
+        );
       }
+
+      // Convert project slug to ID if needed - required for the agent's field discovery
+      let projectId: string | undefined;
+      if (params.projectSlugOrId) {
+        if (isNumericId(params.projectSlugOrId)) {
+          projectId = params.projectSlugOrId;
+        } else {
+          const project = await apiService.getProject({
+            organizationSlug: params.organizationSlug,
+            projectSlugOrId: params.projectSlugOrId,
+          });
+          projectId = String(project.id);
+        }
+      }
+
+      const agentResult = await searchIssuesAgent({
+        query: params.naturalLanguageQuery,
+        organizationSlug: params.organizationSlug,
+        apiService,
+        projectId,
+      });
+
+      const translatedQuery = agentResult.result;
+      query = translatedQuery.query ?? params.query;
+      sort = translatedQuery.sort || params.sort;
+      explanation = translatedQuery.explanation;
+    } else {
+      // Direct mode: use Sentry query syntax params as-is
+      query = params.query;
+      sort = params.sort;
     }
 
-    // Translate natural language to Sentry query
-    const agentResult = await searchIssuesAgent({
-      query: params.naturalLanguageQuery,
-      organizationSlug: params.organizationSlug,
-      apiService,
-      projectId,
-    });
-
-    const translatedQuery = agentResult.result;
-
-    // Execute the search - listIssues accepts projectSlug directly
     const issues = await apiService.listIssues({
       organizationSlug: params.organizationSlug,
       projectSlug: params.projectSlugOrId ?? undefined,
-      query: translatedQuery.query ?? undefined,
-      sortBy: translatedQuery.sort || "date",
+      query,
+      sortBy: sort,
       limit: params.limit,
     });
 
-    // Build output with explanation first (if requested), then results
+    // Build output with explanation first (if requested and NL was used), then results
     let output = "";
 
-    // Add explanation section before results (like search_events)
-    if (params.includeExplanation) {
-      // Start with title including natural language query
+    if (params.includeExplanation && params.naturalLanguageQuery) {
       output += `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
       output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
 
       output += `## Query Translation\n`;
       output += `Natural language: "${params.naturalLanguageQuery}"\n`;
-      output += `Sentry query: \`${translatedQuery.query}\``;
-      if (translatedQuery.sort) {
-        output += `\nSort: ${translatedQuery.sort}`;
-      }
+      output += `Sentry query: \`${query}\``;
+      output += `\nSort: ${sort}`;
       output += `\n\n`;
 
-      if (translatedQuery.explanation) {
-        output += formatExplanation(translatedQuery.explanation);
+      if (explanation) {
+        output += formatExplanation(explanation);
         output += `\n\n`;
       }
 
-      // Format results without the header since we already added it
       output += formatIssueResults({
         issues,
         organizationSlug: params.organizationSlug,
         projectSlugOrId: params.projectSlugOrId ?? undefined,
-        query: translatedQuery.query,
+        query,
         regionUrl: params.regionUrl ?? undefined,
         host: context.sentryHost,
         protocol: context.sentryProtocol,
@@ -166,12 +192,11 @@ export default defineTool({
         skipHeader: true,
       });
     } else {
-      // Format results with natural language query for title
       output = formatIssueResults({
         issues,
         organizationSlug: params.organizationSlug,
         projectSlugOrId: params.projectSlugOrId ?? undefined,
-        query: translatedQuery.query,
+        query,
         regionUrl: params.regionUrl ?? undefined,
         host: context.sentryHost,
         protocol: context.sentryProtocol,
