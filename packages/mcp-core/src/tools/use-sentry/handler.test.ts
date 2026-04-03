@@ -59,9 +59,9 @@ describe("use_sentry handler", () => {
       }),
     });
 
-    // Verify all 21 tools were provided (27 total - use_sentry - 3 list_* tools - 2 internal-only detail tools)
+    // Verify all tools were provided (total - use_sentry - 3 list_* tools - internal-only detail tools)
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
-    expect(Object.keys(toolsArg)).toHaveLength(21);
+    expect(Object.keys(toolsArg)).toHaveLength(22);
 
     // Verify result is returned
     expect(result).toBe("Agent executed tools successfully");
@@ -110,8 +110,8 @@ describe("use_sentry handler", () => {
     // Verify use_sentry is NOT in the list
     expect(toolNames).not.toContain("use_sentry");
 
-    // Verify we have exactly 21 tools (27 total - use_sentry - 3 list_* tools - 2 internal-only detail tools)
-    expect(toolNames).toHaveLength(21);
+    // Verify tool count (total - use_sentry - 3 list_* tools - internal-only detail tools)
+    expect(toolNames).toHaveLength(22);
   });
 
   it("filters find_organizations when organizationSlug constraint is set", async () => {
@@ -137,8 +137,8 @@ describe("use_sentry handler", () => {
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
     expect(toolsArg).toBeDefined();
 
-    // With only org constraint, find_organizations is filtered (21 - 1 = 20)
-    expect(Object.keys(toolsArg)).toHaveLength(20);
+    // With only org constraint, find_organizations is filtered (22 - 1 = 21)
+    expect(Object.keys(toolsArg)).toHaveLength(21);
 
     // Verify find_organizations is filtered but find_projects remains
     expect(toolsArg.find_organizations).toBeUndefined();
@@ -170,8 +170,8 @@ describe("use_sentry handler", () => {
     expect(toolsArg).toBeDefined();
 
     // When both org and project constraints are present,
-    // find_organizations and find_projects are filtered out (21 - 2 = 19)
-    expect(Object.keys(toolsArg)).toHaveLength(19);
+    // find_organizations and find_projects are filtered out (22 - 2 = 20)
+    expect(Object.keys(toolsArg)).toHaveLength(20);
 
     // Verify both find tools are filtered
     expect(toolsArg.find_organizations).toBeUndefined();

@@ -1,0 +1,44 @@
+{
+  "id": "7e07485f-12f9-416b-8b14-26260799b51f",
+  "project_id": "4509109104082945",
+  "started_at": "2025-04-07T12:00:00.000Z",
+  "finished_at": "2025-04-07T12:05:00.000Z",
+  "duration": 300,
+  "is_archived": false,
+  "environment": "production",
+  "platform": "javascript",
+  "count_errors": 1,
+  "count_warnings": 2,
+  "count_infos": 3,
+  "count_dead_clicks": 1,
+  "count_rage_clicks": 0,
+  "count_segments": 2,
+  "count_urls": 2,
+  "urls": ["/login", "/checkout"],
+  "trace_ids": ["a4d1aae7216b47ff8117cf4e09ce9d0a"],
+  "error_ids": ["7ca573c0f4814912aaa9bdc77d1a7d51"],
+  "browser": {
+    "name": "Chrome",
+    "version": "123.0"
+  },
+  "os": {
+    "name": "macOS",
+    "version": "14.4"
+  },
+  "device": {
+    "family": "Mac",
+    "model": "MacBook Pro",
+    "name": "MacBook Pro"
+  },
+  "sdk": {
+    "name": "@sentry/browser",
+    "version": "8.0.0"
+  },
+  "user": {
+    "display_name": "Taylor Example",
+    "email": "taylor@example.com",
+    "id": "user-1"
+  },
+  "tags": {},
+  "releases": ["frontend@1.2.3"]
+}

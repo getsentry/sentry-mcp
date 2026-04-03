@@ -1,46 +1,10 @@
 # Common Patterns
 
-Reusable patterns used throughout the Sentry MCP codebase. Reference these instead of duplicating.
+Reusable patterns used throughout the Sentry MCP codebase.
 
 ## Error Handling
 
-### UserInputError Pattern
-
-For invalid user input that needs clear feedback:
-
-```typescript
-if (!params.organizationSlug) {
-  throw new UserInputError(
-    "Organization slug is required. Please provide an organizationSlug parameter. " +
-    "You can find available organizations using the `find_organizations()` tool."
-  );
-}
-```
-
-See implementation: `packages/mcp-server/src/errors.ts`
-
-### API Error Wrapping
-
-When external API calls fail:
-
-```typescript
-try {
-  const data = await apiService.issues.list(params);
-  return data;
-} catch (error) {
-  throw new Error(`Failed to fetch issues: ${error.message}`);
-}
-```
-
-### Error Message Transformation
-
-Make error messages LLM-friendly:
-
-```typescript
-if (message.includes("You do not have the multi project stream feature enabled")) {
-  return "You do not have access to query across multiple projects. Please select a project for your query.";
-}
-```
+See [error-handling.md](error-handling.md) for the complete error hierarchy, `UserInputError` patterns, and API error wrapping.
 
 ## Zod Schema Patterns
 
@@ -61,7 +25,7 @@ export const ParamRegionUrl = z
   .describe("Sentry region URL. If not provided, uses default region.");
 ```
 
-See: `packages/mcp-server/src/schema.ts`
+See: `packages/mcp-core/src/schema.ts`
 
 ### Flexible Schema Patterns
 
@@ -81,75 +45,6 @@ IssueSchema.partial().passthrough()
 ```typescript
 export type Organization = z.infer<typeof OrganizationSchema>;
 export type ToolParams<T> = z.infer<typeof toolDefinitions[T].parameters>;
-```
-
-## Testing Patterns
-
-For comprehensive testing guidance, see `testing.md` and `adding-tools.md#step-3-add-tests`.
-
-### Unit Test Structure
-
-```typescript
-describe("tool_name", () => {
-  it("returns formatted output", async () => {
-    const result = await TOOL_HANDLERS.tool_name(mockContext, {
-      organizationSlug: "test-org",
-    });
-    
-    expect(result).toMatchInlineSnapshot(`
-      "# Results in **test-org**
-      
-      Expected formatted output here"
-    `);
-  });
-});
-```
-
-### Snapshot Updates
-
-When tool output changes:
-
-```bash
-cd packages/mcp-server
-pnpm vitest --run -u
-```
-
-### Mock Server Setup
-
-```typescript
-beforeAll(() => mswServer.listen());
-afterEach(() => mswServer.resetHandlers());
-afterAll(() => mswServer.close());
-```
-
-See: `packages/mcp-server/src/test-utils/setup.ts`
-
-## API Patterns
-
-For complete API usage patterns, see `api-patterns.md`.
-
-### Service Creation
-
-```typescript
-const apiService = apiServiceFromContext(context, {
-  regionUrl: params.regionUrl,
-});
-```
-
-See: `packages/mcp-server/src/api-utils.ts:apiServiceFromContext`
-
-### Multi-Region Support
-
-```typescript
-if (opts.regionUrl) {
-  try {
-    host = new URL(opts.regionUrl).host;
-  } catch (error) {
-    throw new UserInputError(
-      `Invalid regionUrl provided: ${opts.regionUrl}. Must be a valid URL.`
-    );
-  }
-}
 ```
 
 ## Response Formatting
@@ -214,47 +109,6 @@ if (params.issueUrl) {
 }
 ```
 
-## Mock Patterns
-
-### Basic Handler
-
-```typescript
-{
-  method: "get",
-  path: "/api/0/organizations/:orgSlug/issues/",
-  fetch: ({ params }) => {
-    return HttpResponse.json(issueListFixture);
-  },
-}
-```
-
-### Request Validation
-
-```typescript
-fetch: ({ request, params }) => {
-  const url = new URL(request.url);
-  const sort = url.searchParams.get("sort");
-  
-  if (sort && !["date", "freq", "new"].includes(sort)) {
-    return HttpResponse.json("Invalid sort parameter", { status: 400 });
-  }
-  
-  return HttpResponse.json(data);
-}
-```
-
-See: `packages/mcp-server-mocks/src/handlers/`
-
-## Quality Checks
-
-Required before any commit:
-
-```bash
-pnpm -w run lint:fix    # Fix linting issues
-pnpm tsc --noEmit       # TypeScript type checking
-pnpm test               # Run all tests
-```
-
 ## TypeScript Helpers
 
 ### Generic Type Utilities
@@ -272,8 +126,7 @@ export type ToolName = typeof TOOL_NAMES[number];
 
 ## References
 
-- Error handling: `packages/mcp-server/src/errors.ts`
-- Schema definitions: `packages/mcp-server/src/schema.ts`
-- API utilities: `packages/mcp-server/src/api-utils.ts`
-- Test setup: `packages/mcp-server/src/test-utils/`
-- Mock handlers: `packages/mcp-server-mocks/src/handlers/`
+- Error handling: [error-handling.md](error-handling.md)
+- API patterns: [api-patterns.md](api-patterns.md)
+- Testing: [testing.md](testing.md)
+- Quality checks: [quality-checks.md](quality-checks.md)

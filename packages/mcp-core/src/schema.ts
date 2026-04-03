@@ -66,6 +66,19 @@ export const ParamIssueUrl = z
     "The URL of the issue. e.g. https://my-organization.sentry.io/issues/PROJECT-1Z43",
   );
 
+export const ParamReplayId = z
+  .string()
+  .trim()
+  .describe("The replay ID. e.g. `7e07485f-12f9-416b-8b14-26260799b51f`");
+
+export const ParamReplayUrl = z
+  .string()
+  .url()
+  .trim()
+  .describe(
+    "The URL of the replay. e.g. https://my-organization.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/",
+  );
+
 export const ParamTraceId = z
   .string()
   .trim()

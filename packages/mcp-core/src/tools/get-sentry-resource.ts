@@ -12,6 +12,7 @@ import { fetchAndFormatBreadcrumbs } from "../internal/tool-helpers/breadcrumbs"
 import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
 import getProfile from "./get-profile";
+import getReplayDetails from "./get-replay-details";
 
 /** Types with full API integration. */
 export const FULLY_SUPPORTED_TYPES = [
@@ -19,11 +20,12 @@ export const FULLY_SUPPORTED_TYPES = [
   "event",
   "trace",
   "breadcrumbs",
+  "replay",
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
 /** Recognized from URLs but not yet fully supported -- return guidance messages. */
-export type RecognizedType = "replay" | "monitor" | "release";
+export type RecognizedType = "monitor" | "release";
 
 /**
  * All resource types. Profile is URL-only (requires transactionName,
@@ -125,6 +127,13 @@ export function resolveResourceParams(params: {
         type: "breadcrumbs",
         organizationSlug,
         issueId: resourceId.toUpperCase(),
+      };
+
+    case "replay":
+      return {
+        type: "replay",
+        organizationSlug,
+        replayId: resourceId,
       };
   }
 }
@@ -256,22 +265,6 @@ function generateUnsupportedResourceMessage(
   const { type, organizationSlug } = resolved;
 
   switch (type) {
-    case "replay": {
-      const replayUrl = `https://${organizationSlug}.sentry.io/replays/${resolved.replayId}/`;
-      return [
-        "# Replay Detected",
-        "",
-        `**Organization**: ${organizationSlug}`,
-        `**Replay ID**: ${resolved.replayId}`,
-        "",
-        "Session replay support is coming soon. In the meantime:",
-        "",
-        `- **View in Sentry**: [Open Replay](${replayUrl})`,
-        "- **Find related issues**: Use `search_issues` with the replay's time range",
-        `- **Search events**: Use \`search_events\` with query \`replay_id:${resolved.replayId}\` to find events associated with this replay`,
-      ].join("\n");
-    }
-
     case "monitor": {
       // Include projectSlug in URL when present
       const monitorPath = resolved.projectSlug
@@ -346,7 +339,7 @@ export default defineTool({
       ),
 
     resourceType: z
-      .enum(["issue", "event", "trace", "breadcrumbs"])
+      .enum(["issue", "event", "trace", "breadcrumbs", "replay"])
       .optional()
       .describe(
         "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL).",
@@ -377,11 +370,7 @@ export default defineTool({
     setTag("organization.slug", resolved.organizationSlug);
 
     // Recognized but not yet fully supported types return guidance messages
-    if (
-      resolved.type === "replay" ||
-      resolved.type === "monitor" ||
-      resolved.type === "release"
-    ) {
+    if (resolved.type === "monitor" || resolved.type === "release") {
       return generateUnsupportedResourceMessage(resolved);
     }
 
@@ -435,6 +424,16 @@ export default defineTool({
           throw error;
         }
       }
+
+      case "replay":
+        return getReplayDetails.handler(
+          {
+            replayUrl: params.url,
+            organizationSlug: resolved.organizationSlug,
+            replayId: resolved.replayId,
+          },
+          context,
+        );
 
       case "profile":
         return getProfile.handler(

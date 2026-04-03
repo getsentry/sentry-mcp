@@ -2,17 +2,25 @@
 
 Step-by-step guide for adding new tools to the Sentry MCP server.
 
+## Tool Visibility & Selection
+
+Not every tool is exposed to every consumer. We rely on several mechanisms to keep the active tool set manageable:
+
+- **`requiredCapabilities`** — Tools declare which project capabilities they need (e.g. `profiles`, `replays`, `traces`). If the upstream project doesn't have a capability enabled, the tool is automatically hidden.
+- **`internalOnly`** — Composition primitives (e.g. `get_issue_details`, `get_trace_details`) that are only called by other tools like `get_sentry_resource`, never exposed directly via MCP.
+- **`experimental` / `hideInExperimentalMode`** — Feature flags for tools that are being tested or replaced.
+- **Skills & constraints** — The server filters tools based on granted skills and org/project constraints.
+
+We also expect upstream consumers (Claude Code plugins, Cursor, etc.) to use **tool selection** or **progressive disclosure** on their end. The total registered tool count can exceed what any single session needs because consumers pick a relevant subset.
+
 ## Tool Count Limits
 
-**IMPORTANT**: AI agents have a hard cap of 45 total tools available. Since Sentry MCP cannot consume all available tool slots:
-- **Target**: Keep total tool count around 20
-- **Maximum**: Absolutely no more than 25 tools
-- **Constraint**: This limit exists in Cursor and possibly other tools
+Target ~20 publicly visible tools. Never exceed 25. AI agents have limited tool slots (Cursor caps at 45 total across all providers), so Sentry MCP cannot consume all available slots.
 
 Before adding a new tool, consider if it could be:
 1. Combined with an existing tool
 2. Implemented as a parameter variant
-3. Truly necessary for core functionality
+3. Gated behind `requiredCapabilities` if only relevant to some projects
 
 ## Tool Structure
 
@@ -151,7 +159,7 @@ async handler(params, context: ServerContext) {
 
 ### Response Formatting
 
-See `common-patterns.md#response-formatting` for:
+See [common-patterns.md](common-patterns.md#response-formatting) for:
 - Markdown structure
 - ID/URL formatting
 - Next steps guidance
@@ -187,9 +195,12 @@ describe("your_tool_name", () => {
 ```
 
 **Testing Requirements:**
-- Input validation (see `testing.md#testing-error-cases`)
-- Error handling (use patterns from `common-patterns.md#error-handling`)
+- Input validation (see [testing.md](testing.md#testing-error-cases))
+- Error handling (use patterns from [error-handling.md](error-handling.md))
 - Output formatting with snapshots
+- At least one happy-path test must snapshot the full formatted handler
+  response with `toMatchInlineSnapshot()`; partial `toContain()` assertions are
+  supplemental only
 - API integration with MSW mocks
 
 **After changing output, update snapshots:**
@@ -218,7 +229,7 @@ In `packages/mcp-server-mocks/src/handlers/`:
 }
 ```
 
-See `api-patterns.md#mock-patterns` for validation examples.
+See [api-patterns.md](api-patterns.md#mock-patterns) for validation examples.
 
 ## Step 5: Add Evaluation Tests (Sparingly)
 
@@ -394,10 +405,10 @@ This pattern works with both Cloudflare-hosted and stdio transports.
 
 ## Common Patterns
 
-- Error handling: `common-patterns.md#error-handling`
+- Error handling: [error-handling.md](error-handling.md)
 - API usage: `api-patterns.md`
 - Testing: `testing.md`
-- Response formatting: `common-patterns.md#response-formatting`
+- Response formatting: [common-patterns.md](common-patterns.md#response-formatting)
 
 ## References
 

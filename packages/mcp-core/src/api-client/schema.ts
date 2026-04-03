@@ -123,6 +123,81 @@ export const ProjectSchema = z
 
 export const ProjectListSchema = z.array(ProjectSchema);
 
+export const ReplayDetailsSchema = z
+  .object({
+    activity: z.number().nullable().optional(),
+    browser: z
+      .object({
+        name: z.string().nullable().optional(),
+        version: z.string().nullable().optional(),
+      })
+      .nullish()
+      .default({}),
+    count_dead_clicks: z.number().nullable().optional(),
+    count_errors: z.number().nullable().optional(),
+    count_infos: z.number().nullable().optional(),
+    count_rage_clicks: z.number().nullable().optional(),
+    count_segments: z.number().nullable().optional(),
+    count_urls: z.number().nullable().optional(),
+    count_warnings: z.number().nullable().optional(),
+    device: z
+      .object({
+        brand: z.string().nullable().optional(),
+        family: z.string().nullable().optional(),
+        model: z.string().nullable().optional(),
+        model_id: z.string().nullable().optional(),
+        name: z.string().nullable().optional(),
+      })
+      .nullish()
+      .default({}),
+    dist: z.string().nullable().optional(),
+    duration: z.number().nullable().optional(),
+    environment: z.string().nullable().optional(),
+    error_ids: z.array(z.string()).optional().default([]),
+    finished_at: z.string().nullable().optional(),
+    has_viewed: z.boolean().nullable().optional(),
+    id: z.string(),
+    info_ids: z.array(z.string()).optional().default([]),
+    is_archived: z.boolean().nullable().optional(),
+    os: z
+      .object({
+        name: z.string().nullable().optional(),
+        version: z.string().nullable().optional(),
+      })
+      .nullish()
+      .default({}),
+    platform: z.string().nullable().optional(),
+    project_id: z.union([z.string(), z.number()]).nullable().optional(),
+    releases: z.array(z.string()).nullable().optional(),
+    replay_type: z.string().nullable().optional(),
+    sdk: z
+      .object({
+        name: z.string().nullable().optional(),
+        version: z.string().nullable().optional(),
+      })
+      .nullish()
+      .default({}),
+    started_at: z.string().nullable().optional(),
+    tags: z.record(z.string(), z.array(z.string())).optional().default({}),
+    trace_ids: z.array(z.string()).optional().default([]),
+    urls: z.array(z.string()).optional().default([]),
+    user: z
+      .object({
+        display_name: z.string().nullable().optional(),
+        email: z.string().nullable().optional(),
+        id: z.string().nullable().optional(),
+        ip: z.string().nullable().optional(),
+        username: z.string().nullable().optional(),
+        geo: z.record(z.string(), z.string()).optional(),
+      })
+      .nullish()
+      .default({}),
+    warning_ids: z.array(z.string()).optional().default([]),
+  })
+  .passthrough();
+
+export const ReplayRecordingSegmentsSchema = z.array(z.array(z.unknown()));
+
 export const ClientKeySchema = z
   .object({
     id: z.union([z.string(), z.number()]),

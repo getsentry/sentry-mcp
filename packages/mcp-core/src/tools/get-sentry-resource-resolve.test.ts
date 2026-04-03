@@ -611,14 +611,18 @@ describe("resolveResourceParams", () => {
       ).toThrow("Invalid resourceType: profile");
     });
 
-    it("throws for unsupported explicit resourceType (replay)", () => {
-      expect(() =>
+    it("accepts replay as an explicit resourceType", () => {
+      expect(
         resolveResourceParams({
           resourceType: "replay",
           organizationSlug: "my-org",
           resourceId: "something",
         }),
-      ).toThrow("Invalid resourceType: replay");
+      ).toEqual<ResolvedResourceParams>({
+        type: "replay",
+        organizationSlug: "my-org",
+        replayId: "something",
+      });
     });
 
     it("throws for unsupported explicit resourceType (monitor)", () => {

@@ -75,6 +75,10 @@ Fast, focused tests of actual functionality:
 - Mock external APIs only (Sentry API, OpenAI) with MSW
 - Use real implementations for internal code
 - Test through public APIs rather than implementation details
+- For tools, include at least one happy-path test that snapshots the full
+  formatted handler response with `toMatchInlineSnapshot()`. Supplemental
+  `toContain()` assertions are fine, but they do not replace a full-response
+  snapshot.
 
 ### 2. Evaluation Tests
 Real-world scenarios with LLM:
@@ -132,7 +136,7 @@ describe("tool_name", () => {
 });
 ```
 
-**NOTE**: Follow error handling patterns from `common-patterns.md#error-handling` when testing error cases.
+**NOTE**: Follow error handling patterns from [error-handling.md](error-handling.md) when testing error cases.
 
 ### Testing Error Cases
 
@@ -157,31 +161,7 @@ it("handles API errors gracefully", async () => {
 
 ## Mock Server Setup
 
-Use MSW patterns from `api-patterns.md#mock-patterns` for API mocking.
-
-### Test Configuration
-
-```typescript
-// packages/mcp-server/src/test-utils/setup.ts
-import { setupMockServer } from "@sentry-mcp/mocks";
-
-export const mswServer = setupMockServer();
-
-// Global test setup
-beforeAll(() => mswServer.listen({ onUnhandledRequest: "error" }));
-afterEach(() => mswServer.resetHandlers());
-afterAll(() => mswServer.close());
-```
-
-### Mock Context
-
-```typescript
-export const mockContext: ServerContext = {
-  host: "sentry.io",
-  accessToken: "test-token",
-  organizationSlug: "test-org"
-};
-```
+See [api-patterns.md](api-patterns.md) for MSW mock setup, handler patterns, and request validation examples.
 
 ## Snapshot Testing
 
@@ -192,6 +172,12 @@ Use inline snapshots for:
 - Error message text
 - Markdown responses
 - JSON structure validation
+
+For MCP tools specifically:
+- Every tool test suite must include at least one representative successful call
+  that snapshots the full handler response.
+- Use targeted substring assertions only for additional branch-specific checks,
+  not as the only output coverage.
 
 ### Updating Snapshots
 
@@ -306,11 +292,7 @@ it("streams large responses efficiently", async () => {
 
 ## Common Testing Patterns
 
-See `common-patterns.md` for:
-- Mock server setup
-- Error handling tests
-- Parameter validation
-- Response formatting
+See [common-patterns.md](common-patterns.md) for parameter validation and response formatting patterns, [error-handling.md](error-handling.md) for error testing, and [api-patterns.md](api-patterns.md) for mock setup.
 
 ## CI/CD Integration
 
