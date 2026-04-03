@@ -136,7 +136,7 @@ describe("tool_name", () => {
 });
 ```
 
-**NOTE**: Follow error handling patterns from `common-patterns.md#error-handling` when testing error cases.
+**NOTE**: Follow error handling patterns from [error-handling.md](error-handling.md) when testing error cases.
 
 ### Testing Error Cases
 
@@ -161,31 +161,7 @@ it("handles API errors gracefully", async () => {
 
 ## Mock Server Setup
 
-Use MSW patterns from `api-patterns.md#mock-patterns` for API mocking.
-
-### Test Configuration
-
-```typescript
-// packages/mcp-server/src/test-utils/setup.ts
-import { setupMockServer } from "@sentry-mcp/mocks";
-
-export const mswServer = setupMockServer();
-
-// Global test setup
-beforeAll(() => mswServer.listen({ onUnhandledRequest: "error" }));
-afterEach(() => mswServer.resetHandlers());
-afterAll(() => mswServer.close());
-```
-
-### Mock Context
-
-```typescript
-export const mockContext: ServerContext = {
-  host: "sentry.io",
-  accessToken: "test-token",
-  organizationSlug: "test-org"
-};
-```
+See [api-patterns.md](api-patterns.md) for MSW mock setup, handler patterns, and request validation examples.
 
 ## Snapshot Testing
 
@@ -316,11 +292,7 @@ it("streams large responses efficiently", async () => {
 
 ## Common Testing Patterns
 
-See `common-patterns.md` for:
-- Mock server setup
-- Error handling tests
-- Parameter validation
-- Response formatting
+See [common-patterns.md](common-patterns.md) for parameter validation and response formatting patterns, [error-handling.md](error-handling.md) for error testing, and [api-patterns.md](api-patterns.md) for mock setup.
 
 ## CI/CD Integration
 

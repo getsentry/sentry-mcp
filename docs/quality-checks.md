@@ -1,80 +1,27 @@
 # Quality Checks
 
-Required quality checks that MUST pass before completing any code changes.
+Required checks before completing any code changes.
 
-## Critical Quality Checks
-
-**After ANY code changes, you MUST run:**
+## Required Commands
 
 ```bash
-pnpm -w run lint:fix    # Fix linting issues
-pnpm tsc --noEmit       # Check TypeScript types
-pnpm test               # Run all tests
+pnpm run tsc && pnpm run lint && pnpm run test
 ```
 
-**DO NOT proceed if any check fails.**
-
-## Tool Testing Requirements
-
-**ALL tools MUST have comprehensive tests that verify:**
-
-- **Input validation** - Required/optional parameters, type checking, edge cases
-- **Output formatting** - Markdown structure, content accuracy, error messages
-- **API integration** - Mock server responses, error handling, parameter passing
-- **Snapshot testing** - Use inline snapshots to verify formatted output, with
-  at least one full happy-path response snapshot per tool
-
-**Required test patterns:**
-- Unit tests in individual `{tool-name}.test.ts` files using Vitest and MSW mocks
-- Input/output validation with inline snapshots
-- At least one `toMatchInlineSnapshot()` assertion that captures the complete
-  formatted response for a representative successful tool call
-- Error case testing (API failures, invalid params)
-- Mock server setup in `packages/mcp-server-mocks`
-
-See `docs/testing.md` for detailed testing patterns and `docs/adding-tools.md` for the testing workflow.
+Do not proceed if any check fails.
 
 ## Tool Count Limits
 
-**IMPORTANT**: AI agents have a hard cap of 45 total tools. Sentry MCP must:
-- Target ~20 tools (current best practice)
-- Never exceed 25 tools (absolute maximum)
-- This limit exists in Cursor and possibly other tools
+See [adding-tools.md](adding-tools.md#tool-count-limits) for current limits and guidance on when to add vs. combine tools.
 
-**Current status**: 19 tools (within target range)
+## Testing Requirements
 
-## Build Verification
-
-Ensure the build process works correctly:
-
-```bash
-npm run build              # Build all packages
-npm run generate-tool-definitions  # Generate tool definitions
-```
-
-Tool definitions must generate without errors for client consumption.
-
-## Code Quality Standards
-
-- **TypeScript strict mode** - All code must compile without errors
-- **Linting compliance** - Follow established code style patterns
-- **Test coverage** - All new tools must have comprehensive tests
-- **Error handling** - Use patterns from `common-patterns.md#error-handling`
-- **API patterns** - Follow patterns from `api-patterns.md`
+See [testing.md](testing.md) for testing philosophy, patterns, and snapshot guidelines. Every tool must have at least one happy-path inline snapshot test.
 
 ## Pre-Commit Checklist
 
-Before completing any task:
-
-- [ ] All quality checks pass (`pnpm -w run lint:fix`, `pnpm tsc --noEmit`, `pnpm test`)
-- [ ] Tool count within limits (≤20 target, ≤25 absolute max)
-- [ ] New tools have comprehensive tests
-- [ ] Build process generates tool definitions successfully
+- [ ] Quality checks pass (`pnpm run tsc && pnpm run lint && pnpm run test`)
+- [ ] Tool count within limits
+- [ ] New tools have tests with inline snapshots
+- [ ] Tool/skill definitions regenerated if tools changed (`pnpm run --filter @sentry/mcp-core generate-definitions`)
 - [ ] Documentation updated if patterns changed
-
-## References
-
-- Testing patterns: `testing.md`
-- Tool development: `adding-tools.md`
-- Code patterns: `common-patterns.md`
-- API usage: `api-patterns.md`

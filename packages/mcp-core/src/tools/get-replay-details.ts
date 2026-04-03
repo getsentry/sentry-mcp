@@ -52,7 +52,7 @@ export default defineTool({
   skills: ["inspect"],
   requiredScopes: ["event:read"],
   requiredCapabilities: ["replays"],
-  hideInExperimentalMode: true,
+  internalOnly: true, // Retained as a composition primitive behind get_sentry_resource. Do not expose directly via MCP.
   description: [
     "Get high-level information about a specific Sentry replay by URL or replay ID.",
     "",
