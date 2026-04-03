@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchEvents from "./search-events";
 import { generateText } from "ai";
-import { UserInputError } from "../errors";
+import { UserInputError, ConfigurationError } from "../errors";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -118,6 +118,11 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         naturalLanguageQuery: "database queries",
+        dataset: "errors",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -176,6 +181,11 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         naturalLanguageQuery: "database errors",
+        dataset: "errors",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -239,6 +249,11 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         naturalLanguageQuery: "recent errors with user data",
+        dataset: "errors",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -295,6 +310,11 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         naturalLanguageQuery: "error logs",
+        dataset: "errors",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -326,6 +346,11 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         naturalLanguageQuery: "some impossible query !@#$%",
+        dataset: "errors",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -361,6 +386,11 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         naturalLanguageQuery: "show me errors over time",
+        dataset: "errors",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -407,6 +437,11 @@ describe("search_events", () => {
           regionUrl: null,
           projectSlug: null,
           naturalLanguageQuery: "any query",
+          dataset: "errors",
+          query: "",
+          fields: null,
+          sort: "-timestamp",
+          statsPeriod: "14d",
           limit: 10,
           includeExplanation: false,
         },
@@ -446,6 +481,11 @@ describe("search_events", () => {
           regionUrl: null,
           projectSlug: null,
           naturalLanguageQuery: "any query",
+          dataset: "errors",
+          query: "",
+          fields: null,
+          sort: "-timestamp",
+          statsPeriod: "14d",
           limit: 10,
           includeExplanation: false,
         },
@@ -503,6 +543,11 @@ describe("search_events", () => {
         regionUrl: null,
         projectSlug: null,
         naturalLanguageQuery: "recent errors",
+        dataset: "errors",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -577,6 +622,11 @@ describe("search_events", () => {
         projectSlug: null,
         naturalLanguageQuery:
           "which user agents have the most tool calls yesterday",
+        dataset: "errors",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -597,5 +647,95 @@ describe("search_events", () => {
     expect(result).toContain("120");
     // Should NOT contain user.id references
     expect(result).not.toContain("user.id");
+  });
+
+  it("should search events with direct query syntax (no agent)", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("errors");
+          expect(url.searchParams.get("query")).toBe("level:error");
+          expect(url.searchParams.get("sort")).toBe("-timestamp");
+          return HttpResponse.json({
+            data: [
+              {
+                id: "error1",
+                issue: "PROJ-123",
+                title: "Database Error",
+                level: "error",
+                timestamp: "2024-01-15T10:30:00Z",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "errors",
+        query: "level:error",
+        fields: ["issue", "title", "level", "timestamp"],
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    // Should NOT have called the AI agent
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(result).toContain("Database Error");
+  });
+
+  it("should throw ConfigurationError when naturalLanguageQuery provided without agent", async () => {
+    const savedKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+
+    try {
+      await expect(
+        searchEvents.handler(
+          {
+            organizationSlug: "test-org",
+            regionUrl: null,
+            projectSlug: null,
+            naturalLanguageQuery: "error logs",
+            dataset: "errors",
+            query: "",
+            fields: null,
+            sort: "-timestamp",
+            statsPeriod: "14d",
+            limit: 10,
+            includeExplanation: false,
+          },
+          {
+            constraints: {
+              organizationSlug: null,
+              regionUrl: null,
+              projectSlug: null,
+            },
+            accessToken: "test-token",
+            userId: "1",
+          },
+        ),
+      ).rejects.toThrow(ConfigurationError);
+    } finally {
+      process.env.OPENAI_API_KEY = savedKey;
+    }
   });
 });

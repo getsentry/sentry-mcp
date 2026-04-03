@@ -12,12 +12,11 @@ describeEval("list-issues", {
             arguments: {},
           },
           {
-            name: "find_issues",
+            name: "search_issues",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               query: "is:unresolved",
-              sortBy: "count",
-              regionUrl: "https://us.sentry.io",
+              sort: "freq",
             },
           },
         ],
@@ -30,11 +29,10 @@ describeEval("list-issues", {
             arguments: {},
           },
           {
-            name: "find_issues",
+            name: "search_issues",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              sortBy: "count",
-              regionUrl: "https://us.sentry.io",
+              sort: "freq",
             },
           },
         ],
@@ -47,11 +45,10 @@ describeEval("list-issues", {
             arguments: {},
           },
           {
-            name: "find_issues",
+            name: "search_issues",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              sortBy: "last_seen",
-              regionUrl: "https://us.sentry.io",
+              sort: "date",
             },
           },
         ],
@@ -64,11 +61,10 @@ describeEval("list-issues", {
             arguments: {},
           },
           {
-            name: "find_issues",
+            name: "search_issues",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              sortBy: "first_seen",
-              regionUrl: "https://us.sentry.io",
+              sort: "new",
             },
           },
         ],
@@ -81,11 +77,10 @@ describeEval("list-issues", {
             arguments: {},
           },
           {
-            name: "find_issues",
+            name: "search_issues",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               query: "user.email:david@sentry.io",
-              regionUrl: "https://us.sentry.io",
             },
           },
         ],
