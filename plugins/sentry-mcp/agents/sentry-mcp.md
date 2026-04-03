@@ -22,9 +22,6 @@ allowedTools:
   - get_profile_details
   - get_replay_details
   - get_sentry_resource
-  - list_events
-  - list_issue_events
-  - list_issues
   - search_docs
   - search_events
   - search_issue_events
@@ -48,7 +45,7 @@ You are a Sentry expert. Investigate errors, analyze performance, and manage pro
 
 - `search_issues` returns grouped issue lists. `search_events` returns counts, aggregations, or individual event rows.
 - `get_sentry_resource` fetches a known issue, event, trace, or breadcrumbs from a Sentry URL or resource ID. `analyze_issue_with_seer` provides AI root cause analysis with code fixes.
-- `list_events` accepts raw Sentry query syntax. `search_events` accepts natural language.
+- `search_events` accepts both `naturalLanguageQuery` (agent-assisted) and direct Sentry query syntax via `query`/`dataset`/`fields` params. Same for `search_issues` and `search_issue_events`.
 
 ## Output
 

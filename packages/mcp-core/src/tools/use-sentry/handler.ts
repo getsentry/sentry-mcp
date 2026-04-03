@@ -5,7 +5,7 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import type { ServerContext } from "../../types";
 import { useSentryAgent } from "./agent";
 import { buildServer } from "../../server";
-import tools, { SIMPLE_REPLACEMENT_TOOLS } from "../index";
+import tools from "../index";
 import { isToolVisibleInMode } from "../types";
 import type { ToolCall } from "../../internal/agents/callEmbeddedAgent";
 
@@ -94,14 +94,10 @@ export default defineTool({
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
 
-    // Exclude use_sentry (to prevent recursion) and simple replacement tools
-    // (since use_sentry only runs when an agent provider is available, list_* tools aren't needed).
+    // Exclude use_sentry to prevent recursion.
     // The visibility helper also strips internalOnly tools, so the embedded
     // agent uses get_sentry_resource instead of legacy detail handlers.
-    const toolsToExclude = new Set<string>([
-      "use_sentry",
-      ...SIMPLE_REPLACEMENT_TOOLS,
-    ]);
+    const toolsToExclude = new Set<string>(["use_sentry"]);
     const toolsForAgent = Object.fromEntries(
       Object.entries(tools).filter(
         ([key, tool]) =>

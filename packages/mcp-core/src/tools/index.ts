@@ -21,32 +21,8 @@ import getDoc from "./get-doc";
 import searchIssues from "./search-issues";
 import searchIssueEvents from "./search-issue-events";
 import useSentry from "./use-sentry";
-import listIssues from "./list-issues";
-import listEvents from "./list-events";
-import listIssueEvents from "./list-issue-events";
 import getProfileDetails from "./get-profile-details";
 import getSentryResource from "./get-sentry-resource";
-
-/**
- * Tools that require an embedded agent provider (LLM-powered).
- * These are excluded when no agent provider is configured.
- * Note: use_sentry is handled separately via agentMode.
- */
-export const AGENT_DEPENDENT_TOOLS = [
-  "search_events",
-  "search_issues",
-  "search_issue_events",
-] as const;
-
-/**
- * Simple tools that replace agent-dependent tools when no provider is available.
- * These are excluded when an agent provider IS configured.
- */
-export const SIMPLE_REPLACEMENT_TOOLS = [
-  "list_issues",
-  "list_events",
-  "list_issue_events",
-] as const;
 
 // Default export: object mapping tool names to tools
 export default {
@@ -75,9 +51,6 @@ export default {
   search_issues: searchIssues,
   search_issue_events: searchIssueEvents,
   use_sentry: useSentry,
-  list_issues: listIssues,
-  list_events: listEvents,
-  list_issue_events: listIssueEvents,
   get_profile_details: getProfileDetails,
   get_sentry_resource: getSentryResource,
 } as const;

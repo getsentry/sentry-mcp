@@ -25,10 +25,7 @@ import type {
   ServerRequest,
   ServerNotification,
 } from "@modelcontextprotocol/sdk/types.js";
-import tools, {
-  AGENT_DEPENDENT_TOOLS,
-  SIMPLE_REPLACEMENT_TOOLS,
-} from "./tools/index";
+import tools from "./tools/index";
 import {
   type ToolConfig,
   resolveDescription,
@@ -50,7 +47,6 @@ import {
   getConstraintParametersToInject,
   getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
-import { hasAgentProvider } from "./internal/agents/provider-factory";
 
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
@@ -165,21 +161,6 @@ function configureServer({
   let toolsToRegister = agentMode
     ? { use_sentry: tools.use_sentry }
     : (customTools ?? tools);
-
-  // Filter tools based on agent provider availability
-  // Skip filtering in agent mode (use_sentry handles all tools internally) or when custom tools are provided
-  if (!agentMode && !customTools) {
-    const hasAgent = hasAgentProvider();
-    const toolsToExclude = new Set<string>(
-      hasAgent ? SIMPLE_REPLACEMENT_TOOLS : AGENT_DEPENDENT_TOOLS,
-    );
-
-    toolsToRegister = Object.fromEntries(
-      Object.entries(toolsToRegister).filter(
-        ([key]) => !toolsToExclude.has(key),
-      ),
-    ) as typeof toolsToRegister;
-  }
 
   // Filter tools based on public visibility and experimental mode
   // (applies to all tools, including custom)
