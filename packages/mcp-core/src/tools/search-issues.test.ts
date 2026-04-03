@@ -169,7 +169,8 @@ describe("search_issues", () => {
   });
 
   it("should throw ConfigurationError when naturalLanguageQuery provided without agent", async () => {
-    const savedKey = process.env.OPENAI_API_KEY;
+    const savedOpenAIKey = process.env.OPENAI_API_KEY;
+    const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
 
@@ -190,7 +191,18 @@ describe("search_issues", () => {
         ),
       ).rejects.toThrow(ConfigurationError);
     } finally {
-      process.env.OPENAI_API_KEY = savedKey;
+      if (savedOpenAIKey === undefined) {
+        // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = savedOpenAIKey;
+      }
+      if (savedAnthropicKey === undefined) {
+        // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
+        delete process.env.ANTHROPIC_API_KEY;
+      } else {
+        process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
+      }
     }
   });
 
