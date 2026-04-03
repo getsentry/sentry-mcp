@@ -39,5 +39,6 @@
     "email": "taylor@example.com",
     "id": "user-1"
   },
-  "tags": {}
+  "tags": {},
+  "releases": ["frontend@1.2.3"]
 }

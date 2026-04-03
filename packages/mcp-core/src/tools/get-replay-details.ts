@@ -1,6 +1,5 @@
 import { setTag } from "@sentry/core";
 import type {
-  AutofixRunState,
   Issue,
   ReplayDetails,
   ReplayRecordingSegments,
@@ -9,7 +8,6 @@ import type {
 } from "../api-client";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { getSeerActionabilityLabel } from "../internal/formatting";
 import { parseSentryUrl } from "../internal/url-helpers";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
@@ -33,7 +31,6 @@ interface ReplayActivityEvent {
 interface RelatedReplayIssue {
   eventId: string;
   issue: Issue | null;
-  seerSummary: string | null;
 }
 
 interface RelatedReplayTrace {
@@ -96,27 +93,26 @@ export default defineTool({
       replay.project_id != null ? String(replay.project_id) : null;
     const hasSegments = (replay.count_segments ?? 0) > 0;
 
-    const [{ segments, segmentsError }, relatedIssues, relatedTraces] =
-      await Promise.all([
-        fetchReplaySegments({
-          apiService,
-          organizationSlug: resolved.organizationSlug,
-          replayId: resolved.replayId,
-          projectId,
-          isArchived,
-          hasSegments,
-        }),
-        fetchReplayIssues({
-          apiService,
-          organizationSlug: resolved.organizationSlug,
-          errorIds: replay.error_ids,
-        }),
-        fetchReplayTraces({
-          apiService,
-          organizationSlug: resolved.organizationSlug,
-          traceIds: replay.trace_ids,
-        }),
-      ]);
+    const [{ segments }, relatedIssues, relatedTraces] = await Promise.all([
+      fetchReplaySegments({
+        apiService,
+        organizationSlug: resolved.organizationSlug,
+        replayId: resolved.replayId,
+        projectId,
+        isArchived,
+        hasSegments,
+      }),
+      fetchReplayIssues({
+        apiService,
+        organizationSlug: resolved.organizationSlug,
+        errorIds: replay.error_ids,
+      }),
+      fetchReplayTraces({
+        apiService,
+        organizationSlug: resolved.organizationSlug,
+        traceIds: replay.trace_ids,
+      }),
+    ]);
 
     return formatReplayOutput({
       replay,
@@ -125,7 +121,7 @@ export default defineTool({
         params.replayUrl ??
         apiService.getReplayUrl(resolved.organizationSlug, replay.id),
       segments,
-      segmentsError,
+      isArchived,
       relatedIssues,
       relatedTraces,
     });
@@ -167,7 +163,7 @@ function formatReplayOutput({
   organizationSlug,
   replayUrl,
   segments,
-  segmentsError,
+  isArchived,
   relatedIssues,
   relatedTraces,
 }: {
@@ -175,12 +171,11 @@ function formatReplayOutput({
   organizationSlug: string;
   replayUrl: string;
   segments: ReplayRecordingSegments | null;
-  segmentsError: string | null;
+  isArchived: boolean;
   relatedIssues: RelatedReplayIssue[];
   relatedTraces: RelatedReplayTrace[];
 }): string {
   const lines: string[] = [];
-  const isArchived = replay.is_archived === true;
   const user =
     replay.user?.display_name ??
     replay.user?.email ??
@@ -191,47 +186,44 @@ function formatReplayOutput({
     replay.device?.name ??
     replay.device?.model ??
     replay.device?.family ??
-    "Unknown";
+    null;
   const activityEvents = extractReplayActivityEvents(segments);
-  const metadataEvents = buildReplayMetadataEvents({
-    replay,
-    relatedIssues,
-    isArchived,
-    segmentsError,
-  });
 
+  // Summary
   lines.push(`# Replay ${replay.id} in **${organizationSlug}**`);
   lines.push("");
   lines.push("## Summary");
   lines.push("");
   lines.push(`- **Replay URL**: ${replayUrl}`);
-  lines.push(`- **Started**: ${replay.started_at ?? "Unknown"}`);
-  lines.push(`- **Finished**: ${replay.finished_at ?? "Unknown"}`);
   lines.push(
     `- **Duration**: ${replay.duration != null ? formatDurationSeconds(replay.duration) : "Unknown"}`,
   );
-  lines.push(`- **Archived**: ${isArchived ? "Yes" : "No"}`);
   lines.push(`- **Environment**: ${replay.environment ?? "Unknown"}`);
-  lines.push(`- **Platform**: ${replay.platform ?? "Unknown"}`);
   lines.push(
     `- **Browser**: ${formatNameVersion(replay.browser?.name, replay.browser?.version)}`,
+  );
+  lines.push(
+    `- **OS**: ${formatNameVersion(replay.os?.name, replay.os?.version)}`,
   );
   lines.push(`- **User**: ${user}`);
   if (replay.urls.length > 0) {
     lines.push(`- **URLs**: ${replay.urls.slice(0, 3).join(", ")}`);
   }
-  if (device !== "Unknown") {
+  if (device) {
     lines.push(`- **Device**: ${device}`);
   }
-  lines.push(
-    `- **Signal Counts**: errors=${replay.count_errors ?? 0}, warnings=${replay.count_warnings ?? 0}, infos=${replay.count_infos ?? 0}, dead_clicks=${replay.count_dead_clicks ?? 0}, rage_clicks=${replay.count_rage_clicks ?? 0}, segments=${replay.count_segments ?? 0}`,
-  );
+  if (replay.releases && replay.releases.length > 0) {
+    lines.push(`- **Release**: ${replay.releases[0]}`);
+  }
 
+  // Activity
   lines.push("");
-  lines.push("## Events");
+  lines.push("## Activity");
   lines.push("");
 
-  if (activityEvents.length > 0) {
+  if (isArchived) {
+    lines.push("Recording is archived and not available for playback.");
+  } else if (activityEvents.length > 0) {
     const startTime = activityEvents[0]?.timestampMs ?? null;
     for (const event of activityEvents) {
       const prefix =
@@ -242,68 +234,36 @@ function formatReplayOutput({
         event.details.length > 0 ? ` · ${event.details.join(" · ")}` : "";
       lines.push(`- ${prefix}\`${event.label}\`${details}`);
     }
+  } else {
+    lines.push("No activity events recorded.");
   }
 
-  for (const metadataEvent of metadataEvents) {
-    lines.push(metadataEvent);
-  }
-
-  if (replay.error_ids.length > 0 || replay.trace_ids.length > 0) {
+  // Related
+  const hasRelated = relatedIssues.length > 0 || relatedTraces.length > 0;
+  if (hasRelated) {
     lines.push("");
     lines.push("## Related");
     lines.push("");
-  }
 
-  if (replay.error_ids.length > 0) {
-    for (const relatedIssue of relatedIssues) {
-      lines.push(`### Error Event \`${relatedIssue.eventId}\``);
-      if (relatedIssue.issue) {
-        lines.push(`**Issue ID**: ${relatedIssue.issue.shortId}`);
-        lines.push(`**Summary**: ${relatedIssue.issue.title}`);
-        lines.push(`**Status**: ${relatedIssue.issue.status}`);
-        if (relatedIssue.issue.seerFixabilityScore != null) {
-          lines.push(
-            `**Seer Actionability**: ${getSeerActionabilityLabel(relatedIssue.issue.seerFixabilityScore)}`,
-          );
-        }
-        if (relatedIssue.seerSummary) {
-          lines.push(`**Cached Seer Summary**: ${relatedIssue.seerSummary}`);
-        }
-        lines.push(
-          `**Next Step**: \`get_sentry_resource(organizationSlug='${organizationSlug}', resourceType='issue', resourceId='${relatedIssue.issue.shortId}')\``,
-        );
-        lines.push(
-          `**Root Cause Analysis**: \`analyze_issue_with_seer(organizationSlug='${organizationSlug}', issueId='${relatedIssue.issue.shortId}')\``,
-        );
+    for (const ri of relatedIssues) {
+      if (ri.issue) {
+        lines.push(`- **${ri.issue.shortId}**: ${ri.issue.title}`);
       } else {
-        lines.push(
-          "**Summary**: Replay metadata references this error, but issue details were not resolved from the replay payload alone.",
-        );
-        lines.push(
-          `**Next Step**: \`get_sentry_resource(organizationSlug='${organizationSlug}', resourceType='issue', resourceId='${relatedIssue.eventId}')\``,
-        );
+        lines.push(`- Event \`${ri.eventId}\``);
       }
-      lines.push("");
     }
-  }
 
-  if (replay.trace_ids.length > 0) {
-    for (const relatedTrace of relatedTraces) {
-      lines.push(`### Trace \`${relatedTrace.traceId}\``);
-      if (relatedTrace.traceMeta) {
-        lines.push(
-          `**High-level Stats**: ${formatTraceMetaSummary(relatedTrace.traceMeta)}`,
-        );
-      } else {
-        lines.push(
-          "**High-level Stats**: Trace metadata was not available from this replay lookup.",
-        );
-      }
-      lines.push(
-        `**Next Step**: \`get_sentry_resource(organizationSlug='${organizationSlug}', resourceType='trace', resourceId='${relatedTrace.traceId}')\``,
-      );
-      lines.push("");
+    for (const rt of relatedTraces) {
+      const spanInfo = rt.traceMeta
+        ? ` (${rt.traceMeta.span_count} spans)`
+        : "";
+      lines.push(`- Trace \`${rt.traceId}\`${spanInfo}`);
     }
+
+    lines.push("");
+    lines.push(
+      "Use `get_sentry_resource` to inspect any issue or trace listed above.",
+    );
   }
 
   return lines.join("\n");
@@ -317,65 +277,6 @@ function formatDurationSeconds(durationSeconds: number): string {
   const minutes = Math.floor(durationSeconds / 60);
   const seconds = durationSeconds % 60;
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-}
-
-function buildReplayMetadataEvents({
-  replay,
-  relatedIssues,
-  isArchived,
-  segmentsError,
-}: {
-  replay: ReplayDetails;
-  relatedIssues: RelatedReplayIssue[];
-  isArchived: boolean;
-  segmentsError: string | null;
-}): string[] {
-  const lines: string[] = [];
-
-  if (isArchived) {
-    lines.push("- `recording_segments` · status=archived");
-  } else if (segmentsError) {
-    lines.push(
-      `- \`recording_segments\` · status=unavailable · detail=${quoteDetail(segmentsError)}`,
-    );
-  } else if ((replay.count_segments ?? 0) === 0) {
-    lines.push("- `recording_segments` · count=0");
-  }
-
-  if (relatedIssues.length > 0) {
-    for (const relatedIssue of relatedIssues) {
-      const details = [`event_id=${relatedIssue.eventId}`];
-      if (relatedIssue.issue) {
-        details.push(`issue_id=${relatedIssue.issue.shortId}`);
-        details.push(`title=${quoteDetail(relatedIssue.issue.title)}`);
-      }
-      lines.push(`- metadata · \`error\` · ${details.join(" · ")}`);
-    }
-  } else if ((replay.count_errors ?? 0) > 0) {
-    lines.push(`- metadata · \`error\` · count=${replay.count_errors}`);
-  }
-
-  if ((replay.count_dead_clicks ?? 0) > 0) {
-    lines.push(
-      `- metadata · \`dead_click\` · count=${replay.count_dead_clicks}`,
-    );
-  }
-
-  if ((replay.count_rage_clicks ?? 0) > 0) {
-    lines.push(
-      `- metadata · \`rage_click\` · count=${replay.count_rage_clicks}`,
-    );
-  }
-
-  if ((replay.count_warnings ?? 0) > 0) {
-    lines.push(`- metadata · \`warning\` · count=${replay.count_warnings}`);
-  }
-
-  if ((replay.count_infos ?? 0) > 0) {
-    lines.push(`- metadata · \`info\` · count=${replay.count_infos}`);
-  }
-
-  return lines;
 }
 
 async function fetchReplaySegments({
@@ -394,10 +295,9 @@ async function fetchReplaySegments({
   hasSegments: boolean;
 }): Promise<{
   segments: ReplayRecordingSegments | null;
-  segmentsError: string | null;
 }> {
   if (isArchived || !projectId || !hasSegments) {
-    return { segments: null, segmentsError: null };
+    return { segments: null };
   }
 
   try {
@@ -406,15 +306,9 @@ async function fetchReplaySegments({
       projectSlugOrId: projectId,
       replayId,
     });
-    return { segments, segmentsError: null };
-  } catch (error) {
-    return {
-      segments: null,
-      segmentsError:
-        error instanceof Error
-          ? error.message
-          : "Unknown segment download error",
-    };
+    return { segments };
+  } catch {
+    return { segments: null };
   }
 }
 
@@ -437,27 +331,9 @@ async function fetchReplayIssues({
           query: eventId,
           limit: 1,
         });
-
-        const autofixState = issue
-          ? await apiService
-              .getAutofixState({
-                organizationSlug,
-                issueId: issue.shortId,
-              })
-              .catch(() => undefined)
-          : undefined;
-
-        return {
-          eventId,
-          issue: issue ?? null,
-          seerSummary: getCachedSeerSummary(autofixState),
-        };
+        return { eventId, issue: issue ?? null };
       } catch {
-        return {
-          eventId,
-          issue: null,
-          seerSummary: null,
-        };
+        return { eventId, issue: null };
       }
     }),
   );
@@ -619,58 +495,6 @@ function formatRelativeTime(offsetMs: number): string {
   const minutes = Math.floor(offsetSeconds / 60);
   const seconds = offsetSeconds % 60;
   return seconds > 0 ? `T+${minutes}m ${seconds}s` : `T+${minutes}m`;
-}
-
-function formatTraceMetaSummary(traceMeta: TraceMeta): string {
-  return [
-    `${traceMeta.span_count} spans`,
-    `${traceMeta.errors} errors`,
-    `${traceMeta.performance_issues} performance issues`,
-    `${traceMeta.logs} logs`,
-  ].join(", ");
-}
-
-function getCachedSeerSummary(
-  autofixState: AutofixRunState | undefined,
-): string | null {
-  const autofix = autofixState?.autofix;
-  if (!autofix) {
-    return null;
-  }
-
-  const completedSteps = autofix.steps.filter(
-    (step) => step.status === "COMPLETED",
-  );
-
-  for (const step of completedSteps) {
-    const raw = step as Record<string, unknown>;
-
-    if (step.type === "root_cause_analysis" && Array.isArray(raw.causes)) {
-      const desc = (raw.causes as Array<{ description?: string }>).find((c) =>
-        c.description?.trim(),
-      )?.description;
-      if (desc) return truncate(desc);
-    }
-
-    if (step.type === "solution" && typeof raw.description === "string") {
-      return truncate(raw.description);
-    }
-
-    if (step.type === "default" && Array.isArray(raw.insights)) {
-      const insight = (raw.insights as Array<{ insight?: string }>).find((i) =>
-        i.insight?.trim(),
-      )?.insight;
-      if (insight) return truncate(insight);
-    }
-  }
-
-  return null;
-}
-
-function truncate(value: string, maxLength = 220): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
 function summarizeObject(
