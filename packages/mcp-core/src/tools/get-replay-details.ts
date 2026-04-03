@@ -252,12 +252,8 @@ function formatReplayOutput({
     }
   }
 
-  if (metadataEvents.length > 0) {
-    for (const metadataEvent of metadataEvents) {
-      lines.push(metadataEvent);
-    }
-  } else if ((replay.count_segments ?? 0) === 0) {
-    lines.push("- `recording_segments` · count=0");
+  for (const metadataEvent of metadataEvents) {
+    lines.push(metadataEvent);
   }
 
   if (replay.error_ids.length > 0 || replay.trace_ids.length > 0) {
@@ -282,7 +278,7 @@ function formatReplayOutput({
           lines.push(`**Cached Seer Summary**: ${relatedIssue.seerSummary}`);
         }
         lines.push(
-          `**Next Step**: \`get_issue_details(organizationSlug='${organizationSlug}', eventId='${relatedIssue.eventId}')\``,
+          `**Next Step**: \`get_sentry_resource(organizationSlug='${organizationSlug}', resourceType='issue', resourceId='${relatedIssue.issue.shortId}')\``,
         );
         lines.push(
           `**Root Cause Analysis**: \`analyze_issue_with_seer(organizationSlug='${organizationSlug}', issueId='${relatedIssue.issue.shortId}')\``,
@@ -292,7 +288,7 @@ function formatReplayOutput({
           "**Summary**: Replay metadata references this error, but issue details were not resolved from the replay payload alone.",
         );
         lines.push(
-          `**Next Step**: \`get_issue_details(organizationSlug='${organizationSlug}', eventId='${relatedIssue.eventId}')\``,
+          `**Next Step**: \`get_sentry_resource(organizationSlug='${organizationSlug}', resourceType='issue', resourceId='${relatedIssue.eventId}')\``,
         );
       }
       lines.push("");
@@ -312,7 +308,7 @@ function formatReplayOutput({
         );
       }
       lines.push(
-        `**Next Step**: \`get_trace_details(organizationSlug='${organizationSlug}', traceId='${relatedTrace.traceId}')\``,
+        `**Next Step**: \`get_sentry_resource(organizationSlug='${organizationSlug}', resourceType='trace', resourceId='${relatedTrace.traceId}')\``,
       );
       lines.push("");
     }
@@ -621,24 +617,18 @@ function summarizeTaggedReplayEvent(
     }
   }
 
-  const details = [
-    firstString(payload?.message)
-      ? `message=${quoteDetail(firstString(payload?.message)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
-      : null,
-    firstString(payload?.description)
-      ? `description=${quoteDetail(firstString(payload?.description)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
-      : null,
-    firstString(payload?.category)
-      ? `category=${quoteDetail(firstString(payload?.category)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
-      : null,
-    firstString(payload?.type)
-      ? `type=${quoteDetail(firstString(payload?.type)!)}` // eslint-disable-line @typescript-eslint/no-non-null-assertion
-      : null,
-    summarizeObject(
-      payload,
-      new Set(["message", "description", "category", "type"]),
-    ),
-  ].filter((value): value is string => value !== null);
+  const knownKeys = ["message", "description", "category", "type"] as const;
+  const details: string[] = [];
+  for (const key of knownKeys) {
+    const value = firstString(payload?.[key]);
+    if (value) {
+      details.push(`${key}=${quoteDetail(value)}`);
+    }
+  }
+  const extra = summarizeObject(payload, new Set<string>(knownKeys));
+  if (extra) {
+    details.push(extra);
+  }
 
   return details.length > 0 ? { label: tag, details } : null;
 }

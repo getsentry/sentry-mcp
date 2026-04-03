@@ -84,12 +84,12 @@ describe("get_replay_details", () => {
       **Summary**: Error: Tool list_organizations is already registered
       **Status**: unresolved
       **Cached Seer Summary**: The issue is triggered when the tool registry registers list_organizations twice during startup.
-      **Next Step**: \`get_issue_details(organizationSlug='sentry-mcp-evals', eventId='7ca573c0f4814912aaa9bdc77d1a7d51')\`
+      **Next Step**: \`get_sentry_resource(organizationSlug='sentry-mcp-evals', resourceType='issue', resourceId='CLOUDFLARE-MCP-41')\`
       **Root Cause Analysis**: \`analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')\`
 
       ### Trace \`a4d1aae7216b47ff8117cf4e09ce9d0a\`
       **High-level Stats**: 112 spans, 0 errors, 0 performance issues, 0 logs
-      **Next Step**: \`get_trace_details(organizationSlug='sentry-mcp-evals', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\`
+      **Next Step**: \`get_sentry_resource(organizationSlug='sentry-mcp-evals', resourceType='trace', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\`
       "
     `);
   });
@@ -118,11 +118,11 @@ describe("get_replay_details", () => {
 
     expect(result).toContain("### Error Event `replay-only-event-id`");
     expect(result).toContain(
-      "`get_issue_details(organizationSlug='sentry-mcp-evals', eventId='replay-only-event-id')`",
+      "`get_sentry_resource(organizationSlug='sentry-mcp-evals', resourceType='issue', resourceId='replay-only-event-id')`",
     );
     expect(result).toContain("### Trace `a4d1aae7216b47ff8117cf4e09ce9d0a`");
     expect(result).toContain(
-      "`get_trace_details(organizationSlug='sentry-mcp-evals', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')`",
+      "`get_sentry_resource(organizationSlug='sentry-mcp-evals', resourceType='trace', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a')`",
     );
   });
 
@@ -180,12 +180,12 @@ describe("get_replay_details", () => {
       **Issue ID**: CLOUDFLARE-MCP-41
       **Summary**: Error: Tool list_organizations is already registered
       **Status**: unresolved
-      **Next Step**: \`get_issue_details(organizationSlug='sentry-mcp-evals', eventId='7ca573c0f4814912aaa9bdc77d1a7d51')\`
+      **Next Step**: \`get_sentry_resource(organizationSlug='sentry-mcp-evals', resourceType='issue', resourceId='CLOUDFLARE-MCP-41')\`
       **Root Cause Analysis**: \`analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')\`
 
       ### Trace \`a4d1aae7216b47ff8117cf4e09ce9d0a\`
       **High-level Stats**: 112 spans, 0 errors, 0 performance issues, 0 logs
-      **Next Step**: \`get_trace_details(organizationSlug='sentry-mcp-evals', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\`
+      **Next Step**: \`get_sentry_resource(organizationSlug='sentry-mcp-evals', resourceType='trace', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\`
       "
     `);
   });
@@ -248,12 +248,12 @@ describe("get_replay_details", () => {
       **Issue ID**: CLOUDFLARE-MCP-41
       **Summary**: Error: Tool list_organizations is already registered
       **Status**: unresolved
-      **Next Step**: \`get_issue_details(organizationSlug='sentry-mcp-evals', eventId='7ca573c0f4814912aaa9bdc77d1a7d51')\`
+      **Next Step**: \`get_sentry_resource(organizationSlug='sentry-mcp-evals', resourceType='issue', resourceId='CLOUDFLARE-MCP-41')\`
       **Root Cause Analysis**: \`analyze_issue_with_seer(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41')\`
 
       ### Trace \`a4d1aae7216b47ff8117cf4e09ce9d0a\`
       **High-level Stats**: 112 spans, 0 errors, 0 performance issues, 0 logs
-      **Next Step**: \`get_trace_details(organizationSlug='sentry-mcp-evals', traceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\`
+      **Next Step**: \`get_sentry_resource(organizationSlug='sentry-mcp-evals', resourceType='trace', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a')\`
       "
     `);
   });
