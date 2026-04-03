@@ -703,7 +703,8 @@ describe("search_events", () => {
   });
 
   it("should throw ConfigurationError when naturalLanguageQuery provided without agent", async () => {
-    const savedKey = process.env.OPENAI_API_KEY;
+    const savedOpenAI = process.env.OPENAI_API_KEY;
+    const savedAnthropic = process.env.ANTHROPIC_API_KEY;
     process.env.OPENAI_API_KEY = "";
     process.env.ANTHROPIC_API_KEY = "";
 
@@ -735,7 +736,8 @@ describe("search_events", () => {
         ),
       ).rejects.toThrow(ConfigurationError);
     } finally {
-      process.env.OPENAI_API_KEY = savedKey;
+      process.env.OPENAI_API_KEY = savedOpenAI;
+      process.env.ANTHROPIC_API_KEY = savedAnthropic;
     }
   });
 });
