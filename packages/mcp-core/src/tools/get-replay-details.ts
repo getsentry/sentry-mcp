@@ -41,8 +41,6 @@ interface RelatedReplayTrace {
   traceMeta: TraceMeta | null;
 }
 
-type AutofixStep = NonNullable<AutofixRunState["autofix"]>["steps"][number];
-
 const MAX_ACTIVITY_EVENTS = 6;
 const MAX_RELATED_ERRORS = 3;
 const MAX_RELATED_TRACES = 2;
@@ -95,9 +93,7 @@ export default defineTool({
 
     const isArchived = replay.is_archived === true;
     const projectId =
-      replay.project_id !== null && replay.project_id !== undefined
-        ? String(replay.project_id)
-        : null;
+      replay.project_id != null ? String(replay.project_id) : null;
     const hasSegments = (replay.count_segments ?? 0) > 0;
 
     const [{ segments, segmentsError }, relatedIssues, relatedTraces] =
@@ -212,11 +208,7 @@ function formatReplayOutput({
   lines.push(`- **Started**: ${replay.started_at ?? "Unknown"}`);
   lines.push(`- **Finished**: ${replay.finished_at ?? "Unknown"}`);
   lines.push(
-    `- **Duration**: ${
-      replay.duration !== null && replay.duration !== undefined
-        ? formatDurationSeconds(replay.duration)
-        : "Unknown"
-    }`,
+    `- **Duration**: ${replay.duration != null ? formatDurationSeconds(replay.duration) : "Unknown"}`,
   );
   lines.push(`- **Archived**: ${isArchived ? "Yes" : "No"}`);
   lines.push(`- **Environment**: ${replay.environment ?? "Unknown"}`);
@@ -446,21 +438,18 @@ async function fetchReplayIssues({
           limit: 1,
         });
 
-        const resolvedIssue =
-          issue ??
-          (await maybeGetIssueById(apiService, organizationSlug, eventId));
-        const autofixState = resolvedIssue
+        const autofixState = issue
           ? await apiService
               .getAutofixState({
                 organizationSlug,
-                issueId: resolvedIssue.shortId,
+                issueId: issue.shortId,
               })
               .catch(() => undefined)
           : undefined;
 
         return {
           eventId,
-          issue: resolvedIssue ?? null,
+          issue: issue ?? null,
           seerSummary: getCachedSeerSummary(autofixState),
         };
       } catch {
@@ -472,25 +461,6 @@ async function fetchReplayIssues({
       }
     }),
   );
-}
-
-async function maybeGetIssueById(
-  apiService: SentryApiService,
-  organizationSlug: string,
-  errorId: string,
-): Promise<Issue | null> {
-  if (!looksLikeDirectIssueId(errorId)) {
-    return null;
-  }
-
-  try {
-    return await apiService.getIssue({
-      organizationSlug,
-      issueId: errorId,
-    });
-  } catch {
-    return null;
-  }
 }
 
 async function fetchReplayTraces({
@@ -671,71 +641,35 @@ function getCachedSeerSummary(
   const completedSteps = autofix.steps.filter(
     (step) => step.status === "COMPLETED",
   );
-  const rootCauseStep = completedSteps.find(
-    (step) => step.type === "root_cause_analysis",
-  );
-  if (rootCauseStep && hasRootCauseCauses(rootCauseStep)) {
-    const description = rootCauseStep.causes.find((cause) =>
-      cause.description.trim(),
-    )?.description;
-    if (description) {
-      return truncateSummary(description);
+
+  for (const step of completedSteps) {
+    const raw = step as Record<string, unknown>;
+
+    if (step.type === "root_cause_analysis" && Array.isArray(raw.causes)) {
+      const desc = (raw.causes as Array<{ description?: string }>).find((c) =>
+        c.description?.trim(),
+      )?.description;
+      if (desc) return truncate(desc);
     }
-  }
 
-  const solutionStep = completedSteps.find((step) => step.type === "solution");
-  if (solutionStep && hasSolutionDescription(solutionStep)) {
-    return truncateSummary(solutionStep.description);
-  }
+    if (step.type === "solution" && typeof raw.description === "string") {
+      return truncate(raw.description);
+    }
 
-  const insightStep = completedSteps.find(hasInsights);
-  if (insightStep) {
-    const insight = insightStep.insights.find((entry) =>
-      entry.insight.trim(),
-    )?.insight;
-    if (insight) {
-      return truncateSummary(insight);
+    if (step.type === "default" && Array.isArray(raw.insights)) {
+      const insight = (raw.insights as Array<{ insight?: string }>).find((i) =>
+        i.insight?.trim(),
+      )?.insight;
+      if (insight) return truncate(insight);
     }
   }
 
   return null;
 }
 
-function hasRootCauseCauses(step: AutofixStep): step is AutofixStep & {
-  type: "root_cause_analysis";
-  causes: Array<{ description: string }>;
-} {
-  return (
-    step.type === "root_cause_analysis" &&
-    Array.isArray((step as { causes?: unknown }).causes)
-  );
-}
-
-function hasSolutionDescription(step: AutofixStep): step is AutofixStep & {
-  type: "solution";
-  description: string;
-} {
-  return (
-    step.type === "solution" &&
-    typeof (step as { description?: unknown }).description === "string"
-  );
-}
-
-function hasInsights(step: AutofixStep): step is AutofixStep & {
-  type: "default";
-  insights: Array<{ insight: string }>;
-} {
-  return (
-    step.type === "default" &&
-    Array.isArray((step as { insights?: unknown }).insights)
-  );
-}
-
-function truncateSummary(value: string, maxLength = 220): string {
+function truncate(value: string, maxLength = 220): string {
   const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
+  if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
@@ -768,13 +702,6 @@ function firstString(...values: unknown[]): string | null {
     }
   }
   return null;
-}
-
-function looksLikeDirectIssueId(value: string): boolean {
-  return (
-    /^\d+$/.test(value) ||
-    (value.includes("-") && value === value.toUpperCase())
-  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
