@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
-import { mswServer, replayDetailsFixture } from "@sentry/mcp-server-mocks";
+import {
+  mswServer,
+  organizationFixture,
+  replayDetailsFixture,
+} from "@sentry/mcp-server-mocks";
 import getReplayDetails from "./get-replay-details.js";
 import { getServerContext } from "../test-setup.js";
 
@@ -51,7 +55,7 @@ describe("get_replay_details", () => {
 
     mswServer.use(
       http.get(
-        `https://sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
+        `https://us.sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
         () => HttpResponse.json({ data: replayWithUnresolvedError }),
         { once: true },
       ),
@@ -61,6 +65,7 @@ describe("get_replay_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
       },
       getServerContext(),
     );
@@ -77,7 +82,7 @@ describe("get_replay_details", () => {
 
     mswServer.use(
       http.get(
-        `https://sentry.io/api/0/organizations/sentry-mcp-evals/replays/${archivedReplay.id}/`,
+        `https://us.sentry.io/api/0/organizations/sentry-mcp-evals/replays/${archivedReplay.id}/`,
         () => HttpResponse.json({ data: archivedReplay }),
         { once: true },
       ),
@@ -87,6 +92,7 @@ describe("get_replay_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         replayId: archivedReplay.id,
+        regionUrl: "https://us.sentry.io",
       },
       getServerContext(),
     );
@@ -122,12 +128,12 @@ describe("get_replay_details", () => {
   it("degrades gracefully when segment fetch fails", async () => {
     mswServer.use(
       http.get(
-        `https://sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
+        `https://us.sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
         () => HttpResponse.json({ data: replayDetailsFixture }),
         { once: true },
       ),
       http.get(
-        `https://sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
         () =>
           HttpResponse.json(
             { detail: "Replay recording segment not found." },
@@ -141,6 +147,7 @@ describe("get_replay_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
       },
       getServerContext(),
     );
@@ -181,10 +188,88 @@ describe("get_replay_details", () => {
     );
   });
 
+  it("uses the constrained regionUrl for replay endpoints", async () => {
+    mswServer.use(
+      http.get(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
+        () => HttpResponse.json({ detail: "wrong host" }, { status: 404 }),
+        { once: true },
+      ),
+      http.get(
+        `https://us.sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
+        () => HttpResponse.json({ data: replayDetailsFixture }),
+        { once: true },
+      ),
+      http.get(
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () => HttpResponse.json([]),
+        { once: true },
+      ),
+    );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+      },
+      getServerContext({
+        constraints: { regionUrl: "https://us.sentry.io" },
+      }),
+    );
+
+    expect(result).toContain(
+      `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
+    );
+  });
+
+  it("resolves the organization region when none is provided", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/",
+        () =>
+          HttpResponse.json({
+            ...organizationFixture,
+            links: {
+              ...organizationFixture.links,
+              regionUrl: "https://us.sentry.io",
+            },
+          }),
+        { once: true },
+      ),
+      http.get(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
+        () => HttpResponse.json({ detail: "wrong host" }, { status: 404 }),
+        { once: true },
+      ),
+      http.get(
+        `https://us.sentry.io/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
+        () => HttpResponse.json({ data: replayDetailsFixture }),
+        { once: true },
+      ),
+      http.get(
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        () => HttpResponse.json([]),
+        { once: true },
+      ),
+    );
+
+    const result = await getReplayDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        replayId: replayDetailsFixture.id,
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain(
+      `# Replay ${replayDetailsFixture.id} in **sentry-mcp-evals**`,
+    );
+  });
+
   it("does not repeat explicit payload fields in generic replay events", async () => {
     mswServer.use(
       http.get(
-        `https://sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
         () =>
           HttpResponse.json([
             [
@@ -213,6 +298,7 @@ describe("get_replay_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
       },
       getServerContext(),
     );
@@ -225,7 +311,7 @@ describe("get_replay_details", () => {
   it("ignores array payloads instead of rendering numeric keys", async () => {
     mswServer.use(
       http.get(
-        `https://sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
+        `https://us.sentry.io/api/0/projects/sentry-mcp-evals/${replayDetailsFixture.project_id}/replays/${replayDetailsFixture.id}/recording-segments/`,
         () =>
           HttpResponse.json([
             [
@@ -247,11 +333,31 @@ describe("get_replay_details", () => {
       {
         organizationSlug: "sentry-mcp-evals",
         replayId: replayDetailsFixture.id,
+        regionUrl: "https://us.sentry.io",
       },
       getServerContext(),
     );
 
     expect(result).not.toContain("- T+0s · `console`");
     expect(result).not.toContain('payload="0=');
+  });
+
+  describe("tool definition", () => {
+    it("requires the replay read scopes used by the backend endpoints", () => {
+      expect(getReplayDetails.requiredScopes).toEqual([
+        "org:read",
+        "project:read",
+        "event:read",
+      ]);
+    });
+
+    it("accepts regionUrl so constrained sessions can inject it", () => {
+      expect(Object.keys(getReplayDetails.inputSchema)).toEqual([
+        "replayUrl",
+        "organizationSlug",
+        "replayId",
+        "regionUrl",
+      ]);
+    });
   });
 });

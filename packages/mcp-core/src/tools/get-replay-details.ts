@@ -14,6 +14,7 @@ import type { ServerContext } from "../types";
 import {
   ParamOrganizationSlug,
   ParamReplayId,
+  ParamRegionUrl,
   ParamReplayUrl,
 } from "../schema";
 
@@ -45,7 +46,7 @@ const MAX_RELATED_TRACES = 2;
 export default defineTool({
   name: "get_replay_details",
   skills: ["inspect"],
-  requiredScopes: ["event:read"],
+  requiredScopes: ["org:read", "project:read", "event:read"],
   requiredCapabilities: ["replays"],
   description: [
     "Get high-level information about a specific Sentry replay by URL or replay ID.",
@@ -71,6 +72,7 @@ export default defineTool({
     replayUrl: ParamReplayUrl.optional(),
     organizationSlug: ParamOrganizationSlug.optional(),
     replayId: ParamReplayId.optional(),
+    regionUrl: ParamRegionUrl.nullable().optional(),
   },
   annotations: {
     readOnlyHint: true,
@@ -78,7 +80,14 @@ export default defineTool({
   },
   async handler(params, context: ServerContext) {
     const resolved = resolveReplayParams(params);
-    const apiService = apiServiceFromContext(context);
+    const regionUrl = await resolveReplayRegionUrl({
+      context,
+      organizationSlug: resolved.organizationSlug,
+      regionUrl: params.regionUrl ?? context.constraints.regionUrl,
+    });
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: regionUrl ?? undefined,
+    });
 
     setTag("organization.slug", resolved.organizationSlug);
     setTag("replay.id", resolved.replayId);
@@ -156,6 +165,31 @@ export function resolveReplayParams(params: {
     organizationSlug: params.organizationSlug,
     replayId: params.replayId,
   };
+}
+
+async function resolveReplayRegionUrl({
+  context,
+  organizationSlug,
+  regionUrl,
+}: {
+  context: ServerContext;
+  organizationSlug: string;
+  regionUrl?: string | null;
+}): Promise<string | null> {
+  if (regionUrl != null) {
+    const trimmedRegionUrl = regionUrl.trim();
+    return trimmedRegionUrl || null;
+  }
+
+  try {
+    const organization = await apiServiceFromContext(context).getOrganization(
+      organizationSlug,
+    );
+    const resolvedRegionUrl = organization.links?.regionUrl?.trim();
+    return resolvedRegionUrl || null;
+  } catch {
+    return null;
+  }
 }
 
 function formatReplayOutput({
