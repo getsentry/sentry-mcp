@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   mswServer,
+  organizationFixture,
   replayDetailsFixture,
   traceMetaFixture,
   traceFixture,
@@ -604,7 +605,21 @@ describe("get_sentry_resource", () => {
     it("accepts replay as explicit resourceType", async () => {
       mswServer.use(
         http.get(
-          "https://sentry.io/api/0/organizations/my-org/replays/something/",
+          "https://sentry.io/api/0/organizations/my-org/",
+          () =>
+            HttpResponse.json({
+              ...organizationFixture,
+              slug: "my-org",
+              links: {
+                ...organizationFixture.links,
+                regionUrl: "https://us.sentry.io",
+                organizationUrl: "https://my-org.sentry.io",
+              },
+            }),
+          { once: true },
+        ),
+        http.get(
+          "https://us.sentry.io/api/0/organizations/my-org/replays/something/",
           () =>
             HttpResponse.json({
               data: {
