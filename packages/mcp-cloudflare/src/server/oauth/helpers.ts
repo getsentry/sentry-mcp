@@ -295,9 +295,8 @@ export async function tokenExchangeCallback(
   Sentry.setUser({ id: props.id });
 
   if (!props.refreshToken) {
-    logIssue("No refresh token available in stored props", {
-      loggerScope: ["cloudflare", "oauth", "refresh"],
-    });
+    // Stale grant from before refreshToken was stored in props.
+    // The MCP handler will revoke this grant on the next /mcp request.
     return undefined;
   }
 
