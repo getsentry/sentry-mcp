@@ -17,6 +17,7 @@ import type {
   TransactionEvent,
   Trace,
   ExternalIssueList,
+  Issue,
 } from "../api-client/types";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
@@ -117,39 +118,41 @@ export default defineTool({
         issue = found;
       }
       // For this call, we might want to provide context if it fails
-      const [{ event, performanceTrace }, { autofixState, externalIssues }] =
-        await Promise.all([
-          apiService
-            .getEventForIssue({
-              organizationSlug: orgSlug,
-              issueId: issue.shortId,
-              eventId,
-            })
-            // Optionally enhance 404 errors with parameter context
-            .catch((error) => {
-              if (error instanceof ApiNotFoundError) {
-                throw enhanceNotFoundError(error, {
-                  organizationSlug: orgSlug,
-                  issueId: issue.shortId,
-                  eventId,
-                });
-              }
-              throw error;
-            })
-            .then(async (event) => ({
-              event,
-              performanceTrace: await maybeFetchPerformanceTrace({
-                apiService,
-                organizationSlug: orgSlug,
-                event,
-              }),
-            })),
-          fetchIssueEnrichmentData({
-            apiService,
+      const [
+        { event, performanceTrace },
+        { autofixState, externalIssues, relatedReplayIds },
+      ] = await Promise.all([
+        apiService
+          .getEventForIssue({
             organizationSlug: orgSlug,
             issueId: issue.shortId,
-          }),
-        ]);
+            eventId,
+          })
+          // Optionally enhance 404 errors with parameter context
+          .catch((error) => {
+            if (error instanceof ApiNotFoundError) {
+              throw enhanceNotFoundError(error, {
+                organizationSlug: orgSlug,
+                issueId: issue.shortId,
+                eventId,
+              });
+            }
+            throw error;
+          })
+          .then(async (event) => ({
+            event,
+            performanceTrace: await maybeFetchPerformanceTrace({
+              apiService,
+              organizationSlug: orgSlug,
+              event,
+            }),
+          })),
+        fetchIssueEnrichmentData({
+          apiService,
+          organizationSlug: orgSlug,
+          issue,
+        }),
+      ]);
 
       return formatIssueOutput({
         organizationSlug: orgSlug,
@@ -159,6 +162,7 @@ export default defineTool({
         autofixState,
         performanceTrace,
         externalIssues,
+        relatedReplayIds,
         experimentalMode: context.experimentalMode,
       });
     }
@@ -202,27 +206,29 @@ export default defineTool({
       throw error;
     }
 
-    const [{ event, performanceTrace }, { autofixState, externalIssues }] =
-      await Promise.all([
-        apiService
-          .getLatestEventForIssue({
-            organizationSlug: orgSlug,
-            issueId: issue.shortId,
-          })
-          .then(async (event) => ({
-            event,
-            performanceTrace: await maybeFetchPerformanceTrace({
-              apiService,
-              organizationSlug: orgSlug,
-              event,
-            }),
-          })),
-        fetchIssueEnrichmentData({
-          apiService,
+    const [
+      { event, performanceTrace },
+      { autofixState, externalIssues, relatedReplayIds },
+    ] = await Promise.all([
+      apiService
+        .getLatestEventForIssue({
           organizationSlug: orgSlug,
           issueId: issue.shortId,
-        }),
-      ]);
+        })
+        .then(async (event) => ({
+          event,
+          performanceTrace: await maybeFetchPerformanceTrace({
+            apiService,
+            organizationSlug: orgSlug,
+            event,
+          }),
+        })),
+      fetchIssueEnrichmentData({
+        apiService,
+        organizationSlug: orgSlug,
+        issue,
+      }),
+    ]);
 
     return formatIssueOutput({
       organizationSlug: orgSlug,
@@ -232,6 +238,7 @@ export default defineTool({
       autofixState,
       performanceTrace,
       externalIssues,
+      relatedReplayIds,
       experimentalMode: context.experimentalMode,
     });
   },
@@ -245,25 +252,34 @@ export default defineTool({
 async function fetchIssueEnrichmentData({
   apiService,
   organizationSlug,
-  issueId,
+  issue,
 }: {
   apiService: SentryApiService;
   organizationSlug: string;
-  issueId: string;
+  issue: Issue;
 }): Promise<{
   autofixState: AutofixRunState | undefined;
   externalIssues: ExternalIssueList | undefined;
+  relatedReplayIds: string[] | undefined;
 }> {
-  const [autofixState, externalIssues] = await Promise.all([
+  const issueId = String(issue.id);
+  const [autofixState, externalIssues, relatedReplayIds] = await Promise.all([
     apiService
-      .getAutofixState({ organizationSlug, issueId })
+      .getAutofixState({ organizationSlug, issueId: issue.shortId })
       .catch(() => undefined),
     apiService
-      .getIssueExternalLinks({ organizationSlug, issueId })
+      .getIssueExternalLinks({ organizationSlug, issueId: issue.shortId })
+      .catch(() => undefined),
+    apiService
+      .listReplayIdsForIssue({
+        organizationSlug,
+        issueId,
+        dataSource: getReplayDataSource(issue),
+      })
       .catch(() => undefined),
   ]);
 
-  return { autofixState, externalIssues };
+  return { autofixState, externalIssues, relatedReplayIds };
 }
 
 async function maybeFetchPerformanceTrace({
@@ -315,4 +331,10 @@ function shouldFetchTraceForEvent(event: Event): { traceId: string } | null {
   }
 
   return { traceId };
+}
+
+function getReplayDataSource(issue: Issue): "discover" | "search_issues" {
+  return issue.issueCategory === "error" || issue.type === "error"
+    ? "discover"
+    : "search_issues";
 }

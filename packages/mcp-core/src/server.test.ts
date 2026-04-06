@@ -495,5 +495,42 @@ describe("buildServer", () => {
         expect(toolNames).not.toContain("get_issue_details");
       }
     });
+
+    it("removes constrained organizationSlug from get_replay_details schema", () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "bound-org",
+            projectSlug: null,
+          },
+        },
+      });
+
+      const replayTool = (
+        server as unknown as {
+          _registeredTools?: Record<
+            string,
+            {
+              inputSchema?: {
+                shape?: Record<string, unknown>;
+                _def?: { shape?: () => Record<string, unknown> };
+              };
+            }
+          >;
+        }
+      )._registeredTools?.get_replay_details;
+      const inputSchema = replayTool?.inputSchema;
+      const shape =
+        typeof inputSchema?.shape === "object"
+          ? inputSchema.shape
+          : (inputSchema?._def?.shape?.() ?? {});
+
+      expect(Object.keys(shape).sort()).toEqual([
+        "regionUrl",
+        "replayId",
+        "replayUrl",
+      ]);
+    });
   });
 });

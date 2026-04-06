@@ -150,7 +150,9 @@ export function resolveReplayParams(params: {
       );
     }
     return {
-      organizationSlug: parsed.organizationSlug,
+      // Prefer an explicit or injected organization constraint when available,
+      // while still validating and extracting the replay ID from the URL.
+      organizationSlug: params.organizationSlug ?? parsed.organizationSlug,
       replayId: parsed.replayId,
     };
   }
@@ -182,9 +184,8 @@ async function resolveReplayRegionUrl({
   }
 
   try {
-    const organization = await apiServiceFromContext(context).getOrganization(
-      organizationSlug,
-    );
+    const organization =
+      await apiServiceFromContext(context).getOrganization(organizationSlug);
     const resolvedRegionUrl = organization.links?.regionUrl?.trim();
     return resolvedRegionUrl || null;
   } catch {
