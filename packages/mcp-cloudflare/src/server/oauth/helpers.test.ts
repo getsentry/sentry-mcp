@@ -55,10 +55,42 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should return undefined when no refresh token in props", async () => {
-    const options = createRefreshOptions({ refreshToken: undefined });
+    const futureExpiry = Date.now() + 10 * 60 * 1000;
+    const options = createRefreshOptions({
+      refreshToken: undefined,
+      accessTokenExpiresAt: futureExpiry,
+    });
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
-    expect(result).toBeUndefined();
+    expect(result).toEqual({
+      newProps: expect.objectContaining({
+        refreshToken: undefined,
+      }),
+      accessTokenTTL: expect.any(Number),
+    });
+  });
+
+  it("should probe upstream and keep legacy grant usable when refresh token is missing", async () => {
+    const pastExpiry = Date.now() - 60 * 1000;
+    const options = createRefreshOptions({
+      refreshToken: undefined,
+      accessTokenExpiresAt: pastExpiry,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ id: "1", name: "Test", email: "test@example.com" }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toEqual({
+      newProps: expect.objectContaining({
+        refreshToken: undefined,
+      }),
+      accessTokenTTL: 60 * 60,
+    });
   });
 
   it("should probe upstream and return undefined when token is truly expired", async () => {
@@ -104,6 +136,24 @@ describe("tokenExchangeCallback", () => {
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
     expect(result).toBeUndefined();
+  });
+
+  it("should return cached token TTL when token is locally valid", async () => {
+    const futureExpiry = Date.now() + 10 * 60 * 1000;
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: futureExpiry,
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toEqual({
+      newProps: expect.objectContaining({
+        accessToken: "old-access-token",
+      }),
+      accessTokenTTL: expect.any(Number),
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("should probe upstream when token is within safety window", async () => {

@@ -15,7 +15,6 @@ import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
-import * as Sentry from "@sentry/cloudflare";
 import type { Env } from "../types";
 import {
   checkRateLimit,
@@ -41,6 +40,7 @@ function revokeStaleGrant(
   userId: string,
   clientId: string,
   logLabel: string,
+  errorDescription = "Token requires re-authorization",
 ): Response {
   ctx.waitUntil(
     (async () => {
@@ -63,8 +63,7 @@ function revokeStaleGrant(
     {
       status: 401,
       headers: {
-        "WWW-Authenticate":
-          'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
+        "WWW-Authenticate": `Bearer realm="Sentry MCP", error="invalid_token", error_description="${errorDescription}"`,
       },
     },
   );
@@ -126,21 +125,6 @@ const mcpHandler: ExportedHandler<Env> = {
         extra: { clientId, userId },
       });
       return revokeStaleGrant(ctx, env, userId, clientId, "legacy grant");
-    }
-
-    // Grants created before refreshToken was stored in props are stale and
-    // can no longer be silently refreshed. Revoke and force clean re-auth.
-    if (!oauthCtx.props.refreshToken) {
-      Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-        attributes: { reason: "missing_refresh_token" },
-      });
-      return revokeStaleGrant(
-        ctx,
-        env,
-        userId,
-        clientId,
-        "stale grant (missing refresh token)",
-      );
     }
 
     const { valid: validSkills, invalid: invalidSkills } = parseSkills(

@@ -1,9 +1,10 @@
-import { env } from "cloudflare:test";
+import { createExecutionContext, env } from "cloudflare:test";
 import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SCOPES } from "../../constants";
 import app from "../app";
+import handler from "../index";
 import mcpHandler from "../lib/mcp-handler";
 import type { Env } from "../types";
 import oauthRoute from "./index";
@@ -163,6 +164,54 @@ async function callCallback(
     }),
     testEnv,
   );
+}
+
+function createTokenExchangeRequest(clientId: string, code: string) {
+  return new Request("https://mcp.sentry.dev/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: clientId,
+      code,
+      redirect_uri: REDIRECT_URI,
+    }).toString(),
+  });
+}
+
+function createMcpInitializeRequest(accessToken: string, path = "/mcp") {
+  return new Request(`https://mcp.sentry.dev${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "CF-Connecting-IP": "192.0.2.1",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "callback-test-client", version: "1.0.0" },
+      },
+    }),
+  });
+}
+
+async function parseSseJson<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  const dataLine = text.split("\n").find((line) => line.startsWith("data: "));
+
+  if (!dataLine) {
+    throw new Error(`No SSE payload found in response: ${text}`);
+  }
+
+  return JSON.parse(dataLine.slice(6)) as T;
 }
 
 describe("oauth callback routes", () => {
@@ -341,6 +390,130 @@ describe("oauth callback routes", () => {
       expect(response.status).toBe(302);
       expect(response.headers.get("location")).toContain(REDIRECT_URI);
       expect(response.headers.get("location")).toContain("code=");
+    });
+
+    it("completes callback, exchanges the code, and uses the resulting token at /mcp", async () => {
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(
+        oauthApp,
+        testEnv,
+        client.clientId,
+        "http://localhost/mcp",
+      );
+      const state = await createSignedCallbackState(
+        client.clientId,
+        "http://localhost/mcp",
+      );
+
+      const callbackResponse = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie,
+      });
+
+      expect(callbackResponse.status).toBe(302);
+
+      const redirectUrl = new URL(callbackResponse.headers.get("location")!);
+      const authorizationCode = redirectUrl.searchParams.get("code");
+
+      expect(authorizationCode).toBeTruthy();
+
+      const tokenCtx = createExecutionContext();
+      const tokenResponse = await handler.fetch!(
+        createTokenExchangeRequest(client.clientId, authorizationCode!),
+        testEnv,
+        tokenCtx,
+      );
+
+      expect(tokenResponse.status).toBe(200);
+
+      const tokenPayload = (await tokenResponse.json()) as {
+        access_token: string;
+        token_type: string;
+        resource?: string;
+      };
+
+      expect(tokenPayload.access_token).toBeTruthy();
+      expect(tokenPayload.token_type).toBe("bearer");
+      expect(tokenPayload.resource).toBe("http://localhost/mcp");
+
+      const mcpCtx = createExecutionContext();
+      const mcpResponse = await handler.fetch!(
+        createMcpInitializeRequest(tokenPayload.access_token),
+        testEnv,
+        mcpCtx,
+      );
+
+      expect(mcpResponse.status).toBe(200);
+      const body = await parseSseJson<{
+        result?: { protocolVersion: string };
+      }>(mcpResponse);
+      expect(body.result?.protocolVersion).toBeDefined();
+    });
+
+    it("completes callback for a scoped resource, exchanges the code, and uses the token at the same scoped /mcp path", async () => {
+      const scopedResource =
+        "http://localhost/mcp/sentry-mcp-evals/cloudflare-mcp";
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(
+        oauthApp,
+        testEnv,
+        client.clientId,
+        scopedResource,
+      );
+      const state = await createSignedCallbackState(
+        client.clientId,
+        scopedResource,
+      );
+
+      const callbackResponse = await callCallback(oauthApp, testEnv, {
+        state,
+        code: "test-code",
+        cookie,
+      });
+
+      expect(callbackResponse.status).toBe(302);
+
+      const redirectUrl = new URL(callbackResponse.headers.get("location")!);
+      const authorizationCode = redirectUrl.searchParams.get("code");
+
+      expect(authorizationCode).toBeTruthy();
+
+      const tokenCtx = createExecutionContext();
+      const tokenResponse = await handler.fetch!(
+        createTokenExchangeRequest(client.clientId, authorizationCode!),
+        testEnv,
+        tokenCtx,
+      );
+
+      expect(tokenResponse.status).toBe(200);
+
+      const tokenPayload = (await tokenResponse.json()) as {
+        access_token: string;
+        resource?: string;
+      };
+
+      expect(tokenPayload.resource).toBe(scopedResource);
+
+      const mcpCtx = createExecutionContext();
+      const mcpResponse = await handler.fetch!(
+        createMcpInitializeRequest(
+          tokenPayload.access_token,
+          "/mcp/sentry-mcp-evals/cloudflare-mcp",
+        ),
+        testEnv,
+        mcpCtx,
+      );
+
+      expect(mcpResponse.status).toBe(200);
+      const body = await parseSseJson<{
+        result?: { protocolVersion: string };
+      }>(mcpResponse);
+      expect(body.result?.protocolVersion).toBeDefined();
     });
 
     it.each([

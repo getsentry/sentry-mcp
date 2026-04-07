@@ -98,18 +98,26 @@ const mcpHandler: ExportedHandler<Env> = {
 
 ## OAuth Provider Setup
 
-Configure the OAuth provider with required scopes:
+Configure the OAuth provider with required scopes and MCP token refresh
+settings:
 
 ```typescript
 const oAuthProvider = new OAuthProvider({
-  clientId: env.SENTRY_CLIENT_ID,
-  clientSecret: env.SENTRY_CLIENT_SECRET,
-  oauthUrl: `https://${env.SENTRY_HOST}/api/0/authorize/`,
-  tokenUrl: `https://${env.SENTRY_HOST}/api/0/token/`,
-  redirectUrl: `${new URL(request.url).origin}/auth/sentry/callback`,
-  scope: ["org:read", "project:read", "issue:read", "issue:write"]
+  apiRoute: "/mcp",
+  apiHandler: sentryMcpHandler,
+  defaultHandler: app,
+  authorizeEndpoint: "/oauth/authorize",
+  tokenEndpoint: "/oauth/token",
+  clientRegistrationEndpoint: "/oauth/register",
+  tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
+  scopesSupported: Object.keys(SCOPES),
+  refreshTokenTTL: 30 * 24 * 60 * 60,
 });
 ```
+
+`tokenExchangeCallback` does not refresh upstream Sentry OAuth tokens. It
+re-issues MCP access tokens while the cached Sentry access token is still
+usable, and otherwise requires the client to re-authenticate.
 
 ## Deployment Commands
 

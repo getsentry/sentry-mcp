@@ -274,6 +274,60 @@ export type TokenExchangeEnv = {
   SENTRY_HOST?: string;
 };
 
+export type TokenExchangeOutcome =
+  | "cached_token_still_valid_local"
+  | "cached_token_still_valid_probed"
+  | "upstream_token_invalid"
+  | "verification_indeterminate";
+
+const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
+const PROBED_ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
+
+function recordTokenExchangeOutcome(
+  outcome: TokenExchangeOutcome,
+  attributes?: Record<string, string>,
+): void {
+  Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
+    attributes: {
+      outcome,
+      ...attributes,
+    },
+  });
+}
+
+function buildSuccessfulTokenExchangeResult(
+  props: WorkerProps,
+  accessTokenTTL: number,
+): TokenExchangeCallbackResult {
+  return {
+    newProps: props,
+    accessTokenTTL,
+  };
+}
+
+async function probeUpstreamAccessToken(
+  props: WorkerProps,
+  env: TokenExchangeEnv,
+): Promise<TokenExchangeOutcome> {
+  try {
+    const api = new SentryApiService({
+      accessToken: props.accessToken,
+      host: env.SENTRY_HOST || "sentry.io",
+    });
+    await api.getAuthenticatedUser();
+    return "cached_token_still_valid_probed";
+  } catch (error) {
+    if (error instanceof ApiClientError) {
+      return "upstream_token_invalid";
+    }
+
+    logIssue(error, {
+      loggerScope: ["cloudflare", "oauth", "refresh"],
+    });
+    return "verification_indeterminate";
+  }
+}
+
 /**
  * Handles Sentry OAuth token refreshes without ever refreshing upstream
  * (Sentry rotates both tokens on refresh, and the 30-day access token
@@ -294,24 +348,17 @@ export async function tokenExchangeCallback(
 
   Sentry.setUser({ id: props.id });
 
-  if (!props.refreshToken) {
-    // Stale grant from before refreshToken was stored in props.
-    // The MCP handler will revoke this grant on the next /mcp request.
-    return undefined;
-  }
-
-  const SAFE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
   const expiresAt = props.accessTokenExpiresAt;
   if (expiresAt && Number.isFinite(expiresAt)) {
     const remainingMs = expiresAt - Date.now();
     if (remainingMs > SAFE_WINDOW_MS) {
-      Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
-        attributes: { outcome: "success" },
+      recordTokenExchangeOutcome("cached_token_still_valid_local", {
+        grant_shape: props.refreshToken ? "refreshable" : "legacy",
       });
-      return {
-        newProps: props,
-        accessTokenTTL: Math.floor(remainingMs / 1000),
-      };
+      return buildSuccessfulTokenExchangeResult(
+        props,
+        Math.floor(remainingMs / 1000),
+      );
     }
   }
 
@@ -319,31 +366,29 @@ export async function tokenExchangeCallback(
   // report invalid/expired bearer tokens here as 400 or 401, so treat any 4xx
   // as an expected probe failure and fall back to re-auth without creating an
   // issue.
-  try {
-    const api = new SentryApiService({
-      accessToken: props.accessToken,
-      host: env.SENTRY_HOST || "sentry.io",
-    });
-    await api.getAuthenticatedUser();
-    Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
-      attributes: { outcome: "success_probed" },
-    });
-    return {
-      newProps: props,
-      accessTokenTTL: 60 * 60,
-    };
-  } catch (error) {
-    if (!(error instanceof ApiClientError)) {
-      logIssue(error, {
-        loggerScope: ["cloudflare", "oauth", "refresh"],
+  const outcome = await probeUpstreamAccessToken(props, env);
+  switch (outcome) {
+    case "cached_token_still_valid_probed":
+      recordTokenExchangeOutcome(outcome, {
+        grant_shape: props.refreshToken ? "refreshable" : "legacy",
       });
-    }
+      return buildSuccessfulTokenExchangeResult(
+        props,
+        PROBED_ACCESS_TOKEN_TTL_SECONDS,
+      );
+    case "upstream_token_invalid":
+      recordTokenExchangeOutcome(outcome, {
+        grant_shape: props.refreshToken ? "refreshable" : "legacy",
+      });
+      return undefined;
+    case "verification_indeterminate":
+      recordTokenExchangeOutcome(outcome, {
+        grant_shape: props.refreshToken ? "refreshable" : "legacy",
+      });
+      return undefined;
+    default:
+      return undefined;
   }
-
-  Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
-    attributes: { outcome: "expired" },
-  });
-  return undefined;
 }
 
 /**

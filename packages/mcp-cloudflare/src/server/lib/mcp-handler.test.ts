@@ -120,8 +120,12 @@ describe("MCP Handler", () => {
       );
     });
 
-    it("should revoke and reject stale grants missing a refresh token", async () => {
-      const request = createMcpRequest("tools/list");
+    it("should allow legacy grants missing a refresh token while access token is still usable", async () => {
+      const request = createMcpRequest("initialize", {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "test-client", version: "1.0.0" },
+      });
       const ctx = createMcpContext({
         refreshToken: undefined as unknown as string,
       });
@@ -129,13 +133,8 @@ describe("MCP Handler", () => {
 
       const response = await mcpHandler.fetch!(request, env, ctx);
 
-      expect(response.status).toBe(401);
-      expect(await response.text()).toContain("re-authorize");
-      expect(response.headers.get("WWW-Authenticate")).toContain(
-        "invalid_token",
-      );
-      // Revocation is dispatched via ctx.waitUntil — verify it was scheduled
-      expect(ctx.waitUntil).toHaveBeenCalled();
+      expect(response.status).toBe(200);
+      expect(ctx.waitUntil).not.toHaveBeenCalled();
     });
 
     it("should reject tokens with no valid skills", async () => {

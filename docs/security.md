@@ -25,6 +25,7 @@ MCP Client → MCP Server → Sentry OAuth → Sentry API
 
 3. **Token Management**
    - Access tokens encrypted in KV storage
+   - MCP refresh reuses cached Sentry access tokens while they remain valid
    - Tokens scoped to organizations
 
 ## Implementation Patterns
