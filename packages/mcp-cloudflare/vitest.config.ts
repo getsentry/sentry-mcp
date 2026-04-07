@@ -1,5 +1,6 @@
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
 import path from "node:path";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { defineConfig } from "vitest/config";
 
 /**
  * Unified vitest config using vitest-pool-workers.
@@ -11,18 +12,18 @@ import path from "node:path";
  * Bindings (KV, vars, compatibility flags) are defined in wrangler.test.jsonc
  * to keep test config aligned with production wrangler.jsonc.
  */
-export default defineWorkersConfig({
+export default defineConfig({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.test.jsonc" },
+    }),
+  ],
   test: {
     include: ["src/**/*.test.ts"],
     setupFiles: ["src/test-setup.ts"],
     fileParallelism: false,
     minWorkers: 1,
     maxWorkers: 1,
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.test.jsonc" },
-      },
-    },
   },
   /**
    * Workaround for ajv CJS compatibility in workerd runtime.
