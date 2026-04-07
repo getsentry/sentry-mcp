@@ -1,15 +1,11 @@
-import { fetchMock } from "cloudflare:test";
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import type { WorkerProps } from "../types";
 import {
   createResourceValidationError,
   tokenExchangeCallback,
   validateResourceParameter,
 } from "./helpers";
-
-installFetchMockHooks(fetchMock);
 
 const GRANT_TYPES = {
   AUTHORIZATION_CODE:
@@ -59,42 +55,10 @@ describe("tokenExchangeCallback", () => {
   });
 
   it("should return undefined when no refresh token in props", async () => {
-    const futureExpiry = Date.now() + 10 * 60 * 1000;
-    const options = createRefreshOptions({
-      refreshToken: undefined,
-      accessTokenExpiresAt: futureExpiry,
-    });
+    const options = createRefreshOptions({ refreshToken: undefined });
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
-    expect(result).toEqual({
-      newProps: expect.objectContaining({
-        refreshToken: undefined,
-      }),
-      accessTokenTTL: expect.any(Number),
-    });
-  });
-
-  it("should probe upstream and keep legacy grant usable when refresh token is missing", async () => {
-    const pastExpiry = Date.now() - 60 * 1000;
-    const options = createRefreshOptions({
-      refreshToken: undefined,
-      accessTokenExpiresAt: pastExpiry,
-    });
-
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify({ id: "1", name: "Test", email: "test@example.com" }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
-    );
-
-    const result = await tokenExchangeCallback(options, TEST_ENV);
-    expect(result).toEqual({
-      newProps: expect.objectContaining({
-        refreshToken: undefined,
-      }),
-      accessTokenTTL: 60 * 60,
-    });
+    expect(result).toBeUndefined();
   });
 
   it("should probe upstream and return undefined when token is truly expired", async () => {

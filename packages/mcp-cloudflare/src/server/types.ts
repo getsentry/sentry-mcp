@@ -16,7 +16,7 @@ export type WorkerProps = {
 
   // Sentry-specific fields
   accessToken: string;
-  refreshToken?: string;
+  refreshToken: string;
   accessTokenExpiresAt?: number; // Timestamp when the upstream access token expires
   clientId: string;
   scope: string;

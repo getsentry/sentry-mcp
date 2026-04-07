@@ -351,16 +351,33 @@ export async function tokenExchangeCallback(
     return undefined;
   }
 
-  const props = options.props as WorkerProps;
+  const rawProps = options.props as Partial<WorkerProps>;
 
-  Sentry.setUser({ id: props.id });
+  Sentry.setUser({ id: rawProps.id });
+
+  if (!rawProps.refreshToken) {
+    // Stale grant from before refreshToken was stored in props.
+    // The MCP handler will revoke this grant on the next /mcp request.
+    return undefined;
+  }
+
+  const props: WorkerProps = {
+    id: rawProps.id as string,
+    accessToken: rawProps.accessToken as string,
+    refreshToken: rawProps.refreshToken,
+    accessTokenExpiresAt: rawProps.accessTokenExpiresAt,
+    clientId: rawProps.clientId as string,
+    scope: rawProps.scope as string,
+    grantedScopes: rawProps.grantedScopes,
+    grantedSkills: rawProps.grantedSkills,
+  };
 
   const expiresAt = props.accessTokenExpiresAt;
   if (expiresAt && Number.isFinite(expiresAt)) {
     const remainingMs = expiresAt - Date.now();
     if (remainingMs > SAFE_WINDOW_MS) {
       recordTokenExchangeOutcome("cached_token_still_valid_local", {
-        grant_shape: props.refreshToken ? "refreshable" : "legacy",
+        grant_shape: "refreshable",
       });
       return buildSuccessfulTokenExchangeResult(
         props,
@@ -377,7 +394,7 @@ export async function tokenExchangeCallback(
   switch (outcome) {
     case "cached_token_still_valid_probed":
       recordTokenExchangeOutcome(outcome, {
-        grant_shape: props.refreshToken ? "refreshable" : "legacy",
+        grant_shape: "refreshable",
       });
       return buildSuccessfulTokenExchangeResult(
         props,
@@ -385,12 +402,12 @@ export async function tokenExchangeCallback(
       );
     case "upstream_token_invalid":
       recordTokenExchangeOutcome(outcome, {
-        grant_shape: props.refreshToken ? "refreshable" : "legacy",
+        grant_shape: "refreshable",
       });
       return undefined;
     case "verification_indeterminate":
       recordTokenExchangeOutcome(outcome, {
-        grant_shape: props.refreshToken ? "refreshable" : "legacy",
+        grant_shape: "refreshable",
       });
       return undefined;
     default:

@@ -15,6 +15,8 @@ import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
+import * as Sentry from "@sentry/cloudflare";
+import type { WorkerProps } from "../types";
 import type { Env } from "../types";
 import {
   checkRateLimit,
@@ -112,14 +114,16 @@ const mcpHandler: ExportedHandler<Env> = {
       throw new Error("No authentication context available");
     }
 
-    const userId = oauthCtx.props.id as string;
-    const accessToken = oauthCtx.props.accessToken as string;
-    const clientId = oauthCtx.props.clientId as string;
+    const rawProps = oauthCtx.props as Partial<WorkerProps>;
+
+    const userId = rawProps.id as string;
+    const accessToken = rawProps.accessToken as string;
+    const clientId = rawProps.clientId as string;
     const sentryHost = env.SENTRY_HOST || "sentry.io";
 
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported
-    if (!oauthCtx.props.grantedSkills) {
+    if (!rawProps.grantedSkills) {
       logWarn("Legacy token without grantedSkills detected - revoking grant", {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: { clientId, userId },
@@ -127,8 +131,23 @@ const mcpHandler: ExportedHandler<Env> = {
       return revokeStaleGrant(ctx, env, userId, clientId, "legacy grant");
     }
 
+    // Grants created before refreshToken was stored in props are stale and
+    // can no longer be silently refreshed. Revoke and force clean re-auth.
+    if (!rawProps.refreshToken) {
+      Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+        attributes: { reason: "missing_refresh_token" },
+      });
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        "stale grant (missing refresh token)",
+      );
+    }
+
     const { valid: validSkills, invalid: invalidSkills } = parseSkills(
-      oauthCtx.props.grantedSkills as string[],
+      rawProps.grantedSkills as string[],
     );
 
     if (invalidSkills.length > 0) {
@@ -146,10 +165,10 @@ const mcpHandler: ExportedHandler<Env> = {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: {
           clientId: oauthCtx.props.clientId,
-          userId: oauthCtx.props.id,
-          rawGrantedSkills: oauthCtx.props.grantedSkills,
-          rawGrantedSkillsType: typeof oauthCtx.props.grantedSkills,
-          rawGrantedSkillsIsArray: Array.isArray(oauthCtx.props.grantedSkills),
+          userId: rawProps.id,
+          rawGrantedSkills: rawProps.grantedSkills,
+          rawGrantedSkillsType: typeof rawProps.grantedSkills,
+          rawGrantedSkillsIsArray: Array.isArray(rawProps.grantedSkills),
         },
       });
       return new Response(
@@ -204,6 +223,7 @@ const mcpHandler: ExportedHandler<Env> = {
       userId,
       clientId,
       accessToken,
+      refreshToken: rawProps.refreshToken,
       grantedSkills: validSkills,
       constraints: verification.constraints,
       sentryHost,

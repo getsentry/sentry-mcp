@@ -1,9 +1,6 @@
-import { env, fetchMock } from "cloudflare:test";
+import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
-import { installFetchMockHooks } from "../../../test-utils/fetch-mock-setup";
 import app from "../../app";
-
-installFetchMockHooks(fetchMock);
 
 describe("/.mcp discovery routes", () => {
   it("GET /.mcp should return available endpoints", async () => {

@@ -1,13 +1,9 @@
-import { fetchMock } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import {
   addCorsHeaders,
   isPublicMetadataEndpoint,
   stripCorsHeaders,
 } from "./cors";
-
-installFetchMockHooks(fetchMock);
 
 describe("isPublicMetadataEndpoint", () => {
   it("should match .well-known paths", () => {

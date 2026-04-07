@@ -1,11 +1,7 @@
-import { fetchMock } from "cloudflare:test";
 import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import type { Env } from "../types";
 import mcpHandler from "./mcp-handler";
-
-installFetchMockHooks(fetchMock);
 
 interface OAuthProps {
   id: string;
@@ -124,12 +120,8 @@ describe("MCP Handler", () => {
       );
     });
 
-    it("should allow legacy grants missing a refresh token while access token is still usable", async () => {
-      const request = createMcpRequest("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" },
-      });
+    it("should revoke and reject stale grants missing a refresh token", async () => {
+      const request = createMcpRequest("tools/list");
       const ctx = createMcpContext({
         refreshToken: undefined as unknown as string,
       });
@@ -137,8 +129,12 @@ describe("MCP Handler", () => {
 
       const response = await mcpHandler.fetch!(request, env, ctx);
 
-      expect(response.status).toBe(200);
-      expect(ctx.waitUntil).not.toHaveBeenCalled();
+      expect(response.status).toBe(401);
+      expect(await response.text()).toContain("re-authorize");
+      expect(response.headers.get("WWW-Authenticate")).toContain(
+        "invalid_token",
+      );
+      expect(ctx.waitUntil).toHaveBeenCalled();
     });
 
     it("should reject tokens with no valid skills", async () => {

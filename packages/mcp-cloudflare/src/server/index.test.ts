@@ -1,10 +1,6 @@
-import { fetchMock } from "cloudflare:test";
 import type { ExecutionContext } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { installFetchMockHooks } from "../test-utils/fetch-mock-setup";
 import type { Env } from "./types";
-
-installFetchMockHooks(fetchMock);
 
 const {
   MockOAuthProvider,

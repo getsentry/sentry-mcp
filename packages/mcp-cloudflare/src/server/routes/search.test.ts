@@ -1,12 +1,8 @@
-import { fetchMock } from "cloudflare:test";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import searchRoute from "./search";
 import type { Env } from "../types";
 import type { Ai, AutoRagSearchResponse } from "@cloudflare/workers-types";
-
-installFetchMockHooks(fetchMock);
 
 // Create mock AutoRAG instance
 interface MockAutoRAG {

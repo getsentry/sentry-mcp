@@ -1,12 +1,8 @@
-import { fetchMock } from "cloudflare:test";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import oauthRoute from "./index";
 import type { Env } from "../types";
 import { verifyAndParseState, signState } from "./state";
-
-installFetchMockHooks(fetchMock);
 
 // Mock the OAuth provider
 const mockOAuthProvider = {

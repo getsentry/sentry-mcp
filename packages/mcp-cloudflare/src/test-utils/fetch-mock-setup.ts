@@ -2,9 +2,7 @@
  * Shared outbound mock registrations for Cloudflare Workers tests.
  *
  * The current vitest-pool-workers stack configures Miniflare's `fetchMock`
- * directly from vitest.config.ts. Test files still import
- * `installFetchMockHooks()` for compatibility, but the hook is a no-op because
- * runtime `cloudflare:test` no longer exposes a usable `fetchMock` object.
+ * centrally from vitest.config.ts so test files do not need per-file setup.
  */
 import {
   autofixStateFixture,
@@ -481,9 +479,4 @@ export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
       .reply(200, autofixStateFixture, { headers: JSON_HEADERS })
       .persist();
   }
-}
-
-export function installFetchMockHooks(_fetchMock?: FetchMockLike) {
-  // No-op: the current Cloudflare Vitest integration configures Miniflare's
-  // outbound fetch mocking centrally in vitest.config.ts.
 }
