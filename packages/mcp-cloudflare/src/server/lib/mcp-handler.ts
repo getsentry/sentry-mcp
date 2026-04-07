@@ -31,17 +31,6 @@ type OAuthExecutionContext = ExecutionContext & {
   props?: Record<string, unknown>;
 };
 
-const REAUTH_RESPONSE = new Response(
-  "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
-  {
-    status: 401,
-    headers: {
-      "WWW-Authenticate":
-        'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
-    },
-  },
-);
-
 /**
  * Revokes the OAuth grant for the given user/client pair in the background,
  * then returns a 401 response prompting re-authorization.
@@ -69,7 +58,16 @@ function revokeStaleGrant(
       }
     })(),
   );
-  return REAUTH_RESPONSE.clone();
+  return new Response(
+    "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
+    {
+      status: 401,
+      headers: {
+        "WWW-Authenticate":
+          'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
+      },
+    },
+  );
 }
 
 /**
