@@ -384,8 +384,11 @@ export async function tokenExchangeCallback(
     return undefined;
   }
 
+  const { upstreamTokenInvalid: _ignoredUpstreamTokenInvalid, ...baseProps } =
+    rawProps;
+
   const props = {
-    ...rawProps,
+    ...baseProps,
     id: rawProps.id as string,
     accessToken: rawProps.accessToken as string,
     refreshToken: rawProps.refreshToken,

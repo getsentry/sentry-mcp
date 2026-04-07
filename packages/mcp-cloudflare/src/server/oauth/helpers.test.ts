@@ -170,6 +170,36 @@ describe("tokenExchangeCallback", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("should clear upstreamTokenInvalid after a successful probe", async () => {
+    const pastExpiry = Date.now() - 60 * 1000;
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: pastExpiry,
+      upstreamTokenInvalid: true,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "12345",
+          email: "test@example.com",
+          name: "Test User",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toEqual({
+      newProps: expect.not.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+      accessTokenTTL: expect.any(Number),
+    });
+  });
+
   it("should mark the grant invalid when a near-expiry token probes invalid", async () => {
     const nearExpiry = Date.now() + 1 * 60 * 1000; // 1 minute from now (< 2 min safety window)
     const options = createRefreshOptions({
