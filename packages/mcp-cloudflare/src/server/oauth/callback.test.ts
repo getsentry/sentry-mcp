@@ -1,3 +1,4 @@
+import "../../test-utils/fetch-mock-hooks";
 import { createExecutionContext, env } from "cloudflare:test";
 import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";

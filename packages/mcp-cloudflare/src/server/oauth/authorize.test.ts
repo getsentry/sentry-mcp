@@ -1,3 +1,4 @@
+import "../../test-utils/fetch-mock-hooks";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import oauthRoute from "./index";

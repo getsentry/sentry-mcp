@@ -1,3 +1,4 @@
+import "../../test-utils/fetch-mock-hooks";
 import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../types";

@@ -1,3 +1,4 @@
+import "../../../test-utils/fetch-mock-hooks";
 import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
 import app from "../../app";

@@ -1,3 +1,4 @@
+import "../../test-utils/fetch-mock-hooks";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderApprovalDialog, parseRedirectApproval } from "./approval-dialog";
 import { signState } from "../oauth/state";

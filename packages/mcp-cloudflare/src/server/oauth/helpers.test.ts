@@ -1,3 +1,4 @@
+import "../../test-utils/fetch-mock-hooks";
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerProps } from "../types";

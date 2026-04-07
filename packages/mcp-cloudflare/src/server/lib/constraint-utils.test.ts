@@ -1,3 +1,4 @@
+import "../../test-utils/fetch-mock-hooks";
 import { describe, it, expect, vi } from "vitest";
 import "urlpattern-polyfill";
 import {

@@ -1,3 +1,4 @@
+import "../../test-utils/fetch-mock-hooks";
 import { describe, expect, it } from "vitest";
 import {
   addCorsHeaders,

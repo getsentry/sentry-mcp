@@ -1,3 +1,4 @@
+import "../../test-utils/fetch-mock-hooks";
 import { describe, it, expect } from "vitest";
 import { sanitizeHrefUrl, sanitizeHtml } from "./html-utils";
 

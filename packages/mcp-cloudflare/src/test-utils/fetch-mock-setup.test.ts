@@ -1,3 +1,4 @@
+import "./fetch-mock-hooks";
 import { describe, expect, it } from "vitest";
 
 function createEventsUrl(options?: {

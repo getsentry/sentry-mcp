@@ -1,3 +1,4 @@
+import "../../../test-utils/fetch-mock-hooks";
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

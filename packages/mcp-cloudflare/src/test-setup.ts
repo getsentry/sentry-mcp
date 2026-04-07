@@ -1,18 +1,7 @@
 /**
  * Test setup for Cloudflare Workers tests.
  *
- * Uses fetchMock from cloudflare:test to mock Sentry API responses.
- * This runs in the workerd runtime, not Node.js.
+ * Keep setup-file work limited to runtime-agnostic polyfills. Cloudflare
+ * worker-specific test APIs must be imported from actual test files.
  */
 import "urlpattern-polyfill";
-import { afterEach, beforeEach } from "vitest";
-
-beforeEach(async () => {
-  const { setupFetchMock } = await import("./test-utils/fetch-mock-setup");
-  await setupFetchMock();
-});
-
-afterEach(async () => {
-  const { resetFetchMock } = await import("./test-utils/fetch-mock-setup");
-  await resetFetchMock();
-});
