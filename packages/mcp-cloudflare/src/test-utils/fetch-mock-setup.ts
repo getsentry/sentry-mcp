@@ -474,7 +474,18 @@ export function setupFetchMock() {
  * Reset fetchMock state between tests
  */
 export function resetFetchMock() {
-  // assertNoPendingInterceptors can be called but may throw if there are unused mocks
-  // We reset silently for flexibility in tests that don't use all endpoints
-  fetchMock.deactivate();
+  // In newer Cloudflare test runtimes, fetchMock is reset automatically between
+  // test files and no longer exposes the old deactivate() helper. Only assert
+  // pending interceptors when the runtime provides that API.
+  if (
+    fetchMock &&
+    "assertNoPendingInterceptors" in fetchMock &&
+    typeof fetchMock.assertNoPendingInterceptors === "function"
+  ) {
+    try {
+      fetchMock.assertNoPendingInterceptors();
+    } catch {
+      // Some tests intentionally do not consume every persisted interceptor.
+    }
+  }
 }
