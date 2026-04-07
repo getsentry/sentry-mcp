@@ -6,13 +6,7 @@
     },
     "sentry-dev": {
       "type": "http",
-      "url": "http://localhost:5173/mcp/sentry/mcp-server"
-    },
-    "sentry-spotlight": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@spotlightjs/spotlight", "--stdio-mcp"],
-      "env": {}
+      "url": "http://localhost:5173/mcp/sentry/mcp-server?experimental=1"
     }
   }
 }
