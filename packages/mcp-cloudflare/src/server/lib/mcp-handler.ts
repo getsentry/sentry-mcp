@@ -164,7 +164,7 @@ const mcpHandler: ExportedHandler<Env> = {
       logWarn("Authorization rejected: No valid skills in token", {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: {
-          clientId: oauthCtx.props.clientId,
+          clientId,
           userId: rawProps.id,
           rawGrantedSkills: rawProps.grantedSkills,
           rawGrantedSkillsType: typeof rawProps.grantedSkills,

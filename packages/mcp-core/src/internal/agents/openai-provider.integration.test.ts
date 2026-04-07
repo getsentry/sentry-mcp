@@ -19,6 +19,28 @@ import { searchIssuesAgent } from "../../tools/search-issues/agent";
 import { SentryApiService } from "../../api-client";
 import { setAgentProvider } from "./provider-factory";
 
+async function hasUsableOpenAIKey(): Promise<boolean> {
+  if (!process.env.OPENAI_API_KEY) {
+    return false;
+  }
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/models", {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+const canRunOpenAIIntegration = await hasUsableOpenAIKey();
+const describeIfUsableOpenAIKey = canRunOpenAIIntegration
+  ? describe
+  : describe.skip;
+
 // Mock Sentry API server - intercepts Sentry calls but bypasses OpenAI
 const mswServer = setupServer(
   // Mock the issue search fields endpoint (called by issueFields tool)
@@ -44,26 +66,20 @@ const mswServer = setupServer(
   }),
 );
 
-describe("OpenAI Provider Integration", () => {
-  const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY);
-
+describeIfUsableOpenAIKey("OpenAI Provider Integration", () => {
   beforeAll(() => {
-    if (hasOpenAIKey) {
-      // Explicitly set OpenAI provider to ensure we test OpenAI even if
-      // ANTHROPIC_API_KEY is also set (auto-detect prefers Anthropic)
-      setAgentProvider("openai");
-      mswServer.listen({ onUnhandledRequest: "bypass" });
-    }
+    // Explicitly set OpenAI provider to ensure we test OpenAI even if
+    // ANTHROPIC_API_KEY is also set (auto-detect prefers Anthropic)
+    setAgentProvider("openai");
+    mswServer.listen({ onUnhandledRequest: "bypass" });
   });
 
   afterAll(() => {
-    if (hasOpenAIKey) {
-      setAgentProvider(undefined); // Reset for other tests
-      mswServer.close();
-    }
+    setAgentProvider(undefined); // Reset for other tests
+    mswServer.close();
   });
 
-  it.skipIf(!hasOpenAIKey)(
+  it(
     "searchIssuesAgent translates natural language to Sentry query",
     { timeout: 60000 },
     async () => {
@@ -100,7 +116,7 @@ describe("OpenAI Provider Integration", () => {
     },
   );
 
-  it.skipIf(!hasOpenAIKey)(
+  it(
     "searchIssuesAgent handles nullable sort field correctly",
     { timeout: 60000 },
     async () => {
