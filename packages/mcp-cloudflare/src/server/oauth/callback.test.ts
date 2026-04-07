@@ -59,6 +59,9 @@ function createOAuthApi(testEnv: Env) {
 function createTestEnv(): Env {
   const baseEnv = {
     ...(env as Record<string, unknown>),
+    CF_VERSION_METADATA: {
+      id: "test-version-id",
+    },
     COOKIE_SECRET,
     SENTRY_CLIENT_ID: "test-client-id",
     SENTRY_CLIENT_SECRET: "test-client-secret",

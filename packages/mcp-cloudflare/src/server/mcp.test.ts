@@ -513,7 +513,7 @@ describe("/mcp", () => {
     fetchSpy.mockRestore();
   });
 
-  it("reissues an MCP token on refresh when verification is indeterminate, and the resulting token fails at /mcp", async () => {
+  it("reissues an MCP token on refresh when verification is indeterminate, and the resulting token fails at constrained /mcp", async () => {
     const { clientId, tokens } = await issueTokens(
       "https://mcp.sentry.dev/mcp",
       {
@@ -555,11 +555,12 @@ describe("/mcp", () => {
 
     const mcpCtx = createExecutionContext();
     const mcpResponse = await handler.fetch!(
-      createMcpRequest("/mcp", refreshed.access_token, "initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "integration-test-client", version: "1.0.0" },
-      }),
+      createMcpRequest(
+        "/mcp/sentry-mcp-evals",
+        refreshed.access_token,
+        "tools/list",
+        {},
+      ),
       workerEnv,
       mcpCtx,
     );
