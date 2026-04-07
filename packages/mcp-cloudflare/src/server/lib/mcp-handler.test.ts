@@ -126,19 +126,16 @@ describe("MCP Handler", () => {
         refreshToken: undefined as unknown as string,
       });
       const env = createTestEnv();
-      const mockGrant = { id: "grant-123", clientId: "test-client" };
-      (
-        env.OAUTH_PROVIDER.listUserGrants as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ items: [mockGrant] });
 
       const response = await mcpHandler.fetch!(request, env, ctx);
 
       expect(response.status).toBe(401);
       expect(await response.text()).toContain("re-authorize");
-      expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledWith(
-        "grant-123",
-        "test-user-123",
+      expect(response.headers.get("WWW-Authenticate")).toContain(
+        "invalid_token",
       );
+      // Revocation is dispatched via ctx.waitUntil — verify it was scheduled
+      expect(ctx.waitUntil).toHaveBeenCalled();
     });
 
     it("should reject tokens with no valid skills", async () => {

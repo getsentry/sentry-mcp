@@ -31,6 +31,47 @@ type OAuthExecutionContext = ExecutionContext & {
   props?: Record<string, unknown>;
 };
 
+const REAUTH_RESPONSE = new Response(
+  "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
+  {
+    status: 401,
+    headers: {
+      "WWW-Authenticate":
+        'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
+    },
+  },
+);
+
+/**
+ * Revokes the OAuth grant for the given user/client pair in the background,
+ * then returns a 401 response prompting re-authorization.
+ */
+function revokeStaleGrant(
+  ctx: ExecutionContext,
+  env: Env,
+  userId: string,
+  clientId: string,
+  logLabel: string,
+): Response {
+  ctx.waitUntil(
+    (async () => {
+      try {
+        const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
+        const grant = grants.items.find((g) => g.clientId === clientId);
+        if (grant) {
+          await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
+        }
+      } catch (err) {
+        logWarn(`Failed to revoke ${logLabel}`, {
+          loggerScope: ["cloudflare", "mcp-handler"],
+          extra: { error: String(err), clientId, userId },
+        });
+      }
+    })(),
+  );
+  return REAUTH_RESPONSE.clone();
+}
+
 /**
  * Main request handler that:
  * 1. Extracts auth props from ExecutionContext
@@ -86,37 +127,7 @@ const mcpHandler: ExportedHandler<Env> = {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: { clientId, userId },
       });
-
-      // Revoke the grant in the background (don't block the response)
-      ctx.waitUntil(
-        (async () => {
-          try {
-            // Find the grant for this user/client combination
-            const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
-            const grant = grants.items.find((g) => g.clientId === clientId);
-
-            if (grant) {
-              await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
-            }
-          } catch (err) {
-            logWarn("Failed to revoke legacy grant", {
-              loggerScope: ["cloudflare", "mcp-handler"],
-              extra: { error: String(err), clientId, userId },
-            });
-          }
-        })(),
-      );
-
-      return new Response(
-        "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
-        {
-          status: 401,
-          headers: {
-            "WWW-Authenticate":
-              'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
-          },
-        },
-      );
+      return revokeStaleGrant(ctx, env, userId, clientId, "legacy grant");
     }
 
     // Grants created before refreshToken was stored in props are stale and
@@ -125,33 +136,12 @@ const mcpHandler: ExportedHandler<Env> = {
       Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
         attributes: { reason: "missing_refresh_token" },
       });
-
-      ctx.waitUntil(
-        (async () => {
-          try {
-            const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
-            const grant = grants.items.find((g) => g.clientId === clientId);
-            if (grant) {
-              await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
-            }
-          } catch (err) {
-            logWarn("Failed to revoke stale grant", {
-              loggerScope: ["cloudflare", "mcp-handler"],
-              extra: { error: String(err), clientId, userId },
-            });
-          }
-        })(),
-      );
-
-      return new Response(
-        "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
-        {
-          status: 401,
-          headers: {
-            "WWW-Authenticate":
-              'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
-          },
-        },
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        "stale grant (missing refresh token)",
       );
     }
 
