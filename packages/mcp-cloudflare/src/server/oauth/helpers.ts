@@ -107,6 +107,8 @@ type ParsedUpstreamOAuthError = {
   errorDescription?: string;
 };
 
+type StoredGrantProps = Record<string, unknown> & Partial<WorkerProps>;
+
 function parseUpstreamOAuthError(
   responseText: string,
   contentType: string | null,
@@ -295,10 +297,9 @@ function recordTokenExchangeOutcome(
   });
 }
 
-function buildSuccessfulTokenExchangeResult(
-  props: WorkerProps,
-  accessTokenTTL: number,
-): TokenExchangeCallbackResult {
+function buildSuccessfulTokenExchangeResult<
+  TProps extends Record<string, unknown>,
+>(props: TProps, accessTokenTTL: number): TokenExchangeCallbackResult {
   return {
     newProps: props,
     accessTokenTTL,
@@ -351,7 +352,7 @@ export async function tokenExchangeCallback(
     return undefined;
   }
 
-  const rawProps = options.props as Partial<WorkerProps>;
+  const rawProps = options.props as StoredGrantProps;
 
   Sentry.setUser({ id: rawProps.id });
 
@@ -361,7 +362,8 @@ export async function tokenExchangeCallback(
     return undefined;
   }
 
-  const props: WorkerProps = {
+  const props = {
+    ...rawProps,
     id: rawProps.id as string,
     accessToken: rawProps.accessToken as string,
     refreshToken: rawProps.refreshToken,
@@ -370,7 +372,7 @@ export async function tokenExchangeCallback(
     scope: rawProps.scope as string,
     grantedScopes: rawProps.grantedScopes,
     grantedSkills: rawProps.grantedSkills,
-  };
+  } satisfies WorkerProps & Record<string, unknown>;
 
   const expiresAt = props.accessTokenExpiresAt;
   if (expiresAt && Number.isFinite(expiresAt)) {

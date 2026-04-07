@@ -32,6 +32,14 @@ type OAuthExecutionContext = ExecutionContext & {
   props?: Record<string, unknown>;
 };
 
+function escapeAuthenticateHeaderValue(value: string): string {
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("\r", "")
+    .replaceAll("\n", "");
+}
+
 /**
  * Revokes the OAuth grant for the given user/client pair in the background,
  * then returns a 401 response prompting re-authorization.
@@ -65,7 +73,7 @@ function revokeStaleGrant(
     {
       status: 401,
       headers: {
-        "WWW-Authenticate": `Bearer realm="Sentry MCP", error="invalid_token", error_description="${errorDescription}"`,
+        "WWW-Authenticate": `Bearer realm="Sentry MCP", error="invalid_token", error_description="${escapeAuthenticateHeaderValue(errorDescription)}"`,
       },
     },
   );
