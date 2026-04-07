@@ -321,6 +321,13 @@ async function probeUpstreamAccessToken(
       return "upstream_token_invalid";
     }
 
+    if (typeof error === "object" && error !== null) {
+      const status = "status" in error ? error.status : undefined;
+      if (typeof status === "number" && status >= 400 && status < 500) {
+        return "upstream_token_invalid";
+      }
+    }
+
     logIssue(error, {
       loggerScope: ["cloudflare", "oauth", "refresh"],
     });
