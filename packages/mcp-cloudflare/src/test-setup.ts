@@ -9,10 +9,10 @@ import { afterEach, beforeEach } from "vitest";
 
 beforeEach(async () => {
   const { setupFetchMock } = await import("./test-utils/fetch-mock-setup");
-  setupFetchMock();
+  await setupFetchMock();
 });
 
 afterEach(async () => {
   const { resetFetchMock } = await import("./test-utils/fetch-mock-setup");
-  resetFetchMock();
+  await resetFetchMock();
 });

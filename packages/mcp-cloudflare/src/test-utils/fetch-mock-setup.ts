@@ -4,7 +4,6 @@
  * Uses undici MockAgent via cloudflare:test to mock Sentry API responses.
  * This replaces MSW for tests that need to run in the workerd runtime.
  */
-import { fetchMock } from "cloudflare:test";
 import {
   autofixStateFixture,
   clientKeyFixture,
@@ -56,6 +55,11 @@ const VALID_ERROR_EVENT_QUERIES = new Set<string | null>(
 
 let fetchMockConfigured = false;
 
+async function getFetchMock() {
+  const mod = await import("cloudflare:test");
+  return mod.fetchMock;
+}
+
 /**
  * Set up fetchMock for Sentry API mocking in Cloudflare Workers tests.
  *
@@ -65,7 +69,8 @@ let fetchMockConfigured = false;
  *
  * Safe to call before each test; interceptors are only registered once.
  */
-export function setupFetchMock() {
+export async function setupFetchMock() {
+  const fetchMock = await getFetchMock();
   fetchMock.activate();
   fetchMock.disableNetConnect();
 
@@ -473,7 +478,8 @@ export function setupFetchMock() {
 /**
  * Reset fetchMock state between tests
  */
-export function resetFetchMock() {
+export async function resetFetchMock() {
+  const fetchMock = await getFetchMock();
   // In newer Cloudflare test runtimes, fetchMock is reset automatically between
   // test files and no longer exposes the old deactivate() helper. Only assert
   // pending interceptors when the runtime provides that API.
