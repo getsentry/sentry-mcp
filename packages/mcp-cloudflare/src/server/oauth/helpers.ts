@@ -3,7 +3,11 @@ import type {
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
 import type { z } from "zod";
-import { ApiClientError, SentryApiService } from "@sentry/mcp-core/api-client";
+import {
+  ApiClientError,
+  ApiRateLimitError,
+  SentryApiService,
+} from "@sentry/mcp-core/api-client";
 import { logError, logIssue } from "@sentry/mcp-core/telem/logging";
 import { TokenResponseSchema } from "./constants";
 import type { WorkerProps } from "../types";
@@ -306,6 +310,20 @@ function buildSuccessfulTokenExchangeResult<
   };
 }
 
+function buildInvalidGrantTokenExchangeResult(
+  props: WorkerProps & Record<string, unknown>,
+): TokenExchangeCallbackResult {
+  const invalidProps = {
+    ...props,
+    upstreamTokenInvalid: true,
+  } satisfies WorkerProps & Record<string, unknown>;
+
+  return {
+    newProps: invalidProps,
+    accessTokenProps: invalidProps,
+  };
+}
+
 async function probeUpstreamAccessToken(
   props: WorkerProps,
   env: TokenExchangeEnv,
@@ -318,6 +336,10 @@ async function probeUpstreamAccessToken(
     await api.getAuthenticatedUser();
     return "cached_token_still_valid_probed";
   } catch (error) {
+    if (error instanceof ApiRateLimitError) {
+      return "verification_indeterminate";
+    }
+
     if (error instanceof ApiClientError) {
       return "upstream_token_invalid";
     }
@@ -406,7 +428,7 @@ export async function tokenExchangeCallback(
       recordTokenExchangeOutcome(outcome, {
         grant_shape: "refreshable",
       });
-      return undefined;
+      return buildInvalidGrantTokenExchangeResult(props);
     case "verification_indeterminate":
       recordTokenExchangeOutcome(outcome, {
         grant_shape: "refreshable",

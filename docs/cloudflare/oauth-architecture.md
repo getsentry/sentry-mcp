@@ -258,7 +258,8 @@ tokens anymore.
 
 1. **MCP Token Refresh**: MCP clients exchange an MCP refresh token for a new MCP access token
 2. **Sentry Token Reuse**: The worker keeps reusing the cached Sentry access token while it is still valid
-3. **Re-auth on expiry**: Once the cached Sentry access token is no longer usable, the client must complete OAuth again
+3. **Stale grant rejection**: Grants missing required stored props like `refreshToken` are treated as stale and revoked
+4. **Re-auth on expiry**: Once the cached Sentry access token is no longer usable, the client must complete OAuth again
 
 ### MCP Token Refresh Flow
 
@@ -279,6 +280,10 @@ When an MCP client's token expires:
 export async function tokenExchangeCallback(options, env) {
   // Only handle MCP refresh_token requests
   if (options.grantType !== "refresh_token") {
+    return undefined;
+  }
+
+  if (!options.props.refreshToken) {
     return undefined;
   }
 
@@ -314,8 +319,8 @@ export async function tokenExchangeCallback(options, env) {
 ### Error Scenarios
 
 1. **Legacy grant missing Sentry refresh token**:
-   - Behavior: The worker can still reuse the cached Sentry access token while it remains valid
-   - Resolution: Re-authentication is only required once the token needs verification and can no longer be reused safely
+   - Behavior: The refresh exchange immediately stops returning new MCP tokens
+   - Resolution: The next `/mcp` request revokes the stale grant and requires a clean re-authentication flow
 
 2. **Cached Sentry token invalid**:
    - Error: Sentry probe returns 400/401

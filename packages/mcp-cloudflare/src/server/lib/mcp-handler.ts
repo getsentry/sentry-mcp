@@ -154,6 +154,20 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
+    if (rawProps.upstreamTokenInvalid) {
+      Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+        attributes: { reason: "invalid_upstream_token" },
+      });
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        "stale grant (invalid upstream token)",
+        "Upstream authorization is no longer valid",
+      );
+    }
+
     const { valid: validSkills, invalid: invalidSkills } = parseSkills(
       rawProps.grantedSkills as string[],
     );

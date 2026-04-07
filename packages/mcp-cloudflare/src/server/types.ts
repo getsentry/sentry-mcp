@@ -18,6 +18,7 @@ export type WorkerProps = {
   accessToken: string;
   refreshToken: string;
   accessTokenExpiresAt?: number; // Timestamp when the upstream access token expires
+  upstreamTokenInvalid?: boolean;
   clientId: string;
   scope: string;
   /**

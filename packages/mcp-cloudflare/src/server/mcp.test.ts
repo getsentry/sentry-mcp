@@ -345,7 +345,7 @@ describe("/mcp", () => {
     expect(body.result?.protocolVersion).toBeDefined();
   });
 
-  it("reissues an MCP token on refresh even when the upstream token probes invalid, and the resulting token fails at constrained /mcp", async () => {
+  it("reissues an MCP token on refresh when the upstream token probes invalid, and the resulting token fails even at root /mcp", async () => {
     const { clientId, tokens } = await issueTokens(
       "https://mcp.sentry.dev/mcp",
       {
@@ -392,12 +392,7 @@ describe("/mcp", () => {
 
     const mcpCtx = createExecutionContext();
     const mcpResponse = await handler.fetch!(
-      createMcpRequest(
-        "/mcp/sentry-mcp-evals",
-        refreshed.access_token,
-        "tools/list",
-        {},
-      ),
+      createMcpRequest("/mcp", refreshed.access_token, "tools/list", {}),
       workerEnv,
       mcpCtx,
     );
