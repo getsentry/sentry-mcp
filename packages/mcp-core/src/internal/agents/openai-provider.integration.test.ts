@@ -65,6 +65,7 @@ describe("OpenAI Provider Integration", () => {
 
   it.skipIf(!hasOpenAIKey)(
     "searchIssuesAgent translates natural language to Sentry query",
+    { timeout: 60000 },
     async () => {
       // This tests the actual code path that broke in #623 and with gateway 405s
       // - Uses the real searchIssuesAgent (not mocked)
@@ -97,11 +98,11 @@ describe("OpenAI Provider Integration", () => {
           ["date", "freq", "new", "user"].includes(result.sort),
       ).toBe(true);
     },
-    { timeout: 60000 },
   );
 
   it.skipIf(!hasOpenAIKey)(
     "searchIssuesAgent handles nullable sort field correctly",
+    { timeout: 60000 },
     async () => {
       // Specifically test that nullable fields work (the #623 issue)
       const apiService = new SentryApiService({
@@ -123,6 +124,5 @@ describe("OpenAI Provider Integration", () => {
           ["date", "freq", "new", "user"].includes(result.sort),
       ).toBe(true);
     },
-    { timeout: 60000 },
   );
 });
