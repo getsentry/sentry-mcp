@@ -7,6 +7,7 @@ interface OAuthProps {
   id: string;
   clientId: string;
   accessToken: string;
+  refreshToken: string;
   grantedSkills: string[];
 }
 
@@ -14,6 +15,7 @@ const DEFAULT_OAUTH_PROPS: OAuthProps = {
   id: "test-user-123",
   clientId: "test-client",
   accessToken: "test-access-token",
+  refreshToken: "test-refresh-token",
   grantedSkills: ["inspect", "docs"],
 };
 
@@ -116,6 +118,24 @@ describe("MCP Handler", () => {
       expect(response.headers.get("WWW-Authenticate")).toContain(
         "invalid_token",
       );
+    });
+
+    it("should revoke and reject stale grants missing a refresh token", async () => {
+      const request = createMcpRequest("tools/list");
+      const ctx = createMcpContext({
+        refreshToken: undefined as unknown as string,
+      });
+      const env = createTestEnv();
+
+      const response = await mcpHandler.fetch!(request, env, ctx);
+
+      expect(response.status).toBe(401);
+      expect(await response.text()).toContain("re-authorize");
+      expect(response.headers.get("WWW-Authenticate")).toContain(
+        "invalid_token",
+      );
+      // Revocation is dispatched via ctx.waitUntil — verify it was scheduled
+      expect(ctx.waitUntil).toHaveBeenCalled();
     });
 
     it("should reject tokens with no valid skills", async () => {

@@ -15,6 +15,7 @@ import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
+import * as Sentry from "@sentry/cloudflare";
 import type { Env } from "../types";
 import {
   checkRateLimit,
@@ -29,6 +30,45 @@ import { verifyConstraintsAccess } from "./constraint-utils";
 type OAuthExecutionContext = ExecutionContext & {
   props?: Record<string, unknown>;
 };
+
+/**
+ * Revokes the OAuth grant for the given user/client pair in the background,
+ * then returns a 401 response prompting re-authorization.
+ */
+function revokeStaleGrant(
+  ctx: ExecutionContext,
+  env: Env,
+  userId: string,
+  clientId: string,
+  logLabel: string,
+): Response {
+  ctx.waitUntil(
+    (async () => {
+      try {
+        const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
+        const grant = grants.items.find((g) => g.clientId === clientId);
+        if (grant) {
+          await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
+        }
+      } catch (err) {
+        logWarn(`Failed to revoke ${logLabel}`, {
+          loggerScope: ["cloudflare", "mcp-handler"],
+          extra: { error: String(err), clientId, userId },
+        });
+      }
+    })(),
+  );
+  return new Response(
+    "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
+    {
+      status: 401,
+      headers: {
+        "WWW-Authenticate":
+          'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
+      },
+    },
+  );
+}
 
 /**
  * Main request handler that:
@@ -85,36 +125,21 @@ const mcpHandler: ExportedHandler<Env> = {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: { clientId, userId },
       });
+      return revokeStaleGrant(ctx, env, userId, clientId, "legacy grant");
+    }
 
-      // Revoke the grant in the background (don't block the response)
-      ctx.waitUntil(
-        (async () => {
-          try {
-            // Find the grant for this user/client combination
-            const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
-            const grant = grants.items.find((g) => g.clientId === clientId);
-
-            if (grant) {
-              await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
-            }
-          } catch (err) {
-            logWarn("Failed to revoke legacy grant", {
-              loggerScope: ["cloudflare", "mcp-handler"],
-              extra: { error: String(err), clientId, userId },
-            });
-          }
-        })(),
-      );
-
-      return new Response(
-        "Your authorization has expired. Please re-authorize to continue using Sentry MCP.",
-        {
-          status: 401,
-          headers: {
-            "WWW-Authenticate":
-              'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
-          },
-        },
+    // Grants created before refreshToken was stored in props are stale and
+    // can no longer be silently refreshed. Revoke and force clean re-auth.
+    if (!oauthCtx.props.refreshToken) {
+      Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+        attributes: { reason: "missing_refresh_token" },
+      });
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        "stale grant (missing refresh token)",
       );
     }
 

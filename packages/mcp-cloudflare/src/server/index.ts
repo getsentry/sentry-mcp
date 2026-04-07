@@ -151,6 +151,10 @@ const wrappedOAuthProvider = {
       clientRegistrationEndpoint: "/oauth/register",
       tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
       scopesSupported: Object.keys(SCOPES),
+      // Expire grants after 30 days to prevent unbounded KV accumulation.
+      // Sentry access tokens also have a 30-day lifetime, so re-auth is
+      // required after this window regardless.
+      refreshTokenTTL: 30 * 24 * 60 * 60,
     });
 
     const response = await oAuthProvider.fetch(request, env, ctx);
