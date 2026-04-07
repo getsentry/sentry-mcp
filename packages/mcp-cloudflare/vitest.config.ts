@@ -1,6 +1,7 @@
 import path from "node:path";
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
+import { createConfiguredFetchMock } from "./src/test-utils/configure-fetch-mock";
 
 /**
  * Unified vitest config using vitest-pool-workers.
@@ -16,6 +17,9 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       main: "./src/server/index.ts",
+      miniflare: {
+        fetchMock: createConfiguredFetchMock(),
+      },
       wrangler: { configPath: "./wrangler.test.jsonc" },
     }),
   ],

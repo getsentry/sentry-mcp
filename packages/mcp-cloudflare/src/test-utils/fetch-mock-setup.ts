@@ -1,14 +1,11 @@
 /**
- * fetchMock setup for Cloudflare Workers tests
+ * Shared outbound mock registrations for Cloudflare Workers tests.
  *
- * Uses undici MockAgent via cloudflare:test to mock Sentry API responses.
- * This replaces MSW for tests that need to run in the workerd runtime.
- *
- * Actual test files must import `fetchMock` from `cloudflare:test` and pass it
- * into these helpers. Cloudflare's test APIs are only supported when imported
- * from Worker test modules.
+ * The current vitest-pool-workers stack configures Miniflare's `fetchMock`
+ * directly from vitest.config.ts. Test files still import
+ * `installFetchMockHooks()` for compatibility, but the hook is a no-op because
+ * runtime `cloudflare:test` no longer exposes a usable `fetchMock` object.
  */
-import { afterEach, beforeEach } from "vitest";
 import {
   autofixStateFixture,
   clientKeyFixture,
@@ -60,7 +57,7 @@ const VALID_ERROR_EVENT_QUERIES = new Set<string | null>(
 
 let fetchMockConfigured = false;
 
-type FetchMockLike = {
+export type FetchMockLike = {
   activate(): void;
   disableNetConnect(): void;
   get(origin: string): {
@@ -78,18 +75,13 @@ type FetchMockLike = {
 };
 
 /**
- * Set up fetchMock for Sentry API mocking in Cloudflare Workers tests.
+ * Register outbound interceptors on a MockAgent-like object.
  *
  * IMPORTANT: undici MockAgent matches interceptors in registration order
  * (first match wins). Always register specific path handlers BEFORE
  * general pattern handlers to ensure correct matching.
- *
- * Safe to call before each test; interceptors are only registered once.
  */
-export function setupFetchMock(fetchMock: FetchMockLike) {
-  fetchMock.activate();
-  fetchMock.disableNetConnect();
-
+export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
   if (fetchMockConfigured) {
     return;
   }
@@ -491,32 +483,7 @@ export function setupFetchMock(fetchMock: FetchMockLike) {
   }
 }
 
-/**
- * Reset fetchMock state between tests
- */
-export function resetFetchMock(fetchMock: FetchMockLike) {
-  // In newer Cloudflare test runtimes, fetchMock is reset automatically between
-  // test files and no longer exposes the old deactivate() helper. Only assert
-  // pending interceptors when the runtime provides that API.
-  if (
-    fetchMock &&
-    "assertNoPendingInterceptors" in fetchMock &&
-    typeof fetchMock.assertNoPendingInterceptors === "function"
-  ) {
-    try {
-      fetchMock.assertNoPendingInterceptors();
-    } catch {
-      // Some tests intentionally do not consume every persisted interceptor.
-    }
-  }
-}
-
-export function installFetchMockHooks(fetchMock: FetchMockLike) {
-  beforeEach(() => {
-    setupFetchMock(fetchMock);
-  });
-
-  afterEach(() => {
-    resetFetchMock(fetchMock);
-  });
+export function installFetchMockHooks(_fetchMock?: FetchMockLike) {
+  // No-op: the current Cloudflare Vitest integration configures Miniflare's
+  // outbound fetch mocking centrally in vitest.config.ts.
 }

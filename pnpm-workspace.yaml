@@ -38,6 +38,7 @@ catalog:
   hono: ^4.11.4
   lint-staged: ^15.5.2
   lucide-react: ^0.503.0
+  miniflare: 4.20260401.0
   msw: ^2.10.2
   open: ^10.1.2
   react: ^19.1.0
