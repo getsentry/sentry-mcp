@@ -35,3 +35,11 @@ source = "getsentry/skills"
 [[skills]]
 name = "iterate-pr"
 source = "getsentry/skills"
+
+[[mcp]]
+name = "sentry"
+url = "https://mcp.sentry.dev/mcp/sentry/mcp-server?experimental=1"
+
+[[mcp]]
+name = "sentry-dev"
+url = "http://localhost:5173/mcp/sentry/mcp-server?experimental=1"
