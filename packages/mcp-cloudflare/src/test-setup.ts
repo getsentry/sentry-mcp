@@ -5,13 +5,14 @@
  * This runs in the workerd runtime, not Node.js.
  */
 import "urlpattern-polyfill";
-import { setupFetchMock, resetFetchMock } from "./test-utils/fetch-mock-setup";
 import { afterEach, beforeEach } from "vitest";
 
-beforeEach(() => {
+beforeEach(async () => {
+  const { setupFetchMock } = await import("./test-utils/fetch-mock-setup");
   setupFetchMock();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  const { resetFetchMock } = await import("./test-utils/fetch-mock-setup");
   resetFetchMock();
 });
