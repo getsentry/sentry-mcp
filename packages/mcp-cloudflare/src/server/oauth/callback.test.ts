@@ -188,7 +188,7 @@ function createTokenExchangeRequest(clientId: string, code: string) {
 }
 
 function createMcpInitializeRequest(accessToken: string, path = "/mcp") {
-  return new Request(`https://mcp.sentry.dev${path}`, {
+  return new Request(`http://localhost${path}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

@@ -47,10 +47,15 @@ vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
   StreamableHTTPClientTransport: vi.fn().mockImplementation(() => ({})),
 }));
 
-vi.mock("../chat-oauth", () => ({
-  getOrRegisterChatClient: mockGetOrRegisterChatClient,
-  getSecureCookieOptions: mockGetSecureCookieOptions,
-}));
+vi.mock("../chat-oauth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../chat-oauth")>();
+
+  return {
+    ...actual,
+    getOrRegisterChatClient: mockGetOrRegisterChatClient,
+    getSecureCookieOptions: mockGetSecureCookieOptions,
+  };
+});
 
 import app from "../../app";
 
