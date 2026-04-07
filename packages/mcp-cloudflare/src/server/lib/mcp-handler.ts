@@ -223,7 +223,6 @@ const mcpHandler: ExportedHandler<Env> = {
       userId,
       clientId,
       accessToken,
-      refreshToken: rawProps.refreshToken,
       grantedSkills: validSkills,
       constraints: verification.constraints,
       sentryHost,
