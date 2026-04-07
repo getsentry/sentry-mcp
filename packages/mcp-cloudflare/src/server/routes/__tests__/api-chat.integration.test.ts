@@ -59,6 +59,11 @@ vi.mock("../chat-oauth", async (importOriginal) => {
 
 import app from "../../app";
 
+const workerEnv = {
+  ...(env as Record<string, unknown>),
+  OPENAI_API_KEY: "test-openai-key",
+};
+
 function buildAuthCookie(
   overrides?: Partial<{
     access_token: string;
@@ -122,7 +127,7 @@ describe("/api/chat integration", () => {
           endpointMode: "standard",
         }),
       },
-      env,
+      workerEnv,
     );
 
     expect(res.status).toBe(200);
@@ -185,7 +190,7 @@ describe("/api/chat integration", () => {
           endpointMode: "standard",
         }),
       },
-      env,
+      workerEnv,
     );
 
     expect(res.status).toBe(200);

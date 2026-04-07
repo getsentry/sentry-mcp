@@ -13,9 +13,9 @@ const {
   mockCheckRateLimit,
 } = vi.hoisted(() => {
   const mockOAuthProviderFetch = vi.fn();
-  class MockOAuthProvider {
-    fetch = mockOAuthProviderFetch;
-  }
+  const MockOAuthProvider = vi.fn(function MockOAuthProvider() {
+    return { fetch: mockOAuthProviderFetch };
+  });
   const mockGetClientIp = vi.fn<(request: Request) => string | null>(
     () => null,
   );
