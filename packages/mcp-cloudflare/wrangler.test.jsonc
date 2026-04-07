@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sentry-mcp-test",
-  // Note: We don't specify "main" - vitest-pool-workers handles entry points
+  "main": "./src/server/index.ts",
   "compatibility_date": "2025-03-21",
   // Keep flags in sync with wrangler.jsonc for production parity
   "compatibility_flags": [

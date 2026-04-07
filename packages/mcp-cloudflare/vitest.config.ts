@@ -15,6 +15,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [
     cloudflareTest({
+      main: "./src/server/index.ts",
       wrangler: { configPath: "./wrangler.test.jsonc" },
     }),
   ],
