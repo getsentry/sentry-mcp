@@ -9,9 +9,9 @@
 import {
   autofixStateFixture,
   clientKeyFixture,
+  eventFixture,
   eventsErrorsEmptyFixture,
   eventsErrorsFixture,
-  eventsFixture,
   eventsSpansEmptyFixture,
   eventsSpansFixture,
   issueFixture,
@@ -300,7 +300,7 @@ export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
           p.includes("/events/7ca573c0f4814912aaa9bdc77d1a7d51") ||
           p.includes("/events/latest"),
       })
-      .reply(200, eventsFixture, { headers: JSON_HEADERS })
+      .reply(200, eventFixture, { headers: JSON_HEADERS })
       .persist();
 
     // ===== Traces =====
