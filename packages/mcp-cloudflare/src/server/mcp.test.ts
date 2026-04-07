@@ -1,13 +1,15 @@
-import "../test-utils/fetch-mock-hooks";
-import { createExecutionContext, env } from "cloudflare:test";
+import { createExecutionContext, env, fetchMock } from "cloudflare:test";
 import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SCOPES } from "../constants";
+import { installFetchMockHooks } from "../test-utils/fetch-mock-setup";
 import app from "./app";
 import handler from "./index";
 import mcpHandler from "./lib/mcp-handler";
 import { tokenExchangeCallback } from "./oauth";
 import type { Env, WorkerProps } from "./types";
+
+installFetchMockHooks(fetchMock);
 
 const workerEnv = {
   ...(env as Record<string, unknown>),

@@ -3,7 +3,12 @@
  *
  * Uses undici MockAgent via cloudflare:test to mock Sentry API responses.
  * This replaces MSW for tests that need to run in the workerd runtime.
+ *
+ * Actual test files must import `fetchMock` from `cloudflare:test` and pass it
+ * into these helpers. Cloudflare's test APIs are only supported when imported
+ * from Worker test modules.
  */
+import { afterEach, beforeEach } from "vitest";
 import {
   autofixStateFixture,
   clientKeyFixture,
@@ -55,10 +60,22 @@ const VALID_ERROR_EVENT_QUERIES = new Set<string | null>(
 
 let fetchMockConfigured = false;
 
-async function getFetchMock() {
-  const mod = await import("cloudflare:test");
-  return mod.fetchMock;
-}
+type FetchMockLike = {
+  activate(): void;
+  disableNetConnect(): void;
+  get(origin: string): {
+    intercept(options: Record<string, unknown>): {
+      reply(
+        statusCode: number,
+        body: unknown,
+        options?: Record<string, unknown>,
+      ): {
+        persist(): void;
+      };
+    };
+  };
+  assertNoPendingInterceptors?(): void;
+};
 
 /**
  * Set up fetchMock for Sentry API mocking in Cloudflare Workers tests.
@@ -69,8 +86,7 @@ async function getFetchMock() {
  *
  * Safe to call before each test; interceptors are only registered once.
  */
-export async function setupFetchMock() {
-  const fetchMock = await getFetchMock();
+export function setupFetchMock(fetchMock: FetchMockLike) {
   fetchMock.activate();
   fetchMock.disableNetConnect();
 
@@ -478,8 +494,7 @@ export async function setupFetchMock() {
 /**
  * Reset fetchMock state between tests
  */
-export async function resetFetchMock() {
-  const fetchMock = await getFetchMock();
+export function resetFetchMock(fetchMock: FetchMockLike) {
   // In newer Cloudflare test runtimes, fetchMock is reset automatically between
   // test files and no longer exposes the old deactivate() helper. Only assert
   // pending interceptors when the runtime provides that API.
@@ -494,4 +509,14 @@ export async function resetFetchMock() {
       // Some tests intentionally do not consume every persisted interceptor.
     }
   }
+}
+
+export function installFetchMockHooks(fetchMock: FetchMockLike) {
+  beforeEach(() => {
+    setupFetchMock(fetchMock);
+  });
+
+  afterEach(() => {
+    resetFetchMock(fetchMock);
+  });
 }

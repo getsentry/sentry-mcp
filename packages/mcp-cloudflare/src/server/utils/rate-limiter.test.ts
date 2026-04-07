@@ -1,7 +1,10 @@
-import "../../test-utils/fetch-mock-hooks";
+import { fetchMock } from "cloudflare:test";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import { checkRateLimit } from "./rate-limiter";
 import type { RateLimit } from "@cloudflare/workers-types";
+
+installFetchMockHooks(fetchMock);
 
 describe("checkRateLimit", () => {
   let mockRateLimiter: RateLimit;

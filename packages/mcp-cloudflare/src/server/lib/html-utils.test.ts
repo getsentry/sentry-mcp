@@ -1,6 +1,9 @@
-import "../../test-utils/fetch-mock-hooks";
+import { fetchMock } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
+import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import { sanitizeHrefUrl, sanitizeHtml } from "./html-utils";
+
+installFetchMockHooks(fetchMock);
 
 describe("sanitizeHrefUrl", () => {
   describe("blocks dangerous URI schemes", () => {

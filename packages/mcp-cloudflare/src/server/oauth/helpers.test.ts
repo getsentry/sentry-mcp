@@ -1,12 +1,15 @@
-import "../../test-utils/fetch-mock-hooks";
+import { fetchMock } from "cloudflare:test";
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import type { WorkerProps } from "../types";
 import {
   createResourceValidationError,
   tokenExchangeCallback,
   validateResourceParameter,
 } from "./helpers";
+
+installFetchMockHooks(fetchMock);
 
 const GRANT_TYPES = {
   AUTHORIZATION_CODE:

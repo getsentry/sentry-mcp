@@ -1,11 +1,14 @@
-import "../../test-utils/fetch-mock-hooks";
+import { fetchMock } from "cloudflare:test";
 import { describe, it, expect, vi } from "vitest";
 import "urlpattern-polyfill";
+import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import {
   verifyConstraintsAccess,
   type CachedConstraints,
   type CacheOptions,
 } from "./constraint-utils";
+
+installFetchMockHooks(fetchMock);
 
 /**
  * Create a mock KVNamespace for testing cache behavior.

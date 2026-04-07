@@ -1,7 +1,9 @@
-import "../../../test-utils/fetch-mock-hooks";
-import { env } from "cloudflare:test";
+import { env, fetchMock } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
+import { installFetchMockHooks } from "../../../test-utils/fetch-mock-setup";
 import app from "../../app";
+
+installFetchMockHooks(fetchMock);
 
 describe("/api/chat", () => {
   it("should return 401 without authorization", async () => {

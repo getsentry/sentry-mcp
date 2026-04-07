@@ -1,7 +1,10 @@
-import "../../test-utils/fetch-mock-hooks";
+import { fetchMock } from "cloudflare:test";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import { renderApprovalDialog, parseRedirectApproval } from "./approval-dialog";
 import { signState } from "../oauth/state";
+
+installFetchMockHooks(fetchMock);
 
 describe("approval-dialog", () => {
   const TEST_SECRET = "test-cookie-secret-32-chars-long";

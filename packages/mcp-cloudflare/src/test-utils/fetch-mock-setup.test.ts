@@ -1,5 +1,8 @@
-import "./fetch-mock-hooks";
+import { fetchMock } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { installFetchMockHooks } from "./fetch-mock-setup";
+
+installFetchMockHooks(fetchMock);
 
 function createEventsUrl(options?: {
   query?: string;

@@ -1,6 +1,9 @@
-import "../test-utils/fetch-mock-hooks";
+import { fetchMock } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
+import { installFetchMockHooks } from "../test-utils/fetch-mock-setup";
 import app from "./app";
+
+installFetchMockHooks(fetchMock);
 
 // RFC 5737 TEST-NET-1 address; required by the IP-extraction middleware
 const TEST_HEADERS = { "CF-Connecting-IP": "192.0.2.1" } as const;

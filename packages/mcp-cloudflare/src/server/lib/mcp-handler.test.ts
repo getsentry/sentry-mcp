@@ -1,8 +1,11 @@
-import "../../test-utils/fetch-mock-hooks";
+import { fetchMock } from "cloudflare:test";
 import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import type { Env } from "../types";
 import mcpHandler from "./mcp-handler";
+
+installFetchMockHooks(fetchMock);
 
 interface OAuthProps {
   id: string;

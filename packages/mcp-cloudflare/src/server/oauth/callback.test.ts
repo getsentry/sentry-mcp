@@ -1,15 +1,17 @@
-import "../../test-utils/fetch-mock-hooks";
-import { createExecutionContext, env } from "cloudflare:test";
+import { createExecutionContext, env, fetchMock } from "cloudflare:test";
 import { getOAuthApi } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SCOPES } from "../../constants";
+import { installFetchMockHooks } from "../../test-utils/fetch-mock-setup";
 import app from "../app";
 import handler from "../index";
 import mcpHandler from "../lib/mcp-handler";
 import type { Env } from "../types";
 import oauthRoute from "./index";
 import { signState, type OAuthState } from "./state";
+
+installFetchMockHooks(fetchMock);
 
 const { exchangeCodeForAccessToken } = vi.hoisted(() => ({
   exchangeCodeForAccessToken: vi.fn(),

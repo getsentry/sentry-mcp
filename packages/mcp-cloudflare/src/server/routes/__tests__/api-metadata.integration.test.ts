@@ -1,6 +1,8 @@
-import "../../../test-utils/fetch-mock-hooks";
-import { env } from "cloudflare:test";
+import { env, fetchMock } from "cloudflare:test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { installFetchMockHooks } from "../../../test-utils/fetch-mock-setup";
+
+installFetchMockHooks(fetchMock);
 
 const { mockCreateMCPClient, mockMcpClient } = vi.hoisted(() => {
   const mockMcpClient = {
