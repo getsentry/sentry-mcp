@@ -7,6 +7,7 @@ import { logSuccess } from "./logger.js";
 import type { MCPConnection, MCPConfig } from "./types.js";
 import { randomUUID } from "node:crypto";
 import { LIB_VERSION } from "./version.js";
+import { buildStdioServerLaunchConfig } from "./transport.js";
 
 export async function connectToMCPServer(
   config: MCPConfig,
@@ -25,36 +26,18 @@ export async function connectToMCPServer(
       },
       async (span) => {
         try {
-          const args = [`--access-token=${config.accessToken}`];
-          if (config.host) {
-            args.push(`--host=${config.host}`);
-          }
-          if (config.sentryDsn) {
-            args.push(`--sentry-dsn=${config.sentryDsn}`);
-          }
-          if (config.useAgentEndpoint) {
-            args.push("--agent");
-          }
-          if (config.useExperimental) {
-            args.push("--experimental");
-          }
-
           // Resolve the path to the mcp-server binary
           const __dirname = dirname(fileURLToPath(import.meta.url));
           const mcpServerPath = join(
             __dirname,
             "../../mcp-server/dist/index.js",
           );
+          const launchConfig = buildStdioServerLaunchConfig(config);
 
           const transport = new Experimental_StdioMCPTransport({
             command: "node",
-            args: [mcpServerPath, ...args],
-            env: {
-              ...process.env,
-              SENTRY_ACCESS_TOKEN: config.accessToken,
-              SENTRY_HOST: config.host || "sentry.io",
-              ...(config.sentryDsn && { SENTRY_DSN: config.sentryDsn }),
-            },
+            args: [mcpServerPath, ...launchConfig.args],
+            env: launchConfig.env,
           });
 
           const client = await experimental_createMCPClient({

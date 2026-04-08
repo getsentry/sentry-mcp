@@ -62,7 +62,97 @@ If your changes involve experimental tools:
 pnpm -w run cli --experimental "your query"
 ```
 
-## Step 3: Human-Only Testing (Reference)
+## Step 3: Test Stdio / Auth Flows When Relevant
+
+Run this step when your changes touch stdio transport, auth, device-code flow, token caching, npm package behavior, or `mcp-test-client`.
+
+### Fast stdio checks
+
+These do not require a browser:
+
+```bash
+# Explicit-token stdio path
+pnpm -w run cli --transport stdio --access-token=TOKEN --list-tools
+
+# No-token, non-interactive path should fail with the auth guidance
+pnpm -w run cli --transport stdio --list-tools
+```
+
+Look for `Connected to MCP server (stdio)` in the explicit-token case.
+In the no-token non-interactive case, expect the error that instructs you to run `sentry-mcp auth login` interactively first.
+
+### Device-code auth with isolated cache
+
+Use an isolated cache file so QA does not depend on or overwrite `~/.sentry/mcp.json`:
+
+```bash
+AUTH_DIR=$(mktemp -d /tmp/sentry-mcp-auth.XXXXXX)
+export SENTRY_MCP_AUTH_CACHE="$AUTH_DIR/mcp.json"
+pnpm -w run cli --transport stdio --list-tools
+```
+
+This must run in a real TTY. The server should print a Sentry device-code URL and wait for authorization.
+Complete the browser flow, then confirm the client connects and lists tools.
+
+### Cached-token reuse
+
+After the device-code login succeeds, run the same command again with the same `SENTRY_MCP_AUTH_CACHE`:
+
+```bash
+pnpm -w run cli --transport stdio --list-tools
+```
+
+Confirm that it reuses the cached token and lists tools without starting another browser-based login.
+
+## Step 4: Test Real Agent CLIs When Relevant
+
+Run this step when validating Claude Code, Codex, or another issue that only reproduces in a real agent client.
+
+The repo includes a harness package that uses the installed local CLI session instead of the `mcp-test-client`:
+
+```bash
+# Claude Code against the local dev server MCP entry
+pnpm -w run agent-cli-test --provider claude --setup repo
+
+# Codex against the local dev server MCP entry
+pnpm -w run agent-cli-test --provider codex --setup repo
+
+# Claude Code against the checked-in stdio MCP entry
+pnpm -w run agent-cli-test --provider claude --setup stdio
+
+# Codex against the checked-in stdio MCP entry
+pnpm -w run agent-cli-test --provider codex --setup stdio
+```
+
+What this verifies:
+- The CLI is installed and can see the named MCP server
+- The provider can run a real prompt against Sentry MCP
+- The final answer includes the authenticated email from `whoami`
+
+Use `--setup repo --server sentry` if you want to test the hosted server instead of the local `sentry-dev` entry.
+
+The checked-in `stdio` setup uses `packages/agent-cli-test/projects/stdio/.sentry/mcp.json` as an isolated auth cache.
+Real clients do not give stdio subprocesses a TTY, so the first-run device-code flow must be warmed separately:
+
+```bash
+pnpm -w run agent-cli-test auth login
+```
+
+If the harness fails, rerun the provider directly with debug enabled so you can see the MCP startup failure:
+
+```bash
+# Claude Code: capture a debug log for the real prompt run
+claude --mcp-config /tmp/claude-sentry-dev-config.json --strict-mcp-config --permission-mode bypassPermissions --no-session-persistence --debug-file /tmp/claude-sentry-dev.log -p 'Use the "whoami" tool from the MCP server named "sentry-dev". Call it exactly once. Reply with only the authenticated email address.'
+
+# Codex: capture MCP handshake and transport logs
+RUST_LOG=codex_core=debug,rmcp=debug RUST_BACKTRACE=1 codex exec --skip-git-repo-check --sandbox read-only --output-last-message /tmp/codex-sentry-dev-last.txt 'Use only the MCP server named "sentry-dev". Call the "whoami" tool exactly once. Reply with only the authenticated email address.'
+```
+
+Look for these signatures:
+- Claude: `ToolSearchTool`, `mcp__sentry-dev__whoami`, missing server/tool selection, `tool permission denied`
+- Codex: `UnexpectedContentType`, `AuthRequired`, `resources/list failed`
+
+## Step 5: Human-Only Testing (Reference)
 
 These methods require human interaction and cannot be run by the agent. Suggest them to the user when relevant.
 
@@ -90,14 +180,14 @@ Constraint testing via URL paths:
 
 ## Stdio / Production Build Testing (Rare)
 
-Almost never needed — use the dev server approach above. Only use this when specifically testing the npm package build:
+Use this when specifically testing the published/package build rather than the local dev server:
 
 ```bash
 # Build first
 pnpm -w run build
 
-# Test via stdio transport (requires a Sentry access token)
-pnpm -w run cli --access-token=TOKEN "who am I?"
+# Test via stdio transport with an explicit token
+pnpm -w run cli --transport stdio --access-token=TOKEN "who am I?"
 ```
 
 Look for `Connected to MCP server (stdio)` to confirm stdio transport.

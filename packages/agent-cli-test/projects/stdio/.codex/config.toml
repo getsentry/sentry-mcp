@@ -1,0 +1,4 @@
+[mcp_servers.sentry-stdio]
+command = "node"
+args = ["../../../mcp-server/dist/index.js"]
+env = { SENTRY_MCP_AUTH_CACHE = "./.sentry/mcp.json" }
