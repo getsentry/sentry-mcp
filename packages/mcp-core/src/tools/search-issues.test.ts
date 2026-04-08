@@ -4,6 +4,7 @@ import { mswServer } from "@sentry/mcp-server-mocks";
 import searchIssues from "./search-issues";
 import { generateText } from "ai";
 import type { ServerContext } from "../types";
+import { ConfigurationError } from "../errors";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -104,6 +105,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "unresolved issues",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
@@ -116,10 +119,90 @@ describe("search_issues", () => {
     expect(result).toContain("Test Error");
   });
 
+  it("should search issues with direct query syntax (no agent)", async () => {
+    mswServer.use(
+      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("query")).toBe(
+          "is:unresolved is:unassigned",
+        );
+        expect(url.searchParams.get("sort")).toBe("freq");
+        return HttpResponse.json([
+          {
+            id: "123",
+            shortId: "PROJ-123",
+            title: "Test Error",
+            status: "unresolved",
+            count: "100",
+            userCount: 50,
+            firstSeen: "2025-01-15T10:00:00Z",
+            lastSeen: "2025-01-15T12:00:00Z",
+            permalink: "https://sentry.io/issues/123/",
+            project: {
+              id: "456",
+              slug: "test-project",
+              name: "Test Project",
+            },
+            culprit: "test.function",
+          },
+        ]);
+      }),
+    );
+
+    const result = await searchIssues.handler(
+      {
+        organizationSlug: "test-org",
+        query: "is:unresolved is:unassigned",
+        sort: "freq",
+        projectSlugOrId: null,
+        regionUrl: null,
+        limit: 10,
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    // Should NOT have called the AI agent
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(result).toContain("PROJ-123");
+    expect(result).toContain("Test Error");
+  });
+
+  it("should throw ConfigurationError when naturalLanguageQuery provided without agent", async () => {
+    const savedOpenAI = process.env.OPENAI_API_KEY;
+    const savedAnthropic = process.env.ANTHROPIC_API_KEY;
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+
+    try {
+      await expect(
+        searchIssues.handler(
+          {
+            organizationSlug: "test-org",
+            naturalLanguageQuery: "unresolved issues",
+            query: "is:unresolved",
+            sort: "date",
+            projectSlugOrId: null,
+            regionUrl: null,
+            limit: 10,
+            includeExplanation: false,
+          },
+          mockContext,
+        ),
+      ).rejects.toThrow(ConfigurationError);
+    } finally {
+      process.env.OPENAI_API_KEY = savedOpenAI;
+      if (savedAnthropic === undefined) {
+        process.env.ANTHROPIC_API_KEY = "";
+      } else {
+        process.env.ANTHROPIC_API_KEY = savedAnthropic;
+      }
+    }
+  });
+
   it("should handle project slug parameter", async () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
 
-    // Mock getProject call - handler needs to fetch project to get ID
     mswServer.use(
       http.get("*/api/0/projects/*/my-project/", () => {
         return HttpResponse.json({
@@ -137,6 +220,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "all issues",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: "my-project",
         regionUrl: null,
         limit: 10,
@@ -151,7 +236,6 @@ describe("search_issues", () => {
   it("should handle numeric project ID", async () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
 
-    // Numeric ID doesn't need getProject call - used directly
     mswServer.use(
       http.get("*/api/0/projects/*/123456/issues/*", () => {
         return HttpResponse.json([]);
@@ -162,6 +246,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "all issues",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: "123456",
         regionUrl: null,
         limit: 10,
@@ -187,6 +273,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "most frequent errors",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
@@ -212,6 +300,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "all issues",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
@@ -237,6 +327,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "test",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
         limit: 25,
@@ -259,6 +351,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "unresolved issues",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
@@ -284,31 +378,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "nonexistent issues",
-        projectSlugOrId: null,
-        regionUrl: null,
-        limit: 10,
-        includeExplanation: false,
-      },
-      mockContext,
-    );
-
-    expect(result).toContain("No issues found");
-  });
-
-  it("should handle whitespace-only query gracefully", async () => {
-    mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
-
-    mswServer.use(
-      http.get("*/api/0/organizations/*/issues/", () => {
-        return HttpResponse.json([]);
-      }),
-    );
-
-    // Whitespace gets trimmed but doesn't fail - the AI agent processes it
-    const result = await searchIssues.handler(
-      {
-        organizationSlug: "test-org",
-        naturalLanguageQuery: "   ",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
@@ -338,6 +409,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "unresolved errors",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
@@ -371,6 +444,8 @@ describe("search_issues", () => {
         {
           organizationSlug: "test-org",
           naturalLanguageQuery: "test",
+          query: "is:unresolved",
+          sort: "date",
           projectSlugOrId: null,
           regionUrl: null,
           limit: 10,
@@ -413,6 +488,8 @@ describe("search_issues", () => {
       {
         organizationSlug: "test-org",
         naturalLanguageQuery: "all issues",
+        query: "is:unresolved",
+        sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
         limit: 10,
@@ -428,12 +505,13 @@ describe("search_issues", () => {
   });
 
   it("should validate project slug format", async () => {
-    // Invalid characters in slug should fail validation
     await expect(
       searchIssues.handler(
         {
           organizationSlug: "test-org",
           naturalLanguageQuery: "test",
+          query: "is:unresolved",
+          sort: "date",
           projectSlugOrId: "invalid@slug",
           regionUrl: null,
           limit: 10,
@@ -461,6 +539,8 @@ describe("search_issues", () => {
         {
           organizationSlug: "nonexistent-org",
           naturalLanguageQuery: "test",
+          query: "is:unresolved",
+          sort: "date",
           projectSlugOrId: null,
           regionUrl: null,
           limit: 10,

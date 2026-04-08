@@ -59,7 +59,7 @@ describe("use_sentry handler", () => {
       }),
     });
 
-    // Verify all tools were provided (total - use_sentry - 3 list_* tools - internal-only detail tools)
+    // Verify all tools were provided (total - use_sentry - internal-only detail tools)
     const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
     expect(Object.keys(toolsArg)).toHaveLength(22);
 
@@ -110,7 +110,7 @@ describe("use_sentry handler", () => {
     // Verify use_sentry is NOT in the list
     expect(toolNames).not.toContain("use_sentry");
 
-    // Verify tool count (total - use_sentry - 3 list_* tools - internal-only detail tools)
+    // Verify tool count (total - use_sentry - internal-only detail tools)
     expect(toolNames).toHaveLength(22);
   });
 
