@@ -141,7 +141,7 @@ The checked-in `stdio` setup uses an isolated auth cache at `packages/agent-cli-
 Because real clients launch stdio servers non-interactively, first-run device-code auth does not start inside Claude or Codex. Warm that cache from a real TTY first:
 
 ```bash
-pnpm -w run agent-cli-stdio-auth login
+pnpm -w run agent-cli-test auth login
 ```
 
 When the harness fails, rerun the provider directly with debug enabled so you can inspect the exact MCP startup failure:

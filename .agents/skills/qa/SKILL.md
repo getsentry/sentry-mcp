@@ -135,7 +135,7 @@ The checked-in `stdio` setup uses `packages/agent-cli-test/projects/stdio/.sentr
 Real clients do not give stdio subprocesses a TTY, so the first-run device-code flow must be warmed separately:
 
 ```bash
-pnpm -w run agent-cli-stdio-auth login
+pnpm -w run agent-cli-test auth login
 ```
 
 If the harness fails, rerun the provider directly with debug enabled so you can see the MCP startup failure:

@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { isStdioAuthSubcommand, runStdioAuthCommand } from "./auth.js";
 import { createProvider } from "./providers.js";
 import { SCENARIOS } from "./scenarios.js";
 import { resolveHarnessSetup, type HarnessSetupName } from "./setup.js";
@@ -170,7 +171,23 @@ program
     process.exit(result.passed ? 0 : 1);
   });
 
-program.parseAsync(process.argv).catch((error: unknown) => {
+async function main(): Promise<void> {
+  if (process.argv[2] === "auth") {
+    const subcommand = process.argv[3];
+
+    if (!isStdioAuthSubcommand(subcommand)) {
+      throw new Error(
+        "Usage: sentry-agent-cli-test auth <login|status|logout>",
+      );
+    }
+
+    process.exit(await runStdioAuthCommand(subcommand));
+  }
+
+  await program.parseAsync(process.argv);
+}
+
+main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(message);
   process.exit(1);

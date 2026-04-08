@@ -71,13 +71,13 @@ Claude also needs non-interactive MCP tool permissions enabled in `-p` mode. The
 Warm the cache from a real TTY before rerunning the client harness:
 
 ```bash
-pnpm -w run agent-cli-stdio-auth login
+pnpm -w run agent-cli-test auth login
 ```
 
 Check the cached auth state at any time with:
 
 ```bash
-pnpm -w run agent-cli-stdio-auth status
+pnpm -w run agent-cli-test auth status
 ```
 
 After that succeeds, rerun:

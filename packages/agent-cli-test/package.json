@@ -5,13 +5,11 @@
   "type": "module",
   "description": "Real agent CLI smoke tests for Sentry MCP",
   "bin": {
-    "sentry-agent-cli-test": "./dist/index.js",
-    "sentry-agent-cli-stdio-auth": "./dist/auth.js"
+    "sentry-agent-cli-test": "./dist/index.js"
   },
   "scripts": {
     "build": "tsdown",
     "start": "tsx src/index.ts",
-    "stdio-auth": "tsx src/auth.ts",
     "test": "vitest run",
     "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
     "test:watch": "vitest",
