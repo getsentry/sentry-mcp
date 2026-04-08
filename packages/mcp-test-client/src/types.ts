@@ -8,8 +8,10 @@ export interface MCPConnection {
   transport: "stdio" | "http";
 }
 
+export type RequestedTransportMode = "auto" | "stdio" | "http";
+
 export interface MCPConfig {
-  accessToken: string;
+  accessToken?: string;
   host?: string;
   sentryDsn?: string;
   useAgentEndpoint?: boolean;

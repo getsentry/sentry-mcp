@@ -204,23 +204,27 @@ The `mcp-test-client` package provides a CLI-based way to test the stdio transpo
 
 ### Transport Selection
 
-The CLI client automatically selects the transport based on flags:
+The CLI client supports explicit transport selection:
 
-- **Stdio transport**: `--access-token` flag provided
-- **Remote HTTP transport**: `--mcp-host` flag or no access token
+- **Auto**: `--transport auto` (default) uses stdio when an access token is present, otherwise HTTP
+- **Stdio**: `--transport stdio`
+- **Remote HTTP**: `--transport http`
 
 ### Basic Usage
 
 **Test stdio transport (local):**
 ```bash
 # Single query
-pnpm -w run cli --access-token=YOUR_TOKEN "who am I?"
+pnpm -w run cli --transport stdio --access-token=YOUR_TOKEN "who am I?"
 
 # Interactive mode
-pnpm -w run cli --access-token=YOUR_TOKEN
+pnpm -w run cli --transport stdio --access-token=YOUR_TOKEN
 > who am I?
 > find my organizations
 > exit
+
+# Auth/tool-discovery only (no OPENAI_API_KEY required)
+pnpm -w run cli --transport stdio --list-tools
 ```
 
 **Verify stdio is being used:**
@@ -266,7 +270,7 @@ For testing the stdio mechanics without real API calls:
 # - Tool execution ✅
 # - API error handling ✅ (expected 400 error)
 
-pnpm -w run cli --access-token=test-fake-token-12345 "who am I?"
+pnpm -w run cli --transport stdio --access-token=test-fake-token-12345 "who am I?"
 ```
 
 **Expected output:**
@@ -282,12 +286,12 @@ pnpm -w run cli --access-token=test-fake-token-12345 "who am I?"
 ### Comparing Stdio vs Remote
 
 ```bash
-# Stdio (uses --access-token)
-pnpm -w run cli --access-token=YOUR_TOKEN "query"
+# Stdio
+pnpm -w run cli --transport stdio --access-token=YOUR_TOKEN "query"
 # Output: "Connected to MCP server (stdio)"
 
-# Remote HTTP (uses --mcp-host or defaults to http://localhost:5173)
-pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
+# Remote HTTP
+pnpm -w run cli --transport http --mcp-host=https://mcp.sentry.dev "query"
 # Output: "Connected to MCP server (remote)"
 ```
 

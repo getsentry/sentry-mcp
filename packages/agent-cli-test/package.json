@@ -1,0 +1,28 @@
+{
+  "name": "@sentry/mcp-agent-cli-test",
+  "version": "0.31.0",
+  "private": true,
+  "type": "module",
+  "description": "Real agent CLI smoke tests for Sentry MCP",
+  "bin": {
+    "sentry-agent-cli-test": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "start": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=tests.junit.xml",
+    "test:watch": "vitest",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -16,8 +16,8 @@ A simple CLI tool to test the Sentry MCP server using stdio transport with an AI
 
 - Node.js >= 20
 - pnpm package manager
-- OpenAI API key
-- Sentry access token with appropriate permissions
+- OpenAI API key for prompt/agent mode
+- Sentry access token with appropriate permissions for token-based stdio mode
 
 ## Installation
 
@@ -76,17 +76,15 @@ SENTRY_DSN=your_sentry_dsn  # Error tracking for the client itself
 pnpm mcp-test-client --access-token=your_token "Your prompt"
 ```
 
-### Token Priority
+### Transport Selection
 
-The client automatically determines the connection mode:
+The client supports three transport modes:
 
-**Local Mode (stdio transport)**: Used when an access token is provided via:
+- `--transport auto` (default): use stdio when an access token is available, otherwise use remote HTTP
+- `--transport stdio`: always use the local stdio transport
+- `--transport http`: always use the remote HTTP transport
 
-1. Command-line flag (`--access-token`)
-2. Environment variable (`SENTRY_ACCESS_TOKEN`)
-3. `.env` file
-
-**Remote Mode (HTTP streaming)**: Used when no access token is provided, prompts for OAuth authentication
+This allows stdio auth to be tested without providing an access token upfront.
 
 ### Required Sentry Permissions
 
@@ -117,15 +115,21 @@ pnpm mcp-test-client --mcp-host http://localhost:8787
 
 ### Local Mode
 
-Use the local stdio transport by providing a Sentry access token:
+Use the local stdio transport explicitly:
 
 ```bash
-# Using environment variable
-SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client
+# Test stdio with an explicit token
+SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client --transport stdio
 
-# Using command line flag
-pnpm mcp-test-client --access-token your_token
+# Test stdio auth/tool discovery without OPENAI_API_KEY
+pnpm mcp-test-client --transport stdio --list-tools
 ```
+
+When no token is provided in stdio mode:
+
+- `sentry.io` uses cached auth if available
+- `sentry.io` starts device-code auth when running interactively
+- non-interactive runs fail with the same auth error as the stdio server
 
 ### Interactive Mode (Default)
 
@@ -166,7 +170,7 @@ pnpm mcp-test-client --mcp-host http://localhost:8787 "List my projects"
 Use local stdio transport with custom Sentry host:
 
 ```bash
-SENTRY_HOST=sentry.example.com SENTRY_ACCESS_TOKEN=your_token pnpm mcp-test-client "Show my projects"
+pnpm mcp-test-client --transport stdio --host sentry.example.com --access-token your_token "Show my projects"
 ```
 
 Only configure `SENTRY_HOST` when you run self-hosted Sentry.
@@ -208,6 +212,16 @@ If you get authentication errors:
 1. Verify your OPENAI_API_KEY is set correctly
 2. Check that your SENTRY_ACCESS_TOKEN has the required permissions
 3. For self-hosted Sentry, ensure SENTRY_HOST is set
+
+### Testing Auth Without an LLM
+
+To verify stdio auth behavior without `OPENAI_API_KEY`, use:
+
+```bash
+pnpm mcp-test-client --transport stdio --list-tools
+```
+
+This is useful for checking cached-token auth, device-code auth startup, and tool discovery over stdio.
 
 ### Tool Errors
 

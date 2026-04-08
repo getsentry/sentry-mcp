@@ -113,6 +113,51 @@ pnpm -w run cli --access-token=TOKEN "query"
 
 **Note:** The CLI defaults to `http://localhost:5173` for easier local development. Override with `--mcp-host` or set `MCP_URL` environment variable to test against different servers.
 
+### 4. Real Agent CLI Testing
+Use the agent CLI harness when you need to verify behavior through the actual Claude Code or Codex client, not just the MCP test client.
+
+```bash
+# Claude Code against the local dev server config
+pnpm -w run agent-cli-test --provider claude --setup repo
+
+# Codex against the local dev server config
+pnpm -w run agent-cli-test --provider codex --setup repo
+
+# Claude Code against the checked-in stdio config
+pnpm -w run agent-cli-test --provider claude --setup stdio
+
+# Codex against the checked-in stdio config
+pnpm -w run agent-cli-test --provider codex --setup stdio
+```
+
+This harness:
+- Uses the real local CLI session for the selected provider
+- Checks the configured MCP server entry before running the prompt
+- Runs a real `whoami` smoke prompt and verifies the final response contains an authenticated email
+
+Use `--setup repo --server sentry` to target the hosted server instead of the local `sentry-dev` entry.
+
+The checked-in `stdio` setup uses an isolated auth cache at `packages/agent-cli-test/projects/stdio/.sentry/mcp.json`.
+Because real clients launch stdio servers non-interactively, first-run device-code auth does not start inside Claude or Codex. Warm that cache from a real TTY first:
+
+```bash
+SENTRY_MCP_AUTH_CACHE="$PWD/packages/agent-cli-test/projects/stdio/.sentry/mcp.json" \
+node packages/mcp-server/dist/index.js auth login
+```
+
+When the harness fails, rerun the provider directly with debug enabled so you can inspect the exact MCP startup failure:
+
+```bash
+# Claude Code: capture a full debug log for the prompt run
+claude --mcp-config /tmp/claude-sentry-dev-config.json --strict-mcp-config --permission-mode bypassPermissions --no-session-persistence --debug-file /tmp/claude-sentry-dev.log -p 'Use the "whoami" tool from the MCP server named "sentry-dev". Call it exactly once. Reply with only the authenticated email address.'
+
+# Codex: capture MCP transport and client debug output
+RUST_LOG=codex_core=debug,rmcp=debug RUST_BACKTRACE=1 codex exec --skip-git-repo-check --sandbox read-only --output-last-message /tmp/codex-sentry-dev-last.txt 'Use only the MCP server named "sentry-dev". Call the "whoami" tool exactly once. Reply with only the authenticated email address.'
+```
+
+For Claude, inspect the debug file for `ToolSearchTool`, `mcp__<server>__whoami`, MCP connection lines, and any `tool permission denied` entries.
+For Codex, inspect the debug output for `UnexpectedContentType`, `AuthRequired`, or `resources/list failed`.
+
 ## Functional Testing Patterns
 
 See `adding-tools.md#step-3-add-tests` for the complete tool testing workflow.

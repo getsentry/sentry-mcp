@@ -11,6 +11,7 @@ import {
   logStreamEnd,
   logStreamWrite,
 } from "./logger.js";
+import { formatToolOutputForDisplay } from "./tool-output-format.js";
 import { LIB_VERSION } from "./version.js";
 
 const SYSTEM_PROMPT = `You are a helpful assistant designed EXCLUSIVELY for testing the Sentry MCP server. Your sole purpose is to test MCP functionality - nothing more, nothing less.
@@ -77,7 +78,7 @@ export async function runAgent(
             experimental_telemetry: {
               isEnabled: true,
             },
-            onStepFinish: ({ stepType, toolCalls, toolResults, text }) => {
+            onStepFinish: ({ toolCalls, toolResults }) => {
               if (toolCalls && toolCalls.length > 0) {
                 // End current streaming if active
                 if (isStreaming) {
@@ -93,29 +94,10 @@ export async function runAgent(
                   logTool(toolCall.toolName, toolCall.input);
 
                   // Show the actual tool result if available
-                  if (toolResult?.result) {
-                    let resultStr: string;
-
-                    // Handle MCP-style message format
-                    if (
-                      typeof toolResult.result === "object" &&
-                      "content" in toolResult.result &&
-                      Array.isArray(toolResult.result.content)
-                    ) {
-                      // Extract text from content array
-                      resultStr = toolResult.result.content
-                        .map((item: any) => {
-                          if (item.type === "text") {
-                            return item.text;
-                          }
-                          return `<${item.type} message>`;
-                        })
-                        .join("");
-                    } else if (typeof toolResult.result === "string") {
-                      resultStr = toolResult.result;
-                    } else {
-                      resultStr = JSON.stringify(toolResult.result);
-                    }
+                  if (toolResult) {
+                    const resultStr = formatToolOutputForDisplay(
+                      toolResult.output,
+                    );
 
                     // Truncate to first 200 characters for cleaner output
                     if (resultStr.length > 200) {

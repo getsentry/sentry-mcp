@@ -35,6 +35,7 @@
     "measure-tokens": "pnpm run --filter ./packages/mcp-core measure-tokens",
     "prepare": "simple-git-hooks",
     "cli": "pnpm run --filter ./packages/mcp-test-client start",
+    "agent-cli-test": "pnpm run --filter ./packages/agent-cli-test start",
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
     "test": "dotenv -e .env -e .env.local -- turbo test",
     "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
