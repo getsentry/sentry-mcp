@@ -1,5 +1,4 @@
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
-import { ApiRateLimitError } from "@sentry/mcp-core/api-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerProps } from "../types";
 import {
@@ -144,8 +143,11 @@ describe("tokenExchangeCallback", () => {
       accessTokenExpiresAt: pastExpiry,
     });
 
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(
-      new ApiRateLimitError("Rate limited"),
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Rate limited" }), {
+        status: 429,
+        statusText: "Too Many Requests",
+      }),
     );
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
