@@ -134,7 +134,6 @@ describe("MCP Handler", () => {
       expect(response.headers.get("WWW-Authenticate")).toContain(
         "invalid_token",
       );
-      // Revocation is dispatched via ctx.waitUntil — verify it was scheduled
       expect(ctx.waitUntil).toHaveBeenCalled();
     });
 

@@ -63,13 +63,16 @@ sequenceDiagram
 
     Note over Client,SentryAPI: Token Refresh
     Client->>MCPOAuth: POST /oauth/token<br/>(MCP refresh_token)
-    MCPOAuth->>MCPOAuth: Check Sentry token expiry
-    alt Sentry token still valid
+    MCPOAuth->>MCPOAuth: Check cached Sentry token expiry
+    alt Sentry token still valid locally
         MCPOAuth-->>Client: New MCP token<br/>(reusing cached Sentry token)
-    else Sentry token expired
-        MCPOAuth->>SentryOAuth: Refresh Sentry token
-        SentryOAuth-->>MCPOAuth: New Sentry tokens
-        MCPOAuth-->>Client: New MCP token<br/>(with new Sentry tokens)
+    else Local expiry uncertain
+        MCPOAuth->>SentryAPI: Probe with cached Sentry token
+        alt Probe succeeds
+            MCPOAuth-->>Client: New MCP token<br/>(reusing cached Sentry token)
+        else Probe fails or token invalid
+            MCPOAuth-->>Client: Re-authentication required
+        end
     end
 ```
 
@@ -111,7 +114,7 @@ The integration with Sentry OAuth happens through:
 1. **Authorization redirect** - After MCP consent, redirect to Sentry OAuth
 2. **Code exchange** - Exchange Sentry auth code for tokens
 3. **Token storage** - Store Sentry tokens in MCP token props
-4. **Token refresh** - Use Sentry refresh tokens to get new access tokens
+4. **Token reuse on refresh** - Re-issue MCP tokens while the cached Sentry access token is still usable
 
 ## Key Concepts
 
@@ -248,12 +251,15 @@ const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
 
 ## Token Refresh Implementation
 
-### Dual Refresh Token System
+### MCP Refresh Model
 
-The system maintains two separate refresh flows:
+The system only refreshes MCP tokens. It does not rotate upstream Sentry OAuth
+tokens anymore.
 
-1. **MCP Token Refresh**: When MCP clients need new MCP access tokens
-2. **Sentry Token Refresh**: When Sentry access tokens expire (handled internally)
+1. **MCP Token Refresh**: MCP clients exchange an MCP refresh token for a new MCP access token
+2. **Sentry Token Reuse**: The worker keeps reusing the cached Sentry access token while it is still valid
+3. **Stale grant rejection**: Grants missing required stored props like `refreshToken` are treated as stale and revoked
+4. **Re-auth on expiry**: Once the cached Sentry access token is no longer usable, the client must complete OAuth again
 
 ### MCP Token Refresh Flow
 
@@ -261,9 +267,11 @@ When an MCP client's token expires:
 
 1. Client sends refresh request to MCP OAuth: `POST /oauth/token` with MCP refresh token
 2. MCP OAuth invokes `tokenExchangeCallback` function
-3. Callback checks if cached Sentry token is still valid (with 2-minute safety window)
-4. If Sentry token is valid, returns new MCP token with cached Sentry token
-5. If Sentry token expired, refreshes with Sentry OAuth and updates storage
+3. Callback checks if cached Sentry token is still valid (with a 2-minute safety window)
+4. If the local expiry is still safely in the future, it returns a new MCP token immediately
+5. If the local expiry is stale or near expiry, it probes Sentry with the cached access token
+6. If the probe succeeds, it returns a new MCP token using the same cached Sentry token
+7. If the probe shows the token is invalid, or the worker cannot verify validity, the client must re-authenticate
 
 ### Token Exchange Callback Implementation
 
@@ -275,10 +283,8 @@ export async function tokenExchangeCallback(options, env) {
     return undefined;
   }
 
-  // Extract Sentry refresh token from MCP token props
-  const sentryRefreshToken = options.props.refreshToken;
-  if (!sentryRefreshToken) {
-    throw new Error("No Sentry refresh token available in stored props");
+  if (!options.props.refreshToken) {
+    return undefined;
   }
 
   // Smart caching: Check if Sentry token is still valid
@@ -296,40 +302,33 @@ export async function tokenExchangeCallback(options, env) {
     }
   }
 
-  // Sentry token expired - refresh with Sentry OAuth
-  const [sentryTokens, errorResponse] = await refreshAccessToken({
-    client_id: env.SENTRY_CLIENT_ID,
-    client_secret: env.SENTRY_CLIENT_SECRET,
-    refresh_token: sentryRefreshToken,
-    upstream_url: "https://sentry.io/oauth/token/",
+  // Local expiry is not enough to trust the token, so probe upstream.
+  const api = new SentryApiService({
+    accessToken: props.accessToken,
+    host: env.SENTRY_HOST || "sentry.io",
   });
+  await api.getAuthenticatedUser();
 
-  // Update MCP token props with new Sentry tokens
   return {
-    newProps: {
-      ...options.props,
-      accessToken: sentryTokens.access_token,      // New Sentry access token
-      refreshToken: sentryTokens.refresh_token,    // New Sentry refresh token
-      accessTokenExpiresAt: Date.now() + sentryTokens.expires_in * 1000,
-    },
-    accessTokenTTL: sentryTokens.expires_in,
+    newProps: { ...options.props },
+    accessTokenTTL: 60 * 60,
   };
 }
 ```
 
 ### Error Scenarios
 
-1. **Missing Sentry Refresh Token**: 
-   - Error: "No Sentry refresh token available in stored props"
-   - Resolution: Client must re-authenticate through full OAuth flow
+1. **Legacy grant missing Sentry refresh token**:
+   - Behavior: The refresh exchange immediately stops returning new MCP tokens
+   - Resolution: The next `/mcp` request revokes the stale grant and requires a clean re-authentication flow
 
-2. **Sentry Refresh Token Invalid**: 
-   - Error: Sentry OAuth returns 401/400
-   - Resolution: Client must re-authenticate with both MCP and Sentry
+2. **Cached Sentry token invalid**:
+   - Error: Sentry probe returns 400/401
+   - Resolution: Client must re-authenticate with MCP and Sentry
 
-3. **Network Failures**: 
-   - Error: Cannot reach Sentry OAuth endpoint
-   - Resolution: Retry with exponential backoff or re-authenticate
+3. **Verification indeterminate**:
+   - Error: Network failure, timeout, or upstream 5xx while probing validity
+   - Resolution: The current implementation fails closed and requires re-authentication
 
 The 2-minute safety window prevents edge cases with clock skew and processing delays between MCP and Sentry.
 
@@ -340,7 +339,7 @@ The 2-minute safety window prevents edge cases with clock skew and processing de
 3. **Dual consent**: Users approve both MCP permissions and Sentry access
 4. **Scope enforcement**: Both MCP and Sentry scopes limit access
 5. **Token expiration**: Both MCP and Sentry tokens have expiry times
-6. **Refresh token rotation**: Sentry issues new refresh tokens on each refresh
+6. **Fail-closed verification**: If the worker cannot verify token validity confidently, it requires re-authentication rather than extending access speculatively
 
 ## Discovery Endpoints
 
@@ -376,14 +375,14 @@ The MCP Server then uses the Sentry access token from context to make Sentry API
 ### Benefits of the Dual OAuth Approach
 
 1. **Security isolation**: MCP clients never see Sentry tokens directly
-2. **Token management**: MCP can refresh Sentry tokens transparently
+2. **Token management**: MCP can re-issue its own tokens while reusing cached Sentry credentials
 3. **Permission layering**: MCP permissions separate from Sentry API scopes
 4. **Client flexibility**: MCP clients don't need to understand Sentry OAuth
 
 ### Why Not Direct Sentry OAuth?
 
 If MCP clients used Sentry OAuth directly:
-- Clients would need to manage Sentry token refresh
+- Clients would need to manage Sentry token lifetime and re-authentication directly
 - No way to add MCP-specific permissions
 - Clients would have raw Sentry API access (security risk)
 - No centralized token management

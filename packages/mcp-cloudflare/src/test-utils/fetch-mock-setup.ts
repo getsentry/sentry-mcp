@@ -1,16 +1,15 @@
 /**
- * fetchMock setup for Cloudflare Workers tests
+ * Shared outbound mock registrations for Cloudflare Workers tests.
  *
- * Uses undici MockAgent via cloudflare:test to mock Sentry API responses.
- * This replaces MSW for tests that need to run in the workerd runtime.
+ * The current vitest-pool-workers stack configures Miniflare's `fetchMock`
+ * centrally from vitest.config.ts so test files do not need per-file setup.
  */
-import { fetchMock } from "cloudflare:test";
 import {
   autofixStateFixture,
   clientKeyFixture,
+  eventFixture,
   eventsErrorsEmptyFixture,
   eventsErrorsFixture,
-  eventsFixture,
   eventsSpansEmptyFixture,
   eventsSpansFixture,
   issueFixture,
@@ -56,19 +55,31 @@ const VALID_ERROR_EVENT_QUERIES = new Set<string | null>(
 
 let fetchMockConfigured = false;
 
+export type FetchMockLike = {
+  activate(): void;
+  disableNetConnect(): void;
+  get(origin: string): {
+    intercept(options: Record<string, unknown>): {
+      reply(
+        statusCode: number,
+        body: unknown,
+        options?: Record<string, unknown>,
+      ): {
+        persist(): void;
+      };
+    };
+  };
+  assertNoPendingInterceptors?(): void;
+};
+
 /**
- * Set up fetchMock for Sentry API mocking in Cloudflare Workers tests.
+ * Register outbound interceptors on a MockAgent-like object.
  *
  * IMPORTANT: undici MockAgent matches interceptors in registration order
  * (first match wins). Always register specific path handlers BEFORE
  * general pattern handlers to ensure correct matching.
- *
- * Safe to call before each test; interceptors are only registered once.
  */
-export function setupFetchMock() {
-  fetchMock.activate();
-  fetchMock.disableNetConnect();
-
+export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
   if (fetchMockConfigured) {
     return;
   }
@@ -287,7 +298,7 @@ export function setupFetchMock() {
           p.includes("/events/7ca573c0f4814912aaa9bdc77d1a7d51") ||
           p.includes("/events/latest"),
       })
-      .reply(200, eventsFixture, { headers: JSON_HEADERS })
+      .reply(200, eventFixture, { headers: JSON_HEADERS })
       .persist();
 
     // ===== Traces =====
@@ -468,13 +479,4 @@ export function setupFetchMock() {
       .reply(200, autofixStateFixture, { headers: JSON_HEADERS })
       .persist();
   }
-}
-
-/**
- * Reset fetchMock state between tests
- */
-export function resetFetchMock() {
-  // assertNoPendingInterceptors can be called but may throw if there are unused mocks
-  // We reset silently for flexibility in tests that don't use all endpoints
-  fetchMock.deactivate();
 }

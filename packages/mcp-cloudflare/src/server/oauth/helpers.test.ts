@@ -61,7 +61,7 @@ describe("tokenExchangeCallback", () => {
     expect(result).toBeUndefined();
   });
 
-  it("should probe upstream and return undefined when token is truly expired", async () => {
+  it("should mark the grant invalid when the upstream token is truly expired", async () => {
     const pastExpiry = Date.now() - 60 * 1000; // 1 minute ago
     const options = createRefreshOptions({
       accessTokenExpiresAt: pastExpiry,
@@ -74,10 +74,17 @@ describe("tokenExchangeCallback", () => {
     );
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
-    expect(result).toBeUndefined();
+    expect(result).toEqual({
+      newProps: expect.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+      accessTokenProps: expect.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+    });
   });
 
-  it("should treat 400 probe failures as expired", async () => {
+  it("should mark the grant invalid for 400 probe failures", async () => {
     const pastExpiry = Date.now() - 60 * 1000;
     const options = createRefreshOptions({
       accessTokenExpiresAt: pastExpiry,
@@ -87,6 +94,30 @@ describe("tokenExchangeCallback", () => {
       new Response(JSON.stringify({ detail: "Invalid token" }), {
         status: 400,
         statusText: "Bad Request",
+      }),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toEqual({
+      newProps: expect.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+      accessTokenProps: expect.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+    });
+  });
+
+  it("should treat 5xx probe failures as indeterminate", async () => {
+    const pastExpiry = Date.now() - 60 * 1000;
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: pastExpiry,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Upstream unavailable" }), {
+        status: 503,
+        statusText: "Service Unavailable",
       }),
     );
 
@@ -106,7 +137,72 @@ describe("tokenExchangeCallback", () => {
     expect(result).toBeUndefined();
   });
 
-  it("should probe upstream when token is within safety window", async () => {
+  it("should treat 429 probe failures as indeterminate", async () => {
+    const pastExpiry = Date.now() - 60 * 1000;
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: pastExpiry,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Rate limited" }), {
+        status: 429,
+        statusText: "Too Many Requests",
+      }),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toBeUndefined();
+  });
+
+  it("should return cached token TTL when token is locally valid", async () => {
+    const futureExpiry = Date.now() + 10 * 60 * 1000;
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: futureExpiry,
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toEqual({
+      newProps: expect.objectContaining({
+        accessToken: "old-access-token",
+      }),
+      accessTokenTTL: expect.any(Number),
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("should clear upstreamTokenInvalid after a successful probe", async () => {
+    const pastExpiry = Date.now() - 60 * 1000;
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: pastExpiry,
+      upstreamTokenInvalid: true,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "12345",
+          email: "test@example.com",
+          name: "Test User",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const result = await tokenExchangeCallback(options, TEST_ENV);
+    expect(result).toEqual({
+      newProps: expect.not.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+      accessTokenTTL: expect.any(Number),
+    });
+  });
+
+  it("should mark the grant invalid when a near-expiry token probes invalid", async () => {
     const nearExpiry = Date.now() + 1 * 60 * 1000; // 1 minute from now (< 2 min safety window)
     const options = createRefreshOptions({
       accessTokenExpiresAt: nearExpiry,
@@ -119,10 +215,17 @@ describe("tokenExchangeCallback", () => {
     );
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
-    expect(result).toBeUndefined();
+    expect(result).toEqual({
+      newProps: expect.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+      accessTokenProps: expect.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+    });
   });
 
-  it("should probe upstream when no expiry is set", async () => {
+  it("should mark the grant invalid when a no-expiry token probes invalid", async () => {
     const options = createRefreshOptions({
       accessTokenExpiresAt: undefined,
     });
@@ -134,7 +237,14 @@ describe("tokenExchangeCallback", () => {
     );
 
     const result = await tokenExchangeCallback(options, TEST_ENV);
-    expect(result).toBeUndefined();
+    expect(result).toEqual({
+      newProps: expect.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+      accessTokenProps: expect.objectContaining({
+        upstreamTokenInvalid: true,
+      }),
+    });
     expect(globalThis.fetch).toHaveBeenCalled();
   });
 });

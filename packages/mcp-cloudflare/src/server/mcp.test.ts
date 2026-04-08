@@ -344,4 +344,116 @@ describe("/mcp", () => {
     }>(mcpResponse);
     expect(body.result?.protocolVersion).toBeDefined();
   });
+
+  it("reissues an MCP token on refresh when the upstream token probes invalid, and the resulting token fails even at root /mcp", async () => {
+    const { clientId, tokens } = await issueTokens(
+      "https://mcp.sentry.dev/mcp",
+      {
+        accessTokenExpiresAt: Date.now() - 60 * 1000,
+      },
+    );
+
+    expect(tokens.refresh_token).toBeTruthy();
+
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+
+        if (url.includes("/api/0/")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ detail: "Invalid token" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+
+        return originalFetch(input, init);
+      });
+
+    const refreshCtx = createExecutionContext();
+    const refreshResponse = await handler.fetch!(
+      createRefreshTokenRequest(clientId, tokens.refresh_token!),
+      workerEnv,
+      refreshCtx,
+    );
+
+    expect(refreshResponse.status).toBe(200);
+
+    const refreshed = (await refreshResponse.json()) as TokenResponse;
+    expect(refreshed.access_token).toBeTruthy();
+
+    const mcpCtx = createExecutionContext();
+    const mcpResponse = await handler.fetch!(
+      createMcpRequest("/mcp", refreshed.access_token, "tools/list", {}),
+      workerEnv,
+      mcpCtx,
+    );
+
+    expect(mcpResponse.status).toBe(401);
+    fetchSpy.mockRestore();
+  });
+
+  it("reissues an MCP token on refresh when verification is indeterminate, and the resulting token fails at constrained /mcp", async () => {
+    const { clientId, tokens } = await issueTokens(
+      "https://mcp.sentry.dev/mcp",
+      {
+        accessTokenExpiresAt: Date.now() - 60 * 1000,
+      },
+    );
+
+    expect(tokens.refresh_token).toBeTruthy();
+
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+
+        if (url.includes("/api/0/")) {
+          return Promise.reject(new Error("Network error"));
+        }
+
+        return originalFetch(input, init);
+      });
+
+    const refreshCtx = createExecutionContext();
+    const refreshResponse = await handler.fetch!(
+      createRefreshTokenRequest(clientId, tokens.refresh_token!),
+      workerEnv,
+      refreshCtx,
+    );
+
+    expect(refreshResponse.status).toBe(200);
+
+    const refreshed = (await refreshResponse.json()) as TokenResponse;
+    expect(refreshed.access_token).toBeTruthy();
+
+    const mcpCtx = createExecutionContext();
+    const mcpResponse = await handler.fetch!(
+      createMcpRequest(
+        "/mcp/sentry-mcp-evals",
+        refreshed.access_token,
+        "tools/list",
+        {},
+      ),
+      workerEnv,
+      mcpCtx,
+    );
+
+    expect(mcpResponse.status).toBe(502);
+    fetchSpy.mockRestore();
+  });
 });

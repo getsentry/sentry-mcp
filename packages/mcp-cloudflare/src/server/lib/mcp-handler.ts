@@ -16,6 +16,7 @@ import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import * as Sentry from "@sentry/cloudflare";
+import type { WorkerProps } from "../types";
 import type { Env } from "../types";
 import {
   checkRateLimit,
@@ -31,6 +32,14 @@ type OAuthExecutionContext = ExecutionContext & {
   props?: Record<string, unknown>;
 };
 
+function escapeAuthenticateHeaderValue(value: string): string {
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("\r", "")
+    .replaceAll("\n", "");
+}
+
 /**
  * Revokes the OAuth grant for the given user/client pair in the background,
  * then returns a 401 response prompting re-authorization.
@@ -41,6 +50,7 @@ function revokeStaleGrant(
   userId: string,
   clientId: string,
   logLabel: string,
+  errorDescription = "Token requires re-authorization",
 ): Response {
   ctx.waitUntil(
     (async () => {
@@ -63,8 +73,7 @@ function revokeStaleGrant(
     {
       status: 401,
       headers: {
-        "WWW-Authenticate":
-          'Bearer realm="Sentry MCP", error="invalid_token", error_description="Token requires re-authorization"',
+        "WWW-Authenticate": `Bearer realm="Sentry MCP", error="invalid_token", error_description="${escapeAuthenticateHeaderValue(errorDescription)}"`,
       },
     },
   );
@@ -113,14 +122,16 @@ const mcpHandler: ExportedHandler<Env> = {
       throw new Error("No authentication context available");
     }
 
-    const userId = oauthCtx.props.id as string;
-    const accessToken = oauthCtx.props.accessToken as string;
-    const clientId = oauthCtx.props.clientId as string;
+    const rawProps = oauthCtx.props as Partial<WorkerProps>;
+
+    const userId = rawProps.id as string;
+    const accessToken = rawProps.accessToken as string;
+    const clientId = rawProps.clientId as string;
     const sentryHost = env.SENTRY_HOST || "sentry.io";
 
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported
-    if (!oauthCtx.props.grantedSkills) {
+    if (!rawProps.grantedSkills) {
       logWarn("Legacy token without grantedSkills detected - revoking grant", {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: { clientId, userId },
@@ -130,7 +141,7 @@ const mcpHandler: ExportedHandler<Env> = {
 
     // Grants created before refreshToken was stored in props are stale and
     // can no longer be silently refreshed. Revoke and force clean re-auth.
-    if (!oauthCtx.props.refreshToken) {
+    if (!rawProps.refreshToken) {
       Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
         attributes: { reason: "missing_refresh_token" },
       });
@@ -143,8 +154,22 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
+    if (rawProps.upstreamTokenInvalid) {
+      Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+        attributes: { reason: "invalid_upstream_token" },
+      });
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        "stale grant (invalid upstream token)",
+        "Upstream authorization is no longer valid",
+      );
+    }
+
     const { valid: validSkills, invalid: invalidSkills } = parseSkills(
-      oauthCtx.props.grantedSkills as string[],
+      rawProps.grantedSkills as string[],
     );
 
     if (invalidSkills.length > 0) {
@@ -161,11 +186,11 @@ const mcpHandler: ExportedHandler<Env> = {
       logWarn("Authorization rejected: No valid skills in token", {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: {
-          clientId: oauthCtx.props.clientId,
-          userId: oauthCtx.props.id,
-          rawGrantedSkills: oauthCtx.props.grantedSkills,
-          rawGrantedSkillsType: typeof oauthCtx.props.grantedSkills,
-          rawGrantedSkillsIsArray: Array.isArray(oauthCtx.props.grantedSkills),
+          clientId,
+          userId: rawProps.id,
+          rawGrantedSkills: rawProps.grantedSkills,
+          rawGrantedSkillsType: typeof rawProps.grantedSkills,
+          rawGrantedSkillsIsArray: Array.isArray(rawProps.grantedSkills),
         },
       });
       return new Response(
