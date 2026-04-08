@@ -314,6 +314,74 @@ describe("get_issue_details", () => {
     expect(result).toContain("**Assigned To**: Platform Team (Team)");
   });
 
+  it("includes attached and related replays when available", async () => {
+    const attachedReplayId = "7e07485f12f9416b8b1426260799b51f";
+    const attachedReplayIdWithDashes = "7e07485f-12f9-416b-8b14-26260799b51f";
+    const relatedReplayId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const event = createDefaultEvent();
+    event.tags.push({
+      key: "replayId",
+      value: attachedReplayIdWithDashes,
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/events/latest/",
+        () => HttpResponse.json(event),
+        { once: true },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/replay-count/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("returnIds")).toBe("true");
+          expect(url.searchParams.get("query")).toBe("issue.id:[6507376925]");
+          expect(url.searchParams.get("data_source")).toBe("discover");
+          expect(url.searchParams.get("statsPeriod")).toBe("90d");
+          expect(url.searchParams.get("project")).toBe("-1");
+
+          return HttpResponse.json({
+            "6507376925": [attachedReplayId, relatedReplayId, attachedReplayId],
+          });
+        },
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    if (typeof result !== "string") {
+      throw new Error("Expected string result");
+    }
+
+    const replaySection = result
+      .slice(result.indexOf("## Session Replay"), result.indexOf("### Error"))
+      .trim();
+
+    expect(replaySection).toMatchInlineSnapshot(`
+      "## Session Replay
+
+      **Attached Replay**: https://sentry-mcp-evals.sentry.io/replays/7e07485f12f9416b8b1426260799b51f/
+      **Related Replay Count**: 2
+
+      ### Other Related Replays
+
+      - https://sentry-mcp-evals.sentry.io/replays/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/
+
+      Use \`get_replay_details(organizationSlug='sentry-mcp-evals', replayId='7e07485f12f9416b8b1426260799b51f')\` to inspect a replay in detail."
+    `);
+    expect(result).not.toContain("**replayId**:");
+  });
+
   it("serializes with issueUrl", async () => {
     const result = await getIssueDetails.handler(
       {

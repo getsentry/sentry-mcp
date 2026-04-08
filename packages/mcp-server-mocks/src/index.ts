@@ -533,6 +533,11 @@ export const restHandlers = buildHandlers([
   },
   {
     method: "get",
+    path: "/api/0/organizations/sentry-mcp-evals/replay-count/",
+    fetch: () => HttpResponse.json({}),
+  },
+  {
+    method: "get",
     path: `/api/0/organizations/sentry-mcp-evals/replays/${replayDetailsFixture.id}/`,
     fetch: () => HttpResponse.json({ data: replayDetailsFixture }),
   },

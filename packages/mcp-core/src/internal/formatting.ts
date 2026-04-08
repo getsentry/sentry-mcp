@@ -179,31 +179,51 @@ export function formatEventOutput(
   event: Event,
   options?: {
     performanceTrace?: Trace;
+    replaySummary?: {
+      apiService: SentryApiService;
+      organizationSlug: string;
+      relatedReplayIds?: string[];
+    };
   },
 ) {
   let output = "";
+  const eventWithReplayMetadataStripped = options?.replaySummary
+    ? stripReplayMetadata(event)
+    : event;
+  const eventToRender = eventWithReplayMetadataStripped;
+
+  if (options?.replaySummary) {
+    output += formatIssueReplayOutput({
+      apiService: options.replaySummary.apiService,
+      organizationSlug: options.replaySummary.organizationSlug,
+      event,
+      relatedReplayIds: options.replaySummary.relatedReplayIds,
+    });
+  }
 
   // Check if entries exist (may be undefined for unsupported event types)
-  if (!event.entries || !Array.isArray(event.entries)) {
+  if (!eventToRender.entries || !Array.isArray(eventToRender.entries)) {
     // For unsupported event types, just show tags and contexts
-    output += formatTags(event.tags);
-    output += formatContext(event.context);
-    output += formatContexts(event.contexts);
+    output += formatTags(eventToRender.tags);
+    output += formatContext(eventToRender.context);
+    output += formatContexts(eventToRender.contexts);
     return output;
   }
 
   // Look for the primary error information
-  const messageEntry = event.entries.find((e) => e.type === "message");
-  const exceptionEntry = event.entries.find((e) => e.type === "exception");
-  const threadsEntry = event.entries.find((e) => e.type === "threads");
-  const requestEntry = event.entries.find((e) => e.type === "request");
-  const spansEntry = event.entries.find((e) => e.type === "spans");
-  const cspEntry = event.entries.find((e) => e.type === "csp");
+  const messageEntry = eventToRender.entries.find((e) => e.type === "message");
+  const exceptionEntry = eventToRender.entries.find(
+    (e) => e.type === "exception",
+  );
+  const threadsEntry = eventToRender.entries.find((e) => e.type === "threads");
+  const requestEntry = eventToRender.entries.find((e) => e.type === "request");
+  const spansEntry = eventToRender.entries.find((e) => e.type === "spans");
+  const cspEntry = eventToRender.entries.find((e) => e.type === "csp");
 
   // Error message (if present)
   if (messageEntry) {
     output += formatMessageInterfaceOutput(
-      event,
+      eventToRender,
       messageEntry.data as z.infer<typeof MessageEntrySchema>,
     );
   }
@@ -211,12 +231,12 @@ export function formatEventOutput(
   // Stack trace (from exception or threads)
   if (exceptionEntry) {
     output += formatExceptionInterfaceOutput(
-      event,
+      eventToRender,
       exceptionEntry.data as z.infer<typeof ErrorEntrySchema>,
     );
   } else if (threadsEntry) {
     output += formatThreadsInterfaceOutput(
-      event,
+      eventToRender,
       threadsEntry.data as z.infer<typeof ThreadsEntrySchema>,
     );
   }
@@ -224,31 +244,35 @@ export function formatEventOutput(
   // Request info (if HTTP error)
   if (requestEntry) {
     output += formatRequestInterfaceOutput(
-      event,
+      eventToRender,
       requestEntry.data as z.infer<typeof RequestEntrySchema>,
     );
   }
 
   // CSP violation details
   if (cspEntry) {
-    output += formatCspInterfaceOutput(event, cspEntry.data);
+    output += formatCspInterfaceOutput(eventToRender, cspEntry.data);
   }
 
   // Performance issue details (N+1 queries, etc.)
   // Pass spans data for additional context even if we have evidence
-  if (event.type === "transaction") {
-    output += formatPerformanceIssueOutput(event, spansEntry?.data, options);
+  if (eventToRender.type === "transaction") {
+    output += formatPerformanceIssueOutput(
+      eventToRender,
+      spansEntry?.data,
+      options,
+    );
   }
 
   // Generic events (performance regressions, metric-based issues)
   // These have occurrence data with evidenceDisplay that needs formatting
-  if (event.type === "generic") {
-    output += formatGenericEventOutput(event);
+  if (eventToRender.type === "generic") {
+    output += formatGenericEventOutput(eventToRender);
   }
 
-  output += formatTags(event.tags);
-  output += formatContext(event.context);
-  output += formatContexts(event.contexts);
+  output += formatTags(eventToRender.tags);
+  output += formatContext(eventToRender.context);
+  output += formatContexts(eventToRender.contexts);
   return output;
 }
 
@@ -1684,6 +1708,7 @@ export function formatIssueOutput({
   autofixState,
   performanceTrace,
   externalIssues,
+  relatedReplayIds,
   experimentalMode,
 }: {
   organizationSlug: string;
@@ -1693,6 +1718,7 @@ export function formatIssueOutput({
   autofixState?: AutofixRunState;
   performanceTrace?: Trace;
   externalIssues?: ExternalIssueList;
+  relatedReplayIds?: string[];
   experimentalMode?: boolean;
 }) {
   let output = `# Issue ${issue.shortId} in **${organizationSlug}**\n\n`;
@@ -1829,7 +1855,14 @@ export function formatIssueOutput({
     output += `**Message**:\n${event.message}\n`;
   }
   output += "\n";
-  output += formatEventOutput(event, { performanceTrace });
+  output += formatEventOutput(event, {
+    performanceTrace,
+    replaySummary: {
+      apiService,
+      organizationSlug,
+      relatedReplayIds,
+    },
+  });
 
   // Add Seer context if available
   if (autofixState) {
@@ -1854,4 +1887,157 @@ export function formatIssueOutput({
     output += `- To see the trail of events leading up to this error, use \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
   }
   return output;
+}
+
+const MAX_DISPLAY_REPLAYS = 5;
+
+function formatIssueReplayOutput({
+  apiService,
+  organizationSlug,
+  event,
+  relatedReplayIds,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  event: Event;
+  relatedReplayIds?: string[];
+}): string {
+  const attachedReplayId = getReplayIdFromEvent(event);
+  const normalizedRelatedReplayIds = dedupeReplayIds(relatedReplayIds ?? []);
+  const additionalRelatedReplayIds = normalizedRelatedReplayIds.filter(
+    (replayId) => replayId !== attachedReplayId,
+  );
+
+  if (!attachedReplayId && normalizedRelatedReplayIds.length === 0) {
+    return "";
+  }
+
+  const lines: string[] = ["## Session Replay", ""];
+
+  if (attachedReplayId) {
+    lines.push(
+      `**Attached Replay**: ${apiService.getReplayUrl(organizationSlug, attachedReplayId)}`,
+    );
+  }
+
+  if (normalizedRelatedReplayIds.length > 0) {
+    lines.push(
+      `**Related Replay Count**: ${normalizedRelatedReplayIds.length}`,
+    );
+  }
+
+  if (additionalRelatedReplayIds.length > 0) {
+    const displayedReplayIds = additionalRelatedReplayIds.slice(
+      0,
+      MAX_DISPLAY_REPLAYS,
+    );
+
+    lines.push("");
+    lines.push(
+      attachedReplayId ? "### Other Related Replays" : "### Related Replays",
+    );
+    lines.push("");
+
+    for (const replayId of displayedReplayIds) {
+      lines.push(`- ${apiService.getReplayUrl(organizationSlug, replayId)}`);
+    }
+
+    const remainingReplayCount =
+      additionalRelatedReplayIds.length - displayedReplayIds.length;
+    if (remainingReplayCount > 0) {
+      lines.push(
+        `- ... and ${remainingReplayCount} more replay${remainingReplayCount === 1 ? "" : "s"}`,
+      );
+    }
+  }
+
+  const exampleReplayId =
+    attachedReplayId ?? normalizedRelatedReplayIds.at(0) ?? null;
+  if (exampleReplayId) {
+    lines.push("");
+    lines.push(
+      `Use \`get_replay_details(organizationSlug='${organizationSlug}', replayId='${exampleReplayId}')\` to inspect a replay in detail.`,
+    );
+  }
+
+  return `${lines.join("\n")}\n\n`;
+}
+
+function getReplayIdFromEvent(event: Event): string | null {
+  const replayContext = event.contexts?.replay as
+    | Record<string, unknown>
+    | undefined;
+  const replayContextId =
+    typeof replayContext?.replay_id === "string"
+      ? replayContext.replay_id
+      : null;
+  const replayTagId =
+    event.tags?.find((tag) => tag.key === "replayId" || tag.key === "replay.id")
+      ?.value ?? null;
+
+  return normalizeReplayId(replayContextId ?? replayTagId);
+}
+
+function dedupeReplayIds(replayIds: string[]): string[] {
+  const normalizedReplayIds: string[] = [];
+  const seenReplayIds = new Set<string>();
+
+  for (const replayId of replayIds) {
+    const normalizedReplayId = normalizeReplayId(replayId);
+    if (!normalizedReplayId || seenReplayIds.has(normalizedReplayId)) {
+      continue;
+    }
+    seenReplayIds.add(normalizedReplayId);
+    normalizedReplayIds.push(normalizedReplayId);
+  }
+
+  return normalizedReplayIds;
+}
+
+function normalizeReplayId(replayId: string | null | undefined): string | null {
+  if (typeof replayId !== "string") {
+    return null;
+  }
+
+  const trimmedReplayId = replayId.trim();
+  if (!trimmedReplayId) {
+    return null;
+  }
+
+  return trimmedReplayId.replace(/-/g, "");
+}
+
+function stripReplayMetadata(event: Event): Event {
+  const tags = event.tags?.filter(
+    (tag) => tag.key !== "replay.id" && tag.key !== "replayId",
+  );
+  const replayContext = event.contexts?.replay;
+
+  if (!replayContext) {
+    return { ...event, tags };
+  }
+
+  const nextReplayContext = Object.fromEntries(
+    Object.entries(replayContext).filter(([key]) => key !== "replay_id"),
+  );
+  const nonTypeReplayKeys = Object.keys(nextReplayContext).filter(
+    (key) => key !== "type",
+  );
+  const contexts =
+    nonTypeReplayKeys.length === 0
+      ? Object.fromEntries(
+          Object.entries(event.contexts ?? {}).filter(
+            ([key]) => key !== "replay",
+          ),
+        )
+      : {
+          ...event.contexts,
+          replay: nextReplayContext,
+        };
+
+  return {
+    ...event,
+    tags,
+    contexts,
+  };
 }

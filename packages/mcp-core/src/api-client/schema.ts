@@ -198,6 +198,11 @@ export const ReplayDetailsSchema = z
 
 export const ReplayRecordingSegmentsSchema = z.array(z.array(z.unknown()));
 
+export const ReplayIdsByResourceSchema = z.record(
+  z.string(),
+  z.array(z.string()),
+);
+
 export const ClientKeySchema = z
   .object({
     id: z.union([z.string(), z.number()]),

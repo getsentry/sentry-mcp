@@ -35,6 +35,7 @@ import {
   FlamegraphSchema,
   ProfileChunkResponseSchema,
   ReplayDetailsSchema,
+  ReplayIdsByResourceSchema,
   ReplayRecordingSegmentsSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
@@ -1893,6 +1894,36 @@ export class SentryApiService {
       opts,
     );
     return z.object({ data: ReplayDetailsSchema }).parse(body).data;
+  }
+
+  async listReplayIdsForIssue(
+    {
+      organizationSlug,
+      issueId,
+      dataSource,
+    }: {
+      organizationSlug: string;
+      issueId: string | number;
+      dataSource: "discover" | "search_issues";
+    },
+    opts?: RequestOptions,
+  ): Promise<string[]> {
+    const normalizedIssueId = String(issueId);
+    const queryParams = new URLSearchParams();
+    queryParams.set("returnIds", "true");
+    queryParams.set("query", `issue.id:[${normalizedIssueId}]`);
+    queryParams.set("data_source", dataSource);
+    queryParams.set("statsPeriod", "90d");
+    queryParams.append("project", "-1");
+
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/replay-count/?${queryParams.toString()}`,
+      undefined,
+      opts,
+    );
+
+    const replayIdsByResource = ReplayIdsByResourceSchema.parse(body);
+    return replayIdsByResource[normalizedIssueId] ?? [];
   }
 
   async getReplayRecordingSegments(

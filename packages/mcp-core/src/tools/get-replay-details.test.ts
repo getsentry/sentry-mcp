@@ -5,7 +5,7 @@ import {
   organizationFixture,
   replayDetailsFixture,
 } from "@sentry/mcp-server-mocks";
-import getReplayDetails from "./get-replay-details.js";
+import getReplayDetails, { resolveReplayParams } from "./get-replay-details.js";
 import { getServerContext } from "../test-setup.js";
 
 describe("get_replay_details", () => {
@@ -186,6 +186,18 @@ describe("get_replay_details", () => {
     ).rejects.toThrowErrorMatchingInlineSnapshot(
       `[UserInputError: Provide either \`replayUrl\` or both \`organizationSlug\` and \`replayId\`.]`,
     );
+  });
+
+  it("prefers explicit organizationSlug over replayUrl org when both are provided", () => {
+    expect(
+      resolveReplayParams({
+        replayUrl: `https://url-org.sentry.io/replays/${replayDetailsFixture.id}/`,
+        organizationSlug: "constrained-org",
+      }),
+    ).toEqual({
+      organizationSlug: "constrained-org",
+      replayId: replayDetailsFixture.id,
+    });
   });
 
   it("uses the constrained regionUrl for replay endpoints", async () => {
