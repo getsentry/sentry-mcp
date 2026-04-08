@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { resolveHarnessSetup } from "./setup.js";
+import { getStdioFixtureAuthCachePath, resolveHarnessSetup } from "./setup.js";
 
 describe("resolveHarnessSetup", () => {
   it("defaults repo setup to the invoking cwd and sentry-dev server", () => {
@@ -44,5 +44,15 @@ describe("resolveHarnessSetup", () => {
       cwd: path.resolve("./custom"),
       serverName: "my-stdio-server",
     });
+  });
+
+  it("returns the checked-in stdio auth cache path", () => {
+    const fixtureDir = fileURLToPath(
+      new URL("../projects/stdio", import.meta.url),
+    );
+
+    expect(getStdioFixtureAuthCachePath()).toEqual(
+      path.join(fixtureDir, ".sentry", "mcp.json"),
+    );
   });
 });

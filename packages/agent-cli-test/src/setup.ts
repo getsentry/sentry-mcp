@@ -8,8 +8,14 @@ export interface ResolvedHarnessSetup {
   serverName: string;
 }
 
-function getFixtureProjectDir(name: Exclude<HarnessSetupName, "repo">): string {
+export function getFixtureProjectDir(
+  name: Exclude<HarnessSetupName, "repo">,
+): string {
   return fileURLToPath(new URL(`../projects/${name}`, import.meta.url));
+}
+
+export function getStdioFixtureAuthCachePath(): string {
+  return path.join(getFixtureProjectDir("stdio"), ".sentry", "mcp.json");
 }
 
 export function resolveHarnessSetup(options: {

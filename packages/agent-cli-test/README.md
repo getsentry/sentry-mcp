@@ -71,8 +71,13 @@ Claude also needs non-interactive MCP tool permissions enabled in `-p` mode. The
 Warm the cache from a real TTY before rerunning the client harness:
 
 ```bash
-SENTRY_MCP_AUTH_CACHE="$PWD/packages/agent-cli-test/projects/stdio/.sentry/mcp.json" \
-node packages/mcp-server/dist/index.js auth login
+pnpm -w run agent-cli-stdio-auth login
+```
+
+Check the cached auth state at any time with:
+
+```bash
+pnpm -w run agent-cli-stdio-auth status
 ```
 
 After that succeeds, rerun:
