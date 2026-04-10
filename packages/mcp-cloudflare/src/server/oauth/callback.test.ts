@@ -10,14 +10,19 @@ import type { Env } from "../types";
 import oauthRoute from "./index";
 import { signState, type OAuthState } from "./state";
 
-const { exchangeCodeForAccessToken } = vi.hoisted(() => ({
-  exchangeCodeForAccessToken: vi.fn(),
-}));
+const { exchangeCodeForAccessToken, logError, logIssue, logWarn } = vi.hoisted(
+  () => ({
+    exchangeCodeForAccessToken: vi.fn(),
+    logError: vi.fn(),
+    logIssue: vi.fn(),
+    logWarn: vi.fn(),
+  }),
+);
 
 vi.mock("@sentry/mcp-core/telem/logging", () => ({
-  logError: vi.fn(),
-  logWarn: vi.fn(),
-  logIssue: vi.fn(),
+  logError,
+  logWarn,
+  logIssue,
 }));
 
 vi.mock("./helpers", async (importOriginal) => {
@@ -220,6 +225,9 @@ async function parseSseJson<T>(response: Response): Promise<T> {
 describe("oauth callback routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    logError.mockReturnValue(undefined);
+    logIssue.mockReturnValue(undefined);
+    logWarn.mockReturnValue(undefined);
     exchangeCodeForAccessToken.mockResolvedValue([
       {
         access_token: "sentry-access-token",
@@ -266,6 +274,43 @@ describe("oauth callback routes", () => {
       expect(response.status).toBe(400);
       expect(body).toContain("OAuth Error:</strong> access_denied");
       expect(body).toContain("Authorization was denied");
+      expect(body).not.toContain("Event ID:");
+      expect(logWarn).toHaveBeenCalledWith(
+        "[oauth] Upstream authorization callback error",
+        expect.objectContaining({
+          loggerScope: ["cloudflare", "oauth", "callback"],
+        }),
+      );
+      expect(logIssue).not.toHaveBeenCalled();
+      expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
+    });
+
+    it("renders an event ID for upstream system oauth errors", async () => {
+      logIssue.mockReturnValue("oauth-event-id");
+
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(oauthApp, testEnv, client.clientId);
+      const state = await createSignedCallbackState(client.clientId);
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        cookie,
+        error: "server_error",
+      });
+
+      const body = await response.text();
+      expect(response.status).toBe(502);
+      expect(body).toContain("Sentry OAuth encountered an internal error");
+      expect(body).toContain("Event ID:</strong> <code>oauth-event-id</code>");
+      expect(logIssue).toHaveBeenCalledWith(
+        "[oauth] Upstream authorization callback error",
+        expect.objectContaining({
+          loggerScope: ["cloudflare", "oauth", "callback"],
+        }),
+      );
+      expect(logWarn).not.toHaveBeenCalled();
       expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
     });
 
