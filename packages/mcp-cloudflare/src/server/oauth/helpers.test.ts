@@ -1,8 +1,21 @@
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerProps } from "../types";
+const { logIssue, logWarn } = vi.hoisted(() => ({
+  logIssue: vi.fn(),
+  logWarn: vi.fn(),
+}));
+
+vi.mock("@sentry/mcp-core/telem/logging", () => ({
+  logIssue,
+  logWarn,
+}));
+
 import {
   createResourceValidationError,
+  exchangeCodeForAccessToken,
+  getOAuthCallbackFailureDetails,
+  getTokenExchangeFailureDetails,
   tokenExchangeCallback,
   validateResourceParameter,
 } from "./helpers";
@@ -38,6 +51,10 @@ const TEST_ENV = { SENTRY_HOST: "sentry.io" };
 describe("tokenExchangeCallback", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    logIssue.mockReset();
+    logWarn.mockReset();
+    logIssue.mockReturnValue(undefined);
+    logWarn.mockReturnValue(undefined);
   });
 
   it("should return undefined for non-refresh_token grant types", async () => {
@@ -246,6 +263,244 @@ describe("tokenExchangeCallback", () => {
       }),
     });
     expect(globalThis.fetch).toHaveBeenCalled();
+  });
+});
+
+describe("exchangeCodeForAccessToken", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    logIssue.mockReset();
+    logWarn.mockReset();
+    logIssue.mockReturnValue(undefined);
+    logWarn.mockReturnValue(undefined);
+  });
+
+  it("returns a specific invalid_grant message without an event ID", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "invalid_grant",
+          error_description: "Authorization code expired",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const [payload, response] = await exchangeCodeForAccessToken({
+      client_id: "test-client-id",
+      client_secret: "test-client-secret",
+      code: "expired-code",
+      upstream_url: "https://sentry.io/oauth/token",
+      redirect_uri: "https://mcp.sentry.dev/oauth/callback",
+    });
+
+    expect(payload).toBeNull();
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(400);
+
+    const body = await response!.text();
+    expect(body).toContain(
+      "The authorization code was invalid or expired. Please try connecting your account again.",
+    );
+    expect(body).toContain("OAuth Error:</strong> invalid_grant");
+    expect(body).not.toContain("Event ID:");
+    expect(logWarn).toHaveBeenCalledWith(
+      "[oauth] Failed to exchange code for access token",
+      expect.objectContaining({
+        loggerScope: ["cloudflare", "oauth", "callback"],
+      }),
+    );
+    expect(logIssue).not.toHaveBeenCalled();
+  });
+
+  it("treats invalid_grant without an upstream description as a system failure", async () => {
+    logIssue.mockReturnValue("oauth-invalid-grant-event-id");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "invalid_grant",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const [payload, response] = await exchangeCodeForAccessToken({
+      client_id: "test-client-id",
+      client_secret: "test-client-secret",
+      code: "test-code",
+      upstream_url: "https://sentry.io/oauth/token",
+      redirect_uri: "https://mcp.sentry.dev/oauth/callback",
+    });
+
+    expect(payload).toBeNull();
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(502);
+
+    const body = await response!.text();
+    expect(body).toContain(
+      "The authorization code could not be validated. Please try again.",
+    );
+    expect(body).toContain(
+      "Event ID:</strong> <code>oauth-invalid-grant-event-id</code>",
+    );
+    expect(logIssue).toHaveBeenCalledWith(
+      "[oauth] Failed to exchange code for access token",
+      expect.objectContaining({
+        loggerScope: ["cloudflare", "oauth", "callback"],
+      }),
+    );
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+
+  it("returns an event ID for upstream token exchange system failures", async () => {
+    logIssue.mockReturnValue("oauth-token-event-id");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("upstream unavailable", {
+        status: 503,
+        statusText: "Service Unavailable",
+        headers: { "Content-Type": "text/plain" },
+      }),
+    );
+
+    const [payload, response] = await exchangeCodeForAccessToken({
+      client_id: "test-client-id",
+      client_secret: "test-client-secret",
+      code: "test-code",
+      upstream_url: "https://sentry.io/oauth/token",
+      redirect_uri: "https://mcp.sentry.dev/oauth/callback",
+    });
+
+    expect(payload).toBeNull();
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(502);
+
+    const body = await response!.text();
+    expect(body).toContain(
+      "There was an internal error authenticating your account. Please try again shortly.",
+    );
+    expect(body).toContain(
+      "Event ID:</strong> <code>oauth-token-event-id</code>",
+    );
+    expect(logIssue).toHaveBeenCalledWith(
+      "[oauth] Failed to exchange code for access token",
+      expect.objectContaining({
+        loggerScope: ["cloudflare", "oauth", "callback"],
+      }),
+    );
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+
+  it("returns an event ID for unknown upstream http failures", async () => {
+    logIssue.mockReturnValue("oauth-forbidden-event-id");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<title>403</title>403 Forbidden", {
+        status: 403,
+        statusText: "Forbidden",
+        headers: { "Content-Type": "text/html; charset=UTF-8" },
+      }),
+    );
+
+    const [payload, response] = await exchangeCodeForAccessToken({
+      client_id: "test-client-id",
+      client_secret: "test-client-secret",
+      code: "test-code",
+      upstream_url: "https://sentry.io/oauth/token",
+      redirect_uri: "https://mcp.sentry.dev/oauth/callback",
+    });
+
+    expect(payload).toBeNull();
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(502);
+
+    const body = await response!.text();
+    expect(body).toContain(
+      "There was an internal error authenticating your account. Please try again shortly.",
+    );
+    expect(body).toContain(
+      "Event ID:</strong> <code>oauth-forbidden-event-id</code>",
+    );
+    expect(logIssue).toHaveBeenCalledWith(
+      "[oauth] Failed to exchange code for access token",
+      expect.objectContaining({
+        loggerScope: ["cloudflare", "oauth", "callback"],
+      }),
+    );
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+});
+
+describe("getOAuthCallbackFailureDetails", () => {
+  it("treats invalid_request as a user-correctable callback failure", () => {
+    expect(
+      getOAuthCallbackFailureDetails({ oauthError: "invalid_request" }),
+    ).toEqual({
+      message: "The authorization request was rejected. Please try again.",
+      status: 400,
+      shouldLogIssue: false,
+    });
+  });
+
+  it("treats unknown callback errors as system failures", () => {
+    expect(
+      getOAuthCallbackFailureDetails({ oauthError: "provider_broke_it" }),
+    ).toEqual({
+      message:
+        "There was an internal error authenticating your account. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: true,
+    });
+  });
+});
+
+describe("getTokenExchangeFailureDetails", () => {
+  it("treats invalid_scope as a system failure", () => {
+    expect(
+      getTokenExchangeFailureDetails({ oauthError: "invalid_scope" }),
+    ).toEqual({
+      message: "The requested permissions were invalid. Please try again.",
+      status: 502,
+      shouldLogIssue: true,
+    });
+  });
+
+  it("treats unknown token exchange failures as system failures", () => {
+    expect(getTokenExchangeFailureDetails({})).toEqual({
+      message:
+        "There was an internal error authenticating your account. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: true,
+    });
+  });
+
+  it("only treats invalid_grant as retryable when the description says the code expired", () => {
+    expect(
+      getTokenExchangeFailureDetails({
+        oauthError: "invalid_grant",
+        errorDescription: "Authorization code expired",
+      }),
+    ).toEqual({
+      message:
+        "The authorization code was invalid or expired. Please try connecting your account again.",
+      status: 400,
+      shouldLogIssue: false,
+    });
+
+    expect(
+      getTokenExchangeFailureDetails({
+        oauthError: "invalid_grant",
+      }),
+    ).toEqual({
+      message:
+        "The authorization code could not be validated. Please try again.",
+      status: 502,
+      shouldLogIssue: true,
+    });
   });
 });
 

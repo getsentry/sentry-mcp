@@ -4,13 +4,13 @@ import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
-  createOAuthErrorMessage,
   createOAuthFailureResponse,
   exchangeCodeForAccessToken,
+  getOAuthCallbackFailureDetails,
   validateResourceParameter,
 } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
-import { logError, logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
 
 /**
@@ -91,7 +91,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
   const oauthError = c.req.query("error") ?? undefined;
   if (oauthError) {
-    logIssue("[oauth] Upstream authorization callback error", {
+    const failure = getOAuthCallbackFailureDetails({ oauthError });
+    const logMessage = "[oauth] Upstream authorization callback error";
+    const logOptions = {
       contexts: {
         oauth: {
           clientId: oauthReqInfo.clientId,
@@ -103,17 +105,24 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
         queryKeys: Array.from(new URL(c.req.url).searchParams.keys()),
       },
       loggerScope: ["cloudflare", "oauth", "callback"],
-    });
+    } as const;
+    let eventId: string | undefined;
+    if (failure.shouldLogIssue) {
+      eventId = logIssue(logMessage, logOptions);
+    } else {
+      logWarn(logMessage, logOptions);
+    }
 
     return createOAuthFailureResponse({
-      message: createOAuthErrorMessage(oauthError),
-      status: 400,
+      message: failure.message,
+      status: failure.status,
       oauthError,
+      eventId,
     });
   }
 
   if (!c.req.query("code")) {
-    logError("[oauth] Callback reached without code or upstream error", {
+    logWarn("[oauth] Callback reached without code or upstream error", {
       contexts: {
         oauth: {
           clientId: oauthReqInfo.clientId,
@@ -163,20 +172,24 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       return c.text("Authorization failed: Invalid redirect URL", 400);
     }
   } catch (lookupErr) {
-    logError("Failed to validate client redirect URI on callback", {
-      contexts: {
-        oauth: {
-          clientId: oauthReqInfo.clientId,
-          redirectUri: oauthReqInfo.redirectUri,
+    const eventId = logIssue(
+      "Failed to validate client redirect URI on callback",
+      {
+        contexts: {
+          oauth: {
+            clientId: oauthReqInfo.clientId,
+            redirectUri: oauthReqInfo.redirectUri,
+          },
         },
+        extra: { error: String(lookupErr) },
+        loggerScope: ["cloudflare", "oauth", "callback"],
       },
-      extra: { error: String(lookupErr) },
-      loggerScope: ["cloudflare", "oauth", "callback"],
-    });
+    );
     return createOAuthFailureResponse({
       message:
         "There was an internal error validating the callback redirect URL.",
       status: 500,
+      eventId,
     });
   }
 

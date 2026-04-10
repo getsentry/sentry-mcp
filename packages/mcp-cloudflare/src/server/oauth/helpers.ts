@@ -8,7 +8,7 @@ import {
   ApiRateLimitError,
   SentryApiService,
 } from "@sentry/mcp-core/api-client";
-import { logError, logIssue } from "@sentry/mcp-core/telem/logging";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { TokenResponseSchema } from "./constants";
 import type { WorkerProps } from "../types";
 import * as Sentry from "@sentry/cloudflare";
@@ -22,18 +22,143 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-export function createOAuthErrorMessage(oauthError?: string): string {
+type OAuthFailureDetails = {
+  message: string;
+  status: number;
+  shouldLogIssue: boolean;
+};
+
+const userFailure = (message: string, status = 400): OAuthFailureDetails => ({
+  message,
+  status,
+  shouldLogIssue: false,
+});
+
+const systemFailure = (message: string, status = 502): OAuthFailureDetails => ({
+  message,
+  status,
+  shouldLogIssue: true,
+});
+
+function isRetryableInvalidGrant(errorDescription?: string): boolean {
+  if (!errorDescription) {
+    return false;
+  }
+
+  const normalized = errorDescription.toLowerCase();
+  const userRetryablePatterns = [
+    "expired",
+    "already used",
+    "already been used",
+    "invalid or expired",
+    "authorization code expired",
+  ];
+  const systemMismatchPatterns = [
+    "redirect_uri",
+    "client_id",
+    "pkce",
+    "code verifier",
+    "code_verifier",
+    "mismatch",
+  ];
+
+  return (
+    userRetryablePatterns.some((pattern) => normalized.includes(pattern)) &&
+    !systemMismatchPatterns.some((pattern) => normalized.includes(pattern))
+  );
+}
+
+export function getOAuthCallbackFailureDetails({
+  oauthError,
+}: {
+  oauthError?: string;
+}): OAuthFailureDetails {
   switch (oauthError) {
     case "access_denied":
-      return "Authorization was denied. Please try again if you want to continue connecting your account.";
-    case "temporarily_unavailable":
-      return "Sentry OAuth is temporarily unavailable. Please try again shortly.";
-    case "server_error":
-      return "Sentry OAuth encountered an internal error. Please try again.";
+      return userFailure(
+        "Authorization was denied. Please try again if you want to continue connecting your account.",
+      );
     case "invalid_request":
-      return "The authorization request was rejected. Please try again.";
+      return userFailure(
+        "The authorization request was rejected. Please try again.",
+      );
+    case "temporarily_unavailable":
+      return systemFailure(
+        "Sentry OAuth is temporarily unavailable. Please try again shortly.",
+        503,
+      );
+    case "server_error":
+      return systemFailure(
+        "Sentry OAuth encountered an internal error. Please try again.",
+      );
+    case "invalid_scope":
+      return systemFailure(
+        "The requested permissions were invalid. Please try again.",
+      );
+    case "invalid_client":
+    case "unauthorized_client":
+    case "unsupported_response_type":
+      return systemFailure(
+        "There was an internal configuration issue completing authentication. Please try again later.",
+        500,
+      );
     default:
-      return "There was an issue authenticating your account. Please try again.";
+      return systemFailure(
+        "There was an internal error authenticating your account. Please try again shortly.",
+      );
+  }
+}
+
+export function getTokenExchangeFailureDetails({
+  oauthError,
+  errorDescription,
+}: {
+  oauthError?: string;
+  errorDescription?: string;
+}): OAuthFailureDetails {
+  switch (oauthError) {
+    case "access_denied":
+      return userFailure(
+        "Authorization was denied. Please try again if you want to continue connecting your account.",
+      );
+    case "temporarily_unavailable":
+      return systemFailure(
+        "Sentry OAuth is temporarily unavailable. Please try again shortly.",
+        503,
+      );
+    case "server_error":
+      return systemFailure(
+        "Sentry OAuth encountered an internal error. Please try again.",
+      );
+    case "invalid_request":
+      return systemFailure(
+        "The authorization request was rejected. Please try again.",
+      );
+    case "invalid_grant":
+      if (isRetryableInvalidGrant(errorDescription)) {
+        return userFailure(
+          "The authorization code was invalid or expired. Please try connecting your account again.",
+        );
+      }
+
+      return systemFailure(
+        "The authorization code could not be validated. Please try again.",
+      );
+    case "invalid_scope":
+      return systemFailure(
+        "The requested permissions were invalid. Please try again.",
+      );
+    case "invalid_client":
+    case "unauthorized_client":
+    case "unsupported_grant_type":
+      return systemFailure(
+        "There was an internal configuration issue completing authentication. Please try again later.",
+        500,
+      );
+    default:
+      return systemFailure(
+        "There was an internal error authenticating your account. Please try again shortly.",
+      );
   }
 }
 
@@ -42,15 +167,22 @@ export function createOAuthFailureResponse({
   message,
   status,
   oauthError,
+  eventId,
 }: {
   title?: string;
   message: string;
   status: number;
   oauthError?: string;
+  eventId?: string;
 }): Response {
-  const details = oauthError
-    ? `<p><strong>OAuth Error:</strong> ${escapeHtml(oauthError)}</p>`
-    : "";
+  const details = [
+    oauthError
+      ? `<p><strong>OAuth Error:</strong> ${escapeHtml(oauthError)}</p>`
+      : "",
+    eventId
+      ? `<p><strong>Event ID:</strong> <code>${escapeHtml(eventId)}</code></p>`
+      : "",
+  ].join("");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -80,6 +212,10 @@ export function createOAuthFailureResponse({
       }
       p {
         line-height: 1.6;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.95em;
       }
       .details {
         margin-top: 24px;
@@ -181,7 +317,7 @@ export async function exchangeCodeForAccessToken({
   redirect_uri?: string;
 }): Promise<[z.infer<typeof TokenResponseSchema>, null] | [null, Response]> {
   if (!code) {
-    logError("[oauth] Missing code in token exchange", {
+    logWarn("[oauth] Missing code in token exchange", {
       contexts: {
         oauth: {
           client_id,
@@ -219,7 +355,11 @@ export async function exchangeCodeForAccessToken({
     const responseText = await resp.text();
     const contentType = resp.headers.get("Content-Type");
     const upstreamError = parseUpstreamOAuthError(responseText, contentType);
-    logError("[oauth] Failed to exchange code for access token", {
+    const failure = getTokenExchangeFailureDetails({
+      oauthError: upstreamError.error,
+      errorDescription: upstreamError.errorDescription,
+    });
+    const logOptions = {
       contexts: {
         oauth: {
           client_id,
@@ -236,13 +376,23 @@ export async function exchangeCodeForAccessToken({
         responseBodyPreview: responseText.slice(0, 1000),
       },
       loggerScope: ["cloudflare", "oauth", "callback"],
-    });
+    } as const;
+    let eventId: string | undefined;
+    if (failure.shouldLogIssue) {
+      eventId = logIssue(
+        "[oauth] Failed to exchange code for access token",
+        logOptions,
+      );
+    } else {
+      logWarn("[oauth] Failed to exchange code for access token", logOptions);
+    }
     return [
       null,
       createOAuthFailureResponse({
-        message: createOAuthErrorMessage(upstreamError.error),
-        status: 400,
+        message: failure.message,
+        status: failure.status,
         oauthError: upstreamError.error,
+        eventId,
       }),
     ] as const;
   }
@@ -252,7 +402,7 @@ export async function exchangeCodeForAccessToken({
     const output = TokenResponseSchema.parse(body);
     return [output, null];
   } catch (e) {
-    logError(
+    const eventId = logIssue(
       new Error("Failed to parse token response", {
         cause: e,
       }),
@@ -269,8 +419,9 @@ export async function exchangeCodeForAccessToken({
       null,
       createOAuthFailureResponse({
         message:
-          "There was an issue authenticating your account and retrieving an access token. Please try again.",
+          "There was an internal error authenticating your account and retrieving an access token. Please try again.",
         status: 500,
+        eventId,
       }),
     ] as const;
   }
