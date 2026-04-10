@@ -111,11 +111,9 @@ export function getOAuthCallbackFailureDetails({
 
 export function getTokenExchangeFailureDetails({
   oauthError,
-  upstreamStatus: _upstreamStatus,
   errorDescription,
 }: {
   oauthError?: string;
-  upstreamStatus?: number;
   errorDescription?: string;
 }): OAuthFailureDetails {
   switch (oauthError) {
@@ -359,7 +357,6 @@ export async function exchangeCodeForAccessToken({
     const upstreamError = parseUpstreamOAuthError(responseText, contentType);
     const failure = getTokenExchangeFailureDetails({
       oauthError: upstreamError.error,
-      upstreamStatus: resp.status,
       errorDescription: upstreamError.errorDescription,
     });
     const logOptions = {

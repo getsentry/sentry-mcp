@@ -458,8 +458,8 @@ describe("getTokenExchangeFailureDetails", () => {
     });
   });
 
-  it("treats unknown upstream http failures as system failures", () => {
-    expect(getTokenExchangeFailureDetails({ upstreamStatus: 403 })).toEqual({
+  it("treats unknown token exchange failures as system failures", () => {
+    expect(getTokenExchangeFailureDetails({})).toEqual({
       message:
         "There was an internal error authenticating your account. Please try again shortly.",
       status: 502,
