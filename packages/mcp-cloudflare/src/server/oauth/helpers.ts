@@ -22,10 +22,6 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-export function createOAuthErrorMessage(oauthError?: string): string {
-  return getOAuthCallbackFailureDetails({ oauthError }).message;
-}
-
 type OAuthFailureDetails = {
   message: string;
   status: number;
@@ -115,7 +111,7 @@ export function getOAuthCallbackFailureDetails({
 
 export function getTokenExchangeFailureDetails({
   oauthError,
-  upstreamStatus,
+  upstreamStatus: _upstreamStatus,
   errorDescription,
 }: {
   oauthError?: string;
@@ -162,20 +158,6 @@ export function getTokenExchangeFailureDetails({
         500,
       );
     default:
-      if (typeof upstreamStatus === "number") {
-        if (upstreamStatus >= 500) {
-          return systemFailure(
-            "There was an internal error authenticating your account. Please try again shortly.",
-          );
-        }
-
-        // Any upstream HTTP failure outside explicit user-correctable OAuth errors
-        // points to our configuration, the upstream service, or edge protection.
-        return systemFailure(
-          "There was an internal error authenticating your account. Please try again shortly.",
-        );
-      }
-
       return systemFailure(
         "There was an internal error authenticating your account. Please try again shortly.",
       );
