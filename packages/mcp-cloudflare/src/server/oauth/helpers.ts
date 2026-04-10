@@ -103,8 +103,8 @@ export function getOAuthCallbackFailureDetails({
         500,
       );
     default:
-      return userFailure(
-        "There was an issue authenticating your account. Please try again.",
+      return systemFailure(
+        "There was an internal error authenticating your account. Please try again shortly.",
       );
   }
 }

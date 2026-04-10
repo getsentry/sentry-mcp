@@ -343,6 +343,37 @@ describe("oauth callback routes", () => {
       expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
     });
 
+    it("treats unknown callback errors as system failures", async () => {
+      logIssue.mockReturnValue("oauth-event-id");
+
+      const testEnv = createTestEnv();
+      const oauthApp = createTestApp();
+      const client = await createClient(testEnv);
+      const cookie = await approveClient(oauthApp, testEnv, client.clientId);
+      const state = await createSignedCallbackState(client.clientId);
+
+      const response = await callCallback(oauthApp, testEnv, {
+        state,
+        cookie,
+        error: "provider_broke_it",
+      });
+
+      const body = await response.text();
+      expect(response.status).toBe(502);
+      expect(body).toContain(
+        "There was an internal error authenticating your account. Please try again shortly.",
+      );
+      expect(body).toContain("Event ID:</strong> <code>oauth-event-id</code>");
+      expect(logIssue).toHaveBeenCalledWith(
+        "[oauth] Upstream authorization callback error",
+        expect.objectContaining({
+          loggerScope: ["cloudflare", "oauth", "callback"],
+        }),
+      );
+      expect(logWarn).not.toHaveBeenCalled();
+      expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
+    });
+
     it("renders a safe error page when the callback is missing a code", async () => {
       const testEnv = createTestEnv();
       const oauthApp = createTestApp();

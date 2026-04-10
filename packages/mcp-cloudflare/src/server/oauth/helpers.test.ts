@@ -445,6 +445,17 @@ describe("getOAuthCallbackFailureDetails", () => {
       shouldLogIssue: false,
     });
   });
+
+  it("treats unknown callback errors as system failures", () => {
+    expect(
+      getOAuthCallbackFailureDetails({ oauthError: "provider_broke_it" }),
+    ).toEqual({
+      message:
+        "There was an internal error authenticating your account. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: true,
+    });
+  });
 });
 
 describe("getTokenExchangeFailureDetails", () => {
