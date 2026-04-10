@@ -14,6 +14,7 @@ vi.mock("@sentry/mcp-core/telem/logging", () => ({
 import {
   createResourceValidationError,
   exchangeCodeForAccessToken,
+  getOAuthFailureDetails,
   tokenExchangeCallback,
   validateResourceParameter,
 } from "./helpers";
@@ -350,6 +351,63 @@ describe("exchangeCodeForAccessToken", () => {
       }),
     );
     expect(logWarn).not.toHaveBeenCalled();
+  });
+
+  it("returns an event ID for unknown upstream http failures", async () => {
+    logIssue.mockReturnValue("oauth-forbidden-event-id");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<title>403</title>403 Forbidden", {
+        status: 403,
+        statusText: "Forbidden",
+        headers: { "Content-Type": "text/html; charset=UTF-8" },
+      }),
+    );
+
+    const [payload, response] = await exchangeCodeForAccessToken({
+      client_id: "test-client-id",
+      client_secret: "test-client-secret",
+      code: "test-code",
+      upstream_url: "https://sentry.io/oauth/token",
+      redirect_uri: "https://mcp.sentry.dev/oauth/callback",
+    });
+
+    expect(payload).toBeNull();
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(502);
+
+    const body = await response!.text();
+    expect(body).toContain(
+      "There was an internal error authenticating your account. Please try again shortly.",
+    );
+    expect(body).toContain(
+      "Event ID:</strong> <code>oauth-forbidden-event-id</code>",
+    );
+    expect(logIssue).toHaveBeenCalledWith(
+      "[oauth] Failed to exchange code for access token",
+      expect.objectContaining({
+        loggerScope: ["cloudflare", "oauth", "callback"],
+      }),
+    );
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+});
+
+describe("getOAuthFailureDetails", () => {
+  it("treats invalid_scope as a system failure", () => {
+    expect(getOAuthFailureDetails({ oauthError: "invalid_scope" })).toEqual({
+      message: "The requested permissions were invalid. Please try again.",
+      status: 502,
+      shouldLogIssue: true,
+    });
+  });
+
+  it("treats unknown upstream http failures as system failures", () => {
+    expect(getOAuthFailureDetails({ upstreamStatus: 403 })).toEqual({
+      message:
+        "There was an internal error authenticating your account. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: true,
+    });
   });
 });
 

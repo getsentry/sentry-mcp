@@ -37,6 +37,12 @@ export function getOAuthFailureDetails({
   status: number;
   shouldLogIssue: boolean;
 } {
+  const systemFailure = (message: string, status = 502) => ({
+    message,
+    status,
+    shouldLogIssue: true,
+  });
+
   switch (oauthError) {
     case "access_denied":
       return {
@@ -46,25 +52,18 @@ export function getOAuthFailureDetails({
         shouldLogIssue: false,
       };
     case "temporarily_unavailable":
-      return {
-        message:
-          "Sentry OAuth is temporarily unavailable. Please try again shortly.",
-        status: 503,
-        shouldLogIssue: true,
-      };
+      return systemFailure(
+        "Sentry OAuth is temporarily unavailable. Please try again shortly.",
+        503,
+      );
     case "server_error":
-      return {
-        message:
-          "Sentry OAuth encountered an internal error. Please try again.",
-        status: 502,
-        shouldLogIssue: true,
-      };
+      return systemFailure(
+        "Sentry OAuth encountered an internal error. Please try again.",
+      );
     case "invalid_request":
-      return {
-        message: "The authorization request was rejected. Please try again.",
-        status: 400,
-        shouldLogIssue: false,
-      };
+      return systemFailure(
+        "The authorization request was rejected. Please try again.",
+      );
     case "invalid_grant":
       return {
         message:
@@ -73,36 +72,34 @@ export function getOAuthFailureDetails({
         shouldLogIssue: false,
       };
     case "invalid_scope":
-      return {
-        message: "The requested permissions were invalid. Please try again.",
-        status: 400,
-        shouldLogIssue: false,
-      };
+      return systemFailure(
+        "The requested permissions were invalid. Please try again.",
+      );
     case "invalid_client":
     case "unauthorized_client":
     case "unsupported_grant_type":
-      return {
-        message:
-          "There was an internal configuration issue completing authentication. Please try again later.",
-        status: 500,
-        shouldLogIssue: true,
-      };
+      return systemFailure(
+        "There was an internal configuration issue completing authentication. Please try again later.",
+        500,
+      );
     default:
-      if (typeof upstreamStatus === "number" && upstreamStatus >= 500) {
-        return {
-          message:
+      if (typeof upstreamStatus === "number") {
+        if (upstreamStatus >= 500) {
+          return systemFailure(
             "There was an internal error authenticating your account. Please try again shortly.",
-          status: 502,
-          shouldLogIssue: true,
-        };
+          );
+        }
+
+        // Any upstream HTTP failure outside explicit user-correctable OAuth errors
+        // points to our configuration, the upstream service, or edge protection.
+        return systemFailure(
+          "There was an internal error authenticating your account. Please try again shortly.",
+        );
       }
 
-      return {
-        message:
-          "There was an issue authenticating your account. Please try again.",
-        status: 400,
-        shouldLogIssue: false,
-      };
+      return systemFailure(
+        "There was an internal error authenticating your account. Please try again shortly.",
+      );
   }
 }
 
