@@ -23,34 +23,110 @@ function escapeHtml(value: string): string {
 }
 
 export function createOAuthErrorMessage(oauthError?: string): string {
-  return getOAuthFailureDetails({ oauthError }).message;
+  return getOAuthCallbackFailureDetails({ oauthError }).message;
 }
 
-export function getOAuthFailureDetails({
-  oauthError,
-  upstreamStatus,
-}: {
-  oauthError?: string;
-  upstreamStatus?: number;
-}): {
+type OAuthFailureDetails = {
   message: string;
   status: number;
   shouldLogIssue: boolean;
-} {
-  const systemFailure = (message: string, status = 502) => ({
-    message,
-    status,
-    shouldLogIssue: true,
-  });
+};
 
+const userFailure = (message: string, status = 400): OAuthFailureDetails => ({
+  message,
+  status,
+  shouldLogIssue: false,
+});
+
+const systemFailure = (message: string, status = 502): OAuthFailureDetails => ({
+  message,
+  status,
+  shouldLogIssue: true,
+});
+
+function isRetryableInvalidGrant(errorDescription?: string): boolean {
+  if (!errorDescription) {
+    return false;
+  }
+
+  const normalized = errorDescription.toLowerCase();
+  const userRetryablePatterns = [
+    "expired",
+    "already used",
+    "already been used",
+    "invalid or expired",
+    "authorization code expired",
+  ];
+  const systemMismatchPatterns = [
+    "redirect_uri",
+    "client_id",
+    "pkce",
+    "code verifier",
+    "code_verifier",
+    "mismatch",
+  ];
+
+  return (
+    userRetryablePatterns.some((pattern) => normalized.includes(pattern)) &&
+    !systemMismatchPatterns.some((pattern) => normalized.includes(pattern))
+  );
+}
+
+export function getOAuthCallbackFailureDetails({
+  oauthError,
+}: {
+  oauthError?: string;
+}): OAuthFailureDetails {
   switch (oauthError) {
     case "access_denied":
-      return {
-        message:
-          "Authorization was denied. Please try again if you want to continue connecting your account.",
-        status: 400,
-        shouldLogIssue: false,
-      };
+      return userFailure(
+        "Authorization was denied. Please try again if you want to continue connecting your account.",
+      );
+    case "invalid_request":
+      return userFailure(
+        "The authorization request was rejected. Please try again.",
+      );
+    case "temporarily_unavailable":
+      return systemFailure(
+        "Sentry OAuth is temporarily unavailable. Please try again shortly.",
+        503,
+      );
+    case "server_error":
+      return systemFailure(
+        "Sentry OAuth encountered an internal error. Please try again.",
+      );
+    case "invalid_scope":
+      return systemFailure(
+        "The requested permissions were invalid. Please try again.",
+      );
+    case "invalid_client":
+    case "unauthorized_client":
+    case "unsupported_response_type":
+      return systemFailure(
+        "There was an internal configuration issue completing authentication. Please try again later.",
+        500,
+      );
+    default:
+      return userFailure(
+        "There was an issue authenticating your account. Please try again.",
+      );
+  }
+}
+
+export function getTokenExchangeFailureDetails({
+  oauthError,
+  upstreamStatus,
+  errorDescription,
+}: {
+  oauthError?: string;
+  upstreamStatus?: number;
+  errorDescription?: string;
+}): OAuthFailureDetails {
+  switch (oauthError) {
+    case "access_denied":
+      return userFailure(
+        "Authorization was denied. Please try again if you want to continue connecting your account.",
+      );
     case "temporarily_unavailable":
       return systemFailure(
         "Sentry OAuth is temporarily unavailable. Please try again shortly.",
@@ -65,12 +141,15 @@ export function getOAuthFailureDetails({
         "The authorization request was rejected. Please try again.",
       );
     case "invalid_grant":
-      return {
-        message:
+      if (isRetryableInvalidGrant(errorDescription)) {
+        return userFailure(
           "The authorization code was invalid or expired. Please try connecting your account again.",
-        status: 400,
-        shouldLogIssue: false,
-      };
+        );
+      }
+
+      return systemFailure(
+        "The authorization code could not be validated. Please try again.",
+      );
     case "invalid_scope":
       return systemFailure(
         "The requested permissions were invalid. Please try again.",
@@ -296,9 +375,10 @@ export async function exchangeCodeForAccessToken({
     const responseText = await resp.text();
     const contentType = resp.headers.get("Content-Type");
     const upstreamError = parseUpstreamOAuthError(responseText, contentType);
-    const failure = getOAuthFailureDetails({
+    const failure = getTokenExchangeFailureDetails({
       oauthError: upstreamError.error,
       upstreamStatus: resp.status,
+      errorDescription: upstreamError.errorDescription,
     });
     const logOptions = {
       contexts: {

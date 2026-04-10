@@ -6,7 +6,7 @@ import { SENTRY_TOKEN_URL } from "../constants";
 import {
   createOAuthFailureResponse,
   exchangeCodeForAccessToken,
-  getOAuthFailureDetails,
+  getOAuthCallbackFailureDetails,
   validateResourceParameter,
 } from "../helpers";
 import { verifyAndParseState, type OAuthState } from "../state";
@@ -91,7 +91,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
   const oauthError = c.req.query("error") ?? undefined;
   if (oauthError) {
-    const failure = getOAuthFailureDetails({ oauthError });
+    const failure = getOAuthCallbackFailureDetails({ oauthError });
     const logMessage = "[oauth] Upstream authorization callback error";
     const logOptions = {
       contexts: {

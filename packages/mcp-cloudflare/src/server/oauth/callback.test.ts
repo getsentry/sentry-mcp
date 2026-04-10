@@ -314,9 +314,7 @@ describe("oauth callback routes", () => {
       expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
     });
 
-    it("treats invalid_request callback errors as system failures", async () => {
-      logIssue.mockReturnValue("oauth-invalid-request-event-id");
-
+    it("treats invalid_request callback errors as user-correctable", async () => {
       const testEnv = createTestEnv();
       const oauthApp = createTestApp();
       const client = await createClient(testEnv);
@@ -330,20 +328,18 @@ describe("oauth callback routes", () => {
       });
 
       const body = await response.text();
-      expect(response.status).toBe(502);
+      expect(response.status).toBe(400);
       expect(body).toContain(
         "The authorization request was rejected. Please try again.",
       );
-      expect(body).toContain(
-        "Event ID:</strong> <code>oauth-invalid-request-event-id</code>",
-      );
-      expect(logIssue).toHaveBeenCalledWith(
+      expect(body).not.toContain("Event ID:");
+      expect(logWarn).toHaveBeenCalledWith(
         "[oauth] Upstream authorization callback error",
         expect.objectContaining({
           loggerScope: ["cloudflare", "oauth", "callback"],
         }),
       );
-      expect(logWarn).not.toHaveBeenCalled();
+      expect(logIssue).not.toHaveBeenCalled();
       expect(exchangeCodeForAccessToken).not.toHaveBeenCalled();
     });
 

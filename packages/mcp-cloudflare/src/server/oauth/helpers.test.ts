@@ -14,7 +14,8 @@ vi.mock("@sentry/mcp-core/telem/logging", () => ({
 import {
   createResourceValidationError,
   exchangeCodeForAccessToken,
-  getOAuthFailureDetails,
+  getOAuthCallbackFailureDetails,
+  getTokenExchangeFailureDetails,
   tokenExchangeCallback,
   validateResourceParameter,
 } from "./helpers";
@@ -315,6 +316,48 @@ describe("exchangeCodeForAccessToken", () => {
     expect(logIssue).not.toHaveBeenCalled();
   });
 
+  it("treats invalid_grant without an upstream description as a system failure", async () => {
+    logIssue.mockReturnValue("oauth-invalid-grant-event-id");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "invalid_grant",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const [payload, response] = await exchangeCodeForAccessToken({
+      client_id: "test-client-id",
+      client_secret: "test-client-secret",
+      code: "test-code",
+      upstream_url: "https://sentry.io/oauth/token",
+      redirect_uri: "https://mcp.sentry.dev/oauth/callback",
+    });
+
+    expect(payload).toBeNull();
+    expect(response).not.toBeNull();
+    expect(response!.status).toBe(502);
+
+    const body = await response!.text();
+    expect(body).toContain(
+      "The authorization code could not be validated. Please try again.",
+    );
+    expect(body).toContain(
+      "Event ID:</strong> <code>oauth-invalid-grant-event-id</code>",
+    );
+    expect(logIssue).toHaveBeenCalledWith(
+      "[oauth] Failed to exchange code for access token",
+      expect.objectContaining({
+        loggerScope: ["cloudflare", "oauth", "callback"],
+      }),
+    );
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+
   it("returns an event ID for upstream token exchange system failures", async () => {
     logIssue.mockReturnValue("oauth-token-event-id");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -392,9 +435,23 @@ describe("exchangeCodeForAccessToken", () => {
   });
 });
 
-describe("getOAuthFailureDetails", () => {
+describe("getOAuthCallbackFailureDetails", () => {
+  it("treats invalid_request as a user-correctable callback failure", () => {
+    expect(
+      getOAuthCallbackFailureDetails({ oauthError: "invalid_request" }),
+    ).toEqual({
+      message: "The authorization request was rejected. Please try again.",
+      status: 400,
+      shouldLogIssue: false,
+    });
+  });
+});
+
+describe("getTokenExchangeFailureDetails", () => {
   it("treats invalid_scope as a system failure", () => {
-    expect(getOAuthFailureDetails({ oauthError: "invalid_scope" })).toEqual({
+    expect(
+      getTokenExchangeFailureDetails({ oauthError: "invalid_scope" }),
+    ).toEqual({
       message: "The requested permissions were invalid. Please try again.",
       status: 502,
       shouldLogIssue: true,
@@ -402,9 +459,34 @@ describe("getOAuthFailureDetails", () => {
   });
 
   it("treats unknown upstream http failures as system failures", () => {
-    expect(getOAuthFailureDetails({ upstreamStatus: 403 })).toEqual({
+    expect(getTokenExchangeFailureDetails({ upstreamStatus: 403 })).toEqual({
       message:
         "There was an internal error authenticating your account. Please try again shortly.",
+      status: 502,
+      shouldLogIssue: true,
+    });
+  });
+
+  it("only treats invalid_grant as retryable when the description says the code expired", () => {
+    expect(
+      getTokenExchangeFailureDetails({
+        oauthError: "invalid_grant",
+        errorDescription: "Authorization code expired",
+      }),
+    ).toEqual({
+      message:
+        "The authorization code was invalid or expired. Please try connecting your account again.",
+      status: 400,
+      shouldLogIssue: false,
+    });
+
+    expect(
+      getTokenExchangeFailureDetails({
+        oauthError: "invalid_grant",
+      }),
+    ).toEqual({
+      message:
+        "The authorization code could not be validated. Please try again.",
       status: 502,
       shouldLogIssue: true,
     });
