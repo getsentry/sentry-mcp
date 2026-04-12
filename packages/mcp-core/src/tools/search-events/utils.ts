@@ -75,7 +75,7 @@ function hasUserIdentityFields(value: Record<string, unknown>): boolean {
   );
 }
 
-export function hasUserSummaryFields(
+function hasUserSummaryFields(
   value: Record<string, unknown>,
   options: { allowId?: boolean } = {},
 ): boolean {
@@ -111,6 +111,16 @@ function formatUserSummary(
   }
 
   return parts.length > 0 ? parts.join(", ") : null;
+}
+
+export function formatKnownUserValue(
+  value: Record<string, unknown>,
+  options: { includeGeo?: boolean } = {},
+): string | null {
+  return formatUserSummary(value, {
+    includeGeo: options.includeGeo,
+    allowIdOnly: true,
+  });
 }
 
 function sanitizeWhitespace(value: string): string {
@@ -197,11 +207,6 @@ function formatArrayValue(values: unknown[], maxLength: number): string {
 function formatObjectValue(
   value: Record<string, unknown>,
   maxLength: number,
-  options: {
-    includeUserGeo?: boolean;
-    allowGeoOnlyUser?: boolean;
-    allowIdOnlyUser?: boolean;
-  } = {},
 ): string {
   // Check tag pair first -- it's more specific than the user summary heuristic
   if (isTagPair(value)) {
@@ -211,11 +216,7 @@ function formatObjectValue(
     );
   }
 
-  const userSummary = formatUserSummary(value, {
-    includeGeo: options.includeUserGeo,
-    allowGeoOnly: options.allowGeoOnlyUser,
-    allowIdOnly: options.allowIdOnlyUser,
-  });
+  const userSummary = formatUserSummary(value);
   if (userSummary) {
     return truncateString(sanitizeWhitespace(userSummary), maxLength);
   }
@@ -230,9 +231,6 @@ export function formatEventValue(
   value: unknown,
   options: {
     maxLength?: number;
-    includeUserGeo?: boolean;
-    allowGeoOnlyUser?: boolean;
-    allowIdOnlyUser?: boolean;
   } = {},
 ): string {
   const maxLength = options.maxLength ?? DEFAULT_MAX_VALUE_LENGTH;
@@ -253,11 +251,7 @@ export function formatEventValue(
   }
 
   if (isPlainObject(value)) {
-    return formatObjectValue(value, maxLength, {
-      includeUserGeo: options.includeUserGeo,
-      allowGeoOnlyUser: options.allowGeoOnlyUser,
-      allowIdOnlyUser: options.allowIdOnlyUser,
-    });
+    return formatObjectValue(value, maxLength);
   }
 
   return truncateString(sanitizeWhitespace(String(value)), maxLength);

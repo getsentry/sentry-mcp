@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { fetchCustomAttributes, formatEventValue } from "./utils";
+import {
+  fetchCustomAttributes,
+  formatEventValue,
+  formatKnownUserValue,
+} from "./utils";
 import { SentryApiService } from "../../api-client";
 import * as logging from "../../telem/logging";
 
@@ -91,7 +95,7 @@ describe("formatEventValue", () => {
       expect(result).toContain("ip_address=10.0.0.1");
     });
 
-    it("should include geo summaries for user objects", () => {
+    it("should include geo summaries for known user objects", () => {
       const user = {
         id: "3c7631c0121d40e79e2f992ff5cf7671",
         geo: {
@@ -100,12 +104,12 @@ describe("formatEventValue", () => {
         },
       };
 
-      expect(formatEventValue(user, { allowGeoOnlyUser: true })).toContain(
+      expect(formatKnownUserValue(user, { includeGeo: true })).toContain(
         "geo=US, United States",
       );
     });
 
-    it("should omit geo summaries when requested", () => {
+    it("should omit geo summaries for known user objects when requested", () => {
       const user = {
         id: "3c7631c0121d40e79e2f992ff5cf7671",
         geo: {
@@ -114,12 +118,20 @@ describe("formatEventValue", () => {
         },
       };
 
-      expect(
-        formatEventValue(user, {
-          includeUserGeo: false,
-          allowGeoOnlyUser: true,
-        }),
-      ).toBe("id=3c7631c0121d40e79e2f992ff5cf7671");
+      expect(formatKnownUserValue(user, { includeGeo: false })).toBe(
+        "id=3c7631c0121d40e79e2f992ff5cf7671",
+      );
+    });
+
+    it("should omit summary text for geo-only known users", () => {
+      const user = {
+        geo: {
+          country_code: "US",
+          region: "United States",
+        },
+      };
+
+      expect(formatKnownUserValue(user, { includeGeo: false })).toBeNull();
     });
 
     it("should NOT apply user formatting to objects with only id", () => {

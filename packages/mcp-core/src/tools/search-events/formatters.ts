@@ -4,8 +4,8 @@ import { logInfo } from "../../telem/logging";
 import {
   type FlexibleEventData,
   formatEventValue,
+  formatKnownUserValue,
   getStringValue,
-  hasUserSummaryFields,
   isAggregateQuery,
 } from "./utils";
 
@@ -37,20 +37,13 @@ function formatUserFieldLines(
 ): string[] {
   const prefix = options.prefix ?? "";
   const geoSummary = formatUserGeoSummary(value.geo);
-  const hasSummary = hasUserSummaryFields(value, {
-    allowId: true,
-  });
+  const userSummary = formatKnownUserValue(value, { includeGeo: false });
   const lines: string[] = [];
 
-  if (hasSummary || !geoSummary) {
-    const formattedValue = hasSummary
-      ? formatEventValue(value, {
-          includeUserGeo: false,
-          allowGeoOnlyUser: true,
-          allowIdOnlyUser: true,
-        })
-      : formatEventValue(value);
-    lines.push(`${prefix}**user**: ${formattedValue}`);
+  if (userSummary) {
+    lines.push(`${prefix}**user**: ${userSummary}`);
+  } else if (!geoSummary) {
+    lines.push(`${prefix}**user**: ${formatEventValue(value)}`);
   }
 
   if (geoSummary) {
