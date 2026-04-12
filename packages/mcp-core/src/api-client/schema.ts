@@ -500,7 +500,10 @@ const BaseEventSchema = z.object({
       ip_address: z.string().nullable().optional(),
       name: z.string().nullable().optional(),
       username: z.string().nullable().optional(),
-      geo: z.record(z.string(), z.string()).nullable().optional(),
+      geo: z
+        .record(z.string(), z.union([z.string(), z.null()]))
+        .nullable()
+        .optional(),
     })
     .passthrough()
     .nullable()

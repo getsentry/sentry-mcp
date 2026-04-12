@@ -242,6 +242,47 @@ describe("EventSchema", () => {
     expect(result.type).toBe("error");
   });
 
+  it("should allow partially populated user geo payloads", () => {
+    const errorEvent = {
+      id: "geo123",
+      title: "Geo Event",
+      message: "geo payload includes nulls",
+      platform: "javascript",
+      type: "error",
+      entries: [
+        {
+          type: "exception",
+          data: {
+            values: [
+              {
+                type: "Error",
+                value: "geo payload includes nulls",
+              },
+            ],
+          },
+        },
+      ],
+      culprit: "app/geo.ts",
+      dateCreated: "2025-01-01T00:00:00Z",
+      tags: [],
+      user: {
+        ip_address: "127.0.0.1",
+        geo: {
+          country_code: "US",
+          city: null,
+          region: "United States",
+        },
+      },
+    };
+
+    const result = EventSchema.parse(errorEvent);
+    expect(result.user?.geo).toEqual({
+      country_code: "US",
+      city: null,
+      region: "United States",
+    });
+  });
+
   it("should parse a regressed performance event (generic type)", () => {
     // This is the actual event structure from a regressed performance issue
     const regressedEvent = {
