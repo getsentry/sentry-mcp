@@ -103,6 +103,20 @@ describe("formatEventValue", () => {
       expect(formatEventValue(user)).toContain("geo=US, United States");
     });
 
+    it("should omit geo summaries when requested", () => {
+      const user = {
+        id: "3c7631c0121d40e79e2f992ff5cf7671",
+        geo: {
+          country_code: "US",
+          region: "United States",
+        },
+      };
+
+      expect(formatEventValue(user, { includeUserGeo: false })).toBe(
+        "id=3c7631c0121d40e79e2f992ff5cf7671",
+      );
+    });
+
     it("should NOT apply user formatting to objects with only id", () => {
       const obj = { id: "abc", type: "transaction", description: "GET /api" };
       const result = formatEventValue(obj);

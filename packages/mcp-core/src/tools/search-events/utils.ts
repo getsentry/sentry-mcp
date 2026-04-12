@@ -70,7 +70,11 @@ const USER_IDENTITY_FIELDS = new Set([
   "display_name",
 ]);
 
-function formatUserSummary(value: Record<string, unknown>): string | null {
+function formatUserSummary(
+  value: Record<string, unknown>,
+  options: { includeGeo?: boolean } = {},
+): string | null {
+  const includeGeo = options.includeGeo ?? true;
   // Require at least one identity field to avoid matching arbitrary objects that just have "id"
   const hasIdentityField =
     USER_FIELDS.some((f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null) ||
@@ -83,7 +87,7 @@ function formatUserSummary(value: Record<string, unknown>): string | null {
     (f) => `${f}=${formatSimpleValue(value[f])}`,
   );
   const geoSummary = formatUserGeoSummary(value.geo);
-  if (geoSummary) {
+  if (includeGeo && geoSummary) {
     parts.push(`geo=${geoSummary}`);
   }
 
@@ -174,6 +178,7 @@ function formatArrayValue(values: unknown[], maxLength: number): string {
 function formatObjectValue(
   value: Record<string, unknown>,
   maxLength: number,
+  options: { includeUserGeo?: boolean } = {},
 ): string {
   // Check tag pair first -- it's more specific than the user summary heuristic
   if (isTagPair(value)) {
@@ -183,7 +188,9 @@ function formatObjectValue(
     );
   }
 
-  const userSummary = formatUserSummary(value);
+  const userSummary = formatUserSummary(value, {
+    includeGeo: options.includeUserGeo,
+  });
   if (userSummary) {
     return truncateString(sanitizeWhitespace(userSummary), maxLength);
   }
@@ -196,7 +203,7 @@ function formatObjectValue(
 
 export function formatEventValue(
   value: unknown,
-  options: { maxLength?: number } = {},
+  options: { maxLength?: number; includeUserGeo?: boolean } = {},
 ): string {
   const maxLength = options.maxLength ?? DEFAULT_MAX_VALUE_LENGTH;
 
@@ -216,7 +223,9 @@ export function formatEventValue(
   }
 
   if (isPlainObject(value)) {
-    return formatObjectValue(value, maxLength);
+    return formatObjectValue(value, maxLength, {
+      includeUserGeo: options.includeUserGeo,
+    });
   }
 
   return truncateString(sanitizeWhitespace(String(value)), maxLength);

@@ -163,9 +163,7 @@ describe("search_issue_events", () => {
       mockContext,
     );
 
-    expect(result).toContain(
-      "**user**: id=3c7631c0121d40e79e2f992ff5cf7671, geo=US, United States",
-    );
+    expect(result).toContain("**user**: id=3c7631c0121d40e79e2f992ff5cf7671");
     expect(result).toContain("**user.geo**: US, United States");
   });
 

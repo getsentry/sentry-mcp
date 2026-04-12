@@ -138,7 +138,11 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          output += `**${key}**: ${formatEventValue(value)}\n`;
+          const formattedValue =
+            key === "user"
+              ? formatEventValue(value, { includeUserGeo: false })
+              : formatEventValue(value);
+          output += `**${key}**: ${formattedValue}\n`;
 
           if (key === "user" && typeof value === "object" && value !== null) {
             const geoSummary = formatUserGeoSummary(
