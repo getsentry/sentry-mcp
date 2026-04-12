@@ -89,16 +89,14 @@ function formatUserSummary(
   value: Record<string, unknown>,
   options: {
     includeGeo?: boolean;
-    allowGeoOnly?: boolean;
     allowIdOnly?: boolean;
   } = {},
 ): string | null {
   const includeGeo = options.includeGeo ?? true;
-  const allowGeoOnly = options.allowGeoOnly ?? false;
   const allowIdOnly = options.allowIdOnly ?? false;
   // Require at least one identity field to avoid matching arbitrary objects that just have "id"
   const hasSummaryField = hasUserSummaryFields(value, { allowId: allowIdOnly });
-  if (!hasSummaryField && !(allowGeoOnly && value.geo != null)) {
+  if (!hasSummaryField) {
     return null;
   }
 
