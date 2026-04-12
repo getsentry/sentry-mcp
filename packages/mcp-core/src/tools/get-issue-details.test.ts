@@ -218,6 +218,11 @@ describe("get_issue_details", () => {
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
 
+      ### User
+
+      **user**: ip:2a06:98c0:3600::103
+      **user.geo**: US, United States
+
       ### Tags
 
       **environment**: development
@@ -441,6 +446,11 @@ describe("get_issue_details", () => {
 
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
+
+      ### User
+
+      **user**: ip:2a06:98c0:3600::103
+      **user.geo**: US, United States
 
       ### Tags
 
@@ -718,6 +728,11 @@ describe("get_issue_details", () => {
 
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
+
+      ### User
+
+      **user**: ip:2a06:98c0:3600::103
+      **user.geo**: US, United States
 
       ### Tags
 
@@ -1535,7 +1550,6 @@ describe("get_issue_details", () => {
       **Please report this**: Open a GitHub issue at https://github.com/getsentry/sentry-mcp/issues/new and include Event ID **ffffffffffffffffffffffffffffffff** and Sentry Event ID **<SENTRY_EVENT_ID>** to help us add support for this event type.
       "
     `);
-    expect(result).toContain("**user.geo**: US, United States");
 
     // Verify we actually got a Sentry Event ID
     expect(sentryEventId).toMatch(/^[a-f0-9]{32}$/);
