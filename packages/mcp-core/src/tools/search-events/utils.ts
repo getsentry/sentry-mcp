@@ -1,7 +1,10 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { agentTool } from "../../internal/agents/tools/utils";
-import { formatUserGeoSummary } from "../../internal/user-formatting";
+import {
+  formatUserGeoSummary,
+  isPlainObject,
+} from "../../internal/user-formatting";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
@@ -31,10 +34,6 @@ export function getNumberValue(
 // Helper to check if fields contain aggregate functions
 export function isAggregateQuery(fields: string[]): boolean {
   return fields.some((field) => field.includes("(") && field.includes(")"));
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isPrimitive(

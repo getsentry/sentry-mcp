@@ -258,6 +258,60 @@ describe("search_events", () => {
     expect(result).not.toContain("[object Object]");
   });
 
+  it("should render geo-only users without raw user JSON in error results", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("errors", "issue:PROJ-123", [
+        "title",
+        "timestamp",
+        "user",
+      ]),
+    );
+
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        return HttpResponse.json({
+          data: [
+            {
+              id: "error1",
+              title: "Geo-only User Error",
+              timestamp: "2024-01-15T10:30:00Z",
+              user: {
+                geo: {
+                  country_code: "US",
+                  region: "United States",
+                },
+              },
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "recent errors with geo-only user data",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("**user.geo**: US, United States");
+    expect(result).not.toContain('**user**: {"geo"');
+    expect(result).not.toContain("**user**:");
+  });
+
   it("should handle logs dataset queries", async () => {
     // Mock AI response for logs dataset
     mockGenerateText.mockResolvedValueOnce(
