@@ -70,17 +70,36 @@ const USER_IDENTITY_FIELDS = new Set([
   "display_name",
 ]);
 
+export function hasUserIdentityFields(value: Record<string, unknown>): boolean {
+  return USER_FIELDS.some(
+    (f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null,
+  );
+}
+
+export function hasUserSummaryFields(
+  value: Record<string, unknown>,
+  options: { allowId?: boolean } = {},
+): boolean {
+  return (
+    hasUserIdentityFields(value) ||
+    (options.allowId === true && value.id != null)
+  );
+}
+
 function formatUserSummary(
   value: Record<string, unknown>,
-  options: { includeGeo?: boolean; allowGeoOnly?: boolean } = {},
+  options: {
+    includeGeo?: boolean;
+    allowGeoOnly?: boolean;
+    allowIdOnly?: boolean;
+  } = {},
 ): string | null {
   const includeGeo = options.includeGeo ?? true;
   const allowGeoOnly = options.allowGeoOnly ?? false;
+  const allowIdOnly = options.allowIdOnly ?? false;
   // Require at least one identity field to avoid matching arbitrary objects that just have "id"
-  const hasIdentityField = USER_FIELDS.some(
-    (f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null,
-  );
-  if (!hasIdentityField && !(allowGeoOnly && value.geo != null)) {
+  const hasSummaryField = hasUserSummaryFields(value, { allowId: allowIdOnly });
+  if (!hasSummaryField && !(allowGeoOnly && value.geo != null)) {
     return null;
   }
 
@@ -179,7 +198,11 @@ function formatArrayValue(values: unknown[], maxLength: number): string {
 function formatObjectValue(
   value: Record<string, unknown>,
   maxLength: number,
-  options: { includeUserGeo?: boolean; allowGeoOnlyUser?: boolean } = {},
+  options: {
+    includeUserGeo?: boolean;
+    allowGeoOnlyUser?: boolean;
+    allowIdOnlyUser?: boolean;
+  } = {},
 ): string {
   // Check tag pair first -- it's more specific than the user summary heuristic
   if (isTagPair(value)) {
@@ -192,6 +215,7 @@ function formatObjectValue(
   const userSummary = formatUserSummary(value, {
     includeGeo: options.includeUserGeo,
     allowGeoOnly: options.allowGeoOnlyUser,
+    allowIdOnly: options.allowIdOnlyUser,
   });
   if (userSummary) {
     return truncateString(sanitizeWhitespace(userSummary), maxLength);
@@ -209,6 +233,7 @@ export function formatEventValue(
     maxLength?: number;
     includeUserGeo?: boolean;
     allowGeoOnlyUser?: boolean;
+    allowIdOnlyUser?: boolean;
   } = {},
 ): string {
   const maxLength = options.maxLength ?? DEFAULT_MAX_VALUE_LENGTH;
@@ -232,6 +257,7 @@ export function formatEventValue(
     return formatObjectValue(value, maxLength, {
       includeUserGeo: options.includeUserGeo,
       allowGeoOnlyUser: options.allowGeoOnlyUser,
+      allowIdOnlyUser: options.allowIdOnlyUser,
     });
   }
 

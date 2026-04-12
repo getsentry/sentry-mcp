@@ -167,6 +167,47 @@ describe("search_issue_events", () => {
     expect(result).toContain("**user.geo**: US, United States");
   });
 
+  it("should render geo-only users without duplicating raw user JSON", async () => {
+    mockGenerateText.mockResolvedValue(
+      mockAIResponse("", ["id", "timestamp", "title", "user"], "-timestamp"),
+    );
+
+    mswServer.use(
+      http.get("*/api/0/organizations/*/issues/*/events/", () =>
+        HttpResponse.json([
+          {
+            id: "event1",
+            timestamp: "2025-01-15T10:00:00Z",
+            title: "Geo-only User Error",
+            user: {
+              geo: {
+                country_code: "US",
+                region: "United States",
+              },
+            },
+          },
+        ]),
+      ),
+    );
+
+    const result = await searchIssueEvents.handler(
+      {
+        organizationSlug: "test-org",
+        issueId: "MCP-41",
+        naturalLanguageQuery: "events with geo-only users",
+        projectSlug: null,
+        regionUrl: null,
+        limit: 50,
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).not.toContain('**user**: {"geo"');
+    expect(result).not.toContain("**user**:");
+    expect(result).toContain("**user.geo**: US, United States");
+  });
+
   it("should parse issueUrl and extract organization and issue ID", async () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 

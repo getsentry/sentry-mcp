@@ -5,6 +5,7 @@ import {
   type FlexibleEventData,
   formatEventValue,
   getStringValue,
+  hasUserSummaryFields,
   isAggregateQuery,
 } from "./utils";
 
@@ -138,23 +139,31 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          const formattedValue =
-            key === "user"
-              ? formatEventValue(value, {
-                  includeUserGeo: false,
-                  allowGeoOnlyUser: true,
-                })
-              : formatEventValue(value);
-          output += `**${key}**: ${formattedValue}\n`;
-
           if (key === "user" && typeof value === "object" && value !== null) {
-            const geoSummary = formatUserGeoSummary(
-              (value as Record<string, unknown>).geo,
-            );
+            const userValue = value as Record<string, unknown>;
+            const geoSummary = formatUserGeoSummary(userValue.geo);
+            const hasSummary = hasUserSummaryFields(userValue, {
+              allowId: true,
+            });
+
+            if (hasSummary || !geoSummary) {
+              const formattedValue = hasSummary
+                ? formatEventValue(userValue, {
+                    includeUserGeo: false,
+                    allowGeoOnlyUser: true,
+                    allowIdOnlyUser: true,
+                  })
+                : formatEventValue(userValue);
+              output += `**${key}**: ${formattedValue}\n`;
+            }
+
             if (geoSummary) {
               output += `**user.geo**: ${geoSummary}\n`;
             }
+            continue;
           }
+
+          output += `**${key}**: ${formatEventValue(value)}\n`;
         }
       }
 
@@ -301,7 +310,10 @@ export function formatLogResults(params: FormatEventResultsParams): string {
         ) {
           const formattedValue =
             key === "user"
-              ? formatEventValue(value, { allowGeoOnlyUser: true })
+              ? formatEventValue(value, {
+                  allowGeoOnlyUser: true,
+                  allowIdOnlyUser: true,
+                })
               : formatEventValue(value);
           output += `- **${key}**: ${formattedValue}\n`;
         }
@@ -429,7 +441,10 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
         ) {
           const formattedValue =
             key === "user"
-              ? formatEventValue(value, { allowGeoOnlyUser: true })
+              ? formatEventValue(value, {
+                  allowGeoOnlyUser: true,
+                  allowIdOnlyUser: true,
+                })
               : formatEventValue(value);
           output += `**${key}**: ${formattedValue}\n`;
         }
