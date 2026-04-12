@@ -100,7 +100,9 @@ describe("formatEventValue", () => {
         },
       };
 
-      expect(formatEventValue(user)).toContain("geo=US, United States");
+      expect(formatEventValue(user, { allowGeoOnlyUser: true })).toContain(
+        "geo=US, United States",
+      );
     });
 
     it("should omit geo summaries when requested", () => {
@@ -112,9 +114,12 @@ describe("formatEventValue", () => {
         },
       };
 
-      expect(formatEventValue(user, { includeUserGeo: false })).toBe(
-        "id=3c7631c0121d40e79e2f992ff5cf7671",
-      );
+      expect(
+        formatEventValue(user, {
+          includeUserGeo: false,
+          allowGeoOnlyUser: true,
+        }),
+      ).toBe("id=3c7631c0121d40e79e2f992ff5cf7671");
     });
 
     it("should NOT apply user formatting to objects with only id", () => {
@@ -124,6 +129,21 @@ describe("formatEventValue", () => {
       expect(result).toContain("type");
       expect(result).toContain("transaction");
       expect(result).toContain("description");
+    });
+
+    it("should NOT apply user formatting to non-user objects with geo", () => {
+      const obj = {
+        method: "GET",
+        path: "/api/0/issues/",
+        geo: {
+          country_code: "US",
+        },
+      };
+
+      const result = formatEventValue(obj);
+      expect(result).toContain('"method":"GET"');
+      expect(result).toContain('"path":"/api/0/issues/"');
+      expect(result).toContain('"country_code":"US"');
     });
 
     it("should format tag-pair objects", () => {

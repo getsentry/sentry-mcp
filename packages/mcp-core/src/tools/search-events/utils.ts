@@ -72,14 +72,15 @@ const USER_IDENTITY_FIELDS = new Set([
 
 function formatUserSummary(
   value: Record<string, unknown>,
-  options: { includeGeo?: boolean } = {},
+  options: { includeGeo?: boolean; allowGeoOnly?: boolean } = {},
 ): string | null {
   const includeGeo = options.includeGeo ?? true;
+  const allowGeoOnly = options.allowGeoOnly ?? false;
   // Require at least one identity field to avoid matching arbitrary objects that just have "id"
-  const hasIdentityField =
-    USER_FIELDS.some((f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null) ||
-    value.geo != null;
-  if (!hasIdentityField) {
+  const hasIdentityField = USER_FIELDS.some(
+    (f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null,
+  );
+  if (!hasIdentityField && !(allowGeoOnly && value.geo != null)) {
     return null;
   }
 
@@ -178,7 +179,7 @@ function formatArrayValue(values: unknown[], maxLength: number): string {
 function formatObjectValue(
   value: Record<string, unknown>,
   maxLength: number,
-  options: { includeUserGeo?: boolean } = {},
+  options: { includeUserGeo?: boolean; allowGeoOnlyUser?: boolean } = {},
 ): string {
   // Check tag pair first -- it's more specific than the user summary heuristic
   if (isTagPair(value)) {
@@ -190,6 +191,7 @@ function formatObjectValue(
 
   const userSummary = formatUserSummary(value, {
     includeGeo: options.includeUserGeo,
+    allowGeoOnly: options.allowGeoOnlyUser,
   });
   if (userSummary) {
     return truncateString(sanitizeWhitespace(userSummary), maxLength);
@@ -203,7 +205,11 @@ function formatObjectValue(
 
 export function formatEventValue(
   value: unknown,
-  options: { maxLength?: number; includeUserGeo?: boolean } = {},
+  options: {
+    maxLength?: number;
+    includeUserGeo?: boolean;
+    allowGeoOnlyUser?: boolean;
+  } = {},
 ): string {
   const maxLength = options.maxLength ?? DEFAULT_MAX_VALUE_LENGTH;
 
@@ -225,6 +231,7 @@ export function formatEventValue(
   if (isPlainObject(value)) {
     return formatObjectValue(value, maxLength, {
       includeUserGeo: options.includeUserGeo,
+      allowGeoOnlyUser: options.allowGeoOnlyUser,
     });
   }
 

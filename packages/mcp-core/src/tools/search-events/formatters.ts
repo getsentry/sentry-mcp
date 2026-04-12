@@ -140,7 +140,10 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
         ) {
           const formattedValue =
             key === "user"
-              ? formatEventValue(value, { includeUserGeo: false })
+              ? formatEventValue(value, {
+                  includeUserGeo: false,
+                  allowGeoOnlyUser: true,
+                })
               : formatEventValue(value);
           output += `**${key}**: ${formattedValue}\n`;
 
@@ -296,7 +299,11 @@ export function formatLogResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          output += `- **${key}**: ${formatEventValue(value)}\n`;
+          const formattedValue =
+            key === "user"
+              ? formatEventValue(value, { allowGeoOnlyUser: true })
+              : formatEventValue(value);
+          output += `- **${key}**: ${formattedValue}\n`;
         }
       }
 
@@ -420,7 +427,11 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          output += `**${key}**: ${formatEventValue(value)}\n`;
+          const formattedValue =
+            key === "user"
+              ? formatEventValue(value, { allowGeoOnlyUser: true })
+              : formatEventValue(value);
+          output += `**${key}**: ${formattedValue}\n`;
         }
       }
 
