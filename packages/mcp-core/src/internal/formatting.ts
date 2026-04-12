@@ -34,6 +34,7 @@ import {
   getStatusDisplayName,
 } from "./tool-helpers/seer";
 import { logIssue } from "../telem/logging";
+import { formatUserGeoSummary } from "./user-formatting";
 
 /**
  * Convert Seer fixability score to actionability label.
@@ -209,6 +210,7 @@ export function formatEventOutput(
   // Check if entries exist (may be undefined for unsupported event types)
   if (!eventToRender.entries || !Array.isArray(eventToRender.entries)) {
     // For unsupported event types, just show tags and contexts
+    output += formatEventUser(eventUser);
     output += formatTags(eventToRender.tags);
     output += formatContext(eventToRender.context);
     output += formatContexts(eventToRender.contexts);
@@ -1555,16 +1557,7 @@ function formatEventUser(user: z.infer<typeof EventSchema>["user"]) {
   const userSummary = userFields
     .map(([key, value]) => `${key}:${value}`)
     .join(", ");
-  const geoParts = [
-    user.geo?.country_code,
-    user.geo?.city,
-    user.geo?.region,
-    user.geo?.country_name,
-  ].filter(
-    (value): value is string => typeof value === "string" && value.length > 0,
-  );
-  const geoSummary =
-    geoParts.length > 0 ? Array.from(new Set(geoParts)).join(", ") : null;
+  const geoSummary = formatUserGeoSummary(user.geo);
 
   if (!userSummary && !geoSummary) {
     return "";

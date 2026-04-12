@@ -1535,6 +1535,7 @@ describe("get_issue_details", () => {
       **Please report this**: Open a GitHub issue at https://github.com/getsentry/sentry-mcp/issues/new and include Event ID **ffffffffffffffffffffffffffffffff** and Sentry Event ID **<SENTRY_EVENT_ID>** to help us add support for this event type.
       "
     `);
+    expect(result).toContain("**user.geo**: US, United States");
 
     // Verify we actually got a Sentry Event ID
     expect(sentryEventId).toMatch(/^[a-f0-9]{32}$/);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { agentTool } from "../../internal/agents/tools/utils";
+import { formatUserGeoSummary } from "../../internal/user-formatting";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
@@ -70,27 +71,6 @@ const USER_IDENTITY_FIELDS = new Set([
   "geo",
 ]);
 
-function formatGeoSummary(value: unknown): string | null {
-  if (!isPlainObject(value)) {
-    return null;
-  }
-
-  const parts = [
-    value.country_code,
-    value.city,
-    value.region,
-    value.country_name,
-  ].filter(
-    (part): part is string => typeof part === "string" && part.length > 0,
-  );
-
-  if (parts.length === 0) {
-    return null;
-  }
-
-  return Array.from(new Set(parts)).join(", ");
-}
-
 function formatUserSummary(value: Record<string, unknown>): string | null {
   // Require at least one identity field to avoid matching arbitrary objects that just have "id"
   const hasIdentityField =
@@ -103,7 +83,7 @@ function formatUserSummary(value: Record<string, unknown>): string | null {
   const parts = USER_FIELDS.filter((f) => value[f] != null).map(
     (f) => `${f}=${formatSimpleValue(value[f])}`,
   );
-  const geoSummary = formatGeoSummary(value.geo);
+  const geoSummary = formatUserGeoSummary(value.geo);
   if (geoSummary) {
     parts.push(`geo=${geoSummary}`);
   }
