@@ -312,6 +312,123 @@ describe("search_events", () => {
     expect(result).not.toContain("**user**:");
   });
 
+  it("should render log user geo on a dedicated line", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("logs", "user logs", [
+        "timestamp",
+        "message",
+        "severity",
+        "user",
+      ]),
+    );
+
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        return HttpResponse.json({
+          data: [
+            {
+              timestamp: "2024-01-15T10:30:00Z",
+              message: "User log message",
+              severity: "info",
+              user: {
+                id: "user-123",
+                geo: {
+                  country_code: "US",
+                  region: "United States",
+                },
+              },
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "logs with user geo",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("- **user**: id=user-123");
+    expect(result).toContain("- **user.geo**: US, United States");
+    expect(result).not.toContain(
+      "- **user**: id=user-123, geo=US, United States",
+    );
+  });
+
+  it("should render span user geo on a dedicated line", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("spans", "span users", [
+        "span.description",
+        "span.duration",
+        "timestamp",
+        "user",
+      ]),
+    );
+
+    mswServer.use(
+      http.get("https://sentry.io/api/0/organizations/test-org/events/", () => {
+        return HttpResponse.json({
+          data: [
+            {
+              id: "span1",
+              "span.description": "SELECT * FROM users",
+              "span.duration": 1500,
+              timestamp: "2024-01-15T10:30:00Z",
+              user: {
+                id: "user-123",
+                geo: {
+                  country_code: "US",
+                  region: "United States",
+                },
+              },
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "spans with user geo",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("**user**: id=user-123");
+    expect(result).toContain("**user.geo**: US, United States");
+    expect(result).not.toContain(
+      "**user**: id=user-123, geo=US, United States",
+    );
+  });
+
   it("should handle logs dataset queries", async () => {
     // Mock AI response for logs dataset
     mockGenerateText.mockResolvedValueOnce(

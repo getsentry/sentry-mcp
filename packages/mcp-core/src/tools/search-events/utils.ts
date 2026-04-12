@@ -69,7 +69,7 @@ const USER_IDENTITY_FIELDS = new Set([
   "display_name",
 ]);
 
-export function hasUserIdentityFields(value: Record<string, unknown>): boolean {
+function hasUserIdentityFields(value: Record<string, unknown>): boolean {
   return USER_FIELDS.some(
     (f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null,
   );

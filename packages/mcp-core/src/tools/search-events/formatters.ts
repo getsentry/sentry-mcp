@@ -31,6 +31,35 @@ export interface FormatEventResultsParams {
   explanation?: string;
 }
 
+function formatUserFieldLines(
+  value: Record<string, unknown>,
+  options: { prefix?: string } = {},
+): string[] {
+  const prefix = options.prefix ?? "";
+  const geoSummary = formatUserGeoSummary(value.geo);
+  const hasSummary = hasUserSummaryFields(value, {
+    allowId: true,
+  });
+  const lines: string[] = [];
+
+  if (hasSummary || !geoSummary) {
+    const formattedValue = hasSummary
+      ? formatEventValue(value, {
+          includeUserGeo: false,
+          allowGeoOnlyUser: true,
+          allowIdOnlyUser: true,
+        })
+      : formatEventValue(value);
+    lines.push(`${prefix}**user**: ${formattedValue}`);
+  }
+
+  if (geoSummary) {
+    lines.push(`${prefix}**user.geo**: ${geoSummary}`);
+  }
+
+  return lines;
+}
+
 /**
  * Format error event results for display
  */
@@ -140,25 +169,10 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
           value !== undefined
         ) {
           if (key === "user" && typeof value === "object" && value !== null) {
-            const userValue = value as Record<string, unknown>;
-            const geoSummary = formatUserGeoSummary(userValue.geo);
-            const hasSummary = hasUserSummaryFields(userValue, {
-              allowId: true,
-            });
-
-            if (hasSummary || !geoSummary) {
-              const formattedValue = hasSummary
-                ? formatEventValue(userValue, {
-                    includeUserGeo: false,
-                    allowGeoOnlyUser: true,
-                    allowIdOnlyUser: true,
-                  })
-                : formatEventValue(userValue);
-              output += `**${key}**: ${formattedValue}\n`;
-            }
-
-            if (geoSummary) {
-              output += `**user.geo**: ${geoSummary}\n`;
+            for (const line of formatUserFieldLines(
+              value as Record<string, unknown>,
+            )) {
+              output += `${line}\n`;
             }
             continue;
           }
@@ -308,14 +322,17 @@ export function formatLogResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          const formattedValue =
-            key === "user"
-              ? formatEventValue(value, {
-                  allowGeoOnlyUser: true,
-                  allowIdOnlyUser: true,
-                })
-              : formatEventValue(value);
-          output += `- **${key}**: ${formattedValue}\n`;
+          if (key === "user" && typeof value === "object" && value !== null) {
+            for (const line of formatUserFieldLines(
+              value as Record<string, unknown>,
+              { prefix: "- " },
+            )) {
+              output += `${line}\n`;
+            }
+            continue;
+          }
+
+          output += `- **${key}**: ${formatEventValue(value)}\n`;
         }
       }
 
@@ -439,14 +456,16 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
-          const formattedValue =
-            key === "user"
-              ? formatEventValue(value, {
-                  allowGeoOnlyUser: true,
-                  allowIdOnlyUser: true,
-                })
-              : formatEventValue(value);
-          output += `**${key}**: ${formattedValue}\n`;
+          if (key === "user" && typeof value === "object" && value !== null) {
+            for (const line of formatUserFieldLines(
+              value as Record<string, unknown>,
+            )) {
+              output += `${line}\n`;
+            }
+            continue;
+          }
+
+          output += `**${key}**: ${formatEventValue(value)}\n`;
         }
       }
 
