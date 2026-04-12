@@ -126,6 +126,49 @@ describe("search_issue_events", () => {
     expect(result).toContain("2025-01-15T10:00:00Z");
   });
 
+  it("should include user geo details in formatted event output", async () => {
+    mockGenerateText.mockResolvedValue(
+      mockAIResponse("", ["id", "timestamp", "title", "user"], "-timestamp"),
+    );
+
+    mswServer.use(
+      http.get("*/api/0/organizations/*/issues/*/events/", () =>
+        HttpResponse.json([
+          {
+            id: "event1",
+            timestamp: "2025-01-15T10:00:00Z",
+            title: "Geo-tagged Error",
+            user: {
+              id: "3c7631c0121d40e79e2f992ff5cf7671",
+              geo: {
+                country_code: "US",
+                region: "United States",
+              },
+            },
+          },
+        ]),
+      ),
+    );
+
+    const result = await searchIssueEvents.handler(
+      {
+        organizationSlug: "test-org",
+        issueId: "MCP-41",
+        naturalLanguageQuery: "events with user details",
+        projectSlug: null,
+        regionUrl: null,
+        limit: 50,
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(result).toContain(
+      "**user**: id=3c7631c0121d40e79e2f992ff5cf7671, geo=US, United States",
+    );
+    expect(result).toContain("**user.geo**: US, United States");
+  });
+
   it("should parse issueUrl and extract organization and issue ID", async () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 

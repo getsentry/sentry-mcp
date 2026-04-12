@@ -53,19 +53,49 @@ function isTagPair(value: unknown): value is { key: string; value: unknown } {
   );
 }
 
-const USER_FIELDS = ["id", "email", "username", "ip_address", "name"] as const;
+const USER_FIELDS = [
+  "id",
+  "email",
+  "username",
+  "ip_address",
+  "name",
+  "display_name",
+] as const;
 const USER_IDENTITY_FIELDS = new Set([
   "email",
   "username",
   "ip_address",
   "name",
+  "display_name",
+  "geo",
 ]);
+
+function formatGeoSummary(value: unknown): string | null {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+
+  const parts = [
+    value.country_code,
+    value.city,
+    value.region,
+    value.country_name,
+  ].filter(
+    (part): part is string => typeof part === "string" && part.length > 0,
+  );
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return Array.from(new Set(parts)).join(", ");
+}
 
 function formatUserSummary(value: Record<string, unknown>): string | null {
   // Require at least one identity field to avoid matching arbitrary objects that just have "id"
-  const hasIdentityField = USER_FIELDS.some(
-    (f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null,
-  );
+  const hasIdentityField =
+    USER_FIELDS.some((f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null) ||
+    value.geo != null;
   if (!hasIdentityField) {
     return null;
   }
@@ -73,6 +103,10 @@ function formatUserSummary(value: Record<string, unknown>): string | null {
   const parts = USER_FIELDS.filter((f) => value[f] != null).map(
     (f) => `${f}=${formatSimpleValue(value[f])}`,
   );
+  const geoSummary = formatGeoSummary(value.geo);
+  if (geoSummary) {
+    parts.push(`geo=${geoSummary}`);
+  }
 
   return parts.length > 0 ? parts.join(", ") : null;
 }

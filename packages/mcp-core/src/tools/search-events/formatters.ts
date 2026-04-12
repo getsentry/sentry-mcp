@@ -7,6 +7,31 @@ import {
   isAggregateQuery,
 } from "./utils";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function formatUserGeoValue(value: unknown): string | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const parts = [
+    value.country_code,
+    value.city,
+    value.region,
+    value.country_name,
+  ].filter(
+    (part): part is string => typeof part === "string" && part.length > 0,
+  );
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return Array.from(new Set(parts)).join(", ");
+}
+
 /**
  * Format an explanation for how a natural language query was translated
  */
@@ -138,6 +163,13 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
           value !== undefined
         ) {
           output += `**${key}**: ${formatEventValue(value)}\n`;
+
+          if (key === "user" && isRecord(value)) {
+            const geoSummary = formatUserGeoValue(value.geo);
+            if (geoSummary) {
+              output += `**user.geo**: ${geoSummary}\n`;
+            }
+          }
         }
       }
 

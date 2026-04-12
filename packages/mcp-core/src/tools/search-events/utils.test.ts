@@ -91,6 +91,18 @@ describe("formatEventValue", () => {
       expect(result).toContain("ip_address=10.0.0.1");
     });
 
+    it("should include geo summaries for user objects", () => {
+      const user = {
+        id: "3c7631c0121d40e79e2f992ff5cf7671",
+        geo: {
+          country_code: "US",
+          region: "United States",
+        },
+      };
+
+      expect(formatEventValue(user)).toContain("geo=US, United States");
+    });
+
     it("should NOT apply user formatting to objects with only id", () => {
       const obj = { id: "abc", type: "transaction", description: "GET /api" };
       const result = formatEventValue(obj);

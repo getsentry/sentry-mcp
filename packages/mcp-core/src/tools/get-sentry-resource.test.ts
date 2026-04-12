@@ -387,6 +387,7 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(
         "**Event ID**: 7ca573c0f4814912aaa9bdc77d1a7d51",
       );
+      expect(result).toContain("**user.geo**: US, United States");
     });
 
     it("fetches trace by traceId", async () => {

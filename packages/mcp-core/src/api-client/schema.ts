@@ -491,6 +491,20 @@ const BaseEventSchema = z.object({
   // This is different from "contexts" (plural) which are structured contexts
   context: z.record(z.string(), z.unknown()).optional(),
   tags: EventTagsSchema.optional(),
+  user: z
+    .object({
+      display_name: z.string().nullable().optional(),
+      email: z.string().nullable().optional(),
+      id: z.string().nullable().optional(),
+      ip: z.string().nullable().optional(),
+      ip_address: z.string().nullable().optional(),
+      name: z.string().nullable().optional(),
+      username: z.string().nullable().optional(),
+      geo: z.record(z.string(), z.string()).nullable().optional(),
+    })
+    .passthrough()
+    .nullable()
+    .optional(),
   // The _meta field contains metadata about fields in the response
   // It's safer to type as unknown since its structure varies
   _meta: z.unknown().optional(),
