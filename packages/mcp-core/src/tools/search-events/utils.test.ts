@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import { fetchCustomAttributes, formatEventValue } from "./utils";
+import {
+  fetchCustomAttributes,
+  formatEventValue,
+  formatKnownUserValue,
+} from "./utils";
 import { SentryApiService } from "../../api-client";
 import * as logging from "../../telem/logging";
 
@@ -91,6 +95,45 @@ describe("formatEventValue", () => {
       expect(result).toContain("ip_address=10.0.0.1");
     });
 
+    it("should include geo summaries for known user objects", () => {
+      const user = {
+        id: "3c7631c0121d40e79e2f992ff5cf7671",
+        geo: {
+          country_code: "US",
+          region: "United States",
+        },
+      };
+
+      expect(formatKnownUserValue(user, { includeGeo: true })).toContain(
+        "geo=US, United States",
+      );
+    });
+
+    it("should omit geo summaries for known user objects when requested", () => {
+      const user = {
+        id: "3c7631c0121d40e79e2f992ff5cf7671",
+        geo: {
+          country_code: "US",
+          region: "United States",
+        },
+      };
+
+      expect(formatKnownUserValue(user, { includeGeo: false })).toBe(
+        "id=3c7631c0121d40e79e2f992ff5cf7671",
+      );
+    });
+
+    it("should omit summary text for geo-only known users", () => {
+      const user = {
+        geo: {
+          country_code: "US",
+          region: "United States",
+        },
+      };
+
+      expect(formatKnownUserValue(user, { includeGeo: false })).toBeNull();
+    });
+
     it("should NOT apply user formatting to objects with only id", () => {
       const obj = { id: "abc", type: "transaction", description: "GET /api" };
       const result = formatEventValue(obj);
@@ -98,6 +141,21 @@ describe("formatEventValue", () => {
       expect(result).toContain("type");
       expect(result).toContain("transaction");
       expect(result).toContain("description");
+    });
+
+    it("should NOT apply user formatting to non-user objects with geo", () => {
+      const obj = {
+        method: "GET",
+        path: "/api/0/issues/",
+        geo: {
+          country_code: "US",
+        },
+      };
+
+      const result = formatEventValue(obj);
+      expect(result).toContain('"method":"GET"');
+      expect(result).toContain('"path":"/api/0/issues/"');
+      expect(result).toContain('"country_code":"US"');
     });
 
     it("should format tag-pair objects", () => {

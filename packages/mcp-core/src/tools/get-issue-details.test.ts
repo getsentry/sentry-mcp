@@ -218,6 +218,11 @@ describe("get_issue_details", () => {
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
 
+      ### User
+
+      **user**: ip:2a06:98c0:3600::103
+      **user.geo**: US, United States
+
       ### Tags
 
       **environment**: development
@@ -441,6 +446,11 @@ describe("get_issue_details", () => {
 
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
+
+      ### User
+
+      **user**: ip:2a06:98c0:3600::103
+      **user.geo**: US, United States
 
       ### Tags
 
@@ -718,6 +728,11 @@ describe("get_issue_details", () => {
 
       **Method:** GET
       **URL:** https://mcp.sentry.dev/sse
+
+      ### User
+
+      **user**: ip:2a06:98c0:3600::103
+      **user.geo**: US, United States
 
       ### Tags
 

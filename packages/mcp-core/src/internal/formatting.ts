@@ -34,6 +34,7 @@ import {
   getStatusDisplayName,
 } from "./tool-helpers/seer";
 import { logIssue } from "../telem/logging";
+import { formatUserGeoSummary } from "./user-formatting";
 
 /**
  * Convert Seer fixability score to actionability label.
@@ -187,6 +188,11 @@ export function formatEventOutput(
   },
 ) {
   let output = "";
+  const eventUser = (
+    event as Event & {
+      user?: z.infer<typeof EventSchema>["user"];
+    }
+  ).user;
   const eventWithReplayMetadataStripped = options?.replaySummary
     ? stripReplayMetadata(event)
     : event;
@@ -204,6 +210,7 @@ export function formatEventOutput(
   // Check if entries exist (may be undefined for unsupported event types)
   if (!eventToRender.entries || !Array.isArray(eventToRender.entries)) {
     // For unsupported event types, just show tags and contexts
+    output += formatEventUser(eventUser);
     output += formatTags(eventToRender.tags);
     output += formatContext(eventToRender.context);
     output += formatContexts(eventToRender.contexts);
@@ -270,6 +277,7 @@ export function formatEventOutput(
     output += formatGenericEventOutput(eventToRender);
   }
 
+  output += formatEventUser(eventUser);
   output += formatTags(eventToRender.tags);
   output += formatContext(eventToRender.context);
   output += formatContexts(eventToRender.contexts);
@@ -1531,6 +1539,39 @@ function formatTags(tags: z.infer<typeof EventSchema>["tags"]) {
   return `### Tags\n\n${tags
     .map((tag) => `**${tag.key}**: ${tag.value}`)
     .join("\n")}\n\n`;
+}
+
+function formatEventUser(user: z.infer<typeof EventSchema>["user"]) {
+  if (!user || Object.keys(user).length === 0) {
+    return "";
+  }
+
+  const userFields = [
+    ["id", user.id],
+    ["email", user.email],
+    ["username", user.username],
+    ["ip", user.ip ?? user.ip_address],
+    ["display_name", user.display_name ?? user.name],
+  ].filter(([, value]) => typeof value === "string" && value.length > 0);
+
+  const userSummary = userFields
+    .map(([key, value]) => `${key}:${value}`)
+    .join(", ");
+  const geoSummary = formatUserGeoSummary(user.geo);
+
+  if (!userSummary && !geoSummary) {
+    return "";
+  }
+
+  let output = "### User\n\n";
+  if (userSummary) {
+    output += `**user**: ${userSummary}\n`;
+  }
+  if (geoSummary) {
+    output += `**user.geo**: ${geoSummary}\n`;
+  }
+
+  return `${output}\n`;
 }
 
 function formatContext(context: z.infer<typeof EventSchema>["context"]) {

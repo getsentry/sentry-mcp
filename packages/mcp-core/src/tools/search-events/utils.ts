@@ -1,6 +1,10 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { agentTool } from "../../internal/agents/tools/utils";
+import {
+  formatUserGeoSummary,
+  isPlainObject,
+} from "../../internal/user-formatting";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
@@ -32,10 +36,6 @@ export function isAggregateQuery(fields: string[]): boolean {
   return fields.some((field) => field.includes("(") && field.includes(")"));
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function isPrimitive(
   value: unknown,
 ): value is string | number | boolean | null {
@@ -53,28 +53,72 @@ function isTagPair(value: unknown): value is { key: string; value: unknown } {
   );
 }
 
-const USER_FIELDS = ["id", "email", "username", "ip_address", "name"] as const;
+const USER_FIELDS = [
+  "id",
+  "email",
+  "username",
+  "ip_address",
+  "name",
+  "display_name",
+] as const;
 const USER_IDENTITY_FIELDS = new Set([
   "email",
   "username",
   "ip_address",
   "name",
+  "display_name",
 ]);
 
-function formatUserSummary(value: Record<string, unknown>): string | null {
-  // Require at least one identity field to avoid matching arbitrary objects that just have "id"
-  const hasIdentityField = USER_FIELDS.some(
+function hasUserIdentityFields(value: Record<string, unknown>): boolean {
+  return USER_FIELDS.some(
     (f) => USER_IDENTITY_FIELDS.has(f) && value[f] != null,
   );
-  if (!hasIdentityField) {
+}
+
+function hasUserSummaryFields(
+  value: Record<string, unknown>,
+  options: { allowId?: boolean } = {},
+): boolean {
+  return (
+    hasUserIdentityFields(value) ||
+    (options.allowId === true && value.id != null)
+  );
+}
+
+function formatUserSummary(
+  value: Record<string, unknown>,
+  options: {
+    includeGeo?: boolean;
+    allowIdOnly?: boolean;
+  } = {},
+): string | null {
+  const includeGeo = options.includeGeo ?? true;
+  const allowIdOnly = options.allowIdOnly ?? false;
+  // Require at least one identity field to avoid matching arbitrary objects that just have "id"
+  const hasSummaryField = hasUserSummaryFields(value, { allowId: allowIdOnly });
+  if (!hasSummaryField) {
     return null;
   }
 
   const parts = USER_FIELDS.filter((f) => value[f] != null).map(
     (f) => `${f}=${formatSimpleValue(value[f])}`,
   );
+  const geoSummary = formatUserGeoSummary(value.geo);
+  if (includeGeo && geoSummary) {
+    parts.push(`geo=${geoSummary}`);
+  }
 
   return parts.length > 0 ? parts.join(", ") : null;
+}
+
+export function formatKnownUserValue(
+  value: Record<string, unknown>,
+  options: { includeGeo?: boolean } = {},
+): string | null {
+  return formatUserSummary(value, {
+    includeGeo: options.includeGeo,
+    allowIdOnly: true,
+  });
 }
 
 function sanitizeWhitespace(value: string): string {
@@ -183,7 +227,9 @@ function formatObjectValue(
 
 export function formatEventValue(
   value: unknown,
-  options: { maxLength?: number } = {},
+  options: {
+    maxLength?: number;
+  } = {},
 ): string {
   const maxLength = options.maxLength ?? DEFAULT_MAX_VALUE_LENGTH;
 

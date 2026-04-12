@@ -1,8 +1,10 @@
 import type { SentryApiService } from "../../api-client";
+import { formatUserGeoSummary } from "../../internal/user-formatting";
 import { logInfo } from "../../telem/logging";
 import {
   type FlexibleEventData,
   formatEventValue,
+  formatKnownUserValue,
   getStringValue,
   isAggregateQuery,
 } from "./utils";
@@ -27,6 +29,28 @@ export interface FormatEventResultsParams {
   sentryQuery: string;
   fields: string[];
   explanation?: string;
+}
+
+function formatUserFieldLines(
+  value: Record<string, unknown>,
+  options: { prefix?: string } = {},
+): string[] {
+  const prefix = options.prefix ?? "";
+  const geoSummary = formatUserGeoSummary(value.geo);
+  const userSummary = formatKnownUserValue(value, { includeGeo: false });
+  const lines: string[] = [];
+
+  if (userSummary) {
+    lines.push(`${prefix}**user**: ${userSummary}`);
+  } else if (!geoSummary) {
+    lines.push(`${prefix}**user**: ${formatEventValue(value)}`);
+  }
+
+  if (geoSummary) {
+    lines.push(`${prefix}**user.geo**: ${geoSummary}`);
+  }
+
+  return lines;
 }
 
 /**
@@ -137,6 +161,15 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
+          if (key === "user" && typeof value === "object" && value !== null) {
+            for (const line of formatUserFieldLines(
+              value as Record<string, unknown>,
+            )) {
+              output += `${line}\n`;
+            }
+            continue;
+          }
+
           output += `**${key}**: ${formatEventValue(value)}\n`;
         }
       }
@@ -282,6 +315,16 @@ export function formatLogResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
+          if (key === "user" && typeof value === "object" && value !== null) {
+            for (const line of formatUserFieldLines(
+              value as Record<string, unknown>,
+              { prefix: "- " },
+            )) {
+              output += `${line}\n`;
+            }
+            continue;
+          }
+
           output += `- **${key}**: ${formatEventValue(value)}\n`;
         }
       }
@@ -406,6 +449,15 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
           value !== null &&
           value !== undefined
         ) {
+          if (key === "user" && typeof value === "object" && value !== null) {
+            for (const line of formatUserFieldLines(
+              value as Record<string, unknown>,
+            )) {
+              output += `${line}\n`;
+            }
+            continue;
+          }
+
           output += `**${key}**: ${formatEventValue(value)}\n`;
         }
       }
