@@ -68,7 +68,6 @@ const USER_IDENTITY_FIELDS = new Set([
   "ip_address",
   "name",
   "display_name",
-  "geo",
 ]);
 
 function formatUserSummary(value: Record<string, unknown>): string | null {
