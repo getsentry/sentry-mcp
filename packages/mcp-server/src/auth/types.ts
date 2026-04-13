@@ -29,12 +29,12 @@ export const DeviceCodeErrorSchema = z.object({
  */
 export const TokenResponseSchema = z.object({
   access_token: z.string(),
-  refresh_token: z.string(),
+  refresh_token: z.string().nullable(),
   token_type: z.string(),
-  expires_in: z.number(),
-  expires_at: z.string().datetime(),
+  expires_in: z.number().nullable(),
+  expires_at: z.string().datetime().nullable(),
   user: z.object({
-    email: z.string().email(),
+    email: z.string().nullable().optional(),
     id: z.string(),
     name: z.string().nullable(),
   }),
@@ -48,26 +48,51 @@ export type TokenResponse = z.infer<typeof TokenResponseSchema>;
  */
 export type CachedToken = {
   access_token: string;
-  refresh_token: string;
+  refresh_token: string | null;
   expires_at: string;
   sentry_host: string;
   client_id: string;
+  // Historical name retained for cache compatibility; this stores a user label,
+  // not necessarily an email address.
   user_email: string;
   scope: string;
 };
+
+export function getTokenUserLabel(tokenResponse: TokenResponse): string {
+  return (
+    tokenResponse.user.name ?? tokenResponse.user.email ?? tokenResponse.user.id
+  );
+}
+
+function getTokenExpiresAt(tokenResponse: TokenResponse): string | null {
+  if (tokenResponse.expires_at) {
+    return tokenResponse.expires_at;
+  }
+
+  if (typeof tokenResponse.expires_in === "number") {
+    return new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString();
+  }
+
+  return null;
+}
 
 export function toCachedToken(
   tokenResponse: TokenResponse,
   sentryHost: string,
   clientId: string,
-): CachedToken {
+) {
+  const expiresAt = getTokenExpiresAt(tokenResponse);
+  if (!expiresAt) {
+    return null;
+  }
+
   return {
     access_token: tokenResponse.access_token,
     refresh_token: tokenResponse.refresh_token,
-    expires_at: tokenResponse.expires_at,
+    expires_at: expiresAt,
     sentry_host: sentryHost,
     client_id: clientId,
-    user_email: tokenResponse.user.email,
+    user_email: getTokenUserLabel(tokenResponse),
     scope: tokenResponse.scope,
   };
 }

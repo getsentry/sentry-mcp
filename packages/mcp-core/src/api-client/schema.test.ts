@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { IssueSchema, EventSchema } from "./schema";
+import {
+  ClientKeySchema,
+  EventSchema,
+  FlamegraphSchema,
+  IssueSchema,
+  ReleaseSchema,
+  ReplayDetailsSchema,
+} from "./schema";
 
 describe("IssueSchema", () => {
   it("should parse a standard error issue", () => {
@@ -432,5 +439,143 @@ describe("EventSchema", () => {
 
     const result = EventSchema.parse(eventWithMalformedTag);
     expect(result.tags).toEqual([{ key: "level", value: "error" }]);
+  });
+});
+
+describe("ReplayDetailsSchema", () => {
+  it("normalizes archived replay payloads that use empty-list tags and null URLs", () => {
+    const replay = ReplayDetailsSchema.parse({
+      id: "7aa244144fa44d26813dbe157af9de13",
+      project_id: "1",
+      trace_ids: [],
+      error_ids: [],
+      info_ids: [],
+      warning_ids: [],
+      environment: null,
+      tags: [],
+      user: {
+        id: "Archived Replay",
+        display_name: "Archived Replay",
+        username: null,
+        email: null,
+        ip: null,
+        geo: {
+          city: null,
+          country_code: null,
+          region: null,
+          subdivision: null,
+        },
+      },
+      sdk: { name: null, version: null },
+      os: { name: null, version: null },
+      browser: { name: null, version: null },
+      device: { name: null, brand: null, model: null, family: null },
+      urls: null,
+      is_archived: true,
+      releases: [],
+      replay_type: "session",
+      has_viewed: false,
+    });
+
+    expect(replay.tags).toEqual({});
+    expect(replay.urls).toEqual([]);
+    expect(replay.user?.geo).toEqual({
+      city: null,
+      country_code: null,
+      region: null,
+      subdivision: null,
+    });
+  });
+});
+
+describe("ClientKeySchema", () => {
+  it("accepts null dateCreated from upstream project keys", () => {
+    const clientKey = ClientKeySchema.parse({
+      id: "public-key",
+      name: "Default",
+      isActive: true,
+      dateCreated: null,
+      dsn: {
+        public: "https://public@example.ingest.sentry.io/1",
+      },
+    });
+
+    expect(clientKey.dateCreated).toBeNull();
+  });
+});
+
+describe("ReleaseSchema", () => {
+  it("accepts nullable commit, deploy, and project fields from upstream releases", () => {
+    const release = ReleaseSchema.parse({
+      id: "1",
+      version: "1.2.3",
+      shortVersion: "1.2.3",
+      dateCreated: "2026-04-13T12:00:00.000Z",
+      dateReleased: null,
+      firstEvent: null,
+      lastEvent: null,
+      newGroups: 0,
+      lastCommit: {
+        id: "abc123",
+        message: null,
+        dateCreated: "2026-04-13T12:00:00.000Z",
+        author: {},
+      },
+      lastDeploy: {
+        id: "99",
+        environment: null,
+        dateStarted: null,
+        dateFinished: null,
+      },
+      projects: [
+        {
+          id: "1",
+          slug: null,
+          name: "project-one",
+          platform: "javascript",
+        },
+      ],
+    });
+
+    expect(release.lastCommit?.message).toBeNull();
+    expect(release.lastCommit?.author).toEqual({});
+    expect(release.lastDeploy?.environment).toBeNull();
+    expect(release.projects[0]?.slug).toBeNull();
+  });
+});
+
+describe("FlamegraphSchema", () => {
+  it("fills optional profiling fields that Sentry omits or returns as null", () => {
+    const flamegraph = FlamegraphSchema.parse({
+      metadata: {
+        profileID: "profile-1",
+      },
+      platform: "python",
+      profiles: [
+        {
+          endValue: 0,
+          isMainThread: true,
+          name: "Main Thread",
+          samples: [],
+          startValue: 0,
+          threadID: 1,
+          type: "sampled",
+          unit: "count",
+          weights: [],
+          sample_durations_ns: null,
+        },
+      ],
+      projectID: 1,
+      shared: {
+        frames: [],
+      },
+      transactionName: "POST /oauth/token",
+    });
+
+    expect(flamegraph.activeProfileIndex).toBe(0);
+    expect(flamegraph.shared.frame_infos).toEqual([]);
+    expect(flamegraph.shared.profiles).toEqual([]);
+    expect(flamegraph.profiles[0]?.sample_durations_ns).toEqual([]);
+    expect(flamegraph.profiles[0]?.sample_counts).toEqual([]);
   });
 });

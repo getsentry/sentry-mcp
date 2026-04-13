@@ -103,12 +103,16 @@ export default defineTool({
           );
         }
         if (release.lastCommit) {
+          const commitAuthor =
+            release.lastCommit.author?.name ??
+            release.lastCommit.author?.email ??
+            "Unknown";
           releaseInfo.push("", `### Last Commit`, "");
           releaseInfo.push(`**Commit ID**: ${release.lastCommit.id}`);
-          releaseInfo.push(`**Commit Message**: ${release.lastCommit.message}`);
           releaseInfo.push(
-            `**Commit Author**: ${release.lastCommit.author.name}`,
+            `**Commit Message**: ${release.lastCommit.message ?? "Unknown"}`,
           );
+          releaseInfo.push(`**Commit Author**: ${commitAuthor}`);
           releaseInfo.push(
             `**Commit Date**: ${new Date(release.lastCommit.dateCreated).toISOString()}`,
           );
@@ -117,7 +121,7 @@ export default defineTool({
           releaseInfo.push("", `### Last Deploy`, "");
           releaseInfo.push(`**Deploy ID**: ${release.lastDeploy.id}`);
           releaseInfo.push(
-            `**Environment**: ${release.lastDeploy.environment}`,
+            `**Environment**: ${release.lastDeploy.environment ?? "Unknown"}`,
           );
           if (release.lastDeploy.dateStarted) {
             releaseInfo.push(
