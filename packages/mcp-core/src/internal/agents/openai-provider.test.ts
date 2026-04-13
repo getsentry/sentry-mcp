@@ -150,7 +150,6 @@ describe("openai-provider", () => {
         "codex-mini-latest",
         "computer-use-preview",
         "gpt-5-codex",
-        "gpt-5.2-codex",
       ];
 
       const fetchMock = vi.fn(async (input: Request | URL | string) => {
