@@ -183,7 +183,7 @@ OpenAI base URLs continue using the Responses API.
 For responses-only models on deployment-style URLs, use the canonical OpenAI
 model name (for example `codex-mini-latest` or `computer-use-preview`). If you
 use an opaque deployment alias instead, Sentry MCP cannot infer the backend
-model capability and will assume chat completions.
+model capability and will reject the configuration.
 
 ### Model Selection
 

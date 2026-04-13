@@ -1,6 +1,7 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { generateText } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ConfigurationError } from "../../errors";
 import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider.js";
 
 describe("openai-provider", () => {
@@ -126,6 +127,20 @@ describe("openai-provider", () => {
       expect(fetchMock).toHaveBeenCalledOnce();
     });
 
+    it("rejects unrecognized deployment aliases", () => {
+      process.env.OPENAI_API_KEY = "test-key";
+      setOpenAIBaseUrl(
+        "https://proxy.example.com/openai/deployments/test-model",
+      );
+
+      expect(() => getOpenAIModel("my-company-assistant")).toThrow(
+        ConfigurationError,
+      );
+      expect(() => getOpenAIModel("my-company-assistant")).toThrow(
+        /canonical OPENAI_MODEL value/,
+      );
+    });
+
     it("keeps responses API for responses-only models on deployment base URLs", async () => {
       process.env.OPENAI_API_KEY = "test-key";
       setOpenAIBaseUrl(
@@ -134,6 +149,7 @@ describe("openai-provider", () => {
       const responsesOnlyModels = [
         "codex-mini-latest",
         "computer-use-preview",
+        "gpt-5-codex",
         "gpt-5.1-codex-max",
       ];
 

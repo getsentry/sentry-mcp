@@ -1,5 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
+import { ConfigurationError } from "../../errors";
 import { USER_AGENT } from "../../version";
 
 // Default configuration constants
@@ -23,10 +24,21 @@ function hasAzureDeploymentPath(baseUrl: string): boolean {
 
 function isResponsesOnlyOpenAIModel(modelId: string): boolean {
   return (
-    modelId === "codex-mini-latest" ||
+    modelId.startsWith("codex-") ||
     modelId.startsWith("computer-use-preview") ||
-    modelId === "gpt-5-codex" ||
-    modelId.startsWith("gpt-5.1-codex")
+    /^gpt-[\d.]+-codex(?:-|$)/.test(modelId)
+  );
+}
+
+function isCanonicalOpenAIModelId(modelId: string): boolean {
+  return (
+    modelId === "chatgpt-4o-latest" ||
+    modelId.startsWith("gpt-") ||
+    modelId.startsWith("o1") ||
+    modelId.startsWith("o3") ||
+    modelId.startsWith("o4") ||
+    modelId.startsWith("codex-") ||
+    modelId.startsWith("computer-use-preview")
   );
 }
 
@@ -38,7 +50,17 @@ function shouldUseChatCompletionsApi(modelId: string): boolean {
   // Azure-style deployment endpoints and compatible proxies typically expose
   // chat completions at the deployment URL. Preserve the 0.29.x behavior there
   // without forcing all custom base URLs or responses-only models off the
-  // Responses API.
+  // Responses API. Opaque deployment aliases are rejected because we cannot
+  // safely infer whether they target a responses-only backend model.
+  if (
+    hasAzureDeploymentPath(configuredBaseUrl) &&
+    !isCanonicalOpenAIModelId(modelId)
+  ) {
+    throw new ConfigurationError(
+      `Deployment-style OpenAI base URLs require a canonical OPENAI_MODEL value. Use the formal OpenAI model name instead of the deployment alias "${modelId}" so the correct API can be selected.`,
+    );
+  }
+
   return (
     hasAzureDeploymentPath(configuredBaseUrl) &&
     !isResponsesOnlyOpenAIModel(modelId)

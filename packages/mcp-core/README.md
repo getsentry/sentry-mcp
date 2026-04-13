@@ -44,6 +44,8 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --openai-base-url=https://pro
 Azure-style deployment URLs such as
 `https://.../openai/deployments/<deployment>` are treated as deployment-based
 chat-completions endpoints for compatibility with Azure and similar proxies.
+Responses-only models on deployment URLs must use the canonical OpenAI model
+name rather than an opaque deployment alias.
 
 ### Constraint-Based Tool Exclusion
 
