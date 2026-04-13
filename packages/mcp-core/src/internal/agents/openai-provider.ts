@@ -16,6 +16,35 @@ export function setOpenAIBaseUrl(baseUrl: string | undefined): void {
   configuredBaseUrl = baseUrl;
 }
 
+function hasAzureDeploymentPath(baseUrl: string): boolean {
+  const pathname = new URL(baseUrl).pathname.replace(/\/+$/, "");
+  return /\/openai\/deployments\/[^/]+$/i.test(pathname);
+}
+
+function isResponsesOnlyOpenAIModel(modelId: string): boolean {
+  return (
+    modelId === "codex-mini-latest" ||
+    modelId.startsWith("computer-use-preview") ||
+    modelId === "gpt-5-codex" ||
+    modelId.startsWith("gpt-5.1-codex")
+  );
+}
+
+function shouldUseChatCompletionsApi(modelId: string): boolean {
+  if (!configuredBaseUrl) {
+    return false;
+  }
+
+  // Azure-style deployment endpoints and compatible proxies typically expose
+  // chat completions at the deployment URL. Preserve the 0.29.x behavior there
+  // without forcing all custom base URLs or responses-only models off the
+  // Responses API.
+  return (
+    hasAzureDeploymentPath(configuredBaseUrl) &&
+    !isResponsesOnlyOpenAIModel(modelId)
+  );
+}
+
 /**
  * Retrieve an OpenAI language model configured from environment variables and explicit config.
  *
@@ -34,7 +63,7 @@ export function setOpenAIBaseUrl(baseUrl: string | undefined): void {
  * - Other providers: Check their documentation
  */
 export function getOpenAIModel(model?: string): LanguageModel {
-  const defaultModel = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+  const modelId = model ?? (process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL);
 
   const factory = createOpenAI({
     ...(configuredBaseUrl && { baseURL: configuredBaseUrl }),
@@ -43,5 +72,9 @@ export function getOpenAIModel(model?: string): LanguageModel {
     },
   });
 
-  return factory(model ?? defaultModel);
+  if (shouldUseChatCompletionsApi(modelId)) {
+    return factory.chat(modelId);
+  }
+
+  return factory(modelId);
 }

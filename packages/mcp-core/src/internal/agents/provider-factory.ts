@@ -1,7 +1,7 @@
-import type { EmbeddedAgentProvider, AgentProviderType } from "./types";
-import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider";
-import { getAnthropicModel, setAnthropicBaseUrl } from "./anthropic-provider";
 import { ConfigurationError } from "../../errors";
+import { getAnthropicModel, setAnthropicBaseUrl } from "./anthropic-provider";
+import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider";
+import type { AgentProviderType, EmbeddedAgentProvider } from "./types";
 
 // Module-level state for explicit provider selection
 let configuredProvider: AgentProviderType | undefined;
@@ -23,8 +23,8 @@ export function setProviderBaseUrls(config: {
   openaiBaseUrl?: string;
   anthropicBaseUrl?: string;
 }): void {
-  if (config.openaiBaseUrl) setOpenAIBaseUrl(config.openaiBaseUrl);
-  if (config.anthropicBaseUrl) setAnthropicBaseUrl(config.anthropicBaseUrl);
+  setOpenAIBaseUrl(config.openaiBaseUrl);
+  setAnthropicBaseUrl(config.anthropicBaseUrl);
 }
 
 /**

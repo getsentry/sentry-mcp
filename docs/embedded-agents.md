@@ -175,6 +175,16 @@ export OPENAI_API_KEY=sk-...
 npx @sentry/mcp-server --openai-base-url=https://custom.openai.example.com
 ```
 
+Azure-style deployment URLs such as
+`https://.../openai/deployments/<deployment>` automatically use chat
+completions for compatibility with deployment-based proxies. Generic custom
+OpenAI base URLs continue using the Responses API.
+
+For responses-only models on deployment-style URLs, use the canonical OpenAI
+model name (for example `codex-mini-latest` or `computer-use-preview`). If you
+use an opaque deployment alias instead, Sentry MCP cannot infer the backend
+model capability and will assume chat completions.
+
 ### Model Selection
 
 Override the default model for each provider:

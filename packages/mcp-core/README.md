@@ -41,6 +41,10 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com
 npx @sentry/mcp-server@latest --access-token=TOKEN --openai-base-url=https://proxy.example.com/v1
 ```
 
+Azure-style deployment URLs such as
+`https://.../openai/deployments/<deployment>` are treated as deployment-based
+chat-completions endpoints for compatibility with Azure and similar proxies.
+
 ### Constraint-Based Tool Exclusion
 
 When a session is scoped to a specific organization or project (tenant-bound context), certain list tools are automatically excluded since they cannot query other resources:
