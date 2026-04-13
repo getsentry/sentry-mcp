@@ -29,10 +29,10 @@ export const DeviceCodeErrorSchema = z.object({
  */
 export const TokenResponseSchema = z.object({
   access_token: z.string(),
-  refresh_token: z.string().nullable(),
+  refresh_token: z.string(),
   token_type: z.string(),
-  expires_in: z.number().nullable(),
-  expires_at: z.string().datetime().nullable(),
+  expires_in: z.number(),
+  expires_at: z.string().datetime(),
   user: z.object({
     email: z.string().nullable().optional(),
     id: z.string(),
@@ -48,7 +48,7 @@ export type TokenResponse = z.infer<typeof TokenResponseSchema>;
  */
 export type CachedToken = {
   access_token: string;
-  refresh_token: string | null;
+  refresh_token: string;
   expires_at: string;
   sentry_host: string;
   client_id: string;
@@ -64,32 +64,15 @@ export function getTokenUserLabel(tokenResponse: TokenResponse): string {
   );
 }
 
-function getTokenExpiresAt(tokenResponse: TokenResponse): string | null {
-  if (tokenResponse.expires_at) {
-    return tokenResponse.expires_at;
-  }
-
-  if (typeof tokenResponse.expires_in === "number") {
-    return new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString();
-  }
-
-  return null;
-}
-
 export function toCachedToken(
   tokenResponse: TokenResponse,
   sentryHost: string,
   clientId: string,
-) {
-  const expiresAt = getTokenExpiresAt(tokenResponse);
-  if (!expiresAt) {
-    return null;
-  }
-
+): CachedToken {
   return {
     access_token: tokenResponse.access_token,
     refresh_token: tokenResponse.refresh_token,
-    expires_at: expiresAt,
+    expires_at: tokenResponse.expires_at,
     sentry_host: sentryHost,
     client_id: clientId,
     user_email: getTokenUserLabel(tokenResponse),

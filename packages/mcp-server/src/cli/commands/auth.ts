@@ -55,14 +55,7 @@ async function login(argv: string[]): Promise<void> {
 
   try {
     const tokenResponse = await authenticate({ clientId, host: OAUTH_HOST });
-    const cachedToken = toCachedToken(tokenResponse, sentryHost, clientId);
-    if (cachedToken) {
-      await writeCachedToken(cachedToken);
-    } else {
-      console.warn(
-        "Warning: Upstream did not provide token expiry metadata, so the token was not cached.",
-      );
-    }
+    await writeCachedToken(toCachedToken(tokenResponse, sentryHost, clientId));
   } catch (err) {
     console.error(
       err instanceof Error ? err.message : `Authentication failed: ${err}`,

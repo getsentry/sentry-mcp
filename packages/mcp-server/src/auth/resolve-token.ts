@@ -61,14 +61,7 @@ export async function resolveAccessToken(
   const tokenResponse = await authenticate({ clientId, host: OAUTH_HOST });
 
   try {
-    const cachedToken = toCachedToken(tokenResponse, sentryHost, clientId);
-    if (cachedToken) {
-      await writeCachedToken(cachedToken);
-    } else {
-      process.stderr.write(
-        "Warning: Could not cache authentication token without expiry metadata.\n",
-      );
-    }
+    await writeCachedToken(toCachedToken(tokenResponse, sentryHost, clientId));
   } catch {
     process.stderr.write("Warning: Could not cache authentication token.\n");
   }

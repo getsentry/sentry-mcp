@@ -22,21 +22,13 @@ interface AuthRequestWithSkills extends AuthRequest {
 }
 
 function getUpstreamTokenExpiryTimestamp(payload: {
-  expires_at: string | null;
-  expires_in: number | null;
-}): number | undefined {
-  if (payload.expires_at) {
-    const parsed = new Date(payload.expires_at).getTime();
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  if (typeof payload.expires_in === "number") {
-    return Date.now() + payload.expires_in * 1000;
-  }
-
-  return undefined;
+  expires_at: string;
+  expires_in: number;
+}): number {
+  const parsed = new Date(payload.expires_at).getTime();
+  return Number.isFinite(parsed)
+    ? parsed
+    : Date.now() + payload.expires_in * 1000;
 }
 
 function getUpstreamUserLabel(payload: {
@@ -287,7 +279,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
       // Sentry-specific fields
       accessToken: payload.access_token,
-      refreshToken: payload.refresh_token ?? undefined,
+      refreshToken: payload.refresh_token,
       // Cache upstream expiry so future refresh grants can avoid
       // unnecessary upstream refresh calls when still valid
       accessTokenExpiresAt,
