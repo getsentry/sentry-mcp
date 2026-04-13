@@ -769,4 +769,71 @@ describe("search_events", () => {
     // Should NOT contain user.id references
     expect(result).not.toContain("user.id");
   });
+  it("should handle metrics dataset queries for transaction performance", async () => {
+    // Mock AI response for metrics dataset
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "metrics" as any,
+        "",
+        [
+          "transaction",
+          "epm()",
+          "p75(transaction.duration)",
+          "p95(transaction.duration)",
+          "failure_rate()",
+        ],
+        undefined,
+        "-p75(transaction.duration)",
+        { statsPeriod: "14d" },
+      ),
+    );
+
+    // Mock the Sentry API response for metrics dataset
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("metrics");
+          return HttpResponse.json({
+            data: [
+              {
+                transaction: "GET /api/0/organizations/",
+                "epm()": 45.2,
+                "p75(transaction.duration)": 320.5,
+                "p95(transaction.duration)": 1250.0,
+                "failure_rate()": 0.02,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "slowest transactions by p75 duration",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalled();
+    expect(result).toContain("GET /api/0/organizations/");
+    expect(result).toContain("p75(transaction.duration)");
+    expect(result).toContain("failure_rate()");
+    expect(result).toContain("transaction performance metrics");
+  });
 });

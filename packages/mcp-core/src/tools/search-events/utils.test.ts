@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
+import { http, HttpResponse } from "msw";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SentryApiService } from "../../api-client";
+import * as logging from "../../telem/logging";
 import {
   fetchCustomAttributes,
   formatEventValue,
   formatKnownUserValue,
 } from "./utils";
-import { SentryApiService } from "../../api-client";
-import * as logging from "../../telem/logging";
 
 describe("formatEventValue", () => {
   describe("primitives", () => {

@@ -1,21 +1,22 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
+import { z } from "zod";
+import { UserInputError } from "../../errors";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import type { ServerContext } from "../../types";
+import { defineTool } from "../../internal/tool-helpers/define";
 import {
   ParamOrganizationSlug,
-  ParamRegionUrl,
   ParamProjectSlug,
+  ParamRegionUrl,
 } from "../../schema";
+import type { ServerContext } from "../../types";
 import { searchEventsAgent } from "./agent";
+import { RECOMMENDED_FIELDS } from "./config";
 import {
   formatErrorResults,
   formatLogResults,
+  formatMetricsResults,
   formatSpanResults,
 } from "./formatters";
-import { RECOMMENDED_FIELDS } from "./config";
-import { UserInputError } from "../../errors";
 
 export default defineTool({
   name: "search_events",
@@ -44,6 +45,7 @@ export default defineTool({
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, AI/LLM calls, token usage",
+    "- metrics: Transaction performance metrics (apdex, failure_rate, p75/p95, tpm/epm)",
     "",
     "DO NOT USE for grouped issue lists → use search_issues",
     "",
@@ -256,6 +258,8 @@ export default defineTool({
         return formatLogResults(formatParams);
       case "spans":
         return formatSpanResults(formatParams);
+      case "metrics":
+        return formatMetricsResults(formatParams);
     }
   },
 });

@@ -1,46 +1,46 @@
 import { z } from "zod";
+import { ConfigurationError } from "../errors";
+import { logIssue, logWarn } from "../telem/logging";
 import {
   getIssueUrl as getIssueUrlUtil,
   getReplayUrl as getReplayUrlUtil,
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
 } from "../utils/url-utils";
-import { logIssue, logWarn } from "../telem/logging";
+import { USER_AGENT } from "../version";
+import { ApiNotFoundError, ApiValidationError, createApiError } from "./errors";
 import {
-  OrganizationListSchema,
-  OrganizationSchema,
+  ApiErrorSchema,
+  AutofixRunSchema,
+  AutofixRunStateSchema,
+  ClientKeyListSchema,
   ClientKeySchema,
-  TeamListSchema,
-  TeamSchema,
-  ProjectListSchema,
-  ProjectSchema,
-  ReleaseListSchema,
+  ErrorsSearchResponseSchema,
+  EventAttachmentListSchema,
+  EventSchema,
+  ExternalIssueListSchema,
+  FlamegraphSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
-  ExternalIssueListSchema,
-  EventSchema,
-  EventAttachmentListSchema,
-  ErrorsSearchResponseSchema,
-  SpansSearchResponseSchema,
-  TagListSchema,
-  ApiErrorSchema,
-  ClientKeyListSchema,
-  AutofixRunSchema,
-  AutofixRunStateSchema,
-  TraceMetaSchema,
-  TraceSchema,
-  UserSchema,
-  UserRegionsSchema,
-  FlamegraphSchema,
+  OrganizationListSchema,
+  OrganizationSchema,
   ProfileChunkResponseSchema,
+  ProjectListSchema,
+  ProjectSchema,
+  ReleaseListSchema,
   ReplayDetailsSchema,
   ReplayIdsByResourceSchema,
   ReplayRecordingSegmentsSchema,
+  SpansSearchResponseSchema,
+  TagListSchema,
+  TeamListSchema,
+  TeamSchema,
+  TraceMetaSchema,
+  TraceSchema,
+  UserRegionsSchema,
+  UserSchema,
 } from "./schema";
-import { ConfigurationError } from "../errors";
-import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
-import { USER_AGENT } from "../version";
 import type {
   AutofixRun,
   AutofixRunState,
@@ -49,24 +49,24 @@ import type {
   Event,
   EventAttachment,
   EventAttachmentList,
+  ExternalIssueList,
+  Flamegraph,
   Issue,
   IssueList,
   IssueTagValues,
-  ExternalIssueList,
   OrganizationList,
+  ProfileChunk,
   Project,
   ProjectList,
   ReleaseList,
+  ReplayDetails,
+  ReplayRecordingSegments,
   TagList,
   Team,
   TeamList,
   Trace,
   TraceMeta,
   User,
-  Flamegraph,
-  ProfileChunk,
-  ReplayDetails,
-  ReplayRecordingSegments,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -550,6 +550,7 @@ export class SentryApiService {
     end?: string;
     aggregateFunctions?: string[];
     groupByFields?: string[];
+    dataset?: string;
   }): string {
     const {
       organizationSlug,
@@ -567,7 +568,7 @@ export class SentryApiService {
     const urlParams = new URLSearchParams();
 
     // Discover API specific parameters
-    urlParams.set("dataset", "errors");
+    urlParams.set("dataset", params.dataset ?? "errors");
     urlParams.set("queryDataset", "error-events");
     urlParams.set("query", query);
 
@@ -782,7 +783,7 @@ export class SentryApiService {
     organizationSlug: string,
     query: string,
     projectId?: string,
-    dataset: "spans" | "errors" | "logs" = "spans",
+    dataset: "spans" | "errors" | "logs" | "metrics" = "spans",
     fields?: string[],
     sort?: string,
     aggregateFunctions?: string[],
@@ -791,8 +792,8 @@ export class SentryApiService {
     start?: string,
     end?: string,
   ): string {
-    if (dataset === "errors") {
-      // Route to legacy Discover API
+    if (dataset === "errors" || dataset === "metrics") {
+      // Route to legacy Discover API (errors and metrics use discover-style API)
       return this.buildDiscoverUrl({
         organizationSlug,
         query,
@@ -804,6 +805,7 @@ export class SentryApiService {
         end,
         aggregateFunctions,
         groupByFields,
+        dataset: dataset === "metrics" ? "metrics" : undefined,
       });
     }
 
@@ -2119,13 +2121,14 @@ export class SentryApiService {
     start?: string;
     end?: string;
     sort: string;
+    dataset?: string;
   }): URLSearchParams {
     const queryParams = new URLSearchParams();
 
     // Basic parameters
     queryParams.set("per_page", params.limit.toString());
     queryParams.set("query", params.query);
-    queryParams.set("dataset", "errors");
+    queryParams.set("dataset", params.dataset ?? "errors");
 
     this.applyTimeParams(
       queryParams,
@@ -2259,7 +2262,7 @@ export class SentryApiService {
       fields: string[];
       limit?: number;
       projectId?: string;
-      dataset?: "spans" | "errors" | "logs";
+      dataset?: "spans" | "errors" | "logs" | "metrics";
       statsPeriod?: string;
       start?: string;
       end?: string;
@@ -2269,8 +2272,8 @@ export class SentryApiService {
   ) {
     let queryParams: URLSearchParams;
 
-    if (dataset === "errors") {
-      // Use Discover API query builder
+    if (dataset === "errors" || dataset === "metrics") {
+      // Use Discover API query builder (errors and metrics use the same discover-style endpoint)
       queryParams = this.buildDiscoverApiQuery({
         query,
         fields,
@@ -2280,6 +2283,7 @@ export class SentryApiService {
         start,
         end,
         sort,
+        dataset: dataset === "metrics" ? "metrics" : undefined,
       });
     } else {
       // Use EAP API query builder for spans and logs

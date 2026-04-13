@@ -475,3 +475,54 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
 
   return output;
 }
+
+/**
+ * Format metrics (transaction performance) results for display
+ */
+export function formatMetricsResults(params: FormatEventResultsParams): string {
+  const {
+    eventData,
+    naturalLanguageQuery,
+    includeExplanation,
+    explorerUrl,
+    sentryQuery,
+    fields,
+    explanation,
+  } = params;
+
+  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+
+  // Metrics results are always aggregate-style (p75, epm, failure_rate, etc.)
+  output += `⚠️ **IMPORTANT**: Display these transaction performance metrics as a data table with proper column alignment and formatting.\n\n`;
+
+  if (includeExplanation && explanation) {
+    output += formatExplanation(explanation);
+    output += `\n\n`;
+  }
+
+  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
+  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+
+  if (eventData.length === 0) {
+    output += `No results found.\n\n`;
+    output += `Try being more specific or using different terms in your search.\n`;
+    return output;
+  }
+
+  output += `Found ${eventData.length} result${eventData.length === 1 ? "" : "s"}:\n\n`;
+
+  // Metrics results are always aggregates — output as JSON for table rendering
+  output += "```json\n";
+  output += JSON.stringify(eventData, null, 2);
+  output += "\n```\n\n";
+
+  output += "## Next Steps\n\n";
+  output +=
+    "- View transaction details: Navigate to the Performance page in Sentry\n";
+  output +=
+    "- Set performance alerts: Configure alert thresholds for p75/p95 or failure_rate\n";
+  output +=
+    "- Investigate slow transactions: Drill into individual traces for the slowest transactions\n";
+
+  return output;
+}

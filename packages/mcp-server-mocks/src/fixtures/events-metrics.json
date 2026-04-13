@@ -1,0 +1,34 @@
+{
+  "data": [
+    {
+      "transaction": "GET /api/0/organizations/",
+      "epm()": 45.2,
+      "p75(transaction.duration)": 320.5,
+      "p95(transaction.duration)": 1250.0,
+      "failure_rate()": 0.02
+    },
+    {
+      "transaction": "POST /api/0/issues/",
+      "epm()": 12.8,
+      "p75(transaction.duration)": 580.3,
+      "p95(transaction.duration)": 2100.0,
+      "failure_rate()": 0.05
+    }
+  ],
+  "meta": {
+    "fields": {
+      "transaction": "string",
+      "epm()": "rate",
+      "p75(transaction.duration)": "duration",
+      "p95(transaction.duration)": "duration",
+      "failure_rate()": "percentage"
+    },
+    "units": {
+      "transaction": null,
+      "epm()": "1/minute",
+      "p75(transaction.duration)": "millisecond",
+      "p95(transaction.duration)": "millisecond",
+      "failure_rate()": null
+    }
+  }
+}

@@ -12,6 +12,7 @@ DATASET SELECTION GUIDELINES:
 - spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics, user agent data, "XYZ calls", ambiguous operations (richest attribute set)
 - errors: Exceptions, crashes, error messages, stack traces, unhandled errors, browser/client errors
 - logs: Log entries, log messages, severity levels, debugging information
+- metrics: Transaction-level performance metrics aggregated from indexed transaction data. Use when user asks about apdex, failure_rate, transaction throughput (tpm/epm), p75/p95/p99 of transaction.duration, or performance score by transaction name. This is the "Metrics" product tab in Performance.
 
 For ambiguous queries like "calls using XYZ", prefer spans dataset first as it contains the most comprehensive telemetry data.
 
@@ -168,7 +169,7 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
 
 YOUR RESPONSE FORMAT:
 Return a JSON object with these fields:
-- "dataset": Which dataset you determined to use ("spans", "errors", or "logs")
+- "dataset": Which dataset you determined to use ("spans", "errors", "logs", or "metrics")
 - "query": The Sentry query string for filtering results (use empty string "" for no filters)
 - "fields": Array of field names to return in results
   - For individual event queries: OPTIONAL (will use recommended fields if not provided)
@@ -237,6 +238,14 @@ export const NUMERIC_FIELDS: Record<string, Set<string>> = {
     "stack.lineno",
   ]),
   logs: new Set(["severity_number", "sentry.observed_timestamp_nanos"]),
+  metrics: new Set([
+    "transaction.duration",
+    "measurements.lcp",
+    "measurements.cls",
+    "measurements.inp",
+    "measurements.fcp",
+    "measurements.ttfb",
+  ]),
 };
 
 // Dataset-specific field definitions
@@ -368,6 +377,44 @@ export const DATASET_FIELDS = {
     "p100(field)": "100th percentile (max)",
     "epm()": "Events per minute rate",
   },
+  metrics: {
+    // Transaction metrics fields (backed by metrics_performance in snuba)
+    transaction: "Transaction name/route",
+    "transaction.status": "Transaction status (ok, cancelled, unknown, etc.)",
+    "transaction.op": "Transaction operation type",
+    "transaction.duration": "Transaction duration in milliseconds (numeric)",
+    project: "Project slug",
+    team_key_transaction: "Whether this is a key transaction (true/false)",
+
+    // Web Vitals measurements
+    "measurements.lcp":
+      "Largest Contentful Paint - time until largest content element is visible (ms). Good < 2500ms",
+    "measurements.cls":
+      "Cumulative Layout Shift - visual stability score (unitless). Good < 0.1",
+    "measurements.inp":
+      "Interaction to Next Paint - responsiveness to user input (ms). Good < 200ms",
+    "measurements.fcp":
+      "First Contentful Paint - time until first content is visible (ms). Good < 1800ms",
+    "measurements.ttfb":
+      "Time to First Byte - server response time (ms). Good < 800ms",
+
+    // Aggregate functions supported by metrics dataset
+    "count()": "Count of transactions",
+    "count_unique(field)": "Count of unique values, e.g. count_unique(user.id)",
+    "epm()": "Events (transactions) per minute rate",
+    "tpm()": "Transactions per minute (alias for epm)",
+    "failure_rate()": "Percentage of failed transactions",
+    "apdex()": "Apdex score (user satisfaction metric, 0-1)",
+    "p50(field)": "50th percentile, e.g. p50(transaction.duration)",
+    "p75(field)":
+      "75th percentile - standard for performance analysis, e.g. p75(transaction.duration)",
+    "p90(field)": "90th percentile, e.g. p90(transaction.duration)",
+    "p95(field)": "95th percentile, e.g. p95(transaction.duration)",
+    "p99(field)": "99th percentile, e.g. p99(transaction.duration)",
+    "avg(field)": "Average of numeric field, e.g. avg(transaction.duration)",
+    "sum(field)": "Sum of numeric field, e.g. sum(transaction.duration)",
+    "user_misery()": "User misery score (fraction of unsatisfied users)",
+  },
 };
 
 // Structured examples for dataset-specific query patterns
@@ -383,7 +430,7 @@ export interface QueryExample {
 }
 
 export const DATASET_EXAMPLES: Record<
-  "spans" | "errors" | "logs",
+  "spans" | "errors" | "logs" | "metrics",
   QueryExample[]
 > = {
   spans: [
@@ -588,6 +635,69 @@ export const DATASET_EXAMPLES: Record<
       },
     },
   ],
+  metrics: [
+    {
+      description: "slowest transactions by p75 duration",
+      output: {
+        query: "",
+        fields: [
+          "transaction",
+          "epm()",
+          "p75(transaction.duration)",
+          "failure_rate()",
+        ],
+        sort: "-p75(transaction.duration)",
+      },
+    },
+    {
+      description: "transaction failure rate by endpoint",
+      output: {
+        query: "",
+        fields: [
+          "transaction",
+          "count()",
+          "failure_rate()",
+          "p95(transaction.duration)",
+        ],
+        sort: "-failure_rate()",
+      },
+    },
+    {
+      description: "apdex score for transactions",
+      output: {
+        query: "",
+        fields: ["transaction", "apdex()", "count()", "epm()"],
+        sort: "-apdex()",
+      },
+    },
+    {
+      description: "web vitals performance by page",
+      output: {
+        query: "has:measurements.lcp",
+        fields: [
+          "transaction",
+          "p75(measurements.lcp)",
+          "p75(measurements.fcp)",
+          "p75(measurements.ttfb)",
+          "count()",
+        ],
+        sort: "-p75(measurements.lcp)",
+      },
+    },
+    {
+      description: "transaction throughput (transactions per minute)",
+      output: {
+        query: "",
+        fields: [
+          "transaction",
+          "tpm()",
+          "p50(transaction.duration)",
+          "p95(transaction.duration)",
+        ],
+        sort: "-tpm()",
+      },
+    },
+  ],
 };
 
 // Define recommended fields for each dataset
@@ -623,5 +733,16 @@ export const RECOMMENDED_FIELDS = {
     ],
     description:
       "Core span/trace information including span ID, operation, duration, and trace context",
+  },
+  metrics: {
+    basic: [
+      "transaction",
+      "epm()",
+      "p75(transaction.duration)",
+      "p95(transaction.duration)",
+      "failure_rate()",
+    ],
+    description:
+      "Transaction performance metrics including throughput, latency percentiles, and failure rate",
   },
 };

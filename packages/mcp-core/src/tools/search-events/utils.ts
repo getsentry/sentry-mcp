@@ -259,7 +259,7 @@ export function formatEventValue(
 export async function fetchCustomAttributes(
   apiService: SentryApiService,
   organizationSlug: string,
-  dataset: "errors" | "logs" | "spans",
+  dataset: "errors" | "logs" | "spans" | "metrics",
   projectId?: string,
   timeParams?: { statsPeriod?: string; start?: string; end?: string },
 ): Promise<{
@@ -269,12 +269,14 @@ export async function fetchCustomAttributes(
   const customAttributes: Record<string, string> = {};
   const fieldTypes: Record<string, "string" | "number"> = {};
 
-  if (dataset === "errors") {
-    // TODO: For errors dataset, we currently need to use the old listTags API
-    // This will be updated in the future to use the new trace-items attributes API
+  if (dataset === "errors" || dataset === "metrics") {
+    // For errors and metrics datasets, use the old listTags API
+    // metrics uses the same tags as errors/events (transaction tags)
+    const listTagsDataset: "events" | "errors" =
+      dataset === "metrics" ? "events" : "events";
     const tagsResponse = await apiService.listTags({
       organizationSlug,
-      dataset: "events",
+      dataset: listTagsDataset,
       project: projectId,
       statsPeriod: "14d",
       useCache: true,
@@ -325,7 +327,7 @@ export function createDatasetAttributesTool(options: {
       "Query available attributes and fields for a specific Sentry dataset to understand what data is available",
     parameters: z.object({
       dataset: z
-        .enum(["spans", "errors", "logs"])
+        .enum(["spans", "errors", "logs", "metrics"])
         .describe("The dataset to query attributes for"),
     }),
     execute: async ({ dataset }) => {

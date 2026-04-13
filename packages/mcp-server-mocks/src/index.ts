@@ -47,9 +47,6 @@ import eventsSpansFixture from "./fixtures/events-spans.json" with {
 import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
-import profileChunkFixture from "./fixtures/profile-chunk.json" with {
-  type: "json",
-};
 import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
 };
@@ -60,20 +57,23 @@ import organizationFixture from "./fixtures/organization.json" with {
 import performanceEventFixture from "./fixtures/performance-event.json" with {
   type: "json",
 };
+import profileChunkFixture from "./fixtures/profile-chunk.json" with {
+  type: "json",
+};
 import projectFixture from "./fixtures/project.json" with { type: "json" };
 import releaseFixture from "./fixtures/release.json" with { type: "json" };
+import replayDetailsFixture from "./fixtures/replay-details.json" with {
+  type: "json",
+};
+import replayRecordingSegmentsFixture from "./fixtures/replay-recording-segments.json" with {
+  type: "json",
+};
 import tagsFixture from "./fixtures/tags.json" with { type: "json" };
 import teamFixture from "./fixtures/team.json" with { type: "json" };
 import traceEventFixture from "./fixtures/trace-event.json" with {
   type: "json",
 };
 import traceItemsAttributesLogsNumberFixture from "./fixtures/trace-items-attributes-logs-number.json" with {
-  type: "json",
-};
-import replayDetailsFixture from "./fixtures/replay-details.json" with {
-  type: "json",
-};
-import replayRecordingSegmentsFixture from "./fixtures/replay-recording-segments.json" with {
   type: "json",
 };
 import traceItemsAttributesLogsStringFixture from "./fixtures/trace-items-attributes-logs-string.json" with {
@@ -389,6 +389,18 @@ export const restHandlers = buildHandlers([
         }
 
         return HttpResponse.json(eventsErrorsFixture);
+      }
+
+      if (dataset === "metrics") {
+        // Metrics dataset: transaction performance metrics
+        if (
+          !fields.includes("transaction") ||
+          !fields.includes("epm()") ||
+          !fields.includes("p75(transaction.duration)")
+        ) {
+          return HttpResponse.json(eventsMetricsEmptyFixture);
+        }
+        return HttpResponse.json(eventsMetricsFixture);
       }
 
       return HttpResponse.json("Invalid dataset", { status: 400 });

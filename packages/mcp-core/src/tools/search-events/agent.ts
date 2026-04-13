@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
 import type { SentryApiService } from "../../api-client";
+import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
 import { createOtelLookupTool } from "../../internal/agents/tools/otel-semantics";
 import { createWhoamiTool } from "../../internal/agents/tools/whoami";
-import { createDatasetAttributesTool } from "./utils";
 import { systemPrompt } from "./config";
+import { createDatasetAttributesTool } from "./utils";
 
 // .default("") on explanation is safe because structuredOutputs: false is set via providerOptions.
 // If structuredOutputs is re-enabled, remove .default() calls (OpenAI requires all fields in 'required').
@@ -12,7 +12,7 @@ import { systemPrompt } from "./config";
 export const searchEventsAgentOutputSchema = z
   .object({
     dataset: z
-      .enum(["spans", "errors", "logs"])
+      .enum(["spans", "errors", "logs", "metrics"])
       .describe("Which dataset to use for the query"),
     query: z.string().describe("The Sentry query string for filtering results"),
     fields: z
