@@ -10,7 +10,7 @@ Sentry MCP uses embedded AI agents for the following tools:
 - `search_issue_events` - Search events within a specific issue
 - `use_sentry` - Unified natural language interface to all Sentry operations
 
-These tools require an LLM provider (OpenAI or Anthropic) to be configured.
+These tools require an LLM provider (OpenAI, Azure OpenAI, or Anthropic) to be configured.
 
 ## Provider Selection
 
@@ -19,7 +19,7 @@ These tools require an LLM provider (OpenAI or Anthropic) to be configured.
 Always set `EMBEDDED_AGENT_PROVIDER` to explicitly specify your LLM provider:
 
 ```bash
-export EMBEDDED_AGENT_PROVIDER=openai   # or 'anthropic'
+export EMBEDDED_AGENT_PROVIDER=openai   # or 'azure-openai' / 'anthropic'
 export OPENAI_API_KEY=sk-...            # corresponding API key
 ```
 
@@ -51,6 +51,14 @@ Set `EMBEDDED_AGENT_PROVIDER` to explicitly choose a provider:
 ```bash
 export EMBEDDED_AGENT_PROVIDER=openai
 export OPENAI_API_KEY=sk-...
+```
+
+Or:
+
+```bash
+export EMBEDDED_AGENT_PROVIDER=azure-openai
+export OPENAI_API_KEY=sk-...
+npx @sentry/mcp-server --openai-base-url=https://example.openai.azure.com/openai/v1/
 ```
 
 Or:
@@ -133,7 +141,7 @@ Always set `EMBEDDED_AGENT_PROVIDER` when multiple API keys might be present:
 ```
 Error: Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set.
 Please specify which provider to use by setting the EMBEDDED_AGENT_PROVIDER
-environment variable to 'openai' or 'anthropic'.
+environment variable to 'openai', 'azure-openai', or 'anthropic'.
 ```
 
 **Cause:** Multiple API keys detected without explicit provider selection.
@@ -175,15 +183,20 @@ export OPENAI_API_KEY=sk-...
 npx @sentry/mcp-server --openai-base-url=https://custom.openai.example.com
 ```
 
-Azure-style deployment URLs such as
-`https://.../openai/deployments/<deployment>` automatically use chat
-completions for compatibility with deployment-based proxies. Generic custom
-OpenAI base URLs continue using the Responses API.
+For Azure OpenAI or Azure-compatible deployment proxies, use the dedicated
+provider instead of the generic `openai` mode:
 
-For responses-only models on deployment-style URLs, use the canonical OpenAI
-model name (for example `codex-mini-latest` or `computer-use-preview`). If you
-use an opaque deployment alias instead, Sentry MCP cannot infer the backend
-model capability and will reject the configuration.
+```bash
+export EMBEDDED_AGENT_PROVIDER=azure-openai
+export OPENAI_API_KEY=sk-...
+export OPENAI_API_VERSION=2024-02-15-preview
+
+# Azure v1 endpoint -> Responses API
+npx @sentry/mcp-server --openai-base-url=https://example.openai.azure.com/openai/v1/
+
+# Deployment endpoint -> chat completions
+npx @sentry/mcp-server --openai-base-url=https://example.openai.azure.com/openai/deployments/my-assistant
+```
 
 ### Model Selection
 
@@ -207,7 +220,7 @@ npx @sentry/mcp-server --access-token=... 2>&1 | grep "Using"
 
 Expected output:
 ```
-Using openai for AI-powered search tools (from EMBEDDED_AGENT_PROVIDER).
+Using openai responses API for AI-powered search tools (from EMBEDDED_AGENT_PROVIDER).
 ```
 
 Or:
@@ -252,7 +265,7 @@ npx @sentry/mcp-server --access-token=...
 
 Should output:
 ```
-Using openai for AI-powered search tools (from EMBEDDED_AGENT_PROVIDER).
+Using openai responses API for AI-powered search tools (from EMBEDDED_AGENT_PROVIDER).
 ```
 
 ## Related Documentation

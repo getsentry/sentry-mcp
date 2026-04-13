@@ -4,6 +4,7 @@ import {
   setAgentProvider,
   getResolvedProviderType,
 } from "./provider-factory.js";
+import { setAzureOpenAIBaseUrl } from "./azure-openai-provider.js";
 import { ConfigurationError } from "../../errors.js";
 
 describe("provider-factory", () => {
@@ -14,6 +15,7 @@ describe("provider-factory", () => {
   beforeEach(() => {
     // Reset module state
     setAgentProvider(undefined);
+    setAzureOpenAIBaseUrl(undefined);
     // Clear environment variables
     // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
     delete process.env.ANTHROPIC_API_KEY;
@@ -44,6 +46,7 @@ describe("provider-factory", () => {
       process.env.EMBEDDED_AGENT_PROVIDER = originalProviderEnv;
     }
     setAgentProvider(undefined);
+    setAzureOpenAIBaseUrl(undefined);
   });
 
   describe("single API key auto-detection", () => {
@@ -93,6 +96,16 @@ describe("provider-factory", () => {
       expect(provider.type).toBe("anthropic");
     });
 
+    it("uses azure-openai when both keys present and EMBEDDED_AGENT_PROVIDER=azure-openai", () => {
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+      process.env.OPENAI_API_KEY = "sk-test";
+      process.env.EMBEDDED_AGENT_PROVIDER = "azure-openai";
+      setAzureOpenAIBaseUrl("https://example.openai.azure.com/openai/v1/");
+
+      const provider = getAgentProvider();
+      expect(provider.type).toBe("azure-openai");
+    });
+
     it("uses openai when both keys present and setAgentProvider called", () => {
       process.env.ANTHROPIC_API_KEY = "sk-ant-test";
       process.env.OPENAI_API_KEY = "sk-test";
@@ -130,7 +143,9 @@ describe("provider-factory", () => {
       expect(() => getAgentProvider()).toThrow(
         /EMBEDDED_AGENT_PROVIDER environment variable/,
       );
-      expect(() => getAgentProvider()).toThrow(/'openai' or 'anthropic'/);
+      expect(() => getAgentProvider()).toThrow(
+        /'openai', 'azure-openai', or 'anthropic'/,
+      );
     });
 
     it("returns undefined from getResolvedProviderType when both keys present", () => {
@@ -154,6 +169,22 @@ describe("provider-factory", () => {
     it("returns undefined from getResolvedProviderType when explicit provider lacks API key", () => {
       process.env.EMBEDDED_AGENT_PROVIDER = "openai";
       // No OPENAI_API_KEY set
+
+      const providerType = getResolvedProviderType();
+      expect(providerType).toBeUndefined();
+    });
+
+    it("throws ConfigurationError when azure-openai lacks a supported base URL", () => {
+      process.env.OPENAI_API_KEY = "sk-test";
+      process.env.EMBEDDED_AGENT_PROVIDER = "azure-openai";
+
+      expect(() => getAgentProvider()).toThrow(ConfigurationError);
+      expect(() => getAgentProvider()).toThrow(/requires --openai-base-url/);
+    });
+
+    it("returns undefined from getResolvedProviderType when azure-openai lacks a supported base URL", () => {
+      process.env.OPENAI_API_KEY = "sk-test";
+      process.env.EMBEDDED_AGENT_PROVIDER = "azure-openai";
 
       const providerType = getResolvedProviderType();
       expect(providerType).toBeUndefined();

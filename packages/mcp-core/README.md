@@ -39,6 +39,9 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com
 
 # Override OpenAI endpoint for AI-powered tools (stdio only)
 npx @sentry/mcp-server@latest --access-token=TOKEN --openai-base-url=https://proxy.example.com/v1
+
+# Azure OpenAI / Azure-compatible deployment routing (stdio only)
+npx @sentry/mcp-server@latest --access-token=TOKEN --agent-provider=azure-openai --openai-base-url=https://example.openai.azure.com/openai/v1/
 ```
 
 Azure-style deployment URLs such as

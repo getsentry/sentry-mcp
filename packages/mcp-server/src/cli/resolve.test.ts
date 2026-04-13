@@ -52,6 +52,25 @@ describe("cli/finalize", () => {
     ).toThrow(/OPENAI base URL must use http or https scheme/);
   });
 
+  it("accepts azure-openai as a valid explicit provider", () => {
+    const cfg = finalize({
+      accessToken: "tok",
+      agentProvider: "azure-openai",
+      unknownArgs: [],
+    });
+    expect(cfg.agentProvider).toBe("azure-openai");
+  });
+
+  it("rejects invalid explicit provider values", () => {
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        agentProvider: "openrouter",
+        unknownArgs: [],
+      }),
+    ).toThrow(/Must be "openai", "azure-openai", or "anthropic"/);
+  });
+
   it("throws on non-https URL", () => {
     expect(() =>
       finalize({ accessToken: "tok", url: "http://bad", unknownArgs: [] }),

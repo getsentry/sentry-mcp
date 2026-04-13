@@ -8,7 +8,7 @@ export type ProviderOptions = Record<string, Record<string, JSONValue>>;
 /**
  * Supported embedded agent provider types.
  */
-export type AgentProviderType = "openai" | "anthropic";
+export type AgentProviderType = "openai" | "azure-openai" | "anthropic";
 
 /**
  * Interface for embedded agent providers.

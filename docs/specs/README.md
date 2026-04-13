@@ -37,6 +37,13 @@ When adding a new feature specification:
 
 ## Current Specifications
 
+### embedded-agent-openai-routing
+A spec for splitting generic `openai` from explicit `azure-openai` embedded
+agent behavior so Azure compatibility no longer depends on hidden heuristics.
+
+- **Status**: 📝 Proposed
+- **Key Benefits**: Preserves Azure compatibility, keeps unknown OpenAI-compatible providers predictable, and removes alias-based footguns
+
 ### search-events
 A unified event search tool that uses OpenAI GPT-5 to translate natural language queries into Sentry's search syntax. Replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
 

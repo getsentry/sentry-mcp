@@ -95,12 +95,17 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
     : undefined;
 
   // Validate agent provider if explicitly set
-  let agentProvider: "openai" | "anthropic" | undefined = undefined;
+  let agentProvider: "openai" | "azure-openai" | "anthropic" | undefined =
+    undefined;
   if (input.agentProvider) {
     const provider = input.agentProvider.toLowerCase();
-    if (provider !== "openai" && provider !== "anthropic") {
+    if (
+      provider !== "openai" &&
+      provider !== "azure-openai" &&
+      provider !== "anthropic"
+    ) {
       throw new Error(
-        `Error: Invalid agent provider "${input.agentProvider}". Must be "openai" or "anthropic".`,
+        `Error: Invalid agent provider "${input.agentProvider}". Must be "openai", "azure-openai", or "anthropic".`,
       );
     }
     agentProvider = provider;

@@ -72,7 +72,7 @@ function shouldUseChatCompletionsApi(modelId: string): boolean {
  *
  * Works with:
  * - OpenAI API directly (default)
- * - Any OpenAI-compatible API via custom base URL (Vercel AI Gateway, Azure OpenAI, etc.)
+ * - Generic OpenAI-compatible APIs via custom base URL (Vercel AI Gateway, proxies, etc.)
  *
  * Configuration:
  * - OPENAI_API_KEY: API key for authentication (required)
@@ -83,6 +83,9 @@ function shouldUseChatCompletionsApi(modelId: string): boolean {
  * - Direct OpenAI: "gpt-4o", "gpt-4-turbo", etc.
  * - Vercel AI Gateway: "openai/gpt-4o", "anthropic/claude-sonnet-4.5", etc.
  * - Other providers: Check their documentation
+ *
+ * Azure-specific endpoint routing lives in the dedicated `azure-openai`
+ * provider so generic OpenAI-compatible endpoints keep predictable behavior.
  */
 export function getOpenAIModel(model?: string): LanguageModel {
   const modelId = model ?? (process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL);
