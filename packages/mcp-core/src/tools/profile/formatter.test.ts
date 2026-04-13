@@ -200,6 +200,22 @@ describe("formatter", () => {
       expect(output).toContain("samples");
     });
 
+    it("falls back to thread profiles when shared profile metadata is omitted", () => {
+      const flamegraph = createMockFlamegraph({
+        shared: {
+          ...createMockFlamegraph().shared,
+          profiles: [],
+        },
+      });
+      const output = formatFlamegraphAnalysis(flamegraph, {
+        focusOnUserCode: false,
+        maxHotPaths: 5,
+      });
+
+      expect(output).toContain("**Total Profiles**: 1");
+      expect(output).toContain("across 1 profiles");
+    });
+
     it("includes actionable next steps", () => {
       const flamegraph = createMockFlamegraph();
       const output = formatFlamegraphAnalysis(flamegraph, {
