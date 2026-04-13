@@ -21,6 +21,22 @@ interface AuthRequestWithSkills extends AuthRequest {
   resource?: string;
 }
 
+function getUpstreamTokenExpiryTimestamp(payload: {
+  expires_at: string;
+  expires_in: number;
+}): number {
+  const parsed = new Date(payload.expires_at).getTime();
+  return Number.isFinite(parsed)
+    ? parsed
+    : Date.now() + payload.expires_in * 1000;
+}
+
+function getUpstreamUserLabel(payload: {
+  user: { name: string | null; email?: string | null; id: string };
+}): string {
+  return payload.user.name ?? payload.user.email ?? payload.user.id;
+}
+
 /**
  * OAuth Callback Endpoint (GET /oauth/callback)
  *
@@ -247,11 +263,13 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   const grantedSkills = Array.from(validSkills);
 
   // Return back to the MCP client a new token
+  const accessTokenExpiresAt = getUpstreamTokenExpiryTimestamp(payload);
+  const userLabel = getUpstreamUserLabel(payload);
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
     request: oauthReqInfo as AuthRequest,
     userId: payload.user.id,
     metadata: {
-      label: payload.user.name,
+      label: userLabel,
     },
     scope: oauthReqInfo.scope,
     // Props are available via ExecutionContext.props in the MCP handler
@@ -264,7 +282,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       refreshToken: payload.refresh_token,
       // Cache upstream expiry so future refresh grants can avoid
       // unnecessary upstream refresh calls when still valid
-      accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
+      accessTokenExpiresAt,
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
       // Scopes derived from skills - for backward compatibility with old MCP clients

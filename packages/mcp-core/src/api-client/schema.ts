@@ -123,6 +123,16 @@ export const ProjectSchema = z
 
 export const ProjectListSchema = z.array(ProjectSchema);
 
+const ReplayTagsSchema = z.preprocess(
+  (value) => {
+    if (value === undefined || value === null || Array.isArray(value)) {
+      return {};
+    }
+    return value;
+  },
+  z.record(z.string(), z.array(z.string())),
+);
+
 export const ReplayDetailsSchema = z
   .object({
     activity: z.number().nullable().optional(),
@@ -178,9 +188,9 @@ export const ReplayDetailsSchema = z
       .nullish()
       .default({}),
     started_at: z.string().nullable().optional(),
-    tags: z.record(z.string(), z.array(z.string())).optional().default({}),
+    tags: ReplayTagsSchema,
     trace_ids: z.array(z.string()).optional().default([]),
-    urls: z.array(z.string()).optional().default([]),
+    urls: z.preprocess((value) => value ?? [], z.array(z.string())),
     user: z
       .object({
         display_name: z.string().nullable().optional(),
@@ -188,7 +198,7 @@ export const ReplayDetailsSchema = z
         id: z.string().nullable().optional(),
         ip: z.string().nullable().optional(),
         username: z.string().nullable().optional(),
-        geo: z.record(z.string(), z.string()).optional(),
+        geo: z.record(z.string(), z.union([z.string(), z.null()])).optional(),
       })
       .nullish()
       .default({}),
@@ -211,11 +221,27 @@ export const ClientKeySchema = z
       public: z.string(),
     }),
     isActive: z.boolean(),
-    dateCreated: z.string().datetime(),
+    dateCreated: z.string().datetime().nullable(),
   })
   .passthrough();
 
 export const ClientKeyListSchema = z.array(ClientKeySchema);
+
+const ReleaseProjectSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    slug: z.string().nullable(),
+    name: z.string(),
+    platform: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+const ReleaseCommitAuthorSchema = z
+  .object({
+    name: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+  })
+  .passthrough();
 
 export const ReleaseSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -229,23 +255,22 @@ export const ReleaseSchema = z.object({
   lastCommit: z
     .object({
       id: z.union([z.string(), z.number()]),
-      message: z.string(),
+      message: z.string().nullable(),
       dateCreated: z.string().datetime(),
-      author: z.object({
-        name: z.string(),
-        email: z.string(),
-      }),
+      author: ReleaseCommitAuthorSchema.optional(),
     })
+    .passthrough()
     .nullable(),
   lastDeploy: z
     .object({
       id: z.union([z.string(), z.number()]),
-      environment: z.string(),
+      environment: z.string().nullable(),
       dateStarted: z.string().datetime().nullable(),
       dateFinished: z.string().datetime().nullable(),
     })
+    .passthrough()
     .nullable(),
-  projects: z.array(ProjectSchema),
+  projects: z.array(ReleaseProjectSchema),
 });
 
 export const ReleaseListSchema = z.array(ReleaseSchema);
@@ -982,8 +1007,11 @@ export const FlamegraphProfileSchema = z
     type: z.string(),
     unit: z.string(),
     weights: z.array(z.number()),
-    sample_durations_ns: z.array(z.number()),
-    sample_counts: z.array(z.number()),
+    sample_durations_ns: z.preprocess(
+      (value) => value ?? [],
+      z.array(z.number()),
+    ),
+    sample_counts: z.preprocess((value) => value ?? [], z.array(z.number())),
   })
   .passthrough();
 
@@ -1000,15 +1028,21 @@ export const FlamegraphProfileSchema = z
  */
 export const FlamegraphSchema = z
   .object({
-    activeProfileIndex: z.number(),
+    activeProfileIndex: z.preprocess((value) => value ?? 0, z.number()),
     metadata: z.record(z.unknown()).optional(),
     platform: z.string(),
     profiles: z.array(FlamegraphProfileSchema),
     projectID: z.number(),
     shared: z.object({
       frames: z.array(FlamegraphFrameSchema),
-      frame_infos: z.array(FlamegraphFrameInfoSchema),
-      profiles: z.array(FlamegraphProfileMetadataSchema),
+      frame_infos: z.preprocess(
+        (value) => value ?? [],
+        z.array(FlamegraphFrameInfoSchema),
+      ),
+      profiles: z.preprocess(
+        (value) => value ?? [],
+        z.array(FlamegraphProfileMetadataSchema),
+      ),
     }),
     transactionName: z.string().optional(),
     metrics: z.unknown().optional(),

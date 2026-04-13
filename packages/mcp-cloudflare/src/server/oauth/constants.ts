@@ -11,7 +11,7 @@ export const TokenResponseSchema = z.object({
   expires_in: z.number(),
   expires_at: z.string().datetime(),
   user: z.object({
-    email: z.string().email(),
+    email: z.string().nullable().optional(),
     id: z.string(),
     name: z.string().nullable(),
   }),

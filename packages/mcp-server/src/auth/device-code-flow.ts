@@ -11,6 +11,7 @@ import {
   DeviceCodeResponseSchema,
   DeviceCodeErrorSchema,
   TokenResponseSchema,
+  getTokenUserLabel,
   type DeviceCodeResponse,
   type TokenResponse,
 } from "./types";
@@ -200,6 +201,6 @@ export async function authenticate({
     expiresIn: deviceCodeResponse.expires_in,
   });
 
-  stderr(`Successfully authenticated as ${tokenResponse.user.email}`);
+  stderr(`Successfully authenticated as ${getTokenUserLabel(tokenResponse)}`);
   return tokenResponse;
 }

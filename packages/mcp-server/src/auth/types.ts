@@ -34,7 +34,7 @@ export const TokenResponseSchema = z.object({
   expires_in: z.number(),
   expires_at: z.string().datetime(),
   user: z.object({
-    email: z.string().email(),
+    email: z.string().nullable().optional(),
     id: z.string(),
     name: z.string().nullable(),
   }),
@@ -52,9 +52,17 @@ export type CachedToken = {
   expires_at: string;
   sentry_host: string;
   client_id: string;
+  // Historical name retained for cache compatibility; this stores a user label,
+  // not necessarily an email address.
   user_email: string;
   scope: string;
 };
+
+export function getTokenUserLabel(tokenResponse: TokenResponse): string {
+  return (
+    tokenResponse.user.name ?? tokenResponse.user.email ?? tokenResponse.user.id
+  );
+}
 
 export function toCachedToken(
   tokenResponse: TokenResponse,
@@ -67,7 +75,7 @@ export function toCachedToken(
     expires_at: tokenResponse.expires_at,
     sentry_host: sentryHost,
     client_id: clientId,
-    user_email: tokenResponse.user.email,
+    user_email: getTokenUserLabel(tokenResponse),
     scope: tokenResponse.scope,
   };
 }

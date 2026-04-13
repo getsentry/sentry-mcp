@@ -109,11 +109,16 @@ export function formatFlamegraphAnalysis(
   return sections.join("\n\n");
 }
 
+function getFlamegraphProfileCount(flamegraph: Flamegraph): number {
+  return flamegraph.shared.profiles.length || flamegraph.profiles.length;
+}
+
 /**
  * Formats transaction information section.
  */
 function formatTransactionInfo(flamegraph: Flamegraph): string {
   const profile = flamegraph.profiles[0];
+  const profileCount = getFlamegraphProfileCount(flamegraph);
   const totalSamples = profile?.sample_counts.reduce((a, b) => a + b, 0) || 0;
   const totalDuration =
     profile?.sample_durations_ns.reduce((a, b) => a + b, 0) || 0;
@@ -125,7 +130,7 @@ function formatTransactionInfo(flamegraph: Flamegraph): string {
     `- **Transaction**: ${flamegraph.transactionName || "Unknown"}`,
     `- **Project ID**: ${flamegraph.projectID}`,
     `- **Platform**: ${flamegraph.platform || "Unknown"}`,
-    `- **Total Profiles**: ${flamegraph.shared.profiles.length}`,
+    `- **Total Profiles**: ${profileCount}`,
     `- **Total Samples**: ${totalSamples.toLocaleString()}`,
     `- **Estimated Total Time**: ${formatDuration(totalDuration)}`,
   ].join("\n");
@@ -210,6 +215,7 @@ function formatHotPaths(
   }
 
   const sections = ["## Top Hot Paths", ""];
+  const profileCount = getFlamegraphProfileCount(flamegraph);
 
   hotPaths.forEach((path, idx) => {
     if (idx > 0) sections.push("---", "");
@@ -219,7 +225,7 @@ function formatHotPaths(
     );
     sections.push("");
     sections.push(
-      `**${path.sampleCount.toLocaleString()} samples** across ${flamegraph.shared.profiles.length} profiles`,
+      `**${path.sampleCount.toLocaleString()} samples** across ${profileCount} profiles`,
     );
     sections.push("");
 

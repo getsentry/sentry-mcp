@@ -275,6 +275,55 @@ describe("exchangeCodeForAccessToken", () => {
     logWarn.mockReturnValue(undefined);
   });
 
+  it("accepts upstream token responses when user email is not an email address", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "test-access-token",
+          refresh_token: "test-refresh-token",
+          token_type: "bearer",
+          expires_in: 3600,
+          expires_at: "2026-04-13T16:36:23.087Z",
+          user: {
+            email: "github-sso-user",
+            id: "123",
+            name: "GitHub SSO User",
+          },
+          scope: "org:read project:read",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const [payload, response] = await exchangeCodeForAccessToken({
+      client_id: "test-client-id",
+      client_secret: "test-client-secret",
+      code: "test-code",
+      upstream_url: "https://sentry.io/oauth/token",
+      redirect_uri: "https://mcp.sentry.dev/oauth/callback",
+    });
+
+    expect(response).toBeNull();
+    expect(payload).toEqual({
+      access_token: "test-access-token",
+      refresh_token: "test-refresh-token",
+      token_type: "bearer",
+      expires_in: 3600,
+      expires_at: "2026-04-13T16:36:23.087Z",
+      user: {
+        email: "github-sso-user",
+        id: "123",
+        name: "GitHub SSO User",
+      },
+      scope: "org:read project:read",
+    });
+    expect(logIssue).not.toHaveBeenCalled();
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+
   it("returns a specific invalid_grant message without an event ID", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
