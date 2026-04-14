@@ -18,6 +18,9 @@ export interface EmbeddedAgentProvider {
   /** The provider type identifier */
   readonly type: AgentProviderType;
 
+  /** Human-readable label for startup/status logging */
+  readonly label: string;
+
   /** Get a language model instance, optionally with a model override */
   getModel(modelOverride?: string): LanguageModel;
 

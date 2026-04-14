@@ -211,4 +211,40 @@ describe("provider-factory", () => {
       expect(provider.type).toBe("openai");
     });
   });
+
+  describe("provider labels", () => {
+    it("labels openai as responses", () => {
+      process.env.OPENAI_API_KEY = "sk-test";
+
+      const provider = getAgentProvider();
+      expect(provider.label).toBe("openai responses API");
+    });
+
+    it("labels anthropic without an API surface suffix", () => {
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+
+      const provider = getAgentProvider();
+      expect(provider.label).toBe("anthropic");
+    });
+
+    it("labels azure-openai v1 endpoints as responses", () => {
+      process.env.OPENAI_API_KEY = "sk-test";
+      process.env.EMBEDDED_AGENT_PROVIDER = "azure-openai";
+      setAzureOpenAIBaseUrl("https://example.openai.azure.com/openai/v1/");
+
+      const provider = getAgentProvider();
+      expect(provider.label).toBe("azure-openai responses API");
+    });
+
+    it("labels azure-openai deployment endpoints as chat completions", () => {
+      process.env.OPENAI_API_KEY = "sk-test";
+      process.env.EMBEDDED_AGENT_PROVIDER = "azure-openai";
+      setAzureOpenAIBaseUrl(
+        "https://example.openai.azure.com/openai/deployments/my-assistant",
+      );
+
+      const provider = getAgentProvider();
+      expect(provider.label).toBe("azure-openai chat completions API");
+    });
+  });
 });

@@ -241,12 +241,7 @@ async function main() {
     console.warn("");
   } else {
     const providerSource = getProviderSource();
-    const providerLabel =
-      resolvedProvider === "openai"
-        ? "openai responses API"
-        : resolvedProvider === "azure-openai"
-          ? "azure-openai API"
-          : "anthropic";
+    const providerLabel = getAgentProvider().label;
     console.warn(
       `Using ${providerLabel} for AI-powered search tools (${providerSource}).`,
     );

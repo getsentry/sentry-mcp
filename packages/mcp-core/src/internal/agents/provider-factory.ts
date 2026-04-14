@@ -77,6 +77,7 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
     case "anthropic":
       return {
         type: "anthropic",
+        label: "anthropic",
         getModel: getAnthropicModel,
         // Anthropic doesn't need the structuredOutputs workaround
         getProviderOptions: () => ({}),
@@ -84,6 +85,7 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
     case "openai":
       return {
         type: "openai",
+        label: "openai responses API",
         getModel: getOpenAIModel,
         // OpenAI requires structuredOutputs: false for optional fields
         // See: https://github.com/getsentry/sentry-mcp/issues/623
@@ -94,13 +96,16 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
           },
         }),
       };
-    case "azure-openai":
+    case "azure-openai": {
       // Validate Azure-only configuration up front so explicit misconfiguration
       // is surfaced before any tool calls.
-      getAzureOpenAIApiSurface();
+      const apiSurface = getAzureOpenAIApiSurface();
 
       return {
         type: "azure-openai",
+        label: `azure-openai ${
+          apiSurface === "chat-completions" ? "chat completions" : "responses"
+        } API`,
         getModel: getAzureOpenAIModel,
         getProviderOptions: () => ({
           openai: {
@@ -109,6 +114,7 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
           },
         }),
       };
+    }
   }
 }
 
