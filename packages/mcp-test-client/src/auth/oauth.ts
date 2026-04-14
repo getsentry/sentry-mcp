@@ -9,6 +9,10 @@ import {
   DEFAULT_OAUTH_SCOPES,
 } from "../constants.js";
 import { logInfo, logSuccess, logToolResult, logError } from "../logger.js";
+import {
+  resolveAuthorizationServerUrl,
+  resolveProtectedResourceUrl,
+} from "../mcp-url.js";
 import { ConfigManager } from "./config.js";
 
 export interface OAuthConfig {
@@ -49,6 +53,19 @@ export class OAuthClient {
     this.configManager = new ConfigManager();
   }
 
+  private getProtectedResourceUrl(): URL {
+    return resolveProtectedResourceUrl(this.config.mcpHost);
+  }
+
+  private getAuthorizationServerUrl(pathname: string): string {
+    return new URL(pathname, resolveAuthorizationServerUrl(this.config.mcpHost))
+      .href;
+  }
+
+  private getConfigKey(): string {
+    return this.getProtectedResourceUrl().href;
+  }
+
   /**
    * Generate PKCE code verifier and challenge
    */
@@ -69,7 +86,7 @@ export class OAuthClient {
    * Register the client with the OAuth server using Dynamic Client Registration
    */
   private async registerClient(): Promise<string> {
-    const registrationUrl = `${this.config.mcpHost}/oauth/register`;
+    const registrationUrl = this.getAuthorizationServerUrl("/oauth/register");
 
     const registrationData = {
       client_name: "Sentry MCP CLI",
@@ -219,7 +236,7 @@ export class OAuthClient {
     codeVerifier: string;
     clientId: string;
   }): Promise<TokenResponse> {
-    const tokenUrl = `${this.config.mcpHost}/oauth/token`;
+    const tokenUrl = this.getAuthorizationServerUrl("/oauth/token");
 
     const body = new URLSearchParams({
       grant_type: "authorization_code",
@@ -251,10 +268,10 @@ export class OAuthClient {
    * Get or register OAuth client ID for the MCP host
    */
   private async getOrRegisterClientId(): Promise<string> {
+    const configKey = this.getConfigKey();
+
     // Check if we already have a registered client for this host
-    let clientId = await this.configManager.getOAuthClientId(
-      this.config.mcpHost,
-    );
+    let clientId = await this.configManager.getOAuthClientId(configKey);
 
     if (clientId) {
       return clientId;
@@ -266,7 +283,7 @@ export class OAuthClient {
       clientId = await this.registerClient();
 
       // Store the client ID for future use
-      await this.configManager.setOAuthClientId(this.config.mcpHost, clientId);
+      await this.configManager.setOAuthClientId(configKey, clientId);
 
       logSuccess("Client registered and saved");
       logToolResult(clientId);
@@ -282,10 +299,10 @@ export class OAuthClient {
    * Get cached access token or perform OAuth flow
    */
   async getAccessToken(): Promise<string> {
+    const configKey = this.getConfigKey();
+
     // Check for cached token first
-    const cachedToken = await this.configManager.getAccessToken(
-      this.config.mcpHost,
-    );
+    const cachedToken = await this.configManager.getAccessToken(configKey);
     if (cachedToken) {
       logInfo("Authenticated with Sentry", "using stored token");
       return cachedToken;
@@ -299,6 +316,8 @@ export class OAuthClient {
    * Perform the OAuth flow
    */
   async authenticate(): Promise<string> {
+    const configKey = this.getConfigKey();
+
     // Get or register client ID
     const clientId = await this.getOrRegisterClientId();
 
@@ -310,7 +329,7 @@ export class OAuthClient {
     const state = this.generateState();
 
     // Build authorization URL
-    const authUrl = new URL(`${this.config.mcpHost}/oauth/authorize`);
+    const authUrl = new URL(this.getAuthorizationServerUrl("/oauth/authorize"));
     authUrl.searchParams.set("client_id", clientId);
     authUrl.searchParams.set("redirect_uri", OAUTH_REDIRECT_URI);
     authUrl.searchParams.set("response_type", "code");
@@ -318,6 +337,9 @@ export class OAuthClient {
     authUrl.searchParams.set("state", state);
     authUrl.searchParams.set("code_challenge", challenge);
     authUrl.searchParams.set("code_challenge_method", "S256");
+    // RFC 8707: send the exact `/mcp/...` protected resource the client wants
+    // to use so authorization is scoped to that resource from the start.
+    authUrl.searchParams.set("resource", this.getProtectedResourceUrl().href);
 
     logInfo("Authenticating with Sentry - opening browser");
     console.log(
@@ -352,7 +374,7 @@ export class OAuthClient {
 
         // Cache the access token
         await this.configManager.setAccessToken(
-          this.config.mcpHost,
+          configKey,
           tokenResponse.access_token,
           tokenResponse.expires_in,
         );

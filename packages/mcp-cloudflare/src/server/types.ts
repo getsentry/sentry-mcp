@@ -49,7 +49,7 @@ export interface Env {
   MCP_URL?: string;
   OAUTH_PROVIDER: OAuthHelpers;
   AI: Ai;
-  CF_VERSION_METADATA: WorkerVersionMetadata;
+  CF_VERSION_METADATA?: WorkerVersionMetadata;
   CHAT_RATE_LIMITER?: RateLimit;
   SEARCH_RATE_LIMITER?: RateLimit;
   MCP_IP_RATE_LIMITER?: RateLimit;

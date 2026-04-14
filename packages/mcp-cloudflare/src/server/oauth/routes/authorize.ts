@@ -23,6 +23,42 @@ interface AuthRequestWithSkills extends AuthRequest {
   resource?: string;
 }
 
+function getApprovalScopeFromResource(resource: string | null | undefined): {
+  organizationSlug: string;
+  projectSlug: string | null;
+} | null {
+  if (!resource) {
+    return null;
+  }
+
+  try {
+    const { pathname } = new URL(resource);
+    const pathSegments = pathname.split("/").filter(Boolean);
+
+    if (pathSegments[0] !== "mcp") {
+      return null;
+    }
+
+    if (pathSegments.length === 2) {
+      return {
+        organizationSlug: pathSegments[1],
+        projectSlug: null,
+      };
+    }
+
+    if (pathSegments.length === 3) {
+      return {
+        organizationSlug: pathSegments[1],
+        projectSlug: pathSegments[2],
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function redirectToUpstream(
   env: Env,
   request: Request,
@@ -118,6 +154,7 @@ export default new Hono<{ Bindings: Env }>()
       ...oauthReqInfoWithoutResource,
       ...(resourceParam ? { resource: resourceParam } : {}),
     };
+    const approvalScope = getApprovalScopeFromResource(resourceParam);
 
     // XXX(dcramer): we want to confirm permissions on each time
     // so you can always choose new ones
@@ -141,6 +178,7 @@ export default new Hono<{ Bindings: Env }>()
       server: {
         name: "Sentry MCP",
       },
+      scope: approvalScope,
       state: { oauthReqInfo: oauthReqInfoWithResource },
       cookieSecret: c.env.COOKIE_SECRET,
     });

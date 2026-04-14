@@ -253,6 +253,7 @@ describe("oauth authorize routes", () => {
         expect(response.status).toBe(200);
         const html = await response.text();
         expect(html).toContain("<form");
+        expect(html).not.toContain("Session scope");
       });
 
       it("should allow request with valid resource parameter", async () => {
@@ -276,6 +277,8 @@ describe("oauth authorize routes", () => {
 
         // Should proceed normally
         expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).not.toContain("Session scope");
       });
 
       it("should reject request with origin-only resource parameter", async () => {
@@ -348,6 +351,8 @@ describe("oauth authorize routes", () => {
         const response = await app.fetch(request, testEnv as Env);
 
         expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).not.toContain("Session scope");
       });
 
       it("should allow request with organization-scoped resource parameter", async () => {
@@ -370,6 +375,8 @@ describe("oauth authorize routes", () => {
         const response = await app.fetch(request, testEnv as Env);
 
         expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain(">test-org</strong> organization");
       });
 
       it("should allow request with project-scoped resource parameter", async () => {
@@ -395,6 +402,9 @@ describe("oauth authorize routes", () => {
         const response = await app.fetch(request, testEnv as Env);
 
         expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain(">test-project</strong> project");
+        expect(html).toContain(">test-org</strong> organization");
       });
 
       it("should reject request with invalid resource hostname", async () => {
