@@ -1,6 +1,6 @@
 {
   "name": "@sentry/mcp-agent-cli-test",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "private": true,
   "type": "module",
   "description": "Real agent CLI smoke tests for Sentry MCP",
