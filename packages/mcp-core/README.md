@@ -39,7 +39,19 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com
 
 # Override OpenAI endpoint for AI-powered tools (stdio only)
 npx @sentry/mcp-server@latest --access-token=TOKEN --openai-base-url=https://proxy.example.com/v1
+
+# Azure OpenAI / Azure-compatible deployment routing (stdio only)
+npx @sentry/mcp-server@latest --access-token=TOKEN --agent-provider=azure-openai --openai-base-url=https://example.openai.azure.com/openai/v1/
 ```
+
+For Azure OpenAI or Azure-compatible deployment proxies, use the dedicated
+`azure-openai` provider instead of generic `openai` mode:
+
+- `/openai/v1` endpoints use the Responses API
+- `/openai/deployments/<deployment>` endpoints use chat completions
+
+Generic `openai` mode always uses the Responses API and treats `OPENAI_MODEL`
+as an opaque model identifier.
 
 ### Constraint-Based Tool Exclusion
 

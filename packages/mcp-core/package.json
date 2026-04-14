@@ -11,9 +11,7 @@
   "author": "Sentry",
   "description": "Sentry MCP Core - Shared code for MCP transports",
   "homepage": "https://github.com/getsentry/sentry-mcp",
-  "keywords": [
-    "sentry"
-  ],
+  "keywords": ["sentry"],
   "bugs": {
     "url": "https://github.com/getsentry/sentry-mcp/issues"
   },
@@ -21,9 +19,7 @@
     "type": "git",
     "url": "git@github.com:getsentry/sentry-mcp.git"
   },
-  "files": [
-    "./dist/*"
-  ],
+  "files": ["./dist/*"],
   "exports": {
     "./api-client": {
       "types": "./dist/api-client/index.ts",
@@ -112,6 +108,10 @@
     "./internal/agents/openai-provider": {
       "types": "./dist/internal/agents/openai-provider.ts",
       "default": "./dist/internal/agents/openai-provider.js"
+    },
+    "./internal/agents/azure-openai-provider": {
+      "types": "./dist/internal/agents/azure-openai-provider.ts",
+      "default": "./dist/internal/agents/azure-openai-provider.js"
     },
     "./internal/agents/anthropic-provider": {
       "types": "./dist/internal/agents/anthropic-provider.ts",

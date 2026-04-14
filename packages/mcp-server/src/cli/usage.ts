@@ -24,7 +24,7 @@ Common optional flags:
   --experimental          Enable forward-looking tool variants and experimental features
 
 Embedded agent configuration:
-  --agent-provider <provider>   LLM provider: openai or anthropic (auto-detects from API keys)
+  --agent-provider <provider>   LLM provider: openai, azure-openai, or anthropic (auto-detects from API keys)
   --openai-base-url <url>       Override OpenAI API base URL
   --openai-model <model>        Override OpenAI model (default: gpt-5)
   --anthropic-base-url <url>    Override Anthropic API base URL
@@ -45,7 +45,7 @@ Environment variables:
   SENTRY_CLIENT_ID        Override OAuth client ID for device code flow
   OPENAI_API_KEY          OpenAI API key for AI-powered search tools
   ANTHROPIC_API_KEY       Anthropic API key for AI-powered search tools
-  EMBEDDED_AGENT_PROVIDER Provider override: openai or anthropic
+  EMBEDDED_AGENT_PROVIDER Provider override: openai, azure-openai, or anthropic
   MCP_DISABLE_SKILLS      Disable specific skills (comma-separated)
 
 Examples:
@@ -54,5 +54,6 @@ Examples:
   ${packageName} --access-token=TOKEN --skills=inspect,triage
   ${packageName} --access-token=TOKEN --host=sentry.example.com
   ${packageName} --access-token=TOKEN --host=sentry.example.com --disable-skills=seer
+  ${packageName} --access-token=TOKEN --agent-provider=azure-openai --openai-base-url=https://example.openai.azure.com/openai/v1/
   ${packageName} --access-token=TOKEN --agent-provider=anthropic`;
 }

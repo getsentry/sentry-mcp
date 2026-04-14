@@ -1,4 +1,9 @@
 import type { EmbeddedAgentProvider, AgentProviderType } from "./types";
+import {
+  getAzureOpenAIApiSurface,
+  getAzureOpenAIModel,
+  setAzureOpenAIBaseUrl,
+} from "./azure-openai-provider";
 import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider";
 import { getAnthropicModel, setAnthropicBaseUrl } from "./anthropic-provider";
 import { ConfigurationError } from "../../errors";
@@ -23,8 +28,9 @@ export function setProviderBaseUrls(config: {
   openaiBaseUrl?: string;
   anthropicBaseUrl?: string;
 }): void {
-  if (config.openaiBaseUrl) setOpenAIBaseUrl(config.openaiBaseUrl);
-  if (config.anthropicBaseUrl) setAnthropicBaseUrl(config.anthropicBaseUrl);
+  setOpenAIBaseUrl(config.openaiBaseUrl);
+  setAzureOpenAIBaseUrl(config.openaiBaseUrl);
+  setAnthropicBaseUrl(config.anthropicBaseUrl);
 }
 
 /**
@@ -45,6 +51,7 @@ function hasApiKeyForProvider(type: AgentProviderType): boolean {
     case "anthropic":
       return Boolean(process.env.ANTHROPIC_API_KEY);
     case "openai":
+    case "azure-openai":
       return Boolean(process.env.OPENAI_API_KEY);
   }
 }
@@ -57,6 +64,7 @@ function getApiKeyName(type: AgentProviderType): string {
     case "anthropic":
       return "ANTHROPIC_API_KEY";
     case "openai":
+    case "azure-openai":
       return "OPENAI_API_KEY";
   }
 }
@@ -69,6 +77,7 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
     case "anthropic":
       return {
         type: "anthropic",
+        label: "anthropic",
         getModel: getAnthropicModel,
         // Anthropic doesn't need the structuredOutputs workaround
         getProviderOptions: () => ({}),
@@ -76,6 +85,7 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
     case "openai":
       return {
         type: "openai",
+        label: "openai responses API",
         getModel: getOpenAIModel,
         // OpenAI requires structuredOutputs: false for optional fields
         // See: https://github.com/getsentry/sentry-mcp/issues/623
@@ -86,6 +96,25 @@ function buildProvider(type: AgentProviderType): EmbeddedAgentProvider {
           },
         }),
       };
+    case "azure-openai": {
+      // Validate Azure-only configuration up front so explicit misconfiguration
+      // is surfaced before any tool calls.
+      const apiSurface = getAzureOpenAIApiSurface();
+
+      return {
+        type: "azure-openai",
+        label: `azure-openai ${
+          apiSurface === "chat-completions" ? "chat completions" : "responses"
+        } API`,
+        getModel: getAzureOpenAIModel,
+        getProviderOptions: () => ({
+          openai: {
+            structuredOutputs: false,
+            strictJsonSchema: false,
+          },
+        }),
+      };
+    }
   }
 }
 
@@ -101,7 +130,11 @@ function resolveProviderType(): AgentProviderType | undefined {
 
   // 2. Environment variable
   const envProvider = process.env.EMBEDDED_AGENT_PROVIDER?.toLowerCase();
-  if (envProvider === "openai" || envProvider === "anthropic") {
+  if (
+    envProvider === "openai" ||
+    envProvider === "azure-openai" ||
+    envProvider === "anthropic"
+  ) {
     return envProvider;
   }
 
@@ -141,7 +174,7 @@ export function getAgentProvider(): EmbeddedAgentProvider {
   if (!providerType && detectProviderConflict()) {
     throw new ConfigurationError(
       "Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set. " +
-        "Please specify which provider to use by setting the EMBEDDED_AGENT_PROVIDER environment variable to 'openai' or 'anthropic'.",
+        "Please specify which provider to use by setting the EMBEDDED_AGENT_PROVIDER environment variable to 'openai', 'azure-openai', or 'anthropic'.",
     );
   }
 
@@ -175,8 +208,9 @@ export function hasAgentProvider(): boolean {
  * Returns undefined if no provider is available, API key is missing, or both API keys are present without explicit selection.
  */
 export function getResolvedProviderType(): AgentProviderType | undefined {
-  const providerType = resolveProviderType();
-  return providerType && hasApiKeyForProvider(providerType)
-    ? providerType
-    : undefined;
+  try {
+    return getAgentProvider().type;
+  } catch {
+    return undefined;
+  }
 }

@@ -45,7 +45,7 @@ export async function callEmbeddedAgent<
 }): Promise<EmbeddedAgentResult<TOutput>> {
   const capturedToolCalls: ToolCall[] = [];
 
-  // Get the configured provider (OpenAI or Anthropic)
+  // Get the configured provider (OpenAI, Azure OpenAI, or Anthropic)
   const provider = getAgentProvider();
 
   try {

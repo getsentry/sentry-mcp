@@ -37,6 +37,14 @@ describe("cli/parseArgv", () => {
     expect(parsed.disableSkills).toBe("seer");
   });
 
+  it("parses --agent-provider=azure-openai", () => {
+    const parsed = parseArgv([
+      "--access-token=tok",
+      "--agent-provider=azure-openai",
+    ]);
+    expect(parsed.agentProvider).toBe("azure-openai");
+  });
+
   it("collects unknown args", () => {
     const parsed = parseArgv(["--unknown", "--another=1"]);
     expect(parsed.unknownArgs.length).toBeGreaterThan(0);
@@ -129,5 +137,18 @@ describe("cli/merge", () => {
     const cli = parseArgv(["--access-token=clitok"]);
     const merged = merge(cli, env);
     expect(merged.disableSkills).toBe("seer");
+  });
+
+  it("applies precedence for agentProvider: CLI over env", () => {
+    const env = parseEnv({
+      SENTRY_ACCESS_TOKEN: "envtok",
+      EMBEDDED_AGENT_PROVIDER: "openai",
+    } as any);
+    const cli = parseArgv([
+      "--access-token=clitok",
+      "--agent-provider=azure-openai",
+    ]);
+    const merged = merge(cli, env);
+    expect(merged.agentProvider).toBe("azure-openai");
   });
 });

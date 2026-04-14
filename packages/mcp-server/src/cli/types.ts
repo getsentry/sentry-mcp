@@ -73,7 +73,7 @@ export type PartiallyResolvedConfig = {
   openaiModel?: string;
   anthropicBaseUrl?: string;
   anthropicModel?: string;
-  agentProvider?: "openai" | "anthropic";
+  agentProvider?: "openai" | "azure-openai" | "anthropic";
   /** Skills granted for this session (always populated by finalize()) */
   finalSkills: Set<Skill>;
   organizationSlug?: string;

@@ -32,6 +32,7 @@ import { authCommand } from "./cli/commands/auth";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
 import { SKILLS } from "@sentry/mcp-core/skills";
 import {
+  getAgentProvider,
   setAgentProvider,
   setProviderBaseUrls,
   getResolvedProviderType,
@@ -91,7 +92,9 @@ async function main() {
 
   // Configure embedded agent provider
   if (cfg.agentProvider) {
-    setAgentProvider(cfg.agentProvider);
+    setAgentProvider(
+      cfg.agentProvider as Parameters<typeof setAgentProvider>[0],
+    );
   }
   setProviderBaseUrls({
     openaiBaseUrl: cfg.openaiBaseUrl,
@@ -131,10 +134,14 @@ async function main() {
     const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
 
     // Check if configured provider's key is missing but other key is present
-    if (configured === "openai" && !hasOpenAI && hasAnthropic) {
+    if (
+      (configured === "openai" || configured === "azure-openai") &&
+      !hasOpenAI &&
+      hasAnthropic
+    ) {
       return {
         mismatch: true,
-        configured: "openai",
+        configured,
         availableKey: "ANTHROPIC_API_KEY",
       };
     }
@@ -159,23 +166,36 @@ async function main() {
   }
 
   // Check for LLM API keys and warn if none available
-  const resolvedProvider = getResolvedProviderType();
+  const resolvedProvider = getResolvedProviderType() as
+    | "openai"
+    | "azure-openai"
+    | "anthropic"
+    | undefined;
 
   if (!resolvedProvider) {
     const mismatchInfo = hasProviderMismatch();
+    let providerConfigError: string | undefined;
+    try {
+      getAgentProvider();
+    } catch (error) {
+      providerConfigError =
+        error instanceof Error ? error.message : String(error);
+    }
+
     if (hasProviderConflict()) {
       console.warn(
         "Warning: Both ANTHROPIC_API_KEY and OPENAI_API_KEY are set, but no provider is explicitly configured.",
       );
       console.warn(
-        "Please set EMBEDDED_AGENT_PROVIDER='openai' or 'anthropic' to specify which provider to use.",
+        "Please set EMBEDDED_AGENT_PROVIDER='openai', 'azure-openai', or 'anthropic' to specify which provider to use.",
       );
       console.warn(
         "AI-powered search tools will be unavailable until a provider is selected.",
       );
     } else if (mismatchInfo.mismatch) {
       const expectedKey =
-        mismatchInfo.configured === "openai"
+        mismatchInfo.configured === "openai" ||
+        mismatchInfo.configured === "azure-openai"
           ? "OPENAI_API_KEY"
           : "ANTHROPIC_API_KEY";
       const configuredViaCliFlag = Boolean(cli.agentProvider);
@@ -196,6 +216,14 @@ async function main() {
       console.warn(
         "AI-powered search tools will be unavailable until this is resolved.",
       );
+    } else if (
+      providerConfigError &&
+      !providerConfigError.startsWith("No embedded agent provider configured")
+    ) {
+      console.warn(`Warning: ${providerConfigError}`);
+      console.warn(
+        "AI-powered search tools will be unavailable until this is resolved.",
+      );
     } else {
       console.warn(
         "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
@@ -213,8 +241,9 @@ async function main() {
     console.warn("");
   } else {
     const providerSource = getProviderSource();
+    const providerLabel = getAgentProvider().label;
     console.warn(
-      `Using ${resolvedProvider} for AI-powered search tools (${providerSource}).`,
+      `Using ${providerLabel} for AI-powered search tools (${providerSource}).`,
     );
     // Warn about auto-detection deprecation
     if (providerSource === "auto-detected") {
