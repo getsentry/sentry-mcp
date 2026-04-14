@@ -31,7 +31,6 @@ import { resolveAccessToken } from "./auth/resolve-token";
 import { authCommand } from "./cli/commands/auth";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
 import { SKILLS } from "@sentry/mcp-core/skills";
-import { getAzureOpenAIApiSurface } from "@sentry/mcp-core/internal/agents/azure-openai-provider";
 import {
   getAgentProvider,
   setAgentProvider,
@@ -242,15 +241,11 @@ async function main() {
     console.warn("");
   } else {
     const providerSource = getProviderSource();
-    const azureApiSurfaceLabel =
-      getAzureOpenAIApiSurface() === "chat-completions"
-        ? "chat completions"
-        : "responses";
     const providerLabel =
       resolvedProvider === "openai"
         ? "openai responses API"
         : resolvedProvider === "azure-openai"
-          ? `azure-openai ${azureApiSurfaceLabel} API`
+          ? "azure-openai API"
           : "anthropic";
     console.warn(
       `Using ${providerLabel} for AI-powered search tools (${providerSource}).`,
