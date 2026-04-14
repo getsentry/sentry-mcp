@@ -31,6 +31,7 @@ import { resolveAccessToken } from "./auth/resolve-token";
 import { authCommand } from "./cli/commands/auth";
 import { sentryBeforeSend } from "@sentry/mcp-core/telem/sentry";
 import { SKILLS } from "@sentry/mcp-core/skills";
+import { getAzureOpenAIApiSurface } from "@sentry/mcp-core/internal/agents/azure-openai-provider";
 import {
   getAgentProvider,
   setAgentProvider,
@@ -48,24 +49,6 @@ function die(message: string): never {
   console.error(message);
   console.error(usageText);
   process.exit(1);
-}
-
-function hasAzureDeploymentPath(baseUrl: string | undefined): boolean {
-  if (!baseUrl) {
-    return false;
-  }
-
-  const pathname = new URL(baseUrl).pathname.replace(/\/+$/, "");
-  return /\/openai\/deployments\/[^/]+$/i.test(pathname);
-}
-
-function hasAzureV1Path(baseUrl: string | undefined): boolean {
-  if (!baseUrl) {
-    return false;
-  }
-
-  const pathname = new URL(baseUrl).pathname.replace(/\/+$/, "");
-  return /\/openai\/v1$/i.test(pathname);
 }
 
 async function main() {
@@ -263,11 +246,7 @@ async function main() {
       resolvedProvider === "openai"
         ? "openai responses API"
         : resolvedProvider === "azure-openai"
-          ? hasAzureDeploymentPath(cfg.openaiBaseUrl)
-            ? "azure-openai chat-completions API"
-            : hasAzureV1Path(cfg.openaiBaseUrl)
-              ? "azure-openai responses API"
-              : "azure-openai"
+          ? `azure-openai ${getAzureOpenAIApiSurface()} API`
           : "anthropic";
     console.warn(
       `Using ${providerLabel} for AI-powered search tools (${providerSource}).`,
