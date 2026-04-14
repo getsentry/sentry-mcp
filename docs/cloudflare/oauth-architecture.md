@@ -347,11 +347,23 @@ The MCP worker exposes:
 
 - `/.well-known/oauth-authorization-server` - MCP OAuth server metadata
 - `/.well-known/oauth-protected-resource/mcp...` - Path-specific protected resource metadata per RFC 9728
+- `/.well-known/oauth-authorization-server/mcp...` - Compatibility metadata for clients that probe path-scoped RFC 8414 discovery from the MCP resource URL
 
 The worker only serves path-specific protected-resource metadata for `/mcp...`
 resources. Each metadata document preserves the exact `/mcp` path and any query
 parameters so the advertised `resource` value matches the protected resource
 identifier used for discovery.
+
+The path-scoped RFC 8414 discovery endpoint is a compatibility shim. It is not
+the canonical MCP discovery flow. Instead, it exists for clients that infer the
+RFC 8414 URL directly from the `/mcp/...` endpoint path. The compatibility
+response keeps the exact protected-resource query string in the RFC 8707
+`resource` parameter, while emitting a query-free `issuer` so the document
+remains valid RFC 8414 metadata.
+
+When a constrained OAuth request includes `resource=/mcp/{org}` or
+`resource=/mcp/{org}/{project}`, the approval page surfaces that scope to the
+user as a "Session scope" banner before permissions are granted.
 
 Note: These describe the MCP OAuth server, not Sentry's OAuth endpoints.
 

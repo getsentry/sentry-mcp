@@ -13,6 +13,7 @@ import { createRequestLogger } from "./logging";
 import mcpRoutes from "./routes/mcp";
 import { getClientIp } from "./utils/client-ip";
 import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
+import { createScopedAuthorizationServerMetadataResponse } from "./authorization-server-metadata";
 
 /** Derive the base URL (origin) from the current request. */
 function getBaseUrl(c: Context): string {
@@ -171,6 +172,14 @@ const app = new Hono<{
   .get(
     "/.well-known/oauth-protected-resource/mcp/*",
     handleOAuthProtectedResourceMetadata,
+  )
+  // Compatibility shim for clients that probe path-scoped RFC 8414 discovery
+  // endpoints instead of RFC 9728 protected resource metadata.
+  .get("/.well-known/oauth-authorization-server/mcp", (c) =>
+    createScopedAuthorizationServerMetadataResponse(new URL(c.req.url)),
+  )
+  .get("/.well-known/oauth-authorization-server/mcp/*", (c) =>
+    createScopedAuthorizationServerMetadataResponse(new URL(c.req.url)),
   )
   .route("/oauth", sentryOauth)
   .route("/api/auth", chatOauth)

@@ -61,6 +61,49 @@ describe("approval-dialog", () => {
       // Should not contain any script tags (JavaScript-free implementation)
       expect(html).not.toContain("<script>");
     });
+
+    it("should render organization scope summary when provided", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Sentry MCP" },
+          scope: { organizationSlug: "sentry", projectSlug: null },
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+
+      const html = await response.text();
+
+      expect(html).toContain("Session scope");
+      expect(html).toContain("This session will be limited to the");
+      expect(html).toContain(">sentry</strong> organization");
+      expect(html).toContain(
+        "The permissions below apply only within this scope.",
+      );
+    });
+
+    it("should render project scope summary when provided", async () => {
+      const response = await renderApprovalDialog(
+        new Request("https://example.com/oauth/authorize"),
+        {
+          client: mockClient,
+          server: { name: "Sentry MCP" },
+          scope: {
+            organizationSlug: "sentry",
+            projectSlug: "javascript",
+          },
+          state: { oauthReqInfo: { clientId: "test-client" } },
+          cookieSecret: TEST_SECRET,
+        },
+      );
+
+      const html = await response.text();
+
+      expect(html).toContain(">javascript</strong> project");
+      expect(html).toContain(">sentry</strong> organization");
+    });
   });
 
   describe("CSRF protection with HMAC-signed state", () => {

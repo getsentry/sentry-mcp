@@ -373,6 +373,30 @@ describeIfPreviewUrl(
       expect(allowMethods).toContain("GET");
     });
 
+    it("should serve scoped OAuth metadata with a resource-aware authorization endpoint", async () => {
+      const { response, data } = await safeFetch(
+        `${PREVIEW_URL}/.well-known/oauth-authorization-server/mcp/sentry/mcp-server`,
+        {
+          headers: {
+            Origin: "http://localhost:6274",
+          },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("access-control-allow-origin")).toBe("*");
+
+      expect(data).toHaveProperty("issuer");
+      expect(data.issuer).toBe(`${PREVIEW_URL}/mcp/sentry/mcp-server`);
+      expect(data).toHaveProperty("authorization_endpoint");
+
+      const authorizationEndpoint = new URL(data.authorization_endpoint);
+      expect(authorizationEndpoint.pathname).toBe("/oauth/authorize");
+      expect(authorizationEndpoint.searchParams.get("resource")).toBe(
+        `${PREVIEW_URL}/mcp/sentry/mcp-server`,
+      );
+    });
+
     it("should respond quickly (under 2 seconds)", async () => {
       const start = Date.now();
       const { response } = await safeFetch(PREVIEW_URL);

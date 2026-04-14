@@ -222,6 +222,10 @@ pnpm -w run cli --mcp-host=http://localhost:5173/mcp/sentry "find_projects()"
 pnpm -w run cli --mcp-host=http://localhost:5173/mcp/sentry "find_projects(organizationSlug='other-org')"
 ```
 
+**Verify OAuth consent shows the constraint:**
+- Start a fresh OAuth flow against a constrained MCP URL such as `http://localhost:5173/mcp/sentry` or `http://localhost:5173/mcp/sentry/javascript`
+- On the approval page, confirm the "Session scope" banner matches the constrained organization or project before approving
+
 **Note:** When testing with constraints, some tools are automatically filtered:
 - With org constraint: `find_organizations` is not available (18 tools instead of 19)
 - With org + project constraints: both `find_organizations` and `find_projects` are not available (17 tools instead of 19)

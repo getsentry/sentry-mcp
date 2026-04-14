@@ -221,4 +221,55 @@ describe("app", () => {
       });
     });
   });
+
+  describe("GET /.well-known/oauth-authorization-server/mcp", () => {
+    it("should return scoped OAuth metadata with a resource-aware authorization endpoint", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server/mcp/sentry/mcp-server",
+        { headers: TEST_HEADERS },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json).toEqual({
+        issuer: "https://mcp.sentry.dev/mcp/sentry/mcp-server",
+        authorization_endpoint:
+          "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server",
+        token_endpoint: "https://mcp.sentry.dev/oauth/token",
+        registration_endpoint: "https://mcp.sentry.dev/oauth/register",
+        scopes_supported: [
+          "org:read",
+          "project:write",
+          "team:write",
+          "event:write",
+        ],
+        response_types_supported: ["code"],
+        response_modes_supported: ["query"],
+        grant_types_supported: ["authorization_code", "refresh_token"],
+        token_endpoint_auth_methods_supported: [
+          "client_secret_basic",
+          "client_secret_post",
+          "none",
+        ],
+        revocation_endpoint: "https://mcp.sentry.dev/oauth/token",
+        code_challenge_methods_supported: ["plain", "S256"],
+      });
+    });
+
+    it("should keep query flags in resource while emitting a query-free issuer", async () => {
+      const res = await app.request(
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server/mcp/sentry/mcp-server?experimental=1",
+        { headers: TEST_HEADERS },
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.authorization_endpoint).toBe(
+        "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server%3Fexperimental%3D1",
+      );
+      expect(json.issuer).toBe("https://mcp.sentry.dev/mcp/sentry/mcp-server");
+    });
+  });
 });

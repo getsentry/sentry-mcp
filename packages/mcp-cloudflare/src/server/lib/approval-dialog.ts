@@ -193,6 +193,13 @@ export interface ApprovalDialogOptions {
     description?: string;
   };
   /**
+   * Optional organization/project constraints applied to this session.
+   */
+  scope?: {
+    organizationSlug: string;
+    projectSlug: string | null;
+  } | null;
+  /**
    * Arbitrary state data to pass through the approval flow
    * Will be encoded in the form and returned when approval is complete
    */
@@ -268,7 +275,7 @@ export async function renderApprovalDialog(
   request: Request,
   options: ApprovalDialogOptions,
 ): Promise<Response> {
-  const { client, server, state, cookieSecret } = options;
+  const { client, server, scope, state, cookieSecret } = options;
 
   // Use static skill definitions bundled at build time
   const skills: SkillDefinition[] = skillDefinitions as SkillDefinition[];
@@ -329,6 +336,20 @@ export async function renderApprovalDialog(
       `;
     })
     .join("");
+
+  const scopeHtml = scope
+    ? `
+      <section class="scope-banner" role="note" aria-label="Session scope">
+        <div class="scope-label">Session scope</div>
+        <p class="scope-message">${
+          scope.projectSlug
+            ? `This session will be limited to the <strong class="scope-token">${sanitizeHtml(scope.projectSlug)}</strong> project in the <strong class="scope-token">${sanitizeHtml(scope.organizationSlug)}</strong> organization.`
+            : `This session will be limited to the <strong class="scope-token">${sanitizeHtml(scope.organizationSlug)}</strong> organization.`
+        }</p>
+        <p class="scope-help">The permissions below apply only within this scope.</p>
+      </section>
+    `
+    : "";
 
   // Generate HTML for the approval dialog
   const htmlContent = `
@@ -441,6 +462,57 @@ export async function renderApprovalDialog(
             text-align: center;
             color: var(--text-primary);
             line-height: 1.4;
+          }
+
+          .scope-banner {
+            margin: 0 0 var(--space-xl) 0;
+            padding: var(--space-lg);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(171, 99, 232, 0.28);
+            background:
+              linear-gradient(180deg, rgba(171, 99, 232, 0.10), rgba(171, 99, 232, 0.03)),
+              rgba(255, 255, 255, 0.02);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+          }
+
+          .scope-label {
+            display: inline-flex;
+            align-items: center;
+            margin-bottom: var(--space-sm);
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            background: rgba(171, 99, 232, 0.14);
+            color: var(--purple-light);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+          }
+
+          .scope-message {
+            margin: 0 0 var(--space-sm) 0;
+            color: var(--text-primary);
+            font-size: 1rem;
+            line-height: 1.6;
+          }
+
+          .scope-help {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+          }
+
+          .scope-token {
+            display: inline-block;
+            padding: 0.0625rem 0.45rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.95em;
+            font-weight: 700;
+            white-space: nowrap;
           }
 
           .policy-links {
@@ -716,6 +788,8 @@ export async function renderApprovalDialog(
           <main class="card">
 
             <p class="alert"><strong>${clientUri ? `<a href="${clientUri}" target="_blank" rel="noopener noreferrer">${clientName}</a>` : clientName}</strong> is requesting access to Sentry</p>
+
+            ${scopeHtml}
 
             <form method="post" action="${new URL(request.url).pathname}" aria-label="Authorization form">
               <input type="hidden" name="state" value="${encodedState}">
