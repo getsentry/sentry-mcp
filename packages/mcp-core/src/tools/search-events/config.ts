@@ -345,7 +345,7 @@ export const DATASET_FIELDS = {
   logs: {
     // Log-specific fields
     message: "Log message",
-    severity: "Log severity level",
+    severity: "Log severity level (trace, debug, info, warn, error, fatal)",
     severity_number: "Numeric severity level",
     "sentry.item_id": "Sentry item ID",
     "sentry.observed_timestamp_nanos": "Observed timestamp in nanoseconds",
@@ -582,7 +582,7 @@ export const DATASET_EXAMPLES: Record<
     {
       description: "warning logs about memory",
       output: {
-        query: 'severity:warning AND message:"*memory*"',
+        query: 'severity:warn AND message:"*memory*"',
         fields: ["timestamp", "message", "severity", "trace"],
         sort: "-timestamp",
       },
