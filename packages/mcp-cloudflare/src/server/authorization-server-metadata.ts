@@ -1,21 +1,23 @@
 import { SCOPES } from "../constants";
 
 const OAUTH_METADATA_PREFIX = "/.well-known/oauth-authorization-server";
-const OIDC_METADATA_PREFIX = "/.well-known/openid-configuration";
 
 // RFC 8414 defines authorization server metadata at the root
 // `/.well-known/oauth-authorization-server` endpoint. RFC 9728 defines
 // path-specific protected resource metadata at
 // `/.well-known/oauth-protected-resource/...`.
 //
-// Some MCP clients currently probe path-scoped RFC 8414 and OIDC discovery URLs
-// instead of RFC 9728 protected resource metadata. For those clients, we return a
-// compatibility document whose authorization endpoint is pre-populated with the
-// RFC 8707 `resource` parameter for the scoped `/mcp/...` URL.
+// Some MCP clients currently probe path-scoped RFC 8414 discovery URLs instead
+// of RFC 9728 protected resource metadata. For those clients, we return a
+// compatibility document whose authorization endpoint is pre-populated with
+// the RFC 8707 `resource` parameter for the scoped `/mcp/...` URL.
 
-function getResourceSuffix(requestUrl: URL, prefix: string): string {
-  const resourcePath = requestUrl.pathname.replace(prefix, "");
-  return `${resourcePath}${requestUrl.search}`;
+function getResourcePath(requestUrl: URL): string {
+  return requestUrl.pathname.replace(OAUTH_METADATA_PREFIX, "");
+}
+
+function getResourceUrl(requestUrl: URL, resourcePath: string): string {
+  return `${requestUrl.origin}${resourcePath}${requestUrl.search}`;
 }
 
 function createAuthorizationEndpoint(
@@ -33,17 +35,14 @@ function createAuthorizationEndpoint(
 export function createScopedAuthorizationServerMetadataResponse(
   requestUrl: URL,
 ): Response {
-  const prefix = requestUrl.pathname.startsWith(OIDC_METADATA_PREFIX)
-    ? OIDC_METADATA_PREFIX
-    : OAUTH_METADATA_PREFIX;
-  const resourceSuffix = getResourceSuffix(requestUrl, prefix);
-  const resourceUrl = `${requestUrl.origin}${resourceSuffix}`;
+  const resourcePath = getResourcePath(requestUrl);
+  const resourceUrl = getResourceUrl(requestUrl, resourcePath);
 
   const metadata = {
     // RFC 8414 §3 requires the issuer in the metadata document to match the
-    // issuer identifier used to derive the well-known URL. For this
-    // compatibility response, that identifier is the probed `/mcp/...` URL.
-    issuer: resourceUrl,
+    // issuer identifier used to derive the well-known URL. That identifier
+    // can include a path, but RFC 8414 §2 forbids query components.
+    issuer: `${requestUrl.origin}${resourcePath}`,
     authorization_endpoint: createAuthorizationEndpoint(
       resourceUrl,
       requestUrl.origin,

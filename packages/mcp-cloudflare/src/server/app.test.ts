@@ -256,12 +256,10 @@ describe("app", () => {
         code_challenge_methods_supported: ["plain", "S256"],
       });
     });
-  });
 
-  describe("GET /.well-known/openid-configuration/mcp", () => {
-    it("should mirror scoped OAuth metadata for clients that probe the OIDC path", async () => {
+    it("should keep query flags in resource while emitting a query-free issuer", async () => {
       const res = await app.request(
-        "https://mcp.sentry.dev/.well-known/openid-configuration/mcp/sentry",
+        "https://mcp.sentry.dev/.well-known/oauth-authorization-server/mcp/sentry/mcp-server?experimental=1",
         { headers: TEST_HEADERS },
       );
 
@@ -269,9 +267,9 @@ describe("app", () => {
 
       const json = await res.json();
       expect(json.authorization_endpoint).toBe(
-        "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry",
+        "https://mcp.sentry.dev/oauth/authorize?resource=https%3A%2F%2Fmcp.sentry.dev%2Fmcp%2Fsentry%2Fmcp-server%3Fexperimental%3D1",
       );
-      expect(json.issuer).toBe("https://mcp.sentry.dev/mcp/sentry");
+      expect(json.issuer).toBe("https://mcp.sentry.dev/mcp/sentry/mcp-server");
     });
   });
 });

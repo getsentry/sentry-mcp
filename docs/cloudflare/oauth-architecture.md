@@ -348,21 +348,18 @@ The MCP worker exposes:
 - `/.well-known/oauth-authorization-server` - MCP OAuth server metadata
 - `/.well-known/oauth-protected-resource/mcp...` - Path-specific protected resource metadata per RFC 9728
 - `/.well-known/oauth-authorization-server/mcp...` - Compatibility metadata for clients that probe path-scoped RFC 8414 discovery from the MCP resource URL
-- `/.well-known/openid-configuration/mcp...` - Compatibility metadata for clients that probe path-scoped OIDC discovery from the MCP resource URL
 
 The worker only serves path-specific protected-resource metadata for `/mcp...`
 resources. Each metadata document preserves the exact `/mcp` path and any query
 parameters so the advertised `resource` value matches the protected resource
 identifier used for discovery.
 
-The path-scoped RFC 8414 and OIDC discovery endpoints are compatibility shims.
-They are not the canonical MCP discovery flow. Instead, they exist for clients
-that infer discovery URLs directly from the `/mcp/...` endpoint path. To remain
-valid RFC 8414 / OIDC discovery documents, each scoped metadata response uses
-that probed `/mcp/...` URL as its `issuer`, while still returning a shared
-authorization endpoint pre-populated with the RFC 8707 `resource` parameter for
-the exact protected resource. This keeps constrained OAuth flows aligned with
-the protected resource even when a client skips RFC 9728 discovery.
+The path-scoped RFC 8414 discovery endpoint is a compatibility shim. It is not
+the canonical MCP discovery flow. Instead, it exists for clients that infer the
+RFC 8414 URL directly from the `/mcp/...` endpoint path. The compatibility
+response keeps the exact protected-resource query string in the RFC 8707
+`resource` parameter, while emitting a query-free `issuer` so the document
+remains valid RFC 8414 metadata.
 
 When a constrained OAuth request includes `resource=/mcp/{org}` or
 `resource=/mcp/{org}/{project}`, the approval page surfaces that scope to the

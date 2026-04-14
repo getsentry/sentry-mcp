@@ -173,18 +173,12 @@ const app = new Hono<{
     "/.well-known/oauth-protected-resource/mcp/*",
     handleOAuthProtectedResourceMetadata,
   )
-  // Compatibility shim for clients that probe path-scoped RFC 8414 / OIDC
-  // discovery endpoints instead of RFC 9728 protected resource metadata.
+  // Compatibility shim for clients that probe path-scoped RFC 8414 discovery
+  // endpoints instead of RFC 9728 protected resource metadata.
   .get("/.well-known/oauth-authorization-server/mcp", (c) =>
     createScopedAuthorizationServerMetadataResponse(new URL(c.req.url)),
   )
   .get("/.well-known/oauth-authorization-server/mcp/*", (c) =>
-    createScopedAuthorizationServerMetadataResponse(new URL(c.req.url)),
-  )
-  .get("/.well-known/openid-configuration/mcp", (c) =>
-    createScopedAuthorizationServerMetadataResponse(new URL(c.req.url)),
-  )
-  .get("/.well-known/openid-configuration/mcp/*", (c) =>
     createScopedAuthorizationServerMetadataResponse(new URL(c.req.url)),
   )
   .route("/oauth", sentryOauth)
