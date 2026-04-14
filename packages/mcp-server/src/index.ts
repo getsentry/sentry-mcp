@@ -242,11 +242,15 @@ async function main() {
     console.warn("");
   } else {
     const providerSource = getProviderSource();
+    const azureApiSurfaceLabel =
+      getAzureOpenAIApiSurface() === "chat-completions"
+        ? "chat completions"
+        : "responses";
     const providerLabel =
       resolvedProvider === "openai"
         ? "openai responses API"
         : resolvedProvider === "azure-openai"
-          ? `azure-openai ${getAzureOpenAIApiSurface()} API`
+          ? `azure-openai ${azureApiSurfaceLabel} API`
           : "anthropic";
     console.warn(
       `Using ${providerLabel} for AI-powered search tools (${providerSource}).`,
