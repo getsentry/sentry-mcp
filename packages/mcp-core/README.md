@@ -44,11 +44,14 @@ npx @sentry/mcp-server@latest --access-token=TOKEN --openai-base-url=https://pro
 npx @sentry/mcp-server@latest --access-token=TOKEN --agent-provider=azure-openai --openai-base-url=https://example.openai.azure.com/openai/v1/
 ```
 
-Azure-style deployment URLs such as
-`https://.../openai/deployments/<deployment>` are treated as deployment-based
-chat-completions endpoints for compatibility with Azure and similar proxies.
-Responses-only models on deployment URLs must use the canonical OpenAI model
-name rather than an opaque deployment alias.
+For Azure OpenAI or Azure-compatible deployment proxies, use the dedicated
+`azure-openai` provider instead of generic `openai` mode:
+
+- `/openai/v1` endpoints use the Responses API
+- `/openai/deployments/<deployment>` endpoints use chat completions
+
+Generic `openai` mode always uses the Responses API and treats `OPENAI_MODEL`
+as an opaque model identifier.
 
 ### Constraint-Based Tool Exclusion
 

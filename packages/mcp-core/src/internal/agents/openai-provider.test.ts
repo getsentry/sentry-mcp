@@ -95,6 +95,47 @@ describe("openai-provider", () => {
       expect(fetchMock).toHaveBeenCalledOnce();
     });
 
+    it("keeps responses API for deployment-style URLs in generic openai mode", async () => {
+      process.env.OPENAI_API_KEY = "test-key";
+      setOpenAIBaseUrl(
+        "https://proxy.example.com/openai/deployments/test-model",
+      );
+
+      const fetchMock = vi.fn(async (input: Request | URL | string) => {
+        const url = input instanceof Request ? input.url : input.toString();
+
+        expect(url).toBe(
+          "https://proxy.example.com/openai/deployments/test-model/responses",
+        );
+
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: "boom",
+              type: "invalid_request_error",
+              param: null,
+              code: "bad_request",
+            },
+          }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      });
+
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        generateText({
+          model: getOpenAIModel("my-company-assistant"),
+          prompt: "hello",
+        }),
+      ).rejects.toThrow();
+
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
     it("ignores OPENAI_API_VERSION for generic openai provider requests", async () => {
       process.env.OPENAI_API_KEY = "test-key";
       process.env.OPENAI_API_VERSION = "2024-02-15-preview";

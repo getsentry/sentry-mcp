@@ -1,6 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
-import { ConfigurationError } from "../../errors";
 import { USER_AGENT } from "../../version";
 
 // Default configuration constants
@@ -15,56 +14,6 @@ let configuredBaseUrl: string | undefined;
  */
 export function setOpenAIBaseUrl(baseUrl: string | undefined): void {
   configuredBaseUrl = baseUrl;
-}
-
-function hasAzureDeploymentPath(baseUrl: string): boolean {
-  const pathname = new URL(baseUrl).pathname.replace(/\/+$/, "");
-  return /\/openai\/deployments\/[^/]+$/i.test(pathname);
-}
-
-function isResponsesOnlyOpenAIModel(modelId: string): boolean {
-  return (
-    modelId.startsWith("codex-") ||
-    modelId.startsWith("computer-use-preview") ||
-    /^gpt-[\d.]+-codex(?:-|$)/.test(modelId)
-  );
-}
-
-function isCanonicalOpenAIModelId(modelId: string): boolean {
-  return (
-    modelId === "chatgpt-4o-latest" ||
-    modelId.startsWith("gpt-") ||
-    modelId.startsWith("o1") ||
-    modelId.startsWith("o3") ||
-    modelId.startsWith("o4") ||
-    modelId.startsWith("codex-") ||
-    modelId.startsWith("computer-use-preview")
-  );
-}
-
-function shouldUseChatCompletionsApi(modelId: string): boolean {
-  if (!configuredBaseUrl) {
-    return false;
-  }
-
-  // Azure-style deployment endpoints and compatible proxies typically expose
-  // chat completions at the deployment URL. Preserve the 0.29.x behavior there
-  // without forcing all custom base URLs or responses-only models off the
-  // Responses API. Opaque deployment aliases are rejected because we cannot
-  // safely infer whether they target a responses-only backend model.
-  if (
-    hasAzureDeploymentPath(configuredBaseUrl) &&
-    !isCanonicalOpenAIModelId(modelId)
-  ) {
-    throw new ConfigurationError(
-      `Deployment-style OpenAI base URLs require a canonical OPENAI_MODEL value. Use the formal OpenAI model name instead of the deployment alias "${modelId}" so the correct API can be selected.`,
-    );
-  }
-
-  return (
-    hasAzureDeploymentPath(configuredBaseUrl) &&
-    !isResponsesOnlyOpenAIModel(modelId)
-  );
 }
 
 /**
@@ -88,7 +37,7 @@ function shouldUseChatCompletionsApi(modelId: string): boolean {
  * provider so generic OpenAI-compatible endpoints keep predictable behavior.
  */
 export function getOpenAIModel(model?: string): LanguageModel {
-  const modelId = model ?? (process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL);
+  const defaultModel = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
 
   const factory = createOpenAI({
     ...(configuredBaseUrl && { baseURL: configuredBaseUrl }),
@@ -97,9 +46,5 @@ export function getOpenAIModel(model?: string): LanguageModel {
     },
   });
 
-  if (shouldUseChatCompletionsApi(modelId)) {
-    return factory.chat(modelId);
-  }
-
-  return factory(modelId);
+  return factory(model ?? defaultModel);
 }
