@@ -7,7 +7,10 @@ import { logError, logSuccess } from "./logger.js";
 import type { MCPConnection, RemoteMCPConfig } from "./types.js";
 import { randomUUID } from "node:crypto";
 import { LIB_VERSION } from "./version.js";
-import { resolveProtectedResourceUrl } from "./mcp-url.js";
+import {
+  applyProtectedResourceFlags,
+  resolveProtectedResourceUrl,
+} from "./mcp-url.js";
 
 export async function connectToRemoteMCPServer(
   config: RemoteMCPConfig,
@@ -29,19 +32,13 @@ export async function connectToRemoteMCPServer(
           const mcpUrl = resolveProtectedResourceUrl(
             config.mcpHost || DEFAULT_MCP_URL,
           );
+          applyProtectedResourceFlags(mcpUrl, config);
 
           // Remove custom attributes - let SDK handle standard attributes
           let accessToken = config.accessToken;
 
           // If no access token provided, we need to authenticate
           if (!accessToken) {
-            if (config.useAgentEndpoint) {
-              mcpUrl.searchParams.set("agent", "1");
-            }
-            if (config.useExperimental) {
-              mcpUrl.searchParams.set("experimental", "1");
-            }
-
             await startSpan(
               {
                 name: "mcp.auth/oauth",
@@ -66,14 +63,6 @@ export async function connectToRemoteMCPServer(
           }
 
           // Create HTTP streaming client with authentication
-          // Use ?agent=1 query param for agent mode, otherwise standard endpoint
-          // Use ?experimental=1 to enable experimental tools
-          if (config.useAgentEndpoint) {
-            mcpUrl.searchParams.set("agent", "1");
-          }
-          if (config.useExperimental) {
-            mcpUrl.searchParams.set("experimental", "1");
-          }
           const httpTransport = new StreamableHTTPClientTransport(mcpUrl, {
             requestInit: {
               headers: {
