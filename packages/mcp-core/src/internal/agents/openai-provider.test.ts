@@ -61,27 +61,32 @@ describe("openai-provider", () => {
     it("uses responses API for generic custom base URL requests", async () => {
       process.env.OPENAI_API_KEY = "test-key";
       setOpenAIBaseUrl("https://proxy.example.com/v1");
+      let requestUrl: string | undefined;
 
-      const fetchMock = vi.fn(async (input: Request | URL | string) => {
-        const url = input instanceof Request ? input.url : input.toString();
+      const fetchMock = vi.fn(
+        async (input: Request | URL | string, init?: RequestInit) => {
+          const request =
+            input instanceof Request
+              ? new Request(input, init)
+              : new Request(input.toString(), init);
+          requestUrl = request.url;
 
-        expect(url).toBe("https://proxy.example.com/v1/responses");
-
-        return new Response(
-          JSON.stringify({
-            error: {
-              message: "boom",
-              type: "invalid_request_error",
-              param: null,
-              code: "bad_request",
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: "boom",
+                type: "invalid_request_error",
+                param: null,
+                code: "bad_request",
+              },
+            }),
+            {
+              status: 400,
+              headers: { "content-type": "application/json" },
             },
-          }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json" },
-          },
-        );
-      });
+          );
+        },
+      );
 
       vi.stubGlobal("fetch", fetchMock);
 
@@ -93,6 +98,7 @@ describe("openai-provider", () => {
       ).rejects.toThrow();
 
       expect(fetchMock).toHaveBeenCalledOnce();
+      expect(requestUrl).toBe("https://proxy.example.com/v1/responses");
     });
 
     it("keeps responses API for deployment-style URLs in generic openai mode", async () => {
@@ -100,29 +106,32 @@ describe("openai-provider", () => {
       setOpenAIBaseUrl(
         "https://proxy.example.com/openai/deployments/test-model",
       );
+      let requestUrl: string | undefined;
 
-      const fetchMock = vi.fn(async (input: Request | URL | string) => {
-        const url = input instanceof Request ? input.url : input.toString();
+      const fetchMock = vi.fn(
+        async (input: Request | URL | string, init?: RequestInit) => {
+          const request =
+            input instanceof Request
+              ? new Request(input, init)
+              : new Request(input.toString(), init);
+          requestUrl = request.url;
 
-        expect(url).toBe(
-          "https://proxy.example.com/openai/deployments/test-model/responses",
-        );
-
-        return new Response(
-          JSON.stringify({
-            error: {
-              message: "boom",
-              type: "invalid_request_error",
-              param: null,
-              code: "bad_request",
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: "boom",
+                type: "invalid_request_error",
+                param: null,
+                code: "bad_request",
+              },
+            }),
+            {
+              status: 400,
+              headers: { "content-type": "application/json" },
             },
-          }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json" },
-          },
-        );
-      });
+          );
+        },
+      );
 
       vi.stubGlobal("fetch", fetchMock);
 
@@ -134,34 +143,41 @@ describe("openai-provider", () => {
       ).rejects.toThrow();
 
       expect(fetchMock).toHaveBeenCalledOnce();
+      expect(requestUrl).toBe(
+        "https://proxy.example.com/openai/deployments/test-model/responses",
+      );
     });
 
     it("ignores OPENAI_API_VERSION for generic openai provider requests", async () => {
       process.env.OPENAI_API_KEY = "test-key";
       process.env.OPENAI_API_VERSION = "2024-02-15-preview";
       setOpenAIBaseUrl("https://proxy.example.com/v1");
+      let requestUrl: string | undefined;
 
-      const fetchMock = vi.fn(async (input: Request | URL | string) => {
-        const url = input instanceof Request ? input.url : input.toString();
+      const fetchMock = vi.fn(
+        async (input: Request | URL | string, init?: RequestInit) => {
+          const request =
+            input instanceof Request
+              ? new Request(input, init)
+              : new Request(input.toString(), init);
+          requestUrl = request.url;
 
-        expect(url).toBe("https://proxy.example.com/v1/responses");
-        expect(url).not.toContain("api-version=");
-
-        return new Response(
-          JSON.stringify({
-            error: {
-              message: "boom",
-              type: "invalid_request_error",
-              param: null,
-              code: "bad_request",
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: "boom",
+                type: "invalid_request_error",
+                param: null,
+                code: "bad_request",
+              },
+            }),
+            {
+              status: 400,
+              headers: { "content-type": "application/json" },
             },
-          }),
-          {
-            status: 400,
-            headers: { "content-type": "application/json" },
-          },
-        );
-      });
+          );
+        },
+      );
 
       vi.stubGlobal("fetch", fetchMock);
 
@@ -173,6 +189,8 @@ describe("openai-provider", () => {
       ).rejects.toThrow();
 
       expect(fetchMock).toHaveBeenCalledOnce();
+      expect(requestUrl).toBe("https://proxy.example.com/v1/responses");
+      expect(requestUrl).not.toContain("api-version=");
     });
   });
 

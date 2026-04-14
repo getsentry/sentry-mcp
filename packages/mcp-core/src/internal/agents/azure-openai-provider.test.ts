@@ -64,30 +64,34 @@ describe("azure-openai-provider", () => {
     process.env.OPENAI_API_KEY = "test-key";
     process.env.OPENAI_API_VERSION = "2024-02-15-preview";
     setAzureOpenAIBaseUrl("https://proxy.example.com/openai/v1/");
+    let requestUrl: string | undefined;
+    let apiKeyHeader: string | null | undefined;
 
-    const fetchMock = vi.fn(async (input: Request | URL | string) => {
-      const request =
-        input instanceof Request ? input : new Request(input.toString());
+    const fetchMock = vi.fn(
+      async (input: Request | URL | string, init?: RequestInit) => {
+        const request =
+          input instanceof Request
+            ? new Request(input, init)
+            : new Request(input.toString(), init);
+        requestUrl = request.url;
+        apiKeyHeader = request.headers.get("api-key");
 
-      expect(request.url).toBe("https://proxy.example.com/openai/v1/responses");
-      expect(request.url).not.toContain("api-version=");
-      expect(request.headers.get("api-key")).toBe("test-key");
-
-      return new Response(
-        JSON.stringify({
-          error: {
-            message: "boom",
-            type: "invalid_request_error",
-            param: null,
-            code: "bad_request",
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: "boom",
+              type: "invalid_request_error",
+              param: null,
+              code: "bad_request",
+            },
+          }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json" },
           },
-        }),
-        {
-          status: 400,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    });
+        );
+      },
+    );
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -99,6 +103,9 @@ describe("azure-openai-provider", () => {
     ).rejects.toThrow();
 
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(requestUrl).toBe("https://proxy.example.com/openai/v1/responses");
+    expect(requestUrl).not.toContain("api-version=");
+    expect(apiKeyHeader).toBe("test-key");
   });
 
   it("uses chat completions for deployment-style Azure endpoints", async () => {
@@ -107,31 +114,34 @@ describe("azure-openai-provider", () => {
     setAzureOpenAIBaseUrl(
       "https://proxy.example.com/openai/deployments/test-model",
     );
+    let requestUrl: string | undefined;
+    let apiKeyHeader: string | null | undefined;
 
-    const fetchMock = vi.fn(async (input: Request | URL | string) => {
-      const request =
-        input instanceof Request ? input : new Request(input.toString());
+    const fetchMock = vi.fn(
+      async (input: Request | URL | string, init?: RequestInit) => {
+        const request =
+          input instanceof Request
+            ? new Request(input, init)
+            : new Request(input.toString(), init);
+        requestUrl = request.url;
+        apiKeyHeader = request.headers.get("api-key");
 
-      expect(request.url).toBe(
-        "https://proxy.example.com/openai/deployments/test-model/chat/completions?api-version=2024-02-15-preview",
-      );
-      expect(request.headers.get("api-key")).toBe("test-key");
-
-      return new Response(
-        JSON.stringify({
-          error: {
-            message: "boom",
-            type: "invalid_request_error",
-            param: null,
-            code: "bad_request",
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: "boom",
+              type: "invalid_request_error",
+              param: null,
+              code: "bad_request",
+            },
+          }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json" },
           },
-        }),
-        {
-          status: 400,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    });
+        );
+      },
+    );
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -143,6 +153,10 @@ describe("azure-openai-provider", () => {
     ).rejects.toThrow();
 
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(requestUrl).toBe(
+      "https://proxy.example.com/openai/deployments/test-model/chat/completions?api-version=2024-02-15-preview",
+    );
+    expect(apiKeyHeader).toBe("test-key");
   });
 
   it("treats deployment aliases as opaque model identifiers", () => {
