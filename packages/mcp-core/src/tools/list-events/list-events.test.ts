@@ -51,4 +51,29 @@ describe("list_events", () => {
     expect(typeof result).toBe("string");
     expect(result).toContain("Search Results");
   });
+
+  it("returns formatted tracemetrics aggregates", async () => {
+    const result = await listEvents.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        dataset: "tracemetrics",
+        query: "",
+        fields: [
+          "transaction",
+          "p95(value,http.request.duration,distribution,millisecond)",
+          "count(value,http.request.duration,distribution,millisecond)",
+        ],
+        sort: "-p95(value,http.request.duration,distribution,millisecond)",
+        projectSlug: null,
+        statsPeriod: "14d",
+        limit: 10,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain("Search Results");
+    expect(result).toContain("GET /api/users");
+    expect(result).toContain("/explore/metrics/");
+  });
 });

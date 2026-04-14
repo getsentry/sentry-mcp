@@ -853,6 +853,27 @@ describe("API query builders", () => {
       // Should not crash and should return the original sort if malformed
       expect(params.get("sort")).toBe("-count(((");
     });
+
+    it("should preserve raw sort parameters for tracemetrics", () => {
+      const apiService = new SentryApiService({ host: "sentry.io" });
+
+      // @ts-expect-error - accessing private method for testing
+      const params = apiService.buildDiscoverApiQuery({
+        query: "",
+        fields: [
+          "transaction",
+          "p95(value,http.request.duration,distribution,millisecond)",
+        ],
+        limit: 10,
+        dataset: "tracemetrics",
+        sort: "-p95(value,http.request.duration,distribution,millisecond)",
+      });
+
+      expect(params.get("dataset")).toBe("tracemetrics");
+      expect(params.get("sort")).toBe(
+        "-p95(value,http.request.duration,distribution,millisecond)",
+      );
+    });
   });
 
   describe("buildEapApiQuery", () => {
@@ -977,6 +998,44 @@ describe("API query builders", () => {
       );
       expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.stringContaining("sampling=NORMAL"),
+        expect.any(Object),
+      );
+    });
+
+    it("should route tracemetrics dataset through Discover query params without sort mangling", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () => Promise.resolve({ data: [] }),
+      });
+
+      await apiService.searchEvents({
+        organizationSlug: "test-org",
+        query: "",
+        fields: [
+          "transaction",
+          "p95(value,http.request.duration,distribution,millisecond)",
+        ],
+        dataset: "tracemetrics",
+        sort: "-p95(value,http.request.duration,distribution,millisecond)",
+      });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("dataset=tracemetrics"),
+        expect.any(Object),
+      );
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "sort=-p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29",
+        ),
         expect.any(Object),
       );
     });
@@ -1159,6 +1218,39 @@ describe("API query builders", () => {
 
         expect(url).toMatchInlineSnapshot(
           `"https://sentry.example.com/organizations/my-org/explore/traces/?query=&field=span.op&statsPeriod=24h&table=span"`,
+        );
+      });
+    });
+
+    describe("buildTraceMetricsUrl", () => {
+      it("should build a metrics page URL for tracemetrics aggregates", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        const url = apiService.getEventsExplorerUrl(
+          "my-org",
+          "",
+          "123456",
+          "tracemetrics",
+          [
+            "transaction",
+            "p95(value,http.request.duration,distribution,millisecond)",
+            "count(value,http.request.duration,distribution,millisecond)",
+          ],
+          "-p95(value,http.request.duration,distribution,millisecond)",
+          [
+            "p95(value,http.request.duration,distribution,millisecond)",
+            "count(value,http.request.duration,distribution,millisecond)",
+          ],
+          ["transaction"],
+          "7d",
+        );
+
+        expect(url).toContain("https://my-org.sentry.io/explore/metrics/");
+        expect(url).toContain("project=123456");
+        expect(url).toContain("statsPeriod=7d");
+        expect(url).toContain(`%22mode%22%3A%22aggregate%22`);
+        expect(url).toContain(
+          `%22field%22%3A%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22`,
         );
       });
     });

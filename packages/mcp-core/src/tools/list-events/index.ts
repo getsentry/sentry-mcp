@@ -11,6 +11,7 @@ import {
 import {
   formatErrorResults,
   formatLogResults,
+  formatTraceMetricsResults,
   formatSpanResults,
 } from "../search-events/formatters";
 import { RECOMMENDED_FIELDS } from "../search-events/config";
@@ -20,6 +21,7 @@ const DEFAULT_FIELDS = {
   errors: RECOMMENDED_FIELDS.errors.basic,
   logs: RECOMMENDED_FIELDS.logs.basic,
   spans: RECOMMENDED_FIELDS.spans.basic,
+  tracemetrics: RECOMMENDED_FIELDS.tracemetrics.basic,
 };
 
 export default defineTool({
@@ -40,6 +42,7 @@ export default defineTool({
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, traces, AI/LLM calls",
+    "- tracemetrics: Newer span metrics, counters, gauges, and distributions",
     "",
     "Query Syntax Examples:",
     '- message:"connection timeout"',
@@ -64,10 +67,10 @@ export default defineTool({
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     dataset: z
-      .enum(["errors", "logs", "spans"])
+      .enum(["errors", "logs", "spans", "tracemetrics"])
       .default("errors")
       .describe(
-        "Dataset to query: errors (exceptions), logs, or spans (traces)",
+        "Dataset to query: errors (exceptions), logs, spans (traces), or tracemetrics (newer span metrics)",
       ),
     query: z
       .string()
@@ -199,6 +202,8 @@ export default defineTool({
         return formatLogResults(formatParams);
       case "spans":
         return formatSpanResults(formatParams);
+      case "tracemetrics":
+        return formatTraceMetricsResults(formatParams);
     }
   },
 });

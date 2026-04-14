@@ -1,0 +1,60 @@
+{
+  "data": [
+    {
+      "id": "metric1",
+      "timestamp": "2026-04-13T14:19:18+00:00",
+      "project": "peated",
+      "trace": "6a477f5b0f31ef7b6b9b5e1dea66c91d",
+      "span_id": "07752c6aeb027c8f",
+      "metric.name": "http.request.duration",
+      "metric.type": "distribution",
+      "metric.unit": "millisecond",
+      "value": 12.4
+    },
+    {
+      "id": "metric2",
+      "timestamp": "2026-04-13T14:19:17+00:00",
+      "project": "peated",
+      "trace": "54177131c7b192a446124daba3136045",
+      "span_id": "7ab5edf5b3ba42c9",
+      "metric.name": "http.request.duration",
+      "metric.type": "distribution",
+      "metric.unit": "millisecond",
+      "value": 18.1
+    }
+  ],
+  "meta": {
+    "fields": {
+      "id": "string",
+      "timestamp": "string",
+      "project": "string",
+      "trace": "string",
+      "span_id": "string",
+      "metric.name": "string",
+      "metric.type": "string",
+      "metric.unit": "string",
+      "value": "number"
+    },
+    "units": {
+      "id": null,
+      "timestamp": null,
+      "project": null,
+      "trace": null,
+      "span_id": null,
+      "metric.name": null,
+      "metric.type": null,
+      "metric.unit": null,
+      "value": "millisecond"
+    },
+    "isMetricsData": true,
+    "isMetricsExtractedData": true,
+    "tips": {},
+    "datasetReason": "unchanged",
+    "dataset": "tracemetrics",
+    "dataScanned": "full",
+    "accuracy": {
+      "confidence": [{}, {}]
+    }
+  },
+  "confidence": [{}, {}]
+}

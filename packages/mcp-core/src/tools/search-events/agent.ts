@@ -12,7 +12,7 @@ import { systemPrompt } from "./config";
 export const searchEventsAgentOutputSchema = z
   .object({
     dataset: z
-      .enum(["spans", "errors", "logs"])
+      .enum(["spans", "errors", "logs", "tracemetrics"])
       .describe("Which dataset to use for the query"),
     query: z.string().describe("The Sentry query string for filtering results"),
     fields: z

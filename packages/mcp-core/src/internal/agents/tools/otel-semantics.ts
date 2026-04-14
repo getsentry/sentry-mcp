@@ -176,7 +176,7 @@ interface NamespaceData {
  */
 export async function lookupOtelSemantics(
   namespace: string,
-  dataset: "errors" | "logs" | "spans",
+  dataset: "errors" | "logs" | "spans" | "tracemetrics",
   apiService: SentryApiService,
   organizationSlug: string,
   projectId?: string,
@@ -266,7 +266,7 @@ export function createOtelLookupTool(options: {
           "The OpenTelemetry namespace to look up (e.g., 'gen_ai', 'db', 'http', 'mcp')",
         ),
       dataset: z
-        .enum(["spans", "errors", "logs"])
+        .enum(["spans", "errors", "logs", "tracemetrics"])
         .describe(
           "REQUIRED: Dataset to check attribute availability in. The agent MUST specify this based on their chosen dataset.",
         ),

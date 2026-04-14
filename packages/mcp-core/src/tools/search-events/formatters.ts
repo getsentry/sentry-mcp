@@ -475,3 +475,130 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
 
   return output;
 }
+
+/**
+ * Format trace metric results for display
+ */
+export function formatTraceMetricsResults(
+  params: FormatEventResultsParams,
+): string {
+  const {
+    eventData,
+    naturalLanguageQuery,
+    includeExplanation,
+    apiService,
+    organizationSlug,
+    explorerUrl,
+    sentryQuery,
+    fields,
+    explanation,
+  } = params;
+
+  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+
+  if (isAggregateQuery(fields)) {
+    output += `⚠️ **IMPORTANT**: Display these metric aggregates as a data table with proper column alignment, grouping labels, and units.\n\n`;
+  } else {
+    output += `⚠️ **IMPORTANT**: Display these as metric samples, highlighting the metric name, type, value, and trace context.\n\n`;
+  }
+
+  if (includeExplanation && explanation) {
+    output += formatExplanation(explanation);
+    output += `\n\n`;
+  }
+
+  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
+  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+
+  if (eventData.length === 0) {
+    logInfo(`No trace metric events found for query: ${naturalLanguageQuery}`, {
+      extra: {
+        query: sentryQuery,
+        fields,
+        organizationSlug,
+        dataset: "tracemetrics",
+      },
+    });
+    output += "No results found.\n\n";
+    output +=
+      "Try being more specific about the metric name, type, or filters.\n";
+    return output;
+  }
+
+  output += `Found ${eventData.length} ${isAggregateQuery(fields) ? `aggregate result${eventData.length === 1 ? "" : "s"}` : `metric sample${eventData.length === 1 ? "" : "s"}`}:\n\n`;
+
+  if (isAggregateQuery(fields)) {
+    output += "```json\n";
+    output += JSON.stringify(eventData, null, 2);
+    output += "\n```\n\n";
+  } else {
+    const priorityFields = [
+      "metric.name",
+      "metric.type",
+      "metric.unit",
+      "value",
+      "project",
+      "timestamp",
+      "trace",
+      "span_id",
+    ];
+
+    for (const event of eventData) {
+      const title =
+        getStringValue(event, "metric.name") ||
+        getStringValue(event, "trace") ||
+        "Metric Sample";
+
+      output += `## ${title}\n\n`;
+
+      for (const field of priorityFields) {
+        if (
+          field in event &&
+          event[field] !== null &&
+          event[field] !== undefined
+        ) {
+          const value = event[field];
+
+          if (field === "trace" && typeof value === "string") {
+            output += `**Trace ID**: ${value}\n`;
+            output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+          } else {
+            output += `**${field}**: ${formatEventValue(value)}\n`;
+          }
+        }
+      }
+
+      const displayedFields = new Set([...priorityFields, "id"]);
+      for (const [key, value] of Object.entries(event)) {
+        if (
+          !displayedFields.has(key) &&
+          value !== null &&
+          value !== undefined
+        ) {
+          if (key === "user" && typeof value === "object" && value !== null) {
+            for (const line of formatUserFieldLines(
+              value as Record<string, unknown>,
+            )) {
+              output += `${line}\n`;
+            }
+            continue;
+          }
+
+          output += `**${key}**: ${formatEventValue(value)}\n`;
+        }
+      }
+
+      output += "\n";
+    }
+  }
+
+  output += "## Next Steps\n\n";
+  output +=
+    "- Open the Metrics page link above to refine the selected metric\n";
+  output +=
+    "- Group by additional attributes to break down the metric further\n";
+  output +=
+    "- Switch between samples and aggregates in Sentry for deeper analysis\n";
+
+  return output;
+}

@@ -12,6 +12,7 @@ import { searchEventsAgent } from "./agent";
 import {
   formatErrorResults,
   formatLogResults,
+  formatTraceMetricsResults,
   formatSpanResults,
 } from "./formatters";
 import { RECOMMENDED_FIELDS } from "./config";
@@ -44,6 +45,7 @@ export default defineTool({
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, AI/LLM calls, token usage",
+    "- tracemetrics: Newer span metrics, metric values, counters, gauges, and distributions",
     "",
     "DO NOT USE for grouped issue lists → use search_issues",
     "",
@@ -256,6 +258,8 @@ export default defineTool({
         return formatLogResults(formatParams);
       case "spans":
         return formatSpanResults(formatParams);
+      case "tracemetrics":
+        return formatTraceMetricsResults(formatParams);
     }
   },
 });

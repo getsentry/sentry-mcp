@@ -758,17 +758,194 @@ export class SentryApiService {
     return `${path}?${urlParams.toString()}`;
   }
 
+  private extractTraceMetricFromAggregate(
+    field: string,
+  ): { name: string; type: string; unit?: string } | null {
+    const match = field.match(/^[^(]+\((.*)\)$/);
+    if (!match) {
+      return null;
+    }
+
+    const args = match[1]
+      .split(",")
+      .map((arg) => arg.trim())
+      .filter((arg) => arg.length > 0);
+
+    if (args.length < 4) {
+      return null;
+    }
+
+    const metricName = args[1];
+    const metricType = args[2];
+    const metricUnit = args[3];
+
+    if (!metricName || !metricType) {
+      return null;
+    }
+
+    return {
+      name: metricName,
+      type: metricType,
+      unit: metricUnit && metricUnit !== "-" ? metricUnit : undefined,
+    };
+  }
+
+  private extractTraceMetricFromQuery(
+    query: string,
+  ): { name: string; type: string; unit?: string } | null {
+    const extractValue = (field: string): string | null => {
+      const quotedMatch = query.match(new RegExp(`${field}:\"([^\"]+)\"`, "i"));
+      if (quotedMatch?.[1]) {
+        return quotedMatch[1];
+      }
+
+      const unquotedMatch = query.match(new RegExp(`${field}:([^\\s]+)`, "i"));
+      return unquotedMatch?.[1] ?? null;
+    };
+
+    const metricName = extractValue("metric\\.name");
+    const metricType = extractValue("metric\\.type");
+    const metricUnit = extractValue("metric\\.unit");
+
+    if (!metricName || !metricType) {
+      return null;
+    }
+
+    return {
+      name: metricName,
+      type: metricType,
+      unit: metricUnit && metricUnit !== "-" ? metricUnit : undefined,
+    };
+  }
+
+  private buildTraceMetricsUrl(params: {
+    organizationSlug: string;
+    query: string;
+    projectId?: string;
+    fields?: string[];
+    sort?: string;
+    statsPeriod?: string;
+    start?: string;
+    end?: string;
+    aggregateFunctions?: string[];
+    groupByFields?: string[];
+  }): string {
+    const {
+      organizationSlug,
+      query,
+      projectId,
+      fields,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      aggregateFunctions,
+      groupByFields,
+    } = params;
+
+    const urlParams = new URLSearchParams();
+
+    if (projectId) {
+      urlParams.set("project", projectId);
+    }
+
+    if (start && end) {
+      urlParams.set("start", start);
+      urlParams.set("end", end);
+    } else {
+      urlParams.set("statsPeriod", statsPeriod || "24h");
+    }
+
+    const parsedAggregateFunctions =
+      aggregateFunctions && aggregateFunctions.length > 0
+        ? aggregateFunctions
+        : (fields?.filter(
+            (field) => field.includes("(") && field.includes(")"),
+          ) ?? []);
+    const parsedGroupByFields =
+      groupByFields && groupByFields.length > 0
+        ? groupByFields
+        : (fields?.filter(
+            (field) => !field.includes("(") && !field.includes(")"),
+          ) ?? []);
+    const isAggregateQuery = parsedAggregateFunctions.length > 0;
+
+    const sortField = sort?.startsWith("-") ? sort.slice(1) : sort;
+    const sortKind = sort?.startsWith("-") ? "desc" : "asc";
+
+    const metricQueries = new Map<
+      string,
+      {
+        metric: { name: string; type: string; unit?: string };
+        yAxes: string[];
+      }
+    >();
+
+    if (isAggregateQuery) {
+      for (const aggregateField of parsedAggregateFunctions) {
+        const metric = this.extractTraceMetricFromAggregate(aggregateField) ?? {
+          name: "",
+          type: "",
+        };
+        const key = `${metric.name}|${metric.type}|${metric.unit ?? ""}`;
+        const existing = metricQueries.get(key);
+        if (existing) {
+          existing.yAxes.push(aggregateField);
+        } else {
+          metricQueries.set(key, {
+            metric,
+            yAxes: [aggregateField],
+          });
+        }
+      }
+    } else {
+      metricQueries.set("default", {
+        metric: this.extractTraceMetricFromQuery(query) ?? {
+          name: "",
+          type: "",
+        },
+        yAxes: ["sum(value)"],
+      });
+    }
+
+    for (const { metric, yAxes } of metricQueries.values()) {
+      urlParams.append(
+        "metric",
+        JSON.stringify({
+          metric,
+          query,
+          aggregateFields: [
+            { yAxes },
+            ...parsedGroupByFields.map((field) => ({ groupBy: field })),
+          ],
+          aggregateSortBys: sortField
+            ? [{ field: sortField, kind: sortKind }]
+            : [],
+          mode: isAggregateQuery ? "aggregate" : "samples",
+        }),
+      );
+    }
+
+    const webHost = this.isSaas() ? "sentry.io" : this.host;
+    const path = this.isSaas()
+      ? `https://${organizationSlug}.${webHost}/explore/metrics/`
+      : `https://${this.host}/organizations/${organizationSlug}/explore/metrics/`;
+
+    return `${path}?${urlParams.toString()}`;
+  }
+
   /**
    * Generates a Sentry events explorer URL for viewing search results.
    *
    * Routes to the appropriate API based on dataset:
    * - Errors: Uses legacy Discover API
    * - Spans/Logs: Uses modern EAP (Event Analytics Platform) API
+   * - Tracemetrics: Uses the Metrics page URL format
    *
    * @param organizationSlug Organization identifier
    * @param query Sentry search query
    * @param projectId Optional project filter
-   * @param dataset Dataset type (spans, errors, or logs)
+   * @param dataset Dataset type (spans, errors, logs, or tracemetrics)
    * @param fields Array of fields to include in results
    * @param sort Sort parameter (e.g., "-timestamp", "-count()")
    * @param aggregateFunctions Array of aggregate functions (only used for EAP datasets)
@@ -782,7 +959,7 @@ export class SentryApiService {
     organizationSlug: string,
     query: string,
     projectId?: string,
-    dataset: "spans" | "errors" | "logs" = "spans",
+    dataset: "spans" | "errors" | "logs" | "tracemetrics" = "spans",
     fields?: string[],
     sort?: string,
     aggregateFunctions?: string[],
@@ -794,6 +971,21 @@ export class SentryApiService {
     if (dataset === "errors") {
       // Route to legacy Discover API
       return this.buildDiscoverUrl({
+        organizationSlug,
+        query,
+        projectId,
+        fields,
+        sort,
+        statsPeriod,
+        start,
+        end,
+        aggregateFunctions,
+        groupByFields,
+      });
+    }
+
+    if (dataset === "tracemetrics") {
+      return this.buildTraceMetricsUrl({
         organizationSlug,
         query,
         projectId,
@@ -1380,7 +1572,7 @@ export class SentryApiService {
    *
    * @param params Query parameters
    * @param params.organizationSlug Organization identifier
-   * @param params.itemType Item type to query attributes for ("spans" or "logs")
+   * @param params.itemType Item type to query attributes for ("spans", "logs", or "tracemetrics")
    * @param params.project Numeric project ID to filter attributes
    * @param params.statsPeriod Time range for attribute statistics (e.g., "24h", "7d")
    * @param opts Request options
@@ -1396,7 +1588,7 @@ export class SentryApiService {
       end,
     }: {
       organizationSlug: string;
-      itemType?: "spans" | "logs";
+      itemType?: "spans" | "logs" | "tracemetrics";
       project?: string;
       statsPeriod?: string;
       start?: string;
@@ -1458,7 +1650,7 @@ export class SentryApiService {
 
   private async fetchTraceItemAttributesByType(
     organizationSlug: string,
-    itemType: "spans" | "logs",
+    itemType: "spans" | "logs" | "tracemetrics",
     attributeType: "string" | "number",
     project?: string,
     statsPeriod?: string,
@@ -2115,6 +2307,7 @@ export class SentryApiService {
     fields: string[];
     limit: number;
     projectId?: string;
+    dataset?: "errors" | "tracemetrics";
     statsPeriod?: string;
     start?: string;
     end?: string;
@@ -2125,7 +2318,7 @@ export class SentryApiService {
     // Basic parameters
     queryParams.set("per_page", params.limit.toString());
     queryParams.set("query", params.query);
-    queryParams.set("dataset", "errors");
+    queryParams.set("dataset", params.dataset ?? "errors");
 
     this.applyTimeParams(
       queryParams,
@@ -2141,7 +2334,11 @@ export class SentryApiService {
     // Sort parameter transformation for API compatibility
     let apiSort = params.sort;
     // Skip transformation for equation fields - they should be passed as-is
-    if (params.sort?.includes("(") && !params.sort?.includes("equation|")) {
+    if (
+      params.dataset !== "tracemetrics" &&
+      params.sort?.includes("(") &&
+      !params.sort?.includes("equation|")
+    ) {
       // Transform: count(field) -> count_field, count() -> count
       // Use safer string manipulation to avoid ReDoS
       const parenStart = params.sort.indexOf("(");
@@ -2259,7 +2456,7 @@ export class SentryApiService {
       fields: string[];
       limit?: number;
       projectId?: string;
-      dataset?: "spans" | "errors" | "logs";
+      dataset?: "spans" | "errors" | "logs" | "tracemetrics";
       statsPeriod?: string;
       start?: string;
       end?: string;
@@ -2269,13 +2466,14 @@ export class SentryApiService {
   ) {
     let queryParams: URLSearchParams;
 
-    if (dataset === "errors") {
+    if (dataset === "errors" || dataset === "tracemetrics") {
       // Use Discover API query builder
       queryParams = this.buildDiscoverApiQuery({
         query,
         fields,
         limit,
         projectId,
+        dataset,
         statsPeriod,
         start,
         end,
