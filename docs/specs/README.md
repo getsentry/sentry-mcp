@@ -1,6 +1,7 @@
 # Feature Specifications
 
-This directory contains detailed specifications for features in the Sentry MCP server. Each feature has its own subdirectory with related design documents, technical specifications, and implementation guides.
+This directory contains detailed specifications for features in the Sentry MCP
+server. Each spec should live in a single Markdown file under `docs/specs/`.
 
 
 ## Purpose
@@ -17,8 +18,8 @@ Feature specifications serve to:
 
 When adding a new feature specification:
 
-1. Create a new directory under `specs/` with a descriptive name
-2. Create a **single, concise README.md file** that covers:
+1. Create a new Markdown file under `specs/` with a descriptive name
+2. Keep the spec in a **single, concise `.md` file** that covers:
    - Problem statement and motivation
    - High-level design approach
    - Interface definitions (with code examples)
@@ -28,7 +29,7 @@ When adding a new feature specification:
 4. Link to the spec from relevant documentation
 
 **Important Guidelines**:
-- Keep specs in a single file (README.md)
+- Keep specs in a single file under `docs/specs/`
 - Focus on WHAT and WHY, not HOW
 - Include code examples for interfaces and usage
 - Document constraints and meta concerns
@@ -37,14 +38,14 @@ When adding a new feature specification:
 
 ## Current Specifications
 
-### embedded-agent-openai-routing
+### [embedded-agent-openai-routing](./embedded-agent-openai-routing.md)
 A spec for splitting generic `openai` from explicit `azure-openai` embedded
 agent behavior so Azure compatibility no longer depends on hidden heuristics.
 
 - **Status**: 📝 Proposed
 - **Key Benefits**: Preserves Azure compatibility, keeps unknown OpenAI-compatible providers predictable, and removes alias-based footguns
 
-### search-events
+### [search-events](./search-events.md)
 A unified event search tool that uses OpenAI GPT-5 to translate natural language queries into Sentry's search syntax. Replaced the separate `find_errors` and `find_transactions` tools with a single, more powerful interface.
 
 - **Status**: ✅ Complete

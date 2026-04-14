@@ -84,9 +84,9 @@ the same footguns this change is intended to remove.
 
 This follows the broad pattern used elsewhere:
 
-- Azure’s docs treat Azure as explicit configuration, and their v1 examples use
+- Azure's docs treat Azure as explicit configuration, and their v1 examples use
   deployment names as the `model` value on an Azure endpoint.
-- OpenAI’s official SDK exposes Azure through a distinct `AzureOpenAI` client.
+- OpenAI's official SDK exposes Azure through a distinct `AzureOpenAI` client.
 - Vercel AI SDK exposes Azure through a separate Azure provider instead of
   adding Azure heuristics to the generic OpenAI provider.
 
@@ -258,16 +258,3 @@ Tests should assert request paths, not just selected models.
 
 This introduces one explicit provider choice in exchange for removing hidden
 heuristics.
-
-## Future Work
-
-If Azure support expands beyond URL compatibility, add dedicated Azure flags so
-users do not have to encode Azure details into a generic `openai-base-url`.
-That could include:
-
-- `--azure-openai-endpoint`
-- `--azure-openai-deployment`
-- `--azure-openai-api-version`
-
-That is optional follow-up work. The immediate goal is to make Azure behavior
-explicit without adding a generic routing flag.
