@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `search_events` tool provides a unified interface for searching Sentry events across different datasets (`errors`, `logs`, `spans`, and `tracemetrics`). This document covers the API patterns, query structures, and best practices for both individual event queries and aggregate queries.
+The `search_events` tool provides a unified interface for searching Sentry events across different datasets (`errors`, `logs`, `spans`, and `metrics`). This document covers the API patterns, query structures, and best practices for both individual event queries and aggregate queries.
 
 ## API Architecture
 
@@ -10,10 +10,10 @@ The `search_events` tool provides a unified interface for searching Sentry event
 
 Sentry uses two different query-building patterns depending on the dataset, even though they share the same `/events/` endpoint:
 
-1. **Discover-style events queries** (`errors`, `tracemetrics`)
+1. **Discover-style events queries** (`errors`, `metrics`)
    - Use repeated `field` parameters
    - Use raw aggregate expressions in both `field` and `sort`
-   - Generate Discover-style URLs for `errors` and Metrics page URLs for `tracemetrics`
+   - Generate Discover-style URLs for `errors` and Metrics page URLs for `metrics`
 
 2. **Modern EAP (Event Analytics Platform) queries** (`spans`, `logs`)
    - Use the same `/events/` endpoint with EAP-oriented field conventions
@@ -33,7 +33,7 @@ The tool forwards the dataset name directly to the API:
 - User specifies `errors` → API uses `errors`
 - User specifies `spans` → API uses `spans`
 - User specifies `logs` → API uses `logs`
-- User specifies `tracemetrics` → API uses `tracemetrics`
+- User specifies `metrics` → API uses `tracemetrics`
 
 ## Query Modes
 
@@ -87,7 +87,7 @@ https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.m
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `dataset` | Which dataset to query | `spans`, `errors`, `logs`, `tracemetrics` |
+| `dataset` | Which dataset to query | `spans`, `errors`, `logs`, `metrics` |
 | `field` | Fields to return (repeated for each field) | `field=span.op&field=count()` |
 | `query` | Sentry query syntax filter | `has:db.statement AND span.duration:>1000` |
 | `sort` | Sort order (prefix with `-` for descending) | `-timestamp`, `-count()` |
@@ -115,7 +115,7 @@ https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.m
 - Severity levels: fatal, error, warning, info, debug, trace
 - Common aggregate functions: `count()`, `epm()`
 
-#### Tracemetrics Dataset
+#### Metrics Dataset
 - Represents newer span metrics, including counters, gauges, and distributions
 - Uses the same `/events/` endpoint with `dataset=tracemetrics`
 - Attribute discovery uses `/trace-items/attributes/?itemType=tracemetrics`
@@ -202,7 +202,7 @@ Dataset: logs
 Query: metric.name:http.request.duration AND metric.type:distribution
 Fields: ["transaction", "p75(value,http.request.duration,distribution,millisecond)", "p95(value,http.request.duration,distribution,millisecond)", "count(value,http.request.duration,distribution,millisecond)"]
 Sort: -p95(value,http.request.duration,distribution,millisecond)
-Dataset: tracemetrics
+Dataset: metrics
 ```
 
 ### Tool Calls by Model (Aggregate)

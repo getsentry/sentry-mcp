@@ -7,6 +7,11 @@ import {
   isSentryHost,
   type TraceMetricIdentifier,
 } from "../utils/url-utils";
+import {
+  isMetricsDataset,
+  normalizeEventsDataset,
+  type EventsDataset,
+} from "../utils/events-datasets";
 import { logIssue, logWarn } from "../telem/logging";
 import {
   OrganizationListSchema,
@@ -792,12 +797,12 @@ export class SentryApiService {
    * Routes to the appropriate API based on dataset:
    * - Errors: Uses legacy Discover API
    * - Spans/Logs: Uses modern EAP (Event Analytics Platform) API
-   * - Tracemetrics: Uses the Metrics page URL format
+   * - Metrics: Uses the Metrics page URL format
    *
    * @param organizationSlug Organization identifier
    * @param query Sentry search query
    * @param projectId Optional project filter
-   * @param dataset Dataset type (spans, errors, logs, or tracemetrics)
+   * @param dataset Dataset type (spans, errors, logs, or metrics)
    * @param fields Array of fields to include in results
    * @param sort Sort parameter (e.g., "-timestamp", "-count()")
    * @param aggregateFunctions Array of aggregate functions for aggregate queries
@@ -805,14 +810,14 @@ export class SentryApiService {
    * @param statsPeriod Relative time period (e.g., "24h", "7d")
    * @param start Absolute start time (ISO 8601)
    * @param end Absolute end time (ISO 8601)
-   * @param eventData Optional event rows used to derive trace metric identity for tracemetrics sample URLs
+   * @param eventData Optional event rows used to derive trace metric identity for metrics sample URLs
    * @returns Full HTTPS URL to the events explorer in Sentry UI
    */
   getEventsExplorerUrl(
     organizationSlug: string,
     query: string,
     projectId?: string,
-    dataset: "spans" | "errors" | "logs" | "tracemetrics" = "spans",
+    dataset: EventsDataset = "spans",
     fields?: string[],
     sort?: string,
     aggregateFunctions?: string[],
@@ -838,7 +843,7 @@ export class SentryApiService {
       });
     }
 
-    if (dataset === "tracemetrics") {
+    if (isMetricsDataset(dataset)) {
       return getTraceMetricsExploreUrl(this.host, organizationSlug, {
         query,
         projectId,
@@ -2309,7 +2314,7 @@ export class SentryApiService {
       fields: string[];
       limit?: number;
       projectId?: string;
-      dataset?: "spans" | "errors" | "logs" | "tracemetrics";
+      dataset?: EventsDataset;
       statsPeriod?: string;
       start?: string;
       end?: string;
@@ -2318,15 +2323,19 @@ export class SentryApiService {
     opts?: RequestOptions,
   ) {
     let queryParams: URLSearchParams;
+    const normalizedDataset = normalizeEventsDataset(dataset);
 
-    if (dataset === "errors" || dataset === "tracemetrics") {
+    if (
+      normalizedDataset === "errors" ||
+      normalizedDataset === "tracemetrics"
+    ) {
       // Use Discover API query builder
       queryParams = this.buildDiscoverApiQuery({
         query,
         fields,
         limit,
         projectId,
-        dataset,
+        dataset: normalizedDataset,
         statsPeriod,
         start,
         end,
@@ -2339,7 +2348,7 @@ export class SentryApiService {
         fields,
         limit,
         projectId,
-        dataset,
+        dataset: normalizedDataset,
         statsPeriod,
         start,
         end,

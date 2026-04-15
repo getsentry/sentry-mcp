@@ -418,7 +418,7 @@ describe("fetchCustomAttributes", () => {
       });
     });
 
-    it("should return attributes for tracemetrics dataset", async () => {
+    it("should return attributes for metrics dataset", async () => {
       mswServer.use(
         http.get(
           "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
@@ -450,7 +450,7 @@ describe("fetchCustomAttributes", () => {
       const result = await fetchCustomAttributes(
         apiService,
         "test-org",
-        "tracemetrics",
+        "metrics",
       );
 
       expect(result).toEqual({

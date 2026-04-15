@@ -1002,7 +1002,7 @@ describe("API query builders", () => {
       );
     });
 
-    it("should route tracemetrics dataset through Discover query params without sort mangling", async () => {
+    it("should normalize metrics dataset to tracemetrics for Discover queries", async () => {
       const apiService = new SentryApiService({
         host: "sentry.io",
         accessToken: "test-token",
@@ -1024,7 +1024,7 @@ describe("API query builders", () => {
           "transaction",
           "p95(value,http.request.duration,distribution,millisecond)",
         ],
-        dataset: "tracemetrics",
+        dataset: "metrics",
         sort: "-p95(value,http.request.duration,distribution,millisecond)",
       });
 
@@ -1222,15 +1222,15 @@ describe("API query builders", () => {
       });
     });
 
-    describe("tracemetrics metrics URLs", () => {
-      it("should build a metrics page URL for tracemetrics aggregates", () => {
+    describe("metrics page URLs", () => {
+      it("should build a metrics page URL for metrics aggregates", () => {
         const apiService = new SentryApiService({ host: "sentry.io" });
 
         const url = apiService.getEventsExplorerUrl(
           "my-org",
           "",
           "123456",
-          "tracemetrics",
+          "metrics",
           [
             "transaction",
             "p95(value,http.request.duration,distribution,millisecond)",
@@ -1261,7 +1261,7 @@ describe("API query builders", () => {
           "my-org",
           "",
           "123456",
-          "tracemetrics",
+          "metrics",
           ["timestamp", "value"],
           "-timestamp",
           undefined,

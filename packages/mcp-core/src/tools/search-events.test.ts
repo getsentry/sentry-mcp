@@ -29,7 +29,7 @@ describe("search_events", () => {
 
   // Helper to create AI response for different datasets
   const mockAIResponse = (
-    dataset: "errors" | "logs" | "spans" | "tracemetrics",
+    dataset: "errors" | "logs" | "spans" | "metrics",
     query = "test query",
     fields?: string[],
     errorMessage?: string,
@@ -47,7 +47,7 @@ describe("search_events", () => {
         "timestamp",
         "project",
       ],
-      tracemetrics: [
+      metrics: [
         "timestamp",
         "project",
         "metric.name",
@@ -62,7 +62,7 @@ describe("search_events", () => {
       errors: "-timestamp",
       logs: "-timestamp",
       spans: "-span.duration",
-      tracemetrics: "-timestamp",
+      metrics: "-timestamp",
     };
 
     const output = errorMessage
@@ -147,10 +147,10 @@ describe("search_events", () => {
     expect(result).toContain("db.query");
   });
 
-  it("should handle tracemetrics dataset queries", async () => {
+  it("should handle metrics dataset queries", async () => {
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
-        "tracemetrics",
+        "metrics",
         "",
         [
           "transaction",
@@ -234,10 +234,10 @@ describe("search_events", () => {
     `);
   });
 
-  it("should request trace metric identity fields for sample queries", async () => {
+  it("should request trace metric identity fields for metrics sample queries", async () => {
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
-        "tracemetrics",
+        "metrics",
         "",
         ["timestamp", "value"],
         undefined,

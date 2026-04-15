@@ -243,12 +243,12 @@ describe("url-utils", () => {
       );
     });
 
-    it("should build tracemetrics aggregate URLs from the public helper fields", () => {
+    it("should build metrics aggregate URLs from the public helper fields", () => {
       const result = getEventsExplorerUrl(
         "us.sentry.io",
         "myorg",
         "",
-        "tracemetrics",
+        "metrics",
         "123456",
         [
           "transaction",
@@ -259,6 +259,28 @@ describe("url-utils", () => {
 
       expect(result).toContain("https://myorg.sentry.io/explore/metrics/");
       expect(result).toContain("project=123456");
+      expect(result).toContain(`%22mode%22%3A%22aggregate%22`);
+      expect(result).toContain(`%22groupBy%22%3A%22transaction%22`);
+    });
+
+    it("should keep derived metrics aggregate fields when options omit explicit overrides", () => {
+      const result = getEventsExplorerUrl(
+        "us.sentry.io",
+        "myorg",
+        "",
+        "metrics",
+        "123456",
+        [
+          "transaction",
+          "p95(value,http.request.duration,distribution,millisecond)",
+        ],
+        {
+          sort: "-p95(value,http.request.duration,distribution,millisecond)",
+          aggregateFunctions: undefined,
+          groupByFields: undefined,
+        },
+      );
+
       expect(result).toContain(`%22mode%22%3A%22aggregate%22`);
       expect(result).toContain(`%22groupBy%22%3A%22transaction%22`);
     });

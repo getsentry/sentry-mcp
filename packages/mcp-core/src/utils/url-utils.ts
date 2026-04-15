@@ -1,3 +1,5 @@
+import { isMetricsDataset, type EventsDataset } from "./events-datasets";
+
 /**
  * Determines if a Sentry instance is SaaS or self-hosted based on the host.
  * @param host The Sentry host (e.g., "sentry.io" or "sentry.company.com")
@@ -335,7 +337,7 @@ export function getEventsExplorerUrl(
   host: string,
   organizationSlug: string,
   query: string,
-  dataset: "spans" | "errors" | "logs" | "tracemetrics" = "spans",
+  dataset: EventsDataset = "spans",
   projectSlugOrId?: string,
   fields?: string[],
   traceMetricsOptions?: Omit<
@@ -343,20 +345,20 @@ export function getEventsExplorerUrl(
     "query" | "projectId"
   >,
 ): string {
-  if (dataset === "tracemetrics") {
-    const aggregateFunctions =
+  if (isMetricsDataset(dataset)) {
+    const derivedAggregateFunctions =
       traceMetricsOptions?.aggregateFunctions ??
       fields?.filter((field) => field.includes("(") && field.includes(")"));
-    const groupByFields =
+    const derivedGroupByFields =
       traceMetricsOptions?.groupByFields ??
       fields?.filter((field) => !field.includes("(") && !field.includes(")"));
 
     return getTraceMetricsExploreUrl(host, organizationSlug, {
+      ...traceMetricsOptions,
       query,
       projectId: projectSlugOrId,
-      aggregateFunctions,
-      groupByFields,
-      ...traceMetricsOptions,
+      aggregateFunctions: derivedAggregateFunctions,
+      groupByFields: derivedGroupByFields,
     });
   }
 

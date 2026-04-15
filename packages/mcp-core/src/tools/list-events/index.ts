@@ -19,13 +19,17 @@ import {
   TRACE_METRICS_SAMPLE_IDENTITY_FIELDS,
 } from "../search-events/config";
 import { isAggregateQuery } from "../search-events/utils";
+import {
+  isMetricsDataset,
+  PUBLIC_EVENTS_DATASETS,
+} from "../../utils/events-datasets";
 
 // Default fields for each dataset
 const DEFAULT_FIELDS = {
   errors: RECOMMENDED_FIELDS.errors.basic,
   logs: RECOMMENDED_FIELDS.logs.basic,
   spans: RECOMMENDED_FIELDS.spans.basic,
-  tracemetrics: RECOMMENDED_FIELDS.tracemetrics.basic,
+  metrics: RECOMMENDED_FIELDS.tracemetrics.basic,
 };
 
 export default defineTool({
@@ -46,7 +50,7 @@ export default defineTool({
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, traces, AI/LLM calls",
-    "- tracemetrics: Newer span metrics, counters, gauges, and distributions",
+    "- metrics: Newer span metrics, counters, gauges, and distributions",
     "",
     "Query Syntax Examples:",
     '- message:"connection timeout"',
@@ -71,10 +75,10 @@ export default defineTool({
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     dataset: z
-      .enum(["errors", "logs", "spans", "tracemetrics"])
+      .enum(PUBLIC_EVENTS_DATASETS)
       .default("errors")
       .describe(
-        "Dataset to query: errors (exceptions), logs, spans (traces), or tracemetrics (newer span metrics)",
+        "Dataset to query: errors (exceptions), logs (entries), spans (traces), or metrics (newer span metrics)",
       ),
     query: z
       .string()
@@ -132,7 +136,7 @@ export default defineTool({
     // Use provided fields or defaults for the dataset
     const fields = params.fields ?? DEFAULT_FIELDS[params.dataset];
     const requestFields =
-      params.dataset === "tracemetrics" && !isAggregateQuery(fields)
+      isMetricsDataset(params.dataset) && !isAggregateQuery(fields)
         ? Array.from(
             new Set([...fields, ...TRACE_METRICS_SAMPLE_IDENTITY_FIELDS]),
           )
@@ -215,7 +219,7 @@ export default defineTool({
         return formatLogResults(formatParams);
       case "spans":
         return formatSpanResults(formatParams);
-      case "tracemetrics":
+      default:
         return formatTraceMetricsResults(formatParams);
     }
   },

@@ -20,6 +20,10 @@ import {
   TRACE_METRICS_SAMPLE_IDENTITY_FIELDS,
 } from "./config";
 import { UserInputError } from "../../errors";
+import {
+  isMetricsDataset,
+  normalizeEventsDataset,
+} from "../../utils/events-datasets";
 
 export default defineTool({
   name: "search_events",
@@ -48,7 +52,7 @@ export default defineTool({
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, AI/LLM calls, token usage",
-    "- tracemetrics: Newer span metrics, metric values, counters, gauges, and distributions",
+    "- metrics: Newer span metrics, metric values, counters, gauges, and distributions",
     "",
     "DO NOT USE for grouped issue lists → use search_issues",
     "",
@@ -124,7 +128,8 @@ export default defineTool({
     const dataset = parsed.dataset;
 
     // Get recommended fields for this dataset (for fallback when no fields are provided)
-    const recommendedFields = RECOMMENDED_FIELDS[dataset];
+    const recommendedFields =
+      RECOMMENDED_FIELDS[normalizeEventsDataset(dataset)];
 
     // Validate that sort parameter was provided
     if (!parsed.sort) {
@@ -183,7 +188,7 @@ export default defineTool({
     }
 
     const requestFields =
-      dataset === "tracemetrics" &&
+      isMetricsDataset(dataset) &&
       !fields.some((field) => field.includes("(") && field.includes(")"))
         ? Array.from(
             new Set([...fields, ...TRACE_METRICS_SAMPLE_IDENTITY_FIELDS]),
@@ -270,7 +275,7 @@ export default defineTool({
         return formatLogResults(formatParams);
       case "spans":
         return formatSpanResults(formatParams);
-      case "tracemetrics":
+      default:
         return formatTraceMetricsResults(formatParams);
     }
   },

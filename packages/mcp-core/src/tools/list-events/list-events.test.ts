@@ -52,11 +52,11 @@ describe("list_events", () => {
     expect(result).toContain("Search Results");
   });
 
-  it("returns formatted tracemetrics aggregates", async () => {
+  it("returns formatted metrics aggregates", async () => {
     const result = await listEvents.handler(
       {
         organizationSlug: "sentry-mcp-evals",
-        dataset: "tracemetrics",
+        dataset: "metrics",
         query: "",
         fields: [
           "transaction",
@@ -77,11 +77,11 @@ describe("list_events", () => {
     expect(result).toContain("/explore/metrics/");
   });
 
-  it("returns tracemetrics sample links with concrete metric identity", async () => {
+  it("returns metrics sample links with concrete metric identity", async () => {
     const result = await listEvents.handler(
       {
         organizationSlug: "sentry-mcp-evals",
-        dataset: "tracemetrics",
+        dataset: "metrics",
         query: "",
         fields: null,
         sort: "-timestamp",
