@@ -1,6 +1,10 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
 import { agentTool } from "./utils";
+import {
+  PUBLIC_EVENTS_DATASETS,
+  type EventsDataset,
+} from "../../../utils/events-datasets";
 
 // Import all JSON files directly
 import android from "./data/android.json";
@@ -176,7 +180,7 @@ interface NamespaceData {
  */
 export async function lookupOtelSemantics(
   namespace: string,
-  dataset: "errors" | "logs" | "spans",
+  dataset: EventsDataset,
   apiService: SentryApiService,
   organizationSlug: string,
   projectId?: string,
@@ -266,7 +270,7 @@ export function createOtelLookupTool(options: {
           "The OpenTelemetry namespace to look up (e.g., 'gen_ai', 'db', 'http', 'mcp')",
         ),
       dataset: z
-        .enum(["spans", "errors", "logs"])
+        .enum(PUBLIC_EVENTS_DATASETS)
         .describe(
           "REQUIRED: Dataset to check attribute availability in. The agent MUST specify this based on their chosen dataset.",
         ),

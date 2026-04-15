@@ -5,6 +5,11 @@ import {
   formatUserGeoSummary,
   isPlainObject,
 } from "../../internal/user-formatting";
+import {
+  normalizeEventsDataset,
+  PUBLIC_EVENTS_DATASETS,
+  type EventsDataset,
+} from "../../utils/events-datasets";
 
 // Type for flexible event data that can contain any fields
 export type FlexibleEventData = Record<string, unknown>;
@@ -259,7 +264,7 @@ export function formatEventValue(
 export async function fetchCustomAttributes(
   apiService: SentryApiService,
   organizationSlug: string,
-  dataset: "errors" | "logs" | "spans",
+  dataset: EventsDataset,
   projectId?: string,
   timeParams?: { statsPeriod?: string; start?: string; end?: string },
 ): Promise<{
@@ -268,8 +273,9 @@ export async function fetchCustomAttributes(
 }> {
   const customAttributes: Record<string, string> = {};
   const fieldTypes: Record<string, "string" | "number"> = {};
+  const normalizedDataset = normalizeEventsDataset(dataset);
 
-  if (dataset === "errors") {
+  if (normalizedDataset === "errors") {
     // TODO: For errors dataset, we currently need to use the old listTags API
     // This will be updated in the future to use the new trace-items attributes API
     const tagsResponse = await apiService.listTags({
@@ -287,8 +293,13 @@ export async function fetchCustomAttributes(
       }
     }
   } else {
-    // For logs and spans datasets, use the trace-items attributes endpoint
-    const itemType = dataset === "logs" ? "logs" : "spans";
+    // For logs, spans, and trace metrics datasets, use the trace-items attributes endpoint
+    const itemType =
+      normalizedDataset === "logs"
+        ? "logs"
+        : normalizedDataset === "tracemetrics"
+          ? "tracemetrics"
+          : "spans";
     const attributesResponse = await apiService.listTraceItemAttributes({
       organizationSlug,
       itemType,
@@ -325,7 +336,7 @@ export function createDatasetAttributesTool(options: {
       "Query available attributes and fields for a specific Sentry dataset to understand what data is available",
     parameters: z.object({
       dataset: z
-        .enum(["spans", "errors", "logs"])
+        .enum(PUBLIC_EVENTS_DATASETS)
         .describe("The dataset to query attributes for"),
     }),
     execute: async ({ dataset }) => {
@@ -341,6 +352,7 @@ export function createDatasetAttributesTool(options: {
       // IMPORTANT: Let ALL errors bubble up to wrapAgentToolExecute
       // UserInputError will be converted to error string for the AI agent
       // Other errors will bubble up to be captured by Sentry
+      const normalizedDataset = normalizeEventsDataset(dataset);
       const { attributes: customAttributes, fieldTypes } =
         await fetchCustomAttributes(
           apiService,
@@ -352,15 +364,16 @@ export function createDatasetAttributesTool(options: {
       // Combine all available fields
       const allFields = {
         ...BASE_COMMON_FIELDS,
-        ...DATASET_FIELDS[dataset],
+        ...DATASET_FIELDS[normalizedDataset],
         ...customAttributes,
       };
 
-      const recommendedFields = RECOMMENDED_FIELDS[dataset];
+      const recommendedFields = RECOMMENDED_FIELDS[normalizedDataset];
 
       // Combine field types from both static config and dynamic API
       const allFieldTypes = { ...fieldTypes };
-      const staticNumericFields = NUMERIC_FIELDS[dataset] || new Set();
+      const staticNumericFields =
+        NUMERIC_FIELDS[normalizedDataset] || new Set();
       for (const field of staticNumericFields) {
         allFieldTypes[field] = "number";
       }
@@ -387,7 +400,7 @@ ${Object.keys(allFieldTypes).length > 30 ? `\n... and ${Object.keys(allFieldType
 IMPORTANT: Only use numeric aggregate functions (avg, sum, min, max, percentiles) with numeric fields. Use count() or count_unique() for non-numeric fields.
 
 EXAMPLE QUERIES FOR ${dataset.toUpperCase()}:
-${DATASET_EXAMPLES[dataset]
+${DATASET_EXAMPLES[normalizedDataset]
   .map((ex) => `- "${ex.description}" →\n  ${JSON.stringify(ex.output)}`)
   .join("\n\n")}
 

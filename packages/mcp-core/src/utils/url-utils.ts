@@ -1,3 +1,5 @@
+import { isMetricsDataset, type EventsDataset } from "./events-datasets";
+
 /**
  * Determines if a Sentry instance is SaaS or self-hosted based on the host.
  * @param host The Sentry host (e.g., "sentry.io" or "sentry.company.com")
@@ -5,6 +7,239 @@
  */
 export function isSentryHost(host: string): boolean {
   return host === "sentry.io" || host.endsWith(".sentry.io");
+}
+
+export interface TraceMetricIdentifier {
+  name: string;
+  type: string;
+  unit?: string;
+}
+
+export interface TraceMetricsExplorerUrlOptions {
+  query: string;
+  projectId?: string;
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+  sort?: string;
+  aggregateFunctions?: string[];
+  groupByFields?: string[];
+  traceMetrics?: TraceMetricIdentifier[];
+}
+
+function getSentryWebBaseUrl(
+  host: string,
+  organizationSlug: string,
+  path: string,
+): string {
+  const isSaas = isSentryHost(host);
+  const webHost = isSaas ? "sentry.io" : host;
+  return isSaas
+    ? `https://${organizationSlug}.${webHost}${path}`
+    : `https://${host}/organizations/${organizationSlug}${path}`;
+}
+
+function normalizeTraceMetric(
+  metric: TraceMetricIdentifier | null | undefined,
+): TraceMetricIdentifier | null {
+  if (!metric?.name || !metric.type) {
+    return null;
+  }
+
+  return {
+    name: metric.name,
+    type: metric.type,
+    unit: metric.unit && metric.unit !== "-" ? metric.unit : undefined,
+  };
+}
+
+function extractTraceMetricFromAggregate(
+  field: string,
+): TraceMetricIdentifier | null {
+  const match = field.match(/^[^(]+\((.*)\)$/);
+  if (!match) {
+    return null;
+  }
+
+  const args = match[1]
+    .split(",")
+    .map((arg) => arg.trim())
+    .filter((arg) => arg.length > 0);
+
+  if (args.length < 4) {
+    return null;
+  }
+
+  return normalizeTraceMetric({
+    name: args[1]!,
+    type: args[2]!,
+    unit: args[3],
+  });
+}
+
+function extractTraceMetricFromQuery(
+  query: string,
+): TraceMetricIdentifier | null {
+  const extractValue = (field: string): string | null => {
+    const quotedMatch = query.match(new RegExp(`${field}:"([^"]+)"`, "i"));
+    if (quotedMatch?.[1]) {
+      return quotedMatch[1];
+    }
+
+    const unquotedMatch = query.match(new RegExp(`${field}:([^\\s]+)`, "i"));
+    return unquotedMatch?.[1] ?? null;
+  };
+
+  return normalizeTraceMetric({
+    name: extractValue("metric\\.name") ?? "",
+    type: extractValue("metric\\.type") ?? "",
+    unit: extractValue("metric\\.unit") ?? undefined,
+  });
+}
+
+function dedupeTraceMetrics(
+  metrics: Array<TraceMetricIdentifier | null | undefined>,
+): TraceMetricIdentifier[] {
+  const deduped = new Map<string, TraceMetricIdentifier>();
+
+  for (const metric of metrics) {
+    const normalizedMetric = normalizeTraceMetric(metric);
+    if (!normalizedMetric) {
+      continue;
+    }
+
+    const key = `${normalizedMetric.name}|${normalizedMetric.type}|${normalizedMetric.unit ?? ""}`;
+    deduped.set(key, normalizedMetric);
+  }
+
+  return [...deduped.values()];
+}
+
+function buildMetricQueryState(params: {
+  metric: TraceMetricIdentifier;
+  query: string;
+  mode: "aggregate" | "samples";
+  yAxes: string[];
+  groupByFields?: string[];
+  aggregateSortBys?: Array<{ field: string; kind: "asc" | "desc" }>;
+}): string {
+  return JSON.stringify({
+    metric: params.metric,
+    query: params.query,
+    aggregateFields: [
+      ...params.yAxes.map((yAxis) => ({ yAxes: [yAxis] })),
+      ...(params.groupByFields ?? []).map((field) => ({ groupBy: field })),
+    ],
+    aggregateSortBys: params.aggregateSortBys ?? [],
+    mode: params.mode,
+  });
+}
+
+export function getTraceMetricsExploreUrl(
+  host: string,
+  organizationSlug: string,
+  options: TraceMetricsExplorerUrlOptions,
+): string {
+  const {
+    query,
+    projectId,
+    statsPeriod,
+    start,
+    end,
+    sort,
+    aggregateFunctions,
+    groupByFields,
+    traceMetrics,
+  } = options;
+
+  const urlParams = new URLSearchParams();
+
+  if (projectId) {
+    urlParams.set("project", projectId);
+  }
+
+  if (start && end) {
+    urlParams.set("start", start);
+    urlParams.set("end", end);
+  } else {
+    urlParams.set("statsPeriod", statsPeriod || "24h");
+  }
+
+  const aggregateFields = aggregateFunctions ?? [];
+  const aggregateGroupByFields = groupByFields ?? [];
+  const isAggregateQuery = aggregateFields.length > 0;
+
+  const sortField = sort?.startsWith("-") ? sort.slice(1) : sort;
+  const sortKind = sort?.startsWith("-") ? ("desc" as const) : ("asc" as const);
+
+  if (isAggregateQuery) {
+    const metricQueries = new Map<
+      string,
+      {
+        metric: TraceMetricIdentifier;
+        yAxes: string[];
+      }
+    >();
+
+    for (const aggregateField of aggregateFields) {
+      const metric = extractTraceMetricFromAggregate(aggregateField);
+      if (!metric) {
+        continue;
+      }
+
+      const key = `${metric.name}|${metric.type}|${metric.unit ?? ""}`;
+      const existing = metricQueries.get(key);
+      if (existing) {
+        existing.yAxes.push(aggregateField);
+      } else {
+        metricQueries.set(key, {
+          metric,
+          yAxes: [aggregateField],
+        });
+      }
+    }
+
+    for (const { metric, yAxes } of metricQueries.values()) {
+      const aggregateSortBys =
+        sortField &&
+        (yAxes.includes(sortField) ||
+          aggregateGroupByFields.includes(sortField))
+          ? [{ field: sortField, kind: sortKind }]
+          : [];
+
+      urlParams.append(
+        "metric",
+        buildMetricQueryState({
+          metric,
+          query,
+          mode: "aggregate",
+          yAxes,
+          groupByFields: aggregateGroupByFields,
+          aggregateSortBys,
+        }),
+      );
+    }
+  } else {
+    const sampleMetrics = dedupeTraceMetrics([
+      ...(traceMetrics ?? []),
+      extractTraceMetricFromQuery(query),
+    ]);
+
+    for (const metric of sampleMetrics) {
+      urlParams.append(
+        "metric",
+        buildMetricQueryState({
+          metric,
+          query,
+          mode: "samples",
+          yAxes: ["sum(value)"],
+          aggregateSortBys: [{ field: "sum(value)", kind: "desc" }],
+        }),
+      );
+    }
+  }
+
+  return `${getSentryWebBaseUrl(host, organizationSlug, "/explore/metrics/")}?${urlParams.toString()}`;
 }
 
 /**
@@ -19,13 +254,7 @@ export function getIssueUrl(
   organizationSlug: string,
   issueId: string,
 ): string {
-  const isSaas = isSentryHost(host);
-  // For SaaS instances, always use sentry.io for web UI URLs regardless of region
-  // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-  const webHost = isSaas ? "sentry.io" : host;
-  return isSaas
-    ? `https://${organizationSlug}.${webHost}/issues/${issueId}`
-    : `https://${host}/organizations/${organizationSlug}/issues/${issueId}`;
+  return getSentryWebBaseUrl(host, organizationSlug, `/issues/${issueId}`);
 }
 
 /**
@@ -42,13 +271,7 @@ export function getIssuesSearchUrl(
   query?: string | null,
   projectSlugOrId?: string,
 ): string {
-  const isSaas = isSentryHost(host);
-  // For SaaS instances, always use sentry.io for web UI URLs regardless of region
-  // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-  const webHost = isSaas ? "sentry.io" : host;
-  let url = isSaas
-    ? `https://${organizationSlug}.${webHost}/issues/`
-    : `https://${host}/organizations/${organizationSlug}/issues/`;
+  let url = getSentryWebBaseUrl(host, organizationSlug, "/issues/");
 
   const params = new URLSearchParams();
   if (projectSlugOrId) {
@@ -78,13 +301,11 @@ export function getTraceUrl(
   organizationSlug: string,
   traceId: string,
 ): string {
-  const isSaas = isSentryHost(host);
-  // For SaaS instances, always use sentry.io for web UI URLs regardless of region
-  // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-  const webHost = isSaas ? "sentry.io" : host;
-  return isSaas
-    ? `https://${organizationSlug}.${webHost}/explore/traces/trace/${traceId}`
-    : `https://${host}/organizations/${organizationSlug}/explore/traces/trace/${traceId}`;
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/explore/traces/trace/${traceId}`,
+  );
 }
 
 /**
@@ -99,11 +320,7 @@ export function getReplayUrl(
   organizationSlug: string,
   replayId: string,
 ): string {
-  const isSaas = isSentryHost(host);
-  const webHost = isSaas ? "sentry.io" : host;
-  return isSaas
-    ? `https://${organizationSlug}.${webHost}/replays/${replayId}/`
-    : `https://${host}/organizations/${organizationSlug}/replays/${replayId}/`;
+  return getSentryWebBaseUrl(host, organizationSlug, `/replays/${replayId}/`);
 }
 
 /**
@@ -120,25 +337,40 @@ export function getEventsExplorerUrl(
   host: string,
   organizationSlug: string,
   query: string,
-  dataset: "spans" | "errors" | "logs" = "spans",
-  projectSlug?: string,
+  dataset: EventsDataset = "spans",
+  projectSlugOrId?: string,
   fields?: string[],
+  traceMetricsOptions?: Omit<
+    TraceMetricsExplorerUrlOptions,
+    "query" | "projectId"
+  >,
 ): string {
-  const isSaas = isSentryHost(host);
-  // For SaaS instances, always use sentry.io for web UI URLs regardless of region
-  // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
-  const webHost = isSaas ? "sentry.io" : host;
-  let url = isSaas
-    ? `https://${organizationSlug}.${webHost}/explore/`
-    : `https://${host}/organizations/${organizationSlug}/explore/`;
+  if (isMetricsDataset(dataset)) {
+    const derivedAggregateFunctions =
+      traceMetricsOptions?.aggregateFunctions ??
+      fields?.filter((field) => field.includes("(") && field.includes(")"));
+    const derivedGroupByFields =
+      traceMetricsOptions?.groupByFields ??
+      fields?.filter((field) => !field.includes("(") && !field.includes(")"));
+
+    return getTraceMetricsExploreUrl(host, organizationSlug, {
+      ...traceMetricsOptions,
+      query,
+      projectId: projectSlugOrId,
+      aggregateFunctions: derivedAggregateFunctions,
+      groupByFields: derivedGroupByFields,
+    });
+  }
+
+  let url = getSentryWebBaseUrl(host, organizationSlug, "/explore/");
 
   const params = new URLSearchParams();
   params.append("query", query);
   params.append("dataset", dataset);
   params.append("layout", "table");
 
-  if (projectSlug) {
-    params.append("project", projectSlug);
+  if (projectSlugOrId) {
+    params.append("project", projectSlugOrId);
   }
 
   if (fields && fields.length > 0) {

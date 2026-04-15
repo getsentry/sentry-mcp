@@ -1,6 +1,6 @@
 // Build a dataset-agnostic system prompt
 export const systemPrompt = `You are a Sentry query translator. You need to:
-1. FIRST determine which dataset (spans, errors, or logs) is most appropriate for the query
+1. FIRST determine which dataset (spans, errors, logs, or metrics) is most appropriate for the query
 2. Query the available attributes for that dataset using the datasetAttributes tool
 3. Use the otelSemantics tool if you need OpenTelemetry semantic conventions
 4. Convert the natural language query to Sentry's search syntax (NOT SQL syntax)
@@ -12,8 +12,10 @@ DATASET SELECTION GUIDELINES:
 - spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics, user agent data, "XYZ calls", ambiguous operations (richest attribute set)
 - errors: Exceptions, crashes, error messages, stack traces, unhandled errors, browser/client errors
 - logs: Log entries, log messages, severity levels, debugging information
+- metrics: Newer span metrics and metric summaries, especially named metrics, counters, gauges, distributions, metric values, and queries that explicitly mention metric names/types
 
 For ambiguous queries like "calls using XYZ", prefer spans dataset first as it contains the most comprehensive telemetry data.
+For queries that explicitly ask about a metric name, metric type, counter/gauge/distribution, or newer span metrics, prefer metrics.
 
 CRITICAL - FIELD VERIFICATION REQUIREMENT:
 Before constructing ANY query, you MUST verify field availability:
@@ -102,8 +104,17 @@ When user asks for calculated metrics, ratios, or conversions:
   - "combined metric total" → fields: ["equation|sum(metric.a) + sum(metric.b)"], sort: "-equation|sum(metric.a) + sum(metric.b)"
   - "error rate percentage" → fields: ["equation|failure_rate() * 100"], sort: "-equation|failure_rate() * 100"
   - "events per second" → fields: ["equation|count() / 3600"], sort: "-equation|count() / 3600"
-- IMPORTANT: Equations are ONLY supported in the spans dataset, NOT in errors or logs
+- IMPORTANT: Equations are ONLY supported in the spans dataset, NOT in errors, logs, or metrics
 - IMPORTANT: When sorting by equations, use "-equation|..." for descending order (highest values first)
+
+TRACE METRICS AGGREGATES (TRACEMETRICS DATASET):
+When querying metrics aggregates, prefer aggregate functions that fully encode the target metric:
+- Format: fn(value,metric.name,metric.type,metric.unit)
+- Counter examples: "sum(value,my.counter,counter,-)", "per_second(value,my.counter,counter,-)"
+- Gauge examples: "avg(value,cpu.usage,gauge,percent)", "max(value,cpu.usage,gauge,percent)"
+- Distribution examples: "p95(value,http.request.duration,distribution,millisecond)", "avg(value,http.request.duration,distribution,millisecond)"
+- IMPORTANT: Use the exact metric.name, metric.type, and metric.unit values when they are available
+- IMPORTANT: Tracemetrics do NOT support equation| fields
 
 PERFORMANCE INVESTIGATION STRATEGY:
 When users ask about "performance problems", "slow pages", "slow endpoints", "latency issues",
@@ -151,6 +162,7 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
    - errors dataset: Use "-timestamp" (newest first)
    - spans dataset: Use "-span.duration" (slowest first)  
    - logs dataset: Use "-timestamp" (newest first)
+   - metrics dataset: Use "-timestamp" for samples, or sort by the selected aggregate for grouped metric results
 
 3. SORTING SYNTAX:
    - Use "-" prefix for descending order (e.g., "-timestamp" for newest first)
@@ -168,7 +180,7 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
 
 YOUR RESPONSE FORMAT:
 Return a JSON object with these fields:
-- "dataset": Which dataset you determined to use ("spans", "errors", or "logs")
+- "dataset": Which dataset you determined to use ("spans", "errors", "logs", or "metrics")
 - "query": The Sentry query string for filtering results (use empty string "" for no filters)
 - "fields": Array of field names to return in results
   - For individual event queries: OPTIONAL (will use recommended fields if not provided)
@@ -237,6 +249,12 @@ export const NUMERIC_FIELDS: Record<string, Set<string>> = {
     "stack.lineno",
   ]),
   logs: new Set(["severity_number", "sentry.observed_timestamp_nanos"]),
+  tracemetrics: new Set([
+    "value",
+    "timestamp_precise",
+    "observed_timestamp",
+    "payload_size",
+  ]),
 };
 
 // Dataset-specific field definitions
@@ -368,6 +386,45 @@ export const DATASET_FIELDS = {
     "p100(field)": "100th percentile (max)",
     "epm()": "Events per minute rate",
   },
+  tracemetrics: {
+    "metric.name": "Metric name for the newer span metrics dataset",
+    "metric.type": "Metric type (counter, gauge, distribution)",
+    "metric.unit":
+      "Metric unit if present (for example millisecond, byte, percent)",
+    value: "Raw metric value (numeric)",
+    trace: "Trace ID",
+    span_id: "Span ID that emitted the metric",
+    "trace.parent_span_id": "Parent span ID",
+    timestamp: "When the metric sample occurred",
+    timestamp_precise: "High precision timestamp (numeric)",
+    observed_timestamp: "Observed timestamp (numeric)",
+
+    // Aggregate functions (TRACEMETRICS dataset)
+    "sum(value,metric.name,metric.type,metric.unit)":
+      "Sum a specific metric, e.g. sum(value,request_count,counter,-)",
+    "avg(value,metric.name,metric.type,metric.unit)":
+      "Average a specific metric, e.g. avg(value,http.request.duration,distribution,millisecond)",
+    "min(value,metric.name,metric.type,metric.unit)":
+      "Minimum metric value for a specific metric",
+    "max(value,metric.name,metric.type,metric.unit)":
+      "Maximum metric value for a specific metric",
+    "count(value,metric.name,metric.type,metric.unit)":
+      "Count samples for a specific metric",
+    "p50(value,metric.name,metric.type,metric.unit)":
+      "Median for a distribution metric",
+    "p75(value,metric.name,metric.type,metric.unit)":
+      "75th percentile for a distribution metric",
+    "p90(value,metric.name,metric.type,metric.unit)":
+      "90th percentile for a distribution metric",
+    "p95(value,metric.name,metric.type,metric.unit)":
+      "95th percentile for a distribution metric",
+    "p99(value,metric.name,metric.type,metric.unit)":
+      "99th percentile for a distribution metric",
+    "per_second(value,metric.name,metric.type,metric.unit)":
+      "Per-second rate for a metric, typically counters",
+    "per_minute(value,metric.name,metric.type,metric.unit)":
+      "Per-minute rate for a metric, typically counters",
+  },
 };
 
 // Structured examples for dataset-specific query patterns
@@ -383,7 +440,7 @@ export interface QueryExample {
 }
 
 export const DATASET_EXAMPLES: Record<
-  "spans" | "errors" | "logs",
+  "spans" | "errors" | "logs" | "tracemetrics",
   QueryExample[]
 > = {
   spans: [
@@ -588,6 +645,72 @@ export const DATASET_EXAMPLES: Record<
       },
     },
   ],
+  tracemetrics: [
+    {
+      description: "request duration percentiles by route",
+      output: {
+        query: "",
+        fields: [
+          "transaction",
+          "p75(value,http.request.duration,distribution,millisecond)",
+          "p95(value,http.request.duration,distribution,millisecond)",
+          "count(value,http.request.duration,distribution,millisecond)",
+        ],
+        sort: "-p95(value,http.request.duration,distribution,millisecond)",
+      },
+    },
+    {
+      description: "throughput by endpoint from a counter metric",
+      output: {
+        query: "",
+        fields: [
+          "transaction",
+          "per_minute(value,http.server.request.count,counter,-)",
+        ],
+        sort: "-per_minute(value,http.server.request.count,counter,-)",
+      },
+    },
+    {
+      description: "latest samples for a specific metric",
+      output: {
+        query: "metric.name:http.request.duration AND metric.type:distribution",
+        fields: [
+          "timestamp",
+          "project",
+          "metric.name",
+          "metric.type",
+          "metric.unit",
+          "value",
+          "trace",
+        ],
+        sort: "-timestamp",
+      },
+    },
+    {
+      description: "largest payload size metrics",
+      output: {
+        query: "metric.name:payload.size",
+        fields: [
+          "project",
+          "max(value,payload.size,gauge,byte)",
+          "avg(value,payload.size,gauge,byte)",
+        ],
+        sort: "-max(value,payload.size,gauge,byte)",
+      },
+    },
+    {
+      description: "metric value grouped by environment",
+      output: {
+        query: "metric.name:http.request.duration AND metric.type:distribution",
+        fields: [
+          "environment",
+          "avg(value,http.request.duration,distribution,millisecond)",
+          "count(value,http.request.duration,distribution,millisecond)",
+        ],
+        sort: "-avg(value,http.request.duration,distribution,millisecond)",
+      },
+    },
+  ],
 };
 
 // Define recommended fields for each dataset
@@ -624,4 +747,24 @@ export const RECOMMENDED_FIELDS = {
     description:
       "Core span/trace information including span ID, operation, duration, and trace context",
   },
+  tracemetrics: {
+    basic: [
+      "id",
+      "timestamp",
+      "project",
+      "trace",
+      "metric.name",
+      "metric.type",
+      "metric.unit",
+      "value",
+    ],
+    description:
+      "Core trace metric sample information including metric identity, value, and trace context",
+  },
 };
+
+export const TRACE_METRICS_SAMPLE_IDENTITY_FIELDS = [
+  "metric.name",
+  "metric.type",
+  "metric.unit",
+] as const;

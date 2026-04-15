@@ -417,5 +417,54 @@ describe("fetchCustomAttributes", () => {
         fieldTypes: {},
       });
     });
+
+    it("should return attributes for metrics dataset", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            const attributeType = url.searchParams.get("attributeType");
+            const itemType = url.searchParams.get("itemType");
+
+            expect(itemType).toBe("tracemetrics");
+
+            if (attributeType === "string") {
+              return HttpResponse.json([
+                { key: "metric.name", name: "Metric Name" },
+                { key: "metric.type", name: "Metric Type" },
+              ]);
+            }
+
+            if (attributeType === "number") {
+              return HttpResponse.json([
+                { key: "value", name: "Metric Value" },
+              ]);
+            }
+
+            return HttpResponse.json([]);
+          },
+        ),
+      );
+
+      const result = await fetchCustomAttributes(
+        apiService,
+        "test-org",
+        "metrics",
+      );
+
+      expect(result).toEqual({
+        attributes: {
+          "metric.name": "Metric Name",
+          "metric.type": "Metric Type",
+          value: "Metric Value",
+        },
+        fieldTypes: {
+          "metric.name": "string",
+          "metric.type": "string",
+          value: "number",
+        },
+      });
+    });
   });
 });

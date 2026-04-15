@@ -29,7 +29,7 @@ describe("search_events", () => {
 
   // Helper to create AI response for different datasets
   const mockAIResponse = (
-    dataset: "errors" | "logs" | "spans",
+    dataset: "errors" | "logs" | "spans" | "metrics",
     query = "test query",
     fields?: string[],
     errorMessage?: string,
@@ -47,12 +47,22 @@ describe("search_events", () => {
         "timestamp",
         "project",
       ],
+      metrics: [
+        "timestamp",
+        "project",
+        "metric.name",
+        "metric.type",
+        "metric.unit",
+        "value",
+        "trace",
+      ],
     };
 
     const defaultSorts = {
       errors: "-timestamp",
       logs: "-timestamp",
       spans: "-span.duration",
+      metrics: "-timestamp",
     };
 
     const output = errorMessage
@@ -135,6 +145,175 @@ describe("search_events", () => {
     expect(mockGenerateText).toHaveBeenCalled();
     expect(result).toContain("span1");
     expect(result).toContain("db.query");
+  });
+
+  it("should handle metrics dataset queries", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "metrics",
+        "",
+        [
+          "transaction",
+          "p95(value,http.request.duration,distribution,millisecond)",
+          "count(value,http.request.duration,distribution,millisecond)",
+        ],
+        undefined,
+        "-p95(value,http.request.duration,distribution,millisecond)",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("tracemetrics");
+          expect(url.searchParams.get("sort")).toBe(
+            "-p95(value,http.request.duration,distribution,millisecond)",
+          );
+          return HttpResponse.json({
+            data: [
+              {
+                transaction: "GET /api/users",
+                "p95(value,http.request.duration,distribution,millisecond)": 320,
+                "count(value,http.request.duration,distribution,millisecond)": 42,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "slow request duration metrics",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toMatchInlineSnapshot(`
+      "# Search Results for "slow request duration metrics"
+      
+      ⚠️ **IMPORTANT**: Display these metric aggregates as a data table with proper column alignment, grouping labels, and units.
+      
+      **View these results in Sentry**:
+      https://test-org.sentry.io/explore/metrics/?statsPeriod=14d&metric=%7B%22metric%22%3A%7B%22name%22%3A%22http.request.duration%22%2C%22type%22%3A%22distribution%22%2C%22unit%22%3A%22millisecond%22%7D%2C%22query%22%3A%22%22%2C%22aggregateFields%22%3A%5B%7B%22yAxes%22%3A%5B%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%5D%7D%2C%7B%22yAxes%22%3A%5B%22count%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%5D%7D%2C%7B%22groupBy%22%3A%22transaction%22%7D%5D%2C%22aggregateSortBys%22%3A%5B%7B%22field%22%3A%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%2C%22kind%22%3A%22desc%22%7D%5D%2C%22mode%22%3A%22aggregate%22%7D
+      _Please share this link with the user to view the search results in their Sentry dashboard._
+      
+      Found 1 aggregate result:
+      
+      \`\`\`json
+      [
+        {
+          "transaction": "GET /api/users",
+          "p95(value,http.request.duration,distribution,millisecond)": 320,
+          "count(value,http.request.duration,distribution,millisecond)": 42
+        }
+      ]
+      \`\`\`
+      
+      ## Next Steps
+      
+      - Open the Metrics page link above to refine the selected metric
+      - Group by additional attributes to break down the metric further
+      - Switch between samples and aggregates in Sentry for deeper analysis
+      "
+    `);
+  });
+
+  it("should request trace metric identity fields for metrics sample queries", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "metrics",
+        "",
+        ["timestamp", "value"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+
+          expect(url.searchParams.getAll("field")).toEqual([
+            "timestamp",
+            "value",
+            "metric.name",
+            "metric.type",
+            "metric.unit",
+          ]);
+
+          return HttpResponse.json({
+            data: [
+              {
+                timestamp: "2026-04-13T14:19:18+00:00",
+                value: 12.4,
+                trace: "6a477f5b0f31ef7b6b9b5e1dea66c91d",
+                "metric.name": "http.request.duration",
+                "metric.type": "distribution",
+                "metric.unit": "millisecond",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "recent metrics",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(typeof result).toBe("string");
+    if (typeof result !== "string") {
+      throw new Error("Expected string result");
+    }
+
+    const urlMatch = result.match(/https:\/\/[^\n]+/);
+    expect(urlMatch).not.toBeNull();
+
+    const url = new URL(urlMatch![0]);
+    const metricQuery = JSON.parse(url.searchParams.get("metric")!);
+
+    expect(url.pathname).toBe("/explore/metrics/");
+    expect(metricQuery.metric).toEqual({
+      name: "http.request.duration",
+      type: "distribution",
+      unit: "millisecond",
+    });
+    expect(metricQuery.mode).toBe("samples");
+    expect(metricQuery.aggregateFields).toEqual([{ yAxes: ["sum(value)"] }]);
   });
 
   it("should handle errors dataset queries", async () => {

@@ -51,4 +51,66 @@ describe("list_events", () => {
     expect(typeof result).toBe("string");
     expect(result).toContain("Search Results");
   });
+
+  it("returns formatted metrics aggregates", async () => {
+    const result = await listEvents.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        dataset: "metrics",
+        query: "",
+        fields: [
+          "transaction",
+          "p95(value,http.request.duration,distribution,millisecond)",
+          "count(value,http.request.duration,distribution,millisecond)",
+        ],
+        sort: "-p95(value,http.request.duration,distribution,millisecond)",
+        projectSlug: null,
+        statsPeriod: "14d",
+        limit: 10,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain("Search Results");
+    expect(result).toContain("GET /api/users");
+    expect(result).toContain("/explore/metrics/");
+  });
+
+  it("returns metrics sample links with concrete metric identity", async () => {
+    const result = await listEvents.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        dataset: "metrics",
+        query: "",
+        fields: null,
+        sort: "-timestamp",
+        projectSlug: null,
+        statsPeriod: "14d",
+        limit: 10,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    expect(typeof result).toBe("string");
+    if (typeof result !== "string") {
+      throw new Error("Expected string result");
+    }
+
+    const urlMatch = result.match(/https:\/\/[^\n]+/);
+    expect(urlMatch).not.toBeNull();
+
+    const url = new URL(urlMatch![0]);
+    const metricQuery = JSON.parse(url.searchParams.get("metric")!);
+
+    expect(url.pathname).toBe("/explore/metrics/");
+    expect(metricQuery.metric).toEqual({
+      name: "http.request.duration",
+      type: "distribution",
+      unit: "millisecond",
+    });
+    expect(metricQuery.mode).toBe("samples");
+    expect(metricQuery.aggregateFields).toEqual([{ yAxes: ["sum(value)"] }]);
+  });
 });

@@ -38,6 +38,15 @@ import eventsErrorsEmptyFixture from "./fixtures/events-errors-empty.json" with 
 import eventsErrorsFixture from "./fixtures/events-errors.json" with {
   type: "json",
 };
+import eventsTraceMetricsAggregateFixture from "./fixtures/events-tracemetrics-aggregate.json" with {
+  type: "json",
+};
+import eventsTraceMetricsEmptyFixture from "./fixtures/events-tracemetrics-empty.json" with {
+  type: "json",
+};
+import eventsTraceMetricsFixture from "./fixtures/events-tracemetrics.json" with {
+  type: "json",
+};
 import eventsSpansEmptyFixture from "./fixtures/events-spans-empty.json" with {
   type: "json",
 };
@@ -83,6 +92,12 @@ import traceItemsAttributesSpansNumberFixture from "./fixtures/trace-items-attri
   type: "json",
 };
 import traceItemsAttributesSpansStringFixture from "./fixtures/trace-items-attributes-spans-string.json" with {
+  type: "json",
+};
+import traceItemsAttributesTraceMetricsNumberFixture from "./fixtures/trace-items-attributes-tracemetrics-number.json" with {
+  type: "json",
+};
+import traceItemsAttributesTraceMetricsStringFixture from "./fixtures/trace-items-attributes-tracemetrics-string.json" with {
   type: "json",
 };
 import traceItemsAttributesFixture from "./fixtures/trace-items-attributes.json" with {
@@ -391,6 +406,40 @@ export const restHandlers = buildHandlers([
         return HttpResponse.json(eventsErrorsFixture);
       }
 
+      if (dataset === "tracemetrics") {
+        const sort = url.searchParams.get("sort");
+        const isAggregateQuery = fields.some(
+          (field) => field.includes("(") && field.includes(")"),
+        );
+
+        if (!sort) {
+          return HttpResponse.json("Missing sort", { status: 400 });
+        }
+
+        if (isAggregateQuery) {
+          if (!sort.includes("(")) {
+            return HttpResponse.json("Invalid tracemetrics sort", {
+              status: 400,
+            });
+          }
+
+          return HttpResponse.json(eventsTraceMetricsAggregateFixture);
+        }
+
+        const sortedQuery = query ? query?.split(" ").sort().join(" ") : null;
+        if (
+          ![
+            null,
+            "",
+            "metric.name:http.request.duration metric.type:distribution",
+          ].includes(sortedQuery)
+        ) {
+          return HttpResponse.json(eventsTraceMetricsEmptyFixture);
+        }
+
+        return HttpResponse.json(eventsTraceMetricsFixture);
+      }
+
       return HttpResponse.json("Invalid dataset", { status: 400 });
     },
   },
@@ -666,10 +715,10 @@ export const restHandlers = buildHandlers([
 
       // Validate itemType values (API accepts both singular and plural forms)
       const normalizedItemType = itemType === "spans" ? "span" : itemType;
-      if (!["span", "logs"].includes(normalizedItemType)) {
+      if (!["span", "logs", "tracemetrics"].includes(normalizedItemType)) {
         return HttpResponse.json(
           {
-            detail: `Invalid itemType '${itemType}'. Must be 'span' or 'logs'`,
+            detail: `Invalid itemType '${itemType}'. Must be 'span', 'logs', or 'tracemetrics'`,
           },
           { status: 400 },
         );
@@ -697,6 +746,14 @@ export const restHandlers = buildHandlers([
           return HttpResponse.json(traceItemsAttributesLogsStringFixture);
         }
         return HttpResponse.json(traceItemsAttributesLogsNumberFixture);
+      }
+      if (normalizedItemType === "tracemetrics") {
+        if (attributeType === "string") {
+          return HttpResponse.json(
+            traceItemsAttributesTraceMetricsStringFixture,
+          );
+        }
+        return HttpResponse.json(traceItemsAttributesTraceMetricsNumberFixture);
       }
 
       // Fallback (should not reach here with valid inputs)

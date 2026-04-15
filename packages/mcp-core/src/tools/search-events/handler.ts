@@ -12,10 +12,18 @@ import { searchEventsAgent } from "./agent";
 import {
   formatErrorResults,
   formatLogResults,
+  formatTraceMetricsResults,
   formatSpanResults,
 } from "./formatters";
-import { RECOMMENDED_FIELDS } from "./config";
+import {
+  RECOMMENDED_FIELDS,
+  TRACE_METRICS_SAMPLE_IDENTITY_FIELDS,
+} from "./config";
 import { UserInputError } from "../../errors";
+import {
+  isMetricsDataset,
+  normalizeEventsDataset,
+} from "../../utils/events-datasets";
 
 export default defineTool({
   name: "search_events",
@@ -44,6 +52,7 @@ export default defineTool({
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, AI/LLM calls, token usage",
+    "- metrics: Newer span metrics, metric values, counters, gauges, and distributions",
     "",
     "DO NOT USE for grouped issue lists → use search_issues",
     "",
@@ -119,7 +128,8 @@ export default defineTool({
     const dataset = parsed.dataset;
 
     // Get recommended fields for this dataset (for fallback when no fields are provided)
-    const recommendedFields = RECOMMENDED_FIELDS[dataset];
+    const recommendedFields =
+      RECOMMENDED_FIELDS[normalizeEventsDataset(dataset)];
 
     // Validate that sort parameter was provided
     if (!parsed.sort) {
@@ -134,7 +144,7 @@ export default defineTool({
     const requestedFields = parsed.fields || [];
 
     // Determine if this is an aggregate query by checking if any field contains a function
-    const isAggregateQuery = requestedFields.some(
+    const isAggregateFieldSelection = requestedFields.some(
       (field) => field.includes("(") && field.includes(")"),
     );
 
@@ -142,7 +152,7 @@ export default defineTool({
     // For non-aggregate queries, we can use recommended fields as fallback
     let fields: string[];
 
-    if (isAggregateQuery) {
+    if (isAggregateFieldSelection) {
       // For aggregate queries, fields must be provided and should only include
       // aggregate functions and groupBy fields
       if (!requestedFields || requestedFields.length === 0) {
@@ -177,10 +187,18 @@ export default defineTool({
       timeParams.statsPeriod = "14d";
     }
 
+    const requestFields =
+      isMetricsDataset(dataset) &&
+      !fields.some((field) => field.includes("(") && field.includes(")"))
+        ? Array.from(
+            new Set([...fields, ...TRACE_METRICS_SAMPLE_IDENTITY_FIELDS]),
+          )
+        : fields;
+
     const eventsResponse = await apiService.searchEvents({
       organizationSlug,
       query: sentryQuery,
-      fields,
+      fields: requestFields,
       limit: params.limit,
       projectId, // API requires numeric project ID, not slug
       dataset, // API now accepts "logs" directly (no longer needs "ourlogs")
@@ -195,20 +213,6 @@ export default defineTool({
     );
     const groupByFields = fields.filter(
       (field) => !field.includes("(") && !field.includes(")"),
-    );
-
-    const explorerUrl = apiService.getEventsExplorerUrl(
-      organizationSlug,
-      sentryQuery,
-      projectId, // Pass the numeric project ID for URL generation
-      dataset, // dataset is already correct for URL generation (logs, spans, errors)
-      fields, // Pass fields to detect if it's an aggregate query
-      sortParam, // Pass sort parameter for URL generation
-      aggregateFunctions,
-      groupByFields,
-      timeParams.statsPeriod,
-      timeParams.start,
-      timeParams.end,
     );
 
     // Type-safe access to event data with proper validation
@@ -236,6 +240,21 @@ export default defineTool({
       throw new Error("Invalid event data format from Sentry API");
     }
 
+    const explorerUrl = apiService.getEventsExplorerUrl(
+      organizationSlug,
+      sentryQuery,
+      projectId, // Pass the numeric project ID for URL generation
+      dataset, // dataset is already correct for URL generation (logs, spans, errors)
+      fields,
+      sortParam,
+      aggregateFunctions,
+      groupByFields,
+      timeParams.statsPeriod,
+      timeParams.start,
+      timeParams.end,
+      eventData,
+    );
+
     // Format results based on dataset
     const formatParams = {
       eventData,
@@ -256,6 +275,8 @@ export default defineTool({
         return formatLogResults(formatParams);
       case "spans":
         return formatSpanResults(formatParams);
+      default:
+        return formatTraceMetricsResults(formatParams);
     }
   },
 });
