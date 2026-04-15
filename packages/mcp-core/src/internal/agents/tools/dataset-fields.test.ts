@@ -140,8 +140,11 @@ describe("dataset-fields agent tool", () => {
       mswServer.use(
         http.get(
           "https://sentry.io/api/0/organizations/sentry-mcp-evals/tags/",
-          () =>
-            HttpResponse.json([
+          ({ request }) => {
+            const url = new URL(request.url);
+            expect(url.searchParams.get("dataset")).toBe("replays");
+
+            return HttpResponse.json([
               {
                 key: "count_screens",
                 name: "Count Screens",
@@ -172,7 +175,8 @@ describe("dataset-fields agent tool", () => {
                 name: "Internal User",
                 totalValues: 1,
               },
-            ]),
+            ]);
+          },
         ),
       );
 
