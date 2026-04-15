@@ -229,6 +229,14 @@ function getIgnoreState(
     };
   }
 
+  if (issue.substatus === "archived_forever") {
+    return {
+      family: "forever",
+      behavior: "Forever",
+      message: "The issue is now ignored indefinitely",
+    };
+  }
+
   if (ignoreUntil) {
     const formattedIgnoreUntil = formatIgnoreUntil(ignoreUntil);
     return {

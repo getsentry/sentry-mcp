@@ -641,6 +641,48 @@ describe("update_issue", () => {
     expect(result).toContain("**Ignore Behavior**: Forever");
   });
 
+  it("treats archived_forever as authoritative over stale ignore details", async () => {
+    let putCalled = false;
+    const currentIssue = createIssue({
+      status: "ignored",
+      substatus: "archived_forever",
+      statusDetails: {
+        ignoreCount: 3,
+      },
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => {
+          putCalled = true;
+          return HttpResponse.json(currentIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "ignored",
+        ignoreMode: "forever",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(putCalled).toBe(false);
+    expect(result).toContain("No changes were needed.");
+    expect(result).toContain("**Ignore Behavior**: Forever");
+  });
+
   it("validates required parameters", async () => {
     await expect(
       updateIssue.handler(
