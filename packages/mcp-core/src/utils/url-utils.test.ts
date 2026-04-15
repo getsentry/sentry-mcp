@@ -5,6 +5,8 @@ import {
   validateOpenAiBaseUrlThrows,
   getIssueUrl,
   getIssuesSearchUrl,
+  getReplaysSearchUrl,
+  getReplayUrl,
   getTraceUrl,
   getEventsExplorerUrl,
   getTraceMetricsExploreUrl,
@@ -200,6 +202,46 @@ describe("url-utils", () => {
       const result = getTraceUrl("sentry.example.com", "myorg", "abc123");
       expect(result).toBe(
         "https://sentry.example.com/organizations/myorg/explore/traces/trace/abc123",
+      );
+    });
+  });
+
+  describe("getReplaysSearchUrl", () => {
+    it("should handle regional URLs correctly for SaaS", () => {
+      const result = getReplaysSearchUrl("us.sentry.io", "myorg", {
+        query: "count_errors:>0",
+        projectSlugOrId: "123",
+        environment: ["production", "staging"],
+        sort: "-count_errors",
+        statsPeriod: "24h",
+      });
+      expect(result).toBe(
+        "https://myorg.sentry.io/explore/replays/?project=123&query=count_errors%3A%3E0&environment=production&environment=staging&sort=-count_errors&statsPeriod=24h",
+      );
+    });
+
+    it("should handle self-hosted correctly", () => {
+      const result = getReplaysSearchUrl("sentry.example.com", "myorg", {
+        query: "url:*checkout*",
+        start: "2025-01-01T00:00:00Z",
+        end: "2025-01-02T00:00:00Z",
+      });
+      expect(result).toBe(
+        "https://sentry.example.com/organizations/myorg/explore/replays/?query=url%3A*checkout*&start=2025-01-01T00%3A00%3A00Z&end=2025-01-02T00%3A00%3A00Z",
+      );
+    });
+  });
+
+  describe("getReplayUrl", () => {
+    it("should return the canonical replay details path for SaaS", () => {
+      const result = getReplayUrl("us.sentry.io", "myorg", "abc123");
+      expect(result).toBe("https://myorg.sentry.io/explore/replays/abc123/");
+    });
+
+    it("should handle self-hosted correctly", () => {
+      const result = getReplayUrl("sentry.example.com", "myorg", "abc123");
+      expect(result).toBe(
+        "https://sentry.example.com/organizations/myorg/explore/replays/abc123/",
       );
     });
   });

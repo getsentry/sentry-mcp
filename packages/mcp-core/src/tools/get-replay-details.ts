@@ -59,7 +59,7 @@ export default defineTool({
     "<examples>",
     "### With replay URL",
     "```",
-    "get_replay_details(replayUrl='https://my-organization.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/')",
+    "get_replay_details(replayUrl='https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/')",
     "```",
     "",
     "### With organization and replay ID",

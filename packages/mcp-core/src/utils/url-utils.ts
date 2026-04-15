@@ -290,6 +290,64 @@ export function getIssuesSearchUrl(
 }
 
 /**
+ * Generates a Sentry replay search URL.
+ * @param host The Sentry host (may include regional subdomain for API access)
+ * @param organizationSlug Organization identifier
+ * @param options Replay search options
+ * @returns The complete replay search URL
+ */
+export function getReplaysSearchUrl(
+  host: string,
+  organizationSlug: string,
+  options: {
+    query?: string | null;
+    projectSlugOrId?: string;
+    environment?: string | string[] | null;
+    sort?: string | null;
+    statsPeriod?: string | null;
+    start?: string | null;
+    end?: string | null;
+  } = {},
+): string {
+  const { query, projectSlugOrId, environment, sort, statsPeriod, start, end } =
+    options;
+
+  let url = getSentryWebBaseUrl(host, organizationSlug, "/explore/replays/");
+  const params = new URLSearchParams();
+
+  if (projectSlugOrId) {
+    params.append("project", projectSlugOrId);
+  }
+  if (query) {
+    params.append("query", query);
+  }
+  if (environment) {
+    const environments = Array.isArray(environment)
+      ? environment
+      : [environment];
+    for (const value of environments) {
+      params.append("environment", value);
+    }
+  }
+  if (sort) {
+    params.append("sort", sort);
+  }
+  if (start && end) {
+    params.append("start", start);
+    params.append("end", end);
+  } else if (statsPeriod) {
+    params.append("statsPeriod", statsPeriod);
+  }
+
+  const queryString = params.toString();
+  if (queryString) {
+    url += `?${queryString}`;
+  }
+
+  return url;
+}
+
+/**
  * Generates a Sentry trace URL for performance investigation.
  * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier
@@ -320,7 +378,11 @@ export function getReplayUrl(
   organizationSlug: string,
   replayId: string,
 ): string {
-  return getSentryWebBaseUrl(host, organizationSlug, `/replays/${replayId}/`);
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/explore/replays/${replayId}/`,
+  );
 }
 
 /**

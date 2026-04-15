@@ -375,12 +375,12 @@ describe("get_issue_details", () => {
     expect(replaySection).toMatchInlineSnapshot(`
       "## Session Replay
 
-      **Attached Replay**: https://sentry-mcp-evals.sentry.io/replays/7e07485f12f9416b8b1426260799b51f/
+      **Attached Replay**: https://sentry-mcp-evals.sentry.io/explore/replays/7e07485f12f9416b8b1426260799b51f/
       **Related Replay Count**: 2
 
       ### Other Related Replays
 
-      - https://sentry-mcp-evals.sentry.io/replays/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/
+      - https://sentry-mcp-evals.sentry.io/explore/replays/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/
 
       Use \`get_replay_details(organizationSlug='sentry-mcp-evals', replayId='7e07485f12f9416b8b1426260799b51f')\` to inspect a replay in detail."
     `);

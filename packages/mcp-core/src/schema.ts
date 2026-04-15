@@ -76,7 +76,7 @@ export const ParamReplayUrl = z
   .url()
   .trim()
   .describe(
-    "The URL of the replay. e.g. https://my-organization.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/",
+    "The URL of the replay. e.g. https://my-organization.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/",
   );
 
 export const ParamTraceId = z

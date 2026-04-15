@@ -24,13 +24,19 @@ import {
   isMetricsDataset,
   normalizeEventsDataset,
 } from "../../utils/events-datasets";
+import {
+  DEFAULT_REPLAY_SORT,
+  DEFAULT_REPLAY_STATS_PERIOD,
+  formatReplayResults,
+  isValidReplaySort,
+} from "./replays";
 
 export default defineTool({
   name: "search_events",
   skills: ["inspect", "triage", "seer"], // Available in inspect, triage, and seer skills
   requiredScopes: ["event:read"],
   description: [
-    "Search for events AND perform counts/aggregations - the ONLY tool for statistics and counts.",
+    "Search across Sentry events and replays. This is the ONLY tool for statistics and counts on event datasets.",
     "",
     "Supports TWO query types:",
     "1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'",
@@ -43,16 +49,20 @@ export default defineTool({
     "- 'average response time' → returns avg()",
     "- 'sum of tokens used' → returns sum()",
     "",
-    "ALSO USE FOR INDIVIDUAL EVENTS:",
+    "ALSO USE FOR INDIVIDUAL EVENTS OR REPLAY LISTS:",
     "- 'error logs from last hour' → returns event list",
     "- 'database errors with timestamps' → returns event list",
     "- 'trace spans for slow API calls' → returns span list",
+    "- 'checkout replays with errors this week' → returns replay list",
     "",
     "Dataset Selection (AI automatically chooses):",
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, AI/LLM calls, token usage",
     "- metrics: Newer span metrics, metric values, counters, gauges, and distributions",
+    "- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users",
+    "",
+    "Replay searches on this tool return replay lists only. Replay count()/avg()/sum() aggregations are not supported.",
     "",
     "DO NOT USE for grouped issue lists → use search_issues",
     "",
@@ -123,6 +133,66 @@ export default defineTool({
     });
 
     const parsed = agentResult.result;
+
+    if (parsed.dataset === "replays") {
+      const replaySort = parsed.sort || DEFAULT_REPLAY_SORT;
+      if (!isValidReplaySort(replaySort)) {
+        throw new UserInputError(
+          `Invalid replay sort "${replaySort}". Use a supported replay sort like ${DEFAULT_REPLAY_SORT}, -count_errors, -count_rage_clicks, or -duration.`,
+        );
+      }
+
+      const replayTimeParams: {
+        statsPeriod?: string;
+        start?: string;
+        end?: string;
+      } = {};
+      if (parsed.timeRange) {
+        if ("statsPeriod" in parsed.timeRange) {
+          replayTimeParams.statsPeriod = parsed.timeRange.statsPeriod;
+        } else if ("start" in parsed.timeRange && "end" in parsed.timeRange) {
+          replayTimeParams.start = parsed.timeRange.start;
+          replayTimeParams.end = parsed.timeRange.end;
+        }
+      } else {
+        replayTimeParams.statsPeriod = DEFAULT_REPLAY_STATS_PERIOD;
+      }
+
+      const replayQuery = parsed.query || "";
+      const replays = await apiService.searchReplays({
+        organizationSlug,
+        query: replayQuery,
+        limit: params.limit,
+        projectId,
+        sort: replaySort,
+        environment: parsed.environment ?? undefined,
+        ...replayTimeParams,
+      });
+
+      const replaySearchUrl = apiService.getReplaysSearchUrl(organizationSlug, {
+        query: replayQuery || undefined,
+        projectSlugOrId: projectId,
+        environment: parsed.environment ?? undefined,
+        sort: replaySort,
+        statsPeriod: replayTimeParams.statsPeriod,
+        start: replayTimeParams.start,
+        end: replayTimeParams.end,
+      });
+
+      return formatReplayResults({
+        replays,
+        naturalLanguageQuery: params.naturalLanguageQuery,
+        includeExplanation: params.includeExplanation,
+        organizationSlug,
+        apiService,
+        searchUrl: replaySearchUrl,
+        replayQuery,
+        sort: replaySort,
+        environment: parsed.environment,
+        explanation: parsed.explanation,
+        timeRange: replayTimeParams,
+      });
+    }
 
     // Get the dataset chosen by the agent
     const dataset = parsed.dataset;
