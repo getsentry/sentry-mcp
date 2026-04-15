@@ -55,6 +55,67 @@ describeEval("update-issue", {
           },
         ],
       },
+      // Regression: default ignored status should map to "until escalating"
+      {
+        input: `Ignore the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug} until it escalates. Output only the new status as a single word.`,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "update_issue",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              issueId: FIXTURES.issueId,
+              status: "ignored",
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
+      },
+      // Regression: permanent ignores need the explicit forever mode
+      {
+        input: `Ignore the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug} forever. Output only the new status as a single word.`,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "update_issue",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              issueId: FIXTURES.issueId,
+              status: "ignored",
+              ignoreMode: "forever",
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
+      },
+      // Regression: count-based ignores should use the structured ignore fields
+      {
+        input: `Ignore the issue ${FIXTURES.issueId} in organization ${FIXTURES.organizationSlug} until it happens 100 times in 60 minutes. Output only the new status as a single word.`,
+        expectedTools: [
+          {
+            name: "find_organizations",
+            arguments: {},
+          },
+          {
+            name: "update_issue",
+            arguments: {
+              organizationSlug: FIXTURES.organizationSlug,
+              issueId: FIXTURES.issueId,
+              status: "ignored",
+              ignoreMode: "untilOccurrenceCount",
+              ignoreCount: 100,
+              ignoreWindowMinutes: 60,
+              regionUrl: "https://us.sentry.io",
+            },
+          },
+        ],
+      },
     ];
   },
   task: NoOpTaskRunner(),

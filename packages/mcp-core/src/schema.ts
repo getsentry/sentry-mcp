@@ -135,11 +135,65 @@ export const ParamIssueStatus = z
     "The new status for the issue. Valid values are 'resolved', 'resolvedInNextRelease', 'unresolved', and 'ignored'.",
   );
 
+export const ParamIssueIgnoreMode = z
+  .enum([
+    "untilEscalating",
+    "forever",
+    "forDuration",
+    "untilOccurrenceCount",
+    "untilUserCount",
+  ])
+  .describe(
+    "How ignored issues should behave. Use 'untilEscalating' to match the Sentry UI default, 'forever' for a permanent ignore, 'forDuration' with ignoreDurationMinutes, 'untilOccurrenceCount' with ignoreCount and optional ignoreWindowMinutes, or 'untilUserCount' with ignoreUserCount and optional ignoreUserWindowMinutes.",
+  );
+
 export const ParamAssignedTo = z
   .string()
   .trim()
   .describe(
     "The assignee in format 'user:ID' or 'team:ID_OR_SLUG' where ID is numeric. Example: 'user:123456', 'team:789', or 'team:my-team-slug'. Use the whoami tool to find your user ID.",
+  );
+
+export const ParamIgnoreDurationMinutes = z
+  .number()
+  .int()
+  .positive()
+  .describe(
+    "How many minutes to ignore the issue when ignoreMode is 'forDuration'.",
+  );
+
+export const ParamIgnoreCount = z
+  .number()
+  .int()
+  .positive()
+  .describe(
+    "How many times the issue must occur before it stops being ignored when ignoreMode is 'untilOccurrenceCount'.",
+  );
+
+export const ParamIgnoreWindowMinutes = z
+  .number()
+  .int()
+  .positive()
+  .max(7 * 24 * 60)
+  .describe(
+    "Optional time window in minutes for ignoreCount. If omitted, Sentry counts all future occurrences.",
+  );
+
+export const ParamIgnoreUserCount = z
+  .number()
+  .int()
+  .positive()
+  .describe(
+    "How many users must be affected before the issue stops being ignored when ignoreMode is 'untilUserCount'.",
+  );
+
+export const ParamIgnoreUserWindowMinutes = z
+  .number()
+  .int()
+  .positive()
+  .max(7 * 24 * 60)
+  .describe(
+    "Optional time window in minutes for ignoreUserCount. If omitted, Sentry counts all future affected users.",
   );
 
 export const ParamSentryGuide = z

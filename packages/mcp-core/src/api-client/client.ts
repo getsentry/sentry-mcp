@@ -2002,17 +2002,49 @@ export class SentryApiService {
       issueId,
       status,
       assignedTo,
+      substatus,
+      ignoreDuration,
+      ignoreCount,
+      ignoreWindow,
+      ignoreUserCount,
+      ignoreUserWindow,
     }: {
       organizationSlug: string;
       issueId: string;
       status?: string;
       assignedTo?: string;
+      substatus?: string;
+      ignoreDuration?: number;
+      ignoreCount?: number;
+      ignoreWindow?: number;
+      ignoreUserCount?: number;
+      ignoreUserWindow?: number;
     },
     opts?: RequestOptions,
   ): Promise<Issue> {
-    const updateData: Record<string, any> = {};
+    const updateData: {
+      status?: string;
+      assignedTo?: string;
+      substatus?: string;
+      ignoreDuration?: number;
+      ignoreCount?: number;
+      ignoreWindow?: number;
+      ignoreUserCount?: number;
+      ignoreUserWindow?: number;
+    } = {};
     if (status !== undefined) updateData.status = status;
     if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+    if (substatus !== undefined) updateData.substatus = substatus;
+    if (ignoreDuration !== undefined)
+      updateData.ignoreDuration = ignoreDuration;
+    if (ignoreCount !== undefined) updateData.ignoreCount = ignoreCount;
+    if (ignoreWindow !== undefined) updateData.ignoreWindow = ignoreWindow;
+    if (ignoreUserCount !== undefined) {
+      updateData.ignoreUserCount = ignoreUserCount;
+    }
+    if (ignoreUserWindow !== undefined) {
+      updateData.ignoreUserWindow = ignoreUserWindow;
+    }
 
     const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/`,

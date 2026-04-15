@@ -172,6 +172,86 @@ function buildHandlers(
   return result;
 }
 
+type IssueUpdateBody = {
+  assignedTo?: unknown;
+  ignoreCount?: number;
+  ignoreDuration?: number;
+  ignoreUserCount?: number;
+  ignoreUserWindow?: number;
+  ignoreWindow?: number;
+  status?: string;
+  substatus?: string;
+};
+
+function buildMockIgnoredStatusDetails(
+  body: IssueUpdateBody,
+  substatus: string | null | undefined,
+) {
+  if (substatus === "archived_until_escalating") {
+    return { ignoreUntilEscalating: true };
+  }
+
+  if (substatus === "archived_until_condition_met") {
+    return {
+      ...(body.ignoreDuration !== undefined
+        ? { ignoreDuration: body.ignoreDuration }
+        : {}),
+      ...(body.ignoreCount !== undefined
+        ? { ignoreCount: body.ignoreCount }
+        : {}),
+      ...(body.ignoreWindow !== undefined
+        ? { ignoreWindow: body.ignoreWindow }
+        : {}),
+      ...(body.ignoreUserCount !== undefined
+        ? { ignoreUserCount: body.ignoreUserCount }
+        : {}),
+      ...(body.ignoreUserWindow !== undefined
+        ? { ignoreUserWindow: body.ignoreUserWindow }
+        : {}),
+    };
+  }
+
+  return {};
+}
+
+function buildUpdatedIssueResponse(
+  baseIssue: typeof issueFixture,
+  body: IssueUpdateBody,
+) {
+  const hasIgnoreConditions =
+    body.ignoreDuration !== undefined ||
+    body.ignoreCount !== undefined ||
+    body.ignoreUserCount !== undefined;
+  const requestedStatus = body.status ?? baseIssue.status;
+  const status =
+    requestedStatus === "resolvedInNextRelease" ? "resolved" : requestedStatus;
+  const substatus =
+    status === "ignored"
+      ? (body.substatus ??
+        (hasIgnoreConditions
+          ? "archived_until_condition_met"
+          : "archived_until_escalating"))
+      : baseIssue.substatus;
+
+  let statusDetails = baseIssue.statusDetails;
+
+  if (requestedStatus === "resolvedInNextRelease") {
+    statusDetails = { inNextRelease: true };
+  } else if (status === "ignored") {
+    statusDetails = buildMockIgnoredStatusDetails(body, substatus);
+  } else if (body.status !== undefined) {
+    statusDetails = {};
+  }
+
+  return {
+    ...baseIssue,
+    status,
+    substatus,
+    statusDetails,
+    assignedTo: body.assignedTo ?? baseIssue.assignedTo,
+  };
+}
+
 /**
  * Complete set of Sentry API mock handlers.
  *
@@ -882,52 +962,32 @@ export const restHandlers = buildHandlers([
     method: "put",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
     fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      const updatedIssue = {
-        ...issueFixture,
-        status: body?.status || issueFixture.status,
-        assignedTo: body?.assignedTo || issueFixture.assignedTo,
-      };
-      return HttpResponse.json(updatedIssue);
+      const body = (await request.json()) as IssueUpdateBody;
+      return HttpResponse.json(buildUpdatedIssueResponse(issueFixture, body));
     },
   },
   {
     method: "put",
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
     fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      const updatedIssue = {
-        ...issueFixture,
-        status: body?.status || issueFixture.status,
-        assignedTo: body?.assignedTo || issueFixture.assignedTo,
-      };
-      return HttpResponse.json(updatedIssue);
+      const body = (await request.json()) as IssueUpdateBody;
+      return HttpResponse.json(buildUpdatedIssueResponse(issueFixture, body));
     },
   },
   {
     method: "put",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
     fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      const updatedIssue = {
-        ...issueFixture2,
-        status: body?.status || issueFixture2.status,
-        assignedTo: body?.assignedTo || issueFixture2.assignedTo,
-      };
-      return HttpResponse.json(updatedIssue);
+      const body = (await request.json()) as IssueUpdateBody;
+      return HttpResponse.json(buildUpdatedIssueResponse(issueFixture2, body));
     },
   },
   {
     method: "put",
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
     fetch: async ({ request }) => {
-      const body = (await request.json()) as any;
-      const updatedIssue = {
-        ...issueFixture2,
-        status: body?.status || issueFixture2.status,
-        assignedTo: body?.assignedTo || issueFixture2.assignedTo,
-      };
-      return HttpResponse.json(updatedIssue);
+      const body = (await request.json()) as IssueUpdateBody;
+      return HttpResponse.json(buildUpdatedIssueResponse(issueFixture2, body));
     },
   },
   // Profiling endpoints
