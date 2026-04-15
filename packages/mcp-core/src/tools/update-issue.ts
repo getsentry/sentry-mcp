@@ -682,9 +682,6 @@ export default defineTool({
         throw new UserInputError(
           "Changing ignore behavior on an already ignored issue between `untilEscalating`, `forever`, and condition-based modes is not supported. First set `status` to `unresolved`, then ignore it again with the new rule.",
         );
-      } else if (requestedIgnoreFamily !== "condition") {
-        updateStatus = undefined;
-        updateIgnore = undefined;
       }
     }
 
