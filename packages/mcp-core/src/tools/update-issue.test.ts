@@ -96,6 +96,41 @@ describe("update_issue", () => {
     `);
   });
 
+  it("skips assignment updates when the requested assignee is already set", async () => {
+    let putCalled = false;
+    const currentIssue = createIssue();
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => {
+          putCalled = true;
+          return HttpResponse.json(currentIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: undefined,
+        assignedTo: "user:12345",
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(putCalled).toBe(false);
+    expect(result).toContain("No changes were needed.");
+    expect(result).not.toContain("→");
+  });
+
   it("updates both status and assignment", async () => {
     const result = await updateIssue.handler(
       {

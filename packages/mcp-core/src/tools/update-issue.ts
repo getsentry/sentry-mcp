@@ -301,10 +301,50 @@ function buildNoChangesOutput(params: {
   output += `**Assigned To**: ${formatAssignedTo(issue.assignedTo ?? null)}\n`;
 
   output += "\n# Using this information\n\n";
-  output += "- The issue already matched the requested ignored state\n";
+  output += "- The issue already matched the requested state\n";
   output += `- You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="${organizationSlug}", resourceId="${issue.shortId}")\`\n`;
 
   return output;
+}
+
+function isAssigneeAlreadySet(
+  issue: Issue,
+  requestedAssignee: string | undefined,
+  currentUserId: string | null | undefined,
+): boolean {
+  if (!requestedAssignee || !issue.assignedTo) {
+    return false;
+  }
+
+  if (typeof issue.assignedTo === "string") {
+    return issue.assignedTo === requestedAssignee;
+  }
+
+  if (requestedAssignee === "me") {
+    return (
+      issue.assignedTo.type === "user" &&
+      currentUserId !== undefined &&
+      String(issue.assignedTo.id) === currentUserId
+    );
+  }
+
+  if (requestedAssignee.startsWith("user:")) {
+    return (
+      issue.assignedTo.type === "user" &&
+      String(issue.assignedTo.id) === requestedAssignee.slice("user:".length)
+    );
+  }
+
+  if (requestedAssignee.startsWith("team:")) {
+    const requestedTeam = requestedAssignee.slice("team:".length);
+    return (
+      issue.assignedTo.type === "team" &&
+      (String(issue.assignedTo.id) === requestedTeam ||
+        issue.assignedTo.name === requestedTeam)
+    );
+  }
+
+  return false;
 }
 
 function getIgnoreFamily(
@@ -571,6 +611,11 @@ export default defineTool({
     });
 
     const currentIgnoreState = getIgnoreState(currentIssue);
+    const assignmentAlreadySet = isAssigneeAlreadySet(
+      currentIssue,
+      params.assignedTo,
+      context.userId,
+    );
     const ignoreUpdate = buildIgnoreUpdate(params, {
       applyDefaultIgnoredMode:
         params.status === "ignored" && currentIssue.status !== "ignored",
@@ -578,6 +623,7 @@ export default defineTool({
     const requestedIgnoreFamily = getIgnoreFamily(ignoreUpdate);
 
     let updateStatus = params.status;
+    const updateAssignedTo = assignmentAlreadySet ? undefined : params.assignedTo;
     let updateIgnore = ignoreUpdate;
 
     if (currentIssue.status === "ignored" && params.status === "ignored") {
@@ -603,7 +649,7 @@ export default defineTool({
       currentIssue.shortId,
     );
 
-    if (!updateStatus && !params.assignedTo && !updateIgnore) {
+    if (!updateStatus && !updateAssignedTo && !updateIgnore) {
       return buildNoChangesOutput({
         issue: currentIssue,
         organizationSlug: orgSlug,
@@ -617,7 +663,7 @@ export default defineTool({
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
       status: updateStatus,
-      assignedTo: params.assignedTo,
+      assignedTo: updateAssignedTo,
       substatus: updateIgnore?.substatus,
       ignoreDuration: updateIgnore?.ignoreDuration,
       ignoreCount: updateIgnore?.ignoreCount,
@@ -630,6 +676,9 @@ export default defineTool({
     const statusChanged =
       params.status !== undefined &&
       currentIssue.status !== updatedIssue.status;
+    const assignmentChanged =
+      formatAssignedTo(currentIssue.assignedTo ?? null) !==
+      formatAssignedTo(updatedIssue.assignedTo ?? null);
     const ignoreBehaviorChanged =
       currentIgnoreState?.behavior !== updatedIgnoreState?.behavior;
 
@@ -656,10 +705,12 @@ export default defineTool({
       }
     }
 
-    if (params.assignedTo) {
+    if (updateAssignedTo && assignmentChanged) {
       const oldAssignee = formatAssignedTo(currentIssue.assignedTo ?? null);
       const newAssignee =
-        params.assignedTo === "me" ? "You" : params.assignedTo;
+        params.assignedTo === "me"
+          ? "You"
+          : formatAssignedTo(updatedIssue.assignedTo ?? null);
       output += `**Assigned To**: ${oldAssignee} → **${newAssignee}**\n`;
     }
 
