@@ -1,5 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { issueFixture, mswServer } from "@sentry/mcp-server-mocks";
 import updateIssue from "./update-issue.js";
+
+type MockIssue = typeof issueFixture;
+
+const serverContext = {
+  constraints: {
+    organizationSlug: undefined,
+  },
+  accessToken: "access-token",
+  userId: "1",
+};
+
+function createIssue(overrides: Partial<MockIssue> = {}): MockIssue {
+  return {
+    ...structuredClone(issueFixture),
+    ...overrides,
+  };
+}
+
+afterEach(() => {
+  mswServer.resetHandlers();
+});
 
 describe("update_issue", () => {
   it("updates issue status", async () => {
@@ -12,13 +35,7 @@ describe("update_issue", () => {
         issueUrl: undefined,
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: undefined,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      serverContext,
     );
     expect(result).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
@@ -54,13 +71,7 @@ describe("update_issue", () => {
         issueUrl: undefined,
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: undefined,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      serverContext,
     );
     expect(result).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
@@ -95,13 +106,7 @@ describe("update_issue", () => {
         issueUrl: undefined,
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: undefined,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      serverContext,
     );
     expect(result).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
@@ -138,13 +143,7 @@ describe("update_issue", () => {
         issueUrl: undefined,
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: undefined,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      serverContext,
     );
     expect(result).toContain("Assigned To");
     expect(result).toContain("team:the-goats");
@@ -160,13 +159,7 @@ describe("update_issue", () => {
         issueUrl: undefined,
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: undefined,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      serverContext,
     );
     expect(result).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
@@ -205,13 +198,7 @@ describe("update_issue", () => {
         issueUrl: undefined,
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: undefined,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      serverContext,
     );
     expect(result).toContain("**Ignore Behavior**: Forever");
     expect(result).toContain("The issue is now ignored indefinitely");
@@ -230,13 +217,7 @@ describe("update_issue", () => {
         issueUrl: undefined,
         regionUrl: null,
       },
-      {
-        constraints: {
-          organizationSlug: undefined,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
+      serverContext,
     );
     expect(result).toMatchInlineSnapshot(`
       "# Issue CLOUDFLARE-MCP-41 Updated in **sentry-mcp-evals**
@@ -264,6 +245,200 @@ describe("update_issue", () => {
     `);
   });
 
+  it("preserves existing ignore behavior when assigning an already ignored issue", async () => {
+    let lastRequestBody: Record<string, unknown> | undefined;
+    let currentIssue = createIssue({
+      status: "ignored",
+      substatus: "archived_until_condition_met",
+      statusDetails: {
+        ignoreCount: 3,
+        ignoreWindow: 60,
+      },
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        async ({ request }) => {
+          lastRequestBody = (await request.json()) as Record<string, unknown>;
+          currentIssue = {
+            ...currentIssue,
+            assignedTo: lastRequestBody.assignedTo ?? currentIssue.assignedTo,
+          };
+          return HttpResponse.json(currentIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "ignored",
+        assignedTo: "john.doe",
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(lastRequestBody).toEqual({
+      assignedTo: "john.doe",
+    });
+    expect(result).toContain(
+      "**Ignore Behavior**: Until it occurs 3 times in 60 minutes",
+    );
+    expect(result).not.toContain("The issue is now ignored");
+  });
+
+  it("updates condition-based ignore behavior for already ignored issues", async () => {
+    let lastRequestBody: Record<string, unknown> | undefined;
+    let currentIssue = createIssue({
+      status: "ignored",
+      substatus: "archived_until_condition_met",
+      statusDetails: {
+        ignoreCount: 3,
+        ignoreWindow: 60,
+      },
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        async ({ request }) => {
+          lastRequestBody = (await request.json()) as Record<string, unknown>;
+          currentIssue = {
+            ...currentIssue,
+            status: "ignored",
+            statusDetails: {
+              ignoreCount: lastRequestBody.ignoreCount,
+              ignoreWindow: lastRequestBody.ignoreWindow,
+            },
+          };
+          return HttpResponse.json(currentIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "ignored",
+        ignoreMode: "untilOccurrenceCount",
+        ignoreCount: 10,
+        ignoreWindowMinutes: 30,
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(lastRequestBody).toEqual({
+      status: "ignored",
+      substatus: "archived_until_condition_met",
+      ignoreCount: 10,
+      ignoreWindow: 30,
+    });
+    expect(result).toContain(
+      "**Ignore Behavior**: Until it occurs 3 times in 60 minutes → **Until it occurs 10 times in 30 minutes**",
+    );
+    expect(result).toContain(
+      "**Ignore Behavior**: Until it occurs 10 times in 30 minutes",
+    );
+  });
+
+  it("rejects cross-family ignore changes for already ignored issues", async () => {
+    let putCalled = false;
+    const currentIssue = createIssue({
+      status: "ignored",
+      substatus: "archived_forever",
+      statusDetails: {},
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => {
+          putCalled = true;
+          return HttpResponse.json(currentIssue);
+        },
+      ),
+    );
+
+    await expect(
+      updateIssue.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "ignored",
+          ignoreMode: "untilOccurrenceCount",
+          ignoreCount: 10,
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        serverContext,
+      ),
+    ).rejects.toThrow(
+      "Changing ignore behavior on an already ignored issue between `untilEscalating`, `forever`, and condition-based modes is not supported.",
+    );
+    expect(putCalled).toBe(false);
+  });
+
+  it("returns no changes when the issue is already ignored as requested", async () => {
+    let putCalled = false;
+    const currentIssue = createIssue({
+      status: "ignored",
+      substatus: "archived_forever",
+      statusDetails: {},
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => {
+          putCalled = true;
+          return HttpResponse.json(currentIssue);
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "ignored",
+        ignoreMode: "forever",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(putCalled).toBe(false);
+    expect(result).toContain("No changes were needed.");
+    expect(result).toContain("**Ignore Behavior**: Forever");
+  });
+
   it("validates required parameters", async () => {
     await expect(
       updateIssue.handler(
@@ -275,13 +450,7 @@ describe("update_issue", () => {
           issueUrl: undefined,
           regionUrl: null,
         },
-        {
-          constraints: {
-            organizationSlug: undefined,
-          },
-          accessToken: "access-token",
-          userId: "1",
-        },
+        serverContext,
       ),
     ).rejects.toThrow("Either `issueId` or `issueUrl` must be provided");
   });
@@ -297,13 +466,7 @@ describe("update_issue", () => {
           issueUrl: undefined,
           regionUrl: null,
         },
-        {
-          constraints: {
-            organizationSlug: undefined,
-          },
-          accessToken: "access-token",
-          userId: "1",
-        },
+        serverContext,
       ),
     ).rejects.toThrow(
       "`organizationSlug` is required when providing `issueId`",
@@ -321,13 +484,7 @@ describe("update_issue", () => {
           issueUrl: undefined,
           regionUrl: null,
         },
-        {
-          constraints: {
-            organizationSlug: undefined,
-          },
-          accessToken: "access-token",
-          userId: "1",
-        },
+        serverContext,
       ),
     ).rejects.toThrow(
       "At least one of `status` or `assignedTo` must be provided to update the issue",
@@ -346,13 +503,7 @@ describe("update_issue", () => {
           issueUrl: undefined,
           regionUrl: null,
         },
-        {
-          constraints: {
-            organizationSlug: undefined,
-          },
-          accessToken: "access-token",
-          userId: "1",
-        },
+        serverContext,
       ),
     ).rejects.toThrow(
       "Ignore options can only be used when `status` is `ignored`",
@@ -371,13 +522,7 @@ describe("update_issue", () => {
           issueUrl: undefined,
           regionUrl: null,
         },
-        {
-          constraints: {
-            organizationSlug: undefined,
-          },
-          accessToken: "access-token",
-          userId: "1",
-        },
+        serverContext,
       ),
     ).rejects.toThrow("`ignoreWindowMinutes` requires `ignoreCount`");
   });

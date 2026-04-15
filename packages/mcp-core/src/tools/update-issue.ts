@@ -4,6 +4,7 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { parseIssueParams } from "../internal/tool-helpers/issue";
 import { formatAssignedTo } from "../internal/tool-helpers/formatting";
 import { UserInputError } from "../errors";
+import type { Issue } from "../api-client/types";
 import type { ServerContext } from "../types";
 import {
   ParamOrganizationSlug,
@@ -27,6 +28,8 @@ type IgnoreMode =
   | "untilOccurrenceCount"
   | "untilUserCount";
 
+type IgnoreFamily = "untilEscalating" | "forever" | "condition";
+
 type IgnoreUpdate = {
   substatus:
     | "archived_until_escalating"
@@ -41,18 +44,38 @@ type IgnoreUpdate = {
   message: string;
 };
 
-function pluralize(value: number, noun: string): string {
-  return `${value} ${noun}${value === 1 ? "" : "s"}`;
-}
+type IgnoreState = {
+  family: IgnoreFamily;
+  behavior: string;
+  message: string;
+};
 
-function inferIgnoreMode(params: {
+type IgnoreParams = {
+  status?: string;
   ignoreMode?: IgnoreMode;
   ignoreDurationMinutes?: number;
   ignoreCount?: number;
   ignoreWindowMinutes?: number;
   ignoreUserCount?: number;
   ignoreUserWindowMinutes?: number;
-}): IgnoreMode {
+};
+
+function pluralize(value: number, noun: string): string {
+  return `${value} ${noun}${value === 1 ? "" : "s"}`;
+}
+
+function hasExplicitIgnoreChange(params: IgnoreParams): boolean {
+  return (
+    params.ignoreMode !== undefined ||
+    params.ignoreDurationMinutes !== undefined ||
+    params.ignoreCount !== undefined ||
+    params.ignoreWindowMinutes !== undefined ||
+    params.ignoreUserCount !== undefined ||
+    params.ignoreUserWindowMinutes !== undefined
+  );
+}
+
+function inferIgnoreMode(params: IgnoreParams): IgnoreMode {
   if (params.ignoreMode) {
     return params.ignoreMode;
   }
@@ -78,60 +101,237 @@ function inferIgnoreMode(params: {
   return "untilEscalating";
 }
 
-function getIgnoreBehavior(
-  substatus: string | null | undefined,
+function getIssueStatusDetails(issue: Issue): Record<string, unknown> {
+  const statusDetails = issue.statusDetails;
+
+  if (
+    statusDetails &&
+    typeof statusDetails === "object" &&
+    !Array.isArray(statusDetails)
+  ) {
+    return statusDetails as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function getStatusDetailNumber(
+  statusDetails: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = statusDetails[key];
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  return undefined;
+}
+
+function getStatusDetailString(
+  statusDetails: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = statusDetails[key];
+
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function formatIgnoreUntil(ignoreUntil: string): string {
+  const date = new Date(ignoreUntil);
+  if (Number.isNaN(date.getTime())) {
+    return ignoreUntil;
+  }
+
+  return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
+function getIgnoreStateFromUpdate(
   ignoreUpdate?: IgnoreUpdate,
-): string | null {
-  switch (substatus) {
+): IgnoreState | null {
+  if (!ignoreUpdate) {
+    return null;
+  }
+
+  switch (ignoreUpdate.substatus) {
     case "archived_until_escalating":
-      return "Until escalating";
+      return {
+        family: "untilEscalating",
+        behavior: ignoreUpdate.behavior,
+        message: ignoreUpdate.message,
+      };
     case "archived_forever":
-      return "Forever";
+      return {
+        family: "forever",
+        behavior: ignoreUpdate.behavior,
+        message: ignoreUpdate.message,
+      };
     case "archived_until_condition_met":
-      return ignoreUpdate?.behavior ?? "Until the ignore condition is met";
-    default:
-      return null;
+      return {
+        family: "condition",
+        behavior: ignoreUpdate.behavior,
+        message: ignoreUpdate.message,
+      };
   }
 }
 
-function getIgnoredStatusMessage(
-  substatus: string | null | undefined,
+function getIgnoreState(
+  issue: Issue,
+  fallbackIgnoreUpdate?: IgnoreUpdate,
+): IgnoreState | null {
+  if (issue.status !== "ignored") {
+    return null;
+  }
+
+  const statusDetails = getIssueStatusDetails(issue);
+  const ignoreUntil = getStatusDetailString(statusDetails, "ignoreUntil");
+  const ignoreDuration = getStatusDetailNumber(statusDetails, "ignoreDuration");
+  const ignoreCount = getStatusDetailNumber(statusDetails, "ignoreCount");
+  const ignoreWindow = getStatusDetailNumber(statusDetails, "ignoreWindow");
+  const ignoreUserCount = getStatusDetailNumber(
+    statusDetails,
+    "ignoreUserCount",
+  );
+  const ignoreUserWindow = getStatusDetailNumber(
+    statusDetails,
+    "ignoreUserWindow",
+  );
+
+  if (
+    issue.substatus === "archived_until_escalating" ||
+    statusDetails.ignoreUntilEscalating === true
+  ) {
+    return {
+      family: "untilEscalating",
+      behavior: "Until escalating",
+      message: "The issue is now ignored until it escalates",
+    };
+  }
+
+  if (ignoreUntil) {
+    const formattedIgnoreUntil = formatIgnoreUntil(ignoreUntil);
+    return {
+      family: "condition",
+      behavior: `Until ${formattedIgnoreUntil}`,
+      message: `The issue is now ignored until ${formattedIgnoreUntil}`,
+    };
+  }
+
+  if (ignoreDuration !== undefined) {
+    return {
+      family: "condition",
+      behavior: `For ${pluralize(ignoreDuration, "minute")}`,
+      message: `The issue is now ignored for ${pluralize(ignoreDuration, "minute")}`,
+    };
+  }
+
+  if (ignoreCount !== undefined && ignoreWindow !== undefined) {
+    return {
+      family: "condition",
+      behavior: `Until it occurs ${pluralize(ignoreCount, "time")} in ${pluralize(ignoreWindow, "minute")}`,
+      message: `The issue is now ignored until it occurs ${pluralize(ignoreCount, "time")} in ${pluralize(ignoreWindow, "minute")}`,
+    };
+  }
+
+  if (ignoreCount !== undefined) {
+    return {
+      family: "condition",
+      behavior: `Until it occurs ${pluralize(ignoreCount, "more time")}`,
+      message: `The issue is now ignored until it occurs ${pluralize(ignoreCount, "more time")}`,
+    };
+  }
+
+  if (ignoreUserCount !== undefined && ignoreUserWindow !== undefined) {
+    return {
+      family: "condition",
+      behavior: `Until it affects ${pluralize(ignoreUserCount, "user")} in ${pluralize(ignoreUserWindow, "minute")}`,
+      message: `The issue is now ignored until it affects ${pluralize(ignoreUserCount, "user")} in ${pluralize(ignoreUserWindow, "minute")}`,
+    };
+  }
+
+  if (ignoreUserCount !== undefined) {
+    return {
+      family: "condition",
+      behavior: `Until it affects ${pluralize(ignoreUserCount, "more user")}`,
+      message: `The issue is now ignored until it affects ${pluralize(ignoreUserCount, "more user")}`,
+    };
+  }
+
+  if (issue.substatus === "archived_until_condition_met") {
+    return (
+      getIgnoreStateFromUpdate(fallbackIgnoreUpdate) ?? {
+        family: "condition",
+        behavior: "Until the ignore condition is met",
+        message:
+          "The issue is now ignored until the configured condition is met",
+      }
+    );
+  }
+
+  return {
+    family: "forever",
+    behavior: "Forever",
+    message: "The issue is now ignored indefinitely",
+  };
+}
+
+function buildNoChangesOutput(params: {
+  issue: Issue;
+  organizationSlug: string;
+  ignoreState: IgnoreState | null;
+  issueUrl: string;
+}): string {
+  const { issue, organizationSlug, ignoreState, issueUrl } = params;
+  let output = `# Issue ${issue.shortId} Already Matches Requested State in **${organizationSlug}**\n\n`;
+  output += `**Issue**: ${issue.title}\n`;
+  output += `**URL**: ${issueUrl}\n\n`;
+
+  output += "## Changes Made\n\n";
+  output += "No changes were needed.\n";
+
+  output += "\n## Current Status\n\n";
+  output += `**Status**: ${issue.status}\n`;
+  if (ignoreState) {
+    output += `**Ignore Behavior**: ${ignoreState.behavior}\n`;
+  }
+  output += `**Assigned To**: ${formatAssignedTo(issue.assignedTo ?? null)}\n`;
+
+  output += "\n# Using this information\n\n";
+  output += "- The issue already matched the requested ignored state\n";
+  output += `- You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="${organizationSlug}", resourceId="${issue.shortId}")\`\n`;
+
+  return output;
+}
+
+function getIgnoreFamily(
   ignoreUpdate?: IgnoreUpdate,
-): string {
-  switch (substatus) {
+): IgnoreFamily | undefined {
+  switch (ignoreUpdate?.substatus) {
     case "archived_until_escalating":
-      return "The issue is now ignored until it escalates";
+      return "untilEscalating";
     case "archived_forever":
-      return "The issue is now ignored indefinitely";
+      return "forever";
     case "archived_until_condition_met":
-      return (
-        ignoreUpdate?.message ??
-        "The issue is now ignored until the configured condition is met"
-      );
+      return "condition";
     default:
-      return "The issue is now ignored";
+      return undefined;
   }
 }
 
-function buildIgnoreUpdate(params: {
-  status?: string;
-  ignoreMode?: IgnoreMode;
-  ignoreDurationMinutes?: number;
-  ignoreCount?: number;
-  ignoreWindowMinutes?: number;
-  ignoreUserCount?: number;
-  ignoreUserWindowMinutes?: number;
-}): IgnoreUpdate | undefined {
-  const hasIgnoreOptions =
-    params.ignoreMode !== undefined ||
-    params.ignoreDurationMinutes !== undefined ||
-    params.ignoreCount !== undefined ||
-    params.ignoreWindowMinutes !== undefined ||
-    params.ignoreUserCount !== undefined ||
-    params.ignoreUserWindowMinutes !== undefined;
+function buildIgnoreUpdate(
+  params: IgnoreParams,
+  options: {
+    applyDefaultIgnoredMode: boolean;
+  },
+): IgnoreUpdate | undefined {
+  const hasIgnoreOptions = hasExplicitIgnoreChange(params);
 
   if (!hasIgnoreOptions) {
-    if (params.status === "ignored") {
+    if (params.status === "ignored" && options.applyDefaultIgnoredMode) {
       return {
         substatus: "archived_until_escalating",
         behavior: "Until escalating",
@@ -307,6 +507,7 @@ export default defineTool({
     "- `status='ignored'` defaults to `ignoreMode='untilEscalating'`.",
     "- Ignore modes: `untilEscalating`, `forever`, `forDuration`, `untilOccurrenceCount`, `untilUserCount`.",
     "- Matching ignore inputs are `ignoreDurationMinutes`, `ignoreCount` + optional `ignoreWindowMinutes`, or `ignoreUserCount` + optional `ignoreUserWindowMinutes`.",
+    "- To switch an already ignored issue between `untilEscalating`, `forever`, and condition-based ignore modes, first set `status='unresolved'`, then ignore it again with the new rule.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -361,8 +562,6 @@ export default defineTool({
         issueUrl: params.issueUrl,
       });
 
-    const ignoreUpdate = buildIgnoreUpdate(params);
-
     setTag("organization.slug", orgSlug);
 
     // Get current issue details first
@@ -371,19 +570,68 @@ export default defineTool({
       issueId: parsedIssueId!,
     });
 
+    const currentIgnoreState = getIgnoreState(currentIssue);
+    const ignoreUpdate = buildIgnoreUpdate(params, {
+      applyDefaultIgnoredMode:
+        params.status === "ignored" && currentIssue.status !== "ignored",
+    });
+    const requestedIgnoreFamily = getIgnoreFamily(ignoreUpdate);
+
+    let updateStatus = params.status;
+    let updateIgnore = ignoreUpdate;
+
+    if (currentIssue.status === "ignored" && params.status === "ignored") {
+      if (!hasExplicitIgnoreChange(params)) {
+        updateStatus = undefined;
+        updateIgnore = undefined;
+      } else if (
+        currentIgnoreState &&
+        requestedIgnoreFamily &&
+        currentIgnoreState.family !== requestedIgnoreFamily
+      ) {
+        throw new UserInputError(
+          "Changing ignore behavior on an already ignored issue between `untilEscalating`, `forever`, and condition-based modes is not supported. First set `status` to `unresolved`, then ignore it again with the new rule.",
+        );
+      } else if (requestedIgnoreFamily !== "condition") {
+        updateStatus = undefined;
+        updateIgnore = undefined;
+      }
+    }
+
+    const requestedIssueUrl = apiService.getIssueUrl(
+      orgSlug,
+      currentIssue.shortId,
+    );
+
+    if (!updateStatus && !params.assignedTo && !updateIgnore) {
+      return buildNoChangesOutput({
+        issue: currentIssue,
+        organizationSlug: orgSlug,
+        ignoreState: currentIgnoreState,
+        issueUrl: requestedIssueUrl,
+      });
+    }
+
     // Update the issue
     const updatedIssue = await apiService.updateIssue({
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
-      status: params.status,
+      status: updateStatus,
       assignedTo: params.assignedTo,
-      substatus: ignoreUpdate?.substatus,
-      ignoreDuration: ignoreUpdate?.ignoreDuration,
-      ignoreCount: ignoreUpdate?.ignoreCount,
-      ignoreWindow: ignoreUpdate?.ignoreWindow,
-      ignoreUserCount: ignoreUpdate?.ignoreUserCount,
-      ignoreUserWindow: ignoreUpdate?.ignoreUserWindow,
+      substatus: updateIgnore?.substatus,
+      ignoreDuration: updateIgnore?.ignoreDuration,
+      ignoreCount: updateIgnore?.ignoreCount,
+      ignoreWindow: updateIgnore?.ignoreWindow,
+      ignoreUserCount: updateIgnore?.ignoreUserCount,
+      ignoreUserWindow: updateIgnore?.ignoreUserWindow,
     });
+
+    const updatedIgnoreState = getIgnoreState(updatedIssue, ignoreUpdate);
+    const statusChanged =
+      params.status !== undefined &&
+      currentIssue.status !== updatedIssue.status;
+    const ignoreBehaviorChanged =
+      currentIgnoreState?.behavior !== updatedIgnoreState?.behavior;
 
     let output = `# Issue ${updatedIssue.shortId} Updated in **${orgSlug}**\n\n`;
     output += `**Issue**: ${updatedIssue.title}\n`;
@@ -392,27 +640,19 @@ export default defineTool({
     // Show what changed
     output += "## Changes Made\n\n";
 
-    if (params.status && currentIssue.status !== params.status) {
-      output += `**Status**: ${currentIssue.status} → **${params.status}**\n`;
+    if (statusChanged) {
+      output += `**Status**: ${currentIssue.status} → **${updatedIssue.status}**\n`;
     }
 
-    const previousIgnoreBehavior =
-      currentIssue.status === "ignored"
-        ? getIgnoreBehavior(currentIssue.substatus)
-        : null;
-    const currentIgnoreBehavior = getIgnoreBehavior(
-      updatedIssue.substatus,
-      ignoreUpdate,
-    );
     if (
-      ignoreUpdate &&
-      currentIgnoreBehavior &&
-      previousIgnoreBehavior !== currentIgnoreBehavior
+      updatedIgnoreState &&
+      (statusChanged || ignoreBehaviorChanged) &&
+      (ignoreBehaviorChanged || params.status === "ignored")
     ) {
-      if (previousIgnoreBehavior) {
-        output += `**Ignore Behavior**: ${previousIgnoreBehavior} → **${currentIgnoreBehavior}**\n`;
+      if (currentIgnoreState && ignoreBehaviorChanged) {
+        output += `**Ignore Behavior**: ${currentIgnoreState.behavior} → **${updatedIgnoreState.behavior}**\n`;
       } else {
-        output += `**Ignore Behavior**: **${currentIgnoreBehavior}**\n`;
+        output += `**Ignore Behavior**: **${updatedIgnoreState.behavior}**\n`;
       }
     }
 
@@ -425,10 +665,8 @@ export default defineTool({
 
     output += "\n## Current Status\n\n";
     output += `**Status**: ${updatedIssue.status}\n`;
-    if (updatedIssue.status === "ignored") {
-      if (currentIgnoreBehavior) {
-        output += `**Ignore Behavior**: ${currentIgnoreBehavior}\n`;
-      }
+    if (updatedIgnoreState) {
+      output += `**Ignore Behavior**: ${updatedIgnoreState.behavior}\n`;
     }
     const currentAssignee = formatAssignedTo(updatedIssue.assignedTo ?? null);
     output += `**Assigned To**: ${currentAssignee}\n`;
@@ -437,10 +675,14 @@ export default defineTool({
     output += `- The issue has been successfully updated in Sentry\n`;
     output += `- You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
 
-    if (params.status === "resolved") {
+    if (statusChanged && updatedIssue.status === "resolved") {
       output += `- The issue is now marked as resolved and will no longer generate alerts\n`;
-    } else if (params.status === "ignored") {
-      output += `- ${getIgnoredStatusMessage(updatedIssue.substatus, ignoreUpdate)}\n`;
+    } else if (
+      updatedIgnoreState &&
+      params.status === "ignored" &&
+      (statusChanged || ignoreBehaviorChanged)
+    ) {
+      output += `- ${updatedIgnoreState.message}\n`;
     }
 
     return output;
