@@ -29,12 +29,13 @@ describe("search_events", () => {
 
   // Helper to create AI response for different datasets
   const mockAIResponse = (
-    dataset: "errors" | "logs" | "spans" | "metrics",
+    dataset: "errors" | "logs" | "spans" | "metrics" | "replays",
     query = "test query",
     fields?: string[],
     errorMessage?: string,
     sort?: string,
     timeRange?: { statsPeriod: string } | { start: string; end: string },
+    environment?: string | string[] | null,
   ) => {
     const defaultFields = {
       errors: ["issue", "title", "project", "timestamp", "level", "message"],
@@ -56,6 +57,7 @@ describe("search_events", () => {
         "value",
         "trace",
       ],
+      replays: [],
     };
 
     const defaultSorts = {
@@ -63,6 +65,7 @@ describe("search_events", () => {
       logs: "-timestamp",
       spans: "-span.duration",
       metrics: "-timestamp",
+      replays: "-started_at",
     };
 
     const output = errorMessage
@@ -72,6 +75,7 @@ describe("search_events", () => {
           query,
           fields: fields || defaultFields[dataset],
           sort: sort || defaultSorts[dataset],
+          environment: environment ?? null,
           timeRange: timeRange ?? null,
           explanation: "Test query translation",
         };
@@ -314,6 +318,83 @@ describe("search_events", () => {
     });
     expect(metricQuery.mode).toBe("samples");
     expect(metricQuery.aggregateFields).toEqual([{ yAxes: ["sum(value)"] }]);
+  });
+
+  it("should handle replay dataset queries through search_events", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "replays",
+        "url:*checkout* count_errors:>0",
+        [],
+        undefined,
+        "-count_errors",
+        { statsPeriod: "24h" },
+        ["production", "staging"],
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/replays/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe(
+            "url:*checkout* count_errors:>0",
+          );
+          expect(url.searchParams.get("sort")).toBe("-count_errors");
+          expect(url.searchParams.getAll("environment")).toEqual([
+            "production",
+            "staging",
+          ]);
+          expect(url.searchParams.get("statsPeriod")).toBe("24h");
+          return HttpResponse.json({
+            data: [
+              {
+                id: "7e07485f12f9416b8b1426260799b51f",
+                duration: 576,
+                environment: "production",
+                count_errors: 2,
+                count_rage_clicks: 1,
+                count_dead_clicks: 3,
+                started_at: "2025-01-15T10:00:00Z",
+                browser: { name: "Chrome", version: "131.0.0" },
+                user: { display_name: "Jane Doe" },
+                urls: ["/checkout", "/checkout/payment", "/checkout/confirm"],
+                releases: ["frontend@1.2.3"],
+                trace_ids: ["a4d1aae7216b47ff8117cf4e09ce9d0a"],
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery:
+          "production checkout replays with errors in the last day",
+        limit: 10,
+        includeExplanation: true,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain("https://test-org.sentry.io/explore/replays/");
+    expect(result).toContain("environment=production&environment=staging");
+    expect(result).toContain("Environment: production, staging");
+    expect(result).toContain("Jane Doe");
+    expect(result).toContain("2 errors");
   });
 
   it("should handle errors dataset queries", async () => {

@@ -2,10 +2,13 @@ import { z } from "zod";
 import { callEmbeddedAgent } from "../../internal/agents/callEmbeddedAgent";
 import type { SentryApiService } from "../../api-client";
 import { createOtelLookupTool } from "../../internal/agents/tools/otel-semantics";
+import { createDatasetFieldsTool } from "../../internal/agents/tools/dataset-fields";
 import { createWhoamiTool } from "../../internal/agents/tools/whoami";
 import { createDatasetAttributesTool } from "./utils";
 import { systemPrompt } from "./config";
 import { PUBLIC_EVENTS_DATASETS } from "../../utils/events-datasets";
+
+const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 
 // .default("") on explanation is safe because structuredOutputs: false is set via providerOptions.
 // If structuredOutputs is re-enabled, remove .default() calls (OpenAI requires all fields in 'required').
@@ -13,13 +16,20 @@ import { PUBLIC_EVENTS_DATASETS } from "../../utils/events-datasets";
 export const searchEventsAgentOutputSchema = z
   .object({
     dataset: z
-      .enum(PUBLIC_EVENTS_DATASETS)
+      .enum(SEARCH_EVENTS_DATASETS)
       .describe("Which dataset to use for the query"),
     query: z.string().describe("The Sentry query string for filtering results"),
     fields: z
       .array(z.string())
       .describe("Array of field names to return in results."),
     sort: z.string().describe("Sort parameter for results."),
+    environment: z
+      .union([z.string(), z.array(z.string()).min(1)])
+      .nullable()
+      .default(null)
+      .describe(
+        "Separate environment filter for datasets like replays that do not support environment in the query string. Use a string for one environment or an array when multiple environments are requested.",
+      ),
     timeRange: z
       .union([
         z.object({
@@ -43,6 +53,10 @@ export const searchEventsAgentOutputSchema = z
   })
   .refine(
     (data) => {
+      if (data.dataset === "replays") {
+        return true;
+      }
+
       // Only validate if both sort and fields are present
       if (!data.sort || !data.fields || data.fields.length === 0) {
         return true;
@@ -91,6 +105,12 @@ export async function searchEventsAgent(
     organizationSlug: options.organizationSlug,
     projectId: options.projectId,
   });
+  const replayFieldsTool = createDatasetFieldsTool({
+    apiService: options.apiService,
+    organizationSlug: options.organizationSlug,
+    dataset: "replays",
+    projectId: options.projectId,
+  });
   const whoamiTool = createWhoamiTool({ apiService: options.apiService });
 
   // Use callEmbeddedAgent to translate the query with tool call capture
@@ -102,6 +122,7 @@ export async function searchEventsAgent(
     prompt: options.query,
     tools: {
       datasetAttributes: datasetAttributesTool,
+      replayFields: replayFieldsTool,
       otelSemantics: otelLookupTool,
       whoami: whoamiTool,
     },

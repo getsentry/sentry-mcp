@@ -136,6 +136,97 @@ describe("dataset-fields agent tool", () => {
       });
     });
 
+    it("only returns replay fields and patterns reported by the tags api", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/tags/",
+          () =>
+            HttpResponse.json([
+              {
+                key: "count_screens",
+                name: "Count Screens",
+                totalValues: 7,
+              },
+              {
+                key: "click.textContent",
+                name: "Click Text Content",
+                totalValues: 4,
+              },
+              {
+                key: "viewed_by_me",
+                name: "Viewed By Me",
+                totalValues: 2,
+              },
+              {
+                key: "user.segment",
+                name: "User Segment",
+                totalValues: 12,
+              },
+              {
+                key: "browser",
+                name: "Browser",
+                totalValues: 4,
+              },
+              {
+                key: "sentry:user",
+                name: "Internal User",
+                totalValues: 1,
+              },
+            ]),
+        ),
+      );
+
+      const result = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "replays",
+      );
+
+      const fields = new Map(result.fields.map((field) => [field.key, field]));
+
+      expect(fields.get("count_screens")).toMatchObject({
+        key: "count_screens",
+        name: "Count Screens",
+        totalValues: 7,
+        examples: ["1", "3", "8"],
+      });
+      expect(fields.get("click.textContent")).toMatchObject({
+        key: "click.textContent",
+        name: "Click Text Content",
+        totalValues: 4,
+        examples: ["Save", "Complete Purchase"],
+      });
+      expect(fields.get("viewed_by_me")).toMatchObject({
+        key: "viewed_by_me",
+        totalValues: 2,
+      });
+      expect(fields.get("user.segment")).toMatchObject({
+        key: "user.segment",
+        name: "User Segment",
+        totalValues: 12,
+      });
+      expect(fields.has("tap.message")).toBe(false);
+      expect(fields.has("ota_updates.channel")).toBe(false);
+      expect(fields.has("browser")).toBe(false);
+      expect(fields.has("sentry:user")).toBe(false);
+      expect(result.commonPatterns).toContainEqual({
+        pattern: 'click.textContent:"Save"',
+        description: "Replays where a Save button was clicked",
+      });
+      expect(result.commonPatterns).toContainEqual({
+        pattern: "viewed_by_me:true",
+        description: "Replays you have already viewed",
+      });
+      expect(result.commonPatterns).not.toContainEqual({
+        pattern: "tap.message:*Checkout*",
+        description: "Mobile replay screens related to checkout",
+      });
+      expect(result.commonPatterns).not.toContainEqual({
+        pattern: "count_errors:>0",
+        description: "Replays with associated errors",
+      });
+    });
+
     it("should handle API errors gracefully", async () => {
       // Mock API error
       mswServer.use(
@@ -251,6 +342,52 @@ describe("dataset-fields agent tool", () => {
           { pattern: "has:http.method", description: "HTTP requests" },
         ]),
       );
+
+      const replaysResult = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "replays",
+      );
+
+      expect(replaysResult.commonPatterns).toEqual([]);
+
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/tags/",
+          () =>
+            HttpResponse.json([
+              {
+                key: "count_errors",
+                name: "Count Errors",
+                totalValues: 5,
+              },
+              {
+                key: "viewed_by_me",
+                name: "Viewed By Me",
+                totalValues: 2,
+              },
+            ]),
+        ),
+      );
+
+      const replayResultWithIndexedFields = await discoverDatasetFields(
+        apiService,
+        "sentry-mcp-evals",
+        "replays",
+      );
+
+      expect(replayResultWithIndexedFields.commonPatterns).toEqual(
+        expect.arrayContaining([
+          {
+            pattern: "count_errors:>0",
+            description: "Replays with associated errors",
+          },
+          {
+            pattern: "viewed_by_me:true",
+            description: "Replays you have already viewed",
+          },
+        ]),
+      );
     });
   });
 
@@ -290,6 +427,15 @@ describe("dataset-fields agent tool", () => {
         "debug",
         "fatal",
       ]);
+      expect(getFieldExamples("count_errors", "replays")).toEqual([
+        "0",
+        "1",
+        "5",
+      ]);
+      expect(getFieldExamples("click.textContent", "replays")).toEqual([
+        "Save",
+        "Complete Purchase",
+      ]);
       expect(getFieldExamples("unknown", "search_issues")).toBeUndefined();
     });
   });
@@ -316,6 +462,22 @@ describe("dataset-fields agent tool", () => {
       expect(patterns).toContainEqual({
         pattern: "has:http.method",
         description: "HTTP requests",
+      });
+    });
+
+    it("should return patterns for replays", () => {
+      const patterns = getCommonPatterns("replays");
+      expect(patterns).toContainEqual({
+        pattern: "count_rage_clicks:>0",
+        description: "Replays with rage clicks",
+      });
+      expect(patterns).toContainEqual({
+        pattern: "url:*checkout*",
+        description: "Replays that visited a checkout page",
+      });
+      expect(patterns).toContainEqual({
+        pattern: 'click.textContent:"Save"',
+        description: "Replays where a Save button was clicked",
       });
     });
 

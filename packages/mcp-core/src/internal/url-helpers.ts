@@ -64,7 +64,7 @@ export interface ParsedSentryUrl {
  * - Event: `/issues/{issueId}/events/{eventId}`
  * - Trace: `/explore/traces/trace/{traceId}` or `/performance/trace/{traceId}`
  * - Profile: `/explore/profiling/profile/{project}/flamegraph/` with query params
- * - Replay: `/replays/{replayId}/`
+ * - Replay: `/explore/replays/{replayId}/` or `/replays/{replayId}/`
  * - Monitor: `/crons/{monitorSlug}/` or `/monitors/{monitorSlug}/`
  * - Release: `/releases/{version}/`
  *
@@ -83,7 +83,7 @@ export interface ParsedSentryUrl {
  *
  * @example
  * // Replay URL
- * parseSentryUrl("https://my-org.sentry.io/replays/abc123def456/")
+ * parseSentryUrl("https://my-org.sentry.io/explore/replays/abc123def456/")
  * // { type: "replay", organizationSlug: "my-org", replayId: "abc123def456" }
  *
  * @example
@@ -156,7 +156,11 @@ function extractOrganizationSlug(parsedUrl: URL, pathParts: string[]): string {
     "discover",
     "insights",
   ];
-  if (pathParts.length > 1 && knownSegments.includes(pathParts[1])) {
+  if (
+    pathParts.length > 1 &&
+    !knownSegments.includes(pathParts[0]) &&
+    knownSegments.includes(pathParts[1])
+  ) {
     return pathParts[0];
   }
 
@@ -204,7 +208,7 @@ function identifyResource(
     };
   }
 
-  // Replay URL: /replays/{replayId}/
+  // Replay URL: /explore/replays/{replayId}/ or /replays/{replayId}/
   const replaysIndex = pathParts.indexOf("replays");
   if (replaysIndex !== -1) {
     const replayId = pathParts[replaysIndex + 1];

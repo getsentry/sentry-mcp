@@ -414,7 +414,7 @@ SENTRY_HOST=sentry.example.com
 MCP_SKILLS=inspect,docs,triage           # Limit to specific skills
 
 # AI features
-OPENAI_API_KEY=your-key                  # For search_events/search_issues
+OPENAI_API_KEY=your-key                  # For AI-powered search tools like search_events/search_issues
 
 # Sentry reporting
 SENTRY_DSN=your-dsn

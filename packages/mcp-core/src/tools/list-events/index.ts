@@ -23,6 +23,16 @@ import {
   isMetricsDataset,
   PUBLIC_EVENTS_DATASETS,
 } from "../../utils/events-datasets";
+import {
+  DEFAULT_REPLAY_SORT,
+  DEFAULT_REPLAY_STATS_PERIOD,
+  formatReplayResults,
+  isValidReplaySort,
+} from "../search-events/replays";
+import { UserInputError } from "../../errors";
+
+const LIST_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
+const DEFAULT_EVENTS_SORT = "-timestamp";
 
 // Default fields for each dataset
 const DEFAULT_FIELDS = {
@@ -37,7 +47,7 @@ export default defineTool({
   skills: ["inspect", "triage", "seer"],
   requiredScopes: ["event:read"],
   description: [
-    "Search events using Sentry query syntax directly (no AI/LLM required).",
+    "Search events or replays using Sentry query syntax directly (no AI/LLM required).",
     "",
     "Use this tool when:",
     "- You know Sentry query syntax already",
@@ -45,12 +55,14 @@ export default defineTool({
     "- You want precise control over the query",
     "",
     "For natural language queries, use search_events instead.",
+    "For dataset='replays', this tool returns replay sessions directly and does not support aggregate fields like count().",
     "",
     "Datasets:",
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, traces, AI/LLM calls",
     "- metrics: Newer span metrics, counters, gauges, and distributions",
+    "- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users",
     "",
     "Query Syntax Examples:",
     '- message:"connection timeout"',
@@ -64,6 +76,7 @@ export default defineTool({
     "list_events(organizationSlug='my-org', dataset='spans', query='span.op:db')",
     "list_events(organizationSlug='my-org', dataset='logs', query='severity:error')",
     "list_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')",
+    "list_events(organizationSlug='my-org', dataset='replays', query='count_errors:>0', sort='-count_errors')",
     "</examples>",
     "",
     "<hints>",
@@ -75,10 +88,10 @@ export default defineTool({
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     dataset: z
-      .enum(PUBLIC_EVENTS_DATASETS)
+      .enum(LIST_EVENTS_DATASETS)
       .default("errors")
       .describe(
-        "Dataset to query: errors (exceptions), logs (entries), spans (traces), or metrics (newer span metrics)",
+        "Dataset to query: errors (exceptions), logs (entries), spans (traces), metrics (newer span metrics), or replays (session replay results)",
       ),
     query: z
       .string()
@@ -90,15 +103,27 @@ export default defineTool({
       .nullable()
       .default(null)
       .describe(
-        "Fields to return. If not specified, uses sensible defaults. Include aggregate functions like count(), avg() for statistics.",
+        "Fields to return for event datasets. If not specified, uses sensible defaults. Include aggregate functions like count(), avg() for statistics. Leave null for dataset='replays'.",
       ),
     sort: z
       .string()
-      .default("-timestamp")
+      .trim()
+      .nullable()
+      .default(null)
       .describe(
-        "Sort field (prefix with - for descending). Use -count() for aggregations.",
+        "Sort field (prefix with - for descending). If omitted, event datasets default to -timestamp and replays default to -started_at. Use -count() for event aggregations. For dataset='replays', use replay sorts like -started_at or -count_errors.",
       ),
     projectSlug: ParamProjectSlug.nullable().default(null),
+    environment: z
+      .union([
+        z.string().trim().min(1),
+        z.array(z.string().trim().min(1)).min(1),
+      ])
+      .nullable()
+      .default(null)
+      .describe(
+        "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
+      ),
     statsPeriod: z
       .string()
       .default("14d")
@@ -123,6 +148,12 @@ export default defineTool({
     setTag("organization.slug", params.organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
+    if (params.dataset !== "replays" && params.environment) {
+      throw new UserInputError(
+        "The `environment` parameter is only supported for dataset='replays'. For other datasets, include environment filtering in the query string instead.",
+      );
+    }
+
     // Convert project slug to ID if provided
     let projectId: string | undefined;
     if (params.projectSlug) {
@@ -133,7 +164,53 @@ export default defineTool({
       projectId = String(project.id);
     }
 
+    if (params.dataset === "replays") {
+      const replaySort = params.sort || DEFAULT_REPLAY_SORT;
+      if (!isValidReplaySort(replaySort)) {
+        throw new UserInputError(
+          `Invalid replay sort "${replaySort}". Use a supported replay sort like ${DEFAULT_REPLAY_SORT}, -count_errors, -count_rage_clicks, or -duration.`,
+        );
+      }
+
+      const replays = await apiService.searchReplays({
+        organizationSlug: params.organizationSlug,
+        query: params.query,
+        limit: params.limit,
+        projectId,
+        sort: replaySort,
+        environment: params.environment ?? undefined,
+        statsPeriod: params.statsPeriod || DEFAULT_REPLAY_STATS_PERIOD,
+      });
+
+      const replaySearchUrl = apiService.getReplaysSearchUrl(
+        params.organizationSlug,
+        {
+          query: params.query || undefined,
+          projectSlugOrId: projectId,
+          environment: params.environment ?? undefined,
+          sort: replaySort,
+          statsPeriod: params.statsPeriod || DEFAULT_REPLAY_STATS_PERIOD,
+        },
+      );
+
+      return formatReplayResults({
+        replays,
+        naturalLanguageQuery: params.query || "recent replays",
+        includeExplanation: false,
+        organizationSlug: params.organizationSlug,
+        apiService,
+        searchUrl: replaySearchUrl,
+        replayQuery: params.query,
+        sort: replaySort,
+        environment: params.environment,
+        timeRange: {
+          statsPeriod: params.statsPeriod || DEFAULT_REPLAY_STATS_PERIOD,
+        },
+      });
+    }
+
     // Use provided fields or defaults for the dataset
+    const sort = params.sort || DEFAULT_EVENTS_SORT;
     const fields = params.fields ?? DEFAULT_FIELDS[params.dataset];
     const requestFields =
       isMetricsDataset(params.dataset) && !isAggregateQuery(fields)
@@ -149,7 +226,7 @@ export default defineTool({
       limit: params.limit,
       projectId,
       dataset: params.dataset,
-      sort: params.sort,
+      sort,
       statsPeriod: params.statsPeriod,
     });
 
@@ -192,7 +269,7 @@ export default defineTool({
       projectId,
       params.dataset,
       fields,
-      params.sort,
+      sort,
       aggregateFunctions,
       groupByFields,
       params.statsPeriod,

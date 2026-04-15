@@ -11,7 +11,7 @@ The token cost of tool metadata that MCP sends to clients via `tools/list`:
 
 **Exclusions:**
 - `use_sentry` tool (agent-mode only, not exposed via standard MCP)
-- Runtime token usage by embedded agents (search_events, search_issues)
+- Runtime token usage by embedded agents (search_events, search_issues, search_issue_events)
 
 ## Running Locally
 

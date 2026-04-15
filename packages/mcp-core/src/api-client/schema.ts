@@ -208,6 +208,10 @@ export const ReplayDetailsSchema = z
 
 export const ReplayRecordingSegmentsSchema = z.array(z.array(z.unknown()));
 
+export const ReplayListResponseSchema = z.object({
+  data: z.array(ReplayDetailsSchema),
+});
+
 export const ReplayIdsByResourceSchema = z.record(
   z.string(),
   z.array(z.string()),

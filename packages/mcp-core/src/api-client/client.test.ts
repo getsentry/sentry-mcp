@@ -1039,6 +1039,38 @@ describe("API query builders", () => {
         expect.any(Object),
       );
     });
+
+    it("should build replay search requests with repeated environment params", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () => Promise.resolve({ data: [] }),
+      });
+
+      await apiService.searchReplays({
+        organizationSlug: "test-org",
+        query: "count_errors:>0",
+        sort: "-count_errors",
+        environment: ["production", "staging"],
+        statsPeriod: "24h",
+        limit: 25,
+      });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "/api/0/organizations/test-org/replays/?query=count_errors%3A%3E0&per_page=25&sort=-count_errors&environment=production&environment=staging&statsPeriod=24h",
+        ),
+        expect.any(Object),
+      );
+    });
   });
 
   describe("Web URL builders", () => {

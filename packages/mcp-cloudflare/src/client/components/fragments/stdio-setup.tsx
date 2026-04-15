@@ -111,7 +111,7 @@ export default function StdioSetup() {
               </dt>
               <dd className="text-slate-300">
                 Optional for the standard tools, but required for the AI-powered
-                search tools (<code>search_events</code> /
+                search tools (<code>search_events</code> /{" "}
                 <code>search_issues</code>). When unset, those tools stay hidden
                 but everything else works as usual.
               </dd>

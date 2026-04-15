@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   getIssueUrl as getIssueUrlUtil,
   getReplayUrl as getReplayUrlUtil,
+  getReplaysSearchUrl as getReplaysSearchUrlUtil,
   getTraceMetricsExploreUrl,
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
@@ -42,6 +43,7 @@ import {
   FlamegraphSchema,
   ProfileChunkResponseSchema,
   ReplayDetailsSchema,
+  ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
   ReplayRecordingSegmentsSchema,
 } from "./schema";
@@ -73,6 +75,7 @@ import type {
   Flamegraph,
   ProfileChunk,
   ReplayDetails,
+  ReplayList,
   ReplayRecordingSegments,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
@@ -530,6 +533,13 @@ export class SentryApiService {
 
   getReplayUrl(organizationSlug: string, replayId: string): string {
     return getReplayUrlUtil(this.host, organizationSlug, replayId);
+  }
+
+  getReplaysSearchUrl(
+    organizationSlug: string,
+    options: Parameters<typeof getReplaysSearchUrlUtil>[2] = {},
+  ): string {
+    return getReplaysSearchUrlUtil(this.host, organizationSlug, options);
   }
 
   // ================================================================================
@@ -1355,7 +1365,7 @@ export class SentryApiService {
    *
    * @param params Query parameters
    * @param params.organizationSlug Organization identifier
-   * @param params.dataset Dataset to query tags for ("events", "errors" or "search_issues")
+   * @param params.dataset Dataset to query tags for ("events", "errors", "replays", or "search_issues")
    * @param params.project Numeric project ID to filter tags
    * @param params.statsPeriod Time range for tag statistics (e.g., "24h", "7d")
    * @param params.useCache Whether to use cached results
@@ -1387,7 +1397,7 @@ export class SentryApiService {
       useFlagsBackend,
     }: {
       organizationSlug: string;
-      dataset?: "events" | "errors" | "search_issues";
+      dataset?: "events" | "errors" | "replays" | "search_issues";
       project?: string;
       statsPeriod?: string;
       start?: string;
@@ -1420,6 +1430,72 @@ export class SentryApiService {
       opts,
     );
     return TagListSchema.parse(body);
+  }
+
+  async searchReplays(
+    {
+      organizationSlug,
+      query,
+      limit,
+      projectId,
+      sort,
+      environment,
+      statsPeriod,
+      start,
+      end,
+      fields,
+    }: {
+      organizationSlug: string;
+      query?: string;
+      limit?: number;
+      projectId?: string;
+      sort?: string;
+      environment?: string | string[];
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      fields?: string[];
+    },
+    opts?: RequestOptions,
+  ): Promise<ReplayList> {
+    const searchQuery = new URLSearchParams();
+
+    if (query) {
+      searchQuery.set("query", query);
+    }
+    if (limit !== undefined) {
+      searchQuery.set("per_page", String(limit));
+    }
+    if (projectId) {
+      searchQuery.append("project", projectId);
+    }
+    if (sort) {
+      searchQuery.set("sort", sort);
+    }
+    if (environment) {
+      const environments = Array.isArray(environment)
+        ? environment
+        : [environment];
+      for (const value of environments) {
+        searchQuery.append("environment", value);
+      }
+    }
+    if (fields && fields.length > 0) {
+      for (const field of fields) {
+        searchQuery.append("field", field);
+      }
+    }
+    this.applyTimeParams(searchQuery, statsPeriod, start, end);
+
+    const body = await this.requestJSON(
+      searchQuery.toString()
+        ? `/organizations/${organizationSlug}/replays/?${searchQuery.toString()}`
+        : `/organizations/${organizationSlug}/replays/`,
+      undefined,
+      opts,
+    );
+
+    return ReplayListResponseSchema.parse(body).data;
   }
 
   /**

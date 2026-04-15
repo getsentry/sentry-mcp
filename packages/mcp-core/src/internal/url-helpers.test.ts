@@ -229,7 +229,21 @@ describe("parseSentryUrl", () => {
   });
 
   describe("replay URLs", () => {
-    it("parses replay URL with subdomain", () => {
+    it("parses canonical replay URL with subdomain", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/explore/replays/abc123def456789/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "replayId": "abc123def456789",
+          "type": "replay",
+        }
+      `);
+    });
+
+    it("parses legacy replay URL with subdomain", () => {
       expect(
         parseSentryUrl("https://my-org.sentry.io/replays/abc123def456789/"),
       ).toMatchInlineSnapshot(`

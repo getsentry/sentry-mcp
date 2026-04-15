@@ -12,7 +12,7 @@ describe("get_replay_details", () => {
   it("loads replay details from replayUrl", async () => {
     const result = await getReplayDetails.handler(
       {
-        replayUrl: `https://sentry-mcp-evals.sentry.io/replays/${replayDetailsFixture.id}/`,
+        replayUrl: `https://sentry-mcp-evals.sentry.io/explore/replays/${replayDetailsFixture.id}/`,
       },
       getServerContext(),
     );
@@ -22,7 +22,7 @@ describe("get_replay_details", () => {
 
       ## Summary
 
-      - **Replay URL**: https://sentry-mcp-evals.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/
+      - **Replay URL**: https://sentry-mcp-evals.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/
       - **Duration**: 5m
       - **Environment**: production
       - **Browser**: Chrome 123.0
@@ -102,7 +102,7 @@ describe("get_replay_details", () => {
 
       ## Summary
 
-      - **Replay URL**: https://sentry-mcp-evals.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/
+      - **Replay URL**: https://sentry-mcp-evals.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/
       - **Duration**: 5m
       - **Environment**: production
       - **Browser**: Chrome 123.0
@@ -157,7 +157,7 @@ describe("get_replay_details", () => {
 
       ## Summary
 
-      - **Replay URL**: https://sentry-mcp-evals.sentry.io/replays/7e07485f-12f9-416b-8b14-26260799b51f/
+      - **Replay URL**: https://sentry-mcp-evals.sentry.io/explore/replays/7e07485f-12f9-416b-8b14-26260799b51f/
       - **Duration**: 5m
       - **Environment**: production
       - **Browser**: Chrome 123.0
