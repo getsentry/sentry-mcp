@@ -883,10 +883,45 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
     fetch: async ({ request }) => {
       const body = (await request.json()) as any;
+      const status = body?.status ?? issueFixture.status;
+      const substatus =
+        status === "ignored"
+          ? (body?.substatus ??
+            (body?.ignoreDuration !== undefined ||
+            body?.ignoreCount !== undefined ||
+            body?.ignoreUserCount !== undefined
+              ? "archived_until_condition_met"
+              : "archived_forever"))
+          : issueFixture.substatus;
       const updatedIssue = {
         ...issueFixture,
-        status: body?.status || issueFixture.status,
-        assignedTo: body?.assignedTo || issueFixture.assignedTo,
+        status,
+        substatus,
+        statusDetails:
+          status === "ignored"
+            ? substatus === "archived_until_escalating"
+              ? { ignoreUntilEscalating: true }
+              : substatus === "archived_until_condition_met"
+                ? {
+                    ...(body?.ignoreDuration !== undefined
+                      ? { ignoreDuration: body.ignoreDuration }
+                      : {}),
+                    ...(body?.ignoreCount !== undefined
+                      ? { ignoreCount: body.ignoreCount }
+                      : {}),
+                    ...(body?.ignoreWindow !== undefined
+                      ? { ignoreWindow: body.ignoreWindow }
+                      : {}),
+                    ...(body?.ignoreUserCount !== undefined
+                      ? { ignoreUserCount: body.ignoreUserCount }
+                      : {}),
+                    ...(body?.ignoreUserWindow !== undefined
+                      ? { ignoreUserWindow: body.ignoreUserWindow }
+                      : {}),
+                  }
+                : {}
+            : issueFixture.statusDetails,
+        assignedTo: body?.assignedTo ?? issueFixture.assignedTo,
       };
       return HttpResponse.json(updatedIssue);
     },
@@ -896,10 +931,45 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376925/",
     fetch: async ({ request }) => {
       const body = (await request.json()) as any;
+      const status = body?.status ?? issueFixture.status;
+      const substatus =
+        status === "ignored"
+          ? (body?.substatus ??
+            (body?.ignoreDuration !== undefined ||
+            body?.ignoreCount !== undefined ||
+            body?.ignoreUserCount !== undefined
+              ? "archived_until_condition_met"
+              : "archived_forever"))
+          : issueFixture.substatus;
       const updatedIssue = {
         ...issueFixture,
-        status: body?.status || issueFixture.status,
-        assignedTo: body?.assignedTo || issueFixture.assignedTo,
+        status,
+        substatus,
+        statusDetails:
+          status === "ignored"
+            ? substatus === "archived_until_escalating"
+              ? { ignoreUntilEscalating: true }
+              : substatus === "archived_until_condition_met"
+                ? {
+                    ...(body?.ignoreDuration !== undefined
+                      ? { ignoreDuration: body.ignoreDuration }
+                      : {}),
+                    ...(body?.ignoreCount !== undefined
+                      ? { ignoreCount: body.ignoreCount }
+                      : {}),
+                    ...(body?.ignoreWindow !== undefined
+                      ? { ignoreWindow: body.ignoreWindow }
+                      : {}),
+                    ...(body?.ignoreUserCount !== undefined
+                      ? { ignoreUserCount: body.ignoreUserCount }
+                      : {}),
+                    ...(body?.ignoreUserWindow !== undefined
+                      ? { ignoreUserWindow: body.ignoreUserWindow }
+                      : {}),
+                  }
+                : {}
+            : issueFixture.statusDetails,
+        assignedTo: body?.assignedTo ?? issueFixture.assignedTo,
       };
       return HttpResponse.json(updatedIssue);
     },
@@ -909,10 +979,45 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-42/",
     fetch: async ({ request }) => {
       const body = (await request.json()) as any;
+      const status = body?.status ?? issueFixture2.status;
+      const substatus =
+        status === "ignored"
+          ? (body?.substatus ??
+            (body?.ignoreDuration !== undefined ||
+            body?.ignoreCount !== undefined ||
+            body?.ignoreUserCount !== undefined
+              ? "archived_until_condition_met"
+              : "archived_forever"))
+          : issueFixture2.substatus;
       const updatedIssue = {
         ...issueFixture2,
-        status: body?.status || issueFixture2.status,
-        assignedTo: body?.assignedTo || issueFixture2.assignedTo,
+        status,
+        substatus,
+        statusDetails:
+          status === "ignored"
+            ? substatus === "archived_until_escalating"
+              ? { ignoreUntilEscalating: true }
+              : substatus === "archived_until_condition_met"
+                ? {
+                    ...(body?.ignoreDuration !== undefined
+                      ? { ignoreDuration: body.ignoreDuration }
+                      : {}),
+                    ...(body?.ignoreCount !== undefined
+                      ? { ignoreCount: body.ignoreCount }
+                      : {}),
+                    ...(body?.ignoreWindow !== undefined
+                      ? { ignoreWindow: body.ignoreWindow }
+                      : {}),
+                    ...(body?.ignoreUserCount !== undefined
+                      ? { ignoreUserCount: body.ignoreUserCount }
+                      : {}),
+                    ...(body?.ignoreUserWindow !== undefined
+                      ? { ignoreUserWindow: body.ignoreUserWindow }
+                      : {}),
+                  }
+                : {}
+            : issueFixture2.statusDetails,
+        assignedTo: body?.assignedTo ?? issueFixture2.assignedTo,
       };
       return HttpResponse.json(updatedIssue);
     },
@@ -922,10 +1027,45 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/sentry-mcp-evals/issues/6507376926/",
     fetch: async ({ request }) => {
       const body = (await request.json()) as any;
+      const status = body?.status ?? issueFixture2.status;
+      const substatus =
+        status === "ignored"
+          ? (body?.substatus ??
+            (body?.ignoreDuration !== undefined ||
+            body?.ignoreCount !== undefined ||
+            body?.ignoreUserCount !== undefined
+              ? "archived_until_condition_met"
+              : "archived_forever"))
+          : issueFixture2.substatus;
       const updatedIssue = {
         ...issueFixture2,
-        status: body?.status || issueFixture2.status,
-        assignedTo: body?.assignedTo || issueFixture2.assignedTo,
+        status,
+        substatus,
+        statusDetails:
+          status === "ignored"
+            ? substatus === "archived_until_escalating"
+              ? { ignoreUntilEscalating: true }
+              : substatus === "archived_until_condition_met"
+                ? {
+                    ...(body?.ignoreDuration !== undefined
+                      ? { ignoreDuration: body.ignoreDuration }
+                      : {}),
+                    ...(body?.ignoreCount !== undefined
+                      ? { ignoreCount: body.ignoreCount }
+                      : {}),
+                    ...(body?.ignoreWindow !== undefined
+                      ? { ignoreWindow: body.ignoreWindow }
+                      : {}),
+                    ...(body?.ignoreUserCount !== undefined
+                      ? { ignoreUserCount: body.ignoreUserCount }
+                      : {}),
+                    ...(body?.ignoreUserWindow !== undefined
+                      ? { ignoreUserWindow: body.ignoreUserWindow }
+                      : {}),
+                  }
+                : {}
+            : issueFixture2.statusDetails,
+        assignedTo: body?.assignedTo ?? issueFixture2.assignedTo,
       };
       return HttpResponse.json(updatedIssue);
     },
