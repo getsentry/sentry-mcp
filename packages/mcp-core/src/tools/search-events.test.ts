@@ -210,7 +210,7 @@ describe("search_events", () => {
       ⚠️ **IMPORTANT**: Display these metric aggregates as a data table with proper column alignment, grouping labels, and units.
       
       **View these results in Sentry**:
-      https://test-org.sentry.io/explore/metrics/?statsPeriod=14d&metric=%7B%22metric%22%3A%7B%22name%22%3A%22http.request.duration%22%2C%22type%22%3A%22distribution%22%2C%22unit%22%3A%22millisecond%22%7D%2C%22query%22%3A%22%22%2C%22aggregateFields%22%3A%5B%7B%22yAxes%22%3A%5B%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%2C%22count%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%5D%7D%2C%7B%22groupBy%22%3A%22transaction%22%7D%5D%2C%22aggregateSortBys%22%3A%5B%7B%22field%22%3A%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%2C%22kind%22%3A%22desc%22%7D%5D%2C%22mode%22%3A%22aggregate%22%7D
+      https://test-org.sentry.io/explore/metrics/?statsPeriod=14d&metric=%7B%22metric%22%3A%7B%22name%22%3A%22http.request.duration%22%2C%22type%22%3A%22distribution%22%2C%22unit%22%3A%22millisecond%22%7D%2C%22query%22%3A%22%22%2C%22aggregateFields%22%3A%5B%7B%22yAxes%22%3A%5B%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%5D%7D%2C%7B%22yAxes%22%3A%5B%22count%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%5D%7D%2C%7B%22groupBy%22%3A%22transaction%22%7D%5D%2C%22aggregateSortBys%22%3A%5B%7B%22field%22%3A%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%2C%22kind%22%3A%22desc%22%7D%5D%2C%22mode%22%3A%22aggregate%22%7D
       _Please share this link with the user to view the search results in their Sentry dashboard._
       
       Found 1 aggregate result:
@@ -232,6 +232,88 @@ describe("search_events", () => {
       - Switch between samples and aggregates in Sentry for deeper analysis
       "
     `);
+  });
+
+  it("should request trace metric identity fields for sample queries", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "tracemetrics",
+        "",
+        ["timestamp", "value"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+
+          expect(url.searchParams.getAll("field")).toEqual([
+            "timestamp",
+            "value",
+            "metric.name",
+            "metric.type",
+            "metric.unit",
+          ]);
+
+          return HttpResponse.json({
+            data: [
+              {
+                timestamp: "2026-04-13T14:19:18+00:00",
+                value: 12.4,
+                trace: "6a477f5b0f31ef7b6b9b5e1dea66c91d",
+                "metric.name": "http.request.duration",
+                "metric.type": "distribution",
+                "metric.unit": "millisecond",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "recent metrics",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(typeof result).toBe("string");
+    if (typeof result !== "string") {
+      throw new Error("Expected string result");
+    }
+
+    const urlMatch = result.match(/https:\/\/[^\n]+/);
+    expect(urlMatch).not.toBeNull();
+
+    const url = new URL(urlMatch![0]);
+    const metricQuery = JSON.parse(url.searchParams.get("metric")!);
+
+    expect(url.pathname).toBe("/explore/metrics/");
+    expect(metricQuery.metric).toEqual({
+      name: "http.request.duration",
+      type: "distribution",
+      unit: "millisecond",
+    });
+    expect(metricQuery.mode).toBe("samples");
+    expect(metricQuery.aggregateFields).toEqual([{ yAxes: ["sum(value)"] }]);
   });
 
   it("should handle errors dataset queries", async () => {

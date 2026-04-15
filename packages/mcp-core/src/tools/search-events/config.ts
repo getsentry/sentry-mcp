@@ -762,3 +762,9 @@ export const RECOMMENDED_FIELDS = {
       "Core trace metric sample information including metric identity, value, and trace context",
   },
 };
+
+export const TRACE_METRICS_SAMPLE_IDENTITY_FIELDS = [
+  "metric.name",
+  "metric.type",
+  "metric.unit",
+] as const;

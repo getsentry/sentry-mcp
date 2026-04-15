@@ -14,7 +14,11 @@ import {
   formatTraceMetricsResults,
   formatSpanResults,
 } from "../search-events/formatters";
-import { RECOMMENDED_FIELDS } from "../search-events/config";
+import {
+  RECOMMENDED_FIELDS,
+  TRACE_METRICS_SAMPLE_IDENTITY_FIELDS,
+} from "../search-events/config";
+import { isAggregateQuery } from "../search-events/utils";
 
 // Default fields for each dataset
 const DEFAULT_FIELDS = {
@@ -127,11 +131,17 @@ export default defineTool({
 
     // Use provided fields or defaults for the dataset
     const fields = params.fields ?? DEFAULT_FIELDS[params.dataset];
+    const requestFields =
+      params.dataset === "tracemetrics" && !isAggregateQuery(fields)
+        ? Array.from(
+            new Set([...fields, ...TRACE_METRICS_SAMPLE_IDENTITY_FIELDS]),
+          )
+        : fields;
 
     const eventsResponse = await apiService.searchEvents({
       organizationSlug: params.organizationSlug,
       query: params.query,
-      fields,
+      fields: requestFields,
       limit: params.limit,
       projectId,
       dataset: params.dataset,
@@ -182,6 +192,9 @@ export default defineTool({
       aggregateFunctions,
       groupByFields,
       params.statsPeriod,
+      undefined,
+      undefined,
+      eventData,
     );
 
     const formatParams = {

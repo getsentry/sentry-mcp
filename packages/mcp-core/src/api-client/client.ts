@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
   getIssueUrl as getIssueUrlUtil,
   getReplayUrl as getReplayUrlUtil,
+  getTraceMetricsExploreUrl,
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
+  type TraceMetricIdentifier,
 } from "../utils/url-utils";
 import { logIssue, logWarn } from "../telem/logging";
 import {
@@ -758,180 +760,30 @@ export class SentryApiService {
     return `${path}?${urlParams.toString()}`;
   }
 
-  private extractTraceMetricFromAggregate(
-    field: string,
-  ): { name: string; type: string; unit?: string } | null {
-    const match = field.match(/^[^(]+\((.*)\)$/);
-    if (!match) {
-      return null;
-    }
+  private extractTraceMetricsFromResults(
+    eventData?: Record<string, unknown>[],
+  ): TraceMetricIdentifier[] {
+    const metrics = new Map<string, TraceMetricIdentifier>();
 
-    const args = match[1]
-      .split(",")
-      .map((arg) => arg.trim())
-      .filter((arg) => arg.length > 0);
+    for (const event of eventData ?? []) {
+      const name = event["metric.name"];
+      const type = event["metric.type"];
+      const rawUnit = event["metric.unit"];
 
-    if (args.length < 4) {
-      return null;
-    }
-
-    const metricName = args[1];
-    const metricType = args[2];
-    const metricUnit = args[3];
-
-    if (!metricName || !metricType) {
-      return null;
-    }
-
-    return {
-      name: metricName,
-      type: metricType,
-      unit: metricUnit && metricUnit !== "-" ? metricUnit : undefined,
-    };
-  }
-
-  private extractTraceMetricFromQuery(
-    query: string,
-  ): { name: string; type: string; unit?: string } | null {
-    const extractValue = (field: string): string | null => {
-      const quotedMatch = query.match(new RegExp(`${field}:\"([^\"]+)\"`, "i"));
-      if (quotedMatch?.[1]) {
-        return quotedMatch[1];
+      if (typeof name !== "string" || typeof type !== "string") {
+        continue;
       }
 
-      const unquotedMatch = query.match(new RegExp(`${field}:([^\\s]+)`, "i"));
-      return unquotedMatch?.[1] ?? null;
-    };
+      const unit =
+        typeof rawUnit === "string" && rawUnit !== "-" ? rawUnit : undefined;
+      const key = `${name}|${type}|${unit ?? ""}`;
 
-    const metricName = extractValue("metric\\.name");
-    const metricType = extractValue("metric\\.type");
-    const metricUnit = extractValue("metric\\.unit");
-
-    if (!metricName || !metricType) {
-      return null;
-    }
-
-    return {
-      name: metricName,
-      type: metricType,
-      unit: metricUnit && metricUnit !== "-" ? metricUnit : undefined,
-    };
-  }
-
-  private buildTraceMetricsUrl(params: {
-    organizationSlug: string;
-    query: string;
-    projectId?: string;
-    fields?: string[];
-    sort?: string;
-    statsPeriod?: string;
-    start?: string;
-    end?: string;
-    aggregateFunctions?: string[];
-    groupByFields?: string[];
-  }): string {
-    const {
-      organizationSlug,
-      query,
-      projectId,
-      fields,
-      sort,
-      statsPeriod,
-      start,
-      end,
-      aggregateFunctions,
-      groupByFields,
-    } = params;
-
-    const urlParams = new URLSearchParams();
-
-    if (projectId) {
-      urlParams.set("project", projectId);
-    }
-
-    if (start && end) {
-      urlParams.set("start", start);
-      urlParams.set("end", end);
-    } else {
-      urlParams.set("statsPeriod", statsPeriod || "24h");
-    }
-
-    const parsedAggregateFunctions =
-      aggregateFunctions && aggregateFunctions.length > 0
-        ? aggregateFunctions
-        : (fields?.filter(
-            (field) => field.includes("(") && field.includes(")"),
-          ) ?? []);
-    const parsedGroupByFields =
-      groupByFields && groupByFields.length > 0
-        ? groupByFields
-        : (fields?.filter(
-            (field) => !field.includes("(") && !field.includes(")"),
-          ) ?? []);
-    const isAggregateQuery = parsedAggregateFunctions.length > 0;
-
-    const sortField = sort?.startsWith("-") ? sort.slice(1) : sort;
-    const sortKind = sort?.startsWith("-") ? "desc" : "asc";
-
-    const metricQueries = new Map<
-      string,
-      {
-        metric: { name: string; type: string; unit?: string };
-        yAxes: string[];
+      if (!metrics.has(key)) {
+        metrics.set(key, { name, type, unit });
       }
-    >();
-
-    if (isAggregateQuery) {
-      for (const aggregateField of parsedAggregateFunctions) {
-        const metric = this.extractTraceMetricFromAggregate(aggregateField) ?? {
-          name: "",
-          type: "",
-        };
-        const key = `${metric.name}|${metric.type}|${metric.unit ?? ""}`;
-        const existing = metricQueries.get(key);
-        if (existing) {
-          existing.yAxes.push(aggregateField);
-        } else {
-          metricQueries.set(key, {
-            metric,
-            yAxes: [aggregateField],
-          });
-        }
-      }
-    } else {
-      metricQueries.set("default", {
-        metric: this.extractTraceMetricFromQuery(query) ?? {
-          name: "",
-          type: "",
-        },
-        yAxes: ["sum(value)"],
-      });
     }
 
-    for (const { metric, yAxes } of metricQueries.values()) {
-      urlParams.append(
-        "metric",
-        JSON.stringify({
-          metric,
-          query,
-          aggregateFields: [
-            { yAxes },
-            ...parsedGroupByFields.map((field) => ({ groupBy: field })),
-          ],
-          aggregateSortBys: sortField
-            ? [{ field: sortField, kind: sortKind }]
-            : [],
-          mode: isAggregateQuery ? "aggregate" : "samples",
-        }),
-      );
-    }
-
-    const webHost = this.isSaas() ? "sentry.io" : this.host;
-    const path = this.isSaas()
-      ? `https://${organizationSlug}.${webHost}/explore/metrics/`
-      : `https://${this.host}/organizations/${organizationSlug}/explore/metrics/`;
-
-    return `${path}?${urlParams.toString()}`;
+    return [...metrics.values()];
   }
 
   /**
@@ -948,11 +800,12 @@ export class SentryApiService {
    * @param dataset Dataset type (spans, errors, logs, or tracemetrics)
    * @param fields Array of fields to include in results
    * @param sort Sort parameter (e.g., "-timestamp", "-count()")
-   * @param aggregateFunctions Array of aggregate functions (only used for EAP datasets)
-   * @param groupByFields Array of fields to group by (only used for EAP datasets)
+   * @param aggregateFunctions Array of aggregate functions for aggregate queries
+   * @param groupByFields Array of fields to group by for aggregate queries
    * @param statsPeriod Relative time period (e.g., "24h", "7d")
    * @param start Absolute start time (ISO 8601)
    * @param end Absolute end time (ISO 8601)
+   * @param eventData Optional event rows used to derive trace metric identity for tracemetrics sample URLs
    * @returns Full HTTPS URL to the events explorer in Sentry UI
    */
   getEventsExplorerUrl(
@@ -967,6 +820,7 @@ export class SentryApiService {
     statsPeriod?: string,
     start?: string,
     end?: string,
+    eventData?: Record<string, unknown>[],
   ): string {
     if (dataset === "errors") {
       // Route to legacy Discover API
@@ -985,17 +839,16 @@ export class SentryApiService {
     }
 
     if (dataset === "tracemetrics") {
-      return this.buildTraceMetricsUrl({
-        organizationSlug,
+      return getTraceMetricsExploreUrl(this.host, organizationSlug, {
         query,
         projectId,
-        fields,
         sort,
         statsPeriod,
         start,
         end,
         aggregateFunctions,
         groupByFields,
+        traceMetrics: this.extractTraceMetricsFromResults(eventData),
       });
     }
 

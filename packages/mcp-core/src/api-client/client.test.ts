@@ -1222,7 +1222,7 @@ describe("API query builders", () => {
       });
     });
 
-    describe("buildTraceMetricsUrl", () => {
+    describe("tracemetrics metrics URLs", () => {
       it("should build a metrics page URL for tracemetrics aggregates", () => {
         const apiService = new SentryApiService({ host: "sentry.io" });
 
@@ -1252,6 +1252,52 @@ describe("API query builders", () => {
         expect(url).toContain(
           `%22field%22%3A%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22`,
         );
+      });
+
+      it("should derive concrete sample metrics from result rows", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        const url = apiService.getEventsExplorerUrl(
+          "my-org",
+          "",
+          "123456",
+          "tracemetrics",
+          ["timestamp", "value"],
+          "-timestamp",
+          undefined,
+          undefined,
+          "14d",
+          undefined,
+          undefined,
+          [
+            {
+              timestamp: "2026-04-13T14:19:18+00:00",
+              "metric.name": "http.request.duration",
+              "metric.type": "distribution",
+              "metric.unit": "millisecond",
+              value: 12.4,
+            },
+          ],
+        );
+
+        const parsedUrl = new URL(url);
+        const metricQueries = parsedUrl.searchParams
+          .getAll("metric")
+          .map((value) => JSON.parse(value));
+
+        expect(metricQueries).toEqual([
+          {
+            metric: {
+              name: "http.request.duration",
+              type: "distribution",
+              unit: "millisecond",
+            },
+            query: "",
+            aggregateFields: [{ yAxes: ["sum(value)"] }],
+            aggregateSortBys: [{ field: "sum(value)", kind: "desc" }],
+            mode: "samples",
+          },
+        ]);
       });
     });
   });

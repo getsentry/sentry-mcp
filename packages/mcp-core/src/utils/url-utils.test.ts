@@ -7,6 +7,7 @@ import {
   getIssuesSearchUrl,
   getTraceUrl,
   getEventsExplorerUrl,
+  getTraceMetricsExploreUrl,
 } from "./url-utils";
 
 describe("url-utils", () => {
@@ -240,6 +241,62 @@ describe("url-utils", () => {
       expect(result).toBe(
         "https://sentry.example.com/organizations/myorg/explore/?query=level%3Aerror&dataset=logs&layout=table&project=proj1",
       );
+    });
+
+    it("should build tracemetrics aggregate URLs from the public helper fields", () => {
+      const result = getEventsExplorerUrl(
+        "us.sentry.io",
+        "myorg",
+        "",
+        "tracemetrics",
+        "123456",
+        [
+          "transaction",
+          "p95(value,http.request.duration,distribution,millisecond)",
+          "count(value,http.request.duration,distribution,millisecond)",
+        ],
+      );
+
+      expect(result).toContain("https://myorg.sentry.io/explore/metrics/");
+      expect(result).toContain("project=123456");
+      expect(result).toContain(`%22mode%22%3A%22aggregate%22`);
+      expect(result).toContain(`%22groupBy%22%3A%22transaction%22`);
+    });
+  });
+
+  describe("getTraceMetricsExploreUrl", () => {
+    it("should build sample metric URLs with concrete metric state", () => {
+      const result = getTraceMetricsExploreUrl("sentry.io", "myorg", {
+        query: "",
+        projectId: "123456",
+        statsPeriod: "14d",
+        traceMetrics: [
+          {
+            name: "http.request.duration",
+            type: "distribution",
+            unit: "millisecond",
+          },
+        ],
+      });
+
+      const url = new URL(result);
+      const metricQueries = url.searchParams
+        .getAll("metric")
+        .map((value) => JSON.parse(value));
+
+      expect(metricQueries).toEqual([
+        {
+          metric: {
+            name: "http.request.duration",
+            type: "distribution",
+            unit: "millisecond",
+          },
+          query: "",
+          aggregateFields: [{ yAxes: ["sum(value)"] }],
+          aggregateSortBys: [{ field: "sum(value)", kind: "desc" }],
+          mode: "samples",
+        },
+      ]);
     });
   });
 });
