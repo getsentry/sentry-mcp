@@ -50,6 +50,13 @@ type IgnoreState = {
   message: string;
 };
 
+type IssueStatusDisplay =
+  | "resolved"
+  | "resolvedInNextRelease"
+  | "unresolved"
+  | "ignored"
+  | string;
+
 type IgnoreParams = {
   status?: string;
   ignoreMode?: IgnoreMode;
@@ -148,6 +155,16 @@ function formatIgnoreUntil(ignoreUntil: string): string {
   }
 
   return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
+function getIssueStatusDisplay(issue: Issue): IssueStatusDisplay {
+  const statusDetails = getIssueStatusDetails(issue);
+
+  if (issue.status === "resolved" && statusDetails.inNextRelease === true) {
+    return "resolvedInNextRelease";
+  }
+
+  return issue.status;
 }
 
 function getIgnoreStateFromUpdate(
@@ -294,7 +311,7 @@ function buildNoChangesOutput(params: {
   output += "No changes were needed.\n";
 
   output += "\n## Current Status\n\n";
-  output += `**Status**: ${issue.status}\n`;
+  output += `**Status**: ${getIssueStatusDisplay(issue)}\n`;
   if (ignoreState) {
     output += `**Ignore Behavior**: ${ignoreState.behavior}\n`;
   }
@@ -360,6 +377,20 @@ function getIgnoreFamily(
     default:
       return undefined;
   }
+}
+
+function isIgnoreBehaviorAlreadySet(
+  currentIgnoreState: IgnoreState | null,
+  ignoreUpdate?: IgnoreUpdate,
+): boolean {
+  const requestedIgnoreState = getIgnoreStateFromUpdate(ignoreUpdate);
+
+  return (
+    currentIgnoreState !== null &&
+    requestedIgnoreState !== null &&
+    currentIgnoreState.family === requestedIgnoreState.family &&
+    currentIgnoreState.behavior === requestedIgnoreState.behavior
+  );
 }
 
 function buildIgnoreUpdate(
@@ -483,11 +514,11 @@ function buildIgnoreUpdate(
         ignoreWindow: params.ignoreWindowMinutes,
         behavior:
           params.ignoreWindowMinutes === undefined
-            ? `Until it occurs ${pluralize(params.ignoreCount, "time")}`
+            ? `Until it occurs ${pluralize(params.ignoreCount, "more time")}`
             : `Until it occurs ${pluralize(params.ignoreCount, "time")} in ${pluralize(params.ignoreWindowMinutes, "minute")}`,
         message:
           params.ignoreWindowMinutes === undefined
-            ? `The issue is now ignored until it occurs ${pluralize(params.ignoreCount, "time")}`
+            ? `The issue is now ignored until it occurs ${pluralize(params.ignoreCount, "more time")}`
             : `The issue is now ignored until it occurs ${pluralize(params.ignoreCount, "time")} in ${pluralize(params.ignoreWindowMinutes, "minute")}`,
       };
     case "untilUserCount":
@@ -507,11 +538,11 @@ function buildIgnoreUpdate(
         ignoreUserWindow: params.ignoreUserWindowMinutes,
         behavior:
           params.ignoreUserWindowMinutes === undefined
-            ? `Until it affects ${pluralize(params.ignoreUserCount, "user")}`
+            ? `Until it affects ${pluralize(params.ignoreUserCount, "more user")}`
             : `Until it affects ${pluralize(params.ignoreUserCount, "user")} in ${pluralize(params.ignoreUserWindowMinutes, "minute")}`,
         message:
           params.ignoreUserWindowMinutes === undefined
-            ? `The issue is now ignored until it affects ${pluralize(params.ignoreUserCount, "user")}`
+            ? `The issue is now ignored until it affects ${pluralize(params.ignoreUserCount, "more user")}`
             : `The issue is now ignored until it affects ${pluralize(params.ignoreUserCount, "user")} in ${pluralize(params.ignoreUserWindowMinutes, "minute")}`,
       };
   }
@@ -621,13 +652,26 @@ export default defineTool({
         params.status === "ignored" && currentIssue.status !== "ignored",
     });
     const requestedIgnoreFamily = getIgnoreFamily(ignoreUpdate);
+    const ignoreBehaviorAlreadySet = isIgnoreBehaviorAlreadySet(
+      currentIgnoreState,
+      ignoreUpdate,
+    );
+    const statusAlreadySet =
+      params.status !== undefined &&
+      params.status !== "ignored" &&
+      getIssueStatusDisplay(currentIssue) === params.status;
 
-    let updateStatus = params.status;
-    const updateAssignedTo = assignmentAlreadySet ? undefined : params.assignedTo;
+    let updateStatus = statusAlreadySet ? undefined : params.status;
+    const updateAssignedTo = assignmentAlreadySet
+      ? undefined
+      : params.assignedTo;
     let updateIgnore = ignoreUpdate;
 
     if (currentIssue.status === "ignored" && params.status === "ignored") {
       if (!hasExplicitIgnoreChange(params)) {
+        updateStatus = undefined;
+        updateIgnore = undefined;
+      } else if (ignoreBehaviorAlreadySet) {
         updateStatus = undefined;
         updateIgnore = undefined;
       } else if (
@@ -673,9 +717,9 @@ export default defineTool({
     });
 
     const updatedIgnoreState = getIgnoreState(updatedIssue, ignoreUpdate);
-    const statusChanged =
-      params.status !== undefined &&
-      currentIssue.status !== updatedIssue.status;
+    const currentStatusDisplay = getIssueStatusDisplay(currentIssue);
+    const updatedStatusDisplay = getIssueStatusDisplay(updatedIssue);
+    const statusChanged = currentStatusDisplay !== updatedStatusDisplay;
     const assignmentChanged =
       formatAssignedTo(currentIssue.assignedTo ?? null) !==
       formatAssignedTo(updatedIssue.assignedTo ?? null);
@@ -690,7 +734,7 @@ export default defineTool({
     output += "## Changes Made\n\n";
 
     if (statusChanged) {
-      output += `**Status**: ${currentIssue.status} → **${updatedIssue.status}**\n`;
+      output += `**Status**: ${currentStatusDisplay} → **${updatedStatusDisplay}**\n`;
     }
 
     if (
@@ -715,7 +759,7 @@ export default defineTool({
     }
 
     output += "\n## Current Status\n\n";
-    output += `**Status**: ${updatedIssue.status}\n`;
+    output += `**Status**: ${updatedStatusDisplay}\n`;
     if (updatedIgnoreState) {
       output += `**Ignore Behavior**: ${updatedIgnoreState.behavior}\n`;
     }
@@ -726,8 +770,13 @@ export default defineTool({
     output += `- The issue has been successfully updated in Sentry\n`;
     output += `- You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
 
-    if (statusChanged && updatedIssue.status === "resolved") {
+    if (statusChanged && updatedStatusDisplay === "resolved") {
       output += `- The issue is now marked as resolved and will no longer generate alerts\n`;
+    } else if (
+      statusChanged &&
+      updatedStatusDisplay === "resolvedInNextRelease"
+    ) {
+      output += `- The issue is now marked as resolved in the upcoming release\n`;
     } else if (
       updatedIgnoreState &&
       params.status === "ignored" &&
