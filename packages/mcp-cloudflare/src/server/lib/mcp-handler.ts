@@ -240,13 +240,26 @@ const mcpHandler: ExportedHandler<Env> = {
       });
     }
 
+    let constraints = verification.constraints;
+    if (
+      organizationSlug &&
+      !constraints.regionUrl?.trim() &&
+      rawProps.constraintRegionUrl?.trim() &&
+      rawProps.constraintOrganizationSlug === organizationSlug
+    ) {
+      constraints = {
+        ...constraints,
+        regionUrl: rawProps.constraintRegionUrl.trim(),
+      };
+    }
+
     // Build complete ServerContext from OAuth props + verified constraints
     const serverContext: ServerContext = {
       userId,
       clientId,
       accessToken,
       grantedSkills: validSkills,
-      constraints: verification.constraints,
+      constraints,
       sentryHost,
       mcpUrl: env.MCP_URL,
       agentMode: isAgentMode,

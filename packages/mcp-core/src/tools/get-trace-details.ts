@@ -1,6 +1,7 @@
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { resolveRegionUrlForOrganization } from "../internal/tool-helpers/resolve-region-url";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl, ParamTraceId } from "../schema";
@@ -71,8 +72,14 @@ export default defineTool({
       );
     }
 
+    const regionUrl = await resolveRegionUrlForOrganization({
+      context,
+      organizationSlug: params.organizationSlug,
+      regionUrl: params.regionUrl,
+    });
+
     const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl ?? undefined,
+      regionUrl: regionUrl ?? undefined,
     });
 
     setTag("organization.slug", params.organizationSlug);

@@ -123,6 +123,24 @@ describe("Constraint Helpers", () => {
       // regionUrl not in schema, so it shouldn't be filtered
       expect(keys).toEqual(["organizationSlug"]);
     });
+
+    it("filters regionUrl when it is a resolved non-empty string on constraints", () => {
+      const constraints = {
+        organizationSlug: "my-org",
+        projectSlug: null,
+        regionUrl: "https://us.sentry.io",
+      };
+      const schema = {
+        organizationSlug: z.string(),
+        regionUrl: z.string().nullable(),
+        query: z.string().optional(),
+      };
+      const keys = getConstraintKeysToFilter(constraints, schema);
+      expect(keys).toEqual(
+        expect.arrayContaining(["organizationSlug", "regionUrl"]),
+      );
+      expect(keys).toHaveLength(2);
+    });
   });
 
   describe("getConstraintParametersToInject", () => {
@@ -217,6 +235,22 @@ describe("Constraint Helpers", () => {
       // regionUrl not in schema, so it shouldn't be injected
       expect(params).toEqual({
         organizationSlug: "my-org",
+      });
+    });
+
+    it("injects regionUrl when present on constraints and the tool declares it", () => {
+      const constraints = {
+        organizationSlug: "my-org",
+        projectSlug: null,
+        regionUrl: "https://us.sentry.io",
+      };
+      const schema = {
+        organizationSlug: z.string(),
+        regionUrl: z.string().nullable(),
+      };
+      expect(getConstraintParametersToInject(constraints, schema)).toEqual({
+        organizationSlug: "my-org",
+        regionUrl: "https://us.sentry.io",
       });
     });
   });

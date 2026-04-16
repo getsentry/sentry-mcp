@@ -9,6 +9,22 @@ import {
 } from "@sentry/mcp-server-mocks";
 import getTraceDetails from "./get-trace-details.js";
 
+/** Register the same handler on sentry.io and us.sentry.io (org fixture resolves region). */
+function httpGetRegional(
+  sentryIoUrl: string,
+  resolver: Parameters<typeof http.get>[1],
+  options?: Parameters<typeof http.get>[2],
+) {
+  const usUrl = sentryIoUrl.replace(
+    /^https:\/\/sentry\.io\b/,
+    "https://us.sentry.io",
+  );
+  return [
+    http.get(sentryIoUrl, resolver, options),
+    http.get(usUrl, resolver, options),
+  ];
+}
+
 describe("get_trace_details", () => {
   it("serializes with valid trace ID", async () => {
     const result = await getTraceDetails.handler(
@@ -141,7 +157,7 @@ describe("get_trace_details", () => {
     const traceId = "a4d1aae7216b47ff8117cf4e09ce9d0a";
 
     mswServer.use(
-      http.get(
+      ...httpGetRegional(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/frontend/",
         () =>
           HttpResponse.json({
@@ -151,7 +167,7 @@ describe("get_trace_details", () => {
           }),
         { once: true },
       ),
-      http.get(
+      ...httpGetRegional(
         `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
         ({ request }) => {
           const url = new URL(request.url);
@@ -187,7 +203,7 @@ describe("get_trace_details", () => {
 
   it("handles empty trace response", async () => {
     mswServer.use(
-      http.get(
+      ...httpGetRegional(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/a4d1aae7216b47ff8117cf4e09ce9d0a/",
         () => {
           return HttpResponse.json({
@@ -200,7 +216,7 @@ describe("get_trace_details", () => {
           });
         },
       ),
-      http.get(
+      ...httpGetRegional(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/a4d1aae7216b47ff8117cf4e09ce9d0a/",
         () => {
           return HttpResponse.json([]);
@@ -232,7 +248,7 @@ describe("get_trace_details", () => {
 
   it("handles API error gracefully", async () => {
     mswServer.use(
-      http.get(
+      ...httpGetRegional(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/a4d1aae7216b47ff8117cf4e09ce9d0a/",
         () => {
           return new HttpResponse(
@@ -300,13 +316,13 @@ describe("get_trace_details", () => {
 
   it("handles trace meta with null transaction.event_id values", async () => {
     mswServer.use(
-      http.get(
+      ...httpGetRegional(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/a4d1aae7216b47ff8117cf4e09ce9d0a/",
         () => {
           return HttpResponse.json(traceMetaWithNullsFixture);
         },
       ),
-      http.get(
+      ...httpGetRegional(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/a4d1aae7216b47ff8117cf4e09ce9d0a/",
         () => {
           return HttpResponse.json(traceFixture);
@@ -342,7 +358,7 @@ describe("get_trace_details", () => {
 
   it("handles mixed span/issue arrays in trace responses", async () => {
     mswServer.use(
-      http.get(
+      ...httpGetRegional(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/b4d1aae7216b47ff8117cf4e09ce9d0b/",
         () => {
           return HttpResponse.json({
@@ -355,7 +371,7 @@ describe("get_trace_details", () => {
           });
         },
       ),
-      http.get(
+      ...httpGetRegional(
         "https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/b4d1aae7216b47ff8117cf4e09ce9d0b/",
         () => {
           return HttpResponse.json(traceMixedFixture);

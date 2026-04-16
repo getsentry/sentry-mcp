@@ -409,7 +409,7 @@ export default defineTool({
           {
             organizationSlug: resolved.organizationSlug,
             issueId: resolved.issueId,
-            regionUrl: null,
+            regionUrl: context.constraints.regionUrl ?? null,
           },
           context,
         );
@@ -420,7 +420,7 @@ export default defineTool({
             organizationSlug: resolved.organizationSlug,
             issueId: resolved.issueId,
             eventId: resolved.eventId,
-            regionUrl: null,
+            regionUrl: context.constraints.regionUrl ?? null,
           },
           context,
         );
@@ -430,13 +430,15 @@ export default defineTool({
           {
             organizationSlug: resolved.organizationSlug,
             traceId: resolved.traceId!,
-            regionUrl: null,
+            regionUrl: context.constraints.regionUrl ?? null,
           },
           context,
         );
 
       case "breadcrumbs": {
-        const apiService = apiServiceFromContext(context);
+        const apiService = apiServiceFromContext(context, {
+          regionUrl: context.constraints.regionUrl ?? undefined,
+        });
         try {
           await ensureIssueWithinProjectConstraint({
             apiService,
@@ -466,6 +468,7 @@ export default defineTool({
             replayUrl: params.url,
             organizationSlug: resolved.organizationSlug,
             replayId: resolved.replayId,
+            regionUrl: context.constraints.regionUrl ?? undefined,
           },
           context,
         );
@@ -480,7 +483,7 @@ export default defineTool({
             profilerId: resolved.profilerId,
             start: resolved.start,
             end: resolved.end,
-            regionUrl: null,
+            regionUrl: context.constraints.regionUrl ?? null,
             focusOnUserCode: true,
           },
           context,

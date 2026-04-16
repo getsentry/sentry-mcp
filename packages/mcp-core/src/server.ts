@@ -342,6 +342,8 @@ function configureServer({
             tool.inputSchema,
           );
 
+          // Constraints override raw tool arguments. String constraint fields are
+          // also removed from tool schemas and re-injected (see getConstraintKeysToFilter).
           const paramsWithConstraints = {
             ...params,
             ...applicableConstraints,

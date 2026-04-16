@@ -14,7 +14,8 @@ const CACHE_KEY_VERSION = "v1";
  */
 export type CachedConstraints = {
   regionUrl: string | null;
-  projectCapabilities: ProjectCapabilities;
+  /** Populated when a project constraint was verified; null for org-only cache entries. */
+  projectCapabilities: ProjectCapabilities | null;
   cachedAt: number;
 };
 
@@ -28,15 +29,17 @@ export type CacheOptions = {
 
 /**
  * Build a cache key for constraints verification.
- * Format: caps:v1:{userId}:{sentryHost}:{organizationSlug}:{projectSlug}
+ * Format: caps:v1:{userId}:{sentryHost}:{organizationSlug}:{projectKey}
+ * projectKey is the project slug, or "__org__" when only the organization is constrained.
  */
 function buildCacheKey(
   userId: string,
   sentryHost: string,
   organizationSlug: string,
-  projectSlug: string,
+  projectSlug: string | null | undefined,
 ): string {
-  return `caps:${CACHE_KEY_VERSION}:${userId}:${sentryHost}:${organizationSlug}:${projectSlug}`;
+  const projectKey = projectSlug?.trim() || "__org__";
+  return `caps:${CACHE_KEY_VERSION}:${userId}:${sentryHost}:${organizationSlug}:${projectKey}`;
 }
 
 /**
@@ -149,10 +152,10 @@ export async function verifyConstraintsAccess(
     };
   }
 
-  // Check cache if project constraints are requested and cache is available
-  // Cache key includes userId to ensure per-user isolation
+  // Check KV cache when available (org-only and org+project keys).
+  // Cache key includes userId to ensure per-user isolation.
   let cacheKey: string | null = null;
-  if (projectSlug && cache) {
+  if (cache) {
     cacheKey = buildCacheKey(
       cache.userId,
       sentryHost,
@@ -161,12 +164,11 @@ export async function verifyConstraintsAccess(
     );
     const cached = await getCachedConstraints(cache.kv, cacheKey);
     if (cached) {
-      // Cache hit - return cached constraints without API calls
       return {
         ok: true,
         constraints: {
           organizationSlug,
-          projectSlug,
+          projectSlug: projectSlug || null,
           regionUrl: cached.regionUrl,
           projectCapabilities: cached.projectCapabilities,
         },
@@ -254,12 +256,12 @@ export async function verifyConstraintsAccess(
     }
   }
 
-  // Cache successful verification results for project constraints
-  // Fire-and-forget write - don't block response on cache update
-  if (cacheKey && projectCapabilities) {
+  // Cache: org-only after org fetch; org+project only when project verification
+  // succeeded (skip caching on project timeout so the next request can retry).
+  if (cacheKey && (!projectSlug || projectCapabilities !== null)) {
     void setCachedConstraints(cache!.kv, cacheKey, {
       regionUrl: regionUrl || null,
-      projectCapabilities,
+      projectCapabilities: projectSlug ? projectCapabilities : null,
       cachedAt: Date.now(),
     });
   }

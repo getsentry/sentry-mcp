@@ -30,7 +30,15 @@ export type WorkerProps = {
   /** Primary authorization method - array of skill strings */
   grantedSkills?: string[];
 
-  // Note: constraints are NOT included - they're extracted per-request from URL
+  /**
+   * When the OAuth `resource` parameter scoped the grant to `/mcp/:org` (or
+   * `/mcp/:org/:project`), we resolve `links.regionUrl` once at token grant so
+   * MCP requests can merge it into URL constraints without agents passing `regionUrl`.
+   */
+  constraintOrganizationSlug?: string | null;
+  constraintRegionUrl?: string | null;
+
+  // Note: full URL constraints are still extracted per-request from the MCP path
   // Note: sentryHost and mcpUrl come from env, not OAuth props
 };
 

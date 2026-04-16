@@ -12,6 +12,8 @@ import {
 import { verifyAndParseState, type OAuthState } from "../state";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
+import { SentryApiService } from "@sentry/mcp-core/api-client";
+import { parseResourceMcpConstraints } from "../resource-scope";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
@@ -262,6 +264,26 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // Convert valid skills Set to array for OAuth props
   const grantedSkills = Array.from(validSkills);
 
+  let constraintOrganizationSlug: string | null = null;
+  let constraintRegionUrl: string | null = null;
+  const resource = (oauthReqInfo as AuthRequestWithSkills).resource;
+  const resourceScope = parseResourceMcpConstraints(
+    typeof resource === "string" ? resource : undefined,
+  );
+  if (resourceScope?.organizationSlug) {
+    try {
+      const api = new SentryApiService({
+        accessToken: payload.access_token,
+        host: c.env.SENTRY_HOST || "sentry.io",
+      });
+      const org = await api.getOrganization(resourceScope.organizationSlug);
+      constraintOrganizationSlug = resourceScope.organizationSlug;
+      constraintRegionUrl = org.links?.regionUrl?.trim() || null;
+    } catch {
+      // Fail-open: MCP requests still run verifyConstraintsAccess
+    }
+  }
+
   // Return back to the MCP client a new token
   const accessTokenExpiresAt = getUpstreamTokenExpiryTimestamp(payload);
   const userLabel = getUpstreamUserLabel(payload);
@@ -290,7 +312,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       grantedScopes: Array.from(grantedScopes),
       grantedSkills, // Primary authorization method
 
-      // Note: constraints are NOT included here - they're extracted per-request from URL
+      constraintOrganizationSlug,
+      constraintRegionUrl,
+
       // Note: sentryHost and mcpUrl come from env, not OAuth props
     } as WorkerProps,
   });
