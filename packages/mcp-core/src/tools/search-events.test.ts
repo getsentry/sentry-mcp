@@ -405,6 +405,76 @@ describe("search_events", () => {
     expect(result).toContain("**transaction.duration**: 120ms");
   });
 
+  it("should build continuous profile links when precise timestamps are numeric", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "profiles",
+        "transaction:/api/users",
+        [
+          "project",
+          "profiler.id",
+          "timestamp",
+          "transaction",
+          "transaction.duration",
+          "trace",
+          "precise.start_ts",
+          "precise.finish_ts",
+        ],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("profiles");
+          return HttpResponse.json({
+            data: [
+              {
+                project: "backend",
+                "profiler.id": "7d0d8b4ef0c74b07a3d48886e9b198e5",
+                timestamp: "2025-01-15T10:00:00Z",
+                transaction: "/api/users",
+                "transaction.duration": 120000000,
+                trace: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+                "precise.start_ts": 1736935200000000000,
+                "precise.finish_ts": 1736935200120000000,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        naturalLanguageQuery: "recent profiles for /api/users",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain(
+      "https://test-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=7d0d8b4ef0c74b07a3d48886e9b198e5&start=1736935200000000000&end=1736935200120000000",
+    );
+    expect(result).toContain("**transaction.duration**: 120ms");
+  });
+
   it("should preserve grouped profile fields in the explorer URL", async () => {
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(

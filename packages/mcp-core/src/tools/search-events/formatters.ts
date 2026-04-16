@@ -495,6 +495,18 @@ function getProfileProject(event: FlexibleEventData): string | null {
   return getStringValue(event, "project") || null;
 }
 
+function getProfileTimestampValue(value: unknown): string | null {
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
+}
+
 function getProfileDetailUrl(
   apiService: SentryApiService,
   organizationSlug: string,
@@ -511,9 +523,9 @@ function getProfileDetailUrl(
   }
 
   const profilerId = getStringValue(event, "profiler.id");
-  const start = event["precise.start_ts"];
-  const end = event["precise.finish_ts"];
-  if (profilerId && typeof start === "string" && typeof end === "string") {
+  const start = getProfileTimestampValue(event["precise.start_ts"]);
+  const end = getProfileTimestampValue(event["precise.finish_ts"]);
+  if (profilerId && start && end) {
     return apiService.getContinuousProfileUrl(organizationSlug, project, {
       profilerId,
       start,
