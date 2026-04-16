@@ -1,7 +1,7 @@
 // Build a dataset-agnostic system prompt
 export const systemPrompt = `You are a Sentry query translator. You need to:
-1. FIRST determine which dataset (spans, errors, logs, metrics, or replays) is most appropriate for the query
-2. Query the available attributes for that dataset using the datasetAttributes tool for spans/errors/logs/metrics, or the replayFields tool for replays
+1. FIRST determine which dataset (spans, errors, logs, metrics, profiles, or replays) is most appropriate for the query
+2. Query the available attributes for that dataset using the datasetAttributes tool for spans/errors/logs/metrics/profiles, or the replayFields tool for replays
 3. Use the otelSemantics tool if you need OpenTelemetry semantic conventions
 4. Convert the natural language query to Sentry's search syntax (NOT SQL syntax)
 5. Decide which fields to return in the results
@@ -13,10 +13,12 @@ DATASET SELECTION GUIDELINES:
 - errors: Exceptions, crashes, error messages, stack traces, unhandled errors, browser/client errors
 - logs: Log entries, log messages, severity levels, debugging information
 - metrics: Newer span metrics and metric summaries, especially named metrics, counters, gauges, distributions, metric values, and queries that explicitly mention metric names/types
+- profiles: Transaction and continuous profile results, profile IDs, profile durations, releases, platforms, and profile-related transactions
 - replays: Session replay results, clicked elements, rage/dead clicks, visited pages, replay users, browsers, and releases
 
 For ambiguous queries like "calls using XYZ", prefer spans dataset first as it contains the most comprehensive telemetry data.
 For queries that explicitly ask about a metric name, metric type, counter/gauge/distribution, or newer span metrics, prefer metrics.
+For queries about captured profiles, profile IDs, flamegraphs, or profiled transactions, prefer profiles.
 For queries about session replays, clicked UI elements, rage clicks, dead clicks, visited URLs/screens, or replay users/sessions, prefer replays.
 
 CRITICAL - FIELD VERIFICATION REQUIREMENT:
@@ -186,6 +188,7 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
    - spans dataset: Use "-span.duration" (slowest first)  
    - logs dataset: Use "-timestamp" (newest first)
    - metrics dataset: Use "-timestamp" for samples, or sort by the selected aggregate for grouped metric results
+   - profiles dataset: Use "-timestamp" for samples, or sort by the selected aggregate for grouped profile results
    - replays dataset: Use "-started_at" (most recent replay first)
 
 3. SORTING SYNTAX:
@@ -204,7 +207,7 @@ SORTING RULES (CRITICAL - YOU MUST ALWAYS SPECIFY A SORT):
 
 YOUR RESPONSE FORMAT:
 Return a JSON object with these fields:
-- "dataset": Which dataset you determined to use ("spans", "errors", "logs", "metrics", or "replays")
+- "dataset": Which dataset you determined to use ("spans", "errors", "logs", "metrics", "profiles", or "replays")
 - "query": The Sentry query string for filtering results (use empty string "" for no filters)
 - "fields": Array of field names to return in results
   - For individual event queries: OPTIONAL (will use recommended fields if not provided)
@@ -281,6 +284,12 @@ export const NUMERIC_FIELDS: Record<string, Set<string>> = {
     "timestamp_precise",
     "observed_timestamp",
     "payload_size",
+  ]),
+  profiles: new Set([
+    "profile.duration",
+    "transaction.duration",
+    "precise.start_ts",
+    "precise.finish_ts",
   ]),
 };
 
@@ -452,6 +461,38 @@ export const DATASET_FIELDS = {
     "per_minute(value,metric.name,metric.type,metric.unit)":
       "Per-minute rate for a metric, typically counters",
   },
+  profiles: {
+    "profile.id": "Transaction profile ID for a specific captured profile",
+    "profiler.id":
+      "Continuous profiler session ID for chunk-based profile captures",
+    "thread.id":
+      "Thread ID associated with a continuous profile result when available",
+    timestamp: "When the profile was captured",
+    transaction: "Transaction name associated with the profile when available",
+    trace: "Trace ID linked to the profiled transaction",
+    release: "Release version associated with the profile",
+    environment: "Environment for the profile",
+    project: "Project slug",
+    "project.name": "Project name",
+    "platform.name": "Runtime or SDK platform name",
+    "device.model": "Device model for mobile or device-bound profiles",
+    "device.classification": "Device performance classification",
+    "device.arch": "Device architecture",
+    "profile.duration":
+      "Total profile duration in nanoseconds for a captured profile",
+    "transaction.duration":
+      "Transaction duration represented by the profile in nanoseconds",
+    "precise.start_ts":
+      "Continuous profile precise start timestamp when available",
+    "precise.finish_ts":
+      "Continuous profile precise finish timestamp when available",
+    "count()": "Count of matching profiles",
+    "last_seen()": "Most recent timestamp of the matching profile group",
+    "p50()": "Median profile duration for the selected grouping",
+    "p75()": "75th percentile profile duration",
+    "p95()": "95th percentile profile duration",
+    "p99()": "99th percentile profile duration",
+  },
 };
 
 // Structured examples for dataset-specific query patterns
@@ -467,7 +508,7 @@ export interface QueryExample {
 }
 
 export const DATASET_EXAMPLES: Record<
-  "spans" | "errors" | "logs" | "tracemetrics",
+  "spans" | "errors" | "logs" | "tracemetrics" | "profiles",
   QueryExample[]
 > = {
   spans: [
@@ -738,6 +779,64 @@ export const DATASET_EXAMPLES: Record<
       },
     },
   ],
+  profiles: [
+    {
+      description: "latest profiles for a transaction",
+      output: {
+        query: "transaction:/api/users",
+        fields: [
+          "project",
+          "profile.id",
+          "timestamp",
+          "transaction",
+          "transaction.duration",
+          "release",
+          "trace",
+        ],
+        sort: "-timestamp",
+      },
+    },
+    {
+      description: "count profiles by release",
+      output: {
+        query: "",
+        fields: ["release", "count()", "last_seen()"],
+        sort: "-count()",
+      },
+    },
+    {
+      description: "slowest profiled transactions",
+      output: {
+        query: "",
+        fields: ["transaction", "p95()", "count()"],
+        sort: "-p95()",
+      },
+    },
+    {
+      description: "continuous profiles for a profiler session",
+      output: {
+        query: "profiler.id:041bde57b9844e36b8b7e5734efae5f7",
+        fields: [
+          "project",
+          "profiler.id",
+          "thread.id",
+          "timestamp",
+          "precise.start_ts",
+          "precise.finish_ts",
+          "release",
+        ],
+        sort: "-timestamp",
+      },
+    },
+    {
+      description: "profiles grouped by environment",
+      output: {
+        query: "",
+        fields: ["environment", "count()", "p95()"],
+        sort: "-count()",
+      },
+    },
+  ],
 };
 
 // Define recommended fields for each dataset
@@ -787,6 +886,24 @@ export const RECOMMENDED_FIELDS = {
     ],
     description:
       "Core trace metric sample information including metric identity, value, and trace context",
+  },
+  profiles: {
+    basic: [
+      "project",
+      "profile.id",
+      "profiler.id",
+      "thread.id",
+      "timestamp",
+      "transaction",
+      "transaction.duration",
+      "release",
+      "environment",
+      "trace",
+      "precise.start_ts",
+      "precise.finish_ts",
+    ],
+    description:
+      "Core profiling information including profile identifiers, transaction context, timing, and trace linkage",
   },
 };
 

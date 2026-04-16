@@ -159,15 +159,16 @@ describe("parseSentryUrl", () => {
   });
 
   describe("profile URLs", () => {
-    it("parses explore profiling URL", () => {
+    it("parses transaction profile flamegraph URL", () => {
       expect(
         parseSentryUrl(
-          "https://my-org.sentry.io/explore/profiling/profile/my-project/flamegraph/",
+          "https://my-org.sentry.io/explore/profiling/profile/my-project/cfe78a5c892d4a64a962d837673398d2/flamegraph/",
         ),
       ).toMatchInlineSnapshot(`
         {
           "end": undefined,
           "organizationSlug": "my-org",
+          "profileId": "cfe78a5c892d4a64a962d837673398d2",
           "profilerId": undefined,
           "projectSlug": "my-project",
           "start": undefined,
@@ -176,7 +177,7 @@ describe("parseSentryUrl", () => {
       `);
     });
 
-    it("parses profile URL with profilerId query param", () => {
+    it("parses continuous profile URL with profilerId query param", () => {
       expect(
         parseSentryUrl(
           "https://my-org.sentry.io/explore/profiling/profile/seer/flamegraph/?profilerId=abc123",
@@ -185,6 +186,7 @@ describe("parseSentryUrl", () => {
         {
           "end": undefined,
           "organizationSlug": "my-org",
+          "profileId": undefined,
           "profilerId": "abc123",
           "projectSlug": "seer",
           "start": undefined,
@@ -193,7 +195,7 @@ describe("parseSentryUrl", () => {
       `);
     });
 
-    it("parses profile URL with all query params", () => {
+    it("parses continuous profile URL with all query params", () => {
       expect(
         parseSentryUrl(
           "https://my-org.sentry.io/explore/profiling/profile/backend/flamegraph/?profilerId=xyz789&start=2024-01-01&end=2024-01-07",
@@ -202,6 +204,7 @@ describe("parseSentryUrl", () => {
         {
           "end": "2024-01-07",
           "organizationSlug": "my-org",
+          "profileId": undefined,
           "profilerId": "xyz789",
           "projectSlug": "backend",
           "start": "2024-01-01",
@@ -210,15 +213,16 @@ describe("parseSentryUrl", () => {
       `);
     });
 
-    it("parses profile URL with organizations path", () => {
+    it("parses transaction profile URL with organizations path", () => {
       expect(
         parseSentryUrl(
-          "https://sentry.io/organizations/my-org/profiling/profile/my-project/flamegraph/",
+          "https://sentry.io/organizations/my-org/profiling/profile/my-project/cfe78a5c892d4a64a962d837673398d2/flamegraph/",
         ),
       ).toMatchInlineSnapshot(`
         {
           "end": undefined,
           "organizationSlug": "my-org",
+          "profileId": "cfe78a5c892d4a64a962d837673398d2",
           "profilerId": undefined,
           "projectSlug": "my-project",
           "start": undefined,

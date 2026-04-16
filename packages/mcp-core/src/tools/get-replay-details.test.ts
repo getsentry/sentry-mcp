@@ -31,6 +31,13 @@ describe("get_replay_details", () => {
       - **URLs**: /login, /checkout
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
+      - **Errors**: 1
+      - **Rage Clicks**: 0
+      - **Dead Clicks**: 1
+      - **Warnings**: 2
+      - **Infos**: 3
+      - **Recording Segments**: 2
+      - **Archived**: No
 
       ## Activity
 
@@ -111,6 +118,13 @@ describe("get_replay_details", () => {
       - **URLs**: /login, /checkout
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
+      - **Errors**: 1
+      - **Rage Clicks**: 0
+      - **Dead Clicks**: 1
+      - **Warnings**: 2
+      - **Infos**: 3
+      - **Recording Segments**: 2
+      - **Archived**: Yes
 
       ## Activity
 
@@ -166,6 +180,13 @@ describe("get_replay_details", () => {
       - **URLs**: /login, /checkout
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
+      - **Errors**: 1
+      - **Rage Clicks**: 0
+      - **Dead Clicks**: 1
+      - **Warnings**: 2
+      - **Infos**: 3
+      - **Recording Segments**: 2
+      - **Archived**: No
 
       ## Activity
 

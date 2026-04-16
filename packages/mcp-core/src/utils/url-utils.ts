@@ -1,4 +1,8 @@
-import { isMetricsDataset, type EventsDataset } from "./events-datasets";
+import {
+  isMetricsDataset,
+  isProfilesDataset,
+  type EventsDataset,
+} from "./events-datasets";
 
 /**
  * Determines if a Sentry instance is SaaS or self-hosted based on the host.
@@ -25,6 +29,32 @@ export interface TraceMetricsExplorerUrlOptions {
   aggregateFunctions?: string[];
   groupByFields?: string[];
   traceMetrics?: TraceMetricIdentifier[];
+}
+
+export interface ProfilesExplorerUrlOptions {
+  query: string;
+  projectId?: string;
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+  sort?: string;
+  fields?: string[];
+  aggregateFunctions?: string[];
+  groupByFields?: string[];
+}
+
+function deriveSelectedFields(
+  fields?: string[],
+  aggregateFunctions?: string[],
+  groupByFields?: string[],
+): string[] {
+  if (fields && fields.length > 0) {
+    return fields;
+  }
+
+  return Array.from(
+    new Set([...(groupByFields ?? []), ...(aggregateFunctions ?? [])]),
+  );
 }
 
 function getSentryWebBaseUrl(
@@ -242,6 +272,52 @@ export function getTraceMetricsExploreUrl(
   return `${getSentryWebBaseUrl(host, organizationSlug, "/explore/metrics/")}?${urlParams.toString()}`;
 }
 
+export function getProfilingExplorerUrl(
+  host: string,
+  organizationSlug: string,
+  options: ProfilesExplorerUrlOptions,
+): string {
+  const {
+    query,
+    projectId,
+    statsPeriod,
+    start,
+    end,
+    sort,
+    fields,
+    aggregateFunctions,
+    groupByFields,
+  } = options;
+  const urlParams = new URLSearchParams();
+
+  if (query) {
+    urlParams.set("query", query);
+  }
+  if (projectId) {
+    urlParams.set("project", projectId);
+  }
+  if (sort) {
+    urlParams.set("sort", sort);
+  }
+
+  for (const field of deriveSelectedFields(
+    fields,
+    aggregateFunctions,
+    groupByFields,
+  )) {
+    urlParams.append("field", field);
+  }
+
+  if (start && end) {
+    urlParams.set("start", start);
+    urlParams.set("end", end);
+  } else {
+    urlParams.set("statsPeriod", statsPeriod || "24h");
+  }
+
+  return `${getSentryWebBaseUrl(host, organizationSlug, "/explore/profiling/")}?${urlParams.toString()}`;
+}
+
 /**
  * Generates a Sentry issue URL.
  * @param host The Sentry host (may include regional subdomain for API access)
@@ -385,6 +461,42 @@ export function getReplayUrl(
   );
 }
 
+export function getProfileUrl(
+  host: string,
+  organizationSlug: string,
+  projectSlug: string,
+  profileId: string,
+): string {
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/explore/profiling/profile/${projectSlug}/${profileId}/flamegraph/`,
+  );
+}
+
+export function getContinuousProfileUrl(
+  host: string,
+  organizationSlug: string,
+  projectSlug: string,
+  options: {
+    profilerId: string;
+    start: string;
+    end: string;
+  },
+): string {
+  const url = new URL(
+    getSentryWebBaseUrl(
+      host,
+      organizationSlug,
+      `/explore/profiling/profile/${projectSlug}/flamegraph/`,
+    ),
+  );
+  url.searchParams.set("profilerId", options.profilerId);
+  url.searchParams.set("start", options.start);
+  url.searchParams.set("end", options.end);
+  return url.toString();
+}
+
 /**
  * Generates a Sentry events explorer URL.
  * @param host The Sentry host (may include regional subdomain for API access)
@@ -402,23 +514,41 @@ export function getEventsExplorerUrl(
   dataset: EventsDataset = "spans",
   projectSlugOrId?: string,
   fields?: string[],
-  traceMetricsOptions?: Omit<
-    TraceMetricsExplorerUrlOptions,
-    "query" | "projectId"
-  >,
+  explorerOptions?: Omit<TraceMetricsExplorerUrlOptions, "query" | "projectId">,
 ): string {
   if (isMetricsDataset(dataset)) {
     const derivedAggregateFunctions =
-      traceMetricsOptions?.aggregateFunctions ??
+      explorerOptions?.aggregateFunctions ??
       fields?.filter((field) => field.includes("(") && field.includes(")"));
     const derivedGroupByFields =
-      traceMetricsOptions?.groupByFields ??
+      explorerOptions?.groupByFields ??
       fields?.filter((field) => !field.includes("(") && !field.includes(")"));
 
     return getTraceMetricsExploreUrl(host, organizationSlug, {
-      ...traceMetricsOptions,
+      ...explorerOptions,
       query,
       projectId: projectSlugOrId,
+      aggregateFunctions: derivedAggregateFunctions,
+      groupByFields: derivedGroupByFields,
+    });
+  }
+
+  if (isProfilesDataset(dataset)) {
+    const derivedAggregateFunctions =
+      explorerOptions?.aggregateFunctions ??
+      fields?.filter((field) => field.includes("(") && field.includes(")"));
+    const derivedGroupByFields =
+      explorerOptions?.groupByFields ??
+      fields?.filter((field) => !field.includes("(") && !field.includes(")"));
+
+    return getProfilingExplorerUrl(host, organizationSlug, {
+      query,
+      projectId: projectSlugOrId,
+      fields,
+      sort: explorerOptions?.sort,
+      statsPeriod: explorerOptions?.statsPeriod,
+      start: explorerOptions?.start,
+      end: explorerOptions?.end,
       aggregateFunctions: derivedAggregateFunctions,
       groupByFields: derivedGroupByFields,
     });

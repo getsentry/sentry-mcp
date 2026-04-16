@@ -1332,5 +1332,34 @@ describe("API query builders", () => {
         ]);
       });
     });
+
+    describe("profiles page URLs", () => {
+      it("should preserve grouped profile field selection", () => {
+        const apiService = new SentryApiService({ host: "sentry.io" });
+
+        const url = apiService.getEventsExplorerUrl(
+          "my-org",
+          "",
+          "123456",
+          "profiles",
+          ["release", "count()"],
+          "-count()",
+          ["count()"],
+          ["release"],
+          "7d",
+        );
+
+        const parsedUrl = new URL(url);
+
+        expect(parsedUrl.pathname).toBe("/explore/profiling/");
+        expect(parsedUrl.searchParams.get("project")).toBe("123456");
+        expect(parsedUrl.searchParams.get("statsPeriod")).toBe("7d");
+        expect(parsedUrl.searchParams.get("sort")).toBe("-count()");
+        expect(parsedUrl.searchParams.getAll("field")).toEqual([
+          "release",
+          "count()",
+        ]);
+      });
+    });
   });
 });

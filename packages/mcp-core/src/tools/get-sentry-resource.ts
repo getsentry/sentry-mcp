@@ -11,7 +11,7 @@ import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { fetchAndFormatBreadcrumbs } from "../internal/tool-helpers/breadcrumbs";
 import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
-import getProfile from "./get-profile";
+import getProfileDetails from "./get-profile-details";
 import getReplayDetails from "./get-replay-details";
 
 /** Types with full API integration. */
@@ -27,10 +27,7 @@ export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 /** Recognized from URLs but not yet fully supported -- return guidance messages. */
 export type RecognizedType = "monitor" | "release";
 
-/**
- * All resource types. Profile is URL-only (requires transactionName,
- * which is not expressible through a single resourceId).
- */
+/** All resource types. */
 export type ResolvedResourceType =
   | FullySupportedType
   | RecognizedType
@@ -48,8 +45,10 @@ export interface ResolvedResourceParams {
   spanId?: string;
   // Profile params
   projectSlug?: string;
+  profileId?: string;
   profilerId?: string;
-  transactionName?: string;
+  start?: string;
+  end?: string;
   // Replay params
   replayId?: string;
   // Monitor params
@@ -223,7 +222,10 @@ function resolveFromParsedUrl(
         type: "profile",
         organizationSlug,
         projectSlug: parsed.projectSlug,
+        profileId: parsed.profileId,
         profilerId: parsed.profilerId,
+        start: parsed.start,
+        end: parsed.end,
       };
 
     case "replay":
@@ -436,15 +438,17 @@ export default defineTool({
         );
 
       case "profile":
-        return getProfile.handler(
+        return getProfileDetails.handler(
           {
+            profileUrl: params.url,
             organizationSlug: resolved.organizationSlug,
             projectSlugOrId: resolved.projectSlug,
-            transactionName: resolved.transactionName,
+            profileId: resolved.profileId,
+            profilerId: resolved.profilerId,
+            start: resolved.start,
+            end: resolved.end,
             regionUrl: null,
-            statsPeriod: "7d",
             focusOnUserCode: true,
-            maxHotPaths: 10,
           },
           context,
         );

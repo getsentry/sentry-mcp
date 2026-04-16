@@ -83,6 +83,7 @@ import type {
   FlamegraphProfileMetadataSchema,
   ProfileChunkSchema,
   ProfileChunkResponseSchema,
+  TransactionProfileSchema,
   ProfileFrameSchema,
   ProfileSampleSchema,
 } from "./schema";
@@ -147,6 +148,7 @@ export type FlamegraphProfileMetadata = z.infer<
 >;
 export type ProfileChunk = z.infer<typeof ProfileChunkSchema>;
 export type ProfileChunkResponse = z.infer<typeof ProfileChunkResponseSchema>;
+export type TransactionProfile = z.infer<typeof TransactionProfileSchema>;
 export type ProfileFrame = z.infer<typeof ProfileFrameSchema>;
 export type ProfileSample = z.infer<typeof ProfileSampleSchema>;
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
-import { mswServer } from "@sentry/mcp-server-mocks";
+import { mswServer, profileDetailsFixture } from "@sentry/mcp-server-mocks";
 import getProfileDetails from "./get-profile-details";
 
 const baseContext = {
@@ -11,24 +11,80 @@ const baseContext = {
   userId: "1",
 };
 
-function callHandler(params: {
-  organizationSlug: string;
-  projectSlugOrId: string | number;
-  profilerId: string;
-  start: string;
-  end: string;
-  regionUrl?: string | null;
-  focusOnUserCode?: boolean;
-}) {
-  return getProfileDetails.handler(
-    { regionUrl: null, focusOnUserCode: true, ...params },
-    baseContext,
-  );
-}
-
 describe("get_profile_details", () => {
   describe("handler", () => {
-    it("fetches and formats a profile chunk with slug resolution", async () => {
+    it("fetches and formats a transaction profile from profileUrl", async () => {
+      const result = await getProfileDetails.handler(
+        {
+          profileUrl: `https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/`,
+          regionUrl: null,
+          focusOnUserCode: true,
+        },
+        baseContext,
+      );
+
+      expect(result).toMatchInlineSnapshot(`
+        "# Profile cfe78a5c892d4a64a962d837673398d2
+        
+        ## Summary
+        - **Profile URL**: https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/
+        - **Project**: backend
+        - **Profile ID**: cfe78a5c892d4a64a962d837673398d2
+        - **Transaction**: /api/users
+        - **Trace ID**: a4d1aae7216b47ff8117cf4e09ce9d0a
+        - **Trace URL**: https://sentry-mcp-evals.sentry.io/explore/traces/trace/a4d1aae7216b47ff8117cf4e09ce9d0a
+        - **Duration**: 120ms
+        - **Platform**: python
+        - **Release**: backend@1.2.3
+        - **Environment**: production
+        - **Device**: MacBook Pro · high · arm64
+        - **OS**: macOS 14.4
+        - **SDK**: sentry.python 2.24.1
+        - **Active Thread**: 1
+        
+        ## Sample Summary
+        - **Total Frames**: 3
+        - **Total Samples**: 3
+        - **Total Stacks**: 2
+        - **Threads**: 1
+        
+        ## Thread Information
+        
+        - **Thread 1**: MainThread (3 samples)
+        
+        ## Top Frames by Occurrence
+        
+        | Function | File:Line | Count | Type |
+        |----------|-----------|-------|------|
+        | \`handle_request\` | main.py:42 | 3 | User Code |
+        | \`execute_query\` | db.py:118 | 2 | User Code |
+        
+        ## Next Steps
+        
+        - Open the profile URL above in Sentry for the full flamegraph
+        - Open the related trace URL to inspect the end-to-end request
+        - Use \`search_events\` or \`list_events\` with the profiles dataset to find similar profiles"
+      `);
+    });
+
+    it("fetches a transaction profile from direct parameters", async () => {
+      const result = await getProfileDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlugOrId: "backend",
+          profileId: profileDetailsFixture.profile_id,
+          regionUrl: null,
+          focusOnUserCode: false,
+        },
+        baseContext,
+      );
+
+      expect(result).toContain(`# Profile ${profileDetailsFixture.profile_id}`);
+      expect(result).toContain("**Project**: backend");
+      expect(result).toContain("cursor.execute");
+    });
+
+    it("fetches and formats a continuous profile chunk", async () => {
       mswServer.use(
         http.get(
           "https://sentry.io/api/0/projects/sentry-mcp-evals/backend/",
@@ -38,45 +94,41 @@ describe("get_profile_details", () => {
         ),
       );
 
-      const result = await callHandler({
-        organizationSlug: "sentry-mcp-evals",
-        projectSlugOrId: "backend",
-        profilerId: "041bde57b9844e36b8b7e5734efae5f7",
-        start: "2024-01-01T00:00:00",
-        end: "2024-01-01T01:00:00",
-      });
+      const result = await getProfileDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlugOrId: "backend",
+          profilerId: "041bde57b9844e36b8b7e5734efae5f7",
+          start: "2024-01-01T00:00:00Z",
+          end: "2024-01-01T01:00:00Z",
+          regionUrl: null,
+          focusOnUserCode: true,
+        },
+        baseContext,
+      );
 
-      expect(result).toContain("# Profile Chunk Details");
-      expect(result).toContain("## Metadata");
-      expect(result).toContain("## Sample Summary");
-      expect(result).toContain("## Thread Information");
+      expect(result).toContain(
+        "# Continuous Profile 041bde57b9844e36b8b7e5734efae5f7",
+      );
+      expect(result).toContain("## Summary");
+      expect(result).toContain("## Raw Sample Analysis");
       expect(result).toContain("## Top Frames by Occurrence");
     });
 
-    it("skips slug resolution for numeric project IDs", async () => {
-      const result = await callHandler({
-        organizationSlug: "sentry-mcp-evals",
-        projectSlugOrId: 12345,
-        profilerId: "041bde57b9844e36b8b7e5734efae5f7",
-        start: "2024-01-01T00:00:00",
-        end: "2024-01-01T01:00:00",
-      });
-
-      expect(result).toContain("# Profile Chunk Details");
-    });
-
-    it("respects focusOnUserCode option", async () => {
-      const resultAll = await callHandler({
-        organizationSlug: "sentry-mcp-evals",
-        projectSlugOrId: 12345,
-        profilerId: "041bde57b9844e36b8b7e5734efae5f7",
-        start: "2024-01-01T00:00:00",
-        end: "2024-01-01T01:00:00",
-        focusOnUserCode: false,
-      });
-
-      // With focusOnUserCode false, should include library frames
-      expect(resultAll).toContain("Library");
+    it("rejects incomplete continuous profile URLs", async () => {
+      await expect(
+        getProfileDetails.handler(
+          {
+            profileUrl:
+              "https://my-org.sentry.io/profiling/profile/backend/flamegraph/?profilerId=041bde57b9844e36b8b7e5734efae5f7",
+            regionUrl: null,
+            focusOnUserCode: true,
+          },
+          baseContext,
+        ),
+      ).rejects.toThrow(
+        "Continuous profile URLs must include `profilerId`, `start`, and `end` query parameters.",
+      );
     });
   });
 
@@ -96,9 +148,11 @@ describe("get_profile_details", () => {
     it("has expected params", () => {
       const schemaKeys = Object.keys(getProfileDetails.inputSchema);
       expect(schemaKeys).toEqual([
+        "profileUrl",
         "organizationSlug",
         "regionUrl",
         "projectSlugOrId",
+        "profileId",
         "profilerId",
         "start",
         "end",

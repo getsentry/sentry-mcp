@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import {
   mswServer,
   organizationFixture,
+  profileDetailsFixture,
   replayDetailsFixture,
   traceMetaFixture,
   traceFixture,
@@ -150,38 +151,36 @@ describe("get_sentry_resource", () => {
 
   // ─── URL mode: profile URLs ───────────────────────────────────────────────
   describe("URL mode — profile URLs", () => {
-    it("dispatches profile from flamegraph URL to getProfile handler", async () => {
-      // Profile handler requires transactionName which is not in the URL,
-      // so it throws a clear error
-      await expect(
-        callHandler({
-          url: "https://my-org.sentry.io/explore/profiling/profile/sentry/cfe78a5c/flamegraph/",
-        }),
-      ).rejects.toThrow("Transaction name is required");
+    it("dispatches transaction profile URLs to get_profile_details", async () => {
+      const result = await callHandler({
+        url: `https://my-org.sentry.io/explore/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/`,
+      });
+
+      expect(result).toContain(`# Profile ${profileDetailsFixture.profile_id}`);
+      expect(result).toContain("**Project**: backend");
+      expect(result).toContain("**Transaction**: /api/users");
     });
 
-    it("dispatches profile from flamegraph URL with query params", async () => {
-      await expect(
-        callHandler({
-          url: "https://sentry.sentry.io/explore/profiling/profile/sentry/cfe78a5c892d4a64a962d837673398d2/flamegraph/?colorCoding=by%20system%20vs%20application%20frame&frameName=SentryEnvMiddleware",
-        }),
-      ).rejects.toThrow("Transaction name is required");
+    it("dispatches transaction profile URLs with organizations path", async () => {
+      const result = await callHandler({
+        url: `https://sentry.io/organizations/my-org/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/?frameName=handle_request`,
+      });
+
+      expect(result).toContain(`# Profile ${profileDetailsFixture.profile_id}`);
+      expect(result).toContain(
+        "**Trace ID**: a4d1aae7216b47ff8117cf4e09ce9d0a",
+      );
     });
 
-    it("dispatches profile from /profiling/profile/ URL (without /explore/)", async () => {
-      await expect(
-        callHandler({
-          url: "https://my-org.sentry.io/profiling/profile/my-project/flamegraph/",
-        }),
-      ).rejects.toThrow("Transaction name is required");
-    });
+    it("dispatches continuous profile URLs to get_profile_details", async () => {
+      const result = await callHandler({
+        url: "https://my-org.sentry.io/profiling/profile/backend/flamegraph/?profilerId=041bde57b9844e36b8b7e5734efae5f7&start=2024-01-01T00:00:00Z&end=2024-01-01T01:00:00Z",
+      });
 
-    it("dispatches profile from /organizations/ path variant", async () => {
-      await expect(
-        callHandler({
-          url: "https://sentry.io/organizations/my-org/profiling/profile/my-project/flamegraph/",
-        }),
-      ).rejects.toThrow("Transaction name is required");
+      expect(result).toContain(
+        "# Continuous Profile 041bde57b9844e36b8b7e5734efae5f7",
+      );
+      expect(result).toContain("## Raw Sample Analysis");
     });
   });
 

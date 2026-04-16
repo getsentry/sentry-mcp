@@ -122,6 +122,60 @@ describe("list_events", () => {
     expect(metricQuery.aggregateFields).toEqual([{ yAxes: ["sum(value)"] }]);
   });
 
+  it("returns formatted profile results with profile detail links", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("profiles");
+          return HttpResponse.json({
+            data: [
+              {
+                project: "backend",
+                "profile.id": "cfe78a5c892d4a64a962d837673398d2",
+                "profiler.id": null,
+                "thread.id": null,
+                timestamp: "2025-01-15T10:00:00Z",
+                transaction: "/api/users",
+                "transaction.duration": 120000000,
+                release: "backend@1.2.3",
+                environment: "production",
+                trace: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+                "precise.start_ts": "2025-01-15T10:00:00Z",
+                "precise.finish_ts": "2025-01-15T10:00:00.120Z",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await listEvents.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        dataset: "profiles",
+        query: "transaction:/api/users",
+        fields: null,
+        sort: "-timestamp",
+        projectSlug: null,
+        environment: null,
+        statsPeriod: "14d",
+        limit: 10,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain(
+      "https://sentry-mcp-evals.sentry.io/explore/profiling/",
+    );
+    expect(result).toContain(
+      "https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/",
+    );
+    expect(result).toContain("**transaction.duration**: 120ms");
+  });
+
   it("returns formatted replay results when dataset is replays", async () => {
     mswServer.use(
       http.get(

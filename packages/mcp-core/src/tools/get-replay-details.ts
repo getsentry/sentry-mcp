@@ -250,6 +250,21 @@ function formatReplayOutput({
   if (replay.releases && replay.releases.length > 0) {
     lines.push(`- **Release**: ${replay.releases[0]}`);
   }
+  if (replay.replay_type) {
+    lines.push(`- **Replay Type**: ${replay.replay_type}`);
+  }
+  lines.push(`- **Errors**: ${replay.count_errors ?? 0}`);
+  lines.push(`- **Rage Clicks**: ${replay.count_rage_clicks ?? 0}`);
+  lines.push(`- **Dead Clicks**: ${replay.count_dead_clicks ?? 0}`);
+  lines.push(`- **Warnings**: ${replay.count_warnings ?? 0}`);
+  lines.push(`- **Infos**: ${replay.count_infos ?? 0}`);
+  if (replay.count_segments != null) {
+    lines.push(`- **Recording Segments**: ${replay.count_segments}`);
+  }
+  lines.push(`- **Archived**: ${isArchived ? "Yes" : "No"}`);
+  if (replay.has_viewed != null) {
+    lines.push(`- **Viewed**: ${replay.has_viewed ? "Yes" : "No"}`);
+  }
 
   // Activity
   lines.push("");

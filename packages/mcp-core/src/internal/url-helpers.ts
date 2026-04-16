@@ -40,6 +40,8 @@ export interface ParsedSentryUrl {
   eventId?: string;
   /** Project slug (for profile, monitor URLs) */
   projectSlug?: string;
+  /** Transaction profile ID from profile flamegraph URLs */
+  profileId?: string;
   /** Profiler ID (for profile URLs, from query param) */
   profilerId?: string;
   /** Start timestamp (for profile URLs, from query param) */
@@ -63,7 +65,8 @@ export interface ParsedSentryUrl {
  * - Issue: `/issues/{issueId}` or `/organizations/{org}/issues/{issueId}`
  * - Event: `/issues/{issueId}/events/{eventId}`
  * - Trace: `/explore/traces/trace/{traceId}` or `/performance/trace/{traceId}`
- * - Profile: `/explore/profiling/profile/{project}/flamegraph/` with query params
+ * - Profile: `/explore/profiling/profile/{project}/{profileId}/flamegraph/`
+ * - Continuous profile: `/explore/profiling/profile/{project}/flamegraph/` with query params
  * - Replay: `/explore/replays/{replayId}/` or `/replays/{replayId}/`
  * - Monitor: `/crons/{monitorSlug}/` or `/monitors/{monitorSlug}/`
  * - Release: `/releases/{version}/`
@@ -188,12 +191,16 @@ function identifyResource(
   pathParts: string[],
   organizationSlug: string,
 ): ParsedSentryUrl {
-  // Profile URL: /explore/profiling/profile/{project}/flamegraph/
+  // Profile URL: /explore/profiling/profile/{project}/{profileId}/flamegraph/
+  // Continuous profile URL: /explore/profiling/profile/{project}/flamegraph/
   // or /profiling/profile/{project}/flamegraph/
   // Check this FIRST to avoid false positives when project names match keywords like "replays"
   const profilingIndex = pathParts.indexOf("profiling");
   if (profilingIndex !== -1 && pathParts[profilingIndex + 1] === "profile") {
     const projectSlug = pathParts[profilingIndex + 2];
+    const nextPart = pathParts[profilingIndex + 3];
+    const profileId =
+      nextPart && nextPart !== "flamegraph" ? nextPart : undefined;
     const profilerId = parsedUrl.searchParams.get("profilerId") || undefined;
     const start = parsedUrl.searchParams.get("start") || undefined;
     const end = parsedUrl.searchParams.get("end") || undefined;
@@ -202,6 +209,7 @@ function identifyResource(
       type: "profile",
       organizationSlug,
       projectSlug,
+      profileId,
       profilerId,
       start,
       end,

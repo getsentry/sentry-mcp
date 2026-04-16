@@ -219,7 +219,7 @@ describe("resolveResourceParams", () => {
 
   // ─── URL mode: profile URLs ───────────────────────────────────────────────
   describe("URL mode — profile URLs", () => {
-    it("parses flamegraph URL", () => {
+    it("parses continuous flamegraph URL", () => {
       expect(
         resolveResourceParams({
           url: "https://my-org.sentry.io/explore/profiling/profile/my-project/flamegraph/",
@@ -228,6 +228,10 @@ describe("resolveResourceParams", () => {
         type: "profile",
         organizationSlug: "my-org",
         projectSlug: "my-project",
+        profileId: undefined,
+        profilerId: undefined,
+        start: undefined,
+        end: undefined,
       });
     });
 
@@ -240,13 +244,14 @@ describe("resolveResourceParams", () => {
         type: "profile",
         organizationSlug: "my-org",
         projectSlug: "my-project",
+        profileId: undefined,
         profilerId: "abc123",
+        start: undefined,
+        end: undefined,
       });
     });
 
-    it("parses flamegraph URL with profiler ID in path segment", () => {
-      // Pattern: /profiling/profile/{project}/{profilerId}/flamegraph/
-      // The URL parser treats the segment after project as part of the path
+    it("parses transaction flamegraph URL with profile ID in path segment", () => {
       expect(
         resolveResourceParams({
           url: "https://sentry.sentry.io/explore/profiling/profile/sentry/cfe78a5c892d4a64/flamegraph/",
@@ -255,10 +260,14 @@ describe("resolveResourceParams", () => {
         type: "profile",
         organizationSlug: "sentry",
         projectSlug: "sentry",
+        profileId: "cfe78a5c892d4a64",
+        profilerId: undefined,
+        start: undefined,
+        end: undefined,
       });
     });
 
-    it("parses /profiling/profile/ URL (without /explore/)", () => {
+    it("parses continuous /profiling/profile/ URL (without /explore/)", () => {
       expect(
         resolveResourceParams({
           url: "https://my-org.sentry.io/profiling/profile/my-project/flamegraph/",
@@ -267,6 +276,10 @@ describe("resolveResourceParams", () => {
         type: "profile",
         organizationSlug: "my-org",
         projectSlug: "my-project",
+        profileId: undefined,
+        profilerId: undefined,
+        start: undefined,
+        end: undefined,
       });
     });
 
@@ -279,10 +292,14 @@ describe("resolveResourceParams", () => {
         type: "profile",
         organizationSlug: "my-org",
         projectSlug: "my-project",
+        profileId: undefined,
+        profilerId: undefined,
+        start: undefined,
+        end: undefined,
       });
     });
 
-    it("parses flamegraph URL with extra query params", () => {
+    it("parses transaction flamegraph URL with extra query params", () => {
       expect(
         resolveResourceParams({
           url: "https://sentry.sentry.io/explore/profiling/profile/sentry/cfe78a5c/flamegraph/?colorCoding=by%20system%20vs%20application%20frame&frameName=SentryEnvMiddleware",
@@ -291,6 +308,10 @@ describe("resolveResourceParams", () => {
         type: "profile",
         organizationSlug: "sentry",
         projectSlug: "sentry",
+        profileId: "cfe78a5c",
+        profilerId: undefined,
+        start: undefined,
+        end: undefined,
       });
     });
   });

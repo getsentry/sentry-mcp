@@ -7,7 +7,11 @@
  * - Raw profile chunk analysis (get_profile_details)
  */
 
-import type { Flamegraph, ProfileChunk } from "../../api-client/types";
+import type {
+  Flamegraph,
+  ProfileChunk,
+  TransactionProfile,
+} from "../../api-client/types";
 import {
   analyzeHotPathsFromFlamegraph,
   compareFrameStats,
@@ -71,6 +75,20 @@ export interface FlamegraphComparisonOptions {
  */
 export interface ProfileChunkAnalysisOptions {
   focusOnUserCode: boolean;
+}
+
+export interface TransactionProfileAnalysisOptions {
+  focusOnUserCode: boolean;
+  profileUrl: string;
+  projectSlug: string;
+  traceUrl?: string;
+}
+
+interface ProfileSampleData {
+  frames: ProfileChunk["profile"]["frames"];
+  samples: ProfileChunk["profile"]["samples"];
+  stacks: ProfileChunk["profile"]["stacks"];
+  threadMetadata: ProfileChunk["profile"]["thread_metadata"];
 }
 
 /**
@@ -454,22 +472,118 @@ export function formatProfileChunkAnalysis(
   }
   sections.push("");
 
-  sections.push("## Sample Summary");
-  sections.push(`- **Total Frames**: ${chunk.profile.frames.length}`);
-  sections.push(`- **Total Samples**: ${chunk.profile.samples.length}`);
-  sections.push(`- **Total Stacks**: ${chunk.profile.stacks.length}`);
   sections.push(
-    `- **Threads**: ${Object.keys(chunk.profile.thread_metadata).length}`,
+    ...formatProfileSampleSections(
+      {
+        frames: chunk.profile.frames,
+        samples: chunk.profile.samples,
+        stacks: chunk.profile.stacks,
+        threadMetadata: chunk.profile.thread_metadata,
+      },
+      options,
+    ),
   );
+
+  return sections.join("\n");
+}
+
+export function formatTransactionProfileAnalysis(
+  profile: TransactionProfile,
+  options: TransactionProfileAnalysisOptions,
+): string {
+  const sections: string[] = [];
+  const profileId = profile.profile_id ?? profile.event_id ?? "Unknown";
+  const transactionName = profile.transaction?.name ?? "Unknown";
+  const release = formatProfileRelease(profile.release);
+  const durationNs = getTransactionProfileDurationNs(profile);
+  const device = formatDeviceSummary(profile);
+  const os = formatOsSummary(profile);
+  const sdk = formatSdkSummary(profile);
+
+  sections.push(`# Profile ${profileId}`);
+  sections.push("");
+  sections.push("## Summary");
+  sections.push(`- **Profile URL**: ${options.profileUrl}`);
+  sections.push(`- **Project**: ${options.projectSlug}`);
+  sections.push(`- **Profile ID**: ${profileId}`);
+  sections.push(`- **Transaction**: ${transactionName}`);
+  if (profile.transaction?.trace_id) {
+    sections.push(`- **Trace ID**: ${profile.transaction.trace_id}`);
+  }
+  if (options.traceUrl) {
+    sections.push(`- **Trace URL**: ${options.traceUrl}`);
+  }
+  if (durationNs != null) {
+    sections.push(`- **Duration**: ${formatDuration(durationNs)}`);
+  }
+  sections.push(`- **Platform**: ${profile.platform}`);
+  sections.push(`- **Release**: ${release}`);
+  if (profile.environment) {
+    sections.push(`- **Environment**: ${profile.environment}`);
+  }
+  if (device) {
+    sections.push(`- **Device**: ${device}`);
+  }
+  if (os) {
+    sections.push(`- **OS**: ${os}`);
+  }
+  if (sdk) {
+    sections.push(`- **SDK**: ${sdk}`);
+  }
+  if (profile.transaction?.active_thread_id) {
+    sections.push(
+      `- **Active Thread**: ${profile.transaction.active_thread_id}`,
+    );
+  }
   sections.push("");
 
-  // Thread information
+  sections.push(
+    ...formatProfileSampleSections(
+      {
+        frames: profile.profile.frames,
+        samples: profile.profile.samples,
+        stacks: profile.profile.stacks,
+        threadMetadata: profile.profile.thread_metadata,
+      },
+      options,
+    ),
+  );
+
+  sections.push("");
+  sections.push("## Next Steps");
+  sections.push("");
+  sections.push(
+    "- Open the profile URL above in Sentry for the full flamegraph",
+  );
+  if (options.traceUrl) {
+    sections.push(
+      "- Open the related trace URL to inspect the end-to-end request",
+    );
+  }
+  sections.push(
+    "- Use `search_events` or `list_events` with the profiles dataset to find similar profiles",
+  );
+
+  return sections.join("\n");
+}
+
+function formatProfileSampleSections(
+  profile: ProfileSampleData,
+  options: { focusOnUserCode: boolean },
+): string[] {
+  const sections: string[] = [];
+
+  sections.push("## Sample Summary");
+  sections.push(`- **Total Frames**: ${profile.frames.length}`);
+  sections.push(`- **Total Samples**: ${profile.samples.length}`);
+  sections.push(`- **Total Stacks**: ${profile.stacks.length}`);
+  sections.push(`- **Threads**: ${Object.keys(profile.threadMetadata).length}`);
+  sections.push("");
   sections.push("## Thread Information");
   sections.push("");
-  for (const [threadId, metadata] of Object.entries(
-    chunk.profile.thread_metadata,
-  )) {
-    const threadSamples = chunk.profile.samples.filter(
+
+  for (const [threadId, metadata] of Object.entries(profile.threadMetadata)) {
+    const threadSamples = profile.samples.filter(
       (s) => s.thread_id === threadId,
     );
     sections.push(
@@ -478,45 +592,138 @@ export function formatProfileChunkAnalysis(
   }
   sections.push("");
 
-  // Frame breakdown (top 10 most frequent)
+  const frameSection = formatTopFramesByOccurrence(profile, options);
+  if (frameSection) {
+    sections.push(frameSection);
+  }
+
+  return sections;
+}
+
+function formatTopFramesByOccurrence(
+  profile: ProfileSampleData,
+  options: { focusOnUserCode: boolean },
+): string | null {
+  const sections: string[] = [];
   const frameCounts = new Map<number, number>();
-  for (const stack of chunk.profile.stacks) {
+
+  for (const sample of profile.samples) {
+    const stack = profile.stacks[sample.stack_id];
+    if (!stack) {
+      continue;
+    }
+
     for (const frameIdx of stack) {
       frameCounts.set(frameIdx, (frameCounts.get(frameIdx) || 0) + 1);
     }
   }
 
   const sortedFrames = Array.from(frameCounts.entries())
+    .filter(([frameIdx]) => {
+      const frame = profile.frames[frameIdx];
+      return frame !== undefined && (!options.focusOnUserCode || frame.in_app);
+    })
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  if (sortedFrames.length > 0) {
-    sections.push("## Top Frames by Occurrence");
-    sections.push("");
-    sections.push("| Function | File:Line | Count | Type |");
-    sections.push("|----------|-----------|-------|------|");
-
-    for (const [frameIdx, count] of sortedFrames) {
-      const frame = chunk.profile.frames[frameIdx];
-      if (!frame) continue;
-
-      if (options.focusOnUserCode && !frame.in_app) continue;
-
-      // Show class_name.function for Java/Android frames
-      const funcName = frame.class_name
-        ? `${frame.class_name}.${frame.function}`
-        : frame.function;
-
-      const rawLocation =
-        frame.filename && frame.lineno
-          ? `${frame.filename}:${frame.lineno}`
-          : frame.module || frame.abs_path || "unknown";
-      const location = truncateLocation(rawLocation, 40);
-      const type = frame.in_app ? "User Code" : "Library";
-
-      sections.push(`| \`${funcName}\` | ${location} | ${count} | ${type} |`);
-    }
+  if (sortedFrames.length === 0) {
+    return null;
   }
 
-  return sections.join("\n");
+  sections.push("## Top Frames by Occurrence");
+  sections.push("");
+  sections.push("| Function | File:Line | Count | Type |");
+  sections.push("|----------|-----------|-------|------|");
+
+  for (const [frameIdx, count] of sortedFrames) {
+    const frame = profile.frames[frameIdx];
+    if (!frame) {
+      continue;
+    }
+
+    if (options.focusOnUserCode && !frame.in_app) {
+      continue;
+    }
+
+    const funcName = frame.class_name
+      ? `${frame.class_name}.${frame.function}`
+      : frame.function;
+
+    const rawLocation =
+      frame.filename && frame.lineno
+        ? `${frame.filename}:${frame.lineno}`
+        : frame.module || frame.abs_path || "unknown";
+    const location = truncateLocation(rawLocation, 40);
+    const type = frame.in_app ? "User Code" : "Library";
+
+    sections.push(`| \`${funcName}\` | ${location} | ${count} | ${type} |`);
+  }
+
+  return sections.length > 4 ? sections.join("\n") : null;
+}
+
+function formatProfileRelease(release: TransactionProfile["release"]): string {
+  if (typeof release === "string") {
+    return release;
+  }
+  if (release && typeof release === "object" && "version" in release) {
+    return String(release.version);
+  }
+  return "Unknown";
+}
+
+function getTransactionProfileDurationNs(
+  profile: TransactionProfile,
+): number | null {
+  const relativeStart = profile.transaction?.relative_start_ns;
+  const relativeEnd = profile.transaction?.relative_end_ns;
+  if (
+    typeof relativeStart === "number" &&
+    Number.isFinite(relativeStart) &&
+    typeof relativeEnd === "number" &&
+    Number.isFinite(relativeEnd) &&
+    relativeEnd >= relativeStart
+  ) {
+    return relativeEnd - relativeStart;
+  }
+
+  const timestamps = profile.profile.samples
+    .map((sample) => sample.timestamp)
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (timestamps.length < 2) {
+    return null;
+  }
+
+  const duration = timestamps[timestamps.length - 1]! - timestamps[0]!;
+  if (duration <= 0) {
+    return null;
+  }
+
+  return duration < 1_000_000 ? Math.round(duration * 1_000_000_000) : duration;
+}
+
+function formatDeviceSummary(profile: TransactionProfile): string | null {
+  const parts = [
+    profile.device?.model,
+    profile.device?.classification,
+    profile.device?.arch,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function formatOsSummary(profile: TransactionProfile): string | null {
+  const parts = [
+    profile.os?.name,
+    profile.os?.version,
+    profile.os?.build_number,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+function formatSdkSummary(profile: TransactionProfile): string | null {
+  const parts = [profile.client_sdk?.name, profile.client_sdk?.version].filter(
+    Boolean,
+  );
+  return parts.length > 0 ? parts.join(" ") : null;
 }
