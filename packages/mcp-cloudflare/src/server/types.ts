@@ -37,6 +37,11 @@ export type WorkerProps = {
    */
   constraintOrganizationSlug?: string | null;
   constraintRegionUrl?: string | null;
+  /**
+   * When the `resource` URL included a project segment (`/mcp/:org/:project`),
+   * the MCP handler requires the request path to use that same org and project.
+   */
+  constraintProjectSlug?: string | null;
 
   // Note: full URL constraints are still extracted per-request from the MCP path
   // Note: sentryHost and mcpUrl come from env, not OAuth props

@@ -220,6 +220,23 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
+    const tokenOrg = rawProps.constraintOrganizationSlug?.trim() || null;
+    const tokenProject = rawProps.constraintProjectSlug?.trim() || null;
+    if (tokenProject) {
+      if (!tokenOrg || organizationSlug !== tokenOrg) {
+        return new Response(
+          "This token is scoped to a project. Use the MCP URL for the organization you authorized.",
+          { status: 403 },
+        );
+      }
+      if (!projectSlug || projectSlug !== tokenProject) {
+        return new Response(
+          "This token is scoped to a project. Use the MCP URL that includes that project (for example /mcp/<org>/<project>).",
+          { status: 403 },
+        );
+      }
+    }
+
     // Verify user has access to the requested org/project
     // Cache verification results in KV to avoid repeated API calls
     const verification = await verifyConstraintsAccess(

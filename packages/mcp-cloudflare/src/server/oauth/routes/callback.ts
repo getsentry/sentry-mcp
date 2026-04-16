@@ -266,6 +266,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
   let constraintOrganizationSlug: string | null = null;
   let constraintRegionUrl: string | null = null;
+  let constraintProjectSlug: string | null = null;
   const resource = (oauthReqInfo as AuthRequestWithSkills).resource;
   const resourceScope = parseResourceMcpConstraints(
     typeof resource === "string" ? resource : undefined,
@@ -279,6 +280,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       const org = await api.getOrganization(resourceScope.organizationSlug);
       constraintOrganizationSlug = resourceScope.organizationSlug;
       constraintRegionUrl = org.links?.regionUrl?.trim() || null;
+      if (resourceScope.projectSlug) {
+        constraintProjectSlug = resourceScope.projectSlug;
+      }
     } catch {
       // Fail-open: MCP requests still run verifyConstraintsAccess
     }
@@ -314,6 +318,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
       constraintOrganizationSlug,
       constraintRegionUrl,
+      constraintProjectSlug,
 
       // Note: sentryHost and mcpUrl come from env, not OAuth props
     } as WorkerProps,
