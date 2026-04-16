@@ -511,6 +511,54 @@ describe("formatter", () => {
       expect(output).toContain("| `app_handler` | app.py:99 | 1 | User Code |");
       expect(output).not.toContain("`library_0`");
     });
+
+    it("falls back to epoch-second sample timestamps when relative bounds are missing", () => {
+      const profile = createMockTransactionProfile();
+
+      if (profile.transaction) {
+        profile.transaction.relative_start_ns = undefined;
+        profile.transaction.relative_end_ns = undefined;
+      }
+
+      profile.profile.samples = [
+        { stack_id: 0, thread_id: "1", timestamp: 1710958503.629 },
+        { stack_id: 1, thread_id: "1", timestamp: 1710958503.679 },
+        { stack_id: 1, thread_id: "1", timestamp: 1710958503.729 },
+      ];
+
+      const output = formatTransactionProfileAnalysis(profile, {
+        focusOnUserCode: true,
+        profileUrl:
+          "https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/",
+        projectSlug: "backend",
+      });
+
+      expect(output).toContain("- **Duration**: 100ms");
+    });
+
+    it("preserves nanosecond sample durations under 1ms when relative bounds are missing", () => {
+      const profile = createMockTransactionProfile();
+
+      if (profile.transaction) {
+        profile.transaction.relative_start_ns = undefined;
+        profile.transaction.relative_end_ns = undefined;
+      }
+
+      profile.profile.samples = [
+        { stack_id: 0, thread_id: "1", timestamp: 0 },
+        { stack_id: 1, thread_id: "1", timestamp: 250_000 },
+        { stack_id: 1, thread_id: "1", timestamp: 500_000 },
+      ];
+
+      const output = formatTransactionProfileAnalysis(profile, {
+        focusOnUserCode: true,
+        profileUrl:
+          "https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/",
+        projectSlug: "backend",
+      });
+
+      expect(output).toContain("- **Duration**: 500µs");
+    });
   });
 
   describe("edge cases", () => {

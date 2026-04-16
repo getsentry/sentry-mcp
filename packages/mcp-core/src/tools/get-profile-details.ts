@@ -124,15 +124,13 @@ async function resolveProjectContext(
   projectSlugOrId: string | number,
   options: {
     requireNumericId?: boolean;
-    requireSlug?: boolean;
   } = {},
 ): Promise<{ projectId: string | number; projectSlug: string }> {
   const requireNumericId = options.requireNumericId ?? false;
-  const requireSlug = options.requireSlug ?? false;
   const isNumericProject =
     typeof projectSlugOrId === "number" || isNumericId(String(projectSlugOrId));
 
-  if (!isNumericProject && !requireNumericId && !requireSlug) {
+  if (!isNumericProject && !requireNumericId) {
     return {
       projectId: projectSlugOrId,
       projectSlug: String(projectSlugOrId),

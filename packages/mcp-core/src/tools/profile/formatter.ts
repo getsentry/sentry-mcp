@@ -692,7 +692,33 @@ function getTransactionProfileDurationNs(
     return null;
   }
 
-  return duration < 1_000_000 ? Math.round(duration * 1_000_000_000) : duration;
+  const firstTimestampScale = inferSampleTimestampNsScale(timestamps[0]!);
+  const lastTimestampScale = inferSampleTimestampNsScale(
+    timestamps[timestamps.length - 1]!,
+  );
+
+  if (firstTimestampScale && firstTimestampScale === lastTimestampScale) {
+    return Math.round(duration * firstTimestampScale);
+  }
+
+  return Math.round(duration);
+}
+
+function inferSampleTimestampNsScale(timestamp: number): number | null {
+  const absoluteTimestamp = Math.abs(timestamp);
+
+  // Older transaction profile payloads use absolute epoch timestamps.
+  if (absoluteTimestamp >= 1e8 && absoluteTimestamp < 1e11) {
+    return 1_000_000_000;
+  }
+  if (absoluteTimestamp >= 1e11 && absoluteTimestamp < 1e14) {
+    return 1_000_000;
+  }
+  if (absoluteTimestamp >= 1e14 && absoluteTimestamp < 1e17) {
+    return 1_000;
+  }
+
+  return null;
 }
 
 function formatDeviceSummary(profile: TransactionProfile): string | null {
