@@ -28,8 +28,37 @@ describe("list_events", () => {
       getServerContext(),
     );
 
-    expect(result).toContain("Search Results");
-    expect(result).toContain("View these results in Sentry");
+    expect(result).toMatchInlineSnapshot(`
+      "# Search Results for "errors events"
+
+      ⚠️ **IMPORTANT**: Display these aggregate results as a data table with proper column alignment and formatting.
+
+      **View these results in Sentry**:
+      https://sentry-mcp-evals.sentry.io/explore/discover/homepage/?dataset=errors&queryDataset=error-events&query=&field=issue&field=title&field=project&field=last_seen%28%29&field=count%28%29&sort=-count&statsPeriod=14d&mode=aggregate&yAxis=last_seen%28%29
+      _Please share this link with the user to view the search results in their Sentry dashboard._
+
+      Found 1 aggregate result:
+
+      \`\`\`json
+      [
+        {
+          "issue.id": 6114575469,
+          "title": "Error: Tool list_organizations is already registered",
+          "project": "test-suite",
+          "count()": 2,
+          "last_seen()": "2025-04-07T12:23:39+00:00",
+          "issue": "CLOUDFLARE-MCP-41"
+        }
+      ]
+      \`\`\`
+
+      ## Next Steps
+
+      - Get more details about a specific error: Use the Issue ID
+      - View error groups: Navigate to the Issues page in Sentry
+      - Set up alerts: Configure alert rules for these error patterns
+      "
+    `);
   });
 
   // Note: Spans test skipped because the mock requires very strict parameters (useRpc=1, specific sort)
