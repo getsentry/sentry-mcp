@@ -43,6 +43,51 @@ describe("list_issue_events", () => {
     expect(result).toContain("Search Results");
   });
 
+  it("rejects issue URLs outside the active organization constraint", async () => {
+    await expect(
+      listIssueEvents.handler(
+        {
+          organizationSlug: "other-org",
+          issueId: undefined,
+          issueUrl:
+            "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41/",
+          query: "",
+          sort: "-timestamp",
+          statsPeriod: "14d",
+          limit: 50,
+          regionUrl: null,
+        },
+        getServerContext(),
+      ),
+    ).rejects.toThrow(
+      'Issue URL is outside the active organization constraint. Expected organization "other-org" but got "sentry-mcp-evals".',
+    );
+  });
+
+  it("rejects issues outside the active project constraint", async () => {
+    await expect(
+      listIssueEvents.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          issueUrl: undefined,
+          query: "",
+          sort: "-timestamp",
+          statsPeriod: "14d",
+          limit: 50,
+          regionUrl: null,
+        },
+        getServerContext({
+          constraints: {
+            projectSlug: "frontend",
+          },
+        }),
+      ),
+    ).rejects.toThrow(
+      'Issue is outside the active project constraint. Expected project "frontend".',
+    );
+  });
+
   it("filters events by query", async () => {
     const result = await listIssueEvents.handler(
       {

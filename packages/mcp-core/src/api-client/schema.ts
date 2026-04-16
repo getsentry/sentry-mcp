@@ -1140,3 +1140,73 @@ export const ProfileChunkResponseSchema = z
     chunks: z.array(ProfileChunkSchema),
   })
   .passthrough();
+
+const ProfileReleaseSchema = z
+  .union([
+    z.string(),
+    z
+      .object({
+        version: z.string(),
+      })
+      .passthrough(),
+    z.null(),
+  ])
+  .optional();
+
+export const TransactionProfileSchema = z
+  .object({
+    event_id: z.string().optional(),
+    profile_id: z.string().optional(),
+    profiler_id: z.string().optional(),
+    environment: z.string().nullable().optional(),
+    platform: z.string(),
+    release: ProfileReleaseSchema,
+    version: z.union([z.string(), z.number()]).transform(String).optional(),
+    profile: ProfileChunkSchema.shape.profile,
+    transaction: z
+      .object({
+        name: z.string().optional(),
+        trace_id: z.string().optional(),
+        id: z.string().optional(),
+        active_thread_id: z.string().optional(),
+        relative_start_ns: z
+          .union([z.string(), z.number()])
+          .transform((value) => Number(value))
+          .optional(),
+        relative_end_ns: z
+          .union([z.string(), z.number()])
+          .transform((value) => Number(value))
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
+    device: z
+      .object({
+        classification: z.string().nullable().optional(),
+        manufacturer: z.string().nullable().optional(),
+        locale: z.string().nullable().optional(),
+        model: z.string().nullable().optional(),
+        arch: z.string().nullable().optional(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+    os: z
+      .object({
+        name: z.string().nullable().optional(),
+        version: z.string().nullable().optional(),
+        build_number: z.string().nullable().optional(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+    client_sdk: z
+      .object({
+        name: z.string().nullable().optional(),
+        version: z.string().nullable().optional(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+  })
+  .passthrough();

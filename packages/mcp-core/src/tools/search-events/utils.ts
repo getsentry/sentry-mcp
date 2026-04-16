@@ -292,6 +292,10 @@ export async function fetchCustomAttributes(
         customAttributes[tag.key] = tag.name || tag.key;
       }
     }
+  } else if (normalizedDataset === "profiles") {
+    // Profiles currently use a stable, product-defined field set rather than
+    // the trace-item attributes endpoint.
+    return { attributes: customAttributes, fieldTypes };
   } else {
     // For logs, spans, and trace metrics datasets, use the trace-items attributes endpoint
     const itemType =

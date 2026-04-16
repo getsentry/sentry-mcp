@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import {
   mswServer,
   organizationFixture,
+  profileDetailsFixture,
   replayDetailsFixture,
   traceMetaFixture,
   traceFixture,
@@ -146,42 +147,98 @@ describe("get_sentry_resource", () => {
       });
       expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
     });
+
+    it("rejects traces outside the active project constraint", async () => {
+      mswServer.use(
+        http.get("https://sentry.io/api/0/projects/test-org/frontend/", () =>
+          HttpResponse.json({
+            id: "9999999999999999",
+            slug: "frontend",
+            name: "frontend",
+          }),
+        ),
+        http.get(
+          `https://sentry.io/api/0/organizations/test-org/trace/${traceId}/`,
+          ({ request }) => {
+            const url = new URL(request.url);
+            if (url.searchParams.get("project") === "9999999999999999") {
+              return HttpResponse.json([]);
+            }
+            return HttpResponse.json(traceFixture);
+          },
+        ),
+      );
+
+      await expect(
+        getSentryResource.handler(
+          {
+            url: `https://test-org.sentry.io/explore/traces/trace/${traceId}`,
+          },
+          {
+            ...baseContext,
+            constraints: {
+              organizationSlug: "test-org",
+              projectSlug: "frontend",
+            },
+          },
+        ),
+      ).rejects.toThrow(
+        'Trace is outside the active project constraint. Expected project "frontend".',
+      );
+    });
   });
 
   // ─── URL mode: profile URLs ───────────────────────────────────────────────
   describe("URL mode — profile URLs", () => {
-    it("dispatches profile from flamegraph URL to getProfile handler", async () => {
-      // Profile handler requires transactionName which is not in the URL,
-      // so it throws a clear error
-      await expect(
-        callHandler({
-          url: "https://my-org.sentry.io/explore/profiling/profile/sentry/cfe78a5c/flamegraph/",
-        }),
-      ).rejects.toThrow("Transaction name is required");
+    it("dispatches transaction profile URLs to get_profile_details", async () => {
+      const result = await callHandler({
+        url: `https://my-org.sentry.io/explore/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/`,
+      });
+
+      expect(result).toContain(`# Profile ${profileDetailsFixture.profile_id}`);
+      expect(result).toContain("**Project**: backend");
+      expect(result).toContain("**Transaction**: /api/users");
     });
 
-    it("dispatches profile from flamegraph URL with query params", async () => {
-      await expect(
-        callHandler({
-          url: "https://sentry.sentry.io/explore/profiling/profile/sentry/cfe78a5c892d4a64a962d837673398d2/flamegraph/?colorCoding=by%20system%20vs%20application%20frame&frameName=SentryEnvMiddleware",
-        }),
-      ).rejects.toThrow("Transaction name is required");
+    it("dispatches transaction profile URLs with organizations path", async () => {
+      const result = await callHandler({
+        url: `https://sentry.io/organizations/my-org/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/?frameName=handle_request`,
+      });
+
+      expect(result).toContain(`# Profile ${profileDetailsFixture.profile_id}`);
+      expect(result).toContain(
+        "**Trace ID**: a4d1aae7216b47ff8117cf4e09ce9d0a",
+      );
     });
 
-    it("dispatches profile from /profiling/profile/ URL (without /explore/)", async () => {
-      await expect(
-        callHandler({
-          url: "https://my-org.sentry.io/profiling/profile/my-project/flamegraph/",
-        }),
-      ).rejects.toThrow("Transaction name is required");
+    it("dispatches continuous profile URLs to get_profile_details", async () => {
+      const result = await callHandler({
+        url: "https://my-org.sentry.io/profiling/profile/backend/flamegraph/?profilerId=041bde57b9844e36b8b7e5734efae5f7&start=2024-01-01T00:00:00Z&end=2024-01-01T01:00:00Z",
+      });
+
+      expect(result).toContain(
+        "# Continuous Profile 041bde57b9844e36b8b7e5734efae5f7",
+      );
+      expect(result).toContain("## Raw Sample Analysis");
     });
 
-    it("dispatches profile from /organizations/ path variant", async () => {
+    it("rejects profile URLs outside the active constrained project", async () => {
       await expect(
-        callHandler({
-          url: "https://sentry.io/organizations/my-org/profiling/profile/my-project/flamegraph/",
-        }),
-      ).rejects.toThrow("Transaction name is required");
+        getSentryResource.handler(
+          {
+            url: `https://my-org.sentry.io/explore/profiling/profile/frontend/${profileDetailsFixture.profile_id}/flamegraph/`,
+          },
+          {
+            ...baseContext,
+            constraints: {
+              organizationSlug: "my-org",
+              projectSlug: "backend",
+            },
+          },
+        ),
+      ).rejects.toThrow(
+        'Profile URL is outside the active project constraint. Expected project "backend" but got "frontend".',
+      );
     });
   });
 
@@ -304,6 +361,26 @@ describe("get_sentry_resource", () => {
       expect(result).toContain("fetch");
       expect(result).toContain("console");
       expect(result).toContain("navigation");
+    });
+
+    it("rejects breadcrumbs outside the active project constraint", async () => {
+      await expect(
+        getSentryResource.handler(
+          {
+            url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
+            resourceType: "breadcrumbs",
+          },
+          {
+            ...baseContext,
+            constraints: {
+              organizationSlug: "sentry-mcp-evals",
+              projectSlug: "frontend",
+            },
+          },
+        ),
+      ).rejects.toThrow(
+        'Issue is outside the active project constraint. Expected project "frontend".',
+      );
     });
 
     it("fetches breadcrumbs from event URL (extracts issueId)", async () => {

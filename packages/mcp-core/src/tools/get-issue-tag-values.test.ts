@@ -60,6 +60,27 @@ describe("get_issue_tag_values", () => {
     expect(result).toContain("**Tag Key**: `browser`");
   });
 
+  it("rejects issues outside the active project constraint", async () => {
+    await expect(
+      getIssueTagValues.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          tagKey: "url",
+          regionUrl: null,
+          issueUrl: undefined,
+        },
+        getServerContext({
+          constraints: {
+            projectSlug: "frontend",
+          },
+        }),
+      ),
+    ).rejects.toThrow(
+      'Issue is outside the active project constraint. Expected project "frontend".',
+    );
+  });
+
   it("throws error when neither issueId nor issueUrl provided", async () => {
     await expect(
       getIssueTagValues.handler(

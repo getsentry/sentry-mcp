@@ -12,6 +12,7 @@ import { searchEventsAgent } from "./agent";
 import {
   formatErrorResults,
   formatLogResults,
+  formatProfileResults,
   formatTraceMetricsResults,
   formatSpanResults,
 } from "./formatters";
@@ -36,7 +37,7 @@ export default defineTool({
   skills: ["inspect", "triage", "seer"], // Available in inspect, triage, and seer skills
   requiredScopes: ["event:read"],
   description: [
-    "Search across Sentry events and replays. This is the ONLY tool for statistics and counts on event datasets.",
+    "Search Sentry events and replays. This is the ONLY tool for counts/statistics on event datasets.",
     "",
     "Supports TWO query types:",
     "1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'",
@@ -53,13 +54,14 @@ export default defineTool({
     "- 'error logs from last hour' → returns event list",
     "- 'database errors with timestamps' → returns event list",
     "- 'trace spans for slow API calls' → returns span list",
-    "- 'checkout replays with errors this week' → returns replay list",
+    "- 'checkout replays with errors' → returns replay list",
     "",
     "Dataset Selection (AI automatically chooses):",
     "- errors: Exception/crash events",
     "- logs: Log entries",
     "- spans: Performance data, AI/LLM calls, token usage",
     "- metrics: Newer span metrics, metric values, counters, gauges, and distributions",
+    "- profiles: Transaction and continuous profile results, profile IDs, and profiled transactions",
     "- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users",
     "",
     "Replay searches on this tool return replay lists only. Replay count()/avg()/sum() aggregations are not supported.",
@@ -345,6 +347,8 @@ export default defineTool({
         return formatLogResults(formatParams);
       case "spans":
         return formatSpanResults(formatParams);
+      case "profiles":
+        return formatProfileResults(formatParams);
       default:
         return formatTraceMetricsResults(formatParams);
     }

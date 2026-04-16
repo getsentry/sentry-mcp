@@ -326,6 +326,31 @@ describe("url-utils", () => {
       expect(result).toContain(`%22mode%22%3A%22aggregate%22`);
       expect(result).toContain(`%22groupBy%22%3A%22transaction%22`);
     });
+
+    it("should preserve grouped profile fields for profiling explorer URLs", () => {
+      const result = getEventsExplorerUrl(
+        "us.sentry.io",
+        "myorg",
+        "",
+        "profiles",
+        "123456",
+        ["release", "count()"],
+        {
+          sort: "-count()",
+          statsPeriod: "7d",
+          aggregateFunctions: undefined,
+          groupByFields: undefined,
+        },
+      );
+
+      const url = new URL(result);
+
+      expect(url.pathname).toBe("/explore/profiling/");
+      expect(url.searchParams.get("project")).toBe("123456");
+      expect(url.searchParams.get("statsPeriod")).toBe("7d");
+      expect(url.searchParams.get("sort")).toBe("-count()");
+      expect(url.searchParams.getAll("field")).toEqual(["release", "count()"]);
+    });
   });
 
   describe("getTraceMetricsExploreUrl", () => {

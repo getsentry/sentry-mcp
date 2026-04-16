@@ -11,6 +11,14 @@ const MINIMUM_DURATION_THRESHOLD_MS = 10;
 const MIN_MEANINGFUL_CHILD_DURATION = 5;
 const MIN_AVG_DURATION_MS = 5;
 
+interface TraceSummary {
+  spanCount: number;
+  errors: number;
+  performanceIssues: number | null;
+  logs: number | null;
+  projectSlug?: string;
+}
+
 export default defineTool({
   name: "get_trace_details",
   skills: ["inspect"], // Only available in inspect skill
@@ -70,25 +78,61 @@ export default defineTool({
     setTag("organization.slug", params.organizationSlug);
     setTag("trace.id", params.traceId);
 
-    // Get trace metadata for overview
-    const traceMeta = await apiService.getTraceMeta({
-      organizationSlug: params.organizationSlug,
-      traceId: params.traceId,
-      statsPeriod: "14d", // Fixed stats period
-    });
+    const constrainedProjectSlug = context.constraints.projectSlug ?? undefined;
+    let summary: TraceSummary;
+    let trace: any[];
 
-    // Get minimal trace data to show key transactions
-    const trace = await apiService.getTrace({
-      organizationSlug: params.organizationSlug,
-      traceId: params.traceId,
-      limit: 10, // Only get top-level spans for overview
-      statsPeriod: "14d", // Fixed stats period
-    });
+    if (constrainedProjectSlug) {
+      setTag("project.slug", constrainedProjectSlug);
+
+      const project = await apiService.getProject({
+        organizationSlug: params.organizationSlug,
+        projectSlugOrId: constrainedProjectSlug,
+      });
+
+      trace = await apiService.getTrace({
+        organizationSlug: params.organizationSlug,
+        traceId: params.traceId,
+        limit: 10, // Only get top-level spans for overview
+        project: String(project.id),
+        statsPeriod: "14d", // Fixed stats period
+      });
+
+      if (trace.length === 0) {
+        throw new UserInputError(
+          `Trace is outside the active project constraint. Expected project "${constrainedProjectSlug}".`,
+        );
+      }
+
+      summary = buildProjectScopedTraceSummary(trace, constrainedProjectSlug);
+    } else {
+      // Get trace metadata for overview
+      const traceMeta = await apiService.getTraceMeta({
+        organizationSlug: params.organizationSlug,
+        traceId: params.traceId,
+        statsPeriod: "14d", // Fixed stats period
+      });
+
+      // Get minimal trace data to show key transactions
+      trace = await apiService.getTrace({
+        organizationSlug: params.organizationSlug,
+        traceId: params.traceId,
+        limit: 10, // Only get top-level spans for overview
+        statsPeriod: "14d", // Fixed stats period
+      });
+
+      summary = {
+        spanCount: traceMeta.span_count,
+        errors: traceMeta.errors,
+        performanceIssues: traceMeta.performance_issues,
+        logs: traceMeta.logs,
+      };
+    }
 
     return formatTraceOutput({
       organizationSlug: params.organizationSlug,
       traceId: params.traceId,
-      traceMeta,
+      summary,
       trace,
       apiService,
     });
@@ -395,16 +439,42 @@ function getAllSpansFlattened(spans: any[]): any[] {
   return result;
 }
 
+function buildProjectScopedTraceSummary(
+  trace: any[],
+  projectSlug: string,
+): TraceSummary {
+  const spans = getAllSpansFlattened(trace);
+  const standaloneIssues = trace.filter(
+    (item) =>
+      item &&
+      typeof item === "object" &&
+      (!("children" in item) || !Array.isArray(item.children)),
+  );
+  const spanErrors = spans.reduce(
+    (count, span) =>
+      count + (Array.isArray(span.errors) ? span.errors.length : 0),
+    0,
+  );
+
+  return {
+    spanCount: spans.length,
+    errors: standaloneIssues.length + spanErrors,
+    performanceIssues: null,
+    logs: null,
+    projectSlug,
+  };
+}
+
 function formatTraceOutput({
   organizationSlug,
   traceId,
-  traceMeta,
+  summary,
   trace,
   apiService,
 }: {
   organizationSlug: string;
   traceId: string;
-  traceMeta: any;
+  summary: TraceSummary;
   trace: any[];
   apiService: any;
 }): string {
@@ -417,10 +487,19 @@ function formatTraceOutput({
   // High-level statistics
   sections.push("## Summary");
   sections.push("");
-  sections.push(`**Total Spans**: ${traceMeta.span_count}`);
-  sections.push(`**Errors**: ${traceMeta.errors}`);
-  sections.push(`**Performance Issues**: ${traceMeta.performance_issues}`);
-  sections.push(`**Logs**: ${traceMeta.logs}`);
+  if (summary.projectSlug) {
+    sections.push(`**Scope**: project \`${summary.projectSlug}\``);
+  }
+  sections.push(`**Total Spans**: ${summary.spanCount}`);
+  sections.push(`**Errors**: ${summary.errors}`);
+  if (summary.projectSlug) {
+    sections.push(
+      "*Performance issue and log counts are unavailable for project-scoped traces.*",
+    );
+  } else {
+    sections.push(`**Performance Issues**: ${summary.performanceIssues ?? 0}`);
+    sections.push(`**Logs**: ${summary.logs ?? 0}`);
+  }
 
   // Show operation breakdown with detailed stats if we have trace data
   if (trace.length > 0) {

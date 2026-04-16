@@ -31,6 +31,13 @@ describe("get_replay_details", () => {
       - **URLs**: /login, /checkout
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
+      - **Errors**: 1
+      - **Rage Clicks**: 0
+      - **Dead Clicks**: 1
+      - **Warnings**: 2
+      - **Infos**: 3
+      - **Recording Segments**: 2
+      - **Archived**: No
 
       ## Activity
 
@@ -111,6 +118,13 @@ describe("get_replay_details", () => {
       - **URLs**: /login, /checkout
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
+      - **Errors**: 1
+      - **Rage Clicks**: 0
+      - **Dead Clicks**: 1
+      - **Warnings**: 2
+      - **Infos**: 3
+      - **Recording Segments**: 2
+      - **Archived**: Yes
 
       ## Activity
 
@@ -166,6 +180,13 @@ describe("get_replay_details", () => {
       - **URLs**: /login, /checkout
       - **Device**: MacBook Pro
       - **Release**: frontend@1.2.3
+      - **Errors**: 1
+      - **Rage Clicks**: 0
+      - **Dead Clicks**: 1
+      - **Warnings**: 2
+      - **Infos**: 3
+      - **Recording Segments**: 2
+      - **Archived**: No
 
       ## Activity
 
@@ -188,16 +209,47 @@ describe("get_replay_details", () => {
     );
   });
 
-  it("prefers explicit organizationSlug over replayUrl org when both are provided", () => {
-    expect(
+  it("rejects replay URLs outside the active organization constraint", () => {
+    expect(() =>
       resolveReplayParams({
         replayUrl: `https://url-org.sentry.io/replays/${replayDetailsFixture.id}/`,
         organizationSlug: "constrained-org",
       }),
-    ).toEqual({
-      organizationSlug: "constrained-org",
-      replayId: replayDetailsFixture.id,
-    });
+    ).toThrow(
+      'Replay URL is outside the active organization constraint. Expected organization "constrained-org" but got "url-org".',
+    );
+  });
+
+  it("rejects replays outside the active project constraint", async () => {
+    mswServer.use(
+      http.get(
+        "https://us.sentry.io/api/0/projects/sentry-mcp-evals/frontend/",
+        () =>
+          HttpResponse.json({
+            id: "9999999999999999",
+            slug: "frontend",
+            name: "frontend",
+          }),
+        { once: true },
+      ),
+    );
+
+    await expect(
+      getReplayDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          replayId: replayDetailsFixture.id,
+          regionUrl: "https://us.sentry.io",
+        },
+        getServerContext({
+          constraints: {
+            projectSlug: "frontend",
+          },
+        }),
+      ),
+    ).rejects.toThrow(
+      'Replay is outside the active project constraint. Expected project "frontend".',
+    );
   });
 
   it("uses the constrained regionUrl for replay endpoints", async () => {

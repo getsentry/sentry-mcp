@@ -11,6 +11,7 @@ import {
 import {
   formatErrorResults,
   formatLogResults,
+  formatProfileResults,
   formatTraceMetricsResults,
   formatSpanResults,
 } from "../search-events/formatters";
@@ -40,6 +41,7 @@ const DEFAULT_FIELDS = {
   logs: RECOMMENDED_FIELDS.logs.basic,
   spans: RECOMMENDED_FIELDS.spans.basic,
   metrics: RECOMMENDED_FIELDS.tracemetrics.basic,
+  profiles: RECOMMENDED_FIELDS.profiles.basic,
 };
 
 export default defineTool({
@@ -62,6 +64,7 @@ export default defineTool({
     "- logs: Log entries",
     "- spans: Performance data, traces, AI/LLM calls",
     "- metrics: Newer span metrics, counters, gauges, and distributions",
+    "- profiles: Transaction and continuous profile rows, profile IDs, profiled transactions, and releases",
     "- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users",
     "",
     "Query Syntax Examples:",
@@ -91,7 +94,7 @@ export default defineTool({
       .enum(LIST_EVENTS_DATASETS)
       .default("errors")
       .describe(
-        "Dataset to query: errors (exceptions), logs (entries), spans (traces), metrics (newer span metrics), or replays (session replay results)",
+        "Dataset to query: errors, logs, spans, metrics, profiles, or replays. Profiles returns transaction and continuous profile rows; replays returns replay sessions.",
       ),
     query: z
       .string()
@@ -296,6 +299,8 @@ export default defineTool({
         return formatLogResults(formatParams);
       case "spans":
         return formatSpanResults(formatParams);
+      case "profiles":
+        return formatProfileResults(formatParams);
       default:
         return formatTraceMetricsResults(formatParams);
     }

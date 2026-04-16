@@ -2,10 +2,171 @@ import { setTag } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 import { isNumericId } from "../utils/slug-validation";
-import { formatProfileChunkAnalysis } from "./profile/formatter";
+import { parseSentryUrl, isProfileUrl } from "../internal/url-helpers";
+import {
+  resolveScopedOrganizationSlug,
+  resolveScopedProjectSlugOrId,
+} from "../internal/url-scope";
+import {
+  formatProfileChunkAnalysis,
+  formatTransactionProfileAnalysis,
+} from "./profile/formatter";
+
+type ResolvedProfileDetailsParams =
+  | {
+      mode: "transaction";
+      organizationSlug: string;
+      projectSlugOrId: string | number;
+      profileId: string;
+    }
+  | {
+      mode: "continuous";
+      organizationSlug: string;
+      projectSlugOrId: string | number;
+      profilerId: string;
+      start: string;
+      end: string;
+    };
+
+function resolveProfileDetailsParams(params: {
+  profileUrl?: string | null;
+  organizationSlug?: string | null;
+  projectSlugOrId?: string | number | null;
+  profileId?: string | null;
+  profilerId?: string | null;
+  start?: string | null;
+  end?: string | null;
+}): ResolvedProfileDetailsParams {
+  if (params.profileUrl) {
+    if (!isProfileUrl(params.profileUrl)) {
+      throw new UserInputError(
+        "Invalid profile URL. URL must point to a Sentry profile resource.",
+      );
+    }
+
+    const parsed = parseSentryUrl(params.profileUrl);
+    if (parsed.type !== "profile" || !parsed.projectSlug) {
+      throw new UserInputError(
+        "Invalid profile URL. URL must point to a Sentry profile resource.",
+      );
+    }
+
+    if (parsed.profileId) {
+      return {
+        mode: "transaction",
+        organizationSlug: resolveScopedOrganizationSlug({
+          resourceLabel: "Profile",
+          scopedOrganizationSlug: params.organizationSlug,
+          urlOrganizationSlug: parsed.organizationSlug,
+        }),
+        projectSlugOrId: resolveScopedProjectSlugOrId({
+          resourceLabel: "Profile",
+          scopedProjectSlugOrId: params.projectSlugOrId,
+          urlProjectSlug: parsed.projectSlug,
+        }),
+        profileId: parsed.profileId,
+      };
+    }
+
+    if (parsed.profilerId && parsed.start && parsed.end) {
+      return {
+        mode: "continuous",
+        organizationSlug: resolveScopedOrganizationSlug({
+          resourceLabel: "Profile",
+          scopedOrganizationSlug: params.organizationSlug,
+          urlOrganizationSlug: parsed.organizationSlug,
+        }),
+        projectSlugOrId: resolveScopedProjectSlugOrId({
+          resourceLabel: "Profile",
+          scopedProjectSlugOrId: params.projectSlugOrId,
+          urlProjectSlug: parsed.projectSlug,
+        }),
+        profilerId: parsed.profilerId,
+        start: parsed.start,
+        end: parsed.end,
+      };
+    }
+
+    throw new UserInputError(
+      "Continuous profile URLs must include `profilerId`, `start`, and `end` query parameters.",
+    );
+  }
+
+  const hasTransactionInput = Boolean(params.profileId);
+  const hasAnyContinuousInput = Boolean(
+    params.profilerId || params.start || params.end,
+  );
+
+  if (hasTransactionInput && hasAnyContinuousInput) {
+    throw new UserInputError(
+      "Provide either `profileId` for a transaction profile or `profilerId` + `start` + `end` for a continuous profile, not both.",
+    );
+  }
+
+  if (!params.organizationSlug || !params.projectSlugOrId) {
+    throw new UserInputError(
+      "Provide either `profileUrl` or both `organizationSlug` and `projectSlugOrId`.",
+    );
+  }
+
+  if (params.profileId) {
+    return {
+      mode: "transaction",
+      organizationSlug: params.organizationSlug,
+      projectSlugOrId: params.projectSlugOrId,
+      profileId: params.profileId,
+    };
+  }
+
+  if (params.profilerId && params.start && params.end) {
+    return {
+      mode: "continuous",
+      organizationSlug: params.organizationSlug,
+      projectSlugOrId: params.projectSlugOrId,
+      profilerId: params.profilerId,
+      start: params.start,
+      end: params.end,
+    };
+  }
+
+  throw new UserInputError(
+    "Provide either `profileId` for a transaction profile, or `profilerId`, `start`, and `end` for a continuous profile.",
+  );
+}
+
+async function resolveProjectContext(
+  apiService: ReturnType<typeof apiServiceFromContext>,
+  organizationSlug: string,
+  projectSlugOrId: string | number,
+  options: {
+    requireNumericId?: boolean;
+  } = {},
+): Promise<{ projectId: string | number; projectSlug: string }> {
+  const requireNumericId = options.requireNumericId ?? false;
+  const isNumericProject =
+    typeof projectSlugOrId === "number" || isNumericId(String(projectSlugOrId));
+
+  if (!isNumericProject && !requireNumericId) {
+    return {
+      projectId: projectSlugOrId,
+      projectSlug: String(projectSlugOrId),
+    };
+  }
+
+  const project = await apiService.getProject({
+    organizationSlug,
+    projectSlugOrId: String(projectSlugOrId),
+  });
+
+  return {
+    projectId: project.id,
+    projectSlug: project.slug,
+  };
+}
 
 export default defineTool({
   name: "get_profile_details",
@@ -15,68 +176,95 @@ export default defineTool({
   hideInExperimentalMode: true,
 
   description: [
-    "Retrieve raw profile chunk data to inspect individual function calls, threads, and stack traces.",
+    "Inspect a specific Sentry profile in detail.",
     "",
     "USE THIS TOOL WHEN:",
-    "- User wants to inspect raw profiling samples for a specific profiler session",
-    "- User needs to see individual thread activity and stack traces",
-    "- User wants detailed frame-level data (function names, file locations, call counts)",
+    "- User shares a transaction profile URL and wants the details",
+    "- User has a profile ID and wants a concise summary plus raw sample structure",
+    "- User needs to inspect a continuous profile session by profiler ID and time range",
     "",
     "RETURNS:",
-    "- Profile chunk metadata (platform, release, environment)",
-    "- Per-thread sample counts and names",
-    "- Top frames by occurrence with file locations",
-    "- User code vs library code breakdown",
+    "- Transaction profile summary with profile URL, transaction, trace, release, and runtime details",
+    "- Sample structure summaries such as frame count, sample count, stacks, and thread breakdown",
+    "- Top frames by occurrence for a quick hotspot overview",
     "",
-    "NOTE: This tool requires a `profilerId` which identifies a specific profiling session.",
-    "Use `get_profile` for aggregated flamegraph analysis by transaction name.",
+    "NOTE: This tool supports two profile modes.",
+    "- Transaction profiles: pass `profileUrl` or `organizationSlug` + `projectSlugOrId` + `profileId`",
+    "- Continuous profiles: pass `profileUrl` or `organizationSlug` + `projectSlugOrId` + `profilerId` + `start` + `end`",
     "",
     "<examples>",
-    "### Inspect a profiler session",
+    "### Transaction profile URL",
+    "```",
+    "get_profile_details(",
+    "  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/'",
+    ")",
+    "```",
+    "",
+    "### Transaction profile by ID",
+    "```",
+    "get_profile_details(",
+    "  organizationSlug='my-org',",
+    "  projectSlugOrId='backend',",
+    "  profileId='cfe78a5c892d4a64a962d837673398d2'",
+    ")",
+    "```",
+    "",
+    "### Continuous profile by session",
     "```",
     "get_profile_details(",
     "  organizationSlug='my-org',",
     "  projectSlugOrId='backend',",
     "  profilerId='041bde57b9844e36b8b7e5734efae5f7',",
-    "  start='2024-01-01T00:00:00',",
-    "  end='2024-01-01T01:00:00'",
+    "  start='2024-01-01T00:00:00Z',",
+    "  end='2024-01-01T01:00:00Z'",
     ")",
     "```",
     "</examples>",
-    "",
-    "<hints>",
-    "- Use `focusOnUserCode: true` (default) to filter out library/system frames",
-    "- The profilerId can be found in Sentry profile URLs or event data",
-    "</hints>",
   ].join("\n"),
 
   inputSchema: {
-    organizationSlug: ParamOrganizationSlug,
+    profileUrl: z
+      .string()
+      .url()
+      .optional()
+      .describe(
+        "Sentry transaction profile or continuous profile URL. If provided, organization, project, and profile identifiers are extracted from the URL.",
+      ),
+    organizationSlug: ParamOrganizationSlug.optional(),
     regionUrl: ParamRegionUrl.nullable().default(null),
     projectSlugOrId: z
       .union([z.string(), z.number()])
+      .optional()
       .describe("Project slug or numeric ID"),
+    profileId: z
+      .string()
+      .trim()
+      .optional()
+      .describe("Transaction profile ID from a profile flamegraph URL"),
     profilerId: z
       .string()
       .trim()
-      .describe("Profiler session ID (UUID from Sentry profile data)"),
+      .optional()
+      .describe("Continuous profiler session ID"),
     start: z
       .string()
       .trim()
+      .optional()
       .describe(
-        "Start time for the profile chunk query (ISO 8601 format, e.g., '2024-01-01T00:00:00')",
+        "Continuous profile start time in ISO 8601 format, for example '2024-01-01T00:00:00Z'",
       ),
     end: z
       .string()
       .trim()
+      .optional()
       .describe(
-        "End time for the profile chunk query (ISO 8601 format, e.g., '2024-01-01T01:00:00')",
+        "Continuous profile end time in ISO 8601 format, for example '2024-01-01T01:00:00Z'",
       ),
     focusOnUserCode: z
       .boolean()
       .default(true)
       .describe(
-        "Show only user code (in_app: true). Set to false to include library code.",
+        "Show only user code frames in the hotspot table. Set to false to include library frames.",
       ),
   },
 
@@ -87,44 +275,108 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
-    const {
-      organizationSlug,
-      projectSlugOrId,
-      profilerId,
-      start,
-      end,
-      focusOnUserCode,
-    } = params;
-
-    setTag("organization.slug", organizationSlug);
-    setTag("profiler.id", profilerId);
-
-    // Resolve project slug to numeric ID (profiling API requires numeric IDs)
-    let projectId: string | number;
-    if (
-      typeof projectSlugOrId === "number" ||
-      isNumericId(String(projectSlugOrId))
-    ) {
-      projectId = projectSlugOrId;
-      setTag("project.id", String(projectSlugOrId));
-    } else {
-      const project = await apiService.getProject({
-        organizationSlug,
-        projectSlugOrId: String(projectSlugOrId),
-      });
-      projectId = project.id;
-      setTag("project.slug", String(projectSlugOrId));
-      setTag("project.id", String(project.id));
-    }
-
-    const chunk = await apiService.getProfileChunk({
-      organizationSlug,
-      profilerId,
-      projectId,
-      start,
-      end,
+    const resolved = resolveProfileDetailsParams({
+      profileUrl: params.profileUrl,
+      organizationSlug: params.organizationSlug,
+      projectSlugOrId: params.projectSlugOrId,
+      profileId: params.profileId,
+      profilerId: params.profilerId,
+      start: params.start,
+      end: params.end,
     });
 
-    return formatProfileChunkAnalysis(chunk, { focusOnUserCode });
+    setTag("organization.slug", resolved.organizationSlug);
+
+    if (resolved.mode === "transaction") {
+      const { projectSlug } = await resolveProjectContext(
+        apiService,
+        resolved.organizationSlug,
+        resolved.projectSlugOrId,
+      );
+
+      setTag("profile.id", resolved.profileId);
+      setTag("project.slug", projectSlug);
+
+      const profile = await apiService.getTransactionProfile({
+        organizationSlug: resolved.organizationSlug,
+        projectSlugOrId: resolved.projectSlugOrId,
+        profileId: resolved.profileId,
+      });
+
+      const profileUrl =
+        params.profileUrl ??
+        apiService.getProfileUrl(
+          resolved.organizationSlug,
+          projectSlug,
+          resolved.profileId,
+        );
+
+      const traceUrl = profile.transaction?.trace_id
+        ? apiService.getTraceUrl(
+            resolved.organizationSlug,
+            profile.transaction.trace_id,
+          )
+        : undefined;
+
+      return formatTransactionProfileAnalysis(profile, {
+        focusOnUserCode: params.focusOnUserCode,
+        profileUrl,
+        projectSlug,
+        traceUrl,
+      });
+    }
+
+    setTag("profiler.id", resolved.profilerId);
+
+    const { projectId, projectSlug } = await resolveProjectContext(
+      apiService,
+      resolved.organizationSlug,
+      resolved.projectSlugOrId,
+      { requireNumericId: true },
+    );
+
+    setTag("project.slug", projectSlug);
+    setTag("project.id", String(projectId));
+
+    const chunk = await apiService.getProfileChunk({
+      organizationSlug: resolved.organizationSlug,
+      profilerId: resolved.profilerId,
+      projectId,
+      start: resolved.start,
+      end: resolved.end,
+    });
+
+    const profileUrl =
+      params.profileUrl ??
+      apiService.getContinuousProfileUrl(
+        resolved.organizationSlug,
+        projectSlug,
+        {
+          profilerId: resolved.profilerId,
+          start: resolved.start,
+          end: resolved.end,
+        },
+      );
+
+    const chunkAnalysis = formatProfileChunkAnalysis(chunk, {
+      focusOnUserCode: params.focusOnUserCode,
+    }).replace("# Profile Chunk Details", "## Raw Sample Analysis");
+
+    return [
+      `# Continuous Profile ${resolved.profilerId}`,
+      "",
+      "## Summary",
+      `- **Profile URL**: ${profileUrl}`,
+      `- **Project**: ${projectSlug}`,
+      `- **Profiler ID**: ${resolved.profilerId}`,
+      `- **Time Range**: ${resolved.start} to ${resolved.end}`,
+      `- **Platform**: ${chunk.platform}`,
+      `- **Release**: ${chunk.release}`,
+      chunk.environment ? `- **Environment**: ${chunk.environment}` : "",
+      "",
+      chunkAnalysis,
+    ]
+      .filter(Boolean)
+      .join("\n");
   },
 });

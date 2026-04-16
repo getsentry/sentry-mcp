@@ -29,6 +29,9 @@ import eventsSpansFixture from "./fixtures/events-spans.json" with {
 import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
+import profileDetailsFixture from "./fixtures/profile-details.json" with {
+  type: "json",
+};
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
 import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
@@ -98,6 +101,7 @@ export {
   eventsSpansEmptyFixture,
   eventsSpansFixture,
   flamegraphFixture,
+  profileDetailsFixture,
   issueFixture,
   issueFixture2,
   issueTagValuesFixture,

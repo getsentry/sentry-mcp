@@ -168,6 +168,26 @@ describe("parseIssueParams", () => {
     });
   });
 
+  it("should allow matching organizationSlug with issueUrl", () => {
+    expect(
+      parseIssueParams({
+        organizationSlug: "sentry",
+        issueUrl: "https://sentry.io/sentry/issues/123",
+      }),
+    ).toEqual({ organizationSlug: "sentry", issueId: "123" });
+  });
+
+  it("should reject issueUrl outside the active organization constraint", () => {
+    expect(() =>
+      parseIssueParams({
+        organizationSlug: "other-org",
+        issueUrl: "https://sentry.io/sentry/issues/123",
+      }),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[UserInputError: Issue URL is outside the active organization constraint. Expected organization "other-org" but got "sentry".]`,
+    );
+  });
+
   it("should throw if neither issueId nor issueUrl is provided", () => {
     expect(() =>
       parseIssueParams({ organizationSlug: "foo" }),

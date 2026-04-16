@@ -5,6 +5,7 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import {
   parseIssueParams,
   formatIssueOutput,
+  assertIssueWithinProjectConstraint,
 } from "../internal/tool-helpers/issue";
 import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { ApiNotFoundError } from "../api-client";
@@ -117,6 +118,10 @@ export default defineTool({
         }
         issue = found;
       }
+      assertIssueWithinProjectConstraint({
+        issue,
+        projectSlug: context.constraints.projectSlug,
+      });
       // For this call, we might want to provide context if it fails
       const [
         { event, performanceTrace },
@@ -205,6 +210,10 @@ export default defineTool({
       }
       throw error;
     }
+    assertIssueWithinProjectConstraint({
+      issue,
+      projectSlug: context.constraints.projectSlug,
+    });
 
     const [
       { event, performanceTrace },

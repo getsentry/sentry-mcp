@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { SentryApiService } from "../../api-client";
 import { agentTool } from "../../internal/agents/tools/utils";
 import { UserInputError } from "../../errors";
+import { resolveScopedOrganizationSlug } from "../../internal/url-scope";
 import {
   ISSUE_EVENT_TAGS,
   RECOMMENDED_FIELDS,
@@ -110,7 +111,11 @@ Received: ${params.issueUrl}`,
     }
 
     return {
-      organizationSlug: orgMatch[1],
+      organizationSlug: resolveScopedOrganizationSlug({
+        resourceLabel: "Issue",
+        scopedOrganizationSlug: params.organizationSlug,
+        urlOrganizationSlug: orgMatch[1],
+      }),
       issueId: orgMatch[2],
     };
   }

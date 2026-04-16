@@ -3,16 +3,28 @@ export const PUBLIC_EVENTS_DATASETS = [
   "errors",
   "logs",
   "metrics",
+  "profiles",
 ] as const;
 
 export type PublicEventsDataset = (typeof PUBLIC_EVENTS_DATASETS)[number];
-export type EventsApiDataset = "spans" | "errors" | "logs" | "tracemetrics";
+export type EventsApiDataset =
+  | "spans"
+  | "errors"
+  | "logs"
+  | "tracemetrics"
+  | "profiles";
 export type EventsDataset = PublicEventsDataset | "tracemetrics";
 
 export function isMetricsDataset(
   dataset: EventsDataset,
 ): dataset is "metrics" | "tracemetrics" {
   return dataset === "metrics" || dataset === "tracemetrics";
+}
+
+export function isProfilesDataset(
+  dataset: EventsDataset,
+): dataset is "profiles" {
+  return dataset === "profiles";
 }
 
 /**

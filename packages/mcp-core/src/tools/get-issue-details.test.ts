@@ -1554,4 +1554,27 @@ describe("get_issue_details", () => {
     // Verify we actually got a Sentry Event ID
     expect(sentryEventId).toMatch(/^[a-f0-9]{32}$/);
   });
+
+  it("rejects issues outside the active project constraint", async () => {
+    await expect(
+      getIssueDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          issueUrl: undefined,
+          eventId: undefined,
+          regionUrl: null,
+        },
+        {
+          ...baseContext,
+          constraints: {
+            ...baseContext.constraints,
+            projectSlug: "frontend",
+          },
+        },
+      ),
+    ).rejects.toThrow(
+      'Issue is outside the active project constraint. Expected project "frontend".',
+    );
+  });
 });

@@ -2,7 +2,10 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { parseIssueParams } from "../internal/tool-helpers/issue";
+import {
+  ensureIssueWithinProjectConstraint,
+  parseIssueParams,
+} from "../internal/tool-helpers/issue";
 import {
   getStatusDisplayName,
   isTerminalStatus,
@@ -95,6 +98,13 @@ export default defineTool({
       });
 
     setTag("organization.slug", orgSlug);
+
+    await ensureIssueWithinProjectConstraint({
+      apiService,
+      organizationSlug: orgSlug,
+      issueId: parsedIssueId!,
+      projectSlug: context.constraints.projectSlug,
+    });
 
     let output = `# Seer Analysis for Issue ${parsedIssueId}\n\n`;
 

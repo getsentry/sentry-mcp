@@ -1,6 +1,7 @@
 import type { SentryApiService } from "../../api-client";
 import { formatUserGeoSummary } from "../../internal/user-formatting";
 import { logInfo } from "../../telem/logging";
+import { formatDuration } from "../profile/analyzer";
 import {
   type FlexibleEventData,
   formatEventValue,
@@ -476,6 +477,201 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
   return output;
 }
 
+function getProfileDurationLabel(
+  field: string,
+  value: unknown,
+): string | undefined {
+  if (
+    (field === "transaction.duration" || field === "profile.duration") &&
+    typeof value === "number"
+  ) {
+    return formatDuration(value);
+  }
+
+  return undefined;
+}
+
+function getProfileProject(event: FlexibleEventData): string | null {
+  return getStringValue(event, "project") || null;
+}
+
+function getProfileTimestampValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    return trimmedValue.length > 0 ? trimmedValue : null;
+  }
+
+  return null;
+}
+
+function getProfileDetailUrl(
+  apiService: SentryApiService,
+  organizationSlug: string,
+  event: FlexibleEventData,
+): string | null {
+  const project = getProfileProject(event);
+  if (!project) {
+    return null;
+  }
+
+  const profileId = getStringValue(event, "profile.id");
+  if (profileId) {
+    return apiService.getProfileUrl(organizationSlug, project, profileId);
+  }
+
+  const profilerId = getStringValue(event, "profiler.id");
+  const start = getProfileTimestampValue(event["precise.start_ts"]);
+  const end = getProfileTimestampValue(event["precise.finish_ts"]);
+  if (profilerId && start && end) {
+    return apiService.getContinuousProfileUrl(organizationSlug, project, {
+      profilerId,
+      start,
+      end,
+    });
+  }
+
+  return null;
+}
+
+export function formatProfileResults(params: FormatEventResultsParams): string {
+  const {
+    eventData,
+    naturalLanguageQuery,
+    includeExplanation,
+    apiService,
+    organizationSlug,
+    explorerUrl,
+    sentryQuery,
+    fields,
+    explanation,
+  } = params;
+
+  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+
+  if (isAggregateQuery(fields)) {
+    output += `⚠️ **IMPORTANT**: Display these profile aggregates as a data table with proper column alignment and readable duration units.\n\n`;
+  } else {
+    output += `⚠️ **IMPORTANT**: Display these profiles as concise cards, highlighting the profile identifier, transaction, duration, release, and trace context.\n\n`;
+  }
+
+  if (includeExplanation && explanation) {
+    output += formatExplanation(explanation);
+    output += `\n\n`;
+  }
+
+  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
+  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+
+  if (eventData.length === 0) {
+    logInfo(`No profile events found for query: ${naturalLanguageQuery}`, {
+      extra: {
+        query: sentryQuery,
+        fields,
+        organizationSlug,
+        dataset: "profiles",
+      },
+    });
+    output += "No results found.\n\n";
+    output +=
+      "Try narrowing the transaction, release, platform, or profile filters.\n";
+    return output;
+  }
+
+  output += `Found ${eventData.length} ${isAggregateQuery(fields) ? `aggregate result${eventData.length === 1 ? "" : "s"}` : `profile${eventData.length === 1 ? "" : "s"}`}:\n\n`;
+
+  if (isAggregateQuery(fields)) {
+    output += "```json\n";
+    output += JSON.stringify(eventData, null, 2);
+    output += "\n```\n\n";
+  } else {
+    const priorityFields = [
+      "profile.id",
+      "profiler.id",
+      "thread.id",
+      "transaction",
+      "timestamp",
+      "transaction.duration",
+      "release",
+      "environment",
+      "project",
+      "trace",
+      "precise.start_ts",
+      "precise.finish_ts",
+    ];
+
+    for (const event of eventData) {
+      const title =
+        getStringValue(event, "transaction") ||
+        getStringValue(event, "profile.id") ||
+        getStringValue(event, "profiler.id") ||
+        "Profile";
+      const detailUrl = getProfileDetailUrl(
+        apiService,
+        organizationSlug,
+        event,
+      );
+
+      output += `## ${title}\n\n`;
+
+      if (detailUrl) {
+        output += `**Profile URL**: ${detailUrl}\n`;
+      }
+
+      for (const field of priorityFields) {
+        if (
+          field in event &&
+          event[field] !== null &&
+          event[field] !== undefined
+        ) {
+          const value = event[field];
+          const durationLabel = getProfileDurationLabel(field, value);
+
+          if (field === "trace" && typeof value === "string") {
+            output += `**Trace ID**: ${value}\n`;
+            output += `**Trace URL**: ${apiService.getTraceUrl(organizationSlug, value)}\n`;
+          } else if (durationLabel) {
+            output += `**${field}**: ${durationLabel}\n`;
+          } else {
+            output += `**${field}**: ${formatEventValue(value)}\n`;
+          }
+        }
+      }
+
+      const displayedFields = new Set([...priorityFields, "id"]);
+      for (const [key, value] of Object.entries(event)) {
+        if (
+          !displayedFields.has(key) &&
+          value !== null &&
+          value !== undefined
+        ) {
+          if (key === "user" && typeof value === "object" && value !== null) {
+            for (const line of formatUserFieldLines(
+              value as Record<string, unknown>,
+            )) {
+              output += `${line}\n`;
+            }
+            continue;
+          }
+
+          output += `**${key}**: ${formatEventValue(value)}\n`;
+        }
+      }
+
+      output += "\n";
+    }
+  }
+
+  output += "## Next Steps\n\n";
+  output +=
+    "- Open a Profile URL above when available, or pass the profile identifiers to `get_profile_details` for the full detail view\n";
+  output +=
+    "- Open the Trace URL for an end-to-end view of the profiled request when available\n";
+  output +=
+    "- Refine the profiling search in Sentry by transaction, release, platform, or environment\n";
+
+  return output;
+}
+
 /**
  * Format trace metric results for display
  */
@@ -595,6 +791,10 @@ export function formatTraceMetricsResults(
   output += "## Next Steps\n\n";
   output +=
     "- Open the Metrics page link above to refine the selected metric\n";
+  output +=
+    "- Drill into a specific sample by opening its Trace URL or using `get_sentry_resource` with that trace ID\n";
+  output +=
+    "- Metrics do not expose a standalone detail resource here; use the related trace for deeper inspection\n";
   output +=
     "- Group by additional attributes to break down the metric further\n";
   output +=

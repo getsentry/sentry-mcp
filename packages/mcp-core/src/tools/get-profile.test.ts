@@ -374,5 +374,32 @@ describe("get_profile", () => {
         `[UserInputError: Invalid profile URL. URL must be a Sentry profile URL (containing /profiling/profile/).]`,
       );
     });
+
+    it("rejects profile URLs outside the active constrained session", async () => {
+      await expect(
+        getProfile.handler(
+          {
+            profileUrl:
+              "https://other-org.sentry.io/explore/profiling/profile/frontend/flamegraph/?profilerId=abc123",
+            organizationSlug: "sentry-mcp-evals",
+            projectSlugOrId: "cloudflare-mcp",
+            transactionName: "/api/users",
+            statsPeriod: "7d",
+            focusOnUserCode: true,
+            maxHotPaths: 5,
+            regionUrl: null,
+          },
+          {
+            constraints: {
+              organizationSlug: null,
+            },
+            accessToken: "access-token",
+            userId: "1",
+          },
+        ),
+      ).rejects.toThrow(
+        'Profile URL is outside the active organization constraint. Expected organization "sentry-mcp-evals" but got "other-org".',
+      );
+    });
   });
 });

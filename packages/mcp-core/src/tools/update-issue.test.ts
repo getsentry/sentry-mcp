@@ -717,6 +717,30 @@ describe("update_issue", () => {
     );
   });
 
+  it("rejects issues outside the active project constraint", async () => {
+    await expect(
+      updateIssue.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "resolved",
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        {
+          ...serverContext,
+          constraints: {
+            ...serverContext.constraints,
+            projectSlug: "frontend",
+          },
+        },
+      ),
+    ).rejects.toThrow(
+      'Issue is outside the active project constraint. Expected project "frontend".',
+    );
+  });
+
   it("validates update parameters", async () => {
     await expect(
       updateIssue.handler(

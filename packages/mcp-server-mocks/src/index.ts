@@ -56,6 +56,9 @@ import eventsSpansFixture from "./fixtures/events-spans.json" with {
 import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
+import profileDetailsFixture from "./fixtures/profile-details.json" with {
+  type: "json",
+};
 import profileChunkFixture from "./fixtures/profile-chunk.json" with {
   type: "json",
 };
@@ -384,6 +387,27 @@ export const restHandlers = buildHandlers([
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/",
     fetch: () => {
       return HttpResponse.json(projectFixture);
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/:organizationSlug/:projectSlugOrId/",
+    fetch: ({ params }) => {
+      const projectSlugOrId = String(params.projectSlugOrId);
+      const numericProjectId = Number(projectSlugOrId);
+
+      return HttpResponse.json({
+        ...projectFixture,
+        id: Number.isNaN(numericProjectId)
+          ? projectFixture.id
+          : numericProjectId,
+        slug: Number.isNaN(numericProjectId)
+          ? projectSlugOrId
+          : projectFixture.slug,
+        name: Number.isNaN(numericProjectId)
+          ? projectSlugOrId
+          : projectFixture.name,
+      });
     },
   },
   {
@@ -1049,6 +1073,25 @@ export const restHandlers = buildHandlers([
       return HttpResponse.json(profileChunkFixture);
     },
   },
+  {
+    method: "get",
+    path: "/api/0/organizations/:organizationSlug/profiling/chunks/",
+    fetch: () => {
+      return HttpResponse.json(profileChunkFixture);
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/:organizationSlug/:projectSlugOrId/profiling/profiles/:profileId/",
+    fetch: ({ params }) => {
+      const profileId = String(params.profileId);
+      return HttpResponse.json({
+        ...profileDetailsFixture,
+        event_id: profileId,
+        profile_id: profileId,
+      });
+    },
+  },
   // Event attachment endpoints
   {
     method: "get",
@@ -1368,6 +1411,7 @@ export {
   traceMixedFixture,
   traceEventFixture,
   flamegraphFixture,
+  profileDetailsFixture,
   organizationFixture,
   releaseFixture,
   clientKeyFixture,

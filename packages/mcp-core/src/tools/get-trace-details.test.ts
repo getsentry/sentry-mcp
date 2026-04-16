@@ -137,6 +137,54 @@ describe("get_trace_details", () => {
     ).rejects.toThrow("Trace ID must be a 32-character hexadecimal string");
   });
 
+  it("rejects traces outside the active project constraint", async () => {
+    const traceId = "a4d1aae7216b47ff8117cf4e09ce9d0a";
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/frontend/",
+        () =>
+          HttpResponse.json({
+            id: "9999999999999999",
+            slug: "frontend",
+            name: "frontend",
+          }),
+        { once: true },
+      ),
+      http.get(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
+        ({ request }) => {
+          const url = new URL(request.url);
+          if (url.searchParams.get("project") === "9999999999999999") {
+            return HttpResponse.json([]);
+          }
+          return HttpResponse.json(traceFixture);
+        },
+        { once: true },
+      ),
+    );
+
+    await expect(
+      getTraceDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          traceId,
+          regionUrl: null,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            projectSlug: "frontend",
+          },
+          accessToken: "access-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(
+      'Trace is outside the active project constraint. Expected project "frontend".',
+    );
+  });
+
   it("handles empty trace response", async () => {
     mswServer.use(
       http.get(

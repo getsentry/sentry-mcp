@@ -1,6 +1,9 @@
 import { z } from "zod";
 import {
+  getContinuousProfileUrl as getContinuousProfileUrlUtil,
   getIssueUrl as getIssueUrlUtil,
+  getProfileUrl as getProfileUrlUtil,
+  getProfilingExplorerUrl,
   getReplayUrl as getReplayUrlUtil,
   getReplaysSearchUrl as getReplaysSearchUrlUtil,
   getTraceMetricsExploreUrl,
@@ -10,6 +13,7 @@ import {
 } from "../utils/url-utils";
 import {
   isMetricsDataset,
+  isProfilesDataset,
   normalizeEventsDataset,
   type EventsDataset,
 } from "../utils/events-datasets";
@@ -42,6 +46,7 @@ import {
   UserRegionsSchema,
   FlamegraphSchema,
   ProfileChunkResponseSchema,
+  TransactionProfileSchema,
   ReplayDetailsSchema,
   ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
@@ -74,6 +79,7 @@ import type {
   User,
   Flamegraph,
   ProfileChunk,
+  TransactionProfile,
   ReplayDetails,
   ReplayList,
   ReplayRecordingSegments,
@@ -535,6 +541,36 @@ export class SentryApiService {
     return getReplayUrlUtil(this.host, organizationSlug, replayId);
   }
 
+  getProfileUrl(
+    organizationSlug: string,
+    projectSlug: string,
+    profileId: string,
+  ): string {
+    return getProfileUrlUtil(
+      this.host,
+      organizationSlug,
+      projectSlug,
+      profileId,
+    );
+  }
+
+  getContinuousProfileUrl(
+    organizationSlug: string,
+    projectSlug: string,
+    options: {
+      profilerId: string;
+      start: string;
+      end: string;
+    },
+  ): string {
+    return getContinuousProfileUrlUtil(
+      this.host,
+      organizationSlug,
+      projectSlug,
+      options,
+    );
+  }
+
   getReplaysSearchUrl(
     organizationSlug: string,
     options: Parameters<typeof getReplaysSearchUrlUtil>[2] = {},
@@ -864,6 +900,20 @@ export class SentryApiService {
         aggregateFunctions,
         groupByFields,
         traceMetrics: this.extractTraceMetricsFromResults(eventData),
+      });
+    }
+
+    if (isProfilesDataset(dataset)) {
+      return getProfilingExplorerUrl(this.host, organizationSlug, {
+        query,
+        projectId,
+        fields,
+        sort,
+        statsPeriod,
+        start,
+        end,
+        aggregateFunctions,
+        groupByFields,
       });
     }
 
@@ -2273,7 +2323,7 @@ export class SentryApiService {
     fields: string[];
     limit: number;
     projectId?: string;
-    dataset?: "errors" | "tracemetrics";
+    dataset?: "errors" | "tracemetrics" | "profiles";
     statsPeriod?: string;
     start?: string;
     end?: string;
@@ -2435,7 +2485,8 @@ export class SentryApiService {
 
     if (
       normalizedDataset === "errors" ||
-      normalizedDataset === "tracemetrics"
+      normalizedDataset === "tracemetrics" ||
+      normalizedDataset === "profiles"
     ) {
       // Use Discover API query builder
       queryParams = this.buildDiscoverApiQuery({
@@ -2674,6 +2725,23 @@ export class SentryApiService {
     const path = `/organizations/${organizationSlug}/profiling/flamegraph/?${queryParams.toString()}`;
     const body = await this.requestJSON(path, undefined, opts);
     return FlamegraphSchema.parse(body);
+  }
+
+  async getTransactionProfile(
+    {
+      organizationSlug,
+      projectSlugOrId,
+      profileId,
+    }: {
+      organizationSlug: string;
+      projectSlugOrId: string | number;
+      profileId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TransactionProfile> {
+    const path = `/projects/${organizationSlug}/${projectSlugOrId}/profiling/profiles/${profileId}/`;
+    const body = await this.requestJSON(path, undefined, opts);
+    return TransactionProfileSchema.parse(body);
   }
 
   /**

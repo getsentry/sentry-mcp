@@ -479,10 +479,15 @@
   },
   {
     "name": "get_profile_details",
-    "description": "Retrieve raw profile chunk data to inspect individual function calls, threads, and stack traces.\n\nUSE THIS TOOL WHEN:\n- User wants to inspect raw profiling samples for a specific profiler session\n- User needs to see individual thread activity and stack traces\n- User wants detailed frame-level data (function names, file locations, call counts)\n\nRETURNS:\n- Profile chunk metadata (platform, release, environment)\n- Per-thread sample counts and names\n- Top frames by occurrence with file locations\n- User code vs library code breakdown\n\nNOTE: This tool requires a `profilerId` which identifies a specific profiling session.\nUse `get_profile` for aggregated flamegraph analysis by transaction name.\n\n<examples>\n### Inspect a profiler session\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profilerId='041bde57b9844e36b8b7e5734efae5f7',\n  start='2024-01-01T00:00:00',\n  end='2024-01-01T01:00:00'\n)\n```\n</examples>\n\n<hints>\n- Use `focusOnUserCode: true` (default) to filter out library/system frames\n- The profilerId can be found in Sentry profile URLs or event data\n</hints>",
+    "description": "Inspect a specific Sentry profile in detail.\n\nUSE THIS TOOL WHEN:\n- User shares a transaction profile URL and wants the details\n- User has a profile ID and wants a concise summary plus raw sample structure\n- User needs to inspect a continuous profile session by profiler ID and time range\n\nRETURNS:\n- Transaction profile summary with profile URL, transaction, trace, release, and runtime details\n- Sample structure summaries such as frame count, sample count, stacks, and thread breakdown\n- Top frames by occurrence for a quick hotspot overview\n\nNOTE: This tool supports two profile modes.\n- Transaction profiles: pass `profileUrl` or `organizationSlug` + `projectSlugOrId` + `profileId`\n- Continuous profiles: pass `profileUrl` or `organizationSlug` + `projectSlugOrId` + `profilerId` + `start` + `end`\n\n<examples>\n### Transaction profile URL\n```\nget_profile_details(\n  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/'\n)\n```\n\n### Transaction profile by ID\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profileId='cfe78a5c892d4a64a962d837673398d2'\n)\n```\n\n### Continuous profile by session\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profilerId='041bde57b9844e36b8b7e5734efae5f7',\n  start='2024-01-01T00:00:00Z',\n  end='2024-01-01T01:00:00Z'\n)\n```\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "profileUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "Sentry transaction profile or continuous profile URL. If provided, organization, project, and profile identifiers are extracted from the URL."
+        },
         "organizationSlug": {
           "type": "string",
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
@@ -504,31 +509,28 @@
           "type": ["string", "number"],
           "description": "Project slug or numeric ID"
         },
+        "profileId": {
+          "type": "string",
+          "description": "Transaction profile ID from a profile flamegraph URL"
+        },
         "profilerId": {
           "type": "string",
-          "description": "Profiler session ID (UUID from Sentry profile data)"
+          "description": "Continuous profiler session ID"
         },
         "start": {
           "type": "string",
-          "description": "Start time for the profile chunk query (ISO 8601 format, e.g., '2024-01-01T00:00:00')"
+          "description": "Continuous profile start time in ISO 8601 format, for example '2024-01-01T00:00:00Z'"
         },
         "end": {
           "type": "string",
-          "description": "End time for the profile chunk query (ISO 8601 format, e.g., '2024-01-01T01:00:00')"
+          "description": "Continuous profile end time in ISO 8601 format, for example '2024-01-01T01:00:00Z'"
         },
         "focusOnUserCode": {
           "type": "boolean",
           "default": true,
-          "description": "Show only user code (in_app: true). Set to false to include library code."
+          "description": "Show only user code frames in the hotspot table. Set to false to include library frames."
         }
       },
-      "required": [
-        "organizationSlug",
-        "projectSlugOrId",
-        "profilerId",
-        "start",
-        "end"
-      ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
@@ -603,7 +605,7 @@
   },
   {
     "name": "list_events",
-    "description": "Search events or replays using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_events instead.\nFor dataset='replays', this tool returns replay sessions directly and does not support aggregate fields like count().\n\nDatasets:\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, traces, AI/LLM calls\n- metrics: Newer span metrics, counters, gauges, and distributions\n- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users\n\nQuery Syntax Examples:\n- message:\"connection timeout\"\n- level:error\n- span.op:http.client span.status_code:500\n- log.level:error\n- transaction:/api/users\n\n<examples>\nlist_events(organizationSlug='my-org', dataset='errors', query='level:error')\nlist_events(organizationSlug='my-org', dataset='spans', query='span.op:db')\nlist_events(organizationSlug='my-org', dataset='logs', query='severity:error')\nlist_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\nlist_events(organizationSlug='my-org', dataset='replays', query='count_errors:>0', sort='-count_errors')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
+    "description": "Search events or replays using Sentry query syntax directly (no AI/LLM required).\n\nUse this tool when:\n- You know Sentry query syntax already\n- AI-powered search is unavailable (no OPENAI_API_KEY or ANTHROPIC_API_KEY)\n- You want precise control over the query\n\nFor natural language queries, use search_events instead.\nFor dataset='replays', this tool returns replay sessions directly and does not support aggregate fields like count().\n\nDatasets:\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, traces, AI/LLM calls\n- metrics: Newer span metrics, counters, gauges, and distributions\n- profiles: Transaction and continuous profile rows, profile IDs, profiled transactions, and releases\n- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users\n\nQuery Syntax Examples:\n- message:\"connection timeout\"\n- level:error\n- span.op:http.client span.status_code:500\n- log.level:error\n- transaction:/api/users\n\n<examples>\nlist_events(organizationSlug='my-org', dataset='errors', query='level:error')\nlist_events(organizationSlug='my-org', dataset='spans', query='span.op:db')\nlist_events(organizationSlug='my-org', dataset='logs', query='severity:error')\nlist_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\nlist_events(organizationSlug='my-org', dataset='replays', query='count_errors:>0', sort='-count_errors')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -613,9 +615,9 @@
         },
         "dataset": {
           "type": "string",
-          "enum": ["spans", "errors", "logs", "metrics", "replays"],
+          "enum": ["spans", "errors", "logs", "metrics", "profiles", "replays"],
           "default": "errors",
-          "description": "Dataset to query: errors (exceptions), logs (entries), spans (traces), metrics (newer span metrics), or replays (session replay results)"
+          "description": "Dataset to query: errors, logs, spans, metrics, profiles, or replays. Profiles returns transaction and continuous profile rows; replays returns replay sessions."
         },
         "query": {
           "type": "string",
@@ -1017,7 +1019,7 @@
   },
   {
     "name": "search_events",
-    "description": "Search across Sentry events and replays. This is the ONLY tool for statistics and counts on event datasets.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'\n2. Individual events with timestamps: 'show me error logs from last hour'\n\nUSE THIS FOR ALL COUNTS/STATISTICS:\n- 'how many errors today' → returns count\n- 'count of database failures' → returns count\n- 'total number of issues' → returns count\n- 'average response time' → returns avg()\n- 'sum of tokens used' → returns sum()\n\nALSO USE FOR INDIVIDUAL EVENTS OR REPLAY LISTS:\n- 'error logs from last hour' → returns event list\n- 'database errors with timestamps' → returns event list\n- 'trace spans for slow API calls' → returns span list\n- 'checkout replays with errors this week' → returns replay list\n\nDataset Selection (AI automatically chooses):\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, AI/LLM calls, token usage\n- metrics: Newer span metrics, metric values, counters, gauges, and distributions\n- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users\n\nReplay searches on this tool return replay lists only. Replay count()/avg()/sum() aggregations are not supported.\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n</hints>",
+    "description": "Search Sentry events and replays. This is the ONLY tool for counts/statistics on event datasets.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'count of issues', 'total tokens'\n2. Individual events with timestamps: 'show me error logs from last hour'\n\nUSE THIS FOR ALL COUNTS/STATISTICS:\n- 'how many errors today' → returns count\n- 'count of database failures' → returns count\n- 'total number of issues' → returns count\n- 'average response time' → returns avg()\n- 'sum of tokens used' → returns sum()\n\nALSO USE FOR INDIVIDUAL EVENTS OR REPLAY LISTS:\n- 'error logs from last hour' → returns event list\n- 'database errors with timestamps' → returns event list\n- 'trace spans for slow API calls' → returns span list\n- 'checkout replays with errors' → returns replay list\n\nDataset Selection (AI automatically chooses):\n- errors: Exception/crash events\n- logs: Log entries\n- spans: Performance data, AI/LLM calls, token usage\n- metrics: Newer span metrics, metric values, counters, gauges, and distributions\n- profiles: Transaction and continuous profile results, profile IDs, and profiled transactions\n- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users\n\nReplay searches on this tool return replay lists only. Replay count()/avg()/sum() aggregations are not supported.\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='count of database failures this week')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='total tokens used by model')\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='error logs from the last hour')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {

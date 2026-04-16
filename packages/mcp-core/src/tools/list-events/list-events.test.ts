@@ -28,8 +28,37 @@ describe("list_events", () => {
       getServerContext(),
     );
 
-    expect(result).toContain("Search Results");
-    expect(result).toContain("View these results in Sentry");
+    expect(result).toMatchInlineSnapshot(`
+      "# Search Results for "errors events"
+
+      ⚠️ **IMPORTANT**: Display these aggregate results as a data table with proper column alignment and formatting.
+
+      **View these results in Sentry**:
+      https://sentry-mcp-evals.sentry.io/explore/discover/homepage/?dataset=errors&queryDataset=error-events&query=&field=issue&field=title&field=project&field=last_seen%28%29&field=count%28%29&sort=-count&statsPeriod=14d&mode=aggregate&yAxis=last_seen%28%29
+      _Please share this link with the user to view the search results in their Sentry dashboard._
+
+      Found 1 aggregate result:
+
+      \`\`\`json
+      [
+        {
+          "issue.id": 6114575469,
+          "title": "Error: Tool list_organizations is already registered",
+          "project": "test-suite",
+          "count()": 2,
+          "last_seen()": "2025-04-07T12:23:39+00:00",
+          "issue": "CLOUDFLARE-MCP-41"
+        }
+      ]
+      \`\`\`
+
+      ## Next Steps
+
+      - Get more details about a specific error: Use the Issue ID
+      - View error groups: Navigate to the Issues page in Sentry
+      - Set up alerts: Configure alert rules for these error patterns
+      "
+    `);
   });
 
   // Note: Spans test skipped because the mock requires very strict parameters (useRpc=1, specific sort)
@@ -120,6 +149,60 @@ describe("list_events", () => {
     });
     expect(metricQuery.mode).toBe("samples");
     expect(metricQuery.aggregateFields).toEqual([{ yAxes: ["sum(value)"] }]);
+  });
+
+  it("returns formatted profile results with profile detail links", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("profiles");
+          return HttpResponse.json({
+            data: [
+              {
+                project: "backend",
+                "profile.id": "cfe78a5c892d4a64a962d837673398d2",
+                "profiler.id": null,
+                "thread.id": null,
+                timestamp: "2025-01-15T10:00:00Z",
+                transaction: "/api/users",
+                "transaction.duration": 120000000,
+                release: "backend@1.2.3",
+                environment: "production",
+                trace: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+                "precise.start_ts": "2025-01-15T10:00:00Z",
+                "precise.finish_ts": "2025-01-15T10:00:00.120Z",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await listEvents.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        dataset: "profiles",
+        query: "transaction:/api/users",
+        fields: null,
+        sort: "-timestamp",
+        projectSlug: null,
+        environment: null,
+        statsPeriod: "14d",
+        limit: 10,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    expect(result).toContain(
+      "https://sentry-mcp-evals.sentry.io/explore/profiling/",
+    );
+    expect(result).toContain(
+      "https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/",
+    );
+    expect(result).toContain("**transaction.duration**: 120ms");
   });
 
   it("returns formatted replay results when dataset is replays", async () => {
