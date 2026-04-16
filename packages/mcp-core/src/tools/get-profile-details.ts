@@ -8,6 +8,10 @@ import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 import { isNumericId } from "../utils/slug-validation";
 import { parseSentryUrl, isProfileUrl } from "../internal/url-helpers";
 import {
+  resolveScopedOrganizationSlug,
+  resolveScopedProjectSlugOrId,
+} from "../internal/url-scope";
+import {
   formatProfileChunkAnalysis,
   formatTransactionProfileAnalysis,
 } from "./profile/formatter";
@@ -54,8 +58,16 @@ function resolveProfileDetailsParams(params: {
     if (parsed.profileId) {
       return {
         mode: "transaction",
-        organizationSlug: parsed.organizationSlug,
-        projectSlugOrId: parsed.projectSlug,
+        organizationSlug: resolveScopedOrganizationSlug({
+          resourceLabel: "Profile",
+          scopedOrganizationSlug: params.organizationSlug,
+          urlOrganizationSlug: parsed.organizationSlug,
+        }),
+        projectSlugOrId: resolveScopedProjectSlugOrId({
+          resourceLabel: "Profile",
+          scopedProjectSlugOrId: params.projectSlugOrId,
+          urlProjectSlug: parsed.projectSlug,
+        }),
         profileId: parsed.profileId,
       };
     }
@@ -63,8 +75,16 @@ function resolveProfileDetailsParams(params: {
     if (parsed.profilerId && parsed.start && parsed.end) {
       return {
         mode: "continuous",
-        organizationSlug: parsed.organizationSlug,
-        projectSlugOrId: parsed.projectSlug,
+        organizationSlug: resolveScopedOrganizationSlug({
+          resourceLabel: "Profile",
+          scopedOrganizationSlug: params.organizationSlug,
+          urlOrganizationSlug: parsed.organizationSlug,
+        }),
+        projectSlugOrId: resolveScopedProjectSlugOrId({
+          resourceLabel: "Profile",
+          scopedProjectSlugOrId: params.projectSlugOrId,
+          urlProjectSlug: parsed.projectSlug,
+        }),
         profilerId: parsed.profilerId,
         start: parsed.start,
         end: parsed.end,

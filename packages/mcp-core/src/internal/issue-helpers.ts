@@ -8,6 +8,7 @@
  */
 
 import { UserInputError } from "../errors";
+import { resolveScopedOrganizationSlug } from "./url-scope";
 
 /**
  * Extracts the Sentry issue ID and organization slug from a full URL
@@ -141,7 +142,11 @@ export function parseIssueParams({
       );
     }
     return {
-      ...resolved,
+      organizationSlug: resolveScopedOrganizationSlug({
+        resourceLabel: "Issue",
+        scopedOrganizationSlug: organizationSlug,
+        urlOrganizationSlug: resolved.organizationSlug,
+      }),
       issueId: parseIssueId(resolved.issueId),
     };
   }

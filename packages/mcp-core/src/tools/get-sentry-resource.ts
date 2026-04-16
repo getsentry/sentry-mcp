@@ -5,9 +5,14 @@ import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug } from "../schema";
 import { parseSentryUrl, type ParsedSentryUrl } from "../internal/url-helpers";
+import {
+  resolveScopedOrganizationSlug,
+  resolveScopedProjectSlug,
+} from "../internal/url-scope";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { ApiNotFoundError } from "../api-client";
 import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
+import { ensureIssueWithinProjectConstraint } from "../internal/tool-helpers/issue";
 import { fetchAndFormatBreadcrumbs } from "../internal/tool-helpers/breadcrumbs";
 import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
@@ -62,6 +67,7 @@ export function resolveResourceParams(params: {
   resourceType?: string | null;
   resourceId?: string | null;
   organizationSlug?: string | null;
+  projectSlug?: string | null;
 }): ResolvedResourceParams {
   if (params.url) {
     const parsed = parseSentryUrl(params.url);
@@ -143,9 +149,18 @@ export function resolveResourceParams(params: {
  */
 function resolveFromParsedUrl(
   parsed: ParsedSentryUrl,
-  params: { resourceType?: string | null },
+  params: {
+    resourceType?: string | null;
+    organizationSlug?: string | null;
+    projectSlug?: string | null;
+  },
 ): ResolvedResourceParams {
-  const { type: detectedType, organizationSlug } = parsed;
+  const { type: detectedType } = parsed;
+  const organizationSlug = resolveScopedOrganizationSlug({
+    resourceLabel: "Sentry resource",
+    scopedOrganizationSlug: params.organizationSlug,
+    urlOrganizationSlug: parsed.organizationSlug,
+  });
 
   if (detectedType === "unknown") {
     if (parsed.transaction) {
@@ -221,7 +236,11 @@ function resolveFromParsedUrl(
       return {
         type: "profile",
         organizationSlug,
-        projectSlug: parsed.projectSlug,
+        projectSlug: resolveScopedProjectSlug({
+          resourceLabel: "Profile",
+          scopedProjectSlug: params.projectSlug,
+          urlProjectSlug: parsed.projectSlug,
+        }),
         profileId: parsed.profileId,
         profilerId: parsed.profilerId,
         start: parsed.start,
@@ -246,7 +265,13 @@ function resolveFromParsedUrl(
         type: "monitor",
         organizationSlug,
         monitorSlug: parsed.monitorSlug,
-        projectSlug: parsed.projectSlug,
+        projectSlug: parsed.projectSlug
+          ? resolveScopedProjectSlug({
+              resourceLabel: "Monitor",
+              scopedProjectSlug: params.projectSlug,
+              urlProjectSlug: parsed.projectSlug,
+            })
+          : undefined,
       };
 
     case "release":
@@ -365,7 +390,9 @@ export default defineTool({
       url: params.url,
       resourceType: params.resourceType,
       resourceId: params.resourceId,
-      organizationSlug: params.organizationSlug,
+      organizationSlug:
+        params.organizationSlug ?? context.constraints.organizationSlug,
+      projectSlug: context.constraints.projectSlug,
     });
 
     setTag("resource.type", resolved.type);
@@ -411,6 +438,12 @@ export default defineTool({
       case "breadcrumbs": {
         const apiService = apiServiceFromContext(context);
         try {
+          await ensureIssueWithinProjectConstraint({
+            apiService,
+            organizationSlug: resolved.organizationSlug,
+            issueId: resolved.issueId!,
+            projectSlug: context.constraints.projectSlug,
+          });
           return await fetchAndFormatBreadcrumbs(
             apiService,
             resolved.organizationSlug,

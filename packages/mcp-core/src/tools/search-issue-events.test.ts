@@ -237,6 +237,30 @@ describe("search_issue_events", () => {
     expect(result).toContain("Events in issue 123");
   });
 
+  it("rejects issues outside the active project constraint", async () => {
+    await expect(
+      searchIssueEvents.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          naturalLanguageQuery: "from last hour",
+          projectSlug: null,
+          regionUrl: null,
+          limit: 50,
+          includeExplanation: false,
+        },
+        {
+          ...mockContext,
+          constraints: {
+            projectSlug: "frontend",
+          },
+        },
+      ),
+    ).rejects.toThrow(
+      'Issue is outside the active project constraint. Expected project "frontend".',
+    );
+  });
+
   it("should pass user filters to the query parameter", async () => {
     mockGenerateText.mockResolvedValue(
       mockAIResponse(

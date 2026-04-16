@@ -147,6 +147,45 @@ describe("get_sentry_resource", () => {
       });
       expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
     });
+
+    it("rejects traces outside the active project constraint", async () => {
+      mswServer.use(
+        http.get("https://sentry.io/api/0/projects/test-org/frontend/", () =>
+          HttpResponse.json({
+            id: "9999999999999999",
+            slug: "frontend",
+            name: "frontend",
+          }),
+        ),
+        http.get(
+          `https://sentry.io/api/0/organizations/test-org/trace/${traceId}/`,
+          ({ request }) => {
+            const url = new URL(request.url);
+            if (url.searchParams.get("project") === "9999999999999999") {
+              return HttpResponse.json([]);
+            }
+            return HttpResponse.json(traceFixture);
+          },
+        ),
+      );
+
+      await expect(
+        getSentryResource.handler(
+          {
+            url: `https://test-org.sentry.io/explore/traces/trace/${traceId}`,
+          },
+          {
+            ...baseContext,
+            constraints: {
+              organizationSlug: "test-org",
+              projectSlug: "frontend",
+            },
+          },
+        ),
+      ).rejects.toThrow(
+        'Trace is outside the active project constraint. Expected project "frontend".',
+      );
+    });
   });
 
   // ─── URL mode: profile URLs ───────────────────────────────────────────────
@@ -181,6 +220,25 @@ describe("get_sentry_resource", () => {
         "# Continuous Profile 041bde57b9844e36b8b7e5734efae5f7",
       );
       expect(result).toContain("## Raw Sample Analysis");
+    });
+
+    it("rejects profile URLs outside the active constrained project", async () => {
+      await expect(
+        getSentryResource.handler(
+          {
+            url: `https://my-org.sentry.io/explore/profiling/profile/frontend/${profileDetailsFixture.profile_id}/flamegraph/`,
+          },
+          {
+            ...baseContext,
+            constraints: {
+              organizationSlug: "my-org",
+              projectSlug: "backend",
+            },
+          },
+        ),
+      ).rejects.toThrow(
+        'Profile URL is outside the active project constraint. Expected project "backend" but got "frontend".',
+      );
     });
   });
 
@@ -303,6 +361,26 @@ describe("get_sentry_resource", () => {
       expect(result).toContain("fetch");
       expect(result).toContain("console");
       expect(result).toContain("navigation");
+    });
+
+    it("rejects breadcrumbs outside the active project constraint", async () => {
+      await expect(
+        getSentryResource.handler(
+          {
+            url: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
+            resourceType: "breadcrumbs",
+          },
+          {
+            ...baseContext,
+            constraints: {
+              organizationSlug: "sentry-mcp-evals",
+              projectSlug: "frontend",
+            },
+          },
+        ),
+      ).rejects.toThrow(
+        'Issue is outside the active project constraint. Expected project "frontend".',
+      );
     });
 
     it("fetches breadcrumbs from event URL (extracts issueId)", async () => {

@@ -301,4 +301,27 @@ describe("analyze_issue_with_seer", () => {
     expect(result).toContain("Analysis started with Run ID: new-run-123");
     expect(result).toContain("## Analysis Complete");
   });
+
+  it("rejects issues outside the active project constraint", async () => {
+    await expect(
+      analyzeIssueWithSeer.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          regionUrl: null,
+          issueId: "CLOUDFLARE-MCP-41",
+          instruction: undefined,
+        },
+        {
+          constraints: {
+            organizationSlug: undefined,
+            projectSlug: "frontend",
+          },
+          accessToken: "access-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(
+      'Issue is outside the active project constraint. Expected project "frontend".',
+    );
+  });
 });

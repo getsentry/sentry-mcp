@@ -285,12 +285,7 @@ export const NUMERIC_FIELDS: Record<string, Set<string>> = {
     "observed_timestamp",
     "payload_size",
   ]),
-  profiles: new Set([
-    "profile.duration",
-    "transaction.duration",
-    "precise.start_ts",
-    "precise.finish_ts",
-  ]),
+  profiles: new Set(["profile.duration", "transaction.duration"]),
 };
 
 // Dataset-specific field definitions

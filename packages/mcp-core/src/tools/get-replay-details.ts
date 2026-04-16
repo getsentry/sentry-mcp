@@ -9,6 +9,7 @@ import type {
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { parseSentryUrl } from "../internal/url-helpers";
+import { resolveScopedOrganizationSlug } from "../internal/url-scope";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import {
@@ -96,6 +97,12 @@ export default defineTool({
       organizationSlug: resolved.organizationSlug,
       replayId: resolved.replayId,
     });
+    await assertReplayWithinProjectConstraint({
+      apiService,
+      organizationSlug: resolved.organizationSlug,
+      replay,
+      projectSlug: context.constraints.projectSlug,
+    });
 
     const isArchived = replay.is_archived === true;
     const projectId =
@@ -150,9 +157,11 @@ export function resolveReplayParams(params: {
       );
     }
     return {
-      // Prefer an explicit or injected organization constraint when available,
-      // while still validating and extracting the replay ID from the URL.
-      organizationSlug: params.organizationSlug ?? parsed.organizationSlug,
+      organizationSlug: resolveScopedOrganizationSlug({
+        resourceLabel: "Replay",
+        scopedOrganizationSlug: params.organizationSlug,
+        urlOrganizationSlug: parsed.organizationSlug,
+      }),
       replayId: parsed.replayId,
     };
   }
@@ -190,6 +199,39 @@ async function resolveReplayRegionUrl({
     return resolvedRegionUrl || null;
   } catch {
     return null;
+  }
+}
+
+async function assertReplayWithinProjectConstraint({
+  apiService,
+  organizationSlug,
+  replay,
+  projectSlug,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  replay: ReplayDetails;
+  projectSlug?: string | null;
+}): Promise<void> {
+  if (!projectSlug) {
+    return;
+  }
+
+  if (replay.project_id == null) {
+    throw new UserInputError(
+      `Replay is outside the active project constraint. Expected project "${projectSlug}".`,
+    );
+  }
+
+  const project = await apiService.getProject({
+    organizationSlug,
+    projectSlugOrId: projectSlug,
+  });
+
+  if (String(project.id) !== String(replay.project_id)) {
+    throw new UserInputError(
+      `Replay is outside the active project constraint. Expected project "${projectSlug}".`,
+    );
   }
 }
 

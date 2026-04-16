@@ -130,6 +130,40 @@ describe("get_profile_details", () => {
         "Continuous profile URLs must include `profilerId`, `start`, and `end` query parameters.",
       );
     });
+
+    it("rejects profile URLs outside the active organization constraint", async () => {
+      await expect(
+        getProfileDetails.handler(
+          {
+            profileUrl: `https://other-org.sentry.io/explore/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/`,
+            organizationSlug: "sentry-mcp-evals",
+            projectSlugOrId: "backend",
+            regionUrl: null,
+            focusOnUserCode: true,
+          },
+          baseContext,
+        ),
+      ).rejects.toThrow(
+        'Profile URL is outside the active organization constraint. Expected organization "sentry-mcp-evals" but got "other-org".',
+      );
+    });
+
+    it("rejects profile URLs outside the active project constraint", async () => {
+      await expect(
+        getProfileDetails.handler(
+          {
+            profileUrl: `https://sentry-mcp-evals.sentry.io/explore/profiling/profile/frontend/${profileDetailsFixture.profile_id}/flamegraph/`,
+            organizationSlug: "sentry-mcp-evals",
+            projectSlugOrId: "backend",
+            regionUrl: null,
+            focusOnUserCode: true,
+          },
+          baseContext,
+        ),
+      ).rejects.toThrow(
+        'Profile URL is outside the active project constraint. Expected project "backend" but got "frontend".',
+      );
+    });
   });
 
   describe("tool definition", () => {

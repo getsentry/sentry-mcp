@@ -314,6 +314,28 @@ describe("resolveResourceParams", () => {
         end: undefined,
       });
     });
+
+    it("rejects profile URLs outside the active organization constraint", () => {
+      expect(() =>
+        resolveResourceParams({
+          url: "https://my-org.sentry.io/explore/profiling/profile/my-project/flamegraph/",
+          organizationSlug: "other-org",
+        }),
+      ).toThrow(
+        'Sentry resource URL is outside the active organization constraint. Expected organization "other-org" but got "my-org".',
+      );
+    });
+
+    it("rejects profile URLs outside the active project constraint", () => {
+      expect(() =>
+        resolveResourceParams({
+          url: "https://my-org.sentry.io/explore/profiling/profile/my-project/flamegraph/",
+          projectSlug: "other-project",
+        }),
+      ).toThrow(
+        'Profile URL is outside the active project constraint. Expected project "other-project" but got "my-project".',
+      );
+    });
   });
 
   // ─── URL mode: recognized types (replay, monitor, release) ────────────────

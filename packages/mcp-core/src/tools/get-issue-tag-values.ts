@@ -2,7 +2,10 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { parseIssueParams } from "../internal/tool-helpers/issue";
+import {
+  ensureIssueWithinProjectConstraint,
+  parseIssueParams,
+} from "../internal/tool-helpers/issue";
 import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { ApiNotFoundError } from "../api-client";
 import { UserInputError } from "../errors";
@@ -112,6 +115,13 @@ export default defineTool({
       });
 
     setTag("organization.slug", orgSlug);
+
+    await ensureIssueWithinProjectConstraint({
+      apiService,
+      organizationSlug: orgSlug,
+      issueId: parsedIssueId!,
+      projectSlug: context.constraints.projectSlug,
+    });
 
     // Fetch the tag values for the issue
     let tagValues: Awaited<ReturnType<typeof apiService.getIssueTagValues>>;

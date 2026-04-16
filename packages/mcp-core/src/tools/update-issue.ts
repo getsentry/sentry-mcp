@@ -1,7 +1,10 @@
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { parseIssueParams } from "../internal/tool-helpers/issue";
+import {
+  assertIssueWithinProjectConstraint,
+  parseIssueParams,
+} from "../internal/tool-helpers/issue";
 import { formatAssignedTo } from "../internal/tool-helpers/formatting";
 import { UserInputError } from "../errors";
 import type { Issue } from "../api-client/types";
@@ -647,6 +650,10 @@ export default defineTool({
     const currentIssue = await apiService.getIssue({
       organizationSlug: orgSlug,
       issueId: parsedIssueId!,
+    });
+    assertIssueWithinProjectConstraint({
+      issue: currentIssue,
+      projectSlug: context.constraints.projectSlug,
     });
 
     const currentIgnoreState = getIgnoreState(currentIssue);

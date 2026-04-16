@@ -496,12 +496,9 @@ function getProfileProject(event: FlexibleEventData): string | null {
 }
 
 function getProfileTimestampValue(value: unknown): string | null {
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    return trimmedValue.length > 0 ? trimmedValue : null;
   }
 
   return null;
@@ -666,7 +663,7 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
 
   output += "## Next Steps\n\n";
   output +=
-    "- Open a Profile URL above or pass it to `get_profile_details` for the full detail view\n";
+    "- Open a Profile URL above when available, or pass the profile identifiers to `get_profile_details` for the full detail view\n";
   output +=
     "- Open the Trace URL for an end-to-end view of the profiled request when available\n";
   output +=

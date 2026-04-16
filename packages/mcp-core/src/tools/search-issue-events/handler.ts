@@ -2,6 +2,7 @@ import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
 import type { ServerContext } from "../../types";
 import {
   ParamOrganizationSlug,
@@ -107,6 +108,13 @@ export default defineTool({
     if (params.projectSlug) {
       setTag("project.slug", params.projectSlug);
     }
+
+    await ensureIssueWithinProjectConstraint({
+      apiService,
+      organizationSlug,
+      issueId,
+      projectSlug: context.constraints.projectSlug,
+    });
 
     // 4. Resolve project ID if project slug provided (for better tag discovery)
     let projectId: string | undefined;

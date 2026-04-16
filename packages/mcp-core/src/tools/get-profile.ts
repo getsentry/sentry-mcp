@@ -12,6 +12,10 @@ import {
 } from "./profile/formatter";
 import { hasProfileData } from "./profile/analyzer";
 import { parseSentryUrl, isProfileUrl } from "../internal/url-helpers";
+import {
+  resolveScopedOrganizationSlug,
+  resolveScopedProjectSlugOrId,
+} from "../internal/url-scope";
 
 interface ResolvedProfileParams {
   organizationSlug: string;
@@ -38,9 +42,18 @@ function resolveProfileParams(params: {
     }
     const parsed = parseSentryUrl(params.profileUrl);
     return {
-      organizationSlug: parsed.organizationSlug,
-      projectSlugOrId:
-        parsed.projectSlug ?? params.projectSlugOrId ?? undefined,
+      organizationSlug: resolveScopedOrganizationSlug({
+        resourceLabel: "Profile",
+        scopedOrganizationSlug: params.organizationSlug,
+        urlOrganizationSlug: parsed.organizationSlug,
+      }),
+      projectSlugOrId: parsed.projectSlug
+        ? resolveScopedProjectSlugOrId({
+            resourceLabel: "Profile",
+            scopedProjectSlugOrId: params.projectSlugOrId,
+            urlProjectSlug: parsed.projectSlug,
+          })
+        : (params.projectSlugOrId ?? undefined),
       transactionName: params.transactionName ?? undefined,
     };
   }
