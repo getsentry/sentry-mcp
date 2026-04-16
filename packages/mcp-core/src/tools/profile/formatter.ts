@@ -604,7 +604,6 @@ function formatTopFramesByOccurrence(
   profile: ProfileSampleData,
   options: { focusOnUserCode: boolean },
 ): string | null {
-  const sections: string[] = [];
   const frameCounts = new Map<number, number>();
 
   for (const sample of profile.samples) {
@@ -630,21 +629,8 @@ function formatTopFramesByOccurrence(
     return null;
   }
 
-  sections.push("## Top Frames by Occurrence");
-  sections.push("");
-  sections.push("| Function | File:Line | Count | Type |");
-  sections.push("|----------|-----------|-------|------|");
-
-  for (const [frameIdx, count] of sortedFrames) {
-    const frame = profile.frames[frameIdx];
-    if (!frame) {
-      continue;
-    }
-
-    if (options.focusOnUserCode && !frame.in_app) {
-      continue;
-    }
-
+  const rows = sortedFrames.map(([frameIdx, count]) => {
+    const frame = profile.frames[frameIdx]!;
     const funcName = frame.class_name
       ? `${frame.class_name}.${frame.function}`
       : frame.function;
@@ -656,10 +642,16 @@ function formatTopFramesByOccurrence(
     const location = truncateLocation(rawLocation, 40);
     const type = frame.in_app ? "User Code" : "Library";
 
-    sections.push(`| \`${funcName}\` | ${location} | ${count} | ${type} |`);
-  }
+    return `| \`${funcName}\` | ${location} | ${count} | ${type} |`;
+  });
 
-  return sections.length > 4 ? sections.join("\n") : null;
+  return [
+    "## Top Frames by Occurrence",
+    "",
+    "| Function | File:Line | Count | Type |",
+    "|----------|-----------|-------|------|",
+    ...rows,
+  ].join("\n");
 }
 
 function formatProfileRelease(release: TransactionProfile["release"]): string {
