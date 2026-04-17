@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  profileChunkFixture,
+  profileDetailsFixture,
+} from "@sentry/mcp-server-mocks";
+import {
   ClientKeySchema,
   EventSchema,
   FlamegraphSchema,
   IssueSchema,
   ProfileChunkSampleSchema,
+  ProfileChunkSchema,
   ReleaseSchema,
   ReplayDetailsSchema,
   TransactionProfileSampleSchema,
@@ -642,6 +647,48 @@ describe("TransactionProfileSampleSchema", () => {
     expect(sample.thread_id).toBe("1");
     expect(sample.timestamp).toBe(1710958503.629);
     expect(sample.elapsed_since_start_ns).toBeUndefined();
+  });
+});
+
+describe("profile fixtures", () => {
+  it("parses the V1 transaction profile fixture through TransactionProfileSchema", () => {
+    // profile-details.json mirrors what vroom emits for legacy/V1 transaction
+    // profiles: numeric uint64 thread_id, elapsed_since_start_ns timing, and
+    // a required transaction block with active_thread_id.
+    const profile = TransactionProfileSchema.parse(
+      structuredClone(profileDetailsFixture),
+    );
+
+    expect(profile.transaction?.active_thread_id).toBeTypeOf("string");
+    expect(
+      profile.profile.samples.every(
+        (sample) => typeof sample.thread_id === "string",
+      ),
+    ).toBe(true);
+    expect(
+      profile.profile.samples.some(
+        (sample) => typeof sample.elapsed_since_start_ns === "number",
+      ),
+    ).toBe(true);
+  });
+
+  it("parses the V2 continuous profile chunk fixture through ProfileChunkSchema", () => {
+    // profile-chunk.json mirrors the continuous profiler output: string
+    // thread_id, absolute timestamp per sample, no transaction block.
+    const chunk = ProfileChunkSchema.parse(
+      structuredClone(profileChunkFixture.chunks[0]),
+    );
+
+    expect(
+      chunk.profile.samples.every(
+        (sample) => typeof sample.thread_id === "string",
+      ),
+    ).toBe(true);
+    expect(
+      chunk.profile.samples.every(
+        (sample) => typeof sample.timestamp === "number",
+      ),
+    ).toBe(true);
   });
 });
 
