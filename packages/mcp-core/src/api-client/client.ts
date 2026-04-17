@@ -55,6 +55,7 @@ import {
 import { ConfigurationError } from "../errors";
 import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
 import { USER_AGENT } from "../version";
+import type { SentryProtocol } from "../types";
 import type {
   AutofixRun,
   AutofixRunState,
@@ -135,7 +136,7 @@ type RequestOptions = {
  * - Enhanced error handling with LLM-friendly messages
  * - URL generation for Sentry resources (issues, traces)
  * - Bearer token authentication
- * - Always uses HTTPS for secure connections
+ * - Uses HTTPS by default, with opt-in HTTP for self-hosted stdio deployments
  *
  * @example Basic Usage
  * ```typescript
@@ -169,12 +170,13 @@ type RequestOptions = {
 export class SentryApiService {
   private accessToken: string | null;
   protected host: string;
+  protected protocol: SentryProtocol;
   protected apiPrefix: string;
 
   /**
    * Creates a new Sentry API service instance.
    *
-   * Always uses HTTPS for secure connections.
+   * Uses HTTPS by default. Stdio may opt into HTTP for self-hosted deployments.
    *
    * @param config Configuration object
    * @param config.accessToken OAuth access token for authentication (optional for some endpoints)
@@ -183,26 +185,29 @@ export class SentryApiService {
   constructor({
     accessToken = null,
     host = "sentry.io",
+    protocol = "https",
   }: {
     accessToken?: string | null;
     host?: string;
+    protocol?: SentryProtocol;
   }) {
     this.accessToken = accessToken;
     this.host = host;
-    this.apiPrefix = `https://${host}/api/0`;
+    this.protocol = protocol;
+    this.apiPrefix = `${protocol}://${host}/api/0`;
   }
 
   /**
    * Updates the host for API requests.
    *
    * Used for multi-region support or switching between Sentry instances.
-   * Always uses HTTPS protocol.
+   * Preserves the configured URL scheme.
    *
    * @param host New hostname to use for API requests
    */
   setHost(host: string) {
     this.host = host;
-    this.apiPrefix = `https://${this.host}/api/0`;
+    this.apiPrefix = `${this.protocol}://${this.host}/api/0`;
   }
 
   /**
@@ -275,7 +280,7 @@ export class SentryApiService {
     { host }: { host?: string } = {},
   ): Promise<Response> {
     const url = host
-      ? `https://${host}/api/0${path}`
+      ? `${this.protocol}://${host}/api/0${path}`
       : `${this.apiPrefix}${path}`;
 
     const headers: Record<string, string> = {
@@ -499,7 +504,7 @@ export class SentryApiService {
    * Generates a Sentry issue URL for browser navigation.
    *
    * Handles both SaaS (subdomain-based) and self-hosted URL formats.
-   * Always uses HTTPS protocol.
+   * Uses the configured protocol.
    *
    * @param organizationSlug Organization identifier
    * @param issueId Issue identifier (short ID or numeric ID)
@@ -515,17 +520,17 @@ export class SentryApiService {
    * ```
    */
   getIssueUrl(organizationSlug: string, issueId: string): string {
-    return getIssueUrlUtil(this.host, organizationSlug, issueId);
+    return getIssueUrlUtil(this.host, organizationSlug, issueId, this.protocol);
   }
 
   /**
    * Generates a Sentry trace URL for performance investigation.
    *
-   * Always uses HTTPS protocol.
+   * Uses the configured protocol.
    *
    * @param organizationSlug Organization identifier
    * @param traceId Trace identifier (hex string)
-   * @returns Full HTTPS URL to the trace in Sentry UI
+   * @returns Full URL to the trace in Sentry UI
    *
    * @example
    * ```typescript
@@ -534,11 +539,16 @@ export class SentryApiService {
    * ```
    */
   getTraceUrl(organizationSlug: string, traceId: string): string {
-    return getTraceUrlUtil(this.host, organizationSlug, traceId);
+    return getTraceUrlUtil(this.host, organizationSlug, traceId, this.protocol);
   }
 
   getReplayUrl(organizationSlug: string, replayId: string): string {
-    return getReplayUrlUtil(this.host, organizationSlug, replayId);
+    return getReplayUrlUtil(
+      this.host,
+      organizationSlug,
+      replayId,
+      this.protocol,
+    );
   }
 
   getProfileUrl(
@@ -551,6 +561,7 @@ export class SentryApiService {
       organizationSlug,
       projectSlug,
       profileId,
+      this.protocol,
     );
   }
 
@@ -568,6 +579,7 @@ export class SentryApiService {
       organizationSlug,
       projectSlug,
       options,
+      this.protocol,
     );
   }
 
@@ -575,7 +587,12 @@ export class SentryApiService {
     organizationSlug: string,
     options: Parameters<typeof getReplaysSearchUrlUtil>[2] = {},
   ): string {
-    return getReplaysSearchUrlUtil(this.host, organizationSlug, options);
+    return getReplaysSearchUrlUtil(
+      this.host,
+      organizationSlug,
+      options,
+      this.protocol,
+    );
   }
 
   // ================================================================================
@@ -667,8 +684,8 @@ export class SentryApiService {
     // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
     const webHost = this.isSaas() ? "sentry.io" : this.host;
     const path = this.isSaas()
-      ? `https://${organizationSlug}.${webHost}/explore/discover/homepage/`
-      : `https://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
+      ? `${this.protocol}://${organizationSlug}.${webHost}/explore/discover/homepage/`
+      : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/discover/homepage/`;
 
     return `${path}?${urlParams.toString()}`;
   }
@@ -805,8 +822,8 @@ export class SentryApiService {
     // Regional subdomains (e.g., us.sentry.io) are only for API endpoints
     const webHost = this.isSaas() ? "sentry.io" : this.host;
     const path = this.isSaas()
-      ? `https://${organizationSlug}.${webHost}/explore/${basePath}/`
-      : `https://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
+      ? `${this.protocol}://${organizationSlug}.${webHost}/explore/${basePath}/`
+      : `${this.protocol}://${this.host}/organizations/${organizationSlug}/explore/${basePath}/`;
 
     return `${path}?${urlParams.toString()}`;
   }
@@ -857,7 +874,7 @@ export class SentryApiService {
    * @param start Absolute start time (ISO 8601)
    * @param end Absolute end time (ISO 8601)
    * @param eventData Optional event rows used to derive trace metric identity for metrics sample URLs
-   * @returns Full HTTPS URL to the events explorer in Sentry UI
+   * @returns Full URL to the events explorer in Sentry UI
    */
   getEventsExplorerUrl(
     organizationSlug: string,
@@ -890,31 +907,41 @@ export class SentryApiService {
     }
 
     if (isMetricsDataset(dataset)) {
-      return getTraceMetricsExploreUrl(this.host, organizationSlug, {
-        query,
-        projectId,
-        sort,
-        statsPeriod,
-        start,
-        end,
-        aggregateFunctions,
-        groupByFields,
-        traceMetrics: this.extractTraceMetricsFromResults(eventData),
-      });
+      return getTraceMetricsExploreUrl(
+        this.host,
+        organizationSlug,
+        {
+          query,
+          projectId,
+          sort,
+          statsPeriod,
+          start,
+          end,
+          aggregateFunctions,
+          groupByFields,
+          traceMetrics: this.extractTraceMetricsFromResults(eventData),
+        },
+        this.protocol,
+      );
     }
 
     if (isProfilesDataset(dataset)) {
-      return getProfilingExplorerUrl(this.host, organizationSlug, {
-        query,
-        projectId,
-        fields,
-        sort,
-        statsPeriod,
-        start,
-        end,
-        aggregateFunctions,
-        groupByFields,
-      });
+      return getProfilingExplorerUrl(
+        this.host,
+        organizationSlug,
+        {
+          query,
+          projectId,
+          fields,
+          sort,
+          statsPeriod,
+          start,
+          end,
+          aggregateFunctions,
+          groupByFields,
+        },
+        this.protocol,
+      );
     }
 
     // Route to modern EAP API (spans and logs)

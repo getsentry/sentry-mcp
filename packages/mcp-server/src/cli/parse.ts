@@ -5,6 +5,7 @@ export function parseArgv(argv: string[]): CliArgs {
   const options = {
     "access-token": { type: "string" as const },
     host: { type: "string" as const },
+    "insecure-http": { type: "boolean" as const },
     url: { type: "string" as const },
     "mcp-url": { type: "string" as const },
     "sentry-dsn": { type: "string" as const },
@@ -53,6 +54,7 @@ export function parseArgv(argv: string[]): CliArgs {
   return {
     accessToken: values["access-token"] as string | undefined,
     host: values.host as string | undefined,
+    insecureHttp: values["insecure-http"] === true,
     url: values.url as string | undefined,
     mcpUrl: values["mcp-url"] as string | undefined,
     sentryDsn: values["sentry-dsn"] as string | undefined,
@@ -100,6 +102,7 @@ export function merge(cli: CliArgs, env: EnvArgs): MergedArgs {
     // If CLI provided url/host, prefer those; else fall back to env
     url: cli.url ?? env.url,
     host: cli.host ?? env.host,
+    insecureHttp: cli.insecureHttp === true,
     mcpUrl: cli.mcpUrl ?? env.mcpUrl,
     sentryDsn: cli.sentryDsn ?? env.sentryDsn,
     openaiBaseUrl: cli.openaiBaseUrl,

@@ -11,7 +11,7 @@ import { validateRegionUrl } from "./validate-region-url";
  * Create a Sentry API service from server context with optional region override
  * @param context - Server context containing host and access token
  * @param opts - Options object containing optional regionUrl override
- * @returns Configured SentryApiService instance (always uses HTTPS)
+ * @returns Configured SentryApiService instance using the context's configured protocol
  * @throws {UserInputError} When regionUrl is provided but invalid
  */
 export function apiServiceFromContext(
@@ -29,6 +29,7 @@ export function apiServiceFromContext(
 
   return new SentryApiService({
     host,
+    protocol: context.sentryProtocol,
     accessToken: context.accessToken,
   });
 }

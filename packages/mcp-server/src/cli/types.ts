@@ -1,8 +1,10 @@
+import type { SentryProtocol } from "@sentry/mcp-core/types";
 import type { Skill } from "@sentry/mcp-core/skills";
 
 export type CliArgs = {
   accessToken?: string;
   host?: string;
+  insecureHttp?: boolean;
   url?: string;
   mcpUrl?: string;
   sentryDsn?: string;
@@ -39,6 +41,7 @@ export type EnvArgs = {
 export type MergedArgs = {
   accessToken?: string;
   host?: string;
+  insecureHttp?: boolean;
   url?: string;
   mcpUrl?: string;
   sentryDsn?: string;
@@ -67,6 +70,7 @@ export type PartiallyResolvedConfig = {
   accessToken?: string;
   clientId: string;
   sentryHost: string;
+  sentryProtocol: SentryProtocol;
   mcpUrl?: string;
   sentryDsn?: string;
   openaiBaseUrl?: string;

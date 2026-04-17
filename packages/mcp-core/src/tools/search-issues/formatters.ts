@@ -2,6 +2,7 @@ import type { Issue } from "../../api-client";
 import { logInfo } from "../../telem/logging";
 import { getIssueUrl, getIssuesSearchUrl } from "../../utils/url-utils";
 import { getSeerActionabilityLabel } from "../../internal/formatting";
+import type { SentryProtocol } from "../../types";
 
 /**
  * Format an explanation for how a natural language query was translated
@@ -16,6 +17,8 @@ export interface FormatIssueResultsParams {
   projectSlugOrId?: string;
   query?: string | null;
   regionUrl?: string;
+  host?: string;
+  protocol?: SentryProtocol;
   naturalLanguageQuery?: string;
   skipHeader?: boolean;
 }
@@ -30,11 +33,17 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
     projectSlugOrId,
     query,
     regionUrl,
+    host,
+    protocol = "https",
     naturalLanguageQuery,
     skipHeader = false,
   } = params;
 
-  const host = regionUrl ? new URL(regionUrl).host : "sentry.io";
+  const region = regionUrl ? new URL(regionUrl) : null;
+  const resolvedHost = region?.host || host || "sentry.io";
+  const resolvedProtocol =
+    (region?.protocol.replace(":", "") as SentryProtocol | undefined) ||
+    protocol;
 
   let output = "";
 
@@ -71,10 +80,11 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
 
   // Generate search URL for viewing results
   const searchUrl = getIssuesSearchUrl(
-    host,
+    resolvedHost,
     organizationSlug,
     query,
     projectSlugOrId,
+    resolvedProtocol,
   );
 
   // Add view link with emoji and guidance text (like search_events)
@@ -86,7 +96,12 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
   // Format each issue
   issues.forEach((issue, index) => {
     // Generate issue URL using the utility function
-    const issueUrl = getIssueUrl(host, organizationSlug, issue.shortId);
+    const issueUrl = getIssueUrl(
+      resolvedHost,
+      organizationSlug,
+      issue.shortId,
+      resolvedProtocol,
+    );
 
     output += `## ${index + 1}. [${issue.shortId}](${issueUrl})\n\n`;
     output += `**${issue.title}**\n\n`;

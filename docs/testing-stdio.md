@@ -176,6 +176,19 @@ This opens the MCP Inspector at `http://localhost:6274`
 }
 ```
 
+**For self-hosted Sentry on plain HTTP:**
+```json
+{
+  "command": "npx",
+  "args": [
+    "@sentry/mcp-server@latest",
+    "--access-token=YOUR_TOKEN",
+    "--host=sentry.internal:9000",
+    "--insecure-http"
+  ]
+}
+```
+
 4. Click "Connect"
 5. Click "List Tools" to verify connection
 
