@@ -1114,18 +1114,13 @@ export const ProfileChunkSampleSchema = z
  *   normalized to a string here so downstream code can compare against the
  *   string keys in `thread_metadata`.
  * - Time is carried as `elapsed_since_start_ns` (uint64 nanoseconds since the
- *   start of the profile) rather than an absolute `timestamp`.
- *
- * `timestamp` is retained as an optional legacy field because some historical
- * V1 payloads emitted absolute or millisecond timestamps that the formatter
- * still falls back to.
+ *   start of the profile). V1 samples never carry an absolute `timestamp`.
  */
 export const TransactionProfileSampleSchema = z
   .object({
     stack_id: z.number(),
     thread_id: z.union([z.string(), z.number()]).transform(String),
-    elapsed_since_start_ns: z.number().optional(),
-    timestamp: z.number().optional(),
+    elapsed_since_start_ns: z.number(),
     queue_address: z.string().optional(),
   })
   .passthrough();

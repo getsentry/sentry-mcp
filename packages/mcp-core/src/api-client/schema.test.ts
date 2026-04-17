@@ -634,19 +634,30 @@ describe("TransactionProfileSampleSchema", () => {
 
     expect(sample.thread_id).toBe("1");
     expect(sample.elapsed_since_start_ns).toBe(50000000);
-    expect(sample.timestamp).toBeUndefined();
   });
 
-  it("still accepts legacy V1 payloads that use a string thread_id and timestamp", () => {
+  it("still normalizes V1 payloads that already carry a string thread_id", () => {
     const sample = TransactionProfileSampleSchema.parse({
       stack_id: 0,
       thread_id: "1",
-      timestamp: 1710958503.629,
+      elapsed_since_start_ns: 1_000_000,
     });
 
     expect(sample.thread_id).toBe("1");
-    expect(sample.timestamp).toBe(1710958503.629);
-    expect(sample.elapsed_since_start_ns).toBeUndefined();
+    expect(sample.elapsed_since_start_ns).toBe(1_000_000);
+  });
+
+  it("rejects V1 samples that are missing the required elapsed_since_start_ns", () => {
+    // vroom always emits Sample.ElapsedSinceStartNS for V1 transaction
+    // profiles, so make that a hard requirement rather than silently accepting
+    // a V2-shaped payload on the V1 path.
+    expect(() =>
+      TransactionProfileSampleSchema.parse({
+        stack_id: 0,
+        thread_id: "1",
+        timestamp: 1710958503.629,
+      }),
+    ).toThrow();
   });
 });
 
