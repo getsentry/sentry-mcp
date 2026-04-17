@@ -210,6 +210,34 @@ describe("IssueSchema", () => {
       name: "Backend Team",
     });
   });
+
+  it("should handle issues with null firstSeen and lastSeen", () => {
+    // Sentry's API can return null for firstSeen/lastSeen in some cases
+    // (e.g. issues with no events). Regression test for MCP-SERVER-EWN.
+    const issue = {
+      id: "777",
+      shortId: "TEST-77",
+      title: "Test Issue",
+      firstSeen: null,
+      lastSeen: null,
+      count: 1,
+      userCount: 1,
+      permalink: "https://sentry.io/issues/777/",
+      project: {
+        id: "5",
+        name: "test",
+        slug: "test",
+        platform: "node",
+      },
+      status: "unresolved",
+      culprit: "test.js",
+      type: "error",
+    };
+
+    const result = IssueSchema.parse(issue);
+    expect(result.firstSeen).toBeNull();
+    expect(result.lastSeen).toBeNull();
+  });
 });
 
 describe("EventSchema", () => {
