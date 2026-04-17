@@ -113,20 +113,22 @@ export default defineTool({
 
       summary = buildProjectScopedTraceSummary(trace, constrainedProjectSlug);
     } else {
-      // Get trace metadata for overview
-      const traceMeta = await apiService.getTraceMeta({
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-        statsPeriod: "14d", // Fixed stats period
-      });
+      // Fetch trace metadata and span data in parallel (no data dependency)
+      const [traceMeta, traceResult] = await Promise.all([
+        apiService.getTraceMeta({
+          organizationSlug: params.organizationSlug,
+          traceId: params.traceId,
+          statsPeriod: "14d", // Fixed stats period
+        }),
+        apiService.getTrace({
+          organizationSlug: params.organizationSlug,
+          traceId: params.traceId,
+          limit: 10, // Only get top-level spans for overview
+          statsPeriod: "14d", // Fixed stats period
+        }),
+      ]);
 
-      // Get minimal trace data to show key transactions
-      trace = await apiService.getTrace({
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-        limit: 10, // Only get top-level spans for overview
-        statsPeriod: "14d", // Fixed stats period
-      });
+      trace = traceResult;
 
       summary = {
         spanCount: traceMeta.span_count,
