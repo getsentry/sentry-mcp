@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   profileChunkFixture,
-  profileDetailsFixture,
+  transactionProfileV1Fixture,
 } from "@sentry/mcp-server-mocks";
 import {
   ClientKeySchema,
@@ -663,11 +663,11 @@ describe("TransactionProfileSampleSchema", () => {
 
 describe("profile fixtures", () => {
   it("parses the V1 transaction profile fixture through TransactionProfileSchema", () => {
-    // profile-details.json mirrors what vroom emits for legacy/V1 transaction
-    // profiles: numeric uint64 thread_id, elapsed_since_start_ns timing, and
-    // a required transaction block with active_thread_id.
+    // transaction-profile-v1.json mirrors what vroom emits for legacy/V1
+    // transaction profiles: numeric uint64 thread_id, elapsed_since_start_ns
+    // timing, and a required transaction block with active_thread_id.
     const profile = TransactionProfileSchema.parse(
-      structuredClone(profileDetailsFixture),
+      structuredClone(transactionProfileV1Fixture),
     );
 
     expect(profile.transaction?.active_thread_id).toBeTypeOf("string");

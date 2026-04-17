@@ -72,7 +72,7 @@
     "name": "/api/users",
     "trace_id": "a4d1aae7216b47ff8117cf4e09ce9d0a",
     "id": "7ca573c0f4814912aaa9bdc77d1a7d51",
-    "active_thread_id": "1",
+    "active_thread_id": 1,
     "relative_start_ns": 0,
     "relative_end_ns": 120000000
   },
