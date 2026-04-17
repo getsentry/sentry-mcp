@@ -43,18 +43,18 @@
     "samples": [
       {
         "stack_id": 0,
-        "thread_id": "1",
-        "timestamp": 1710958503.629
+        "thread_id": 1,
+        "elapsed_since_start_ns": 0
       },
       {
         "stack_id": 1,
-        "thread_id": "1",
-        "timestamp": 1710958503.679
+        "thread_id": 1,
+        "elapsed_since_start_ns": 50000000
       },
       {
         "stack_id": 1,
-        "thread_id": "1",
-        "timestamp": 1710958503.729
+        "thread_id": 1,
+        "elapsed_since_start_ns": 100000000
       }
     ],
     "stacks": [
@@ -72,7 +72,7 @@
     "name": "/api/users",
     "trace_id": "a4d1aae7216b47ff8117cf4e09ce9d0a",
     "id": "7ca573c0f4814912aaa9bdc77d1a7d51",
-    "active_thread_id": "1",
+    "active_thread_id": 1,
     "relative_start_ns": 0,
     "relative_end_ns": 120000000
   },

@@ -56,7 +56,7 @@ import eventsSpansFixture from "./fixtures/events-spans.json" with {
 import flamegraphFixture from "./fixtures/flamegraph.json" with {
   type: "json",
 };
-import profileDetailsFixture from "./fixtures/profile-details.json" with {
+import transactionProfileV1Fixture from "./fixtures/transaction-profile-v1.json" with {
   type: "json",
 };
 import profileChunkFixture from "./fixtures/profile-chunk.json" with {
@@ -1086,7 +1086,7 @@ export const restHandlers = buildHandlers([
     fetch: ({ params }) => {
       const profileId = String(params.profileId);
       return HttpResponse.json({
-        ...profileDetailsFixture,
+        ...transactionProfileV1Fixture,
         event_id: profileId,
         profile_id: profileId,
       });
@@ -1411,7 +1411,7 @@ export {
   traceMixedFixture,
   traceEventFixture,
   flamegraphFixture,
-  profileDetailsFixture,
+  transactionProfileV1Fixture,
   organizationFixture,
   releaseFixture,
   clientKeyFixture,

@@ -13,14 +13,14 @@ import type {
   TransactionProfile,
 } from "../../api-client/types";
 import {
+  type FrameComparison,
+  type HotPath,
   analyzeHotPathsFromFlamegraph,
   compareFrameStats,
   formatDuration,
   formatPercentage,
   generatePerformanceInsights,
   identifyHotspotFramesFromFlamegraph,
-  type FrameComparison,
-  type HotPath,
 } from "./analyzer";
 
 /**
@@ -84,9 +84,15 @@ export interface TransactionProfileAnalysisOptions {
   traceUrl?: string;
 }
 
+/**
+ * Shape consumed by the sample-based formatters. Using a narrow structural
+ * type lets us accept both V2 continuous profile chunk samples and V1
+ * transaction profile samples without forcing one side's timing fields onto
+ * the other — the formatters here only care about `stack_id` and `thread_id`.
+ */
 interface ProfileSampleData {
   frames: ProfileChunk["profile"]["frames"];
-  samples: ProfileChunk["profile"]["samples"];
+  samples: Array<{ stack_id: number; thread_id: string }>;
   stacks: ProfileChunk["profile"]["stacks"];
   threadMetadata: ProfileChunk["profile"]["thread_metadata"];
 }
@@ -679,46 +685,19 @@ function getTransactionProfileDurationNs(
     return relativeEnd - relativeStart;
   }
 
-  const timestamps = profile.profile.samples
-    .map((sample) => sample.timestamp)
+  // V1 transaction profile samples always carry elapsed_since_start_ns in
+  // nanoseconds — there's no timestamp field on the wire — so we can derive
+  // duration from them directly without scale inference.
+  const elapsed = profile.profile.samples
+    .map((sample) => sample.elapsed_since_start_ns)
     .filter((value) => Number.isFinite(value))
     .sort((a, b) => a - b);
-  if (timestamps.length < 2) {
+  if (elapsed.length < 2) {
     return null;
   }
 
-  const duration = timestamps[timestamps.length - 1]! - timestamps[0]!;
-  if (duration <= 0) {
-    return null;
-  }
-
-  const firstTimestampScale = inferSampleTimestampNsScale(timestamps[0]!);
-  const lastTimestampScale = inferSampleTimestampNsScale(
-    timestamps[timestamps.length - 1]!,
-  );
-
-  if (firstTimestampScale && firstTimestampScale === lastTimestampScale) {
-    return Math.round(duration * firstTimestampScale);
-  }
-
-  return Math.round(duration);
-}
-
-function inferSampleTimestampNsScale(timestamp: number): number | null {
-  const absoluteTimestamp = Math.abs(timestamp);
-
-  // Older transaction profile payloads use absolute epoch timestamps.
-  if (absoluteTimestamp >= 1e8 && absoluteTimestamp < 1e11) {
-    return 1_000_000_000;
-  }
-  if (absoluteTimestamp >= 1e11 && absoluteTimestamp < 1e14) {
-    return 1_000_000;
-  }
-  if (absoluteTimestamp >= 1e14 && absoluteTimestamp < 1e17) {
-    return 1_000;
-  }
-
-  return null;
+  const duration = elapsed[elapsed.length - 1]! - elapsed[0]!;
+  return duration > 0 ? Math.round(duration) : null;
 }
 
 function formatDeviceSummary(profile: TransactionProfile): string | null {

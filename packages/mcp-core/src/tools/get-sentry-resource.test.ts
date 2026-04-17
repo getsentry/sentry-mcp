@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import {
   mswServer,
   organizationFixture,
-  profileDetailsFixture,
+  transactionProfileV1Fixture,
   replayDetailsFixture,
   traceMetaFixture,
   traceFixture,
@@ -192,20 +192,24 @@ describe("get_sentry_resource", () => {
   describe("URL mode — profile URLs", () => {
     it("dispatches transaction profile URLs to get_profile_details", async () => {
       const result = await callHandler({
-        url: `https://my-org.sentry.io/explore/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/`,
+        url: `https://my-org.sentry.io/explore/profiling/profile/backend/${transactionProfileV1Fixture.profile_id}/flamegraph/`,
       });
 
-      expect(result).toContain(`# Profile ${profileDetailsFixture.profile_id}`);
+      expect(result).toContain(
+        `# Profile ${transactionProfileV1Fixture.profile_id}`,
+      );
       expect(result).toContain("**Project**: backend");
       expect(result).toContain("**Transaction**: /api/users");
     });
 
     it("dispatches transaction profile URLs with organizations path", async () => {
       const result = await callHandler({
-        url: `https://sentry.io/organizations/my-org/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/?frameName=handle_request`,
+        url: `https://sentry.io/organizations/my-org/profiling/profile/backend/${transactionProfileV1Fixture.profile_id}/flamegraph/?frameName=handle_request`,
       });
 
-      expect(result).toContain(`# Profile ${profileDetailsFixture.profile_id}`);
+      expect(result).toContain(
+        `# Profile ${transactionProfileV1Fixture.profile_id}`,
+      );
       expect(result).toContain(
         "**Trace ID**: a4d1aae7216b47ff8117cf4e09ce9d0a",
       );
@@ -226,7 +230,7 @@ describe("get_sentry_resource", () => {
       await expect(
         getSentryResource.handler(
           {
-            url: `https://my-org.sentry.io/explore/profiling/profile/frontend/${profileDetailsFixture.profile_id}/flamegraph/`,
+            url: `https://my-org.sentry.io/explore/profiling/profile/frontend/${transactionProfileV1Fixture.profile_id}/flamegraph/`,
           },
           {
             ...baseContext,

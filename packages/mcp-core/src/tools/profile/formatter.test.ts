@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { profileDetailsFixture } from "@sentry/mcp-server-mocks";
+import { transactionProfileV1Fixture } from "@sentry/mcp-server-mocks";
+import { describe, expect, it } from "vitest";
+import { TransactionProfileSchema } from "../../api-client/schema";
 import type {
   Flamegraph,
   ProfileChunk,
@@ -154,7 +155,13 @@ function createMockProfileChunk(): ProfileChunk {
 }
 
 function createMockTransactionProfile(): TransactionProfile {
-  return structuredClone(profileDetailsFixture) as TransactionProfile;
+  // Parse the fixture through the schema so transforms run (e.g. normalizing
+  // numeric thread_id and active_thread_id to strings). This keeps test
+  // fixtures in sync with what production code actually receives after the
+  // API client validates the response.
+  return TransactionProfileSchema.parse(
+    structuredClone(transactionProfileV1Fixture),
+  );
 }
 
 describe("formatter", () => {
@@ -491,12 +498,12 @@ describe("formatter", () => {
         ...Array.from({ length: 22 }, (_, index) => ({
           stack_id: Math.floor(index / 2),
           thread_id: "1",
-          timestamp: 1710958503.629 + index * 0.01,
+          elapsed_since_start_ns: index * 10_000_000,
         })),
         {
           stack_id: 11,
           thread_id: "1",
-          timestamp: 1710958503.999,
+          elapsed_since_start_ns: 220_000_000,
         },
       ];
 
@@ -512,7 +519,10 @@ describe("formatter", () => {
       expect(output).not.toContain("`library_0`");
     });
 
-    it("falls back to epoch-second sample timestamps when relative bounds are missing", () => {
+    it("falls back to elapsed_since_start_ns for V1 transaction profiles when relative bounds are missing", () => {
+      // Regression test for getsentry/sentry-mcp issue MCP-SERVER-FRN: vroom
+      // emits V1 samples with elapsed_since_start_ns (uint64 nanoseconds)
+      // instead of timestamp, and numeric thread_id.
       const profile = createMockTransactionProfile();
 
       if (profile.transaction) {
@@ -521,9 +531,9 @@ describe("formatter", () => {
       }
 
       profile.profile.samples = [
-        { stack_id: 0, thread_id: "1", timestamp: 1710958503.629 },
-        { stack_id: 1, thread_id: "1", timestamp: 1710958503.679 },
-        { stack_id: 1, thread_id: "1", timestamp: 1710958503.729 },
+        { stack_id: 0, thread_id: "1", elapsed_since_start_ns: 0 },
+        { stack_id: 1, thread_id: "1", elapsed_since_start_ns: 50_000_000 },
+        { stack_id: 1, thread_id: "1", elapsed_since_start_ns: 100_000_000 },
       ];
 
       const output = formatTransactionProfileAnalysis(profile, {
@@ -536,7 +546,7 @@ describe("formatter", () => {
       expect(output).toContain("- **Duration**: 100ms");
     });
 
-    it("preserves nanosecond sample durations under 1ms when relative bounds are missing", () => {
+    it("preserves sub-millisecond V1 sample durations", () => {
       const profile = createMockTransactionProfile();
 
       if (profile.transaction) {
@@ -545,9 +555,9 @@ describe("formatter", () => {
       }
 
       profile.profile.samples = [
-        { stack_id: 0, thread_id: "1", timestamp: 0 },
-        { stack_id: 1, thread_id: "1", timestamp: 250_000 },
-        { stack_id: 1, thread_id: "1", timestamp: 500_000 },
+        { stack_id: 0, thread_id: "1", elapsed_since_start_ns: 0 },
+        { stack_id: 1, thread_id: "1", elapsed_since_start_ns: 250_000 },
+        { stack_id: 1, thread_id: "1", elapsed_since_start_ns: 500_000 },
       ];
 
       const output = formatTransactionProfileAnalysis(profile, {

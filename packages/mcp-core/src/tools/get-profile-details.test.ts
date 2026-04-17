@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { http, HttpResponse } from "msw";
-import { mswServer, profileDetailsFixture } from "@sentry/mcp-server-mocks";
+import {
+  mswServer,
+  transactionProfileV1Fixture,
+} from "@sentry/mcp-server-mocks";
 import getProfileDetails from "./get-profile-details";
 
 const baseContext = {
@@ -16,7 +19,7 @@ describe("get_profile_details", () => {
     it("fetches and formats a transaction profile from profileUrl", async () => {
       const result = await getProfileDetails.handler(
         {
-          profileUrl: `https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/`,
+          profileUrl: `https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/${transactionProfileV1Fixture.profile_id}/flamegraph/`,
           regionUrl: null,
           focusOnUserCode: true,
         },
@@ -72,14 +75,16 @@ describe("get_profile_details", () => {
         {
           organizationSlug: "sentry-mcp-evals",
           projectSlugOrId: "backend",
-          profileId: profileDetailsFixture.profile_id,
+          profileId: transactionProfileV1Fixture.profile_id,
           regionUrl: null,
           focusOnUserCode: false,
         },
         baseContext,
       );
 
-      expect(result).toContain(`# Profile ${profileDetailsFixture.profile_id}`);
+      expect(result).toContain(
+        `# Profile ${transactionProfileV1Fixture.profile_id}`,
+      );
       expect(result).toContain("**Project**: backend");
       expect(result).toContain("cursor.execute");
     });
@@ -135,7 +140,7 @@ describe("get_profile_details", () => {
       await expect(
         getProfileDetails.handler(
           {
-            profileUrl: `https://other-org.sentry.io/explore/profiling/profile/backend/${profileDetailsFixture.profile_id}/flamegraph/`,
+            profileUrl: `https://other-org.sentry.io/explore/profiling/profile/backend/${transactionProfileV1Fixture.profile_id}/flamegraph/`,
             organizationSlug: "sentry-mcp-evals",
             projectSlugOrId: "backend",
             regionUrl: null,
@@ -152,7 +157,7 @@ describe("get_profile_details", () => {
       await expect(
         getProfileDetails.handler(
           {
-            profileUrl: `https://sentry-mcp-evals.sentry.io/explore/profiling/profile/frontend/${profileDetailsFixture.profile_id}/flamegraph/`,
+            profileUrl: `https://sentry-mcp-evals.sentry.io/explore/profiling/profile/frontend/${transactionProfileV1Fixture.profile_id}/flamegraph/`,
             organizationSlug: "sentry-mcp-evals",
             projectSlugOrId: "backend",
             regionUrl: null,
