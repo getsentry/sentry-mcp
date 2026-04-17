@@ -9,6 +9,8 @@ interface OAuthProps {
   accessToken: string;
   refreshToken: string;
   grantedSkills: string[];
+  constraintOrganizationSlug?: string | null;
+  constraintProjectSlug?: string | null;
 }
 
 const DEFAULT_OAUTH_PROPS: OAuthProps = {
@@ -247,6 +249,68 @@ describe("MCP Handler", () => {
 
       expect(response.status).toBe(404);
       expect(await response.text()).toContain("not found");
+    });
+
+    it("returns 403 when the token is org-scoped but the MCP URL uses a different organization", async () => {
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp/other-org" },
+      );
+      const ctx = createMcpContext({
+        constraintOrganizationSlug: "my-org",
+      });
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).toContain("scoped to an organization");
+    });
+
+    it("returns 403 when the token is project-scoped but the MCP URL uses a different project", async () => {
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp/my-org/wrong-project" },
+      );
+      const ctx = createMcpContext({
+        constraintOrganizationSlug: "my-org",
+        constraintProjectSlug: "expected-project",
+      });
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).toContain("scoped to a project");
+    });
+
+    it("returns 403 when the token is project-scoped but the MCP URL omits the project segment", async () => {
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp/my-org" },
+      );
+      const ctx = createMcpContext({
+        constraintOrganizationSlug: "my-org",
+        constraintProjectSlug: "my-project",
+      });
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).toContain("scoped to a project");
     });
   });
 

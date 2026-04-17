@@ -220,6 +220,23 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
+    const tokenOrg = rawProps.constraintOrganizationSlug?.trim() || null;
+    const tokenProject = rawProps.constraintProjectSlug?.trim() || null;
+    if (tokenOrg && organizationSlug !== tokenOrg) {
+      return new Response(
+        "This token is scoped to an organization. Use the MCP URL for the organization you authorized.",
+        { status: 403 },
+      );
+    }
+    if (tokenProject) {
+      if (!projectSlug || projectSlug !== tokenProject) {
+        return new Response(
+          "This token is scoped to a project. Use the MCP URL that includes that project (for example /mcp/<org>/<project>).",
+          { status: 403 },
+        );
+      }
+    }
+
     // Verify user has access to the requested org/project
     // Cache verification results in KV to avoid repeated API calls
     const verification = await verifyConstraintsAccess(
@@ -240,13 +257,15 @@ const mcpHandler: ExportedHandler<Env> = {
       });
     }
 
+    const constraints = verification.constraints;
+
     // Build complete ServerContext from OAuth props + verified constraints
     const serverContext: ServerContext = {
       userId,
       clientId,
       accessToken,
       grantedSkills: validSkills,
-      constraints: verification.constraints,
+      constraints,
       sentryHost,
       mcpUrl: env.MCP_URL,
       agentMode: isAgentMode,

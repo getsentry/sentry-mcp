@@ -177,7 +177,7 @@ describe("verifyConstraintsAccess", () => {
       // Verify cache was checked
       expect(mockKV.get).toHaveBeenCalledOnce();
       expect(mockKV.get).toHaveBeenCalledWith(
-        "caps:v1:user-123:sentry.io:sentry-mcp-evals:cloudflare-mcp",
+        "caps:v1:user-123:sentry.io:sentry-mcp-evals:project:cloudflare-mcp",
         "json",
       );
 
@@ -222,7 +222,7 @@ describe("verifyConstraintsAccess", () => {
       // Verify cache was written with correct key and TTL
       expect(mockKV.put).toHaveBeenCalledOnce();
       expect(mockKV.put).toHaveBeenCalledWith(
-        "caps:v1:user-456:sentry.io:sentry-mcp-evals:cloudflare-mcp",
+        "caps:v1:user-456:sentry.io:sentry-mcp-evals:project:cloudflare-mcp",
         expect.any(String),
         { expirationTtl: 900 },
       );
@@ -294,8 +294,13 @@ describe("verifyConstraintsAccess", () => {
       expect(mockKV.put).toHaveBeenCalledOnce();
     });
 
-    it("does not use cache for org-only verification", async () => {
-      const mockKV = createMockKV({ getResult: cachedData });
+    it("uses cache for org-only verification", async () => {
+      const orgOnlyCached: CachedConstraints = {
+        regionUrl: "https://us.sentry.io",
+        projectCapabilities: null,
+        cachedAt: Date.now(),
+      };
+      const mockKV = createMockKV({ getResult: orgOnlyCached });
       const cache: CacheOptions = {
         kv: mockKV,
         userId: "user-org-only",
@@ -307,10 +312,82 @@ describe("verifyConstraintsAccess", () => {
       );
 
       expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.constraints).toEqual({
+          organizationSlug: "sentry-mcp-evals",
+          projectSlug: null,
+          regionUrl: "https://us.sentry.io",
+          projectCapabilities: null,
+        });
+      }
 
-      // Cache should not be checked for org-only verification
-      expect(mockKV.get).not.toHaveBeenCalled();
+      expect(mockKV.get).toHaveBeenCalledOnce();
+      expect(mockKV.get).toHaveBeenCalledWith(
+        "caps:v1:user-org-only:sentry.io:sentry-mcp-evals:org",
+        "json",
+      );
       expect(mockKV.put).not.toHaveBeenCalled();
+    });
+
+    it("uses distinct cache keys for org-only and '__org__' project constraints", async () => {
+      const mockKV = createMockKV({ getResult: cachedData });
+      const cache: CacheOptions = {
+        kv: mockKV,
+        userId: "user-sentinel",
+      };
+
+      const orgOnlyResult = await verifyConstraintsAccess(
+        { organizationSlug: "sentry-mcp-evals", projectSlug: null },
+        { accessToken: token, sentryHost: host, cache },
+      );
+      const projectResult = await verifyConstraintsAccess(
+        { organizationSlug: "sentry-mcp-evals", projectSlug: "__org__" },
+        { accessToken: token, sentryHost: host, cache },
+      );
+
+      expect(orgOnlyResult.ok).toBe(true);
+      expect(projectResult.ok).toBe(true);
+      expect(mockKV.get).toHaveBeenNthCalledWith(
+        1,
+        "caps:v1:user-sentinel:sentry.io:sentry-mcp-evals:org",
+        "json",
+      );
+      expect(mockKV.get).toHaveBeenNthCalledWith(
+        2,
+        "caps:v1:user-sentinel:sentry.io:sentry-mcp-evals:project:__org__",
+        "json",
+      );
+    });
+
+    it("writes KV cache after org-only verification on miss", async () => {
+      const mockKV = createMockKV({ getResult: null });
+      const cache: CacheOptions = {
+        kv: mockKV,
+        userId: "user-org-cache-write",
+      };
+
+      const result = await verifyConstraintsAccess(
+        { organizationSlug: "sentry-mcp-evals", projectSlug: null },
+        { accessToken: token, sentryHost: host, cache },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(mockKV.get).toHaveBeenCalledOnce();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(mockKV.put).toHaveBeenCalledOnce();
+      expect(mockKV.put).toHaveBeenCalledWith(
+        "caps:v1:user-org-cache-write:sentry.io:sentry-mcp-evals:org",
+        expect.any(String),
+        { expirationTtl: 900 },
+      );
+      const parsed = JSON.parse(
+        vi.mocked(mockKV.put).mock.calls[0][1] as string,
+      );
+      expect(parsed).toMatchObject({
+        regionUrl: "https://us.sentry.io",
+        projectCapabilities: null,
+        cachedAt: expect.any(Number),
+      });
     });
   });
 });

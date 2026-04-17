@@ -12,6 +12,7 @@ import {
 import { verifyAndParseState, type OAuthState } from "../state";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
 import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
+import { parseResourceMcpConstraints } from "../resource-scope";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
@@ -262,6 +263,13 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // Convert valid skills Set to array for OAuth props
   const grantedSkills = Array.from(validSkills);
 
+  const resource = (oauthReqInfo as AuthRequestWithSkills).resource;
+  const resourceScope = parseResourceMcpConstraints(
+    typeof resource === "string" ? resource : undefined,
+  );
+  const constraintOrganizationSlug = resourceScope?.organizationSlug ?? null;
+  const constraintProjectSlug = resourceScope?.projectSlug ?? null;
+
   // Return back to the MCP client a new token
   const accessTokenExpiresAt = getUpstreamTokenExpiryTimestamp(payload);
   const userLabel = getUpstreamUserLabel(payload);
@@ -290,7 +298,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       grantedScopes: Array.from(grantedScopes),
       grantedSkills, // Primary authorization method
 
-      // Note: constraints are NOT included here - they're extracted per-request from URL
+      constraintOrganizationSlug,
+      constraintProjectSlug,
+
       // Note: sentryHost and mcpUrl come from env, not OAuth props
     } as WorkerProps,
   });

@@ -14,6 +14,7 @@ import {
 import { SCOPES } from "../../../constants";
 import { signState, type OAuthState } from "../state";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
+import { parseResourceMcpConstraints } from "../resource-scope";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
@@ -21,42 +22,6 @@ import { logWarn } from "@sentry/mcp-core/telem/logging";
 interface AuthRequestWithSkills extends AuthRequest {
   skills?: unknown;
   resource?: string;
-}
-
-function getApprovalScopeFromResource(resource: string | null | undefined): {
-  organizationSlug: string;
-  projectSlug: string | null;
-} | null {
-  if (!resource) {
-    return null;
-  }
-
-  try {
-    const { pathname } = new URL(resource);
-    const pathSegments = pathname.split("/").filter(Boolean);
-
-    if (pathSegments[0] !== "mcp") {
-      return null;
-    }
-
-    if (pathSegments.length === 2) {
-      return {
-        organizationSlug: pathSegments[1],
-        projectSlug: null,
-      };
-    }
-
-    if (pathSegments.length === 3) {
-      return {
-        organizationSlug: pathSegments[1],
-        projectSlug: pathSegments[2],
-      };
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 async function redirectToUpstream(
@@ -154,7 +119,7 @@ export default new Hono<{ Bindings: Env }>()
       ...oauthReqInfoWithoutResource,
       ...(resourceParam ? { resource: resourceParam } : {}),
     };
-    const approvalScope = getApprovalScopeFromResource(resourceParam);
+    const approvalScope = parseResourceMcpConstraints(resourceParam);
 
     // XXX(dcramer): we want to confirm permissions on each time
     // so you can always choose new ones

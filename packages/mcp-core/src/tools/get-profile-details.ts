@@ -2,6 +2,7 @@ import { setTag } from "@sentry/core";
 import { z } from "zod";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { resolveRegionUrlForOrganization } from "../internal/tool-helpers/resolve-region-url";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
@@ -271,10 +272,6 @@ export default defineTool({
   annotations: { readOnlyHint: true, openWorldHint: false },
 
   async handler(params, context: ServerContext) {
-    const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl ?? undefined,
-    });
-
     const resolved = resolveProfileDetailsParams({
       profileUrl: params.profileUrl,
       organizationSlug: params.organizationSlug,
@@ -283,6 +280,16 @@ export default defineTool({
       profilerId: params.profilerId,
       start: params.start,
       end: params.end,
+    });
+
+    const regionUrl = await resolveRegionUrlForOrganization({
+      context,
+      organizationSlug: resolved.organizationSlug,
+      regionUrl: params.regionUrl,
+    });
+
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: regionUrl ?? undefined,
     });
 
     setTag("organization.slug", resolved.organizationSlug);

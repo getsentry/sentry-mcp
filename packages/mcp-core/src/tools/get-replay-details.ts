@@ -8,6 +8,7 @@ import type {
 } from "../api-client";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { resolveRegionUrlForOrganization } from "../internal/tool-helpers/resolve-region-url";
 import { parseSentryUrl } from "../internal/url-helpers";
 import { resolveScopedOrganizationSlug } from "../internal/url-scope";
 import { UserInputError } from "../errors";
@@ -81,10 +82,10 @@ export default defineTool({
   },
   async handler(params, context: ServerContext) {
     const resolved = resolveReplayParams(params);
-    const regionUrl = await resolveReplayRegionUrl({
+    const regionUrl = await resolveRegionUrlForOrganization({
       context,
       organizationSlug: resolved.organizationSlug,
-      regionUrl: params.regionUrl ?? context.constraints.regionUrl,
+      regionUrl: params.regionUrl,
     });
     const apiService = apiServiceFromContext(context, {
       regionUrl: regionUrl ?? undefined,
@@ -176,30 +177,6 @@ export function resolveReplayParams(params: {
     organizationSlug: params.organizationSlug,
     replayId: params.replayId,
   };
-}
-
-async function resolveReplayRegionUrl({
-  context,
-  organizationSlug,
-  regionUrl,
-}: {
-  context: ServerContext;
-  organizationSlug: string;
-  regionUrl?: string | null;
-}): Promise<string | null> {
-  if (regionUrl != null) {
-    const trimmedRegionUrl = regionUrl.trim();
-    return trimmedRegionUrl || null;
-  }
-
-  try {
-    const organization =
-      await apiServiceFromContext(context).getOrganization(organizationSlug);
-    const resolvedRegionUrl = organization.links?.regionUrl?.trim();
-    return resolvedRegionUrl || null;
-  } catch {
-    return null;
-  }
 }
 
 async function assertReplayWithinProjectConstraint({

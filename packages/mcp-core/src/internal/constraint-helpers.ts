@@ -3,6 +3,10 @@
  *
  * These functions handle the logic for filtering tool schemas and injecting
  * constraint parameters, including support for parameter aliases (e.g., projectSlug → projectSlugOrId).
+ *
+ * Non-empty string `constraints.regionUrl` (from org resolution on the host transport
+ * or OAuth) is filtered and re-injected like other string constraints so clients cannot
+ * override the regional API host for an org-scoped session.
  */
 import type { Constraints } from "../types";
 import type { z } from "zod";

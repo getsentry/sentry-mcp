@@ -337,6 +337,7 @@ async function main() {
     constraints: {
       organizationSlug: cfg.organizationSlug ?? null,
       projectSlug: cfg.projectSlug ?? null,
+      regionUrl: null,
     },
     sentryHost: cfg.sentryHost,
     mcpUrl: cfg.mcpUrl,
