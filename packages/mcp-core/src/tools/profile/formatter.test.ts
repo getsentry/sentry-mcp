@@ -1,5 +1,6 @@
 import { profileDetailsFixture } from "@sentry/mcp-server-mocks";
 import { describe, expect, it } from "vitest";
+import { TransactionProfileSchema } from "../../api-client/schema";
 import type {
   Flamegraph,
   ProfileChunk,
@@ -154,7 +155,11 @@ function createMockProfileChunk(): ProfileChunk {
 }
 
 function createMockTransactionProfile(): TransactionProfile {
-  return structuredClone(profileDetailsFixture) as TransactionProfile;
+  // Parse the fixture through the schema so transforms run (e.g. normalizing
+  // numeric thread_id and active_thread_id to strings). This keeps test
+  // fixtures in sync with what production code actually receives after the
+  // API client validates the response.
+  return TransactionProfileSchema.parse(structuredClone(profileDetailsFixture));
 }
 
 describe("formatter", () => {
