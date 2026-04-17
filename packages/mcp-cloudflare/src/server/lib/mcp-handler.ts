@@ -222,13 +222,13 @@ const mcpHandler: ExportedHandler<Env> = {
 
     const tokenOrg = rawProps.constraintOrganizationSlug?.trim() || null;
     const tokenProject = rawProps.constraintProjectSlug?.trim() || null;
+    if (tokenOrg && organizationSlug !== tokenOrg) {
+      return new Response(
+        "This token is scoped to an organization. Use the MCP URL for the organization you authorized.",
+        { status: 403 },
+      );
+    }
     if (tokenProject) {
-      if (!tokenOrg || organizationSlug !== tokenOrg) {
-        return new Response(
-          "This token is scoped to a project. Use the MCP URL for the organization you authorized.",
-          { status: 403 },
-        );
-      }
       if (!projectSlug || projectSlug !== tokenProject) {
         return new Response(
           "This token is scoped to a project. Use the MCP URL that includes that project (for example /mcp/<org>/<project>).",

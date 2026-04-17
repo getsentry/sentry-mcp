@@ -251,6 +251,26 @@ describe("MCP Handler", () => {
       expect(await response.text()).toContain("not found");
     });
 
+    it("returns 403 when the token is org-scoped but the MCP URL uses a different organization", async () => {
+      const request = createMcpRequest(
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+        { path: "/mcp/other-org" },
+      );
+      const ctx = createMcpContext({
+        constraintOrganizationSlug: "my-org",
+      });
+
+      const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).toContain("scoped to an organization");
+    });
+
     it("returns 403 when the token is project-scoped but the MCP URL uses a different project", async () => {
       const request = createMcpRequest(
         "initialize",
