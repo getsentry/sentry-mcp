@@ -4,8 +4,10 @@ import {
   EventSchema,
   FlamegraphSchema,
   IssueSchema,
+  ProfileSampleSchema,
   ReleaseSchema,
   ReplayDetailsSchema,
+  TransactionProfileSchema,
 } from "./schema";
 
 describe("IssueSchema", () => {
@@ -577,5 +579,65 @@ describe("FlamegraphSchema", () => {
     expect(flamegraph.shared.profiles).toEqual([]);
     expect(flamegraph.profiles[0]?.sample_durations_ns).toEqual([]);
     expect(flamegraph.profiles[0]?.sample_counts).toEqual([]);
+  });
+});
+
+describe("ProfileSampleSchema", () => {
+  it("parses V2 continuous profile chunk samples with string thread_id and timestamp", () => {
+    const sample = ProfileSampleSchema.parse({
+      stack_id: 0,
+      thread_id: "1",
+      timestamp: 1710958503.629,
+    });
+
+    expect(sample.thread_id).toBe("1");
+    expect(sample.timestamp).toBe(1710958503.629);
+    expect(sample.elapsed_since_start_ns).toBeUndefined();
+  });
+
+  it("parses V1 transaction profile samples with numeric thread_id and elapsed_since_start_ns", () => {
+    // Regression test for getsentry/sentry-mcp issue MCP-SERVER-FRN: vroom
+    // serializes V1 Sample.ThreadID as uint64 and uses elapsed_since_start_ns
+    // rather than timestamp. We must accept both shapes.
+    const sample = ProfileSampleSchema.parse({
+      stack_id: 0,
+      thread_id: 1,
+      elapsed_since_start_ns: 50000000,
+    });
+
+    expect(sample.thread_id).toBe("1");
+    expect(sample.elapsed_since_start_ns).toBe(50000000);
+    expect(sample.timestamp).toBeUndefined();
+  });
+});
+
+describe("TransactionProfileSchema", () => {
+  it("parses V1 transaction profiles with numeric active_thread_id and uint64 sample thread ids", () => {
+    // Regression test for getsentry/sentry-mcp issue MCP-SERVER-FRN.
+    const profile = TransactionProfileSchema.parse({
+      event_id: "cfe78a5c892d4a64a962d837673398d2",
+      profile_id: "cfe78a5c892d4a64a962d837673398d2",
+      platform: "python",
+      version: "2",
+      profile: {
+        frames: [{ function: "handle_request", in_app: true }],
+        samples: [
+          { stack_id: 0, thread_id: 1, elapsed_since_start_ns: 0 },
+          { stack_id: 0, thread_id: 1, elapsed_since_start_ns: 50000000 },
+        ],
+        stacks: [[0]],
+        thread_metadata: { "1": { name: "MainThread" } },
+      },
+      transaction: {
+        name: "/api/users",
+        trace_id: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        id: "7ca573c0f4814912aaa9bdc77d1a7d51",
+        active_thread_id: 1,
+      },
+    });
+
+    expect(profile.transaction?.active_thread_id).toBe("1");
+    expect(profile.profile.samples[0]?.thread_id).toBe("1");
+    expect(profile.profile.samples[0]?.elapsed_since_start_ns).toBe(0);
   });
 });

@@ -13,14 +13,14 @@ import type {
   TransactionProfile,
 } from "../../api-client/types";
 import {
+  type FrameComparison,
+  type HotPath,
   analyzeHotPathsFromFlamegraph,
   compareFrameStats,
   formatDuration,
   formatPercentage,
   generatePerformanceInsights,
   identifyHotspotFramesFromFlamegraph,
-  type FrameComparison,
-  type HotPath,
 } from "./analyzer";
 
 /**
@@ -679,9 +679,29 @@ function getTransactionProfileDurationNs(
     return relativeEnd - relativeStart;
   }
 
+  // V1 transaction profile samples carry elapsed_since_start_ns (already in ns)
+  // instead of timestamp. Prefer it when present so we don't have to guess a
+  // scale factor.
+  const elapsed = profile.profile.samples
+    .map((sample) => sample.elapsed_since_start_ns)
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value),
+    )
+    .sort((a, b) => a - b);
+  if (elapsed.length >= 2) {
+    const duration = elapsed[elapsed.length - 1]! - elapsed[0]!;
+    if (duration > 0) {
+      return Math.round(duration);
+    }
+  }
+
   const timestamps = profile.profile.samples
     .map((sample) => sample.timestamp)
-    .filter((value) => Number.isFinite(value))
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value),
+    )
     .sort((a, b) => a - b);
   if (timestamps.length < 2) {
     return null;

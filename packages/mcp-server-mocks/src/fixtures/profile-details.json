@@ -43,18 +43,18 @@
     "samples": [
       {
         "stack_id": 0,
-        "thread_id": "1",
-        "timestamp": 1710958503.629
+        "thread_id": 1,
+        "elapsed_since_start_ns": 0
       },
       {
         "stack_id": 1,
-        "thread_id": "1",
-        "timestamp": 1710958503.679
+        "thread_id": 1,
+        "elapsed_since_start_ns": 50000000
       },
       {
         "stack_id": 1,
-        "thread_id": "1",
-        "timestamp": 1710958503.729
+        "thread_id": 1,
+        "elapsed_since_start_ns": 100000000
       }
     ],
     "stacks": [

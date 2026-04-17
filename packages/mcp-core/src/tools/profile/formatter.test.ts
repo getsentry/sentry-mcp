@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import { profileDetailsFixture } from "@sentry/mcp-server-mocks";
+import { describe, expect, it } from "vitest";
 import type {
   Flamegraph,
   ProfileChunk,
@@ -524,6 +524,33 @@ describe("formatter", () => {
         { stack_id: 0, thread_id: "1", timestamp: 1710958503.629 },
         { stack_id: 1, thread_id: "1", timestamp: 1710958503.679 },
         { stack_id: 1, thread_id: "1", timestamp: 1710958503.729 },
+      ];
+
+      const output = formatTransactionProfileAnalysis(profile, {
+        focusOnUserCode: true,
+        profileUrl:
+          "https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/",
+        projectSlug: "backend",
+      });
+
+      expect(output).toContain("- **Duration**: 100ms");
+    });
+
+    it("falls back to elapsed_since_start_ns for V1 transaction profiles when relative bounds are missing", () => {
+      // Regression test for getsentry/sentry-mcp issue MCP-SERVER-FRN: vroom
+      // emits V1 samples with elapsed_since_start_ns (uint64 nanoseconds)
+      // instead of timestamp, and numeric thread_id.
+      const profile = createMockTransactionProfile();
+
+      if (profile.transaction) {
+        profile.transaction.relative_start_ns = undefined;
+        profile.transaction.relative_end_ns = undefined;
+      }
+
+      profile.profile.samples = [
+        { stack_id: 0, thread_id: "1", elapsed_since_start_ns: 0 },
+        { stack_id: 1, thread_id: "1", elapsed_since_start_ns: 50_000_000 },
+        { stack_id: 1, thread_id: "1", elapsed_since_start_ns: 100_000_000 },
       ];
 
       const output = formatTransactionProfileAnalysis(profile, {

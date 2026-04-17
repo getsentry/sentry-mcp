@@ -1084,12 +1084,23 @@ export const ProfileFrameSchema = z
  *
  * Each sample represents a point-in-time snapshot of the call stack,
  * with a reference to the stack_id and thread_id.
+ *
+ * This schema accepts both the V1 and V2 sample formats emitted by Sentry's
+ * profiling service (vroom):
+ * - V1 (transaction profiles) uses `elapsed_since_start_ns` and emits
+ *   `thread_id` as a number (Go `uint64`).
+ * - V2 (continuous profile chunks) uses `timestamp` and emits `thread_id` as a
+ *   string.
+ *
+ * `thread_id` is normalized to a string so downstream consumers can safely
+ * compare against `thread_metadata` keys, which are always strings.
  */
 export const ProfileSampleSchema = z
   .object({
     stack_id: z.number(),
-    thread_id: z.string(),
-    timestamp: z.number(),
+    thread_id: z.union([z.string(), z.number()]).transform(String),
+    timestamp: z.number().optional(),
+    elapsed_since_start_ns: z.number().optional(),
     queue_address: z.string().optional(),
   })
   .passthrough();
@@ -1168,7 +1179,10 @@ export const TransactionProfileSchema = z
         name: z.string().optional(),
         trace_id: z.string().optional(),
         id: z.string().optional(),
-        active_thread_id: z.string().optional(),
+        active_thread_id: z
+          .union([z.string(), z.number()])
+          .transform(String)
+          .optional(),
         relative_start_ns: z
           .union([z.string(), z.number()])
           .transform((value) => Number(value))
