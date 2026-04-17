@@ -1787,8 +1787,12 @@ export function formatIssueOutput({
     output += `**Culprit**: ${issue.culprit}\n`;
   }
 
-  output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
-  output += `**Last Seen**: ${new Date(issue.lastSeen).toISOString()}\n`;
+  if (issue.firstSeen) {
+    output += `**First Seen**: ${new Date(issue.firstSeen).toISOString()}\n`;
+  }
+  if (issue.lastSeen) {
+    output += `**Last Seen**: ${new Date(issue.lastSeen).toISOString()}\n`;
+  }
   output += `**Occurrences**: ${issue.count}\n`;
   output += `**Users Impacted**: ${issue.userCount}\n`;
   output += `**Status**: ${issue.status}\n`;
