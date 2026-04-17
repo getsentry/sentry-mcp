@@ -25,30 +25,6 @@ import {
 import { annotateResponseMetric } from "../metrics";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
-export function mergeConstraintRegionUrl(
-  constraints: ServerContext["constraints"],
-  organizationSlug: string | null,
-  rawConstraintOrganizationSlug: string | null | undefined,
-  rawConstraintRegionUrl: string | null | undefined,
-): ServerContext["constraints"] {
-  const tokenOrganizationSlug = rawConstraintOrganizationSlug?.trim() || null;
-  const tokenRegionUrl = rawConstraintRegionUrl?.trim() || null;
-
-  if (
-    organizationSlug &&
-    !constraints.regionUrl?.trim() &&
-    tokenRegionUrl &&
-    tokenOrganizationSlug === organizationSlug
-  ) {
-    return {
-      ...constraints,
-      regionUrl: tokenRegionUrl,
-    };
-  }
-
-  return constraints;
-}
-
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
  */
@@ -281,13 +257,7 @@ const mcpHandler: ExportedHandler<Env> = {
       });
     }
 
-    let constraints = verification.constraints;
-    constraints = mergeConstraintRegionUrl(
-      constraints,
-      organizationSlug,
-      rawProps.constraintOrganizationSlug ?? null,
-      rawProps.constraintRegionUrl ?? null,
-    );
+    const constraints = verification.constraints;
 
     // Build complete ServerContext from OAuth props + verified constraints
     const serverContext: ServerContext = {

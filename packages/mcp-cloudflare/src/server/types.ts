@@ -32,11 +32,10 @@ export type WorkerProps = {
 
   /**
    * When the OAuth `resource` parameter scoped the grant to `/mcp/:org` (or
-   * `/mcp/:org/:project`), we resolve `links.regionUrl` once at token grant so
-   * MCP requests can merge it into URL constraints without agents passing `regionUrl`.
+   * `/mcp/:org/:project`), persist those path constraints on the token. The
+   * regional API host is resolved later from cached verification or lazy lookup.
    */
   constraintOrganizationSlug?: string | null;
-  constraintRegionUrl?: string | null;
   /**
    * When the `resource` URL included a project segment (`/mcp/:org/:project`),
    * the MCP handler requires the request path to use that same org and project.

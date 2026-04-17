@@ -21,7 +21,6 @@
  */
 
 import { buildServer } from "@sentry/mcp-core/server";
-import { SentryApiService } from "@sentry/mcp-core/api-client";
 import { startStdio } from "./transports/stdio";
 import * as Sentry from "@sentry/node";
 import { LIB_VERSION } from "@sentry/mcp-core/version";
@@ -90,21 +89,6 @@ async function main() {
   const cfg = await resolveAccessToken(partialCfg).catch((err) => {
     die(err instanceof Error ? err.message : String(err));
   });
-
-  let constraintRegionUrl: string | null = null;
-  const orgSlugForRegion = cfg.organizationSlug?.trim();
-  if (orgSlugForRegion && cfg.accessToken) {
-    try {
-      const api = new SentryApiService({
-        host: cfg.sentryHost,
-        accessToken: cfg.accessToken,
-      });
-      const org = await api.getOrganization(orgSlugForRegion);
-      constraintRegionUrl = org.links?.regionUrl?.trim() || null;
-    } catch {
-      // Leave null; unconstrained regionUrl stays on tool schemas when applicable.
-    }
-  }
 
   // Configure embedded agent provider
   if (cfg.agentProvider) {
@@ -353,7 +337,7 @@ async function main() {
     constraints: {
       organizationSlug: cfg.organizationSlug ?? null,
       projectSlug: cfg.projectSlug ?? null,
-      regionUrl: constraintRegionUrl,
+      regionUrl: null,
     },
     sentryHost: cfg.sentryHost,
     mcpUrl: cfg.mcpUrl,
