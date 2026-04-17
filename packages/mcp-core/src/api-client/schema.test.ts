@@ -4,9 +4,10 @@ import {
   EventSchema,
   FlamegraphSchema,
   IssueSchema,
-  ProfileSampleSchema,
+  ProfileChunkSampleSchema,
   ReleaseSchema,
   ReplayDetailsSchema,
+  TransactionProfileSampleSchema,
   TransactionProfileSchema,
 } from "./schema";
 
@@ -582,9 +583,9 @@ describe("FlamegraphSchema", () => {
   });
 });
 
-describe("ProfileSampleSchema", () => {
+describe("ProfileChunkSampleSchema", () => {
   it("parses V2 continuous profile chunk samples with string thread_id and timestamp", () => {
-    const sample = ProfileSampleSchema.parse({
+    const sample = ProfileChunkSampleSchema.parse({
       stack_id: 0,
       thread_id: "1",
       timestamp: 1710958503.629,
@@ -592,14 +593,35 @@ describe("ProfileSampleSchema", () => {
 
     expect(sample.thread_id).toBe("1");
     expect(sample.timestamp).toBe(1710958503.629);
-    expect(sample.elapsed_since_start_ns).toBeUndefined();
   });
 
+  it("rejects V1-only fields and shapes that don't match the V2 wire format", () => {
+    // V2 samples must have a string thread_id (not uint64) and a required
+    // timestamp. Keeping this strict prevents V1 payloads from silently
+    // parsing as V2 and vice-versa.
+    expect(() =>
+      ProfileChunkSampleSchema.parse({
+        stack_id: 0,
+        thread_id: 1,
+        timestamp: 1710958503.629,
+      }),
+    ).toThrow();
+    expect(() =>
+      ProfileChunkSampleSchema.parse({
+        stack_id: 0,
+        thread_id: "1",
+        elapsed_since_start_ns: 50000000,
+      }),
+    ).toThrow();
+  });
+});
+
+describe("TransactionProfileSampleSchema", () => {
   it("parses V1 transaction profile samples with numeric thread_id and elapsed_since_start_ns", () => {
     // Regression test for getsentry/sentry-mcp issue MCP-SERVER-FRN: vroom
     // serializes V1 Sample.ThreadID as uint64 and uses elapsed_since_start_ns
-    // rather than timestamp. We must accept both shapes.
-    const sample = ProfileSampleSchema.parse({
+    // rather than timestamp.
+    const sample = TransactionProfileSampleSchema.parse({
       stack_id: 0,
       thread_id: 1,
       elapsed_since_start_ns: 50000000,
@@ -608,6 +630,18 @@ describe("ProfileSampleSchema", () => {
     expect(sample.thread_id).toBe("1");
     expect(sample.elapsed_since_start_ns).toBe(50000000);
     expect(sample.timestamp).toBeUndefined();
+  });
+
+  it("still accepts legacy V1 payloads that use a string thread_id and timestamp", () => {
+    const sample = TransactionProfileSampleSchema.parse({
+      stack_id: 0,
+      thread_id: "1",
+      timestamp: 1710958503.629,
+    });
+
+    expect(sample.thread_id).toBe("1");
+    expect(sample.timestamp).toBe(1710958503.629);
+    expect(sample.elapsed_since_start_ns).toBeUndefined();
   });
 });
 

@@ -84,9 +84,15 @@ export interface TransactionProfileAnalysisOptions {
   traceUrl?: string;
 }
 
+/**
+ * Shape consumed by the sample-based formatters. Using a narrow structural
+ * type lets us accept both V2 continuous profile chunk samples and V1
+ * transaction profile samples without forcing one side's timing fields onto
+ * the other — the formatters here only care about `stack_id` and `thread_id`.
+ */
 interface ProfileSampleData {
   frames: ProfileChunk["profile"]["frames"];
-  samples: ProfileChunk["profile"]["samples"];
+  samples: Array<{ stack_id: number; thread_id: string }>;
   stacks: ProfileChunk["profile"]["stacks"];
   threadMetadata: ProfileChunk["profile"]["thread_metadata"];
 }

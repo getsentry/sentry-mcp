@@ -1079,34 +1079,59 @@ export const ProfileFrameSchema = z
   })
   .passthrough();
 
+const ProfileThreadMetadataSchema = z.record(
+  z
+    .object({
+      name: z.string().nullable(),
+      priority: z.number().nullable().optional(),
+    })
+    .passthrough(),
+);
+
 /**
- * Schema for individual samples in raw profile chunk data.
+ * Schema for a single V2 continuous profile chunk sample.
  *
- * Each sample represents a point-in-time snapshot of the call stack,
- * with a reference to the stack_id and thread_id.
- *
- * This schema accepts both the V1 and V2 sample formats emitted by Sentry's
- * profiling service (vroom):
- * - V1 (transaction profiles) uses `elapsed_since_start_ns` and emits
- *   `thread_id` as a number (Go `uint64`).
- * - V2 (continuous profile chunks) uses `timestamp` and emits `thread_id` as a
- *   string.
- *
- * `thread_id` is normalized to a string so downstream consumers can safely
- * compare against `thread_metadata` keys, which are always strings.
+ * V2 chunks are produced by the continuous profiler and span multiple
+ * transactions. Each sample carries an absolute (or relative-to-chunk) wall
+ * clock `timestamp` in seconds and a string `thread_id` matching
+ * `thread_metadata` keys.
  */
-export const ProfileSampleSchema = z
+export const ProfileChunkSampleSchema = z
   .object({
     stack_id: z.number(),
-    thread_id: z.union([z.string(), z.number()]).transform(String),
-    timestamp: z.number().optional(),
-    elapsed_since_start_ns: z.number().optional(),
+    thread_id: z.string(),
+    timestamp: z.number(),
     queue_address: z.string().optional(),
   })
   .passthrough();
 
 /**
- * Schema for raw profile chunk data.
+ * Schema for a single V1 transaction profile sample.
+ *
+ * V1 samples are produced per-transaction by Sentry's profiling service
+ * (vroom). They differ from V2 chunk samples in two important ways:
+ * - `thread_id` is serialized as a Go `uint64` (a number on the wire). It is
+ *   normalized to a string here so downstream code can compare against the
+ *   string keys in `thread_metadata`.
+ * - Time is carried as `elapsed_since_start_ns` (uint64 nanoseconds since the
+ *   start of the profile) rather than an absolute `timestamp`.
+ *
+ * `timestamp` is retained as an optional legacy field because some historical
+ * V1 payloads emitted absolute or millisecond timestamps that the formatter
+ * still falls back to.
+ */
+export const TransactionProfileSampleSchema = z
+  .object({
+    stack_id: z.number(),
+    thread_id: z.union([z.string(), z.number()]).transform(String),
+    elapsed_since_start_ns: z.number().optional(),
+    timestamp: z.number().optional(),
+    queue_address: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Schema for raw V2 continuous-profile chunk data.
  *
  * Contains the raw sampling data including:
  * - frames: All unique stack frames
@@ -1127,16 +1152,9 @@ export const ProfileChunkSchema = z
     version: z.string(),
     profile: z.object({
       frames: z.array(ProfileFrameSchema),
-      samples: z.array(ProfileSampleSchema),
+      samples: z.array(ProfileChunkSampleSchema),
       stacks: z.array(z.array(z.number())),
-      thread_metadata: z.record(
-        z
-          .object({
-            name: z.string().nullable(),
-            priority: z.number().nullable().optional(),
-          })
-          .passthrough(),
-      ),
+      thread_metadata: ProfileThreadMetadataSchema,
     }),
   })
   .passthrough();
@@ -1164,6 +1182,14 @@ const ProfileReleaseSchema = z
   ])
   .optional();
 
+/**
+ * Schema for a V1 transaction profile response.
+ *
+ * Unlike V2 continuous profile chunks, transaction profiles are scoped to a
+ * single transaction and always include a `transaction` object. vroom emits
+ * both `Sample.thread_id` and `Transaction.active_thread_id` as `uint64`, so
+ * both are accepted as number or string here and normalized to strings.
+ */
 export const TransactionProfileSchema = z
   .object({
     event_id: z.string().optional(),
@@ -1173,7 +1199,12 @@ export const TransactionProfileSchema = z
     platform: z.string(),
     release: ProfileReleaseSchema,
     version: z.union([z.string(), z.number()]).transform(String).optional(),
-    profile: ProfileChunkSchema.shape.profile,
+    profile: z.object({
+      frames: z.array(ProfileFrameSchema),
+      samples: z.array(TransactionProfileSampleSchema),
+      stacks: z.array(z.array(z.number())),
+      thread_metadata: ProfileThreadMetadataSchema,
+    }),
     transaction: z
       .object({
         name: z.string().optional(),
