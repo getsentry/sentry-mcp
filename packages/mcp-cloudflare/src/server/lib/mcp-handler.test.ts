@@ -1,7 +1,7 @@
 import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../types";
-import mcpHandler from "./mcp-handler";
+import mcpHandler, { mergeConstraintRegionUrl } from "./mcp-handler";
 
 interface OAuthProps {
   id: string;
@@ -87,6 +87,42 @@ function createTestEnv(): Env {
 describe("MCP Handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe("mergeConstraintRegionUrl", () => {
+    it("matches the trimmed token org slug before merging the token region URL", () => {
+      const merged = mergeConstraintRegionUrl(
+        {
+          organizationSlug: "my-org",
+          projectSlug: null,
+          regionUrl: null,
+        },
+        "my-org",
+        " my-org ",
+        " https://de.sentry.io ",
+      );
+
+      expect(merged).toEqual({
+        organizationSlug: "my-org",
+        projectSlug: null,
+        regionUrl: "https://de.sentry.io",
+      });
+    });
+
+    it("does not override a verified region URL", () => {
+      const merged = mergeConstraintRegionUrl(
+        {
+          organizationSlug: "my-org",
+          projectSlug: null,
+          regionUrl: "https://us.sentry.io",
+        },
+        "my-org",
+        "my-org",
+        "https://de.sentry.io",
+      );
+
+      expect(merged.regionUrl).toBe("https://us.sentry.io");
+    });
   });
 
   describe("authentication", () => {

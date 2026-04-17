@@ -177,7 +177,7 @@ describe("verifyConstraintsAccess", () => {
       // Verify cache was checked
       expect(mockKV.get).toHaveBeenCalledOnce();
       expect(mockKV.get).toHaveBeenCalledWith(
-        "caps:v1:user-123:sentry.io:sentry-mcp-evals:cloudflare-mcp",
+        "caps:v1:user-123:sentry.io:sentry-mcp-evals:project:cloudflare-mcp",
         "json",
       );
 
@@ -222,7 +222,7 @@ describe("verifyConstraintsAccess", () => {
       // Verify cache was written with correct key and TTL
       expect(mockKV.put).toHaveBeenCalledOnce();
       expect(mockKV.put).toHaveBeenCalledWith(
-        "caps:v1:user-456:sentry.io:sentry-mcp-evals:cloudflare-mcp",
+        "caps:v1:user-456:sentry.io:sentry-mcp-evals:project:cloudflare-mcp",
         expect.any(String),
         { expirationTtl: 900 },
       );
@@ -323,10 +323,40 @@ describe("verifyConstraintsAccess", () => {
 
       expect(mockKV.get).toHaveBeenCalledOnce();
       expect(mockKV.get).toHaveBeenCalledWith(
-        "caps:v1:user-org-only:sentry.io:sentry-mcp-evals:__org__",
+        "caps:v1:user-org-only:sentry.io:sentry-mcp-evals:org",
         "json",
       );
       expect(mockKV.put).not.toHaveBeenCalled();
+    });
+
+    it("uses distinct cache keys for org-only and '__org__' project constraints", async () => {
+      const mockKV = createMockKV({ getResult: cachedData });
+      const cache: CacheOptions = {
+        kv: mockKV,
+        userId: "user-sentinel",
+      };
+
+      const orgOnlyResult = await verifyConstraintsAccess(
+        { organizationSlug: "sentry-mcp-evals", projectSlug: null },
+        { accessToken: token, sentryHost: host, cache },
+      );
+      const projectResult = await verifyConstraintsAccess(
+        { organizationSlug: "sentry-mcp-evals", projectSlug: "__org__" },
+        { accessToken: token, sentryHost: host, cache },
+      );
+
+      expect(orgOnlyResult.ok).toBe(true);
+      expect(projectResult.ok).toBe(true);
+      expect(mockKV.get).toHaveBeenNthCalledWith(
+        1,
+        "caps:v1:user-sentinel:sentry.io:sentry-mcp-evals:org",
+        "json",
+      );
+      expect(mockKV.get).toHaveBeenNthCalledWith(
+        2,
+        "caps:v1:user-sentinel:sentry.io:sentry-mcp-evals:project:__org__",
+        "json",
+      );
     });
 
     it("writes KV cache after org-only verification on miss", async () => {
@@ -346,7 +376,7 @@ describe("verifyConstraintsAccess", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(mockKV.put).toHaveBeenCalledOnce();
       expect(mockKV.put).toHaveBeenCalledWith(
-        "caps:v1:user-org-cache-write:sentry.io:sentry-mcp-evals:__org__",
+        "caps:v1:user-org-cache-write:sentry.io:sentry-mcp-evals:org",
         expect.any(String),
         { expirationTtl: 900 },
       );

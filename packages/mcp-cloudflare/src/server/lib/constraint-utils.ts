@@ -29,8 +29,8 @@ export type CacheOptions = {
 
 /**
  * Build a cache key for constraints verification.
- * Format: caps:v1:{userId}:{sentryHost}:{organizationSlug}:{projectKey}
- * projectKey is the project slug, or "__org__" when only the organization is constrained.
+ * Format: caps:v1:{userId}:{sentryHost}:{organizationSlug}:{scopeKey}
+ * scopeKey is "org" for org-only entries or "project:{slug}" for project-scoped entries.
  */
 function buildCacheKey(
   userId: string,
@@ -38,8 +38,11 @@ function buildCacheKey(
   organizationSlug: string,
   projectSlug: string | null | undefined,
 ): string {
-  const projectKey = projectSlug?.trim() || "__org__";
-  return `caps:${CACHE_KEY_VERSION}:${userId}:${sentryHost}:${organizationSlug}:${projectKey}`;
+  const normalizedProjectSlug = projectSlug?.trim();
+  const scopeKey = normalizedProjectSlug
+    ? `project:${normalizedProjectSlug}`
+    : "org";
+  return `caps:${CACHE_KEY_VERSION}:${userId}:${sentryHost}:${organizationSlug}:${scopeKey}`;
 }
 
 /**
