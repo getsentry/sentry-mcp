@@ -583,6 +583,22 @@ describe("resolveResourceParams", () => {
       });
     });
 
+    it("resolves trace type with span focus", () => {
+      expect(
+        resolveResourceParams({
+          resourceType: "trace",
+          organizationSlug: "my-org",
+          resourceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+          spanId: "aa8e7f3384ef4ff5",
+        }),
+      ).toEqual<ResolvedResourceParams>({
+        type: "trace",
+        organizationSlug: "my-org",
+        traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        spanId: "aa8e7f3384ef4ff5",
+      });
+    });
+
     it("resolves breadcrumbs type", () => {
       expect(
         resolveResourceParams({
@@ -676,6 +692,17 @@ describe("resolveResourceParams", () => {
           resourceId: "something",
         }),
       ).toThrow("Invalid resourceType: monitor");
+    });
+
+    it("throws when spanId is used with a non-trace resource", () => {
+      expect(() =>
+        resolveResourceParams({
+          resourceType: "issue",
+          organizationSlug: "my-org",
+          resourceId: "PROJECT-123",
+          spanId: "aa8e7f3384ef4ff5",
+        }),
+      ).toThrow("`spanId` can only be used with trace resources.");
     });
 
     it("throws for completely invalid resourceType", () => {

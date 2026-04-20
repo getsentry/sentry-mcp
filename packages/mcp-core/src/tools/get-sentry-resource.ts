@@ -3,7 +3,7 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
-import { ParamOrganizationSlug } from "../schema";
+import { ParamOrganizationSlug, ParamSpanId } from "../schema";
 import { parseSentryUrl, type ParsedSentryUrl } from "../internal/url-helpers";
 import {
   resolveScopedOrganizationSlug,
@@ -46,7 +46,6 @@ export interface ResolvedResourceParams {
   eventId?: string;
   // Trace params
   traceId?: string;
-  // TODO: spanId is parsed from URLs but not yet used - add when get_trace_details supports span focusing
   spanId?: string;
   // Profile params
   projectSlug?: string;
@@ -68,6 +67,7 @@ export function resolveResourceParams(params: {
   resourceId?: string | null;
   organizationSlug?: string | null;
   projectSlug?: string | null;
+  spanId?: string | null;
 }): ResolvedResourceParams {
   if (params.url) {
     const parsed = parseSentryUrl(params.url);
@@ -99,6 +99,10 @@ export function resolveResourceParams(params: {
   const resourceType = params.resourceType as FullySupportedType;
   const organizationSlug = params.organizationSlug;
 
+  if (params.spanId && resourceType !== "trace") {
+    throw new UserInputError("`spanId` can only be used with trace resources.");
+  }
+
   if (!params.resourceId) {
     throw new UserInputError("`resourceId` is required when not using a URL.");
   }
@@ -125,6 +129,7 @@ export function resolveResourceParams(params: {
         type: "trace",
         organizationSlug,
         traceId: resourceId,
+        spanId: params.spanId ?? undefined,
       };
 
     case "breadcrumbs":
@@ -153,6 +158,7 @@ function resolveFromParsedUrl(
     resourceType?: string | null;
     organizationSlug?: string | null;
     projectSlug?: string | null;
+    spanId?: string | null;
   },
 ): ResolvedResourceParams {
   const { type: detectedType } = parsed;
@@ -172,6 +178,10 @@ function resolveFromParsedUrl(
       "Could not determine resource type from URL. " +
         "Supported URL patterns: issues, events, traces, profiles, replays, monitors, and releases.",
     );
+  }
+
+  if (params.spanId && detectedType !== "trace") {
+    throw new UserInputError("`spanId` can only be used with trace resources.");
   }
 
   if (params.resourceType && params.resourceType !== detectedType) {
@@ -224,7 +234,7 @@ function resolveFromParsedUrl(
         type: "trace",
         organizationSlug,
         traceId: parsed.traceId,
-        spanId: parsed.spanId,
+        spanId: parsed.spanId ?? params.spanId ?? undefined,
       };
 
     case "profile":
@@ -353,6 +363,9 @@ export default defineTool({
     "",
     "### By type and ID",
     "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
+    "",
+    "### Focus a single span in a trace",
+    "get_sentry_resource(resourceType='trace', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')",
     "</examples>",
   ].join("\n"),
 
@@ -380,6 +393,8 @@ export default defineTool({
         "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL.",
       ),
 
+    spanId: ParamSpanId.optional(),
+
     organizationSlug: ParamOrganizationSlug.optional(),
   },
 
@@ -393,10 +408,14 @@ export default defineTool({
       organizationSlug:
         params.organizationSlug ?? context.constraints.organizationSlug,
       projectSlug: context.constraints.projectSlug,
+      spanId: params.spanId,
     });
 
     setTag("resource.type", resolved.type);
     setTag("organization.slug", resolved.organizationSlug);
+    if (resolved.spanId) {
+      setTag("trace.span_id", resolved.spanId);
+    }
 
     // Recognized but not yet fully supported types return guidance messages
     if (resolved.type === "monitor" || resolved.type === "release") {
@@ -430,6 +449,7 @@ export default defineTool({
           {
             organizationSlug: resolved.organizationSlug,
             traceId: resolved.traceId!,
+            spanId: resolved.spanId,
             regionUrl: context.constraints.regionUrl ?? null,
           },
           context,

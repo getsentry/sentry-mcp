@@ -575,7 +575,7 @@
   },
   {
     "name": "get_sentry_resource",
-    "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
+    "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Focus a single span in a trace\nget_sentry_resource(resourceType='trace', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -592,6 +592,11 @@
         "resourceId": {
           "type": "string",
           "description": "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL."
+        },
+        "spanId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The span ID within a trace. Use this with a trace resource to focus on a specific span."
         },
         "organizationSlug": {
           "type": "string",

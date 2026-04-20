@@ -1,15 +1,27 @@
 import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import { hasAgentProvider } from "../internal/agents/provider-factory";
 import { resolveRegionUrlForOrganization } from "../internal/tool-helpers/resolve-region-url";
+import type { SentryApiService, Trace } from "../api-client";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
-import { ParamOrganizationSlug, ParamRegionUrl, ParamTraceId } from "../schema";
+import {
+  ParamOrganizationSlug,
+  ParamRegionUrl,
+  ParamSpanId,
+  ParamTraceId,
+} from "../schema";
 
 // Constants for span filtering and tree rendering
-const MAX_DEPTH = 2;
+const MAX_TRACE_FETCH_LIMIT = 1000;
+const MIN_TRACE_FETCH_LIMIT = 50;
+const MAX_DEPTH = 8;
+const MAX_ROOT_SPANS = 12;
+const MAX_OVERVIEW_SPANS = 96;
+const MAX_FOCUSED_CHILD_SPANS = 40;
+const MAX_QUEUED_CHILDREN_PER_PARENT = 24;
 const MINIMUM_DURATION_THRESHOLD_MS = 10;
-const MIN_MEANINGFUL_CHILD_DURATION = 5;
 const MIN_AVG_DURATION_MS = 5;
 
 interface TraceSummary {
@@ -18,6 +30,56 @@ interface TraceSummary {
   performanceIssues: number | null;
   logs: number | null;
   projectSlug?: string;
+}
+
+interface TraceSpanNode {
+  children: unknown[];
+  errors?: unknown[];
+  occurrences?: unknown[];
+  event_id: string;
+  span_id?: string;
+  parent_span_id?: string | null;
+  transaction_id?: string;
+  project_id?: string | number;
+  project_slug?: string;
+  profile_id?: string | null;
+  profiler_id?: string | null;
+  start_timestamp?: number;
+  end_timestamp?: number;
+  timestamp?: number | string;
+  measurements?: Record<string, number>;
+  duration: number;
+  trace?: string;
+  hash?: string | null;
+  exclusive_time?: number;
+  status?: string | null;
+  is_segment?: boolean;
+  is_transaction?: boolean;
+  description?: string | null;
+  transaction?: string | null;
+  sdk_name?: string | null;
+  op?: string | null;
+  name?: string | null;
+  event_type?: string | null;
+  same_process_as_parent?: boolean;
+  organization?: unknown;
+  tags?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+  additional_attributes?: Record<string, unknown>;
+}
+
+interface SpanBranchStats {
+  interesting: boolean;
+  score: number;
+  maxDuration: number;
+  descendantCount: number;
+}
+
+interface SpanExpansionCandidate {
+  span: TraceSpanNode;
+  parent: SelectedSpan;
+  level: number;
+  score: number;
 }
 
 export default defineTool({
@@ -34,10 +96,11 @@ export default defineTool({
     "- Ask to 'show me trace [TRACE-ID]', 'explain trace [TRACE-ID]'",
     "- Want high-level overview and link to view trace details in Sentry",
     "- Need trace statistics and span breakdown",
+    "- Want an overview first, then a guided pivot into additional spans or events",
     "",
     "DO NOT USE for:",
     "- General searching for traces (use search_events with trace queries)",
-    "- Individual span details (this shows trace overview)",
+    "- Complete span enumeration or branch-by-branch reconstruction (use search_events or list_events scoped to the trace)",
     "",
     "TRIGGER PATTERNS:",
     "- 'Show me trace abc123' → use get_trace_details",
@@ -53,12 +116,16 @@ export default defineTool({
     "",
     "<hints>",
     "- Trace IDs are 32-character hexadecimal strings",
+    "- This returns a condensed trace overview, not a full span dump",
+    "- Provide `spanId` to focus on a single span within the trace",
+    "- If the response says it shows a subset of spans, use search_events or list_events to inspect the rest of the trace",
     "</hints>",
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
     regionUrl: ParamRegionUrl.nullable().default(null),
     traceId: ParamTraceId,
+    spanId: ParamSpanId.optional(),
   },
   annotations: {
     readOnlyHint: true,
@@ -84,10 +151,13 @@ export default defineTool({
 
     setTag("organization.slug", params.organizationSlug);
     setTag("trace.id", params.traceId);
+    if (params.spanId) {
+      setTag("trace.span_id", params.spanId);
+    }
 
     const constrainedProjectSlug = context.constraints.projectSlug ?? undefined;
     let summary: TraceSummary;
-    let trace: any[];
+    let trace: Trace;
 
     if (constrainedProjectSlug) {
       setTag("project.slug", constrainedProjectSlug);
@@ -100,7 +170,7 @@ export default defineTool({
       trace = await apiService.getTrace({
         organizationSlug: params.organizationSlug,
         traceId: params.traceId,
-        limit: 10, // Only get top-level spans for overview
+        limit: MAX_TRACE_FETCH_LIMIT,
         project: String(project.id),
         statsPeriod: "14d", // Fixed stats period
       });
@@ -120,11 +190,17 @@ export default defineTool({
         statsPeriod: "14d", // Fixed stats period
       });
 
-      // Get minimal trace data to show key transactions
+      const traceFetchLimit = getTraceFetchLimit(
+        traceMeta.span_count,
+        traceMeta.errors,
+      );
+
+      // Fetch as much of the trace as we can so the overview and operation
+      // breakdown are based on the real trace tree instead of a tiny sample.
       trace = await apiService.getTrace({
         organizationSlug: params.organizationSlug,
         traceId: params.traceId,
-        limit: 10, // Only get top-level spans for overview
+        limit: traceFetchLimit,
         statsPeriod: "14d", // Fixed stats period
       });
 
@@ -139,6 +215,7 @@ export default defineTool({
     return formatTraceOutput({
       organizationSlug: params.organizationSlug,
       traceId: params.traceId,
+      spanId: params.spanId,
       summary,
       trace,
       apiService,
@@ -146,8 +223,36 @@ export default defineTool({
   },
 });
 
+function isTraceSpanNode(node: unknown): node is TraceSpanNode {
+  if (node === null || typeof node !== "object") {
+    return false;
+  }
+
+  const candidate = node as Partial<TraceSpanNode>;
+  return (
+    typeof candidate.event_id === "string" &&
+    typeof candidate.duration === "number" &&
+    Array.isArray(candidate.children)
+  );
+}
+
+function getTraceSpans(trace: Trace): TraceSpanNode[] {
+  return trace.filter(isTraceSpanNode);
+}
+
+function getTraceSpanChildren(span: TraceSpanNode): TraceSpanNode[] {
+  return span.children.filter(isTraceSpanNode);
+}
+
+function getTraceFetchLimit(totalSpanCount: number, errorCount = 0): number {
+  return Math.min(
+    Math.max(totalSpanCount + errorCount, MIN_TRACE_FETCH_LIMIT),
+    MAX_TRACE_FETCH_LIMIT,
+  );
+}
+
 interface SelectedSpan {
-  event_id: string;
+  id: string;
   op: string;
   name: string | null;
   description: string;
@@ -172,120 +277,239 @@ interface SelectedSpan {
  * 4. **Hierarchical context** - Maintains parent-child relationships for understanding
  *
  * Span inclusion rules:
- * - All transactions are included (they're typically root-level operations)
- * - Spans with errors are always included (debugging importance)
- * - Spans with duration >= 10ms are included (performance relevance)
- * - Children are recursively added up to 2 levels deep:
- *   - Transactions can have up to 2 children each
- *   - Regular spans can have up to 1 child each
+ * - Root spans are ranked by branch score, not just root duration
+ * - Spans with errors or long descendants stay in consideration
+ * - The tree expands best-first across the whole trace, not one branch at a time
+ * - Children are recursively added up to MAX_DEPTH levels deep
  * - Total output is capped at maxSpans to prevent overwhelming display
  *
- * @param spans - Complete array of trace spans with nested children
+ * @param trace - Complete array of trace spans with nested children
  * @param traceId - Trace ID to display in the fake root span
- * @param maxSpans - Maximum number of spans to include in output (default: 20)
+ * @param maxSpans - Maximum number of spans to include in output
  * @returns Single-element array containing fake root span with selected spans as children
  */
 function selectInterestingSpans(
-  spans: any[],
+  trace: Trace,
   traceId: string,
-  maxSpans = 20,
+  maxSpans = MAX_OVERVIEW_SPANS,
 ): SelectedSpan[] {
-  const selected: SelectedSpan[] = [];
+  const getBranchStats = createBranchStatsGetter();
+
+  const sortedRoots = getTraceSpans(trace)
+    .map((root) => ({
+      root,
+      stats: getBranchStats(root),
+    }))
+    .sort((a, b) => b.stats.score - a.stats.score)
+    .slice(0, MAX_ROOT_SPANS);
+
+  const fakeRoot = fakeRootTemplate(traceId);
+  const expansionQueue: SpanExpansionCandidate[] = [];
   let spanCount = 0;
 
-  // Filter out non-span items (issues) from the trace data
-  // Spans must have children array, duration, and other span-specific fields
-  const actualSpans = spans.filter(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      "children" in item &&
-      Array.isArray(item.children) &&
-      "duration" in item,
-  );
-
-  function addSpan(span: any, level: number): boolean {
-    if (spanCount >= maxSpans || level > MAX_DEPTH) return false;
-
-    const duration = span.duration || 0;
-    const isTransaction = span.is_transaction;
-    const hasErrors = span.errors?.length > 0;
-
-    // Always include transactions and spans with errors
-    // For regular spans, include if they have reasonable duration or are at root level
-    const shouldInclude =
-      isTransaction ||
-      hasErrors ||
-      level === 0 ||
-      duration >= MINIMUM_DURATION_THRESHOLD_MS;
-
-    if (!shouldInclude) return false;
-
-    const selectedSpan: SelectedSpan = {
-      event_id: span.event_id,
-      op: span.op || "unknown",
-      name: span.name || null,
-      description: span.description || span.transaction || "unnamed",
-      duration,
-      is_transaction: isTransaction,
-      children: [],
-      level,
-    };
-
-    spanCount++;
-
-    // Add up to one interesting child per span, up to MAX_DEPTH levels deep
-    if (level < MAX_DEPTH && span.children?.length > 0) {
-      // Sort children by duration (descending) and take the most interesting ones
-      const sortedChildren = span.children
-        .filter((child: any) => child.duration > MIN_MEANINGFUL_CHILD_DURATION) // Only children with meaningful duration
-        .sort((a: any, b: any) => (b.duration || 0) - (a.duration || 0));
-
-      // Add up to 2 children for transactions, 1 for regular spans
-      const maxChildren = isTransaction ? 2 : 1;
-      let addedChildren = 0;
-
-      for (const child of sortedChildren) {
-        if (addedChildren >= maxChildren || spanCount >= maxSpans) break;
-
-        if (addSpan(child, level + 1)) {
-          const childSpan = selected[selected.length - 1];
-          selectedSpan.children.push(childSpan);
-          addedChildren++;
-        }
-      }
+  for (const { root } of sortedRoots) {
+    if (spanCount >= maxSpans) {
+      break;
     }
 
-    selected.push(selectedSpan);
-    return true;
+    fakeRoot.children.push(createSelectedSpan(root, 0));
+    const selectedRoot = fakeRoot.children[fakeRoot.children.length - 1];
+    spanCount += 1;
+    enqueueSelectedChildren(
+      root,
+      selectedRoot,
+      1,
+      expansionQueue,
+      getBranchStats,
+    );
   }
 
-  // Sort root spans by duration and select the most interesting ones
-  const sortedRoots = actualSpans
-    .sort((a, b) => (b.duration || 0) - (a.duration || 0))
-    .slice(0, 5); // Start with top 5 root spans
+  while (expansionQueue.length > 0 && spanCount < maxSpans) {
+    expansionQueue.sort((a, b) => b.score - a.score);
+    const candidate = expansionQueue.shift();
 
-  for (const root of sortedRoots) {
-    if (spanCount >= maxSpans) break;
-    addSpan(root, 0);
+    if (!candidate || candidate.level > MAX_DEPTH) {
+      continue;
+    }
+
+    const selectedChild = createSelectedSpan(candidate.span, candidate.level);
+    candidate.parent.children.push(selectedChild);
+    spanCount += 1;
+    enqueueSelectedChildren(
+      candidate.span,
+      selectedChild,
+      candidate.level + 1,
+      expansionQueue,
+      getBranchStats,
+    );
   }
-
-  const rootSpans = selected.filter((span) => span.level === 0);
-
-  // Create fake root span representing the entire trace (no duration - traces are unbounded)
-  const fakeRoot: SelectedSpan = {
-    event_id: traceId,
-    op: "trace",
-    name: null,
-    description: `Trace ${traceId.substring(0, 8)}`,
-    duration: 0, // Traces don't have duration
-    is_transaction: false,
-    children: rootSpans,
-    level: -1, // Mark as fake root
-  };
 
   return [fakeRoot];
 }
+
+function selectInterestingSpanSubtree(
+  span: TraceSpanNode,
+  maxDescendantSpans = MAX_FOCUSED_CHILD_SPANS,
+): SelectedSpan {
+  const getBranchStats = createBranchStatsGetter();
+  const selectedRoot = createSelectedSpan(span, 0);
+  const expansionQueue: SpanExpansionCandidate[] = [];
+  let descendantCount = 0;
+
+  enqueueSelectedChildren(
+    span,
+    selectedRoot,
+    1,
+    expansionQueue,
+    getBranchStats,
+  );
+
+  while (expansionQueue.length > 0 && descendantCount < maxDescendantSpans) {
+    expansionQueue.sort((a, b) => b.score - a.score);
+    const candidate = expansionQueue.shift();
+
+    if (!candidate || candidate.level > MAX_DEPTH) {
+      continue;
+    }
+
+    const selectedChild = createSelectedSpan(candidate.span, candidate.level);
+    candidate.parent.children.push(selectedChild);
+    descendantCount += 1;
+    enqueueSelectedChildren(
+      candidate.span,
+      selectedChild,
+      candidate.level + 1,
+      expansionQueue,
+      getBranchStats,
+    );
+  }
+
+  return selectedRoot;
+}
+
+function normalizeSpanId(value: unknown): string | undefined {
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function getTraceSpanId(span: TraceSpanNode): string {
+  return (
+    normalizeSpanId(span.span_id) ||
+    normalizeSpanId(span.additional_attributes?.span_id) ||
+    span.event_id
+  );
+}
+
+function createBranchStatsGetter(): (span: TraceSpanNode) => SpanBranchStats {
+  const branchStatsBySpan = new Map<string, SpanBranchStats>();
+
+  function getBranchStats(span: TraceSpanNode): SpanBranchStats {
+    const spanId = getTraceSpanId(span);
+    const cached = branchStatsBySpan.get(spanId);
+    if (cached) {
+      return cached;
+    }
+
+    const duration = span.duration || 0;
+    const hasErrors = Array.isArray(span.errors) && span.errors.length > 0;
+
+    let maxDuration = duration;
+    let descendantCount = 1;
+    let childScore = 0;
+    let hasInterestingDescendant = false;
+
+    for (const child of getTraceSpanChildren(span)) {
+      const childStats = getBranchStats(child);
+      maxDuration = Math.max(maxDuration, childStats.maxDuration);
+      descendantCount += childStats.descendantCount;
+      childScore = Math.max(childScore, childStats.score);
+      hasInterestingDescendant ||= childStats.interesting;
+    }
+
+    const interesting =
+      Boolean(span.is_transaction) ||
+      hasErrors ||
+      duration >= MINIMUM_DURATION_THRESHOLD_MS ||
+      hasInterestingDescendant;
+
+    const score =
+      duration +
+      maxDuration * 0.75 +
+      descendantCount * 4 +
+      (span.is_transaction ? 250 : 0) +
+      (hasErrors ? 1000 : 0) +
+      childScore * 0.25;
+
+    const stats = {
+      interesting,
+      score,
+      maxDuration,
+      descendantCount,
+    };
+
+    branchStatsBySpan.set(spanId, stats);
+    return stats;
+  }
+
+  return getBranchStats;
+}
+
+function createSelectedSpan(span: TraceSpanNode, level: number): SelectedSpan {
+  return {
+    id: getTraceSpanId(span),
+    op: span.op || "unknown",
+    name: typeof span.name === "string" ? span.name : null,
+    description: span.description || span.transaction || "unnamed",
+    duration: span.duration || 0,
+    is_transaction: Boolean(span.is_transaction),
+    children: [],
+    level,
+  };
+}
+
+function enqueueSelectedChildren(
+  span: TraceSpanNode,
+  parent: SelectedSpan,
+  level: number,
+  queue: SpanExpansionCandidate[],
+  getBranchStats: (span: TraceSpanNode) => SpanBranchStats,
+): void {
+  if (level > MAX_DEPTH) {
+    return;
+  }
+
+  const childCandidates = getTraceSpanChildren(span)
+    .map((child) => ({
+      child,
+      stats: getBranchStats(child),
+    }))
+    .sort((a, b) => b.stats.score - a.stats.score)
+    .slice(0, MAX_QUEUED_CHILDREN_PER_PARENT);
+
+  for (const { child, stats } of childCandidates) {
+    queue.push({
+      span: child,
+      parent,
+      level,
+      score: stats.score,
+    });
+  }
+}
+
+// Create fake root span representing the entire trace (no duration - traces are unbounded)
+const fakeRootTemplate = (traceId: string): SelectedSpan => ({
+  id: traceId,
+  op: "trace",
+  name: null,
+  description: `Trace ${traceId.substring(0, 8)}`,
+  duration: 0, // Traces don't have duration
+  is_transaction: false,
+  children: [],
+  level: -1, // Mark as fake root
+});
 
 /**
  * Formats a span display name for the tree view.
@@ -325,7 +549,7 @@ function renderSpanTree(spans: SelectedSpan[]): string[] {
   const lines: string[] = [];
 
   function renderSpan(span: SelectedSpan, prefix = "", isLast = true): void {
-    const shortId = span.event_id.substring(0, 8);
+    const shortId = span.id.substring(0, 8);
     const connector = prefix === "" ? "" : isLast ? "└─ " : "├─ ";
     const displayName = formatSpanDisplayName(span);
 
@@ -362,7 +586,36 @@ function renderSpanTree(spans: SelectedSpan[]): string[] {
   return lines;
 }
 
-function calculateOperationStats(spans: any[]): Record<
+function findTraceSpan(trace: Trace, spanId: string): TraceSpanNode | null {
+  for (const span of getTraceSpans(trace)) {
+    const found = findTraceSpanInSubtree(span, spanId);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
+function findTraceSpanInSubtree(
+  span: TraceSpanNode,
+  targetSpanId: string,
+): TraceSpanNode | null {
+  if (getTraceSpanId(span) === targetSpanId) {
+    return span;
+  }
+
+  for (const child of getTraceSpanChildren(span)) {
+    const found = findTraceSpanInSubtree(child, targetSpanId);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
+function calculateOperationStats(trace: Trace): Record<
   string,
   {
     count: number;
@@ -370,8 +623,8 @@ function calculateOperationStats(spans: any[]): Record<
     p95Duration: number;
   }
 > {
-  const allSpans = getAllSpansFlattened(spans);
-  const operationSpans: Record<string, any[]> = {};
+  const allSpans = getAllSpansFlattened(trace);
+  const operationSpans: Record<string, TraceSpanNode[]> = {};
 
   // Group leaf spans by operation type (only spans with no children)
   for (const span of allSpans) {
@@ -419,44 +672,29 @@ function calculateOperationStats(spans: any[]): Record<
   return stats;
 }
 
-function getAllSpansFlattened(spans: any[]): any[] {
-  const result: any[] = [];
+function getAllSpansFlattened(trace: Trace): TraceSpanNode[] {
+  const result: TraceSpanNode[] = [];
 
-  // Filter out non-span items (issues) from the trace data
-  // Spans must have children array and duration
-  const actualSpans = spans.filter(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      "children" in item &&
-      Array.isArray(item.children) &&
-      "duration" in item,
-  );
-
-  function collectSpans(spanList: any[]) {
+  function collectSpans(spanList: TraceSpanNode[]) {
     for (const span of spanList) {
       result.push(span);
-      if (span.children && span.children.length > 0) {
-        collectSpans(span.children);
+      const children = getTraceSpanChildren(span);
+      if (children.length > 0) {
+        collectSpans(children);
       }
     }
   }
 
-  collectSpans(actualSpans);
+  collectSpans(getTraceSpans(trace));
   return result;
 }
 
 function buildProjectScopedTraceSummary(
-  trace: any[],
+  trace: Trace,
   projectSlug: string,
 ): TraceSummary {
   const spans = getAllSpansFlattened(trace);
-  const standaloneIssues = trace.filter(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      (!("children" in item) || !Array.isArray(item.children)),
-  );
+  const standaloneIssues = trace.filter((item) => !isTraceSpanNode(item));
   const spanErrors = spans.reduce(
     (count, span) =>
       count + (Array.isArray(span.errors) ? span.errors.length : 0),
@@ -475,6 +713,41 @@ function buildProjectScopedTraceSummary(
 function formatTraceOutput({
   organizationSlug,
   traceId,
+  spanId,
+  summary,
+  trace,
+  apiService,
+}: {
+  organizationSlug: string;
+  traceId: string;
+  spanId?: string;
+  summary: TraceSummary;
+  trace: Trace;
+  apiService: SentryApiService;
+}): string {
+  if (spanId) {
+    return formatFocusedSpanOutput({
+      organizationSlug,
+      traceId,
+      spanId,
+      summary,
+      trace,
+      apiService,
+    });
+  }
+
+  return formatTraceOverviewOutput({
+    organizationSlug,
+    traceId,
+    summary,
+    trace,
+    apiService,
+  });
+}
+
+function formatTraceOverviewOutput({
+  organizationSlug,
+  traceId,
   summary,
   trace,
   apiService,
@@ -482,8 +755,8 @@ function formatTraceOutput({
   organizationSlug: string;
   traceId: string;
   summary: TraceSummary;
-  trace: any[];
-  apiService: any;
+  trace: Trace;
+  apiService: SentryApiService;
 }): string {
   const sections: string[] = [];
 
@@ -535,15 +808,17 @@ function formatTraceOutput({
   // Show span tree structure
   if (trace.length > 0) {
     const selectedSpans = selectInterestingSpans(trace, traceId);
+    const overviewSpanCount = countSelectedSpans(selectedSpans);
 
-    if (selectedSpans.length > 0) {
+    if (overviewSpanCount > 0) {
       sections.push("## Overview");
       sections.push("");
       const treeLines = renderSpanTree(selectedSpans);
       sections.push(...treeLines);
       sections.push("");
+
       sections.push(
-        "*Note: This shows a subset of spans. View the full trace for complete details.*",
+        `*Overview shows ${overviewSpanCount} of ${summary.spanCount} spans.*`,
       );
       sections.push("");
     }
@@ -555,16 +830,272 @@ function formatTraceOutput({
   sections.push("");
   sections.push(`**Sentry URL**: ${traceUrl}`);
   sections.push("");
-  sections.push("## Find Related Events");
+  sections.push("## Next Steps");
   sections.push("");
-  sections.push(`Use this search query to find all events in this trace:`);
-  sections.push("```");
-  sections.push(`trace:${traceId}`);
-  sections.push("```");
-  sections.push("");
-  sections.push(
-    "You can use this query with the `search_events` tool to get detailed event data from this trace.",
-  );
+  sections.push(...buildTraceNextSteps());
 
   return sections.join("\n");
+}
+
+function formatFocusedSpanOutput({
+  organizationSlug,
+  traceId,
+  spanId,
+  summary,
+  trace,
+  apiService,
+}: {
+  organizationSlug: string;
+  traceId: string;
+  spanId: string;
+  summary: TraceSummary;
+  trace: Trace;
+  apiService: SentryApiService;
+}): string {
+  const focusedSpan = findTraceSpan(trace, spanId);
+  if (!focusedSpan) {
+    const fetchedSpanCount = getAllSpansFlattened(trace).length;
+    if (fetchedSpanCount < summary.spanCount) {
+      throw new UserInputError(
+        `Span \`${spanId}\` was not found in the fetched portion of trace \`${traceId}\`. Fetched ${fetchedSpanCount} of ${summary.spanCount} spans.`,
+      );
+    }
+
+    throw new UserInputError(
+      `Span \`${spanId}\` was not found in trace \`${traceId}\`.`,
+    );
+  }
+
+  const focusedSpanId = getTraceSpanId(focusedSpan);
+  const traceUrl = apiService.getTraceUrl(organizationSlug, traceId);
+  const focusedSpanUrl = buildSpanUrl(traceUrl, focusedSpanId);
+  const totalDescendantCount = countDescendantSpans(focusedSpan);
+  const selectedTree = selectInterestingSpanSubtree(focusedSpan);
+  const shownDescendantCount = countSelectedDescendants(selectedTree);
+  const sections: string[] = [];
+
+  sections.push(
+    `# Span \`${focusedSpanId}\` in Trace \`${traceId}\` in **${organizationSlug}**`,
+  );
+  sections.push("");
+  sections.push("## Summary");
+  sections.push("");
+  if (summary.projectSlug) {
+    sections.push(`**Scope**: project \`${summary.projectSlug}\``);
+  }
+  sections.push(`**Project**: ${focusedSpan.project_slug ?? "unknown"}`);
+  sections.push(`**Operation**: ${focusedSpan.op ?? "unknown"}`);
+  sections.push(`**Description**: ${formatTraceSpanDescription(focusedSpan)}`);
+  sections.push(`**Duration**: ${formatDuration(focusedSpan.duration)}`);
+  if (typeof focusedSpan.exclusive_time === "number") {
+    sections.push(
+      `**Exclusive Time**: ${formatDuration(focusedSpan.exclusive_time)}`,
+    );
+  }
+  sections.push(
+    `**Status**: ${focusedSpan.status ?? (focusedSpan.is_transaction ? "transaction" : "unknown")}`,
+  );
+  sections.push(
+    `**Parent Span ID**: ${focusedSpan.parent_span_id ?? "None (root span)"}`,
+  );
+  sections.push(`**Child Spans**: ${getTraceSpanChildren(focusedSpan).length}`);
+  sections.push(`**Descendant Spans**: ${totalDescendantCount}`);
+  sections.push(
+    `**Errors**: ${Array.isArray(focusedSpan.errors) ? focusedSpan.errors.length : 0}`,
+  );
+  sections.push(`**Event Type**: ${focusedSpan.event_type ?? "span"}`);
+  sections.push(`**SDK**: ${focusedSpan.sdk_name ?? "unknown"}`);
+  sections.push(`**Trace Total Spans**: ${summary.spanCount}`);
+  sections.push("");
+  sections.push("## Child Snapshot");
+  sections.push("");
+  sections.push(...renderSpanTree([selectedTree]));
+  sections.push("");
+  sections.push(
+    `*Child snapshot shows ${shownDescendantCount} of ${totalDescendantCount} descendant spans.*`,
+  );
+  sections.push("");
+  sections.push("## View Full Span");
+  sections.push("");
+  sections.push(`**Sentry URL**: ${focusedSpanUrl}`);
+  sections.push("");
+  sections.push("## Attributes");
+  sections.push("");
+  sections.push(...formatSpanAttributeSections(focusedSpan, traceId));
+  sections.push("## Next Steps");
+  sections.push("");
+  sections.push(...buildTraceNextSteps(true));
+
+  return sections.join("\n");
+}
+
+function countSelectedSpans(spans: SelectedSpan[]): number {
+  let count = 0;
+
+  function visit(span: SelectedSpan): void {
+    if (span.op !== "trace") {
+      count += 1;
+    }
+
+    for (const child of span.children) {
+      visit(child);
+    }
+  }
+
+  for (const span of spans) {
+    visit(span);
+  }
+
+  return count;
+}
+
+function countDescendantSpans(span: TraceSpanNode): number {
+  let count = 0;
+
+  for (const child of getTraceSpanChildren(span)) {
+    count += 1;
+    count += countDescendantSpans(child);
+  }
+
+  return count;
+}
+
+function countSelectedDescendants(span: SelectedSpan): number {
+  let count = 0;
+
+  for (const child of span.children) {
+    count += 1;
+    count += countSelectedDescendants(child);
+  }
+
+  return count;
+}
+
+function formatDuration(durationMs: number | undefined): string {
+  if (typeof durationMs !== "number") {
+    return "unknown";
+  }
+
+  return `${Math.round(durationMs)}ms`;
+}
+
+function formatTraceSpanDescription(span: TraceSpanNode): string {
+  return span.name?.trim() || span.description || span.transaction || "unnamed";
+}
+
+function buildSpanUrl(traceUrl: string, spanId: string): string {
+  const url = new URL(traceUrl);
+  url.searchParams.set("node", `span-${spanId}`);
+  return url.toString();
+}
+
+function formatSpanAttributeSections(
+  span: TraceSpanNode,
+  traceId: string,
+): string[] {
+  const sections: string[] = [];
+  const coreFields = stripUndefined({
+    span_id: getTraceSpanId(span),
+    event_id: span.event_id,
+    trace: span.trace ?? traceId,
+    transaction_id: span.transaction_id,
+    parent_span_id: span.parent_span_id ?? null,
+    project_id: span.project_id,
+    project_slug: span.project_slug,
+    profile_id: span.profile_id,
+    profiler_id: span.profiler_id,
+    start_timestamp: span.start_timestamp,
+    end_timestamp: span.end_timestamp,
+    timestamp: span.timestamp,
+    duration: span.duration,
+    exclusive_time: span.exclusive_time,
+    transaction: span.transaction,
+    is_transaction: span.is_transaction,
+    description: span.description,
+    sdk_name: span.sdk_name,
+    op: span.op,
+    name: span.name,
+    event_type: span.event_type,
+    status: span.status,
+    is_segment: span.is_segment,
+    same_process_as_parent: span.same_process_as_parent,
+    hash: span.hash,
+    organization: span.organization ?? null,
+  });
+
+  sections.push(...formatJsonSection("### Core Fields", coreFields));
+  sections.push(
+    ...formatJsonSection("### Measurements", span.measurements ?? {}),
+  );
+  sections.push(...formatJsonSection("### Tags", span.tags ?? {}));
+  sections.push(...formatJsonSection("### Data", span.data ?? {}));
+  sections.push(
+    ...formatJsonSection(
+      "### Additional Attributes",
+      span.additional_attributes ?? {},
+    ),
+  );
+  sections.push(...formatJsonSection("### Errors", span.errors ?? []));
+  sections.push(
+    ...formatJsonSection("### Occurrences", span.occurrences ?? []),
+  );
+
+  return sections;
+}
+
+function formatJsonSection(title: string, value: unknown): string[] {
+  return [
+    title,
+    "",
+    "```json",
+    JSON.stringify(sortJsonValue(value), null, 2) ?? "null",
+    "```",
+    "",
+  ];
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortJsonValue(item));
+  }
+
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, nestedValue]) => nestedValue !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nestedValue]) => [key, sortJsonValue(nestedValue)]),
+  );
+}
+
+function stripUndefined(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
+  );
+}
+
+function buildTraceNextSteps(spanFocused = false): string[] {
+  const spanTool = hasAgentProvider()
+    ? "`search_events`"
+    : "`list_events` with the `spans` dataset";
+  const errorTool = hasAgentProvider()
+    ? "`search_events`"
+    : "`list_events` with the `errors` dataset";
+  const logTool = hasAgentProvider()
+    ? "`search_events`"
+    : "`list_events` with the `logs` dataset";
+  const spanScope = spanFocused
+    ? "inspect sibling spans or the rest of this trace"
+    : "inspect more spans from this trace";
+
+  return [
+    `- **Search spans**: Use ${spanTool} to ${spanScope}.`,
+    `- **Search errors**: Use ${errorTool} to inspect related error events in this trace.`,
+    `- **Search logs**: Use ${logTool} to inspect related logs in this trace.`,
+  ];
 }

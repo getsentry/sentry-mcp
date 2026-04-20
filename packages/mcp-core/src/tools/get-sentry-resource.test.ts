@@ -24,6 +24,7 @@ function callHandler(params: {
   resourceType?: "issue" | "event" | "trace" | "breadcrumbs" | "replay";
   resourceId?: string;
   organizationSlug?: string;
+  spanId?: string;
 }) {
   return getSentryResource.handler(params, baseContext);
 }
@@ -134,10 +135,30 @@ describe("get_sentry_resource", () => {
     it("resolves trace with span focus query param", async () => {
       mockTraceEndpoints("test-org");
       const result = await callHandler({
-        url: `https://test-org.sentry.io/performance/trace/${traceId}?node=span-abc123`,
+        url: `https://test-org.sentry.io/performance/trace/${traceId}?node=span-aa8e7f3343113fbf`,
       });
-      // Span focus is parsed but not yet used in output — just verify trace loads
-      expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
+      expect(result).toContain(
+        `# Span \`aa8e7f3343113fbf\` in Trace \`${traceId}\` in **test-org**`,
+      );
+      expect(result).toContain(
+        "POST https://api.openai.com/v1/chat/completions [ad0f7c48 · http.client · 1708ms]",
+      );
+      expect(result).toContain("### Tags");
+    });
+
+    it("resolves a focused span from direct trace parameters", async () => {
+      mockTraceEndpoints("test-org");
+      const result = await callHandler({
+        resourceType: "trace",
+        organizationSlug: "test-org",
+        resourceId: traceId,
+        spanId: "aa8e7f3343113fbf",
+      });
+
+      expect(result).toContain(
+        `# Span \`aa8e7f3343113fbf\` in Trace \`${traceId}\` in **test-org**`,
+      );
+      expect(result).toContain("**Child Spans**:");
     });
 
     it("resolves trace from /organizations/{org}/ path", async () => {
@@ -755,12 +776,13 @@ describe("get_sentry_resource", () => {
       expect(getSentryResource.skills).toContain("inspect");
     });
 
-    it("has simplified 4-param schema", () => {
+    it("has simplified 5-param schema", () => {
       const schemaKeys = Object.keys(getSentryResource.inputSchema);
       expect(schemaKeys).toEqual([
         "url",
         "resourceType",
         "resourceId",
+        "spanId",
         "organizationSlug",
       ]);
     });

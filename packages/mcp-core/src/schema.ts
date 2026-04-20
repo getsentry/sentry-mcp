@@ -88,6 +88,14 @@ export const ParamTraceId = z
   )
   .describe("The trace ID. e.g. `a4d1aae7216b47ff8117cf4e09ce9d0a`");
 
+export const ParamSpanId = z
+  .string()
+  .trim()
+  .min(1)
+  .describe(
+    "The span ID within a trace. Use this with a trace resource to focus on a specific span.",
+  );
+
 export const ParamPlatform = z
   .string()
   .toLowerCase()
