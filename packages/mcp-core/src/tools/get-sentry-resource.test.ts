@@ -6,6 +6,7 @@ import {
   transactionProfileV1Fixture,
   replayDetailsFixture,
   traceMetaFixture,
+  traceMixedFixture,
   traceFixture,
   eventFixture,
 } from "@sentry/mcp-server-mocks";
@@ -19,12 +20,31 @@ const baseContext = {
   userId: "1",
 };
 
+function mockOrganization(org: string) {
+  return http.get(`https://sentry.io/api/0/organizations/${org}/`, () =>
+    HttpResponse.json({
+      ...organizationFixture,
+      slug: org,
+      links: {
+        ...organizationFixture.links,
+        regionUrl: "https://sentry.io",
+        organizationUrl: `https://${org}.sentry.io`,
+      },
+    }),
+  );
+}
+
 function callHandler(params: {
   url?: string;
-  resourceType?: "issue" | "event" | "trace" | "breadcrumbs" | "replay";
+  resourceType?:
+    | "issue"
+    | "event"
+    | "trace"
+    | "span"
+    | "breadcrumbs"
+    | "replay";
   resourceId?: string;
   organizationSlug?: string;
-  spanId?: string;
 }) {
   return getSentryResource.handler(params, baseContext);
 }
@@ -102,6 +122,7 @@ describe("get_sentry_resource", () => {
 
     function mockTraceEndpoints(org: string) {
       mswServer.use(
+        mockOrganization(org),
         http.get(
           `https://sentry.io/api/0/organizations/${org}/trace-meta/${traceId}/`,
           () => HttpResponse.json(traceMetaFixture),
@@ -146,19 +167,148 @@ describe("get_sentry_resource", () => {
       expect(result).toContain("### Tags");
     });
 
-    it("resolves a focused span from direct trace parameters", async () => {
-      mockTraceEndpoints("test-org");
+    it("resolves a span from a compound resourceId", async () => {
+      const focusedTraceId = "b4d1aae7216b47ff8117cf4e09ce9d0b";
+
+      mswServer.use(
+        mockOrganization("test-org"),
+        http.get(
+          `https://sentry.io/api/0/organizations/test-org/trace-meta/${focusedTraceId}/`,
+          () =>
+            HttpResponse.json({
+              logs: 0,
+              errors: 2,
+              performance_issues: 0,
+              span_count: 4,
+              transaction_child_count_map: [],
+              span_count_map: {},
+            }),
+          { once: true },
+        ),
+        http.get(
+          `https://sentry.io/api/0/organizations/test-org/trace/${focusedTraceId}/`,
+          () => HttpResponse.json(traceMixedFixture),
+          { once: true },
+        ),
+      );
+
       const result = await callHandler({
-        resourceType: "trace",
+        resourceType: "span",
         organizationSlug: "test-org",
-        resourceId: traceId,
-        spanId: "aa8e7f3343113fbf",
+        resourceId: `${focusedTraceId}:aa8e7f3384ef4ff5`,
       });
 
-      expect(result).toContain(
-        `# Span \`aa8e7f3343113fbf\` in Trace \`${traceId}\` in **test-org**`,
-      );
-      expect(result).toContain("**Child Spans**:");
+      expect(result).toMatchInlineSnapshot(`
+        "# Span \`aa8e7f3384ef4ff5\` in Trace \`b4d1aae7216b47ff8117cf4e09ce9d0b\` in **test-org**
+
+        ## Summary
+
+        **Project**: mcp-server
+        **Operation**: function
+        **Description**: tools/call search_events
+        **Duration**: 5203ms
+        **Exclusive Time**: 3495ms
+        **Status**: unknown
+        **Parent Span ID**: None (root span)
+        **Child Spans**: 1
+        **Descendant Spans**: 1
+        **Errors**: 0
+        **Event Type**: span
+        **SDK**: sentry.javascript.bun
+        **Trace Total Spans**: 4
+
+        ## Child Snapshot
+
+        tools/call search_events [aa8e7f33 · function · 5203ms]
+           └─ POST https://api.openai.com/v1/chat/completions [ad0f7c48 · http.client · 1708ms]
+
+        *Child snapshot shows 1 of 1 descendant spans.*
+
+        ## View Full Span
+
+        **Sentry URL**: https://test-org.sentry.io/explore/traces/trace/b4d1aae7216b47ff8117cf4e09ce9d0b?node=span-aa8e7f3384ef4ff5
+
+        ## Attributes
+
+        ### Core Fields
+
+        \`\`\`json
+        {
+          "description": "tools/call search_events",
+          "duration": 5203,
+          "end_timestamp": 1713805463.608875,
+          "event_id": "aa8e7f3384ef4ff5850ba966b29ed10d",
+          "exclusive_time": 3495,
+          "hash": "4ed30c7c-4fae-4c79-b2f1-be95c24e7b04",
+          "is_segment": true,
+          "op": "function",
+          "organization": null,
+          "parent_span_id": null,
+          "profile_id": "",
+          "profiler_id": "",
+          "project_id": 4509109107622913,
+          "project_slug": "mcp-server",
+          "same_process_as_parent": true,
+          "sdk_name": "sentry.javascript.bun",
+          "span_id": "aa8e7f3384ef4ff5",
+          "start_timestamp": 1713805458.405616,
+          "status": null,
+          "timestamp": 1713805463.608875,
+          "trace": "b4d1aae7216b47ff8117cf4e09ce9d0b",
+          "transaction_id": "aa8e7f3384ef4ff5850ba966b29ed10d"
+        }
+        \`\`\`
+
+        ### Measurements
+
+        \`\`\`json
+        {}
+        \`\`\`
+
+        ### Tags
+
+        \`\`\`json
+        {
+          "ai.input_messages": "1",
+          "ai.model_id": "gpt-4o-2024-08-06",
+          "ai.pipeline.name": "search_events",
+          "ai.response.finish_reason": "stop",
+          "ai.streaming": "false",
+          "ai.total_tokens.used": "435",
+          "server_name": "mcp-server"
+        }
+        \`\`\`
+
+        ### Data
+
+        \`\`\`json
+        {}
+        \`\`\`
+
+        ### Additional Attributes
+
+        \`\`\`json
+        {}
+        \`\`\`
+
+        ### Errors
+
+        \`\`\`json
+        []
+        \`\`\`
+
+        ### Occurrences
+
+        \`\`\`json
+        []
+        \`\`\`
+
+        ## Next Steps
+
+        - **Search spans**: Use \`list_events\` with the \`spans\` dataset to inspect sibling spans or the rest of this trace.
+        - **Search errors**: Use \`list_events\` with the \`errors\` dataset to inspect related error events in this trace.
+        - **Search logs**: Use \`list_events\` with the \`logs\` dataset to inspect related logs in this trace."
+      `);
     });
 
     it("resolves trace from /organizations/{org}/ path", async () => {
@@ -451,6 +601,17 @@ describe("get_sentry_resource", () => {
         }),
       ).rejects.toThrow("Could not extract issue ID from URL for breadcrumbs");
     });
+
+    it("rejects span override on a plain trace URL", async () => {
+      await expect(
+        callHandler({
+          url: "https://test-org.sentry.io/explore/traces/trace/a4d1aae7216b47ff8117cf4e09ce9d0a",
+          resourceType: "span",
+        }),
+      ).rejects.toThrow(
+        "Could not extract span ID from URL for span resource.",
+      );
+    });
   });
 
   // ─── By type and ID ─────────────────────────────────────────────────────────
@@ -496,6 +657,7 @@ describe("get_sentry_resource", () => {
       const traceId = "a4d1aae7216b47ff8117cf4e09ce9d0a";
 
       mswServer.use(
+        mockOrganization("test-org"),
         http.get(
           `https://sentry.io/api/0/organizations/test-org/trace-meta/${traceId}/`,
           () => HttpResponse.json(traceMetaFixture),
@@ -516,6 +678,33 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
       expect(result).toContain("**Total Spans**: 112");
       expect(result).toContain("**Errors**: 0");
+    });
+
+    it("fetches span by traceId:spanId", async () => {
+      const traceId = "a4d1aae7216b47ff8117cf4e09ce9d0a";
+
+      mswServer.use(
+        mockOrganization("test-org"),
+        http.get(
+          `https://sentry.io/api/0/organizations/test-org/trace-meta/${traceId}/`,
+          () => HttpResponse.json(traceMetaFixture),
+          { once: true },
+        ),
+        http.get(
+          `https://sentry.io/api/0/organizations/test-org/trace/${traceId}/`,
+          () => HttpResponse.json(traceFixture),
+          { once: true },
+        ),
+      );
+
+      const result = await callHandler({
+        resourceType: "span",
+        organizationSlug: "test-org",
+        resourceId: `${traceId}:aa8e7f3343113fbf`,
+      });
+      expect(result).toContain(
+        "# Span `aa8e7f3343113fbf` in Trace `a4d1aae7216b47ff8117cf4e09ce9d0a` in **test-org**",
+      );
     });
 
     it("fetches breadcrumbs by issueId", async () => {
@@ -686,6 +875,15 @@ describe("get_sentry_resource", () => {
       ).rejects.toThrow("`resourceId` is required when not using a URL");
     });
 
+    it("throws when resourceId missing for span type", async () => {
+      await expect(
+        callHandler({
+          resourceType: "span",
+          organizationSlug: "my-org",
+        }),
+      ).rejects.toThrow("`resourceId` is required when not using a URL");
+    });
+
     it("throws when resourceId missing for breadcrumbs type", async () => {
       await expect(
         callHandler({
@@ -776,13 +974,12 @@ describe("get_sentry_resource", () => {
       expect(getSentryResource.skills).toContain("inspect");
     });
 
-    it("has simplified 5-param schema", () => {
+    it("has simplified 4-param schema", () => {
       const schemaKeys = Object.keys(getSentryResource.inputSchema);
       expect(schemaKeys).toEqual([
         "url",
         "resourceType",
         "resourceId",
-        "spanId",
         "organizationSlug",
       ]);
     });

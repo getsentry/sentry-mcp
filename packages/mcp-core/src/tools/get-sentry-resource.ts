@@ -3,7 +3,7 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
-import { ParamOrganizationSlug, ParamSpanId } from "../schema";
+import { ParamOrganizationSlug } from "../schema";
 import { parseSentryUrl, type ParsedSentryUrl } from "../internal/url-helpers";
 import {
   resolveScopedOrganizationSlug,
@@ -24,6 +24,7 @@ export const FULLY_SUPPORTED_TYPES = [
   "issue",
   "event",
   "trace",
+  "span",
   "breadcrumbs",
   "replay",
 ] as const;
@@ -44,7 +45,7 @@ export interface ResolvedResourceParams {
   // Issue/Event params
   issueId?: string;
   eventId?: string;
-  // Trace params
+  // Trace/Span params
   traceId?: string;
   spanId?: string;
   // Profile params
@@ -67,7 +68,6 @@ export function resolveResourceParams(params: {
   resourceId?: string | null;
   organizationSlug?: string | null;
   projectSlug?: string | null;
-  spanId?: string | null;
 }): ResolvedResourceParams {
   if (params.url) {
     const parsed = parseSentryUrl(params.url);
@@ -99,10 +99,6 @@ export function resolveResourceParams(params: {
   const resourceType = params.resourceType as FullySupportedType;
   const organizationSlug = params.organizationSlug;
 
-  if (params.spanId && resourceType !== "trace") {
-    throw new UserInputError("`spanId` can only be used with trace resources.");
-  }
-
   if (!params.resourceId) {
     throw new UserInputError("`resourceId` is required when not using a URL.");
   }
@@ -129,8 +125,17 @@ export function resolveResourceParams(params: {
         type: "trace",
         organizationSlug,
         traceId: resourceId,
-        spanId: params.spanId ?? undefined,
       };
+
+    case "span": {
+      const { traceId, spanId } = parseSpanResourceId(resourceId);
+      return {
+        type: "span",
+        organizationSlug,
+        traceId,
+        spanId,
+      };
+    }
 
     case "breadcrumbs":
       return {
@@ -150,7 +155,7 @@ export function resolveResourceParams(params: {
 
 /**
  * When resourceType is provided alongside a URL, it overrides the auto-detected type.
- * Only 'breadcrumbs' is allowed as an override (requires an issue URL).
+ * Breadcrumbs can override issue/event URLs, and trace URLs can override span-focused trace URLs.
  */
 function resolveFromParsedUrl(
   parsed: ParsedSentryUrl,
@@ -158,10 +163,10 @@ function resolveFromParsedUrl(
     resourceType?: string | null;
     organizationSlug?: string | null;
     projectSlug?: string | null;
-    spanId?: string | null;
   },
 ): ResolvedResourceParams {
-  const { type: detectedType } = parsed;
+  const detectedType: ResolvedResourceType | "unknown" =
+    parsed.type === "trace" && parsed.spanId ? "span" : parsed.type;
   const organizationSlug = resolveScopedOrganizationSlug({
     resourceLabel: "Sentry resource",
     scopedOrganizationSlug: params.organizationSlug,
@@ -180,14 +185,25 @@ function resolveFromParsedUrl(
     );
   }
 
-  if (params.spanId && detectedType !== "trace") {
-    throw new UserInputError("`spanId` can only be used with trace resources.");
-  }
-
   if (params.resourceType && params.resourceType !== detectedType) {
+    if (params.resourceType === "trace" && detectedType === "span") {
+      if (!parsed.traceId) {
+        throw new UserInputError("Could not extract trace ID from URL.");
+      }
+      return {
+        type: "trace",
+        organizationSlug,
+        traceId: parsed.traceId,
+      };
+    }
+    if (params.resourceType === "span" && detectedType === "trace") {
+      throw new UserInputError(
+        "Could not extract span ID from URL for span resource. Provide a trace URL with `?node=span-<spanId>` or use `resourceId='<traceId>:<spanId>'`.",
+      );
+    }
     if (params.resourceType !== "breadcrumbs") {
       throw new UserInputError(
-        `Cannot override URL type with resourceType '${params.resourceType}'. Only 'breadcrumbs' can be used as a resourceType override with a URL.`,
+        `Cannot override URL type with resourceType '${params.resourceType}'. Only 'breadcrumbs' or 'trace' on a span URL can be used as a resourceType override with a URL.`,
       );
     }
     if (!parsed.issueId) {
@@ -234,7 +250,19 @@ function resolveFromParsedUrl(
         type: "trace",
         organizationSlug,
         traceId: parsed.traceId,
-        spanId: parsed.spanId ?? params.spanId ?? undefined,
+      };
+
+    case "span":
+      if (!parsed.traceId || !parsed.spanId) {
+        throw new UserInputError(
+          "Could not extract trace ID and span ID from URL.",
+        );
+      }
+      return {
+        type: "span",
+        organizationSlug,
+        traceId: parsed.traceId,
+        spanId: parsed.spanId,
       };
 
     case "profile":
@@ -296,6 +324,24 @@ function resolveFromParsedUrl(
   }
 }
 
+function parseSpanResourceId(resourceId: string): {
+  traceId: string;
+  spanId: string;
+} {
+  const parts = resourceId.trim().split(":");
+
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new UserInputError(
+      "Span resourceId must use the format `<traceId>:<spanId>`.",
+    );
+  }
+
+  return {
+    traceId: parts[0],
+    spanId: parts[1],
+  };
+}
+
 function generateUnsupportedResourceMessage(
   resolved: ResolvedResourceParams,
 ): string {
@@ -354,6 +400,8 @@ export default defineTool({
   description: [
     "Fetch a Sentry resource by URL or by type and ID.",
     "",
+    "For `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.",
+    "",
     "<examples>",
     "### From a Sentry URL",
     "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
@@ -364,8 +412,8 @@ export default defineTool({
     "### By type and ID",
     "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
     "",
-    "### Focus a single span in a trace",
-    "get_sentry_resource(resourceType='trace', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a', spanId='aa8e7f3384ef4ff5')",
+    "### Span by trace and span ID",
+    "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')",
     "</examples>",
   ].join("\n"),
 
@@ -379,10 +427,10 @@ export default defineTool({
       ),
 
     resourceType: z
-      .enum(["issue", "event", "trace", "breadcrumbs", "replay"])
+      .enum(["issue", "event", "trace", "span", "breadcrumbs", "replay"])
       .optional()
       .describe(
-        "Resource type. With a URL, overrides the auto-detected type (e.g., 'breadcrumbs' on an issue URL).",
+        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL.",
       ),
 
     resourceId: z
@@ -390,10 +438,8 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, or trace ID. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, or `traceId:spanId` for span resources. Required when not using a URL.",
       ),
-
-    spanId: ParamSpanId.optional(),
 
     organizationSlug: ParamOrganizationSlug.optional(),
   },
@@ -408,7 +454,6 @@ export default defineTool({
       organizationSlug:
         params.organizationSlug ?? context.constraints.organizationSlug,
       projectSlug: context.constraints.projectSlug,
-      spanId: params.spanId,
     });
 
     setTag("resource.type", resolved.type);
@@ -445,6 +490,16 @@ export default defineTool({
         );
 
       case "trace":
+        return getTraceDetails.handler(
+          {
+            organizationSlug: resolved.organizationSlug,
+            traceId: resolved.traceId!,
+            regionUrl: context.constraints.regionUrl ?? null,
+          },
+          context,
+        );
+
+      case "span":
         return getTraceDetails.handler(
           {
             organizationSlug: resolved.organizationSlug,

@@ -167,13 +167,13 @@ describe("resolveResourceParams", () => {
       });
     });
 
-    it("extracts spanId from query param", () => {
+    it("treats focused trace URLs as span resources", () => {
       expect(
         resolveResourceParams({
           url: `https://my-org.sentry.io/performance/trace/${traceId}?node=span-abc123`,
         }),
       ).toEqual<ResolvedResourceParams>({
-        type: "trace",
+        type: "span",
         organizationSlug: "my-org",
         traceId,
         spanId: "abc123",
@@ -497,6 +497,28 @@ describe("resolveResourceParams", () => {
       });
     });
 
+    it("allows trace override on a focused span URL", () => {
+      expect(
+        resolveResourceParams({
+          url: "https://my-org.sentry.io/explore/traces/trace/abc123?node=span-def456",
+          resourceType: "trace",
+        }),
+      ).toEqual<ResolvedResourceParams>({
+        type: "trace",
+        organizationSlug: "my-org",
+        traceId: "abc123",
+      });
+    });
+
+    it("rejects span override on a plain trace URL", () => {
+      expect(() =>
+        resolveResourceParams({
+          url: "https://my-org.sentry.io/explore/traces/trace/abc123",
+          resourceType: "span",
+        }),
+      ).toThrow("Could not extract span ID from URL for span resource");
+    });
+
     it("rejects non-breadcrumbs override on different type URL", () => {
       expect(() =>
         resolveResourceParams({
@@ -583,16 +605,15 @@ describe("resolveResourceParams", () => {
       });
     });
 
-    it("resolves trace type with span focus", () => {
+    it("resolves span type from a compound resourceId", () => {
       expect(
         resolveResourceParams({
-          resourceType: "trace",
+          resourceType: "span",
           organizationSlug: "my-org",
-          resourceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
-          spanId: "aa8e7f3384ef4ff5",
+          resourceId: "a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5",
         }),
       ).toEqual<ResolvedResourceParams>({
-        type: "trace",
+        type: "span",
         organizationSlug: "my-org",
         traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
         spanId: "aa8e7f3384ef4ff5",
@@ -694,15 +715,14 @@ describe("resolveResourceParams", () => {
       ).toThrow("Invalid resourceType: monitor");
     });
 
-    it("throws when spanId is used with a non-trace resource", () => {
+    it("throws when span resourceId is malformed", () => {
       expect(() =>
         resolveResourceParams({
-          resourceType: "issue",
+          resourceType: "span",
           organizationSlug: "my-org",
-          resourceId: "PROJECT-123",
-          spanId: "aa8e7f3384ef4ff5",
+          resourceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
         }),
-      ).toThrow("`spanId` can only be used with trace resources.");
+      ).toThrow("Span resourceId must use the format `<traceId>:<spanId>`.");
     });
 
     it("throws for completely invalid resourceType", () => {
