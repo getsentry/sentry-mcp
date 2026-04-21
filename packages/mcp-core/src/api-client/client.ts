@@ -2621,8 +2621,8 @@ export class SentryApiService {
    * @param params Query parameters
    * @param params.organizationSlug Organization identifier
    * @param params.traceId Trace identifier (32-character hex string)
-   * @param params.limit Maximum number of spans to return (default: 1000)
-   * @param params.project Project filter (-1 for all projects)
+   * @param params.limit Requested span-count hint (default: 1000). The server currently paginates trace data internally and may ignore this value.
+   * @param params.project Project filter hint (-1 for all projects). The current organization trace endpoint ignores this value server-side.
    * @param params.statsPeriod Optional stats period (e.g., "14d", "7d")
    * @param opts Request options
    * @returns Complete trace tree structure
@@ -2654,6 +2654,8 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<Trace> {
     const queryParams = new URLSearchParams();
+    // Keep sending the endpoint's declared query parameters even though the
+    // current server implementation ignores `project` and paginates internally.
     queryParams.set("limit", String(limit));
     queryParams.set("project", project);
     queryParams.set("statsPeriod", statsPeriod);

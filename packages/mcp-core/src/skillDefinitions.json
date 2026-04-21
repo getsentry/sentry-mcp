@@ -49,7 +49,7 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, and breadcrumbs.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
@@ -114,7 +114,7 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, and breadcrumbs.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
@@ -204,7 +204,7 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL or by type and ID.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n</examples>",
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, and breadcrumbs.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n</examples>",
         "requiredScopes": ["event:read"]
       },
       {
