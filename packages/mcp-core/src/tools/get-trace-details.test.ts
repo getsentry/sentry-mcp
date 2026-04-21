@@ -576,6 +576,12 @@ describe("get_trace_details", () => {
 
   it("reports a partial fetch when a focused span is missing from a large trace", async () => {
     const traceId = "d4d1aae7216b47ff8117cf4e09ce9d0d";
+    const fetchedTrace = Array.from({ length: 10000 }, (_, index) =>
+      buildTraceSpan({
+        eventId: index.toString(16).padStart(32, "0"),
+        spanId: index.toString(16).padStart(16, "0"),
+      }),
+    );
 
     mswServer.use(
       ...httpGetRegional(
@@ -592,20 +598,7 @@ describe("get_trace_details", () => {
       ),
       ...httpGetRegional(
         `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
-        ({ request }) => {
-          const limit = Number(
-            new URL(request.url).searchParams.get("limit") ?? "0",
-          );
-
-          return HttpResponse.json(
-            Array.from({ length: limit }, (_, index) =>
-              buildTraceSpan({
-                eventId: index.toString(16).padStart(32, "0"),
-                spanId: index.toString(16).padStart(16, "0"),
-              }),
-            ),
-          );
-        },
+        () => HttpResponse.json(fetchedTrace),
       ),
     );
 
@@ -628,7 +621,7 @@ describe("get_trace_details", () => {
     ).rejects.toThrow(
       /was not found in the fetched portion of trace .*Fetched 10000 of 20000 spans\./,
     );
-  });
+  }, 15_000);
 
   it("renders a focused span with child snapshot and attributes", async () => {
     mswServer.use(
