@@ -15,6 +15,7 @@ import {
 
 // Constants for span filtering and tree rendering
 const MAX_TRACE_FETCH_LIMIT = 1000;
+const MAX_FOCUSED_TRACE_FETCH_LIMIT = 10000;
 const MIN_TRACE_FETCH_LIMIT = 50;
 const MAX_DEPTH = 8;
 const MAX_ROOT_SPANS = 12;
@@ -30,6 +31,12 @@ interface TraceSummary {
   performanceIssues: number | null;
   logs: number | null;
   projectSlug?: string;
+}
+
+interface TraceFetchState {
+  fetchedSpanCount: number;
+  isComplete: boolean;
+  requestedLimit: number;
 }
 
 interface TraceSpanNode {
@@ -163,6 +170,7 @@ export default defineTool({
     const constrainedProjectSlug = context.constraints.projectSlug ?? undefined;
     let summary: TraceSummary;
     let trace: Trace;
+    let traceFetchState: TraceFetchState;
 
     if (constrainedProjectSlug) {
       setTag("project.slug", constrainedProjectSlug);
@@ -172,10 +180,14 @@ export default defineTool({
         projectSlugOrId: constrainedProjectSlug,
       });
 
+      const traceFetchLimit = params.spanId
+        ? MAX_FOCUSED_TRACE_FETCH_LIMIT
+        : MAX_TRACE_FETCH_LIMIT;
+
       trace = await apiService.getTrace({
         organizationSlug: params.organizationSlug,
         traceId: params.traceId,
-        limit: MAX_TRACE_FETCH_LIMIT,
+        limit: traceFetchLimit,
         project: String(project.id),
         statsPeriod: "14d", // Fixed stats period
       });
@@ -187,6 +199,10 @@ export default defineTool({
       }
 
       summary = buildProjectScopedTraceSummary(trace, constrainedProjectSlug);
+      traceFetchState = buildTraceFetchState({
+        trace,
+        requestedLimit: traceFetchLimit,
+      });
     } else {
       // Get trace metadata for overview
       const traceMeta = await apiService.getTraceMeta({
@@ -198,6 +214,7 @@ export default defineTool({
       const traceFetchLimit = getTraceFetchLimit(
         traceMeta.span_count,
         traceMeta.errors,
+        params.spanId ? MAX_FOCUSED_TRACE_FETCH_LIMIT : MAX_TRACE_FETCH_LIMIT,
       );
 
       // Fetch as much of the trace as we can so the overview and operation
@@ -215,6 +232,11 @@ export default defineTool({
         performanceIssues: traceMeta.performance_issues,
         logs: traceMeta.logs,
       };
+      traceFetchState = buildTraceFetchState({
+        trace,
+        requestedLimit: traceFetchLimit,
+        totalSpanCount: traceMeta.span_count,
+      });
     }
 
     return formatTraceOutput({
@@ -223,6 +245,7 @@ export default defineTool({
       spanId: params.spanId,
       summary,
       trace,
+      traceFetchState,
       apiService,
     });
   },
@@ -249,10 +272,14 @@ function getTraceSpanChildren(span: TraceSpanNode): TraceSpanNode[] {
   return span.children.filter(isTraceSpanNode);
 }
 
-function getTraceFetchLimit(totalSpanCount: number, errorCount = 0): number {
+function getTraceFetchLimit(
+  totalSpanCount: number,
+  errorCount = 0,
+  maxFetchLimit = MAX_TRACE_FETCH_LIMIT,
+): number {
   return Math.min(
     Math.max(totalSpanCount + errorCount, MIN_TRACE_FETCH_LIMIT),
-    MAX_TRACE_FETCH_LIMIT,
+    maxFetchLimit,
   );
 }
 
@@ -715,12 +742,34 @@ function buildProjectScopedTraceSummary(
   };
 }
 
+function buildTraceFetchState({
+  trace,
+  requestedLimit,
+  totalSpanCount,
+}: {
+  trace: Trace;
+  requestedLimit: number;
+  totalSpanCount?: number;
+}): TraceFetchState {
+  const fetchedSpanCount = getAllSpansFlattened(trace).length;
+
+  return {
+    fetchedSpanCount,
+    isComplete:
+      typeof totalSpanCount === "number"
+        ? fetchedSpanCount >= totalSpanCount
+        : trace.length < requestedLimit,
+    requestedLimit,
+  };
+}
+
 function formatTraceOutput({
   organizationSlug,
   traceId,
   spanId,
   summary,
   trace,
+  traceFetchState,
   apiService,
 }: {
   organizationSlug: string;
@@ -728,6 +777,7 @@ function formatTraceOutput({
   spanId?: string;
   summary: TraceSummary;
   trace: Trace;
+  traceFetchState: TraceFetchState;
   apiService: SentryApiService;
 }): string {
   if (spanId) {
@@ -737,6 +787,7 @@ function formatTraceOutput({
       spanId,
       summary,
       trace,
+      traceFetchState,
       apiService,
     });
   }
@@ -848,6 +899,7 @@ function formatFocusedSpanOutput({
   spanId,
   summary,
   trace,
+  traceFetchState,
   apiService,
 }: {
   organizationSlug: string;
@@ -855,14 +907,14 @@ function formatFocusedSpanOutput({
   spanId: string;
   summary: TraceSummary;
   trace: Trace;
+  traceFetchState: TraceFetchState;
   apiService: SentryApiService;
 }): string {
   const focusedSpan = findTraceSpan(trace, spanId);
   if (!focusedSpan) {
-    const fetchedSpanCount = getAllSpansFlattened(trace).length;
-    if (fetchedSpanCount < summary.spanCount) {
+    if (!traceFetchState.isComplete) {
       throw new UserInputError(
-        `Span \`${spanId}\` was not found in the fetched portion of trace \`${traceId}\`. Fetched ${fetchedSpanCount} of ${summary.spanCount} spans.`,
+        `Span \`${spanId}\` was not found in the fetched portion of trace \`${traceId}\`. ${formatIncompleteTraceFetchMessage(summary, traceFetchState)}`,
       );
     }
 
@@ -932,6 +984,17 @@ function formatFocusedSpanOutput({
   sections.push(...buildTraceNextSteps(true));
 
   return sections.join("\n");
+}
+
+function formatIncompleteTraceFetchMessage(
+  summary: TraceSummary,
+  traceFetchState: TraceFetchState,
+): string {
+  if (traceFetchState.fetchedSpanCount < summary.spanCount) {
+    return `Fetched ${traceFetchState.fetchedSpanCount} of ${summary.spanCount} spans.`;
+  }
+
+  return `Fetched ${traceFetchState.fetchedSpanCount} spans and hit the fetch limit of ${traceFetchState.requestedLimit}.`;
 }
 
 function countSelectedSpans(spans: SelectedSpan[]): number {

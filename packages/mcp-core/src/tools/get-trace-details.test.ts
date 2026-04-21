@@ -29,6 +29,26 @@ function httpGetRegional(
   ];
 }
 
+function buildTraceSpan({
+  description = "Synthetic span",
+  eventId,
+  spanId,
+}: {
+  description?: string;
+  eventId: string;
+  spanId: string;
+}) {
+  return {
+    children: [],
+    description,
+    duration: 25,
+    event_id: eventId,
+    op: "task",
+    project_slug: "mcp-server",
+    span_id: spanId,
+  };
+}
+
 describe("get_trace_details", () => {
   beforeEach(() => {
     process.env.OPENAI_API_KEY = "test-key";
@@ -510,6 +530,121 @@ describe("get_trace_details", () => {
       - **Search errors**: Use \`search_events\` to inspect related error events in this trace.
       - **Search logs**: Use \`search_events\` to inspect related logs in this trace."
     `);
+  });
+
+  it("fetches enough spans to resolve focused spans in large traces", async () => {
+    const traceId = "c4d1aae7216b47ff8117cf4e09ce9d0c";
+    const spanId = "00000000000007d0";
+
+    mswServer.use(
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/${traceId}/`,
+        () =>
+          HttpResponse.json({
+            logs: 0,
+            errors: 0,
+            performance_issues: 0,
+            span_count: 2000,
+            transaction_child_count_map: [],
+            span_count_map: {},
+          }),
+      ),
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
+        ({ request }) => {
+          const limit = Number(
+            new URL(request.url).searchParams.get("limit") ?? "0",
+          );
+
+          if (limit < 2000) {
+            return HttpResponse.json([]);
+          }
+
+          return HttpResponse.json([
+            buildTraceSpan({
+              eventId: "1".repeat(32),
+              spanId,
+              description: "Late span in a large trace",
+            }),
+          ]);
+        },
+      ),
+    );
+
+    const result = await getTraceDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        traceId,
+        spanId,
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain(`# Span \`${spanId}\` in Trace \`${traceId}\``);
+    expect(result).toContain("Late span in a large trace");
+    expect(result).toContain("**Trace Total Spans**: 2000");
+  });
+
+  it("reports a partial fetch when project-scoped focused span lookup hits the fetch limit", async () => {
+    const traceId = "d4d1aae7216b47ff8117cf4e09ce9d0d";
+
+    mswServer.use(
+      ...httpGetRegional(
+        "https://sentry.io/api/0/projects/sentry-mcp-evals/frontend/",
+        () =>
+          HttpResponse.json({
+            id: "9999999999999999",
+            slug: "frontend",
+            name: "frontend",
+          }),
+      ),
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
+        ({ request }) => {
+          const url = new URL(request.url);
+          const limit = Number(url.searchParams.get("limit") ?? "0");
+
+          expect(url.searchParams.get("project")).toBe("9999999999999999");
+
+          return HttpResponse.json(
+            Array.from({ length: limit }, (_, index) =>
+              buildTraceSpan({
+                eventId: index.toString(16).padStart(32, "0"),
+                spanId: index.toString(16).padStart(16, "0"),
+              }),
+            ),
+          );
+        },
+      ),
+    );
+
+    await expect(
+      getTraceDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          traceId,
+          spanId: "ffffffffffffffff",
+          regionUrl: null,
+        },
+        {
+          constraints: {
+            organizationSlug: null,
+            projectSlug: "frontend",
+          },
+          accessToken: "access-token",
+          userId: "1",
+        },
+      ),
+    ).rejects.toThrow(
+      /was not found in the fetched portion of trace .*hit the fetch limit of 10000\./,
+    );
   });
 
   it("renders a focused span with child snapshot and attributes", async () => {
