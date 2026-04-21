@@ -30,13 +30,11 @@ interface TraceSummary {
   errors: number;
   performanceIssues: number | null;
   logs: number | null;
-  projectSlug?: string;
 }
 
 interface TraceFetchState {
   fetchedSpanCount: number;
   isComplete: boolean;
-  requestedLimit: number;
 }
 
 interface TraceSpanNode {
@@ -167,77 +165,45 @@ export default defineTool({
       setTag("trace.span_id", params.spanId);
     }
 
-    const constrainedProjectSlug = context.constraints.projectSlug ?? undefined;
-    let summary: TraceSummary;
-    let trace: Trace;
-    let traceFetchState: TraceFetchState;
-
-    if (constrainedProjectSlug) {
-      setTag("project.slug", constrainedProjectSlug);
-
-      const project = await apiService.getProject({
-        organizationSlug: params.organizationSlug,
-        projectSlugOrId: constrainedProjectSlug,
-      });
-
-      const traceFetchLimit = params.spanId
-        ? MAX_FOCUSED_TRACE_FETCH_LIMIT
-        : MAX_TRACE_FETCH_LIMIT;
-
-      trace = await apiService.getTrace({
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-        limit: traceFetchLimit,
-        project: String(project.id),
-        statsPeriod: "14d", // Fixed stats period
-      });
-
-      if (trace.length === 0) {
-        throw new UserInputError(
-          `Trace is outside the active project constraint. Expected project "${constrainedProjectSlug}".`,
-        );
-      }
-
-      summary = buildProjectScopedTraceSummary(trace, constrainedProjectSlug);
-      traceFetchState = buildTraceFetchState({
-        trace,
-        requestedLimit: traceFetchLimit,
-      });
-    } else {
-      // Get trace metadata for overview
-      const traceMeta = await apiService.getTraceMeta({
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-        statsPeriod: "14d", // Fixed stats period
-      });
-
-      const traceFetchLimit = getTraceFetchLimit(
-        traceMeta.span_count,
-        traceMeta.errors,
-        params.spanId ? MAX_FOCUSED_TRACE_FETCH_LIMIT : MAX_TRACE_FETCH_LIMIT,
-      );
-
-      // Fetch as much of the trace as we can so the overview and operation
-      // breakdown are based on the real trace tree instead of a tiny sample.
-      trace = await apiService.getTrace({
-        organizationSlug: params.organizationSlug,
-        traceId: params.traceId,
-        limit: traceFetchLimit,
-        statsPeriod: "14d", // Fixed stats period
-      });
-
-      summary = {
-        spanCount: traceMeta.span_count,
-        errors: traceMeta.errors,
-        performanceIssues: traceMeta.performance_issues,
-        logs: traceMeta.logs,
-      };
-      traceFetchState = buildTraceFetchState({
-        trace,
-        requestedLimit: traceFetchLimit,
-        totalSpanCount: traceMeta.span_count,
-      });
+    if (context.constraints.projectSlug) {
+      setTag("project.slug", context.constraints.projectSlug);
     }
+
+    // Get trace metadata for overview
+    const traceMeta = await apiService.getTraceMeta({
+      organizationSlug: params.organizationSlug,
+      traceId: params.traceId,
+      statsPeriod: "14d", // Fixed stats period
+    });
+
+    const traceFetchLimit = getTraceFetchLimit(
+      traceMeta.span_count,
+      traceMeta.errors,
+      params.spanId ? MAX_FOCUSED_TRACE_FETCH_LIMIT : MAX_TRACE_FETCH_LIMIT,
+    );
+
+    // Fetch as much of the trace as we can so the overview and operation
+    // breakdown are based on the real trace tree instead of a tiny sample.
+    // Sentry's organization trace endpoint ignores incoming `project` filters
+    // and paginates internally, so trace/span lookups remain org-scoped even
+    // when the session carries a project constraint.
+    const trace = await apiService.getTrace({
+      organizationSlug: params.organizationSlug,
+      traceId: params.traceId,
+      limit: traceFetchLimit,
+      statsPeriod: "14d", // Fixed stats period
+    });
+
+    const summary = {
+      spanCount: traceMeta.span_count,
+      errors: traceMeta.errors,
+      performanceIssues: traceMeta.performance_issues,
+      logs: traceMeta.logs,
+    };
+    const traceFetchState = buildTraceFetchState({
+      trace,
+      totalSpanCount: traceMeta.span_count,
+    });
 
     return formatTraceOutput({
       organizationSlug: params.organizationSlug,
@@ -721,45 +687,18 @@ function getAllSpansFlattened(trace: Trace): TraceSpanNode[] {
   return result;
 }
 
-function buildProjectScopedTraceSummary(
-  trace: Trace,
-  projectSlug: string,
-): TraceSummary {
-  const spans = getAllSpansFlattened(trace);
-  const standaloneIssues = trace.filter((item) => !isTraceSpanNode(item));
-  const spanErrors = spans.reduce(
-    (count, span) =>
-      count + (Array.isArray(span.errors) ? span.errors.length : 0),
-    0,
-  );
-
-  return {
-    spanCount: spans.length,
-    errors: standaloneIssues.length + spanErrors,
-    performanceIssues: null,
-    logs: null,
-    projectSlug,
-  };
-}
-
 function buildTraceFetchState({
   trace,
-  requestedLimit,
   totalSpanCount,
 }: {
   trace: Trace;
-  requestedLimit: number;
-  totalSpanCount?: number;
+  totalSpanCount: number;
 }): TraceFetchState {
   const fetchedSpanCount = getAllSpansFlattened(trace).length;
 
   return {
     fetchedSpanCount,
-    isComplete:
-      typeof totalSpanCount === "number"
-        ? fetchedSpanCount >= totalSpanCount
-        : trace.length < requestedLimit,
-    requestedLimit,
+    isComplete: fetchedSpanCount >= totalSpanCount,
   };
 }
 
@@ -823,19 +762,10 @@ function formatTraceOverviewOutput({
   // High-level statistics
   sections.push("## Summary");
   sections.push("");
-  if (summary.projectSlug) {
-    sections.push(`**Scope**: project \`${summary.projectSlug}\``);
-  }
   sections.push(`**Total Spans**: ${summary.spanCount}`);
   sections.push(`**Errors**: ${summary.errors}`);
-  if (summary.projectSlug) {
-    sections.push(
-      "*Performance issue and log counts are unavailable for project-scoped traces.*",
-    );
-  } else {
-    sections.push(`**Performance Issues**: ${summary.performanceIssues ?? 0}`);
-    sections.push(`**Logs**: ${summary.logs ?? 0}`);
-  }
+  sections.push(`**Performance Issues**: ${summary.performanceIssues ?? 0}`);
+  sections.push(`**Logs**: ${summary.logs ?? 0}`);
 
   // Show operation breakdown with detailed stats if we have trace data
   if (trace.length > 0) {
@@ -937,9 +867,6 @@ function formatFocusedSpanOutput({
   sections.push("");
   sections.push("## Summary");
   sections.push("");
-  if (summary.projectSlug) {
-    sections.push(`**Scope**: project \`${summary.projectSlug}\``);
-  }
   sections.push(`**Project**: ${focusedSpan.project_slug ?? "unknown"}`);
   sections.push(`**Operation**: ${focusedSpan.op ?? "unknown"}`);
   sections.push(`**Description**: ${formatTraceSpanDescription(focusedSpan)}`);
@@ -990,11 +917,7 @@ function formatIncompleteTraceFetchMessage(
   summary: TraceSummary,
   traceFetchState: TraceFetchState,
 ): string {
-  if (traceFetchState.fetchedSpanCount < summary.spanCount) {
-    return `Fetched ${traceFetchState.fetchedSpanCount} of ${summary.spanCount} spans.`;
-  }
-
-  return `Fetched ${traceFetchState.fetchedSpanCount} spans and hit the fetch limit of ${traceFetchState.requestedLimit}.`;
+  return `Fetched ${traceFetchState.fetchedSpanCount} of ${summary.spanCount} spans.`;
 }
 
 function countSelectedSpans(spans: SelectedSpan[]): number {

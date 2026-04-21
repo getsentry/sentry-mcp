@@ -254,52 +254,34 @@ describe("get_trace_details", () => {
     ).rejects.toThrow("Trace ID must be a 32-character hexadecimal string");
   });
 
-  it("rejects traces outside the active project constraint", async () => {
-    const traceId = "a4d1aae7216b47ff8117cf4e09ce9d0a";
-
+  it("returns trace details under an active project constraint", async () => {
     mswServer.use(
       ...httpGetRegional(
         "https://sentry.io/api/0/projects/sentry-mcp-evals/frontend/",
-        () =>
-          HttpResponse.json({
-            id: "9999999999999999",
-            slug: "frontend",
-            name: "frontend",
-          }),
-        { once: true },
-      ),
-      ...httpGetRegional(
-        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
-        ({ request }) => {
-          const url = new URL(request.url);
-          if (url.searchParams.get("project") === "9999999999999999") {
-            return HttpResponse.json([]);
-          }
-          return HttpResponse.json(traceFixture);
+        () => {
+          throw new Error("getProject should not be called for trace lookups");
         },
-        { once: true },
       ),
     );
 
-    await expect(
-      getTraceDetails.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          traceId,
-          regionUrl: null,
+    const result = await getTraceDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          projectSlug: "frontend",
         },
-        {
-          constraints: {
-            organizationSlug: null,
-            projectSlug: "frontend",
-          },
-          accessToken: "access-token",
-          userId: "1",
-        },
-      ),
-    ).rejects.toThrow(
-      'Trace is outside the active project constraint. Expected project "frontend".',
+        accessToken: "access-token",
+        userId: "1",
+      },
     );
+
+    expect(result).toContain("**Total Spans**: 112");
+    expect(result).not.toContain("**Scope**:");
   });
 
   it("handles empty trace response", async () => {
@@ -592,26 +574,28 @@ describe("get_trace_details", () => {
     expect(result).toContain("**Trace Total Spans**: 2000");
   });
 
-  it("reports a partial fetch when project-scoped focused span lookup hits the fetch limit", async () => {
+  it("reports a partial fetch when a focused span is missing from a large trace", async () => {
     const traceId = "d4d1aae7216b47ff8117cf4e09ce9d0d";
 
     mswServer.use(
       ...httpGetRegional(
-        "https://sentry.io/api/0/projects/sentry-mcp-evals/frontend/",
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/${traceId}/`,
         () =>
           HttpResponse.json({
-            id: "9999999999999999",
-            slug: "frontend",
-            name: "frontend",
+            logs: 0,
+            errors: 0,
+            performance_issues: 0,
+            span_count: 20000,
+            transaction_child_count_map: [],
+            span_count_map: {},
           }),
       ),
       ...httpGetRegional(
         `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
         ({ request }) => {
-          const url = new URL(request.url);
-          const limit = Number(url.searchParams.get("limit") ?? "0");
-
-          expect(url.searchParams.get("project")).toBe("9999999999999999");
+          const limit = Number(
+            new URL(request.url).searchParams.get("limit") ?? "0",
+          );
 
           return HttpResponse.json(
             Array.from({ length: limit }, (_, index) =>
@@ -636,14 +620,13 @@ describe("get_trace_details", () => {
         {
           constraints: {
             organizationSlug: null,
-            projectSlug: "frontend",
           },
           accessToken: "access-token",
           userId: "1",
         },
       ),
     ).rejects.toThrow(
-      /was not found in the fetched portion of trace .*hit the fetch limit of 10000\./,
+      /was not found in the fetched portion of trace .*Fetched 10000 of 20000 spans\./,
     );
   });
 

@@ -319,43 +319,28 @@ describe("get_sentry_resource", () => {
       expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
     });
 
-    it("rejects traces outside the active project constraint", async () => {
+    it("returns traces under an active project constraint", async () => {
+      mockTraceEndpoints("test-org");
       mswServer.use(
-        http.get("https://sentry.io/api/0/projects/test-org/frontend/", () =>
-          HttpResponse.json({
-            id: "9999999999999999",
-            slug: "frontend",
-            name: "frontend",
-          }),
-        ),
-        http.get(
-          `https://sentry.io/api/0/organizations/test-org/trace/${traceId}/`,
-          ({ request }) => {
-            const url = new URL(request.url);
-            if (url.searchParams.get("project") === "9999999999999999") {
-              return HttpResponse.json([]);
-            }
-            return HttpResponse.json(traceFixture);
-          },
-        ),
+        http.get("https://sentry.io/api/0/projects/test-org/frontend/", () => {
+          throw new Error("getProject should not be called for trace lookups");
+        }),
       );
 
-      await expect(
-        getSentryResource.handler(
-          {
-            url: `https://test-org.sentry.io/explore/traces/trace/${traceId}`,
+      const result = await getSentryResource.handler(
+        {
+          url: `https://test-org.sentry.io/explore/traces/trace/${traceId}`,
+        },
+        {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "test-org",
+            projectSlug: "frontend",
           },
-          {
-            ...baseContext,
-            constraints: {
-              organizationSlug: "test-org",
-              projectSlug: "frontend",
-            },
-          },
-        ),
-      ).rejects.toThrow(
-        'Trace is outside the active project constraint. Expected project "frontend".',
+        },
       );
+
+      expect(result).toContain(`# Trace \`${traceId}\` in **test-org**`);
     });
   });
 
