@@ -1,19 +1,20 @@
 version = 1
 
-#[[triggers]]
-#name = "testing-guidelines"
-#event = "pull_request"
-#actions = ["opened", "synchronize", "reopened"]
-#skill = "testing-guidelines"
-#
-#[triggers.filters]
-#paths = ["**/*.ts", "**/*.tsx"]
-#
-#[[triggers]]
-#name = "logging-observability"
-#event = "pull_request"
-#actions = ["opened", "synchronize", "reopened"]
-#skill = "logging-observability"
-#
-#[triggers.filters]
-#paths = ["**/*.ts", "**/*.tsx"]
+[defaults]
+failOn = "high"
+reportOn = "medium"
+
+[[skills]]
+name = "mcp-audit"
+paths = [
+  "docs/adding-tools.md",
+  "packages/mcp-core/src/server.ts",
+  "packages/mcp-core/src/server.test.ts",
+  "packages/mcp-core/src/skillDefinitions.json",
+  "packages/mcp-core/src/toolDefinitions.json",
+  "packages/mcp-core/src/tools/**",
+]
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
