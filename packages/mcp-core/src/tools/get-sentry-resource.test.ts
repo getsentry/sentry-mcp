@@ -305,9 +305,9 @@ describe("get_sentry_resource", () => {
 
         ## Next Steps
 
-        - **Search spans**: Use \`list_events\` with the \`spans\` dataset to inspect sibling spans or the rest of this trace.
-        - **Search errors**: Use \`list_events\` with the \`errors\` dataset to inspect related error events in this trace.
-        - **Search logs**: Use \`list_events\` with the \`logs\` dataset to inspect related logs in this trace."
+        - **Search spans**: \`list_events(organizationSlug='test-org', dataset='spans', query='trace:${focusedTraceId}')\`
+        - **Search errors**: \`list_events(organizationSlug='test-org', dataset='errors', query='trace:${focusedTraceId}')\`
+        - **Search logs**: \`list_events(organizationSlug='test-org', dataset='logs', query='trace:${focusedTraceId}')\`"
       `);
     });
 

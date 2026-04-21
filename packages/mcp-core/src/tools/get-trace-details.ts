@@ -782,7 +782,7 @@ function formatTraceOverviewOutput({
   sections.push("");
   sections.push("## Next Steps");
   sections.push("");
-  sections.push(...buildTraceNextSteps());
+  sections.push(...buildTraceNextSteps({ organizationSlug, traceId }));
 
   return sections.join("\n");
 }
@@ -872,7 +872,9 @@ function formatFocusedSpanOutput({
   sections.push(...formatSpanAttributeSections(focusedSpan, traceId));
   sections.push("## Next Steps");
   sections.push("");
-  sections.push(...buildTraceNextSteps(true));
+  sections.push(
+    ...buildTraceNextSteps({ organizationSlug, traceId, spanFocused: true }),
+  );
 
   return sections.join("\n");
 }
@@ -1034,23 +1036,30 @@ function stripUndefined(
   );
 }
 
-function buildTraceNextSteps(spanFocused = false): string[] {
-  const spanTool = hasAgentProvider()
-    ? "`search_events`"
-    : "`list_events` with the `spans` dataset";
-  const errorTool = hasAgentProvider()
-    ? "`search_events`"
-    : "`list_events` with the `errors` dataset";
-  const logTool = hasAgentProvider()
-    ? "`search_events`"
-    : "`list_events` with the `logs` dataset";
-  const spanScope = spanFocused
-    ? "inspect sibling spans or the rest of this trace"
-    : "inspect more spans from this trace";
+function buildTraceNextSteps({
+  organizationSlug,
+  traceId,
+  spanFocused = false,
+}: {
+  organizationSlug: string;
+  traceId: string;
+  spanFocused?: boolean;
+}): string[] {
+  if (hasAgentProvider()) {
+    const spanQuery = spanFocused
+      ? `show sibling spans or the rest of trace ${traceId}`
+      : `show more spans from trace ${traceId}`;
+
+    return [
+      `- **Search spans**: \`search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='${spanQuery}')\``,
+      `- **Search errors**: \`search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='show error events from trace ${traceId}')\``,
+      `- **Search logs**: \`search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='show logs from trace ${traceId}')\``,
+    ];
+  }
 
   return [
-    `- **Search spans**: Use ${spanTool} to ${spanScope}.`,
-    `- **Search errors**: Use ${errorTool} to inspect related error events in this trace.`,
-    `- **Search logs**: Use ${logTool} to inspect related logs in this trace.`,
+    `- **Search spans**: \`list_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\``,
+    `- **Search errors**: \`list_events(organizationSlug='${organizationSlug}', dataset='errors', query='trace:${traceId}')\``,
+    `- **Search logs**: \`list_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\``,
   ];
 }
