@@ -3,7 +3,7 @@ import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { hasAgentProvider } from "../internal/agents/provider-factory";
 import { resolveRegionUrlForOrganization } from "../internal/tool-helpers/resolve-region-url";
-import type { SentryApiService, Trace } from "../api-client";
+import type { SentryApiService, Trace, TraceSpan } from "../api-client";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import {
@@ -37,42 +37,6 @@ interface TraceFetchState {
   isComplete: boolean;
 }
 
-interface TraceSpanNode {
-  children: unknown[];
-  errors?: unknown[];
-  occurrences?: unknown[];
-  event_id: string;
-  span_id?: string;
-  parent_span_id?: string | null;
-  transaction_id?: string;
-  project_id?: string | number;
-  project_slug?: string;
-  profile_id?: string | null;
-  profiler_id?: string | null;
-  start_timestamp?: number;
-  end_timestamp?: number;
-  timestamp?: number | string;
-  measurements?: Record<string, number>;
-  duration: number;
-  trace?: string;
-  hash?: string | null;
-  exclusive_time?: number;
-  status?: string | null;
-  is_segment?: boolean;
-  is_transaction?: boolean;
-  description?: string | null;
-  transaction?: string | null;
-  sdk_name?: string | null;
-  op?: string | null;
-  name?: string | null;
-  event_type?: string | null;
-  same_process_as_parent?: boolean;
-  organization?: unknown;
-  tags?: Record<string, unknown>;
-  data?: Record<string, unknown>;
-  additional_attributes?: Record<string, unknown>;
-}
-
 interface SpanBranchStats {
   interesting: boolean;
   score: number;
@@ -81,7 +45,7 @@ interface SpanBranchStats {
 }
 
 interface SpanExpansionCandidate {
-  span: TraceSpanNode;
+  span: TraceSpan;
   parent: SelectedSpan;
   level: number;
   score: number;
@@ -217,12 +181,12 @@ export default defineTool({
   },
 });
 
-function isTraceSpanNode(node: unknown): node is TraceSpanNode {
+function isTraceSpanNode(node: unknown): node is TraceSpan {
   if (node === null || typeof node !== "object") {
     return false;
   }
 
-  const candidate = node as Partial<TraceSpanNode>;
+  const candidate = node as Partial<TraceSpan>;
   return (
     typeof candidate.event_id === "string" &&
     typeof candidate.duration === "number" &&
@@ -230,11 +194,11 @@ function isTraceSpanNode(node: unknown): node is TraceSpanNode {
   );
 }
 
-function getTraceSpans(trace: Trace): TraceSpanNode[] {
+function getTraceSpans(trace: Trace): TraceSpan[] {
   return trace.filter(isTraceSpanNode);
 }
 
-function getTraceSpanChildren(span: TraceSpanNode): TraceSpanNode[] {
+function getTraceSpanChildren(span: TraceSpan): TraceSpan[] {
   return span.children.filter(isTraceSpanNode);
 }
 
@@ -346,7 +310,7 @@ function selectInterestingSpans(
 }
 
 function selectInterestingSpanSubtree(
-  span: TraceSpanNode,
+  span: TraceSpan,
   maxDescendantSpans = MAX_FOCUSED_CHILD_SPANS,
 ): SelectedSpan {
   const getBranchStats = createBranchStatsGetter();
@@ -393,7 +357,7 @@ function normalizeSpanId(value: unknown): string | undefined {
   return undefined;
 }
 
-function getTraceSpanId(span: TraceSpanNode): string {
+function getTraceSpanId(span: TraceSpan): string {
   return (
     normalizeSpanId(span.span_id) ||
     normalizeSpanId(span.additional_attributes?.span_id) ||
@@ -401,10 +365,10 @@ function getTraceSpanId(span: TraceSpanNode): string {
   );
 }
 
-function createBranchStatsGetter(): (span: TraceSpanNode) => SpanBranchStats {
+function createBranchStatsGetter(): (span: TraceSpan) => SpanBranchStats {
   const branchStatsBySpan = new Map<string, SpanBranchStats>();
 
-  function getBranchStats(span: TraceSpanNode): SpanBranchStats {
+  function getBranchStats(span: TraceSpan): SpanBranchStats {
     const spanId = getTraceSpanId(span);
     const cached = branchStatsBySpan.get(spanId);
     if (cached) {
@@ -455,7 +419,7 @@ function createBranchStatsGetter(): (span: TraceSpanNode) => SpanBranchStats {
   return getBranchStats;
 }
 
-function createSelectedSpan(span: TraceSpanNode, level: number): SelectedSpan {
+function createSelectedSpan(span: TraceSpan, level: number): SelectedSpan {
   return {
     id: getTraceSpanId(span),
     op: span.op || "unknown",
@@ -469,11 +433,11 @@ function createSelectedSpan(span: TraceSpanNode, level: number): SelectedSpan {
 }
 
 function enqueueSelectedChildren(
-  span: TraceSpanNode,
+  span: TraceSpan,
   parent: SelectedSpan,
   level: number,
   queue: SpanExpansionCandidate[],
-  getBranchStats: (span: TraceSpanNode) => SpanBranchStats,
+  getBranchStats: (span: TraceSpan) => SpanBranchStats,
 ): void {
   if (level > MAX_DEPTH) {
     return;
@@ -584,7 +548,7 @@ function renderSpanTree(spans: SelectedSpan[]): string[] {
   return lines;
 }
 
-function findTraceSpan(trace: Trace, spanId: string): TraceSpanNode | null {
+function findTraceSpan(trace: Trace, spanId: string): TraceSpan | null {
   for (const span of getTraceSpans(trace)) {
     const found = findTraceSpanInSubtree(span, spanId);
     if (found) {
@@ -596,9 +560,9 @@ function findTraceSpan(trace: Trace, spanId: string): TraceSpanNode | null {
 }
 
 function findTraceSpanInSubtree(
-  span: TraceSpanNode,
+  span: TraceSpan,
   targetSpanId: string,
-): TraceSpanNode | null {
+): TraceSpan | null {
   if (getTraceSpanId(span) === targetSpanId) {
     return span;
   }
@@ -622,7 +586,7 @@ function calculateOperationStats(trace: Trace): Record<
   }
 > {
   const allSpans = getAllSpansFlattened(trace);
-  const operationSpans: Record<string, TraceSpanNode[]> = {};
+  const operationSpans: Record<string, TraceSpan[]> = {};
 
   // Group leaf spans by operation type (only spans with no children)
   for (const span of allSpans) {
@@ -670,10 +634,10 @@ function calculateOperationStats(trace: Trace): Record<
   return stats;
 }
 
-function getAllSpansFlattened(trace: Trace): TraceSpanNode[] {
-  const result: TraceSpanNode[] = [];
+function getAllSpansFlattened(trace: Trace): TraceSpan[] {
+  const result: TraceSpan[] = [];
 
-  function collectSpans(spanList: TraceSpanNode[]) {
+  function collectSpans(spanList: TraceSpan[]) {
     for (const span of spanList) {
       result.push(span);
       const children = getTraceSpanChildren(span);
@@ -940,7 +904,7 @@ function countSelectedSpans(spans: SelectedSpan[]): number {
   return count;
 }
 
-function countDescendantSpans(span: TraceSpanNode): number {
+function countDescendantSpans(span: TraceSpan): number {
   let count = 0;
 
   for (const child of getTraceSpanChildren(span)) {
@@ -970,7 +934,7 @@ function formatDuration(durationMs: number | undefined): string {
   return `${Math.round(durationMs)}ms`;
 }
 
-function formatTraceSpanDescription(span: TraceSpanNode): string {
+function formatTraceSpanDescription(span: TraceSpan): string {
   return span.name?.trim() || span.description || span.transaction || "unnamed";
 }
 
@@ -981,7 +945,7 @@ function buildSpanUrl(traceUrl: string, spanId: string): string {
 }
 
 function formatSpanAttributeSections(
-  span: TraceSpanNode,
+  span: TraceSpan,
   traceId: string,
 ): string[] {
   const sections: string[] = [];
