@@ -400,6 +400,9 @@ export default defineTool({
   description: [
     "Fetch a Sentry resource by URL or by type and ID.",
     "",
+    "Supports issues, events, traces, spans, replays, and breadcrumbs.",
+    "Trace lookups return a condensed overview by default.",
+    "",
     "For `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.",
     "",
     "<examples>",
@@ -414,6 +417,9 @@ export default defineTool({
     "",
     "### Span by trace and span ID",
     "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')",
+    "",
+    "### Replay by ID",
+    "get_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')",
     "</examples>",
   ].join("\n"),
 
@@ -438,7 +444,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, or `traceId:spanId` for span resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, replay ID, or `traceId:spanId` for span resources. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
