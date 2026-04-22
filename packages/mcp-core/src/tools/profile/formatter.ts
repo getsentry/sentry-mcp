@@ -637,9 +637,10 @@ function formatTopFramesByOccurrence(
 
   const rows = sortedFrames.map(([frameIdx, count]) => {
     const frame = profile.frames[frameIdx]!;
+    const functionName = frame.function ?? frame.raw_function ?? "unknown";
     const funcName = frame.class_name
-      ? `${frame.class_name}.${frame.function}`
-      : frame.function;
+      ? `${frame.class_name}.${functionName}`
+      : functionName;
 
     const rawLocation =
       frame.filename && frame.lineno

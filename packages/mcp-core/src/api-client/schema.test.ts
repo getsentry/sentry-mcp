@@ -1,17 +1,26 @@
-import { describe, expect, it } from "vitest";
 import {
+  autofixStateExplorerFixture,
+  issueNullCulpritFixture,
   profileChunkFixture,
+  tagsFixture,
+  transactionProfileV1MissingFunctionFixture,
   transactionProfileV1Fixture,
 } from "@sentry/mcp-server-mocks";
+import { describe, expect, it } from "vitest";
 import {
+  AutofixRunSchema,
+  AutofixRunStateSchema,
   ClientKeySchema,
   EventSchema,
   FlamegraphSchema,
   IssueSchema,
+  IssueTagValuesSchema,
   ProfileChunkSampleSchema,
   ProfileChunkSchema,
+  ProfileFrameSchema,
   ReleaseSchema,
   ReplayDetailsSchema,
+  TagSchema,
   TransactionProfileSampleSchema,
   TransactionProfileSchema,
 } from "./schema";
@@ -245,6 +254,11 @@ describe("IssueSchema", () => {
     const result = IssueSchema.parse(issue);
     expect(result.firstSeen).toBeNull();
     expect(result.lastSeen).toBeNull();
+  });
+
+  it("should handle issues with null culprit", () => {
+    const result = IssueSchema.parse(issueNullCulpritFixture);
+    expect(result.culprit).toBeNull();
   });
 });
 
@@ -580,6 +594,83 @@ describe("ReleaseSchema", () => {
   });
 });
 
+describe("TagSchema", () => {
+  it("normalizes upstream tag counts when only uniqueValues is present", () => {
+    const tag = TagSchema.parse(tagsFixture[0]);
+
+    expect(tag).toEqual({
+      key: "transaction",
+      name: "Transaction",
+      totalValues: 1080,
+    });
+  });
+});
+
+describe("AutofixRunSchema", () => {
+  it("accepts the numeric run_id returned by the autofix POST endpoint", () => {
+    const run = AutofixRunSchema.parse({ run_id: 123 });
+
+    expect(run.run_id).toBe(123);
+  });
+});
+
+describe("AutofixRunStateSchema", () => {
+  it("accepts explorer-style autofix state without legacy steps", () => {
+    const state = AutofixRunStateSchema.parse(autofixStateExplorerFixture);
+
+    expect(state.autofix?.steps).toEqual([]);
+    expect(state.autofix?.blocks).toEqual([
+      {
+        type: "root_cause",
+        title: "Investigate failing request",
+        status: "COMPLETED",
+      },
+      {
+        type: "solution",
+        title: "Draft fix plan",
+        status: "IN_PROGRESS",
+      },
+    ]);
+  });
+});
+
+describe("IssueTagValuesSchema", () => {
+  it("normalizes aggregate counts and missing topValues from upstream tag details", () => {
+    const tagValues = IssueTagValuesSchema.parse({
+      key: "release",
+      name: "Release",
+      uniqueValues: 3,
+    });
+
+    expect(tagValues).toEqual({
+      key: "release",
+      name: "Release",
+      totalValues: 3,
+      topValues: [],
+    });
+  });
+
+  it("normalizes nullable tag value counts to zero", () => {
+    const tagValues = IssueTagValuesSchema.parse({
+      key: "user",
+      name: "User",
+      totalValues: 1,
+      topValues: [
+        {
+          key: "user",
+          name: null,
+          value: null,
+          count: null,
+          firstSeen: null,
+          lastSeen: null,
+        },
+      ],
+    });
+
+    expect(tagValues.topValues[0]?.count).toBe(0);
+  });
+});
+
 describe("FlamegraphSchema", () => {
   it("fills optional profiling fields that Sentry omits or returns as null", () => {
     const flamegraph = FlamegraphSchema.parse({
@@ -689,6 +780,22 @@ describe("TransactionProfileSampleSchema", () => {
   });
 });
 
+describe("ProfileFrameSchema", () => {
+  it("accepts sampled profile frames without a function name", () => {
+    // Sentry's sampled profile frame contract treats function as optional:
+    // static/app/types/profiling.d.ts defines `function?: string`, and the
+    // profile processing pipeline falls back when it is missing.
+    const frame = ProfileFrameSchema.parse({
+      filename: "main.py",
+      in_app: true,
+      lineno: 42,
+    });
+
+    expect(frame.function).toBeUndefined();
+    expect(frame.in_app).toBe(true);
+  });
+});
+
 describe("profile fixtures", () => {
   it("parses the V1 transaction profile fixture through TransactionProfileSchema", () => {
     // transaction-profile-v1.json mirrors what vroom emits for legacy/V1
@@ -759,5 +866,13 @@ describe("TransactionProfileSchema", () => {
     expect(profile.transaction?.active_thread_id).toBe("1");
     expect(profile.profile.samples[0]?.thread_id).toBe("1");
     expect(profile.profile.samples[0]?.elapsed_since_start_ns).toBe(0);
+  });
+
+  it("accepts V1 transaction profiles when some frames omit function", () => {
+    const parsed = TransactionProfileSchema.parse(
+      structuredClone(transactionProfileV1MissingFunctionFixture),
+    );
+
+    expect(parsed.profile.frames[0]?.function).toBeUndefined();
   });
 });

@@ -9,6 +9,9 @@
 import autofixStateFixture from "./fixtures/autofix-state.json" with {
   type: "json",
 };
+import autofixStateExplorerFixture from "./fixtures/autofix-state-explorer.json" with {
+  type: "json",
+};
 import clientKeyFixture from "./fixtures/client-key.json" with { type: "json" };
 import eventAttachmentsFixture from "./fixtures/event-attachments.json" with {
   type: "json",
@@ -32,7 +35,13 @@ import flamegraphFixture from "./fixtures/flamegraph.json" with {
 import transactionProfileV1Fixture from "./fixtures/transaction-profile-v1.json" with {
   type: "json",
 };
+import transactionProfileV1MissingFunctionFixture from "./fixtures/transaction-profile-v1-missing-function.json" with {
+  type: "json",
+};
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
+import issueNullCulpritFixture from "./fixtures/issue-null-culprit.json" with {
+  type: "json",
+};
 import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
 };
@@ -93,6 +102,7 @@ const issueFixture2 = {
 // Export all fixtures
 export {
   autofixStateFixture,
+  autofixStateExplorerFixture,
   clientKeyFixture,
   eventAttachmentsFixture,
   eventFixture,
@@ -102,8 +112,10 @@ export {
   eventsSpansFixture,
   flamegraphFixture,
   transactionProfileV1Fixture,
+  transactionProfileV1MissingFunctionFixture,
   issueFixture,
   issueFixture2,
+  issueNullCulpritFixture,
   issueTagValuesFixture,
   organizationFixture,
   performanceEventFixture,

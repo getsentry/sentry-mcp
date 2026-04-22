@@ -1,0 +1,22 @@
+{
+  "autofix": {
+    "run_id": 21831,
+    "status": "IN_PROGRESS",
+    "blocks": [
+      {
+        "type": "root_cause",
+        "title": "Investigate failing request",
+        "status": "COMPLETED"
+      },
+      {
+        "type": "solution",
+        "title": "Draft fix plan",
+        "status": "IN_PROGRESS"
+      }
+    ],
+    "updated_at": "2026-04-22T12:00:00Z",
+    "pending_user_input": null,
+    "repo_pr_states": {},
+    "coding_agents": {}
+  }
+}
