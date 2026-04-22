@@ -1,17 +1,18 @@
-import { describe, it, expect } from "vitest";
-import { http, HttpResponse } from "msw";
 import {
-  mswServer,
+  createCspEvent,
+  createCspIssue,
   createDefaultEvent,
   createGenericEvent,
-  createUnknownEvent,
   createPerformanceEvent,
   createPerformanceIssue,
   createRegressedIssue,
+  createUnknownEvent,
   createUnsupportedIssue,
-  createCspIssue,
-  createCspEvent,
+  issueNullCulpritFixture,
+  mswServer,
 } from "@sentry/mcp-server-mocks";
+import { http, HttpResponse } from "msw";
+import { describe, expect, it } from "vitest";
 import getIssueDetails from "./get-issue-details.js";
 
 const baseContext = {
@@ -259,6 +260,33 @@ describe("get_issue_details", () => {
       - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', naturalLanguageQuery='your query')\`
       "
     `);
+  });
+
+  it("omits null culprit values from issue output", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(issueNullCulpritFixture),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      baseContext,
+    );
+
+    expect(result).toContain(
+      "**Description**: Error: Tool list_issues is already registered",
+    );
+    expect(result).not.toContain("**Culprit**:");
+    expect(result).not.toContain("**Culprit**: null");
   });
 
   it("displays team assignment correctly", async () => {
