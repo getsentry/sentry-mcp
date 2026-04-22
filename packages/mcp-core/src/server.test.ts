@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { buildServer } from "./server";
 import type { ServerContext } from "./types";
 import type { ToolConfig } from "./tools/types";
@@ -28,6 +30,25 @@ function getRegisteredToolNames(server: unknown): string[] {
     return [];
   }
   return Object.keys(registeredTools);
+}
+
+async function listRegisteredTools(server: ReturnType<typeof buildServer>) {
+  const [clientTransport, serverTransport] =
+    InMemoryTransport.createLinkedPair();
+  const client = new Client({
+    name: "server-test-client",
+    version: "1.0.0",
+  });
+
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  try {
+    return (await client.listTools()).tools;
+  } finally {
+    await client.close();
+    await server.close();
+  }
 }
 
 describe("buildServer", () => {
@@ -494,6 +515,46 @@ describe("buildServer", () => {
         expect(toolNames).toContain("get_sentry_resource");
         expect(toolNames).not.toContain("get_issue_details");
       }
+    });
+
+    it("exposes use_sentry safety annotations through tool metadata in agent mode", async () => {
+      const server = buildServer({
+        context: baseContext,
+        agentMode: true,
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+      const useSentryTool = registeredTools.find(
+        (tool) => tool.name === "use_sentry",
+      );
+
+      expect(useSentryTool).toMatchObject({
+        name: "use_sentry",
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          openWorldHint: true,
+        },
+      });
+    });
+
+    it("exposes get_profile_details safety annotations through tool metadata", async () => {
+      const server = buildServer({
+        context: baseContext,
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+      const getProfileDetailsTool = registeredTools.find(
+        (tool) => tool.name === "get_profile_details",
+      );
+
+      expect(getProfileDetailsTool).toMatchObject({
+        name: "get_profile_details",
+        annotations: {
+          readOnlyHint: true,
+          openWorldHint: true,
+        },
+      });
     });
 
     it("removes constrained organizationSlug from get_replay_details schema", () => {

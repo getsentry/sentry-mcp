@@ -269,7 +269,7 @@ export default defineTool({
       ),
   },
 
-  annotations: { readOnlyHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, openWorldHint: true },
 
   async handler(params, context: ServerContext) {
     const resolved = resolveProfileDetailsParams({
