@@ -7,33 +7,33 @@
  */
 import type { z } from "zod";
 import type {
-  Event,
-  Issue,
-  AutofixRunState,
-  Trace,
-  TraceSpan,
-  GenericEvent,
-  ExternalIssueList,
-} from "../api-client/types";
-import type {
+  AutofixRunStepRootCauseAnalysisSchema,
+  DefaultEventSchema,
   ErrorEntrySchema,
   ErrorEventSchema,
-  DefaultEventSchema,
-  GenericEventSchema,
   EventSchema,
   FrameInterface,
-  RequestEntrySchema,
+  GenericEventSchema,
   MessageEntrySchema,
-  ThreadsEntrySchema,
+  RequestEntrySchema,
   SentryApiService,
-  AutofixRunStepRootCauseAnalysisSchema,
+  ThreadsEntrySchema,
 } from "../api-client";
+import type {
+  AutofixRunState,
+  Event,
+  ExternalIssueList,
+  GenericEvent,
+  Issue,
+  Trace,
+  TraceSpan,
+} from "../api-client/types";
+import { logIssue } from "../telem/logging";
 import {
   getOutputForAutofixStep,
-  isTerminalStatus,
   getStatusDisplayName,
+  isTerminalStatus,
 } from "./tool-helpers/seer";
-import { logIssue } from "../telem/logging";
 import { formatUserGeoSummary } from "./user-formatting";
 
 /**
@@ -1784,7 +1784,9 @@ export function formatIssueOutput({
   } else {
     // For regular errors and other issues
     output += `**Description**: ${issue.title}\n`;
-    output += `**Culprit**: ${issue.culprit}\n`;
+    if (issue.culprit) {
+      output += `**Culprit**: ${issue.culprit}\n`;
+    }
   }
 
   if (issue.firstSeen) {

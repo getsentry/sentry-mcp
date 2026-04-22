@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { http, HttpResponse } from "msw";
 import {
   mswServer,
+  transactionProfileV1MissingFunctionFixture,
   transactionProfileV1Fixture,
 } from "@sentry/mcp-server-mocks";
+import { http, HttpResponse } from "msw";
+import { describe, expect, it } from "vitest";
 import getProfileDetails from "./get-profile-details";
 
 const baseContext = {
@@ -87,6 +88,35 @@ describe("get_profile_details", () => {
       );
       expect(result).toContain("**Project**: backend");
       expect(result).toContain("cursor.execute");
+    });
+
+    it("formats transaction profiles even when frames omit function names", async () => {
+      mswServer.use(
+        http.get(
+          `https://sentry.io/api/0/projects/sentry-mcp-evals/backend/profiling/profiles/${transactionProfileV1Fixture.profile_id}/`,
+          () => HttpResponse.json(transactionProfileV1MissingFunctionFixture),
+          { once: true },
+        ),
+        http.get(
+          `https://us.sentry.io/api/0/projects/sentry-mcp-evals/backend/profiling/profiles/${transactionProfileV1Fixture.profile_id}/`,
+          () => HttpResponse.json(transactionProfileV1MissingFunctionFixture),
+          { once: true },
+        ),
+      );
+
+      const result = await getProfileDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlugOrId: "backend",
+          profileId: transactionProfileV1Fixture.profile_id,
+          regionUrl: null,
+          focusOnUserCode: true,
+        },
+        baseContext,
+      );
+
+      expect(result).toContain("## Top Frames by Occurrence");
+      expect(result).toContain("| `unknown` | main.py:42 | 3 | User Code |");
     });
 
     it("fetches a transaction profile from a numeric project ID", async () => {

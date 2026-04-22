@@ -27,6 +27,9 @@ import { setupServer } from "msw/node";
 import autofixStateFixture from "./fixtures/autofix-state.json" with {
   type: "json",
 };
+import autofixStateExplorerFixture from "./fixtures/autofix-state-explorer.json" with {
+  type: "json",
+};
 import clientKeyFixture from "./fixtures/client-key.json" with { type: "json" };
 import eventAttachmentsFixture from "./fixtures/event-attachments.json" with {
   type: "json",
@@ -59,6 +62,9 @@ import flamegraphFixture from "./fixtures/flamegraph.json" with {
 import transactionProfileV1Fixture from "./fixtures/transaction-profile-v1.json" with {
   type: "json",
 };
+import transactionProfileV1MissingFunctionFixture from "./fixtures/transaction-profile-v1-missing-function.json" with {
+  type: "json",
+};
 import profileChunkFixture from "./fixtures/profile-chunk.json" with {
   type: "json",
 };
@@ -66,6 +72,9 @@ import issueTagValuesFixture from "./fixtures/issue-tag-values.json" with {
   type: "json",
 };
 import issueFixture from "./fixtures/issue.json" with { type: "json" };
+import issueNullCulpritFixture from "./fixtures/issue-null-culprit.json" with {
+  type: "json",
+};
 import organizationFixture from "./fixtures/organization.json" with {
   type: "json",
 };
@@ -1401,6 +1410,7 @@ export const mswServer = setupServer(
 // Export fixtures for use in tests
 export {
   autofixStateFixture,
+  autofixStateExplorerFixture,
   eventsFixture as eventFixture,
   replayDetailsFixture,
   replayRecordingSegmentsFixture,
@@ -1412,6 +1422,7 @@ export {
   traceEventFixture,
   flamegraphFixture,
   transactionProfileV1Fixture,
+  transactionProfileV1MissingFunctionFixture,
   organizationFixture,
   releaseFixture,
   clientKeyFixture,
@@ -1421,6 +1432,7 @@ export {
   eventsSpansFixture,
   eventsSpansEmptyFixture,
   issueFixture,
+  issueNullCulpritFixture,
   eventsFixture,
   projectFixture,
   teamFixture,
