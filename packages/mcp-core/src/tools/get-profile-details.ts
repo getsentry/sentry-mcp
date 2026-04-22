@@ -295,20 +295,38 @@ export default defineTool({
     setTag("organization.slug", resolved.organizationSlug);
 
     if (resolved.mode === "transaction") {
-      const { projectSlug } = await resolveProjectContext(
-        apiService,
-        resolved.organizationSlug,
-        resolved.projectSlugOrId,
-      );
-
       setTag("profile.id", resolved.profileId);
-      setTag("project.slug", projectSlug);
+      const isNumericProjectInput =
+        typeof resolved.projectSlugOrId === "number" ||
+        isNumericId(String(resolved.projectSlugOrId));
+      let projectSlug: string;
+      let profile: Awaited<ReturnType<typeof apiService.getTransactionProfile>>;
 
-      const profile = await apiService.getTransactionProfile({
-        organizationSlug: resolved.organizationSlug,
-        projectSlugOrId: resolved.projectSlugOrId,
-        profileId: resolved.profileId,
-      });
+      if (isNumericProjectInput) {
+        const [project, fetchedProfile] = await Promise.all([
+          apiService.getProject({
+            organizationSlug: resolved.organizationSlug,
+            projectSlugOrId: String(resolved.projectSlugOrId),
+          }),
+          apiService.getTransactionProfile({
+            organizationSlug: resolved.organizationSlug,
+            projectSlugOrId: resolved.projectSlugOrId,
+            profileId: resolved.profileId,
+          }),
+        ]);
+
+        projectSlug = project.slug;
+        profile = fetchedProfile;
+      } else {
+        projectSlug = String(resolved.projectSlugOrId);
+        profile = await apiService.getTransactionProfile({
+          organizationSlug: resolved.organizationSlug,
+          projectSlugOrId: resolved.projectSlugOrId,
+          profileId: resolved.profileId,
+        });
+      }
+
+      setTag("project.slug", projectSlug);
 
       const profileUrl =
         params.profileUrl ??
