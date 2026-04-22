@@ -8,11 +8,27 @@ reportOn = "medium"
 name = "mcp-audit"
 paths = [
   "docs/adding-tools.md",
+  "docs/stdio-auth.md",
   "packages/mcp-core/src/server.ts",
   "packages/mcp-core/src/server.test.ts",
   "packages/mcp-core/src/skillDefinitions.json",
   "packages/mcp-core/src/toolDefinitions.json",
   "packages/mcp-core/src/tools/**",
+  "packages/mcp-server/src/auth/**",
+  "packages/mcp-server/src/index.ts",
+  "packages/mcp-server/src/transports/**",
+  "packages/mcp-cloudflare/src/server/app.ts",
+  "packages/mcp-cloudflare/src/server/index.ts",
+  "packages/mcp-cloudflare/src/server/authorization-server-metadata.ts",
+  "packages/mcp-cloudflare/src/server/protected-resource-metadata.ts",
+  "packages/mcp-cloudflare/src/server/lib/mcp-handler.ts",
+  "packages/mcp-cloudflare/src/server/oauth/**",
+  "packages/mcp-cloudflare/src/server/routes/chat-oauth.ts",
+  "packages/mcp-cloudflare/src/server/routes/mcp.ts",
+  "packages/mcp-cloudflare/src/server/routes/metadata.ts",
+  "packages/mcp-cloudflare/src/server/utils/auth-errors.ts",
+  "packages/mcp-cloudflare/src/server/utils/cors.ts",
+  "packages/mcp-cloudflare/src/server/utils/rate-limiter.ts",
 ]
 
 [[skills.triggers]]
