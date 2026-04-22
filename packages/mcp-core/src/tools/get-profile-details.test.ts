@@ -89,6 +89,42 @@ describe("get_profile_details", () => {
       expect(result).toContain("cursor.execute");
     });
 
+    it("fetches a transaction profile from a numeric project ID", async () => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/projects/sentry-mcp-evals/12345/",
+          () =>
+            HttpResponse.json({ id: 12345, slug: "backend", name: "Backend" }),
+          { once: true },
+        ),
+        http.get(
+          "https://us.sentry.io/api/0/projects/sentry-mcp-evals/12345/",
+          () =>
+            HttpResponse.json({ id: 12345, slug: "backend", name: "Backend" }),
+          { once: true },
+        ),
+      );
+
+      const result = await getProfileDetails.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          projectSlugOrId: 12345,
+          profileId: transactionProfileV1Fixture.profile_id,
+          regionUrl: null,
+          focusOnUserCode: true,
+        },
+        baseContext,
+      );
+
+      expect(result).toContain(
+        `# Profile ${transactionProfileV1Fixture.profile_id}`,
+      );
+      expect(result).toContain("**Project**: backend");
+      expect(result).toContain(
+        `https://sentry-mcp-evals.sentry.io/explore/profiling/profile/backend/${transactionProfileV1Fixture.profile_id}/flamegraph/`,
+      );
+    });
+
     it("fetches and formats a continuous profile chunk", async () => {
       mswServer.use(
         http.get(
