@@ -188,6 +188,8 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
         extra: {
           clientId: oauthReqInfo.clientId,
           redirectUri: oauthReqInfo.redirectUri,
+          registeredUris: client?.redirectUris,
+          clientName: registeredClientName,
         },
       });
       return c.text("Authorization failed: Invalid redirect URL", 400);
