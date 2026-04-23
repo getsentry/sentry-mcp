@@ -70,11 +70,13 @@ export default new Hono<{ Bindings: Env }>()
         const attemptedClientId = authUrl.searchParams.get("client_id");
         const attemptedRedirectUri = authUrl.searchParams.get("redirect_uri");
         let registeredUris: string[] | undefined;
+        let clientName: string | undefined;
         if (attemptedClientId) {
           try {
             const client =
               await c.env.OAUTH_PROVIDER.lookupClient(attemptedClientId);
             registeredUris = client?.redirectUris;
+            clientName = client?.clientName;
           } catch {}
         }
         logWarn(`OAuth authorization failed: ${errorMessage}`, {
@@ -84,6 +86,7 @@ export default new Hono<{ Bindings: Env }>()
             clientId: attemptedClientId,
             redirectUri: attemptedRedirectUri,
             registeredUris,
+            clientName,
           },
         });
         return c.text("Invalid redirect URI", 400);

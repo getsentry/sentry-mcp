@@ -173,10 +173,12 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   }
 
   // Validate redirectUri is registered for this client
+  let registeredClientName: string | undefined;
   try {
     const client = await c.env.OAUTH_PROVIDER.lookupClient(
       oauthReqInfo.clientId,
     );
+    registeredClientName = client?.clientName;
     const uriIsAllowed =
       Array.isArray(client?.redirectUris) &&
       client.redirectUris.includes(oauthReqInfo.redirectUri);
@@ -310,17 +312,10 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   Sentry.setUser({ id: payload.user.id });
   // /oauth/callback is browser-navigated, so the User-Agent is the user's
   // browser, not the MCP client. Derive client family from the DCR-registered
-  // client_name instead.
-  let callbackClientName: string | undefined;
-  try {
-    const callbackClient = await c.env.OAUTH_PROVIDER.lookupClient(
-      oauthReqInfo.clientId,
-    );
-    callbackClientName = callbackClient?.clientName;
-  } catch {}
+  // client_name (resolved above).
   Sentry.metrics.count("mcp.oauth.callback_completed", 1, {
     attributes: {
-      client_family: resolveClientFamilyFromName(callbackClientName),
+      client_family: resolveClientFamilyFromName(registeredClientName),
     },
   });
 
