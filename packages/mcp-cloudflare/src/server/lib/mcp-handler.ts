@@ -141,9 +141,12 @@ const mcpHandler: ExportedHandler<Env> = {
 
     // Grants created before refreshToken was stored in props are stale and
     // can no longer be silently refreshed. Revoke and force clean re-auth.
+    // Attribute values intentionally avoid the substring "token" because
+    // Sentry's default PII scrubber replaces it with "[Filtered]" on ingest,
+    // making the `reason` dimension unusable for diagnosis.
     if (!rawProps.refreshToken) {
       Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-        attributes: { reason: "missing_refresh_token" },
+        attributes: { reason: "stale_props_no_refresh" },
       });
       return revokeStaleGrant(
         ctx,
@@ -156,7 +159,7 @@ const mcpHandler: ExportedHandler<Env> = {
 
     if (rawProps.upstreamTokenInvalid) {
       Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-        attributes: { reason: "invalid_upstream_token" },
+        attributes: { reason: "upstream_rejected" },
       });
       return revokeStaleGrant(
         ctx,
