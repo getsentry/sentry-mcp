@@ -478,52 +478,39 @@ function buildInvalidGrantTokenExchangeResult(
   };
 }
 
-function recordProbeStatus(status: number | undefined): void {
-  if (typeof status !== "number") {
-    return;
-  }
-  // The @sentry/cloudflare SDK does not attach http.response.status_code to
-  // outgoing http.client spans in this handler, so do it manually. Queries
-  // in Discover can then split upstream_rejected outcomes by 401 vs 403 vs 400
-  // without introducing a new metric.
-  Sentry.getActiveSpan()?.setAttribute("mcp.oauth.probe.status", status);
-}
+type ProbeResult = { outcome: TokenExchangeOutcome; status?: number };
 
 async function probeUpstreamAccessToken(
   props: WorkerProps,
   env: TokenExchangeEnv,
-): Promise<TokenExchangeOutcome> {
+): Promise<ProbeResult> {
   try {
     const api = new SentryApiService({
       accessToken: props.accessToken,
       host: env.SENTRY_HOST || "sentry.io",
     });
     await api.getAuthenticatedUser();
-    recordProbeStatus(200);
-    return "cached_valid_probed";
+    return { outcome: "cached_valid_probed", status: 200 };
   } catch (error) {
     if (error instanceof ApiRateLimitError) {
-      recordProbeStatus(error.status);
-      return "verification_indeterminate";
+      return { outcome: "verification_indeterminate", status: error.status };
     }
 
     if (error instanceof ApiClientError) {
-      recordProbeStatus(error.status);
-      return "upstream_rejected";
+      return { outcome: "upstream_rejected", status: error.status };
     }
 
     if (typeof error === "object" && error !== null) {
       const status = "status" in error ? error.status : undefined;
       if (typeof status === "number" && status >= 400 && status < 500) {
-        recordProbeStatus(status);
-        return "upstream_rejected";
+        return { outcome: "upstream_rejected", status };
       }
     }
 
     logIssue(error, {
       loggerScope: ["cloudflare", "oauth", "refresh"],
     });
-    return "verification_indeterminate";
+    return { outcome: "verification_indeterminate" };
   }
 }
 
@@ -586,12 +573,19 @@ export async function tokenExchangeCallback(
   // report invalid/expired bearer tokens here as 400 or 401, so treat any 4xx
   // as an expected probe failure and fall back to re-auth without creating an
   // issue.
-  const outcome = await probeUpstreamAccessToken(props, env);
+  const { outcome, status } = await probeUpstreamAccessToken(props, env);
+  // Carried as a metric attribute (not a span attribute) because Sentry.getActiveSpan()
+  // is undefined inside tokenExchangeCallback — the workers-oauth-provider invokes
+  // the callback outside the request span context.
+  const outcomeAttributes: Record<string, string> = {
+    grant_shape: "refreshable",
+  };
+  if (typeof status === "number") {
+    outcomeAttributes.probe_status = String(status);
+  }
   switch (outcome) {
     case "cached_valid_probed": {
-      recordTokenExchangeOutcome(outcome, {
-        grant_shape: "refreshable",
-      });
+      recordTokenExchangeOutcome(outcome, outcomeAttributes);
       // Extend the cached expiry by twice the wrapper TTL so the next
       // refresh can take the local fast path instead of re-probing upstream.
       // Any Sentry-side revocation still surfaces on real MCP tool calls,
@@ -607,14 +601,10 @@ export async function tokenExchangeCallback(
       );
     }
     case "upstream_rejected":
-      recordTokenExchangeOutcome(outcome, {
-        grant_shape: "refreshable",
-      });
+      recordTokenExchangeOutcome(outcome, outcomeAttributes);
       return buildInvalidGrantTokenExchangeResult(props);
     case "verification_indeterminate":
-      recordTokenExchangeOutcome(outcome, {
-        grant_shape: "refreshable",
-      });
+      recordTokenExchangeOutcome(outcome, outcomeAttributes);
       return undefined;
     default:
       return undefined;
