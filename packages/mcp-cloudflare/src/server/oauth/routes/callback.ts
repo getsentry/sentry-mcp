@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
+import * as Sentry from "@sentry/cloudflare";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
+import { resolveClientFamily } from "../../lib/client-family";
 import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
@@ -303,6 +305,13 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
       // Note: sentryHost and mcpUrl come from env, not OAuth props
     } as WorkerProps,
+  });
+
+  Sentry.setUser({ id: payload.user.id });
+  Sentry.metrics.count("mcp.oauth.callback_completed", 1, {
+    attributes: {
+      client_family: resolveClientFamily(c.req.header("user-agent")),
+    },
   });
 
   // Use manual redirect instead of Response.redirect() to allow middleware to add headers
