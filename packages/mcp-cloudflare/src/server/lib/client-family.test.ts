@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveClientFamily } from "./client-family";
+import {
+  resolveClientFamily,
+  resolveClientFamilyFromName,
+} from "./client-family";
 
 describe("resolveClientFamily", () => {
   it.each([
@@ -23,5 +26,24 @@ describe("resolveClientFamily", () => {
     [undefined, "unknown"],
   ])("maps %s → %s", (input, expected) => {
     expect(resolveClientFamily(input)).toBe(expected);
+  });
+});
+
+describe("resolveClientFamilyFromName", () => {
+  it.each([
+    ["Claude Code", "claude-code"],
+    ["claude-code", "claude-code"],
+    ["Claude", "claude-desktop"],
+    ["Claude Desktop", "claude-desktop"],
+    ["Cursor", "cursor"],
+    ["GitHub Copilot", "copilot"],
+    ["Codex CLI", "codex"],
+    ["opencode", "opencode"],
+    ["Some Random Client", "other"],
+    ["", "unknown"],
+    [null, "unknown"],
+    [undefined, "unknown"],
+  ])("maps %s → %s", (input, expected) => {
+    expect(resolveClientFamilyFromName(input)).toBe(expected);
   });
 });

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import * as Sentry from "@sentry/cloudflare";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
-import { resolveClientFamily } from "../../lib/client-family";
+import { resolveClientFamilyFromName } from "../../lib/client-family";
 import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
@@ -308,9 +308,19 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   });
 
   Sentry.setUser({ id: payload.user.id });
+  // /oauth/callback is browser-navigated, so the User-Agent is the user's
+  // browser, not the MCP client. Derive client family from the DCR-registered
+  // client_name instead.
+  let callbackClientName: string | undefined;
+  try {
+    const callbackClient = await c.env.OAUTH_PROVIDER.lookupClient(
+      oauthReqInfo.clientId,
+    );
+    callbackClientName = callbackClient?.clientName;
+  } catch {}
   Sentry.metrics.count("mcp.oauth.callback_completed", 1, {
     attributes: {
-      client_family: resolveClientFamily(c.req.header("user-agent")),
+      client_family: resolveClientFamilyFromName(callbackClientName),
     },
   });
 
