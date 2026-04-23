@@ -31,13 +31,13 @@ jobs:
           private-key: ${{ secrets.SENTRY_RELEASE_BOT_PRIVATE_KEY }}
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           token: ${{ steps.token.outputs.token }}
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
 
@@ -56,7 +56,7 @@ jobs:
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
 
       - name: Prepare release
-        uses: getsentry/action-prepare-release@v1
+        uses: getsentry/action-prepare-release@c8e1c2009ab08259029170132c384f03c1064c0e # v1
         env:
           GITHUB_TOKEN: ${{ steps.token.outputs.token }}
         with:
