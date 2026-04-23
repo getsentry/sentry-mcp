@@ -297,6 +297,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       // Cache upstream expiry so future refresh grants can avoid
       // unnecessary upstream refresh calls when still valid
       accessTokenExpiresAt,
+      upstreamExpiresAt: accessTokenExpiresAt,
       clientId: oauthReqInfo.clientId,
       scope: oauthReqInfo.scope.join(" "),
       // Scopes derived from skills - for backward compatibility with old MCP clients
