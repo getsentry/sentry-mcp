@@ -23,6 +23,7 @@ import {
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
 } from "../utils/rate-limiter";
 import { annotateResponseMetric } from "../metrics";
+import { resolveClientFamily } from "./client-family";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
 /**
@@ -128,6 +129,8 @@ const mcpHandler: ExportedHandler<Env> = {
     const accessToken = rawProps.accessToken as string;
     const clientId = rawProps.clientId as string;
     const sentryHost = env.SENTRY_HOST || "sentry.io";
+    const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
+    Sentry.setUser({ id: userId });
 
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported
@@ -139,14 +142,14 @@ const mcpHandler: ExportedHandler<Env> = {
       return revokeStaleGrant(ctx, env, userId, clientId, "legacy grant");
     }
 
-    // Grants created before refreshToken was stored in props are stale and
-    // can no longer be silently refreshed. Revoke and force clean re-auth.
-    // Attribute values intentionally avoid the substring "token" because
-    // Sentry's default PII scrubber replaces it with "[Filtered]" on ingest,
-    // making the `reason` dimension unusable for diagnosis.
+    // Attribute values avoid the substring "token" so Sentry's default PII
+    // scrubber doesn't replace them with "[Filtered]" on ingest.
     if (!rawProps.refreshToken) {
       Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-        attributes: { reason: "stale_props_no_refresh" },
+        attributes: {
+          reason: "stale_props_no_refresh",
+          client_family: clientFamily,
+        },
       });
       return revokeStaleGrant(
         ctx,
@@ -159,7 +162,10 @@ const mcpHandler: ExportedHandler<Env> = {
 
     if (rawProps.upstreamTokenInvalid) {
       Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-        attributes: { reason: "upstream_rejected" },
+        attributes: {
+          reason: "upstream_rejected",
+          client_family: clientFamily,
+        },
       });
       return revokeStaleGrant(
         ctx,

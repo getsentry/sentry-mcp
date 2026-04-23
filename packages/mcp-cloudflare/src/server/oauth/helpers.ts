@@ -6,6 +6,7 @@ import type { z } from "zod";
 import {
   ApiClientError,
   ApiRateLimitError,
+  ApiServerError,
   SentryApiService,
 } from "@sentry/mcp-core/api-client";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
@@ -431,9 +432,8 @@ export type TokenExchangeEnv = {
   SENTRY_HOST?: string;
 };
 
-// Attribute values intentionally avoid the substring "token" because Sentry's
-// default PII scrubber replaces it with "[Filtered]" on ingest, making metrics
-// grouped by `outcome` unusable for diagnosis.
+// Values avoid the substring "token" so Sentry's default PII scrubber
+// doesn't replace them with "[Filtered]" on ingest.
 export type TokenExchangeOutcome =
   | "cached_valid_local"
   | "cached_valid_probed"
@@ -478,7 +478,11 @@ function buildInvalidGrantTokenExchangeResult(
   };
 }
 
-type ProbeResult = { outcome: TokenExchangeOutcome; status?: number };
+type ProbeResult = {
+  outcome: TokenExchangeOutcome;
+  status?: number;
+  reason?: "rate_limit" | "server_error" | "unknown";
+};
 
 async function probeUpstreamAccessToken(
   props: WorkerProps,
@@ -493,7 +497,19 @@ async function probeUpstreamAccessToken(
     return { outcome: "cached_valid_probed", status: 200 };
   } catch (error) {
     if (error instanceof ApiRateLimitError) {
-      return { outcome: "verification_indeterminate", status: error.status };
+      return {
+        outcome: "verification_indeterminate",
+        status: error.status,
+        reason: "rate_limit",
+      };
+    }
+
+    if (error instanceof ApiServerError) {
+      return {
+        outcome: "verification_indeterminate",
+        status: error.status,
+        reason: "server_error",
+      };
     }
 
     if (error instanceof ApiClientError) {
@@ -502,15 +518,24 @@ async function probeUpstreamAccessToken(
 
     if (typeof error === "object" && error !== null) {
       const status = "status" in error ? error.status : undefined;
-      if (typeof status === "number" && status >= 400 && status < 500) {
-        return { outcome: "upstream_rejected", status };
+      if (typeof status === "number") {
+        if (status >= 400 && status < 500) {
+          return { outcome: "upstream_rejected", status };
+        }
+        if (status >= 500) {
+          return {
+            outcome: "verification_indeterminate",
+            status,
+            reason: "server_error",
+          };
+        }
       }
     }
 
     logIssue(error, {
       loggerScope: ["cloudflare", "oauth", "refresh"],
     });
-    return { outcome: "verification_indeterminate" };
+    return { outcome: "verification_indeterminate", reason: "unknown" };
   }
 }
 
@@ -525,6 +550,7 @@ async function probeUpstreamAccessToken(
 export async function tokenExchangeCallback(
   options: TokenExchangeCallbackOptions,
   env: TokenExchangeEnv,
+  clientFamily = "unknown",
 ): Promise<TokenExchangeCallbackResult | undefined> {
   if (options.grantType !== "refresh_token") {
     return undefined;
@@ -561,6 +587,7 @@ export async function tokenExchangeCallback(
     if (remainingMs > SAFE_WINDOW_MS) {
       recordTokenExchangeOutcome("cached_valid_local", {
         grant_shape: "refreshable",
+        client_family: clientFamily,
       });
       return buildSuccessfulTokenExchangeResult(
         props,
@@ -573,15 +600,21 @@ export async function tokenExchangeCallback(
   // report invalid/expired bearer tokens here as 400 or 401, so treat any 4xx
   // as an expected probe failure and fall back to re-auth without creating an
   // issue.
-  const { outcome, status } = await probeUpstreamAccessToken(props, env);
-  // Carried as a metric attribute (not a span attribute) because Sentry.getActiveSpan()
-  // is undefined inside tokenExchangeCallback — the workers-oauth-provider invokes
-  // the callback outside the request span context.
+  const { outcome, status, reason } = await probeUpstreamAccessToken(
+    props,
+    env,
+  );
+  // Metric attribute (not span attribute): Sentry.getActiveSpan() is
+  // undefined inside tokenExchangeCallback.
   const outcomeAttributes: Record<string, string> = {
     grant_shape: "refreshable",
+    client_family: clientFamily,
   };
   if (typeof status === "number") {
     outcomeAttributes.probe_status = String(status);
+  }
+  if (reason) {
+    outcomeAttributes.probe_reason = reason;
   }
   switch (outcome) {
     case "cached_valid_probed": {

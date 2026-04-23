@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
+import * as Sentry from "@sentry/cloudflare";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
+import { resolveClientFamilyFromName } from "../../lib/client-family";
 import type { Env, WorkerProps } from "../../types";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
@@ -171,10 +173,12 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   }
 
   // Validate redirectUri is registered for this client
+  let registeredClientName: string | undefined;
   try {
     const client = await c.env.OAUTH_PROVIDER.lookupClient(
       oauthReqInfo.clientId,
     );
+    registeredClientName = client?.clientName;
     const uriIsAllowed =
       Array.isArray(client?.redirectUris) &&
       client.redirectUris.includes(oauthReqInfo.redirectUri);
@@ -184,6 +188,8 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
         extra: {
           clientId: oauthReqInfo.clientId,
           redirectUri: oauthReqInfo.redirectUri,
+          registeredUris: client?.redirectUris,
+          clientName: registeredClientName,
         },
       });
       return c.text("Authorization failed: Invalid redirect URL", 400);
@@ -303,6 +309,16 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
 
       // Note: sentryHost and mcpUrl come from env, not OAuth props
     } as WorkerProps,
+  });
+
+  Sentry.setUser({ id: payload.user.id });
+  // /oauth/callback is browser-navigated, so the User-Agent is the user's
+  // browser, not the MCP client. Derive client family from the DCR-registered
+  // client_name (resolved above).
+  Sentry.metrics.count("mcp.oauth.callback_completed", 1, {
+    attributes: {
+      client_family: resolveClientFamilyFromName(registeredClientName),
+    },
   });
 
   // Use manual redirect instead of Response.redirect() to allow middleware to add headers
