@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { ApiNotFoundError, createApiError } from "../../api-client";
+import {
+  ApiAuthenticationError,
+  ApiNotFoundError,
+  createApiError,
+} from "../../api-client";
 import { UserInputError } from "../../errors";
 import { handleApiError, withApiErrorHandling } from "./api";
 
@@ -69,6 +73,13 @@ describe("handleApiError", () => {
     const error = new Error("Network error");
 
     expect(() => handleApiError(error)).toThrow(error);
+  });
+
+  it("re-throws 401 errors unchanged (not UserInputError)", () => {
+    const error = new ApiAuthenticationError("Unauthorized");
+
+    expect(() => handleApiError(error)).toThrow(ApiAuthenticationError);
+    expect(() => handleApiError(error)).not.toThrow(UserInputError);
   });
 });
 

@@ -57,4 +57,11 @@ export type ServerContext = {
   experimentalMode?: boolean;
   /** Transport type - affects error message formatting */
   transport?: TransportType;
+  /**
+   * Invoked when a tool call surfaces an upstream 401 from Sentry. Transports
+   * wire this up to revoke the MCP grant and record the sign-out so users
+   * don't keep getting handed wrapper tokens backed by a dead upstream token.
+   * Errors thrown by the callback are swallowed.
+   */
+  onUpstreamUnauthorized?: () => void | Promise<void>;
 };

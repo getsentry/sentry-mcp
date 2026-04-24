@@ -3,7 +3,12 @@ import {
   ConfigurationError,
   LLMProviderError,
 } from "../errors";
-import { ApiError, ApiClientError, ApiServerError } from "../api-client";
+import {
+  ApiAuthenticationError,
+  ApiError,
+  ApiClientError,
+  ApiServerError,
+} from "../api-client";
 import { logIssue } from "../telem/logging";
 import { APICallError, NoObjectGeneratedError } from "ai";
 import type { TransportType } from "../types";
@@ -173,6 +178,16 @@ export async function formatErrorForUser(
     return [
       "**AI Processing Error**",
       "The AI was unable to process your query. Please try rephrasing your request.",
+    ].join("\n\n");
+  }
+
+  // Upstream 401 means Sentry rejected our stored access token — never a
+  // user-input problem. Tell the client to re-authorize instead of implying
+  // their request was wrong.
+  if (error instanceof ApiAuthenticationError) {
+    return [
+      "**Authorization Expired**",
+      "Sentry rejected the stored access token for this session. Please re-authorize to continue.",
     ].join("\n\n");
   }
 

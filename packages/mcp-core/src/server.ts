@@ -35,6 +35,7 @@ import {
   isToolVisibleInMode,
 } from "./tools/types";
 import type { ServerContext, ProjectCapabilities } from "./types";
+import { ApiAuthenticationError } from "./api-client";
 import {
   setTag,
   setUser,
@@ -381,6 +382,20 @@ function configureServer({
               code: 2, // error
             });
             activeSpan.recordException(error);
+          }
+
+          // A 401 from Sentry on the tool-call path means the upstream access
+          // token was rejected while still cached. Notify the transport so it
+          // can revoke the MCP grant and stop handing out new wrapper tokens
+          // backed by a dead upstream token. Errors from the callback are
+          // swallowed — the user still needs the formatted tool response.
+          if (
+            error instanceof ApiAuthenticationError &&
+            context.onUpstreamUnauthorized
+          ) {
+            try {
+              await context.onUpstreamUnauthorized();
+            } catch {}
           }
 
           // CRITICAL: Tool errors MUST be returned as formatted text responses,

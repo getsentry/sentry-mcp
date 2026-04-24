@@ -1,5 +1,6 @@
 import {
   SentryApiService,
+  ApiAuthenticationError,
   ApiClientError,
   ApiNotFoundError,
 } from "../../api-client/index";
@@ -45,6 +46,13 @@ export function handleApiError(
   error: unknown,
   params?: Record<string, unknown>,
 ): never {
+  // 401 from upstream means our stored access token was rejected by Sentry.
+  // That's never a user-input problem — let it propagate so the server-level
+  // handler can emit telemetry and revoke the MCP grant.
+  if (error instanceof ApiAuthenticationError) {
+    throw error;
+  }
+
   // Use the new error hierarchy - all 4xx errors extend ApiClientError
   if (error instanceof ApiClientError) {
     let message = `API error (${error.status}): ${error.message}`;

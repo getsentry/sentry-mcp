@@ -47,6 +47,7 @@ sentry-mcp/
 - docs/pr-management.md — Commit/PR guidelines
 - docs/security.md — Authentication patterns
 - docs/stdio-auth.md — Device code flow, token caching, client ID architecture
+- docs/oauth-signout-playbook.md — Remote OAuth failure modes, telemetry, diagnostic runbook
 - docs/embedded-agents.md — LLM provider configuration for AI-powered tools
 - docs/releases/stdio.md — npm package release
 - docs/releases/cloudflare.md — Cloudflare deployment
