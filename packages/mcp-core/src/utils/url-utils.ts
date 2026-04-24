@@ -3,6 +3,7 @@ import {
   isProfilesDataset,
   type EventsDataset,
 } from "./events-datasets";
+import type { SentryProtocol } from "../types";
 
 /**
  * Determines if a Sentry instance is SaaS or self-hosted based on the host.
@@ -61,12 +62,13 @@ function getSentryWebBaseUrl(
   host: string,
   organizationSlug: string,
   path: string,
+  protocol: SentryProtocol = "https",
 ): string {
   const isSaas = isSentryHost(host);
   const webHost = isSaas ? "sentry.io" : host;
   return isSaas
-    ? `https://${organizationSlug}.${webHost}${path}`
-    : `https://${host}/organizations/${organizationSlug}${path}`;
+    ? `${protocol}://${organizationSlug}.${webHost}${path}`
+    : `${protocol}://${host}/organizations/${organizationSlug}${path}`;
 }
 
 function normalizeTraceMetric(
@@ -169,6 +171,7 @@ export function getTraceMetricsExploreUrl(
   host: string,
   organizationSlug: string,
   options: TraceMetricsExplorerUrlOptions,
+  protocol: SentryProtocol = "https",
 ): string {
   const {
     query,
@@ -269,13 +272,14 @@ export function getTraceMetricsExploreUrl(
     }
   }
 
-  return `${getSentryWebBaseUrl(host, organizationSlug, "/explore/metrics/")}?${urlParams.toString()}`;
+  return `${getSentryWebBaseUrl(host, organizationSlug, "/explore/metrics/", protocol)}?${urlParams.toString()}`;
 }
 
 export function getProfilingExplorerUrl(
   host: string,
   organizationSlug: string,
   options: ProfilesExplorerUrlOptions,
+  protocol: SentryProtocol = "https",
 ): string {
   const {
     query,
@@ -315,7 +319,7 @@ export function getProfilingExplorerUrl(
     urlParams.set("statsPeriod", statsPeriod || "24h");
   }
 
-  return `${getSentryWebBaseUrl(host, organizationSlug, "/explore/profiling/")}?${urlParams.toString()}`;
+  return `${getSentryWebBaseUrl(host, organizationSlug, "/explore/profiling/", protocol)}?${urlParams.toString()}`;
 }
 
 /**
@@ -329,8 +333,14 @@ export function getIssueUrl(
   host: string,
   organizationSlug: string,
   issueId: string,
+  protocol: SentryProtocol = "https",
 ): string {
-  return getSentryWebBaseUrl(host, organizationSlug, `/issues/${issueId}`);
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/issues/${issueId}`,
+    protocol,
+  );
 }
 
 /**
@@ -346,8 +356,9 @@ export function getIssuesSearchUrl(
   organizationSlug: string,
   query?: string | null,
   projectSlugOrId?: string,
+  protocol: SentryProtocol = "https",
 ): string {
-  let url = getSentryWebBaseUrl(host, organizationSlug, "/issues/");
+  let url = getSentryWebBaseUrl(host, organizationSlug, "/issues/", protocol);
 
   const params = new URLSearchParams();
   if (projectSlugOrId) {
@@ -384,11 +395,17 @@ export function getReplaysSearchUrl(
     start?: string | null;
     end?: string | null;
   } = {},
+  protocol: SentryProtocol = "https",
 ): string {
   const { query, projectSlugOrId, environment, sort, statsPeriod, start, end } =
     options;
 
-  let url = getSentryWebBaseUrl(host, organizationSlug, "/explore/replays/");
+  let url = getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    "/explore/replays/",
+    protocol,
+  );
   const params = new URLSearchParams();
 
   if (projectSlugOrId) {
@@ -434,11 +451,13 @@ export function getTraceUrl(
   host: string,
   organizationSlug: string,
   traceId: string,
+  protocol: SentryProtocol = "https",
 ): string {
   return getSentryWebBaseUrl(
     host,
     organizationSlug,
     `/explore/traces/trace/${traceId}`,
+    protocol,
   );
 }
 
@@ -453,11 +472,13 @@ export function getReplayUrl(
   host: string,
   organizationSlug: string,
   replayId: string,
+  protocol: SentryProtocol = "https",
 ): string {
   return getSentryWebBaseUrl(
     host,
     organizationSlug,
     `/explore/replays/${replayId}/`,
+    protocol,
   );
 }
 
@@ -466,11 +487,13 @@ export function getProfileUrl(
   organizationSlug: string,
   projectSlug: string,
   profileId: string,
+  protocol: SentryProtocol = "https",
 ): string {
   return getSentryWebBaseUrl(
     host,
     organizationSlug,
     `/explore/profiling/profile/${projectSlug}/${profileId}/flamegraph/`,
+    protocol,
   );
 }
 
@@ -483,12 +506,14 @@ export function getContinuousProfileUrl(
     start: string;
     end: string;
   },
+  protocol: SentryProtocol = "https",
 ): string {
   const url = new URL(
     getSentryWebBaseUrl(
       host,
       organizationSlug,
       `/explore/profiling/profile/${projectSlug}/flamegraph/`,
+      protocol,
     ),
   );
   url.searchParams.set("profilerId", options.profilerId);
@@ -515,6 +540,7 @@ export function getEventsExplorerUrl(
   projectSlugOrId?: string,
   fields?: string[],
   explorerOptions?: Omit<TraceMetricsExplorerUrlOptions, "query" | "projectId">,
+  protocol: SentryProtocol = "https",
 ): string {
   if (isMetricsDataset(dataset)) {
     const derivedAggregateFunctions =
@@ -524,13 +550,18 @@ export function getEventsExplorerUrl(
       explorerOptions?.groupByFields ??
       fields?.filter((field) => !field.includes("(") && !field.includes(")"));
 
-    return getTraceMetricsExploreUrl(host, organizationSlug, {
-      ...explorerOptions,
-      query,
-      projectId: projectSlugOrId,
-      aggregateFunctions: derivedAggregateFunctions,
-      groupByFields: derivedGroupByFields,
-    });
+    return getTraceMetricsExploreUrl(
+      host,
+      organizationSlug,
+      {
+        ...explorerOptions,
+        query,
+        projectId: projectSlugOrId,
+        aggregateFunctions: derivedAggregateFunctions,
+        groupByFields: derivedGroupByFields,
+      },
+      protocol,
+    );
   }
 
   if (isProfilesDataset(dataset)) {
@@ -541,20 +572,25 @@ export function getEventsExplorerUrl(
       explorerOptions?.groupByFields ??
       fields?.filter((field) => !field.includes("(") && !field.includes(")"));
 
-    return getProfilingExplorerUrl(host, organizationSlug, {
-      query,
-      projectId: projectSlugOrId,
-      fields,
-      sort: explorerOptions?.sort,
-      statsPeriod: explorerOptions?.statsPeriod,
-      start: explorerOptions?.start,
-      end: explorerOptions?.end,
-      aggregateFunctions: derivedAggregateFunctions,
-      groupByFields: derivedGroupByFields,
-    });
+    return getProfilingExplorerUrl(
+      host,
+      organizationSlug,
+      {
+        query,
+        projectId: projectSlugOrId,
+        fields,
+        sort: explorerOptions?.sort,
+        statsPeriod: explorerOptions?.statsPeriod,
+        start: explorerOptions?.start,
+        end: explorerOptions?.end,
+        aggregateFunctions: derivedAggregateFunctions,
+        groupByFields: derivedGroupByFields,
+      },
+      protocol,
+    );
   }
 
-  let url = getSentryWebBaseUrl(host, organizationSlug, "/explore/");
+  let url = getSentryWebBaseUrl(host, organizationSlug, "/explore/", protocol);
 
   const params = new URLSearchParams();
   params.append("query", query);

@@ -39,9 +39,11 @@ export const CONSTRAINT_PARAMETER_KEYS = new Set<string>([
 ]);
 
 export type TransportType = "stdio" | "http";
+export type SentryProtocol = "http" | "https";
 
 export type ServerContext = {
   sentryHost?: string;
+  sentryProtocol?: SentryProtocol;
   mcpUrl?: string;
   accessToken: string;
   openaiBaseUrl?: string;

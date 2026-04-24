@@ -148,6 +148,18 @@ describe("url-utils", () => {
         "https://sentry.example.com/organizations/myorg/issues/PROJ-123",
       );
     });
+
+    it("should support HTTP for self-hosted issue URLs when requested", () => {
+      const result = getIssueUrl(
+        "sentry.internal:9000",
+        "myorg",
+        "PROJ-123",
+        "http",
+      );
+      expect(result).toBe(
+        "http://sentry.internal:9000/organizations/myorg/issues/PROJ-123",
+      );
+    });
   });
 
   describe("getIssuesSearchUrl", () => {
@@ -179,6 +191,19 @@ describe("url-utils", () => {
       );
       expect(result).toBe(
         "https://sentry.example.com/organizations/myorg/issues/?project=proj1&query=is%3Aunresolved",
+      );
+    });
+
+    it("should support HTTP for self-hosted issue search URLs when requested", () => {
+      const result = getIssuesSearchUrl(
+        "sentry.internal:9000",
+        "myorg",
+        "is:unresolved",
+        "proj1",
+        "http",
+      );
+      expect(result).toBe(
+        "http://sentry.internal:9000/organizations/myorg/issues/?project=proj1&query=is%3Aunresolved",
       );
     });
   });

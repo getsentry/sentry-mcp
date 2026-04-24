@@ -160,6 +160,8 @@ export default defineTool({
         projectSlugOrId: params.projectSlugOrId ?? undefined,
         query: translatedQuery.query,
         regionUrl: params.regionUrl ?? undefined,
+        host: context.sentryHost,
+        protocol: context.sentryProtocol,
         naturalLanguageQuery: params.naturalLanguageQuery,
         skipHeader: true,
       });
@@ -171,6 +173,8 @@ export default defineTool({
         projectSlugOrId: params.projectSlugOrId ?? undefined,
         query: translatedQuery.query,
         regionUrl: params.regionUrl ?? undefined,
+        host: context.sentryHost,
+        protocol: context.sentryProtocol,
         naturalLanguageQuery: params.naturalLanguageQuery,
         skipHeader: false,
       });
