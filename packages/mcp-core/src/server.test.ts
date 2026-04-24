@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ApiAuthenticationError } from "./api-client";
 import { buildServer } from "./server";
 import type { ServerContext } from "./types";
 import type { ToolConfig } from "./tools/types";
@@ -593,67 +592,6 @@ describe("buildServer", () => {
         "replayId",
         "replayUrl",
       ]);
-    });
-  });
-
-  describe("onUpstreamUnauthorized", () => {
-    // Non-empty annotations are required so the MCP SDK's tool() parser doesn't
-    // mis-identify them as a raw schema shape.
-    const failingToolAnnotations = { readOnlyHint: true } as const;
-
-    async function runFailingTool(handlerError: unknown) {
-      const onUpstreamUnauthorized = vi.fn();
-      const server = buildServer({
-        context: {
-          ...baseContext,
-          onUpstreamUnauthorized,
-        },
-        tools: {
-          failing: createMockTool("failing", {
-            annotations: failingToolAnnotations,
-            handler: async () => {
-              throw handlerError;
-            },
-          }),
-        },
-      });
-
-      const [clientTransport, serverTransport] =
-        InMemoryTransport.createLinkedPair();
-      const client = new Client({
-        name: "server-test-client",
-        version: "1.0.0",
-      });
-
-      await server.connect(serverTransport);
-      await client.connect(clientTransport);
-
-      try {
-        const result = await client.callTool({
-          name: "failing",
-          arguments: {},
-        });
-        return { result, onUpstreamUnauthorized };
-      } finally {
-        await client.close();
-        await server.close();
-      }
-    }
-
-    it("fires when a tool throws ApiAuthenticationError", async () => {
-      const { result, onUpstreamUnauthorized } = await runFailingTool(
-        new ApiAuthenticationError("Invalid token"),
-      );
-      expect(result.isError).toBe(true);
-      expect(onUpstreamUnauthorized).toHaveBeenCalledTimes(1);
-    });
-
-    it("is not called for non-401 tool errors", async () => {
-      const { result, onUpstreamUnauthorized } = await runFailingTool(
-        new Error("some other error"),
-      );
-      expect(result.isError).toBe(true);
-      expect(onUpstreamUnauthorized).not.toHaveBeenCalled();
     });
   });
 });

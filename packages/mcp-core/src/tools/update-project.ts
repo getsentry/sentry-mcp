@@ -108,6 +108,7 @@ export default defineTool({
         logIssue(err);
         throw new Error(
           `Failed to assign team ${params.teamSlug} to project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
+          { cause: err },
         );
       }
     }
@@ -129,6 +130,7 @@ export default defineTool({
         logIssue(err);
         throw new Error(
           `Failed to update project ${params.projectSlug}: ${err instanceof Error ? err.message : "Unknown error"}`,
+          { cause: err },
         );
       }
     } else {
