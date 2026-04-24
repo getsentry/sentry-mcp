@@ -17,7 +17,11 @@ export type WorkerProps = {
   // Sentry-specific fields
   accessToken: string;
   refreshToken: string;
-  accessTokenExpiresAt?: number; // Timestamp when the upstream access token expires
+  accessTokenExpiresAt?: number; // Cached validity deadline; extended on successful probe.
+  // Scheduled upstream expiry from the original callback payload. Never
+  // mutated after grant creation so probe-failure classification can compare
+  // against the real upstream lifetime (not a probe-extended deadline).
+  upstreamExpiresAt?: number;
   upstreamTokenInvalid?: boolean;
   clientId: string;
   scope: string;

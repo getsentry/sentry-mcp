@@ -575,6 +575,7 @@ export async function tokenExchangeCallback(
     accessToken: rawProps.accessToken as string,
     refreshToken: rawProps.refreshToken,
     accessTokenExpiresAt: rawProps.accessTokenExpiresAt,
+    upstreamExpiresAt: rawProps.upstreamExpiresAt,
     clientId: rawProps.clientId as string,
     scope: rawProps.scope as string,
     grantedScopes: rawProps.grantedScopes,
@@ -633,9 +634,24 @@ export async function tokenExchangeCallback(
         PROBED_ACCESS_TOKEN_TTL_SECONDS,
       );
     }
-    case "upstream_rejected":
-      recordTokenExchangeOutcome(outcome, outcomeAttributes);
+    case "upstream_rejected": {
+      // Classify the rejection against the original upstream expiry (never
+      // mutated by probe-extension). Splits 401s into natural 30d rollovers
+      // vs premature Sentry-side invalidation (SSO expiry, org changes, etc.).
+      const upstreamExpiresAt = props.upstreamExpiresAt;
+      const expiredOnSchedule =
+        typeof upstreamExpiresAt === "number" &&
+        Number.isFinite(upstreamExpiresAt)
+          ? Date.now() >= upstreamExpiresAt
+            ? "true"
+            : "false"
+          : "unknown";
+      recordTokenExchangeOutcome(outcome, {
+        ...outcomeAttributes,
+        expired_on_schedule: expiredOnSchedule,
+      });
       return buildInvalidGrantTokenExchangeResult(props);
+    }
     case "verification_indeterminate":
       recordTokenExchangeOutcome(outcome, outcomeAttributes);
       return undefined;
