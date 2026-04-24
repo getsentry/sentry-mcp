@@ -4,10 +4,10 @@ import {
   LLMProviderError,
 } from "../errors";
 import {
-  ApiAuthenticationError,
   ApiError,
   ApiClientError,
   ApiServerError,
+  isApiAuthenticationErrorDeep,
 } from "../api-client";
 import { logIssue } from "../telem/logging";
 import { APICallError, NoObjectGeneratedError } from "ai";
@@ -182,8 +182,9 @@ export async function formatErrorForUser(
   }
 
   // Upstream 401 isn't a user-input problem — prompt re-authorization instead
-  // of routing through the generic Input Error template below.
-  if (error instanceof ApiAuthenticationError) {
+  // of routing through the generic Input Error template below. Deep check
+  // handles tools that rewrap the original with `{ cause: apiError }`.
+  if (isApiAuthenticationErrorDeep(error)) {
     return [
       "**Authorization Expired**",
       "Sentry rejected the stored access token for this session. Please re-authorize to continue.",

@@ -35,7 +35,7 @@ import {
   isToolVisibleInMode,
 } from "./tools/types";
 import type { ServerContext, ProjectCapabilities } from "./types";
-import { ApiAuthenticationError } from "./api-client";
+import { isApiAuthenticationErrorDeep } from "./api-client";
 import {
   setTag,
   setUser,
@@ -52,18 +52,6 @@ import {
   getConstraintKeysToFilter,
 } from "./internal/constraint-helpers";
 import { hasAgentProvider } from "./internal/agents/provider-factory";
-
-// Some tools rewrap upstream errors with `{ cause: apiError }`, so check the
-// cause chain (bounded depth guards against cycles).
-function isApiAuthenticationErrorDeep(error: unknown): boolean {
-  let current: unknown = error;
-  for (let i = 0; i < 3; i++) {
-    if (current instanceof ApiAuthenticationError) return true;
-    if (!(current instanceof Error)) return false;
-    current = current.cause;
-  }
-  return false;
-}
 
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.

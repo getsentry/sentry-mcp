@@ -6,22 +6,10 @@
  */
 
 import { z } from "zod";
-import { ApiAuthenticationError } from "../../api-client";
+import { isApiAuthenticationErrorDeep } from "../../api-client";
 import { agentTool } from "../../internal/agents/tools/utils";
 import type { ServerContext } from "../../types";
 import { type ToolConfig, resolveDescription } from "../types";
-
-// Some tools rewrap upstream errors with `{ cause: apiError }`, so check the
-// cause chain (bounded depth guards against cycles).
-function isApiAuthenticationErrorDeep(error: unknown): boolean {
-  let current: unknown = error;
-  for (let i = 0; i < 3; i++) {
-    if (current instanceof ApiAuthenticationError) return true;
-    if (!(current instanceof Error)) return false;
-    current = current.cause;
-  }
-  return false;
-}
 
 /**
  * Options for wrapping a tool

@@ -324,3 +324,20 @@ export function createApiError(
       return new ApiError(message, status, detail, responseBody);
   }
 }
+
+/**
+ * Returns true if `error` is an `ApiAuthenticationError`, either directly or
+ * anywhere within the first few levels of `error.cause`. Tools that wrap
+ * upstream errors as `throw new Error(msg, { cause: apiError })` would
+ * otherwise hide the 401 signal from a direct `instanceof` check. Bounded
+ * depth guards against accidental cycles.
+ */
+export function isApiAuthenticationErrorDeep(error: unknown): boolean {
+  let current: unknown = error;
+  for (let i = 0; i < 3; i++) {
+    if (current instanceof ApiAuthenticationError) return true;
+    if (!(current instanceof Error)) return false;
+    current = current.cause;
+  }
+  return false;
+}
