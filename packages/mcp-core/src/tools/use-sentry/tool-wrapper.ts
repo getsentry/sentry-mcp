@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { isApiAuthenticationErrorDeep } from "../../api-client";
 import { agentTool } from "../../internal/agents/tools/utils";
 import type { ServerContext } from "../../types";
 import { type ToolConfig, resolveDescription } from "../types";
@@ -89,12 +90,23 @@ export function wrapToolForAgent<TSchema extends Record<string, z.ZodType>>(
         options.context.constraints,
       );
 
-      // Call the actual tool handler with full context
-      // Type assertion is safe: fullParams matches the tool's input schema (enforced by Zod)
-      const result = await tool.handler(fullParams as never, options.context);
-
-      // Return the result - agentTool handles error wrapping
-      return result;
+      try {
+        // fullParams is validated against tool.inputSchema by agentTool's Zod parse.
+        return await tool.handler(fullParams as never, options.context);
+      } catch (error) {
+        // agentTool turns thrown errors into tool-result messages for the LLM,
+        // which would hide the upstream-auth signal. Route it out before
+        // re-throwing so the grant still gets revoked from inside the agent.
+        if (
+          isApiAuthenticationErrorDeep(error) &&
+          options.context.onUpstreamUnauthorized
+        ) {
+          try {
+            await options.context.onUpstreamUnauthorized();
+          } catch {}
+        }
+        throw error;
+      }
     },
   });
 }

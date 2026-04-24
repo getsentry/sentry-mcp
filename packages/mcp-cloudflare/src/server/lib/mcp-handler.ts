@@ -268,7 +268,11 @@ const mcpHandler: ExportedHandler<Env> = {
 
     const constraints = verification.constraints;
 
-    // Build complete ServerContext from OAuth props + verified constraints
+    // Build complete ServerContext from OAuth props + verified constraints.
+    // `upstreamUnauthorizedHandled` de-dupes within the request — use_sentry
+    // runs multiple sub-tool calls in a single request, and each would
+    // otherwise fire the callback independently against the same dead grant.
+    let upstreamUnauthorizedHandled = false;
     const serverContext: ServerContext = {
       userId,
       clientId,
@@ -280,6 +284,32 @@ const mcpHandler: ExportedHandler<Env> = {
       agentMode: isAgentMode,
       experimentalMode: isExperimentalMode,
       transport: "http",
+      onUpstreamUnauthorized: () => {
+        if (upstreamUnauthorizedHandled) return;
+        upstreamUnauthorizedHandled = true;
+        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+          attributes: {
+            reason: "upstream_rejected_in_use",
+            client_family: clientFamily,
+          },
+        });
+        ctx.waitUntil(
+          (async () => {
+            try {
+              const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
+              const grant = grants.items.find((g) => g.clientId === clientId);
+              if (grant) {
+                await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
+              }
+            } catch (err) {
+              logWarn("Failed to revoke grant after upstream 401", {
+                loggerScope: ["cloudflare", "mcp-handler"],
+                extra: { error: String(err), clientId, userId },
+              });
+            }
+          })(),
+        );
+      },
     };
 
     // Create and configure MCP server with tools filtered by context

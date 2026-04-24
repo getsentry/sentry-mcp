@@ -3,7 +3,12 @@ import {
   ConfigurationError,
   LLMProviderError,
 } from "../errors";
-import { ApiError, ApiClientError, ApiServerError } from "../api-client";
+import {
+  ApiError,
+  ApiClientError,
+  ApiServerError,
+  isApiAuthenticationErrorDeep,
+} from "../api-client";
 import { logIssue } from "../telem/logging";
 import { APICallError, NoObjectGeneratedError } from "ai";
 import type { TransportType } from "../types";
@@ -173,6 +178,16 @@ export async function formatErrorForUser(
     return [
       "**AI Processing Error**",
       "The AI was unable to process your query. Please try rephrasing your request.",
+    ].join("\n\n");
+  }
+
+  // Upstream 401 isn't a user-input problem — prompt re-authorization instead
+  // of routing through the generic Input Error template below. Deep check
+  // handles tools that rewrap the original with `{ cause: apiError }`.
+  if (isApiAuthenticationErrorDeep(error)) {
+    return [
+      "**Authorization Expired**",
+      "Sentry rejected the stored access token for this session. Please re-authorize to continue.",
     ].join("\n\n");
   }
 

@@ -1,5 +1,6 @@
 import {
   SentryApiService,
+  ApiAuthenticationError,
   ApiClientError,
   ApiNotFoundError,
 } from "../../api-client/index";
@@ -45,6 +46,12 @@ export function handleApiError(
   error: unknown,
   params?: Record<string, unknown>,
 ): never {
+  // 401 isn't a user-input problem — propagate unwrapped so the server-level
+  // catch can route it through ServerContext.onUpstreamUnauthorized.
+  if (error instanceof ApiAuthenticationError) {
+    throw error;
+  }
+
   // Use the new error hierarchy - all 4xx errors extend ApiClientError
   if (error instanceof ApiClientError) {
     let message = `API error (${error.status}): ${error.message}`;
