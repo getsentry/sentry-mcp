@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
+import { getActiveSpan, setTag } from "@sentry/core";
 import { defineTool } from "../internal/tool-helpers/define";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
@@ -467,6 +467,8 @@ export default defineTool({
     if (resolved.spanId) {
       setTag("trace.span_id", resolved.spanId);
     }
+
+    getActiveSpan()?.setAttribute("sentry-mcp.resource-type", resolved.type);
 
     // Recognized but not yet fully supported types return guidance messages
     if (resolved.type === "monitor" || resolved.type === "release") {
