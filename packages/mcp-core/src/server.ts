@@ -53,8 +53,8 @@ import {
 } from "./internal/constraint-helpers";
 import { hasAgentProvider } from "./internal/agents/provider-factory";
 
-// Walks error.cause up to 3 levels so tools that wrap upstream errors (e.g.,
-// `throw new Error(msg, { cause: apiError })`) still surface the auth signal.
+// Some tools rewrap upstream errors with `{ cause: apiError }`, so check the
+// cause chain (bounded depth guards against cycles).
 function isApiAuthenticationErrorDeep(error: unknown): boolean {
   let current: unknown = error;
   for (let i = 0; i < 3; i++) {
@@ -396,12 +396,9 @@ function configureServer({
             activeSpan.recordException(error);
           }
 
-          // A 401 from Sentry on the tool-call path means the upstream access
-          // token was rejected while still cached. Notify the transport so it
-          // can revoke the MCP grant and stop handing out new wrapper tokens
-          // backed by a dead upstream token. Walk the cause chain in case a
-          // tool wrapped the error. Errors from the callback are swallowed —
-          // the user still needs the formatted tool response.
+          // Upstream 401 during a tool call — route via the transport so it
+          // can revoke the MCP grant; swallow callback errors since the
+          // formatted tool response still needs to land.
           if (
             isApiAuthenticationErrorDeep(error) &&
             context.onUpstreamUnauthorized

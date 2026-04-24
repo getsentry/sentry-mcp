@@ -181,9 +181,8 @@ export async function formatErrorForUser(
     ].join("\n\n");
   }
 
-  // Upstream 401 means Sentry rejected our stored access token — never a
-  // user-input problem. Tell the client to re-authorize instead of implying
-  // their request was wrong.
+  // Upstream 401 isn't a user-input problem — prompt re-authorization instead
+  // of routing through the generic Input Error template below.
   if (error instanceof ApiAuthenticationError) {
     return [
       "**Authorization Expired**",

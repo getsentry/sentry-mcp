@@ -11,8 +11,8 @@ import { agentTool } from "../../internal/agents/tools/utils";
 import type { ServerContext } from "../../types";
 import { type ToolConfig, resolveDescription } from "../types";
 
-// Walks error.cause up to 3 levels so tools that wrap upstream errors still
-// surface the auth signal. Mirrors the helper in server.ts.
+// Some tools rewrap upstream errors with `{ cause: apiError }`, so check the
+// cause chain (bounded depth guards against cycles).
 function isApiAuthenticationErrorDeep(error: unknown): boolean {
   let current: unknown = error;
   for (let i = 0; i < 3; i++) {
@@ -103,14 +103,12 @@ export function wrapToolForAgent<TSchema extends Record<string, z.ZodType>>(
       );
 
       try {
-        // Call the actual tool handler with full context
-        // Type assertion is safe: fullParams matches the tool's input schema (enforced by Zod)
+        // fullParams is validated against tool.inputSchema by agentTool's Zod parse.
         return await tool.handler(fullParams as never, options.context);
       } catch (error) {
-        // The AI SDK converts thrown errors into tool-result messages for the
-        // LLM, which would swallow the upstream-auth signal. Route it out via
-        // the transport callback before re-throwing so the grant still gets
-        // revoked even when the 401 happens inside the embedded agent.
+        // agentTool turns thrown errors into tool-result messages for the LLM,
+        // which would hide the upstream-auth signal. Route it out before
+        // re-throwing so the grant still gets revoked from inside the agent.
         if (
           isApiAuthenticationErrorDeep(error) &&
           options.context.onUpstreamUnauthorized

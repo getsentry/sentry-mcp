@@ -4,9 +4,9 @@ Reference for diagnosing why users of the remote MCP server (`mcp.sentry.dev`) l
 
 ## Token lifecycle
 
-Upstream: Sentry's OAuth issues a 30-day access token + rotating refresh token on a completed `/oauth/authorize` flow. `ApiToken.expires_at` defaults to `now + 30 days` (see `~/src/sentry/src/sentry/models/apitoken.py`).
+Upstream: Sentry's OAuth issues a 30-day access token + rotating refresh token on a completed `/oauth/authorize` flow. `ApiToken.expires_at` defaults to `now + 30 days` (see `getsentry/sentry` `src/sentry/models/apitoken.py`).
 
-MCP wrapper: `@cloudflare/workers-oauth-provider` issues its own shorter-lived wrapper access token (default 1h) backed by the same stored grant. Clients refresh against our `/oauth/token`; we do **not** refresh upstream — we reuse the cached upstream access token for its full 30d lifetime. See `packages/mcp-cloudflare/src/server/oauth/helpers.ts:530`.
+MCP wrapper: `@cloudflare/workers-oauth-provider` issues its own shorter-lived wrapper access token (default 1h) backed by the same stored grant. Clients refresh against our `/oauth/token`; we do **not** refresh upstream — we reuse the cached upstream access token for its full 30d lifetime. See `tokenExchangeCallback` in `packages/mcp-cloudflare/src/server/oauth/helpers.ts`.
 
 ```
 MCP client ──(refresh wrapper token)──> /oauth/token ──> tokenExchangeCallback
@@ -20,8 +20,8 @@ MCP client ──(refresh wrapper token)──> /oauth/token ──> tokenExchan
 
 MCP client ──(tool call)──> /mcp ──> mcp-handler ──> tool handler ──> SentryApiService (upstream /api/0/…)
                                         │                                  │
-                                        ├─ upstreamTokenInvalid → revoke   └─ 401 here is currently only surfaced as
-                                        └─ rate limit check                   UserInputError to the client
+                                        ├─ upstreamTokenInvalid → revoke   └─ 401 → ServerContext.onUpstreamUnauthorized
+                                        └─ rate limit check                   → revoke grant + emit grant_revoked
 ```
 
 ## Failure modes
@@ -55,7 +55,7 @@ Attributes:
 - `grant_shape` — currently always `refreshable`
 - `probe_status` — upstream HTTP status on outcomes where a probe fired (`200` / `400` / `401` / `403` / `429` / `500` / …)
 - `probe_reason` — `rate_limit` / `server_error` / `unknown` on `verification_indeterminate`
-- `expired_on_schedule` — on `upstream_rejected` only; `"true"` if `upstreamExpiresAt` is in the past, `"false"` if scheduled expiry is still in the future, `"unknown"` for legacy grants. **Currently only produces `"true"` or `"unknown"` — see Gap #1.**
+- `expired_on_schedule` — on `upstream_rejected` only; `"true"` if `upstreamExpiresAt` is in the past, `"false"` if scheduled expiry is still in the future, `"unknown"` for legacy grants. **In practice always `"true"` or `"unknown"`**: the probe only fires once `accessTokenExpiresAt` has passed, and that field is always ≥ `upstreamExpiresAt` by construction, so `"false"` is unreachable. Sub-30d sign-outs surface via `grant_revoked{reason:upstream_rejected_in_use}` instead (see below).
 
 User is set via `Sentry.setUser({ id: rawProps.id })` in the callback, so metrics can be filtered by `user.id`.
 
@@ -143,24 +143,23 @@ logs message:"Invalid redirect URI" over 24 hours, sorted by timestamp
 
 ### Gap #1 — Premature Sentry-side invalidation — **closed**
 
-When Sentry invalidates a user's access token between issuance and the 30d `expires_at` (SSO session ends, user changes password, admin revokes, org membership changes), this surfaces as a 401 from Sentry when the user's tool call hits the upstream API. Previously invisible: the grant stayed alive and `tokenExchangeCallback` kept issuing wrapper tokens backed by a dead upstream token (death spiral).
+Before: Sentry invalidating a token between issuance and its 30d `expires_at` (SSO session end, password change, admin revoke, org change) only showed up as a 401 on the user's tool call. `handleApiError` wrapped it as `UserInputError`, the grant stayed alive, the next `/oauth/token` refresh took the `cached_valid_local` fast path, and the client got a new wrapper token backed by the same dead upstream token — the death spiral.
 
-Now:
+After:
 
-1. `handleApiError` (`packages/mcp-core/src/internal/tool-helpers/api.ts`) no longer wraps `ApiAuthenticationError` as `UserInputError` — it re-throws so the server-level catch can act on it.
-2. The tool-handler catch block in `packages/mcp-core/src/server.ts` detects `ApiAuthenticationError` and invokes `context.onUpstreamUnauthorized` when present.
-3. The Cloudflare transport wires `onUpstreamUnauthorized` to emit `grant_revoked{reason:upstream_rejected_in_use}` and revoke the grant via `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`.
-4. The user-facing error text is now "Authorization Expired — please re-authorize" instead of a misleading "Input Error."
-
-What `expired_on_schedule` doesn't help with is still true: the probe only fires when local expiry passes, so the probe-time classification can never show `"false"`. Left in place for legacy compatibility but ignored in queries.
+- `handleApiError` re-throws `ApiAuthenticationError` unwrapped.
+- `server.ts` tool-handler catch detects it (walking `error.cause` up to 3 levels) and invokes `context.onUpstreamUnauthorized`.
+- `use_sentry`'s tool wrapper does the same check before re-throwing, so 401s inside the embedded agent aren't absorbed by the AI SDK.
+- The Cloudflare transport's `onUpstreamUnauthorized` emits `grant_revoked{reason:upstream_rejected_in_use}` and calls `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`. `workers-oauth-provider` stores tokens under `token:userId:grantId:*` in KV and validates every access token via a KV lookup, so revoking the grant invalidates all outstanding wrapper tokens too — the client's next `/mcp` request gets a 401 and is forced into a clean re-auth.
+- `formatErrorForUser` returns "Authorization Expired — please re-authorize" instead of falling through to the generic Input Error template.
 
 ### Gap #2 — `handleApiError` misclassified 401 — **closed**
 
-Fixed alongside Gap #1. `ApiAuthenticationError` now propagates unwrapped.
+Fixed alongside Gap #1. `ApiAuthenticationError` now propagates unwrapped and triggers a dedicated branch in `formatErrorForUser`.
 
 ### Gap #3 — tool-call `clientInfo` lost on stateless transport
 
-`mcp.client.name` is `null` on 100% of tool-call spans because `createMcpHandler` (from `agents@0.3.10`) creates a fresh `WorkerTransport` per request, and `clientInfo` is only captured during `initialize`. Documented at `packages/mcp-cloudflare/src/server/lib/mcp-handler.ts`. Closing this would require persisting `clientInfo` keyed by MCP session id and reinjecting it per-request. Not blocking for OAuth diagnosis (user-agent family is an adequate substitute for the sign-out investigation) but worth fixing for tool-level telemetry.
+`mcp.client.name` is `null` on 100% of tool-call spans because `createMcpHandler` (from `agents@0.3.10`) creates a fresh `WorkerTransport` per request, and `clientInfo` is only captured during `initialize`. Closing this would require persisting `clientInfo` keyed by MCP session id (e.g., in `MCP_CACHE` KV) and reinjecting it per-request. Not blocking for OAuth diagnosis — user-agent family is an adequate substitute — but worth fixing for tool-level telemetry.
 
 ## Runbook — "a user says they got signed out"
 
@@ -179,5 +178,5 @@ Fixed alongside Gap #1. `ApiAuthenticationError` now propagates unwrapped.
 - #916 — restored sign-out telemetry (scrubber rename) and reduced probe volume.
 - #917 — carried probe status as a metric attribute.
 - #918 — added `client_family`, user tagging, `callback_completed` / `register` metrics, `probe_reason`, structured Invalid-redirect-URI fields.
-- #919 — added `expired_on_schedule` on `upstream_rejected`. Operationally inert (see Gap #1 closure note).
-- _(next)_ — closes Gaps #1 and #2: tool-call 401 detection, grant revocation, `grant_revoked{reason:upstream_rejected_in_use}`.
+- #919 — added `expired_on_schedule` on `upstream_rejected`. Never reaches `"false"` by construction; see the attribute note above.
+- #920 — closes Gaps #1 and #2: tool-call 401 detection, grant revocation, `grant_revoked{reason:upstream_rejected_in_use}`.

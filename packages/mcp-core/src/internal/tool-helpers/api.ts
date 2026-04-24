@@ -46,9 +46,8 @@ export function handleApiError(
   error: unknown,
   params?: Record<string, unknown>,
 ): never {
-  // 401 from upstream means our stored access token was rejected by Sentry.
-  // That's never a user-input problem — let it propagate so the server-level
-  // handler can emit telemetry and revoke the MCP grant.
+  // 401 isn't a user-input problem — propagate unwrapped so the server-level
+  // catch can route it through ServerContext.onUpstreamUnauthorized.
   if (error instanceof ApiAuthenticationError) {
     throw error;
   }
