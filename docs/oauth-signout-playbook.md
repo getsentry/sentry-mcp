@@ -55,9 +55,8 @@ Attributes:
 - `grant_shape` — currently always `refreshable`
 - `probe_status` — upstream HTTP status on outcomes where a probe fired (`200` / `400` / `401` / `403` / `429` / `500` / …)
 - `probe_reason` — `rate_limit` / `server_error` / `unknown` on `verification_indeterminate`
-- `expired_on_schedule` — on `upstream_rejected` only; `"true"` if `upstreamExpiresAt` is in the past, `"false"` if scheduled expiry is still in the future, `"unknown"` for legacy grants. **In practice always `"true"` or `"unknown"`**: the probe only fires once `accessTokenExpiresAt` has passed, and that field is always ≥ `upstreamExpiresAt` by construction, so `"false"` is unreachable. Sub-30d sign-outs surface via `grant_revoked{reason:upstream_rejected_in_use}` instead (see below).
 
-User is set via `Sentry.setUser({ id: rawProps.id })` in the callback, so metrics can be filtered by `user.id`.
+User is set via `Sentry.setUser({ id: rawProps.id })` in the callback, so metrics can be filtered by `user.id`. Sub-30d sign-outs surface via `mcp.oauth.grant_revoked{reason:upstream_rejected_in_use}`, not on this metric.
 
 ### `mcp.oauth.grant_revoked` (counter)
 
@@ -178,5 +177,5 @@ Fixed alongside Gap #1. `ApiAuthenticationError` now propagates unwrapped and tr
 - #916 — restored sign-out telemetry (scrubber rename) and reduced probe volume.
 - #917 — carried probe status as a metric attribute.
 - #918 — added `client_family`, user tagging, `callback_completed` / `register` metrics, `probe_reason`, structured Invalid-redirect-URI fields.
-- #919 — added `expired_on_schedule` on `upstream_rejected`. Never reaches `"false"` by construction; see the attribute note above.
-- #920 — closes Gaps #1 and #2: tool-call 401 detection, grant revocation, `grant_revoked{reason:upstream_rejected_in_use}`.
+- #919 — added `expired_on_schedule` on `upstream_rejected`. Removed in #920 once we realized the probe path can't produce `"false"` by construction.
+- #920 — closes Gaps #1 and #2 via tool-call 401 detection, grant revocation, and `grant_revoked{reason:upstream_rejected_in_use}`. Also removes the unreachable `expired_on_schedule` attribute and its `upstreamExpiresAt` grant field.
