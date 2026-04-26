@@ -10,7 +10,7 @@ import {
   resolveScopedProjectSlug,
 } from "../internal/url-scope";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import { ApiNotFoundError } from "../api-client";
+import { ApiNotFoundError, type SentryApiService } from "../api-client";
 import { enhanceNotFoundError } from "../internal/tool-helpers/enhance-error";
 import { ensureIssueWithinProjectConstraint } from "../internal/tool-helpers/issue";
 import { fetchAndFormatBreadcrumbs } from "../internal/tool-helpers/breadcrumbs";
@@ -344,6 +344,7 @@ function parseSpanResourceId(resourceId: string): {
 
 function generateUnsupportedResourceMessage(
   resolved: ResolvedResourceParams,
+  apiService: SentryApiService,
 ): string {
   const { type, organizationSlug } = resolved;
 
@@ -352,8 +353,11 @@ function generateUnsupportedResourceMessage(
       // Include projectSlug in URL when present
       const monitorPath = resolved.projectSlug
         ? `${resolved.projectSlug}/${resolved.monitorSlug}`
-        : resolved.monitorSlug;
-      const monitorUrl = `https://${organizationSlug}.sentry.io/crons/${monitorPath}/`;
+        : (resolved.monitorSlug ?? "");
+      const monitorUrl = apiService.getMonitorUrl(
+        organizationSlug,
+        monitorPath,
+      );
       return [
         "# Cron Monitor Detected",
         "",
@@ -371,7 +375,10 @@ function generateUnsupportedResourceMessage(
     }
 
     case "release": {
-      const releaseUrl = `https://${organizationSlug}.sentry.io/releases/${resolved.releaseVersion}/`;
+      const releaseUrl = apiService.getReleaseUrl(
+        organizationSlug,
+        resolved.releaseVersion ?? "",
+      );
       return [
         "# Release Detected",
         "",
@@ -472,7 +479,10 @@ export default defineTool({
 
     // Recognized but not yet fully supported types return guidance messages
     if (resolved.type === "monitor" || resolved.type === "release") {
-      return generateUnsupportedResourceMessage(resolved);
+      const apiService = apiServiceFromContext(context, {
+        regionUrl: context.constraints.regionUrl ?? undefined,
+      });
+      return generateUnsupportedResourceMessage(resolved, apiService);
     }
 
     switch (resolved.type) {

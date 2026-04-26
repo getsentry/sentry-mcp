@@ -35,6 +35,16 @@ describe("getIssueUrl", () => {
       `"https://localhost:8000/organizations/sentry-mcp/issues/123456"`,
     );
   });
+  it("should support HTTP issue URLs for self-hosted instances when configured", () => {
+    const apiService = new SentryApiService({
+      host: "localhost:8000",
+      protocol: "http",
+    });
+    const result = apiService.getIssueUrl("sentry-mcp", "123456");
+    expect(result).toMatchInlineSnapshot(
+      `"http://localhost:8000/organizations/sentry-mcp/issues/123456"`,
+    );
+  });
   it("should handle regional URLs correctly for SaaS", () => {
     const apiService = new SentryApiService({ host: "us.sentry.io" });
     const result = apiService.getIssueUrl("sentry", "PROJ-THREAD-LEAKS-12");
@@ -622,6 +632,20 @@ describe("host configuration", () => {
     expect(apiService.host).toBe("localhost:8000");
     // @ts-expect-error - accessing private property for testing
     expect(apiService.apiPrefix).toBe("https://localhost:8000/api/0");
+  });
+
+  it("should support opt-in HTTP for self-hosted instances", () => {
+    const apiService = new SentryApiService({
+      host: "sentry.internal:9000",
+      protocol: "http",
+    });
+    // @ts-expect-error - accessing private property for testing
+    expect(apiService.host).toBe("sentry.internal:9000");
+    // @ts-expect-error - accessing private property for testing
+    expect(apiService.apiPrefix).toBe("http://sentry.internal:9000/api/0");
+    expect(apiService.getIssueUrl("sentry-mcp", "123456")).toBe(
+      "http://sentry.internal:9000/organizations/sentry-mcp/issues/123456",
+    );
   });
 
   it("should update host and API prefix with setHost", () => {

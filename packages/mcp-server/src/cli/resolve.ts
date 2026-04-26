@@ -1,5 +1,6 @@
 import { ALL_SKILLS, parseSkills, type Skill } from "@sentry/mcp-core/skills";
 import {
+  isSentryHost,
   validateAndParseSentryUrlThrows,
   validateOpenAiBaseUrlThrows,
   validateSentryHostThrows,
@@ -32,7 +33,21 @@ export function resolveHost(url?: string, host?: string): string {
 }
 
 export function finalize(input: MergedArgs): PartiallyResolvedConfig {
+  if (input.insecureHttp && input.url) {
+    throw new Error(
+      "Error: --insecure-http cannot be used with --url or SENTRY_URL. Use --host for insecure self-hosted instances.",
+    );
+  }
+
   const sentryHost = resolveHost(input.url, input.host);
+
+  if (input.insecureHttp && isSentryHost(sentryHost)) {
+    throw new Error(
+      "Error: --insecure-http is only supported for self-hosted Sentry hosts.",
+    );
+  }
+
+  const sentryProtocol = input.insecureHttp ? "http" : "https";
 
   // Skills resolution
   //
@@ -115,6 +130,7 @@ export function finalize(input: MergedArgs): PartiallyResolvedConfig {
     accessToken: input.accessToken,
     clientId: input.clientId || DEFAULT_SENTRY_CLIENT_ID,
     sentryHost,
+    sentryProtocol,
     mcpUrl: input.mcpUrl,
     sentryDsn: input.sentryDsn,
     openaiBaseUrl: resolvedOpenAiBaseUrl,

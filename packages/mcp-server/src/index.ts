@@ -340,6 +340,7 @@ async function main() {
       regionUrl: null,
     },
     sentryHost: cfg.sentryHost,
+    sentryProtocol: cfg.sentryProtocol,
     mcpUrl: cfg.mcpUrl,
     openaiBaseUrl: cfg.openaiBaseUrl,
     agentMode: cli.agent,

@@ -273,5 +273,28 @@ describe("formatIssueResults", () => {
         "
       `);
     });
+
+    it("uses the configured self-hosted host and protocol when regionUrl is absent", () => {
+      const feedbackIssue = createFeedbackIssue({
+        shortId: "PROJ-FB-2",
+        title: "User Feedback: Internal Sentry",
+        issueCategory: "feedback",
+      });
+
+      const result = formatIssueResults({
+        organizationSlug: "test-org",
+        host: "sentry.internal:9000",
+        protocol: "http",
+        issues: [feedbackIssue],
+        naturalLanguageQuery: "show me user feedback",
+      });
+
+      expect(result).toContain(
+        "http://sentry.internal:9000/organizations/test-org/issues/",
+      );
+      expect(result).toContain(
+        "## 1. [PROJ-FB-2](http://sentry.internal:9000/organizations/test-org/issues/PROJ-FB-2)",
+      );
+    });
   });
 });

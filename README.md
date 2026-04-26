@@ -54,12 +54,20 @@ npx @sentry/mcp-server@latest --access-token=sentry-user-token
 
 Need to connect to a self-hosted deployment? Add <code>--host</code> (hostname
 only, e.g. <code>--host=sentry.example.com</code>) when you run the command.
+For isolated internal deployments that only expose plain HTTP, also add
+<code>--insecure-http</code>.
 
 Some features (like Seer) may not be available on self-hosted instances. You can
 disable specific skills to prevent unsupported tools from being exposed:
 
 ```shell
 npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com --disable-skills=seer
+```
+
+For self-hosted instances without TLS:
+
+```shell
+npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.internal:9000 --insecure-http
 ```
 
 #### Environment Variables

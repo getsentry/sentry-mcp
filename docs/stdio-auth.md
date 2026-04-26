@@ -7,6 +7,7 @@ How the stdio transport authenticates with Sentry, including the device code flo
 The stdio transport supports two authentication methods, in order of precedence:
 
 1. **Explicit token** — `--access-token` flag or `SENTRY_ACCESS_TOKEN` env var. Works for all Sentry hosts. This is the only method available for self-hosted instances.
+   For self-hosted deployments that only expose plain HTTP, pair `--access-token` with `--host` and `--insecure-http`.
 
 2. **Device code flow** — OAuth Device Authorization Grant (RFC 8628). Only available for sentry.io (including regional subdomains like `us.sentry.io`). Requires an interactive terminal (TTY). Falls back to cached tokens in non-interactive contexts.
 
