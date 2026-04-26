@@ -178,14 +178,18 @@ const mcpHandler: ExportedHandler<Env> = {
     }
 
     // Attribute values avoid the substring "token" so Sentry's default PII
-    // scrubber doesn't replace them with "[Filtered]" on ingest.
+    // scrubber doesn't replace them with "[Filtered]" on ingest. Only emit
+    // when we're actually going to revoke; otherwise the count drifts away
+    // from "grants we actually deleted from KV".
     if (!rawProps.refreshToken) {
-      Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-        attributes: {
-          reason: "stale_props_no_refresh",
-          client_family: clientFamily,
-        },
-      });
+      if (requestGrantId) {
+        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+          attributes: {
+            reason: "stale_props_no_refresh",
+            client_family: clientFamily,
+          },
+        });
+      }
       return revokeStaleGrant(
         ctx,
         env,
@@ -197,12 +201,14 @@ const mcpHandler: ExportedHandler<Env> = {
     }
 
     if (rawProps.upstreamTokenInvalid) {
-      Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-        attributes: {
-          reason: "upstream_rejected",
-          client_family: clientFamily,
-        },
-      });
+      if (requestGrantId) {
+        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+          attributes: {
+            reason: "upstream_rejected",
+            client_family: clientFamily,
+          },
+        });
+      }
       return revokeStaleGrant(
         ctx,
         env,
@@ -324,22 +330,23 @@ const mcpHandler: ExportedHandler<Env> = {
       onUpstreamUnauthorized: () => {
         if (upstreamUnauthorizedHandled) return;
         upstreamUnauthorizedHandled = true;
-        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-          attributes: {
-            reason: "upstream_rejected_in_use",
-            client_family: clientFamily,
-          },
-        });
         if (!requestGrantId) {
           // Same reasoning as revokeStaleGrant: without a grantId, falling
           // back to clientId-based lookup would risk killing another active
-          // session now that grants can coexist.
+          // session now that grants can coexist. Skip the metric too so the
+          // count stays aligned with grants we actually deleted from KV.
           logWarn("Cannot revoke grant after upstream 401 without grantId", {
             loggerScope: ["cloudflare", "mcp-handler"],
             extra: { clientId, userId },
           });
           return;
         }
+        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+          attributes: {
+            reason: "upstream_rejected_in_use",
+            client_family: clientFamily,
+          },
+        });
         ctx.waitUntil(
           (async () => {
             try {
