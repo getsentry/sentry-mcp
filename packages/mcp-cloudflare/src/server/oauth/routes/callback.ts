@@ -279,6 +279,39 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // Return back to the MCP client a new token
   const accessTokenExpiresAt = getUpstreamTokenExpiryTimestamp(payload);
   const userLabel = getUpstreamUserLabel(payload);
+
+  // Count grants we're about to allow to coexist (under the prior library
+  // default they would have been silently revoked). Best-effort: failures
+  // here must not block auth.
+  const callbackClientFamily =
+    resolveClientFamilyFromName(registeredClientName);
+  let concurrentGrantCount = 0;
+  try {
+    let cursor: string | undefined;
+    do {
+      const page = await c.env.OAUTH_PROVIDER.listUserGrants(payload.user.id, {
+        cursor,
+      });
+      for (const g of page.items) {
+        if (g.clientId === oauthReqInfo.clientId) concurrentGrantCount++;
+      }
+      cursor = page.cursor ?? undefined;
+    } while (cursor);
+  } catch (err) {
+    logWarn("Failed to count concurrent grants on callback", {
+      loggerScope: ["cloudflare", "oauth", "callback"],
+      extra: { error: String(err), clientId: oauthReqInfo.clientId },
+    });
+  }
+  if (concurrentGrantCount > 0) {
+    Sentry.setUser({ id: payload.user.id });
+    Sentry.metrics.count(
+      "mcp.oauth.concurrent_grant_observed",
+      concurrentGrantCount,
+      { attributes: { client_family: callbackClientFamily } },
+    );
+  }
+
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
     request: oauthReqInfo as AuthRequest,
     userId: payload.user.id,
@@ -323,9 +356,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // browser, not the MCP client. Derive client family from the DCR-registered
   // client_name (resolved above).
   Sentry.metrics.count("mcp.oauth.callback_completed", 1, {
-    attributes: {
-      client_family: resolveClientFamilyFromName(registeredClientName),
-    },
+    attributes: { client_family: callbackClientFamily },
   });
 
   // Use manual redirect instead of Response.redirect() to allow middleware to add headers
