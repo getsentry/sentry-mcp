@@ -42,29 +42,56 @@ function escapeAuthenticateHeaderValue(value: string): string {
 }
 
 /**
- * Revokes the OAuth grant for the given user/client pair in the background,
- * then returns a 401 response prompting re-authorization.
+ * The wrapper bearer token format from `@cloudflare/workers-oauth-provider` is
+ * `userId:grantId:secret`. The library validates the token before our handler
+ * runs, so when we're here the format is known to be correct. Pulling the
+ * grantId out lets us target the exact grant for the current request — under
+ * `revokeExistingGrants: false`, multiple grants for the same `(userId,
+ * clientId)` may coexist, so finding by clientId would risk killing the wrong
+ * session.
+ */
+function getRequestGrantId(request: Request): string | null {
+  const auth = request.headers.get("Authorization");
+  if (!auth) return null;
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+  const parts = match[1].split(":");
+  if (parts.length !== 3) return null;
+  return parts[1] || null;
+}
+
+/**
+ * Revokes the OAuth grant for the current request in the background, then
+ * returns a 401 response prompting re-authorization.
  */
 function revokeStaleGrant(
   ctx: ExecutionContext,
   env: Env,
   userId: string,
   clientId: string,
+  grantId: string | null,
   logLabel: string,
   errorDescription = "Token requires re-authorization",
 ): Response {
   ctx.waitUntil(
     (async () => {
+      if (!grantId) {
+        // Without a grantId, falling back to clientId-based lookup would
+        // risk revoking another active session. Log and skip — the user
+        // will still see the 401 and re-auth, just leaving the stale grant
+        // behind to expire naturally (refreshTokenTTL = 30d).
+        logWarn(`Cannot revoke ${logLabel} without grantId`, {
+          loggerScope: ["cloudflare", "mcp-handler"],
+          extra: { clientId, userId },
+        });
+        return;
+      }
       try {
-        const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
-        const grant = grants.items.find((g) => g.clientId === clientId);
-        if (grant) {
-          await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
-        }
+        await env.OAUTH_PROVIDER.revokeGrant(grantId, userId);
       } catch (err) {
         logWarn(`Failed to revoke ${logLabel}`, {
           loggerScope: ["cloudflare", "mcp-handler"],
-          extra: { error: String(err), clientId, userId },
+          extra: { error: String(err), clientId, userId, grantId },
         });
       }
     })(),
@@ -130,6 +157,7 @@ const mcpHandler: ExportedHandler<Env> = {
     const clientId = rawProps.clientId as string;
     const sentryHost = env.SENTRY_HOST || "sentry.io";
     const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
+    const requestGrantId = getRequestGrantId(request);
     Sentry.setUser({ id: userId });
 
     // Parse and validate granted skills (primary authorization method)
@@ -139,7 +167,14 @@ const mcpHandler: ExportedHandler<Env> = {
         loggerScope: ["cloudflare", "mcp-handler"],
         extra: { clientId, userId },
       });
-      return revokeStaleGrant(ctx, env, userId, clientId, "legacy grant");
+      return revokeStaleGrant(
+        ctx,
+        env,
+        userId,
+        clientId,
+        requestGrantId,
+        "legacy grant",
+      );
     }
 
     // Attribute values avoid the substring "token" so Sentry's default PII
@@ -156,6 +191,7 @@ const mcpHandler: ExportedHandler<Env> = {
         env,
         userId,
         clientId,
+        requestGrantId,
         "stale grant (missing refresh token)",
       );
     }
@@ -172,6 +208,7 @@ const mcpHandler: ExportedHandler<Env> = {
         env,
         userId,
         clientId,
+        requestGrantId,
         "stale grant (invalid upstream token)",
         "Upstream authorization is no longer valid",
       );
@@ -293,18 +330,29 @@ const mcpHandler: ExportedHandler<Env> = {
             client_family: clientFamily,
           },
         });
+        if (!requestGrantId) {
+          // Same reasoning as revokeStaleGrant: without a grantId, falling
+          // back to clientId-based lookup would risk killing another active
+          // session now that grants can coexist.
+          logWarn("Cannot revoke grant after upstream 401 without grantId", {
+            loggerScope: ["cloudflare", "mcp-handler"],
+            extra: { clientId, userId },
+          });
+          return;
+        }
         ctx.waitUntil(
           (async () => {
             try {
-              const grants = await env.OAUTH_PROVIDER.listUserGrants(userId);
-              const grant = grants.items.find((g) => g.clientId === clientId);
-              if (grant) {
-                await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
-              }
+              await env.OAUTH_PROVIDER.revokeGrant(requestGrantId, userId);
             } catch (err) {
               logWarn("Failed to revoke grant after upstream 401", {
                 loggerScope: ["cloudflare", "mcp-handler"],
-                extra: { error: String(err), clientId, userId },
+                extra: {
+                  error: String(err),
+                  clientId,
+                  userId,
+                  grantId: requestGrantId,
+                },
               });
             }
           })(),
