@@ -80,10 +80,6 @@ Attributes:
 - `client_family` — resolved from the DCR-registered `client_name` (not the browser User-Agent, which is always a browser string on this endpoint)
 - `user.id`
 
-### `mcp.oauth.concurrent_grant_observed` (counter)
-
-Fired during `/oauth/callback`, before `completeAuthorization`. Counts the number of existing grants for the same `(userId, clientId)` pair. Each callback that finds N existing grants emits a counter increment of N. Sum across queries gives total concurrent grants observed; ratio against `callback_completed` shows how often re-auth happens while the user has another active session of the same client. Tags: `client_family`, `user.id`.
-
 ### `mcp.oauth.register` (counter)
 
 Fired from the `wrappedOAuthProvider` after the library handles a successful `/oauth/register`.
@@ -171,7 +167,7 @@ Fixed alongside Gap #1. `ApiAuthenticationError` now propagates unwrapped and tr
 
 We now pass `revokeExistingGrants: false` to `completeAuthorization`. Multiple grants for the same `(userId, clientId)` coexist; each lives until its own `refreshTokenTTL` (30d) or an explicit revoke. This matches how mainstream OAuth servers (Google, GitHub, Auth0, etc.) behave; the library's prior default was an unusual policy.
 
-Trade-off: KV storage holds extra grant entries (each up to 30d). Not a real concern at current scale. The new `mcp.oauth.concurrent_grant_observed` metric counts how often re-auth happens while another session of the same `(userId, clientId)` is active, replacing what would have been an invisible cascade-revoke event under the prior default.
+Trade-off: KV storage holds extra grant entries (each up to 30d). Not a real concern at current scale. Library-side auto-revokes are no longer happening, so the cascade event is structurally eliminated rather than counted; if visibility into "user re-authed while another session was active" becomes useful, a metric pre-callback would need its own paginated `listUserGrants` call per callback (skipped here for cost).
 
 ## Runbook — "a user says they got signed out"
 
