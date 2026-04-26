@@ -1,7 +1,7 @@
 import type { ExecutionContext, RateLimit } from "@cloudflare/workers-types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../types";
-import mcpHandler, { createOnUpstreamUnauthorized } from "./mcp-handler";
+import mcpHandler from "./mcp-handler";
 
 interface OAuthProps {
   id: string;
@@ -150,8 +150,6 @@ describe("MCP Handler", () => {
       );
       expect(ctx.waitUntil).toHaveBeenCalled();
 
-      // Drive the scheduled revoke task and confirm we revoke the exact
-      // grant from the bearer token, not whatever listUserGrants returns.
       await (ctx.waitUntil as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
       expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledTimes(1);
       expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledWith(
@@ -162,9 +160,6 @@ describe("MCP Handler", () => {
     });
 
     it("targets the exact grant when multiple grants exist for the same client", async () => {
-      // Simulate the multi-session case enabled by `revokeExistingGrants:false`:
-      // listUserGrants would return another active session's grant first, but
-      // the request's own bearer-token grant is what should be revoked.
       const request = createMcpRequest(
         "tools/list",
         {},
@@ -205,9 +200,6 @@ describe("MCP Handler", () => {
       await (ctx.waitUntil as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
 
       expect(response.status).toBe(401);
-      // No grantId means we can't safely target a specific grant. Return
-      // the 401 but skip the KV revoke rather than risk killing another
-      // session via a clientId-based fallback.
       expect(env.OAUTH_PROVIDER.revokeGrant).not.toHaveBeenCalled();
     });
 
@@ -416,65 +408,6 @@ describe("MCP Handler", () => {
 
       expect(toolNames).toContain("search_docs");
       expect(toolNames).not.toContain("get_issue_details");
-    });
-  });
-
-  describe("createOnUpstreamUnauthorized", () => {
-    function buildDeps(overrides: { requestGrantId?: string | null } = {}) {
-      const env = createTestEnv();
-      const ctx = {
-        waitUntil: vi.fn(),
-        passThroughOnException: vi.fn(),
-      } as unknown as ExecutionContext;
-      const deps = {
-        ctx,
-        env,
-        userId: "test-user-123",
-        clientId: "test-client",
-        clientFamily: "claude-code",
-        requestGrantId:
-          "requestGrantId" in overrides
-            ? (overrides.requestGrantId ?? null)
-            : "request-grant",
-      };
-      return { deps, ctx, env };
-    }
-
-    it("revokes the request's specific grant", async () => {
-      const { deps, ctx, env } = buildDeps();
-
-      createOnUpstreamUnauthorized(deps)();
-      await (ctx.waitUntil as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-
-      expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledExactlyOnceWith(
-        "request-grant",
-        "test-user-123",
-      );
-      expect(env.OAUTH_PROVIDER.listUserGrants).not.toHaveBeenCalled();
-    });
-
-    it("skips revoke when grantId is missing", async () => {
-      const { deps, ctx, env } = buildDeps({ requestGrantId: null });
-
-      createOnUpstreamUnauthorized(deps)();
-      // No waitUntil scheduled when we have nothing safe to revoke.
-      expect(ctx.waitUntil).not.toHaveBeenCalled();
-      expect(env.OAUTH_PROVIDER.revokeGrant).not.toHaveBeenCalled();
-    });
-
-    it("latches: subsequent invocations are no-ops", async () => {
-      // Mirrors the use_sentry agent path where N inner-tool calls each
-      // see the upstream 401 within one /mcp request.
-      const { deps, ctx, env } = buildDeps();
-      const callback = createOnUpstreamUnauthorized(deps);
-
-      callback();
-      callback();
-      callback();
-      await (ctx.waitUntil as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-
-      expect(ctx.waitUntil).toHaveBeenCalledTimes(1);
-      expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledTimes(1);
     });
   });
 });

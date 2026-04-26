@@ -42,13 +42,10 @@ function escapeAuthenticateHeaderValue(value: string): string {
 }
 
 /**
- * The wrapper bearer token format from `@cloudflare/workers-oauth-provider` is
- * `userId:grantId:secret`. The library validates the token before our handler
- * runs, so when we're here the format is known to be correct. Pulling the
- * grantId out lets us target the exact grant for the current request — under
- * `revokeExistingGrants: false`, multiple grants for the same `(userId,
- * clientId)` may coexist, so finding by clientId would risk killing the wrong
- * session.
+ * Extracts the grantId from the wrapper bearer token (format
+ * `userId:grantId:secret`, validated by the library before our handler runs).
+ * Concurrent grants per `(userId, clientId)` mean a clientId-based lookup
+ * cannot safely identify the request's own grant.
  */
 export function getRequestGrantId(request: Request): string | null {
   const auth = request.headers.get("Authorization");
@@ -58,60 +55,6 @@ export function getRequestGrantId(request: Request): string | null {
   const parts = match[1].split(":");
   if (parts.length !== 3) return null;
   return parts[1] || null;
-}
-
-/**
- * Builds the `onUpstreamUnauthorized` callback the MCP core invokes when a
- * tool-call surfaces an upstream 401. Latches so an agent that runs N
- * sub-tool calls within one /mcp request emits at most one revocation —
- * see `revokeExistingGrants:false` and PR #925 for context. Falls back to
- * a logWarn (no revoke) when we can't identify the grant from the bearer
- * token, since revoking by clientId could now kill another active session.
- */
-export function createOnUpstreamUnauthorized(deps: {
-  ctx: ExecutionContext;
-  env: Env;
-  userId: string;
-  clientId: string;
-  clientFamily: string;
-  requestGrantId: string | null;
-}): () => void {
-  const { ctx, env, userId, clientId, clientFamily, requestGrantId } = deps;
-  let handled = false;
-  return () => {
-    if (handled) return;
-    handled = true;
-    if (!requestGrantId) {
-      logWarn("Cannot revoke grant after upstream 401 without grantId", {
-        loggerScope: ["cloudflare", "mcp-handler"],
-        extra: { clientId, userId },
-      });
-      return;
-    }
-    Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
-      attributes: {
-        reason: "upstream_rejected_in_use",
-        client_family: clientFamily,
-      },
-    });
-    ctx.waitUntil(
-      (async () => {
-        try {
-          await env.OAUTH_PROVIDER.revokeGrant(requestGrantId, userId);
-        } catch (err) {
-          logWarn("Failed to revoke grant after upstream 401", {
-            loggerScope: ["cloudflare", "mcp-handler"],
-            extra: {
-              error: String(err),
-              clientId,
-              userId,
-              grantId: requestGrantId,
-            },
-          });
-        }
-      })(),
-    );
-  };
 }
 
 /**
@@ -232,9 +175,7 @@ const mcpHandler: ExportedHandler<Env> = {
     }
 
     // Attribute values avoid the substring "token" so Sentry's default PII
-    // scrubber doesn't replace them with "[Filtered]" on ingest. Only emit
-    // when we're actually going to revoke; otherwise the count drifts away
-    // from "grants we actually deleted from KV".
+    // scrubber doesn't replace them with "[Filtered]" on ingest.
     if (!rawProps.refreshToken) {
       if (requestGrantId) {
         Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
@@ -366,6 +307,8 @@ const mcpHandler: ExportedHandler<Env> = {
     const constraints = verification.constraints;
 
     // Build complete ServerContext from OAuth props + verified constraints.
+    // Latched so use_sentry's multi-tool runs revoke at most once per request.
+    let upstreamUnauthorizedHandled = false;
     const serverContext: ServerContext = {
       userId,
       clientId,
@@ -377,14 +320,40 @@ const mcpHandler: ExportedHandler<Env> = {
       agentMode: isAgentMode,
       experimentalMode: isExperimentalMode,
       transport: "http",
-      onUpstreamUnauthorized: createOnUpstreamUnauthorized({
-        ctx,
-        env,
-        userId,
-        clientId,
-        clientFamily,
-        requestGrantId,
-      }),
+      onUpstreamUnauthorized: () => {
+        if (upstreamUnauthorizedHandled) return;
+        upstreamUnauthorizedHandled = true;
+        if (!requestGrantId) {
+          logWarn("Cannot revoke grant after upstream 401 without grantId", {
+            loggerScope: ["cloudflare", "mcp-handler"],
+            extra: { clientId, userId },
+          });
+          return;
+        }
+        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+          attributes: {
+            reason: "upstream_rejected_in_use",
+            client_family: clientFamily,
+          },
+        });
+        ctx.waitUntil(
+          (async () => {
+            try {
+              await env.OAUTH_PROVIDER.revokeGrant(requestGrantId, userId);
+            } catch (err) {
+              logWarn("Failed to revoke grant after upstream 401", {
+                loggerScope: ["cloudflare", "mcp-handler"],
+                extra: {
+                  error: String(err),
+                  clientId,
+                  userId,
+                  grantId: requestGrantId,
+                },
+              });
+            }
+          })(),
+        );
+      },
     };
 
     // Create and configure MCP server with tools filtered by context
