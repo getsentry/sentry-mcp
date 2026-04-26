@@ -318,6 +318,44 @@ describe("get_sentry_resource", () => {
         - **Search issues**: Use \`search_issues\` with query \`release:backend@2024.01.15-abc123\` to find issues in this release"
       `);
     });
+
+    it("uses configured host and protocol for self-hosted monitor URL", async () => {
+      const result = await getSentryResource.handler(
+        {
+          resourceType: undefined,
+          resourceId: undefined,
+          organizationSlug: undefined,
+          url: "http://sentry.internal:9000/organizations/my-org/crons/daily-backup/",
+        },
+        {
+          ...baseContext,
+          sentryHost: "sentry.internal:9000",
+          sentryProtocol: "http",
+        },
+      );
+      expect(result).toContain(
+        "[Open Monitor](http://sentry.internal:9000/organizations/my-org/crons/daily-backup/)",
+      );
+    });
+
+    it("uses configured host and protocol for self-hosted release URL", async () => {
+      const result = await getSentryResource.handler(
+        {
+          resourceType: undefined,
+          resourceId: undefined,
+          organizationSlug: undefined,
+          url: "http://sentry.internal:9000/organizations/my-org/releases/v1.2.3/",
+        },
+        {
+          ...baseContext,
+          sentryHost: "sentry.internal:9000",
+          sentryProtocol: "http",
+        },
+      );
+      expect(result).toContain(
+        "[Open Release](http://sentry.internal:9000/organizations/my-org/releases/v1.2.3/)",
+      );
+    });
   });
 
   // ─── URL mode: error cases ────────────────────────────────────────────────

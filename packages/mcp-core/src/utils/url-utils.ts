@@ -344,6 +344,48 @@ export function getIssueUrl(
 }
 
 /**
+ * Generates a Sentry cron monitor URL.
+ * @param host The Sentry host (may include regional subdomain for API access)
+ * @param organizationSlug Organization identifier
+ * @param monitorSlug Monitor slug, optionally prefixed with project slug (e.g. "my-project/my-monitor")
+ * @returns The complete monitor URL
+ */
+export function getMonitorUrl(
+  host: string,
+  organizationSlug: string,
+  monitorSlug: string,
+  protocol: SentryProtocol = "https",
+): string {
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/crons/${monitorSlug}/`,
+    protocol,
+  );
+}
+
+/**
+ * Generates a Sentry release URL.
+ * @param host The Sentry host (may include regional subdomain for API access)
+ * @param organizationSlug Organization identifier
+ * @param releaseVersion Release version identifier
+ * @returns The complete release URL
+ */
+export function getReleaseUrl(
+  host: string,
+  organizationSlug: string,
+  releaseVersion: string,
+  protocol: SentryProtocol = "https",
+): string {
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/releases/${releaseVersion}/`,
+    protocol,
+  );
+}
+
+/**
  * Generates a Sentry issues search URL.
  * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier

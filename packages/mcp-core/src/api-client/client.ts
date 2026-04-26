@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
   getIssueUrl as getIssueUrlUtil,
+  getMonitorUrl as getMonitorUrlUtil,
   getProfileUrl as getProfileUrlUtil,
   getProfilingExplorerUrl,
+  getReleaseUrl as getReleaseUrlUtil,
   getReplayUrl as getReplayUrlUtil,
   getReplaysSearchUrl as getReplaysSearchUrlUtil,
   getTraceMetricsExploreUrl,
@@ -591,6 +593,24 @@ export class SentryApiService {
       this.host,
       organizationSlug,
       options,
+      this.protocol,
+    );
+  }
+
+  getMonitorUrl(organizationSlug: string, monitorSlug: string): string {
+    return getMonitorUrlUtil(
+      this.host,
+      organizationSlug,
+      monitorSlug,
+      this.protocol,
+    );
+  }
+
+  getReleaseUrl(organizationSlug: string, releaseVersion: string): string {
+    return getReleaseUrlUtil(
+      this.host,
+      organizationSlug,
+      releaseVersion,
       this.protocol,
     );
   }
