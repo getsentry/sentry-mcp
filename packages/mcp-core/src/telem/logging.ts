@@ -28,6 +28,15 @@ const ROOT_LOG_CATEGORY = ["sentry", "mcp"] as const;
 
 type SinkId = "console" | "sentry";
 
+const STDERR_CONSOLE_LEVEL_MAP = {
+  trace: "error",
+  debug: "error",
+  info: "error",
+  warning: "error",
+  error: "error",
+  fatal: "error",
+} as const;
+
 let loggingConfigured = false;
 
 function resolveLowestLevel(): LogLevel {
@@ -114,6 +123,7 @@ function ensureLoggingConfigured(): void {
 
   const consoleSink = getConsoleSink({
     formatter: getJsonLinesFormatter(),
+    levelMap: STDERR_CONSOLE_LEVEL_MAP,
   });
   const sentrySink = createSentryLogsSink();
 
