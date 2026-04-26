@@ -279,6 +279,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // Return back to the MCP client a new token
   const accessTokenExpiresAt = getUpstreamTokenExpiryTimestamp(payload);
   const userLabel = getUpstreamUserLabel(payload);
+
   const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
     request: oauthReqInfo as AuthRequest,
     userId: payload.user.id,
@@ -286,6 +287,13 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       label: userLabel,
     },
     scope: oauthReqInfo.scope,
+    // Default revokes every existing grant for (userId, clientId), which
+    // cascades a sign-out to every other concurrent session of the same
+    // user — common when Claude Code processes share DCR credentials
+    // across project folders. Our props don't drift between re-auths in a
+    // way that would require server-forced single-grant semantics, so
+    // allow concurrent grants instead. See issue #924.
+    revokeExistingGrants: false,
     // Props are available via ExecutionContext.props in the MCP handler
     props: {
       // OAuth standard fields

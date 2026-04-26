@@ -40,17 +40,23 @@ function createMcpRequest(
   options: {
     path?: string;
     id?: number | string;
+    bearerToken?: string;
   } = {},
 ): Request {
-  const { path = "/mcp", id = 1 } = options;
+  const { path = "/mcp", id = 1, bearerToken } = options;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+    "CF-Connecting-IP": "192.0.2.1",
+  };
+  if (bearerToken) {
+    headers.Authorization = `Bearer ${bearerToken}`;
+  }
 
   return new Request(`http://localhost${path}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-      "CF-Connecting-IP": "192.0.2.1",
-    },
+    headers,
     body: JSON.stringify({
       jsonrpc: "2.0",
       method,
@@ -123,7 +129,13 @@ describe("MCP Handler", () => {
     });
 
     it("should revoke and reject stale grants missing a refresh token", async () => {
-      const request = createMcpRequest("tools/list");
+      const request = createMcpRequest(
+        "tools/list",
+        {},
+        {
+          bearerToken: "test-user-123:specific-grant-id:secret",
+        },
+      );
       const ctx = createMcpContext({
         refreshToken: undefined as unknown as string,
       });
@@ -137,6 +149,58 @@ describe("MCP Handler", () => {
         "invalid_token",
       );
       expect(ctx.waitUntil).toHaveBeenCalled();
+
+      await (ctx.waitUntil as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+      expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledTimes(1);
+      expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledWith(
+        "specific-grant-id",
+        "test-user-123",
+      );
+      expect(env.OAUTH_PROVIDER.listUserGrants).not.toHaveBeenCalled();
+    });
+
+    it("targets the exact grant when multiple grants exist for the same client", async () => {
+      const request = createMcpRequest(
+        "tools/list",
+        {},
+        {
+          bearerToken: "test-user-123:request-specific-grant:secret",
+        },
+      );
+      const ctx = createMcpContext({
+        refreshToken: undefined as unknown as string,
+      });
+      const env = createTestEnv();
+      (
+        env.OAUTH_PROVIDER.listUserGrants as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
+        items: [
+          { id: "other-active-session-grant", clientId: "test-client" },
+          { id: "request-specific-grant", clientId: "test-client" },
+        ],
+      });
+
+      await mcpHandler.fetch!(request, env, ctx);
+      await (ctx.waitUntil as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+
+      expect(env.OAUTH_PROVIDER.revokeGrant).toHaveBeenCalledExactlyOnceWith(
+        "request-specific-grant",
+        "test-user-123",
+      );
+    });
+
+    it("skips revoke when bearer token is missing or malformed", async () => {
+      const request = createMcpRequest("tools/list");
+      const ctx = createMcpContext({
+        refreshToken: undefined as unknown as string,
+      });
+      const env = createTestEnv();
+
+      const response = await mcpHandler.fetch!(request, env, ctx);
+      await (ctx.waitUntil as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+
+      expect(response.status).toBe(401);
+      expect(env.OAUTH_PROVIDER.revokeGrant).not.toHaveBeenCalled();
     });
 
     it("should reject tokens with no valid skills", async () => {
