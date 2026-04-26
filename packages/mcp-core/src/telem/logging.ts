@@ -28,6 +28,15 @@ const ROOT_LOG_CATEGORY = ["sentry", "mcp"] as const;
 
 type SinkId = "console" | "sentry";
 
+// Invariant: every log level routes through `console.error` so LogTape's
+// console sink writes to stderr, never stdout. The MCP stdio transport
+// reserves stdout for JSON-RPC frames — any non-JSON-RPC line on stdout
+// (LogTape records carry `@timestamp`/`level`/`message`/`logger`/`properties`,
+// not `jsonrpc`/`id`/`method`) fails client framing and closes the transport.
+// Severity is preserved inside the JSON record (e.g. `"level":"INFO"`); this
+// map only controls which `console.*` method is called. Do not promote levels
+// back to `console.info`/`console.debug` — Node sends those to stdout and
+// re-introduces the stdio disconnect bug fixed in #922.
 const STDERR_CONSOLE_LEVEL_MAP = {
   trace: "error",
   debug: "error",

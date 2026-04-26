@@ -16,6 +16,19 @@ Log levels are controlled by:
 
 Implementation: @packages/mcp-server/src/telem/logging.ts
 
+## Stdio Transport Invariant: Logs MUST Go to Stderr
+
+The MCP stdio transport reserves **stdout** for JSON-RPC frames. Any non-JSON-RPC line written to stdout makes the client fail framing and close the transport. **All log output — every level, every sink that writes to a console — must go to stderr.**
+
+This is enforced in @packages/mcp-core/src/telem/logging.ts via `STDERR_CONSOLE_LEVEL_MAP`, which routes every LogTape level through `console.error` (Node sends `console.error`/`console.warn` to stderr; `console.log`/`console.info`/`console.debug` go to stdout). Severity is preserved inside the JSON record (e.g. `"level":"INFO"`); the map only controls which `console.*` method is invoked.
+
+Regression history: #922 — LogTape's default level map sent `info`/`debug` records through `console.info`/`console.debug`, landing structured JSON on stdout and breaking stdio clients.
+
+**Rules for new code:**
+- Do not call `console.log`, `console.info`, or `console.debug` anywhere reachable from the stdio entry point. Use `logInfo`/`logDebug` instead.
+- Do not introduce new LogTape sinks that write to stdout.
+- Do not change `STDERR_CONSOLE_LEVEL_MAP` to map any level to a non-stderr method. The regression test in `logging.test.ts` enforces this for `info`.
+
 ## Using the Log Helpers
 
 ### logInfo() - Routine telemetry
