@@ -34,6 +34,7 @@ MCP client ──(tool call)──> /mcp ──> mcp-handler ──> tool handle
 | **Client-side state loss (DCR state reset, fresh install, reinstall)** | Client drops its stored `client_id`/`refresh_token` | Indirectly | High `/oauth/register` volume and `register:callback` ratio per `client_family` |
 | **Invalid redirect URI at authorize** | Client sends an `redirect_uri` that's not registered | Yes | Log `OAuth authorization failed: Invalid redirect URI` with `clientId`/`redirectUri`/`registeredUris`/`clientName` |
 | **Upstream probe transient (5xx / rate limit / network)** | Sentry side instability | Yes | `token_exchange{outcome:verification_indeterminate, probe_reason:…}` (does not force sign-out) |
+| **Same-user concurrent session interference** | Another session of the same user re-authorizes | Resolved by passing `revokeExistingGrants: false` — see Gap #4 below | n/a after fix |
 
 ## Telemetry surface
 
@@ -159,6 +160,14 @@ Fixed alongside Gap #1. `ApiAuthenticationError` now propagates unwrapped and tr
 ### Gap #3 — tool-call `clientInfo` lost on stateless transport
 
 `mcp.client.name` is `null` on 100% of tool-call spans because `createMcpHandler` (from `agents@0.3.10`) creates a fresh `WorkerTransport` per request, and `clientInfo` is only captured during `initialize`. Closing this would require persisting `clientInfo` keyed by MCP session id (e.g., in `MCP_CACHE` KV) and reinjecting it per-request. Not blocking for OAuth diagnosis — user-agent family is an adequate substitute — but worth fixing for tool-level telemetry.
+
+### Gap #4 — Same-user concurrent session interference — **closed**
+
+`workers-oauth-provider`'s `completeAuthorization` defaulted to revoking every existing grant for `(userId, clientId)` whenever a new authorization completed. Because Claude Code persists its DCR `client_id` across processes (e.g., across project folders, or after an update triggers re-auth in one session), one process re-authorizing would silently invalidate every other active session for the same user. The affected sessions saw 401s from the OAuth library on their next `/mcp` request — *before* reaching our handler — so no `grant_revoked` metric ever fired. See issue #924.
+
+We now pass `revokeExistingGrants: false` to `completeAuthorization`. Multiple grants for the same `(userId, clientId)` coexist; each lives until its own `refreshTokenTTL` (30d) or an explicit revoke. This matches how mainstream OAuth servers (Google, GitHub, Auth0, etc.) behave; the library's prior default was an unusual policy.
+
+Trade-off: KV storage holds extra grant entries (each up to 30d). Not a real concern at current scale. Library-side auto-revokes remain the only revocation pathway invisible to our metrics — a follow-up could explicitly count `listUserGrants` matches before each completion.
 
 ## Runbook — "a user says they got signed out"
 
