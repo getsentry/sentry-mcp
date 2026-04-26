@@ -33,13 +33,13 @@ export function resolveHost(url?: string, host?: string): string {
 }
 
 export function finalize(input: MergedArgs): PartiallyResolvedConfig {
-  const sentryHost = resolveHost(input.url, input.host);
-
   if (input.insecureHttp && input.url) {
     throw new Error(
       "Error: --insecure-http cannot be used with --url or SENTRY_URL. Use --host for insecure self-hosted instances.",
     );
   }
+
+  const sentryHost = resolveHost(input.url, input.host);
 
   if (input.insecureHttp && isSentryHost(sentryHost)) {
     throw new Error(

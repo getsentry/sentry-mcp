@@ -100,6 +100,20 @@ describe("cli/finalize", () => {
     ).toThrow(/cannot be used with --url or SENTRY_URL/);
   });
 
+  it("surfaces the --insecure-http + --url conflict before URL validation", () => {
+    // Even with a non-HTTPS --url, the --insecure-http conflict should win
+    // so the user gets the actionable guidance rather than the generic
+    // "must be a full HTTPS URL" error.
+    expect(() =>
+      finalize({
+        accessToken: "tok",
+        url: "http://sentry.internal:9000",
+        insecureHttp: true,
+        unknownArgs: [],
+      }),
+    ).toThrow(/cannot be used with --url or SENTRY_URL/);
+  });
+
   it("throws when --insecure-http targets sentry.io", () => {
     expect(() =>
       finalize({
