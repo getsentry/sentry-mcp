@@ -2,13 +2,125 @@
 
 Authentication and security patterns for the Sentry MCP server.
 
+## Remote HTTP Auth Model
+
+The remote HTTP deployment uses two separate authorization layers:
+
+```
+MCP Client → MCP OAuth (our server) → Sentry OAuth → Sentry API
+```
+
+This is not just "OAuth to Sentry, then proxy requests back." The Cloudflare
+deployment issues its own MCP access token to the client, and that token wraps
+the upstream Sentry credentials the server needs to make API calls.
+
+### Two Distinct Tokens
+
+1. **Upstream Sentry token**
+   - Issued by Sentry's OAuth server
+   - Stored inside the MCP grant props
+   - Never sent directly to the MCP client
+   - Used only by the MCP server when calling Sentry's REST API
+
+2. **Downstream MCP token**
+   - Issued by our OAuth provider (`@cloudflare/workers-oauth-provider`)
+   - Sent to the MCP client
+   - Used to authenticate requests to `/mcp`
+   - Carries encrypted props such as the upstream Sentry token, granted skills, and optional org/project constraints
+
+### End-to-End Flow
+
+1. The MCP client registers with our OAuth provider and starts authorization.
+2. Our approval UI collects the MCP-side permissions for the session.
+3. We redirect the user to Sentry OAuth.
+4. Sentry returns an authorization code to our `/oauth/callback`.
+5. We exchange that code for a Sentry access token and refresh token.
+6. We issue a downstream MCP token to the client and store the upstream Sentry credentials in its encrypted props.
+7. On `/mcp` requests, the worker validates the downstream MCP token, reconstructs `ServerContext`, and uses the upstream Sentry token to call Sentry APIs.
+
+## Permission Model
+
+The important design point is that the upstream token and downstream token do
+not mean the same thing.
+
+### Upstream Sentry Scopes
+
+When we redirect to Sentry OAuth, we always request the shared Sentry scope set
+defined in `packages/mcp-core/src/scopes.ts`:
+
+```text
+org:read project:write team:write event:write
+```
+
+We ask Sentry for this broader shared token because:
+
+1. Sentry OAuth scopes are coarse compared to our MCP capability model.
+2. A single upstream token must support every tool that could be enabled for the granted MCP skills.
+3. The worker reuses the same upstream token across later MCP token refreshes and MCP requests for that grant.
+
+This token is therefore a server-side capability token for talking to Sentry,
+not the final permission boundary presented to the MCP client.
+
+### Downstream MCP Restrictions
+
+The final token returned to the MCP client is more restrictive in practice. It
+captures three separate kinds of restriction:
+
+1. **OAuth scope requested by the MCP client**
+   - Stored as `scope` on the MCP grant/token props
+   - Represents the downstream OAuth grant made to the MCP client
+   - Useful as part of the wrapper-token contract even though runtime tool authorization is primarily skill-based today
+
+2. **Granted MCP skills**
+   - Stored as `grantedSkills`
+   - This is the primary authorization mechanism for tool exposure in `mcp-core`
+   - Tools are registered only when their skill set is enabled
+
+3. **Optional resource constraints**
+   - Derived from the OAuth `resource` parameter for `/mcp`, `/mcp/:org`, or `/mcp/:org/:project`
+   - Stored as `constraintOrganizationSlug` and `constraintProjectSlug`
+   - Enforced on every request so a token minted for one scoped MCP URL cannot be reused against a broader path
+
+### What Actually Enforces Access
+
+Today, runtime authorization for remote HTTP sessions is driven primarily by:
+
+- `grantedSkills` for which tools the session can access
+- path constraints for which org/project the session can access
+- Sentry's own upstream bearer-token checks for whether the user can perform the underlying API operation
+
+`grantedScopes` still exists on tokens for backward compatibility with older
+clients, but it is transitional. Skills are the primary authorization model.
+
+## Security Model
+
+The remote deployment intentionally separates trust boundaries:
+
+1. **Client-to-MCP trust boundary**
+   - The client only receives an MCP token
+   - The client does not receive raw Sentry OAuth credentials
+
+2. **MCP-to-Sentry trust boundary**
+   - Only the server uses the upstream Sentry bearer token
+   - All Sentry API access happens server-side
+
+3. **Session narrowing**
+   - Broad upstream Sentry scopes are narrowed by MCP-side skills and URL constraints
+   - A client may hold a valid MCP token but still be unable to access tools or resources outside the granted session shape
+
+4. **Revocation on upstream failure**
+   - If Sentry starts rejecting the stored upstream token, the MCP grant is treated as stale
+   - Future requests are forced back through re-authorization instead of silently continuing with an invalid wrapper token
+
+## Key Security Properties
+
+1. **Sentry credentials are server-held**: MCP clients never need direct Sentry API tokens.
+2. **Authorization is layered**: Sentry scopes, MCP skills, and MCP resource constraints each narrow access differently.
+3. **Each session can be path-scoped**: `/mcp/:org` and `/mcp/:org/:project` produce tokens that only work for that scoped MCP URL.
+4. **Refresh does not widen access**: MCP refresh reuses the same stored grant props and does not ask Sentry for broader permissions.
+5. **Stale or invalid grants fail closed**: legacy grants, missing props, or rejected upstream tokens are revoked or require re-authentication.
+
 ## OAuth Architecture
-
-The MCP server acts as an OAuth proxy between clients and Sentry:
-
-```
-MCP Client → MCP Server → Sentry OAuth → Sentry API
-```
 
 ### Key Components
 
@@ -21,12 +133,12 @@ MCP Client → MCP Server → Sentry OAuth → Sentry API
 2. **Client Approval**
    - First-time clients require user approval
    - Approved clients stored in signed cookies
-   - Per-organization access control
+   - Can surface session scope for constrained `/mcp/...` URLs
 
 3. **Token Management**
    - Access tokens encrypted in KV storage
    - MCP refresh reuses cached Sentry access tokens while they remain valid
-   - Tokens scoped to organizations
+   - Tokens can be constrained to organization/project paths
 
 ## Implementation Patterns
 
@@ -39,17 +151,6 @@ Key endpoints:
 - `/authorize` - Client approval and redirect to Sentry
 - `/callback` - Handle Sentry callback, store tokens
 - `/approve` - Process user approval
-
-### Required OAuth Scopes
-
-```typescript
-const REQUIRED_SCOPES = [
-  "org:read",
-  "project:read", 
-  "issue:read",
-  "issue:write"
-];
-```
 
 ### Security Context
 
@@ -191,7 +292,7 @@ catch (error) {
 
 ### Organization Isolation
 
-- Tokens scoped to organizations
+- Tokens may be scoped to organizations or projects via the OAuth `resource` parameter
 - Users can switch organizations
 - Each organization requires separate approval
 
