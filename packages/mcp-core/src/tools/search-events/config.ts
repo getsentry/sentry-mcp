@@ -9,10 +9,10 @@ export const systemPrompt = `You are a Sentry query translator. You need to:
 CRITICAL: Sentry does NOT use SQL syntax. Do NOT generate SQL-like queries.
 
 DATASET SELECTION GUIDELINES:
-- spans: Performance data, traces, AI/LLM calls, database queries, HTTP requests, token usage, costs, duration metrics, user agent data, "XYZ calls", ambiguous operations (richest attribute set)
-- errors: Exceptions, crashes, error messages, stack traces, unhandled errors, browser/client errors
-- logs: Log entries, log messages, severity levels, debugging information
-- metrics: Newer span metrics and metric summaries, especially named metrics, counters, gauges, distributions, metric values, and queries that explicitly mention metric names/types
+- spans: Raw trace/span events for performance, AI/LLM calls, database queries, HTTP requests, token usage, costs, user agent data, "XYZ calls", ambiguous operations (richest attribute set)
+- errors: Exceptions, crashes, stack traces, unhandled errors, browser/client errors; these usually become Sentry issues
+- logs: Application log entries, log messages, severity levels, debugging information; error-severity logs are still logs
+- metrics: Metric rows and aggregates, especially named metrics, counters, gauges, distributions, metric values, and queries that explicitly mention metric names/types
 - profiles: Transaction and continuous profile results, profile IDs, profile durations, releases, platforms, and profile-related transactions
 - replays: Session replay results, clicked elements, rage/dead clicks, visited pages, replay users, browsers, and releases
 
@@ -20,6 +20,7 @@ For ambiguous queries like "calls using XYZ", prefer spans dataset first as it c
 For queries that explicitly ask about a metric name, metric type, counter/gauge/distribution, or newer span metrics, prefer metrics.
 For queries about captured profiles, profile IDs, flamegraphs, or profiled transactions, prefer profiles.
 For queries about session replays, clicked UI elements, rage clicks, dead clicks, visited URLs/screens, or replay users/sessions, prefer replays.
+If the user says logs, log messages, error logs, or warning logs, choose logs instead of errors.
 
 CRITICAL - FIELD VERIFICATION REQUIREMENT:
 Before constructing ANY query, you MUST verify field availability:

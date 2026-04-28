@@ -69,7 +69,7 @@ export default defineTool({
     "",
     "DO NOT USE for:",
     "- General searching for traces (use search_events with trace queries)",
-    "- Complete span enumeration or branch-by-branch reconstruction (use search_events or list_events scoped to the trace)",
+    "- Complete span enumeration or branch-by-branch reconstruction (use search_events scoped to the trace)",
     "",
     "TRIGGER PATTERNS:",
     "- 'Show me trace abc123' → use get_trace_details",
@@ -92,7 +92,7 @@ export default defineTool({
     "- Trace IDs are 32-character hexadecimal strings",
     "- This returns a condensed trace overview, not a full span dump",
     "- Provide `spanId` to focus on a single span within the trace",
-    "- If the response says it shows a subset of spans, use search_events or list_events to inspect the rest of the trace",
+    "- If the response says it shows a subset of spans, use search_events to inspect the rest of the trace",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -1051,15 +1051,15 @@ function buildTraceNextSteps({
       : `show more spans from trace ${traceId}`;
 
     return [
-      `- **Search spans**: \`search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='${spanQuery}')\``,
-      `- **Search errors**: \`search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='show error events from trace ${traceId}')\``,
-      `- **Search logs**: \`search_events(organizationSlug='${organizationSlug}', naturalLanguageQuery='show logs from trace ${traceId}')\``,
+      `- **Search spans**: \`search_events(organizationSlug='${organizationSlug}', query='${spanQuery}')\``,
+      `- **Search errors**: \`search_events(organizationSlug='${organizationSlug}', query='show error events from trace ${traceId}')\``,
+      `- **Search logs**: \`search_events(organizationSlug='${organizationSlug}', query='show logs from trace ${traceId}')\``,
     ];
   }
 
   return [
-    `- **Search spans**: \`list_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\``,
-    `- **Search errors**: \`list_events(organizationSlug='${organizationSlug}', dataset='errors', query='trace:${traceId}')\``,
-    `- **Search logs**: \`list_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\``,
+    `- **Search spans**: \`search_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\``,
+    `- **Search errors**: \`search_events(organizationSlug='${organizationSlug}', dataset='errors', query='trace:${traceId}')\``,
+    `- **Search logs**: \`search_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\``,
   ];
 }

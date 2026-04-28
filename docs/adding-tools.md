@@ -274,13 +274,20 @@ pnpm eval your-tool
 
 ## Agent-in-Tool Pattern
 
-Some tools (`search_events` and `search_issues`) embed AI agents to handle complex natural language translation. This pattern is used when:
+Some tools (`search_events`, `search_issue_events`, and `search_issues`) embed
+AI agents to normalize search parameters before the handler calls Sentry. Treat
+the agent as a repair step for a structured request, not only as a natural
+language query translator. The agent may rewrite the query string, but it may
+also correct or fill related parameters such as dataset, fields, sort, and time
+range when the provided combination would fail or produce the wrong result.
 
 ### When to Use This Pattern
 
-1. **Complex query translation** - Converting natural language to domain-specific query languages
-2. **Dynamic field discovery** - When available fields vary by project/context
-3. **Semantic understanding** - When the tool needs to understand intent, not just parameters
+1. **Parameter repair** - Fixing mismatched or incomplete search parameters
+2. **Query normalization** - Converting natural language or loose syntax to
+   valid Sentry search syntax
+3. **Dynamic field discovery** - When available fields vary by project/context
+4. **Semantic understanding** - When the tool needs to understand intent across multiple parameters
 
 ### When NOT to Use This Pattern
 
@@ -293,21 +300,53 @@ Some tools (`search_events` and `search_issues`) embed AI agents to handle compl
 ```typescript
 // Tool handler delegates to embedded agent
 async handler(params, context) {
-  // 1. Embedded agent translates natural language
-  const translated = await translateQuery(params.naturalLanguageQuery, ...);
+  const request = hasAgentProvider()
+    ? await repairSearchParams({
+        query: params.query,
+        dataset: params.dataset,
+        fields: params.fields,
+        sort: params.sort,
+        statsPeriod: params.statsPeriod,
+      })
+    : {
+        query: params.query,
+        dataset: params.dataset,
+        fields: params.fields,
+        sort: params.sort,
+        statsPeriod: params.statsPeriod,
+      };
   
-  // 2. Tool executes the translated query
-  const results = await apiService.searchEvents(translated.query, ...);
+  // Tool executes either the repaired request or the direct parameters.
+  const results = await apiService.searchEvents({
+    query: request.query,
+    dataset: request.dataset,
+    fields: request.fields,
+    sort: request.sort,
+    statsPeriod: request.statsPeriod,
+  });
   
-  // 3. Format and return results
   return formatResults(results);
 }
 ```
 
+### Provider Availability
+
+Direct-capable tools should still work when no embedded agent provider is
+available. Use `hasAgentProvider()` to decide whether to run the repair step.
+If it returns false because API keys are missing, both OpenAI and Anthropic keys
+are set without an explicit provider, or Azure OpenAI is missing a supported
+base URL, execute the direct parameters as provided.
+
+Do not silently fall back after a provider has been selected and the provider API
+call fails. Invalid keys, deactivated accounts, rate limits, and other provider
+4xx responses should become user-facing `LLMProviderError`s from
+`callEmbeddedAgent()`. That makes configuration/account problems visible instead
+of hiding them behind an un-repaired direct search.
+
 ### Error Handling Philosophy
 
 **DO NOT retry internally**. When the embedded agent fails:
-1. Throw a clear `UserInputError` with specific guidance
+1. Throw a clear `UserInputError` or `LLMProviderError` with specific guidance
 2. Let the calling agent (Claude/Cursor) see the error
 3. The calling agent can retry with corrections if needed
 
@@ -323,21 +362,24 @@ if (previousError) {
 // GOOD: Static prompt with clear error boundaries
 const systemPrompt = STATIC_SYSTEM_PROMPT;
 try {
-  return await translateQuery(...);
+  return await repairSearchParams(...);
 } catch (error) {
-  throw new UserInputError(`Could not translate query: ${error.message}`);
+  throw new UserInputError(
+    `Could not repair search parameters: ${error.message}`,
+  );
 }
 ```
 
 ### Tool Boundaries
 
 1. **Embedded Agent Responsibilities**:
-   - Translate natural language to structured queries
+   - Repair or normalize structured search parameters
+   - Convert natural language to Sentry search syntax when needed
    - Discover available fields/attributes
-   - Validate query syntax
+   - Validate query syntax and parameter combinations
 
 2. **Tool Handler Responsibilities**:
-   - Execute the translated query
+   - Execute the repaired request
    - Handle API errors
    - Format results for the calling agent
 
@@ -350,7 +392,7 @@ try {
 
 1. **Create an AGENTS.md file** in the tool directory documenting:
    - The embedded agent's prompt and behavior
-   - Common translation patterns
+   - Common repair and normalization patterns
    - Known limitations
 
 2. **Keep agent prompts focused** - Don't duplicate general MCP knowledge

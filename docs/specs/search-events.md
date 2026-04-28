@@ -15,7 +15,7 @@ A unified search tool that accepts natural language queries and translates them 
 ```typescript
 interface SearchEventsParams {
   organizationSlug: string;      // Required
-  naturalLanguageQuery: string;  // Natural language search description
+  query: string;  // Natural language search description
   dataset?: "spans" | "errors" | "logs" | "metrics"; // Dataset to search (default: "errors")
   projectSlug?: string;          // Optional - limit to specific project
   regionUrl?: string;           
@@ -30,13 +30,13 @@ interface SearchEventsParams {
 // Find errors (errors dataset is default)
 search_events({
   organizationSlug: "my-org",
-  naturalLanguageQuery: "database timeouts in checkout flow from last hour"
+  query: "database timeouts in checkout flow from last hour"
 })
 
 // Find slow transactions
 search_events({
   organizationSlug: "my-org",
-  naturalLanguageQuery: "API calls taking over 5 seconds",
+  query: "API calls taking over 5 seconds",
   projectSlug: "backend",
   dataset: "spans"
 })
@@ -44,14 +44,14 @@ search_events({
 // Find logs
 search_events({
   organizationSlug: "my-org",
-  naturalLanguageQuery: "warning logs about memory usage",
+  query: "warning logs about memory usage",
   dataset: "logs"
 })
 
 // Find request duration metrics
 search_events({
   organizationSlug: "my-org",
-  naturalLanguageQuery: "p95 request duration by transaction this week",
+  query: "p95 request duration by transaction this week",
   dataset: "metrics"
 })
 ```
@@ -125,7 +125,7 @@ find_errors({
 // After
 search_events({
   organizationSlug: "sentry",
-  naturalLanguageQuery: "unresolved errors in checkout.js"
+  query: "unresolved errors in checkout.js"
 })
 ```
 

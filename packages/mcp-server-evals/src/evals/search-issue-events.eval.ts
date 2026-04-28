@@ -19,7 +19,7 @@ describeEval("search-issue-events", {
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               issueId: FIXTURES.issueId,
-              naturalLanguageQuery: "from the last hour",
+              query: "from the last hour",
             },
           },
         ],
@@ -37,7 +37,7 @@ describeEval("search-issue-events", {
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               issueId: FIXTURES.issueId,
-              naturalLanguageQuery: "production events with release v1.0",
+              query: "production events with release v1.0",
             },
           },
         ],
@@ -55,7 +55,7 @@ describeEval("search-issue-events", {
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               issueId: FIXTURES.issueId,
-              naturalLanguageQuery: "affecting user alice@example.com",
+              query: "affecting user alice@example.com",
             },
           },
         ],
@@ -73,7 +73,7 @@ describeEval("search-issue-events", {
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               issueId: FIXTURES.issueId,
-              naturalLanguageQuery: "with trace ID abc123",
+              query: "with trace ID abc123",
             },
           },
         ],

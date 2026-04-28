@@ -67,7 +67,7 @@ describe("get_profile_details", () => {
         
         - Open the profile URL above in Sentry for the full flamegraph
         - Open the related trace URL to inspect the end-to-end request
-        - Use \`search_events\` or \`list_events\` with the profiles dataset to find similar profiles"
+        - Use \`search_events\` with the profiles dataset to find similar profiles"
       `);
     });
 

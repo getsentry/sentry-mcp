@@ -11,7 +11,7 @@ import {
 } from "./utils";
 
 /**
- * Format an explanation for how a natural language query was translated
+ * Format an explanation for how the input query was translated
  */
 export function formatExplanation(explanation: string): string {
   return `## How I interpreted your query\n\n${explanation}`;
@@ -22,7 +22,7 @@ export function formatExplanation(explanation: string): string {
  */
 export interface FormatEventResultsParams {
   eventData: FlexibleEventData[];
-  naturalLanguageQuery: string;
+  inputQuery: string;
   includeExplanation?: boolean;
   apiService: SentryApiService;
   organizationSlug: string;
@@ -60,7 +60,7 @@ function formatUserFieldLines(
 export function formatErrorResults(params: FormatEventResultsParams): string {
   const {
     eventData,
-    naturalLanguageQuery,
+    inputQuery,
     includeExplanation,
     apiService,
     organizationSlug,
@@ -70,7 +70,7 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
     explanation,
   } = params;
 
-  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+  let output = `# Search Results for "${inputQuery}"\n\n`;
 
   // Check if this is an aggregate query and adjust display instructions
   if (isAggregateQuery(fields)) {
@@ -88,7 +88,7 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
-    logInfo(`No error events found for query: ${naturalLanguageQuery}`, {
+    logInfo(`No error events found for query: ${inputQuery}`, {
       extra: {
         query: sentryQuery,
         fields: fields,
@@ -193,7 +193,7 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
 export function formatLogResults(params: FormatEventResultsParams): string {
   const {
     eventData,
-    naturalLanguageQuery,
+    inputQuery,
     includeExplanation,
     apiService,
     organizationSlug,
@@ -203,7 +203,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
     explanation,
   } = params;
 
-  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+  let output = `# Search Results for "${inputQuery}"\n\n`;
 
   // Check if this is an aggregate query and adjust display instructions
   if (isAggregateQuery(fields)) {
@@ -221,7 +221,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
-    logInfo(`No log events found for query: ${naturalLanguageQuery}`, {
+    logInfo(`No log events found for query: ${inputQuery}`, {
       extra: {
         query: sentryQuery,
         fields: fields,
@@ -349,7 +349,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
 export function formatSpanResults(params: FormatEventResultsParams): string {
   const {
     eventData,
-    naturalLanguageQuery,
+    inputQuery,
     includeExplanation,
     apiService,
     organizationSlug,
@@ -359,7 +359,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
     explanation,
   } = params;
 
-  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+  let output = `# Search Results for "${inputQuery}"\n\n`;
 
   // Check if this is an aggregate query and adjust display instructions
   if (isAggregateQuery(fields)) {
@@ -377,7 +377,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
-    logInfo(`No span events found for query: ${naturalLanguageQuery}`, {
+    logInfo(`No span events found for query: ${inputQuery}`, {
       extra: {
         query: sentryQuery,
         fields: fields,
@@ -536,7 +536,7 @@ function getProfileDetailUrl(
 export function formatProfileResults(params: FormatEventResultsParams): string {
   const {
     eventData,
-    naturalLanguageQuery,
+    inputQuery,
     includeExplanation,
     apiService,
     organizationSlug,
@@ -546,7 +546,7 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
     explanation,
   } = params;
 
-  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+  let output = `# Search Results for "${inputQuery}"\n\n`;
 
   if (isAggregateQuery(fields)) {
     output += `⚠️ **IMPORTANT**: Display these profile aggregates as a data table with proper column alignment and readable duration units.\n\n`;
@@ -563,7 +563,7 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
-    logInfo(`No profile events found for query: ${naturalLanguageQuery}`, {
+    logInfo(`No profile events found for query: ${inputQuery}`, {
       extra: {
         query: sentryQuery,
         fields,
@@ -680,7 +680,7 @@ export function formatTraceMetricsResults(
 ): string {
   const {
     eventData,
-    naturalLanguageQuery,
+    inputQuery,
     includeExplanation,
     apiService,
     organizationSlug,
@@ -690,7 +690,7 @@ export function formatTraceMetricsResults(
     explanation,
   } = params;
 
-  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+  let output = `# Search Results for "${inputQuery}"\n\n`;
 
   if (isAggregateQuery(fields)) {
     output += `⚠️ **IMPORTANT**: Display these metric aggregates as a data table with proper column alignment, grouping labels, and units.\n\n`;
@@ -707,7 +707,7 @@ export function formatTraceMetricsResults(
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
   if (eventData.length === 0) {
-    logInfo(`No trace metric events found for query: ${naturalLanguageQuery}`, {
+    logInfo(`No trace metric events found for query: ${inputQuery}`, {
       extra: {
         query: sentryQuery,
         fields,

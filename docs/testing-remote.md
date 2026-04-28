@@ -343,7 +343,7 @@ Opens at `http://localhost:6274`
 // Test search_events with AI
 {
   "organizationSlug": "your-org",
-  "naturalLanguageQuery": "errors in the last hour",
+  "query": "errors in the last hour",
   "dataset": "errors"
 }
 ```

@@ -83,8 +83,8 @@ describe("search_events", () => {
       : {
           dataset,
           query,
-          fields: fields || defaultFields[dataset],
-          sort: sort || defaultSorts[dataset],
+          fields: fields ?? defaultFields[dataset],
+          sort: sort ?? defaultSorts[dataset],
           environment: environment ?? null,
           timeRange: timeRange ?? null,
           explanation: "Test query translation",
@@ -141,7 +141,11 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "database queries",
+        query: "database queries",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -203,7 +207,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "slow request duration metrics",
+        query: "slow request duration metrics",
         limit: 10,
         includeExplanation: false,
       },
@@ -296,7 +300,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "recent metrics",
+        query: "recent metrics",
         limit: 10,
         includeExplanation: false,
       },
@@ -383,7 +387,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "recent profiles for /api/users",
+        query: "recent profiles for /api/users",
         limit: 10,
         includeExplanation: false,
       },
@@ -454,7 +458,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "recent profiles for /api/users",
+        query: "recent profiles for /api/users",
         limit: 10,
         includeExplanation: false,
       },
@@ -524,7 +528,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "recent profiles for /api/users",
+        query: "recent profiles for /api/users",
         limit: 10,
         includeExplanation: false,
       },
@@ -579,7 +583,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "count profiles by release",
+        query: "count profiles by release",
         limit: 10,
         includeExplanation: false,
       },
@@ -652,7 +656,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "recent profiles for /api/users",
+        query: "recent profiles for /api/users",
         limit: 10,
         includeExplanation: false,
       },
@@ -726,8 +730,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery:
-          "production checkout replays with errors in the last day",
+        query: "production checkout replays with errors in the last day",
         limit: 10,
         includeExplanation: true,
       },
@@ -747,6 +750,61 @@ describe("search_events", () => {
     expect(result).toContain("Environment: production, staging");
     expect(result).toContain("Jane Doe");
     expect(result).toContain("2 errors");
+  });
+
+  it("should not add default statsPeriod to replay absolute time ranges", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "replays",
+        "url:*checkout*",
+        [],
+        undefined,
+        "-started_at",
+        {
+          start: "2025-01-15T00:00:00Z",
+          end: "2025-01-16T00:00:00Z",
+        },
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/replays/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("url:*checkout*");
+          expect(url.searchParams.get("sort")).toBe("-started_at");
+          expect(url.searchParams.get("start")).toBe("2025-01-15T00:00:00Z");
+          expect(url.searchParams.get("end")).toBe("2025-01-16T00:00:00Z");
+          expect(url.searchParams.has("statsPeriod")).toBe(false);
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "checkout replays yesterday",
+        limit: 10,
+        includeExplanation: true,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).not.toContain("statsPeriod=14d");
+    expect(result).toContain("2025-01-15");
+    expect(result).toContain("2025-01-16");
   });
 
   it("should handle errors dataset queries", async () => {
@@ -787,7 +845,11 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "database errors",
+        query: "database errors",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -850,7 +912,11 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "recent errors with user data",
+        query: "recent errors with user data",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -904,7 +970,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "recent errors with geo-only user data",
+        query: "recent errors with geo-only user data",
         limit: 10,
         includeExplanation: false,
       },
@@ -960,7 +1026,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "logs with user geo",
+        query: "logs with user geo",
         limit: 10,
         includeExplanation: false,
       },
@@ -1019,7 +1085,7 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "spans with user geo",
+        query: "spans with user geo",
         limit: 10,
         includeExplanation: false,
       },
@@ -1077,7 +1143,11 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "error logs",
+        query: "error logs",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1097,6 +1167,66 @@ describe("search_events", () => {
     expect(result).toContain("🔴 [ERROR]");
   });
 
+  it("should repair direct search params with the agent when available", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse("logs", "severity:error", [
+        "timestamp",
+        "message",
+        "severity",
+      ]),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("logs");
+          expect(url.searchParams.get("query")).toBe("severity:error");
+          return HttpResponse.json({
+            data: [
+              {
+                id: "log1",
+                timestamp: "2024-01-15T10:30:00Z",
+                message: "Connection failed to database",
+                severity: "error",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "severity:error",
+        dataset: "errors",
+        fields: ["timestamp", "message", "level"],
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    const prompt = mockGenerateText.mock.calls[0]?.[0]?.prompt;
+    expect(prompt).toContain("Fix this Sentry event search request");
+    expect(prompt).toContain("severity:error");
+    expect(prompt).toContain('"dataset": "errors"');
+  });
+
   it("should handle AI agent errors gracefully", async () => {
     // Mock AI response with error
     mockGenerateText.mockResolvedValueOnce(
@@ -1108,7 +1238,11 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "some impossible query !@#$%",
+        query: "some impossible query !@#$%",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1127,6 +1261,45 @@ describe("search_events", () => {
     await expect(promise).rejects.toThrow("Cannot parse this query");
   });
 
+  it("should reject agent responses with empty sort", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "errors",
+        "level:error",
+        ["timestamp", "title"],
+        undefined,
+        "",
+      ),
+    );
+
+    const promise = searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "recent errors",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    await expect(promise).rejects.toThrow(UserInputError);
+    await expect(promise).rejects.toThrow("missing required 'sort'");
+  });
+
   it("should return UserInputError for time series queries", async () => {
     // Mock AI response with time series error
     mockGenerateText.mockResolvedValueOnce(
@@ -1143,7 +1316,11 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "show me errors over time",
+        query: "show me errors over time",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1189,7 +1366,11 @@ describe("search_events", () => {
           organizationSlug: "test-org",
           regionUrl: null,
           projectSlug: null,
-          naturalLanguageQuery: "any query",
+          query: "any query",
+          dataset: "errors",
+          fields: null,
+          sort: "-timestamp",
+          statsPeriod: "14d",
           limit: 10,
           includeExplanation: false,
         },
@@ -1228,7 +1409,11 @@ describe("search_events", () => {
           organizationSlug: "test-org",
           regionUrl: null,
           projectSlug: null,
-          naturalLanguageQuery: "any query",
+          query: "any query",
+          dataset: "errors",
+          fields: null,
+          sort: "-timestamp",
+          statsPeriod: "14d",
           limit: 10,
           includeExplanation: false,
         },
@@ -1285,7 +1470,11 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery: "recent errors",
+        query: "recent errors",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1358,8 +1547,11 @@ describe("search_events", () => {
         organizationSlug: "test-org",
         regionUrl: null,
         projectSlug: null,
-        naturalLanguageQuery:
-          "which user agents have the most tool calls yesterday",
+        query: "which user agents have the most tool calls yesterday",
+        dataset: "errors",
+        fields: null,
+        sort: "-timestamp",
+        statsPeriod: "14d",
         limit: 10,
         includeExplanation: false,
       },
@@ -1380,5 +1572,61 @@ describe("search_events", () => {
     expect(result).toContain("120");
     // Should NOT contain user.id references
     expect(result).not.toContain("user.id");
+  });
+
+  it("should search events with direct query syntax (no agent)", async () => {
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("errors");
+          expect(url.searchParams.get("query")).toBe("level:error");
+          expect(url.searchParams.get("sort")).toBe("-timestamp");
+          return HttpResponse.json({
+            data: [
+              {
+                id: "error1",
+                issue: "PROJ-123",
+                title: "Database Error",
+                level: "error",
+                timestamp: "2024-01-15T10:30:00Z",
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        dataset: "errors",
+        query: "level:error",
+        fields: ["issue", "title", "level", "timestamp"],
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    // Should NOT have called the AI agent
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(result).toContain("Database Error");
   });
 });

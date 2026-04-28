@@ -46,7 +46,7 @@ interface ReplayTimeRange {
 
 export interface FormatReplayResultsParams {
   replays: ReplayDetails[];
-  naturalLanguageQuery: string;
+  inputQuery: string;
   includeExplanation: boolean;
   organizationSlug: string;
   apiService: SentryApiService;
@@ -65,7 +65,7 @@ export function isValidReplaySort(sort: string): boolean {
 export function formatReplayResults(params: FormatReplayResultsParams): string {
   const {
     replays,
-    naturalLanguageQuery,
+    inputQuery,
     includeExplanation,
     organizationSlug,
     apiService,
@@ -77,13 +77,13 @@ export function formatReplayResults(params: FormatReplayResultsParams): string {
     timeRange,
   } = params;
 
-  let output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+  let output = `# Search Results for "${inputQuery}"\n\n`;
   output +=
     "⚠️ **IMPORTANT**: Display these replays as cards or rows with clickable Replay IDs, user context, duration, click/error counts, and page URLs.\n\n";
 
   if (includeExplanation) {
     output += "## Query Translation\n";
-    output += `Natural language: "${naturalLanguageQuery}"\n`;
+    output += `Input query: "${inputQuery}"\n`;
     output += `Replay query: \`${replayQuery || "(none)"}\`\n`;
     if (environment) {
       output += `Environment: ${formatReplayEnvironment(environment)}\n`;

@@ -5,7 +5,7 @@ import { getSeerActionabilityLabel } from "../../internal/formatting";
 import type { SentryProtocol } from "../../types";
 
 /**
- * Format an explanation for how a natural language query was translated
+ * Format an explanation for how the input query was translated
  */
 export function formatExplanation(explanation: string): string {
   return `## How I interpreted your query\n\n${explanation}`;
@@ -19,7 +19,7 @@ export interface FormatIssueResultsParams {
   regionUrl?: string;
   host?: string;
   protocol?: SentryProtocol;
-  naturalLanguageQuery?: string;
+  inputQuery?: string;
   skipHeader?: boolean;
 }
 
@@ -35,7 +35,7 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
     regionUrl,
     host,
     protocol = "https",
-    naturalLanguageQuery,
+    inputQuery,
     skipHeader = false,
   } = params;
 
@@ -49,9 +49,9 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
 
   // Skip header section if requested (when called from handler with includeExplanation)
   if (!skipHeader) {
-    // Use natural language query in title if provided, otherwise fall back to org/project
-    if (naturalLanguageQuery) {
-      output = `# Search Results for "${naturalLanguageQuery}"\n\n`;
+    // Use the original input in the title if provided, otherwise fall back to org/project.
+    if (inputQuery) {
+      output = `# Search Results for "${inputQuery}"\n\n`;
     } else {
       output = `# Issues in **${organizationSlug}`;
       if (projectSlugOrId) {
@@ -65,12 +65,12 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
   }
 
   if (issues.length === 0) {
-    logInfo(`No issues found for query: ${naturalLanguageQuery || query}`, {
+    logInfo(`No issues found for query: ${inputQuery || query}`, {
       extra: {
         query,
         organizationSlug,
         projectSlug: projectSlugOrId,
-        naturalLanguageQuery,
+        inputQuery,
       },
     });
     output += "No issues found matching your search criteria.\n\n";
