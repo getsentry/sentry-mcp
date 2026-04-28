@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import searchIssueEvents from "./search-issue-events";
 import { generateText } from "ai";
-import { UserInputError, ConfigurationError } from "../errors";
+import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 
 // Mock the AI SDK
@@ -112,8 +112,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "from last hour",
-        query: "",
+        query: "from last hour",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -157,7 +156,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "events with user details",
+        query: "events with user details",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -197,7 +196,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "events with geo-only users",
+        query: "events with geo-only users",
         projectSlug: null,
         regionUrl: null,
         limit: 50,
@@ -228,8 +227,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: null,
         issueUrl: "https://sentry.io/organizations/my-org/issues/123/",
-        naturalLanguageQuery: "all events",
-        query: "",
+        query: "all events",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -249,7 +247,7 @@ describe("search_issue_events", () => {
         {
           organizationSlug: "sentry-mcp-evals",
           issueId: "CLOUDFLARE-MCP-41",
-          naturalLanguageQuery: "from last hour",
+          query: "from last hour",
           projectSlug: null,
           regionUrl: null,
           limit: 50,
@@ -290,8 +288,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "production with release v1.0",
-        query: "",
+        query: "production with release v1.0",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -322,8 +319,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "from last hour",
-        query: "",
+        query: "from last hour",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -356,8 +352,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "from Jan 15 2025",
-        query: "",
+        query: "from Jan 15 2025",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -386,8 +381,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "all events",
-        query: "",
+        query: "all events",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -410,8 +404,7 @@ describe("search_issue_events", () => {
         {
           organizationSlug: "test-org",
           issueId: "MCP-41",
-          naturalLanguageQuery: "test query",
-          query: "",
+          query: "test query",
           sort: "-timestamp",
           statsPeriod: "14d",
           projectSlug: null,
@@ -437,8 +430,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "from last hour",
-        query: "",
+        query: "from last hour",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -457,8 +449,7 @@ describe("search_issue_events", () => {
       searchIssueEvents.handler(
         {
           organizationSlug: "test-org",
-          naturalLanguageQuery: "test",
-          query: "",
+          query: "test",
           sort: "-timestamp",
           statsPeriod: "14d",
           projectSlug: null,
@@ -477,8 +468,7 @@ describe("search_issue_events", () => {
         {
           organizationSlug: null,
           issueId: "MCP-41",
-          naturalLanguageQuery: "test",
-          query: "",
+          query: "test",
           sort: "-timestamp",
           statsPeriod: "14d",
           projectSlug: null,
@@ -497,8 +487,7 @@ describe("search_issue_events", () => {
         {
           organizationSlug: null,
           issueUrl: "https://invalid-url.com",
-          naturalLanguageQuery: "test",
-          query: "",
+          query: "test",
           sort: "-timestamp",
           statsPeriod: "14d",
           projectSlug: null,
@@ -535,8 +524,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "production events",
-        query: "",
+        query: "production events",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -563,8 +551,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "test",
-        query: "",
+        query: "test",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -596,8 +583,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: "test-org",
         issueId: "MCP-41",
-        naturalLanguageQuery: "production events",
-        query: "",
+        query: "production events",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -628,8 +614,7 @@ describe("search_issue_events", () => {
       {
         organizationSlug: null,
         issueUrl: "https://my-org.sentry.io/issues/456/",
-        naturalLanguageQuery: "test",
-        query: "",
+        query: "test",
         sort: "-timestamp",
         statsPeriod: "14d",
         projectSlug: null,
@@ -642,6 +627,9 @@ describe("search_issue_events", () => {
   });
 
   it("should search events with direct query syntax (no agent)", async () => {
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+
     mswServer.use(
       http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
         const url = new URL(request.url);
@@ -684,35 +672,5 @@ describe("search_issue_events", () => {
     expect(mockGenerateText).not.toHaveBeenCalled();
     expect(result).toContain("Events in issue MCP-41");
     expect(result).toContain("Test Error");
-  });
-
-  it("should throw ConfigurationError when naturalLanguageQuery provided without agent", async () => {
-    const savedOpenAI = process.env.OPENAI_API_KEY;
-    const savedAnthropic = process.env.ANTHROPIC_API_KEY;
-    process.env.OPENAI_API_KEY = "";
-    process.env.ANTHROPIC_API_KEY = "";
-
-    try {
-      await expect(
-        searchIssueEvents.handler(
-          {
-            organizationSlug: "test-org",
-            issueId: "MCP-41",
-            naturalLanguageQuery: "from last hour",
-            query: "",
-            sort: "-timestamp",
-            statsPeriod: "14d",
-            projectSlug: null,
-            regionUrl: null,
-            limit: 50,
-            includeExplanation: false,
-          },
-          mockContext,
-        ),
-      ).rejects.toThrow(ConfigurationError);
-    } finally {
-      process.env.OPENAI_API_KEY = savedOpenAI;
-      process.env.ANTHROPIC_API_KEY = savedAnthropic;
-    }
   });
 });

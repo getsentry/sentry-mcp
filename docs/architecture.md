@@ -279,7 +279,7 @@ Some tools (`search_events` and `search_issues`) implement a two-tier agent patt
 ```
 1. User: "Show me errors from yesterday"
    ↓
-2. Claude: Calls search_events(naturalLanguageQuery="errors from yesterday")
+2. Claude: Calls search_events(query="errors from yesterday")
    ↓
 3. MCP Tool Handler: Receives request
    ↓

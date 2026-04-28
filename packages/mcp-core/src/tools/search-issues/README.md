@@ -42,7 +42,7 @@ The AI agent has access to these shared agent tools from `../../agent-tools/`:
 ```typescript
 search_issues({
   organizationSlug: "my-org",
-  naturalLanguageQuery: "critical bugs from last week",
+  query: "critical bugs from last week",
   limit: 25,
   includeExplanation: true
 })

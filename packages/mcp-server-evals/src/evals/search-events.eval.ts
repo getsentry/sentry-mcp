@@ -18,7 +18,7 @@ describeEval("search-events", {
             name: "search_events",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              naturalLanguageQuery: "database timeouts from the last week",
+              query: "database timeouts from the last week",
               dataset: "errors",
             },
           },
@@ -36,7 +36,7 @@ describeEval("search-events", {
             name: "search_events",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              naturalLanguageQuery: "slow API calls taking over 5 seconds",
+              query: "slow API calls taking over 5 seconds",
               dataset: "spans",
             },
           },
@@ -54,7 +54,7 @@ describeEval("search-events", {
             name: "search_events",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              naturalLanguageQuery: "error logs from the last hour",
+              query: "error logs from the last hour",
               dataset: "logs",
             },
           },
@@ -73,7 +73,7 @@ describeEval("search-events", {
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               projectSlug: FIXTURES.projectSlug,
-              naturalLanguageQuery: "authentication errors",
+              query: "authentication errors",
               dataset: "errors",
             },
           },
@@ -95,7 +95,7 @@ describeEval("search-events", {
             name: "search_events",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              naturalLanguageQuery: "errors affecting user.id:12345",
+              query: "errors affecting user.id:12345",
               dataset: "errors",
             },
           },

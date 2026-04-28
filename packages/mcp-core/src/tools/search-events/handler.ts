@@ -9,7 +9,7 @@ import {
   ParamProjectSlug,
 } from "../../schema";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
-import { ConfigurationError, UserInputError } from "../../errors";
+import { UserInputError } from "../../errors";
 import { searchEventsAgent } from "./agent";
 import {
   formatErrorResults,
@@ -39,15 +39,44 @@ import {
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 const DEFAULT_EVENTS_SORT = "-timestamp";
 
+function buildSearchRepairPrompt(params: {
+  query?: string;
+  dataset: PublicEventsDataset | "replays";
+  fields?: string[] | null;
+  sort?: string | null;
+  statsPeriod?: string;
+  environment?: string | string[] | null;
+}): string {
+  return [
+    "Fix this Sentry event search request.",
+    "The query may be natural language or already-valid Sentry search syntax.",
+    "Preserve valid explicit parameters, but correct dataset, query syntax, fields, sort, and time range when they conflict or would fail.",
+    "For non-replay datasets, convert environment parameters into query filters. For replays, keep environment in the separate environment parameter.",
+    "",
+    `User query: ${params.query || "(empty)"}`,
+    "Current parameters:",
+    JSON.stringify(
+      {
+        dataset: params.dataset,
+        fields: params.fields ?? null,
+        sort: params.sort ?? null,
+        statsPeriod: params.statsPeriod ?? null,
+        environment: params.environment ?? null,
+      },
+      null,
+      2,
+    ),
+  ].join("\n");
+}
+
 export default defineTool({
   name: "search_events",
   skills: ["inspect", "triage", "seer"], // Available in inspect, triage, and seer skills
   requiredScopes: ["event:read"],
   description: [
-    "Search Sentry events and replays. This is the ONLY tool for counts/statistics on event datasets.",
+    "Search Sentry events and replays. Use for event counts/statistics.",
     "",
-    "Provide `naturalLanguageQuery` to let an embedded agent determine dataset, query, fields, and sort,",
-    "or provide these directly with Sentry search syntax.",
+    "`query` can be natural language or Sentry search syntax. With an agent configured, it fixes dataset, query, fields, and sort before running.",
     "",
     "Supports TWO query types:",
     "1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'total tokens'",
@@ -57,17 +86,17 @@ export default defineTool({
     "- errors: Exception/crash events with stack traces, usually grouped into issues",
     "- logs: Application log entries, including error-severity log messages",
     "- spans: Raw trace/span events for performance, AI/LLM calls, requests, and operations",
-    "- metrics: Metric rows and aggregates, including counters, gauges, distributions, and metric values",
-    "- profiles: Transaction and continuous profile results, profile IDs, and profiled transactions",
-    "- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users",
+    "- metrics: Metric rows and aggregates: counters, gauges, distributions, values",
+    "- profiles: Transaction/continuous profile results, profile IDs, profiled transactions",
+    "- replays: Session replay results: rage clicks, dead clicks, visited pages, replay users",
     "If the user says logs, log messages, error logs, or warning logs, choose logs instead of errors.",
     "",
-    "Replay searches on this tool return replay lists only. Replay count()/avg()/sum() aggregations are not supported.",
+    "Replay searches return replay lists only; replay count()/avg()/sum() are not supported.",
     "",
     "DO NOT USE for grouped issue lists → use search_issues",
     "",
     "<examples>",
-    "search_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')",
+    "search_events(organizationSlug='my-org', query='how many errors today')",
     "search_events(organizationSlug='my-org', dataset='errors', query='level:error')",
     "search_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')",
     "search_events(organizationSlug='my-org', dataset='spans', query='span.op:db', sort='-span.duration')",
@@ -83,27 +112,17 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
-    naturalLanguageQuery: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe(
-        "Natural language description of what you want to search for. When provided, an embedded agent determines the dataset, query, fields, and sort.",
-      ),
     dataset: z
       .enum(SEARCH_EVENTS_DATASETS)
       .optional()
       .describe(
-        "Dataset to query when naturalLanguageQuery is not provided: errors, logs, spans, metrics, profiles, or replays.",
+        "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured.",
       ),
     query: z
       .string()
       .trim()
       .optional()
-      .describe(
-        "Sentry event search query syntax. Used when naturalLanguageQuery is not provided.",
-      ),
+      .describe("Natural language or Sentry event search query syntax."),
     fields: z
       .array(z.string())
       .nullable()
@@ -133,9 +152,7 @@ export default defineTool({
     statsPeriod: z
       .string()
       .optional()
-      .describe(
-        "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided.",
-      ),
+      .describe("Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."),
     regionUrl: ParamRegionUrl.nullable().default(null),
     limit: z
       .number()
@@ -147,7 +164,7 @@ export default defineTool({
       .boolean()
       .default(false)
       .describe(
-        "Include explanation of how the query was translated (only applies with naturalLanguageQuery)",
+        "Include explanation of how the query was translated or repaired",
       ),
   },
   annotations: {
@@ -166,7 +183,7 @@ export default defineTool({
     const inputDataset = params.dataset ?? "errors";
 
     if (
-      !params.naturalLanguageQuery &&
+      !hasAgentProvider() &&
       inputDataset !== "replays" &&
       params.environment
     ) {
@@ -192,25 +209,32 @@ export default defineTool({
     let explanation: string | undefined;
     let environment: string | string[] | null | undefined = params.environment;
 
-    if (params.naturalLanguageQuery) {
-      if (!hasAgentProvider()) {
-        throw new ConfigurationError(
-          "Natural language search requires an AI provider (OPENAI_API_KEY or ANTHROPIC_API_KEY). " +
-            "Use the 'query', 'dataset', and 'fields' parameters with Sentry search syntax instead.",
-        );
-      }
-
+    if (hasAgentProvider()) {
       const agentResult = await searchEventsAgent({
-        query: params.naturalLanguageQuery,
+        query: buildSearchRepairPrompt({
+          query: params.query,
+          dataset: inputDataset,
+          fields: params.fields,
+          sort: params.sort,
+          statsPeriod: params.statsPeriod,
+          environment: params.environment,
+        }),
         organizationSlug,
         apiService,
         projectId,
       });
 
       const parsed = agentResult.result;
+
+      if (!parsed.sort?.trim()) {
+        throw new UserInputError(
+          `Search Events Agent response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}. The agent must specify how to sort results (e.g., '-timestamp' for newest first).`,
+        );
+      }
+
       dataset = parsed.dataset;
       sentryQuery = parsed.query || "";
-      sortParam = parsed.sort;
+      sortParam = parsed.sort.trim();
       explanation = parsed.explanation;
       environment = parsed.environment;
 
@@ -230,12 +254,6 @@ export default defineTool({
         fields = [];
       } else {
         const requestedFields = parsed.fields || [];
-        const isAggregateFieldSelection = isAggregateQuery(requestedFields);
-        if (isAggregateFieldSelection && requestedFields.length === 0) {
-          throw new UserInputError(
-            "AI response missing required 'fields' for aggregate query. For aggregate queries, include only aggregate functions and groupBy fields.",
-          );
-        }
         fields =
           requestedFields.length > 0
             ? requestedFields
@@ -244,7 +262,9 @@ export default defineTool({
     } else {
       dataset = inputDataset;
       sentryQuery = params.query ?? "";
-      sortParam = params.sort || DEFAULT_EVENTS_SORT;
+      sortParam =
+        params.sort ||
+        (dataset === "replays" ? DEFAULT_REPLAY_SORT : DEFAULT_EVENTS_SORT);
       timeParams = { statsPeriod: params.statsPeriod ?? "14d" };
       fields =
         dataset === "replays"
@@ -287,8 +307,7 @@ export default defineTool({
 
       return formatReplayResults({
         replays,
-        naturalLanguageQuery:
-          params.naturalLanguageQuery || sentryQuery || "recent replays",
+        inputQuery: params.query || sentryQuery || "recent replays",
         includeExplanation: params.includeExplanation,
         organizationSlug,
         apiService,
@@ -367,8 +386,7 @@ export default defineTool({
 
     const formatParams = {
       eventData,
-      naturalLanguageQuery:
-        params.naturalLanguageQuery || sentryQuery || `${dataset} events`,
+      inputQuery: params.query || sentryQuery || `${dataset} events`,
       includeExplanation: params.includeExplanation,
       apiService,
       organizationSlug,

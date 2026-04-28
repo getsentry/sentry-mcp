@@ -152,7 +152,7 @@ describe("formatIssueResults", () => {
       const result = formatIssueResults({
         ...baseParams,
         issues: [],
-        naturalLanguageQuery: "user feedback",
+        inputQuery: "user feedback",
       });
 
       expect(result).toContain("No issues found matching your search criteria");
@@ -238,7 +238,7 @@ describe("formatIssueResults", () => {
       const result = formatIssueResults({
         ...baseParams,
         issues: [feedbackIssue],
-        naturalLanguageQuery: "show me user feedback",
+        inputQuery: "show me user feedback",
       });
 
       expect(result).toMatchInlineSnapshot(`
@@ -286,7 +286,7 @@ describe("formatIssueResults", () => {
         host: "sentry.internal:9000",
         protocol: "http",
         issues: [feedbackIssue],
-        naturalLanguageQuery: "show me user feedback",
+        inputQuery: "show me user feedback",
       });
 
       expect(result).toContain(

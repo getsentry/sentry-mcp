@@ -4,7 +4,6 @@ import { mswServer } from "@sentry/mcp-server-mocks";
 import searchIssues from "./search-issues";
 import { generateText } from "ai";
 import type { ServerContext } from "../types";
-import { ConfigurationError } from "../errors";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -104,8 +103,7 @@ describe("search_issues", () => {
     const result = await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "unresolved issues",
-        query: "is:unresolved",
+        query: "unresolved issues",
         sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
@@ -120,6 +118,9 @@ describe("search_issues", () => {
   });
 
   it("should search issues with direct query syntax (no agent)", async () => {
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+
     mswServer.use(
       http.get("*/api/0/organizations/*/issues/", ({ request }) => {
         const url = new URL(request.url);
@@ -168,38 +169,6 @@ describe("search_issues", () => {
     expect(result).toContain("Test Error");
   });
 
-  it("should throw ConfigurationError when naturalLanguageQuery provided without agent", async () => {
-    const savedOpenAI = process.env.OPENAI_API_KEY;
-    const savedAnthropic = process.env.ANTHROPIC_API_KEY;
-    process.env.OPENAI_API_KEY = "";
-    process.env.ANTHROPIC_API_KEY = "";
-
-    try {
-      await expect(
-        searchIssues.handler(
-          {
-            organizationSlug: "test-org",
-            naturalLanguageQuery: "unresolved issues",
-            query: "is:unresolved",
-            sort: "date",
-            projectSlugOrId: null,
-            regionUrl: null,
-            limit: 10,
-            includeExplanation: false,
-          },
-          mockContext,
-        ),
-      ).rejects.toThrow(ConfigurationError);
-    } finally {
-      process.env.OPENAI_API_KEY = savedOpenAI;
-      if (savedAnthropic === undefined) {
-        process.env.ANTHROPIC_API_KEY = "";
-      } else {
-        process.env.ANTHROPIC_API_KEY = savedAnthropic;
-      }
-    }
-  });
-
   it("should handle project slug parameter", async () => {
     mockGenerateText.mockResolvedValue(mockAIResponse("", "date"));
 
@@ -219,8 +188,7 @@ describe("search_issues", () => {
     const result = await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "all issues",
-        query: "is:unresolved",
+        query: "all issues",
         sort: "date",
         projectSlugOrId: "my-project",
         regionUrl: null,
@@ -245,8 +213,7 @@ describe("search_issues", () => {
     await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "all issues",
-        query: "is:unresolved",
+        query: "all issues",
         sort: "date",
         projectSlugOrId: "123456",
         regionUrl: null,
@@ -272,8 +239,7 @@ describe("search_issues", () => {
     await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "most frequent errors",
-        query: "is:unresolved",
+        query: "most frequent errors",
         sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
@@ -299,8 +265,7 @@ describe("search_issues", () => {
     await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "all issues",
-        query: "is:unresolved",
+        query: "all issues",
         sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
@@ -326,8 +291,7 @@ describe("search_issues", () => {
     await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "test",
-        query: "is:unresolved",
+        query: "test",
         sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
@@ -350,8 +314,7 @@ describe("search_issues", () => {
     const result = await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "unresolved issues",
-        query: "is:unresolved",
+        query: "unresolved issues",
         sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
@@ -377,8 +340,7 @@ describe("search_issues", () => {
     const result = await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "nonexistent issues",
-        query: "is:unresolved",
+        query: "nonexistent issues",
         sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
@@ -408,8 +370,7 @@ describe("search_issues", () => {
     await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "unresolved errors",
-        query: "is:unresolved",
+        query: "unresolved errors",
         sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
@@ -443,8 +404,7 @@ describe("search_issues", () => {
       await searchIssues.handler(
         {
           organizationSlug: "test-org",
-          naturalLanguageQuery: "test",
-          query: "is:unresolved",
+          query: "test",
           sort: "date",
           projectSlugOrId: null,
           regionUrl: null,
@@ -487,8 +447,7 @@ describe("search_issues", () => {
     const result = await searchIssues.handler(
       {
         organizationSlug: "test-org",
-        naturalLanguageQuery: "all issues",
-        query: "is:unresolved",
+        query: "all issues",
         sort: "date",
         projectSlugOrId: null,
         regionUrl: null,
@@ -509,8 +468,7 @@ describe("search_issues", () => {
       searchIssues.handler(
         {
           organizationSlug: "test-org",
-          naturalLanguageQuery: "test",
-          query: "is:unresolved",
+          query: "test",
           sort: "date",
           projectSlugOrId: "invalid@slug",
           regionUrl: null,
@@ -538,8 +496,7 @@ describe("search_issues", () => {
       searchIssues.handler(
         {
           organizationSlug: "nonexistent-org",
-          naturalLanguageQuery: "test",
-          query: "is:unresolved",
+          query: "test",
           sort: "date",
           projectSlugOrId: null,
           regionUrl: null,

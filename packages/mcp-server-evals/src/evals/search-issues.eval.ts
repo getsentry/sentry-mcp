@@ -18,7 +18,7 @@ describeEval("search-issues", {
             name: "search_issues",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              naturalLanguageQuery: "unresolved issues",
+              query: "unresolved issues",
             },
           },
         ],
@@ -39,7 +39,7 @@ describeEval("search-issues", {
             name: "search_issues",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              naturalLanguageQuery: "issues assigned to me",
+              query: "issues assigned to me",
             },
           },
         ],
@@ -57,7 +57,7 @@ describeEval("search-issues", {
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
               projectSlugOrId: FIXTURES.projectSlug,
-              naturalLanguageQuery: "database errors",
+              query: "database errors",
             },
           },
         ],
@@ -74,8 +74,7 @@ describeEval("search-issues", {
             name: "search_issues",
             arguments: {
               organizationSlug: FIXTURES.organizationSlug,
-              naturalLanguageQuery:
-                "critical production errors affecting more than 100 users",
+              query: "critical production errors affecting more than 100 users",
             },
           },
         ],

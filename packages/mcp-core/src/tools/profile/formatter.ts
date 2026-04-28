@@ -567,7 +567,7 @@ export function formatTransactionProfileAnalysis(
     );
   }
   sections.push(
-    "- Use `search_events` or `list_events` with the profiles dataset to find similar profiles",
+    "- Use `search_events` with the profiles dataset to find similar profiles",
   );
 
   return sections.join("\n");

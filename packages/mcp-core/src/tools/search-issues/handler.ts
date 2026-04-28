@@ -6,9 +6,23 @@ import type { ServerContext } from "../../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
 import { validateSlugOrId, isNumericId } from "../../utils/slug-validation";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
-import { ConfigurationError } from "../../errors";
 import { searchIssuesAgent } from "./agent";
 import { formatIssueResults, formatExplanation } from "./formatters";
+
+function buildIssueSearchRepairPrompt(params: {
+  query: string;
+  sort: "date" | "freq" | "new" | "user";
+}): string {
+  return [
+    "Fix this Sentry issue search request.",
+    "The query may be natural language or already-valid Sentry issue search syntax.",
+    "Preserve valid explicit parameters, but correct query syntax and sort when they conflict or would fail.",
+    "",
+    `User query: ${params.query}`,
+    "Current parameters:",
+    JSON.stringify({ sort: params.sort }, null, 2),
+  ].join("\n");
+}
 
 export default defineTool({
   name: "search_issues",
@@ -17,8 +31,7 @@ export default defineTool({
   description: [
     "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.",
     "",
-    "Provide `naturalLanguageQuery` to let an embedded agent determine the correct query and sort params,",
-    "or use `query` and `sort` directly with Sentry search syntax.",
+    "Provide `query` as natural language or Sentry issue search syntax. When an embedded agent is configured, it fixes query and sort before running.",
     "",
     "Returns grouped issues with metadata like title, status, and user count.",
     "",
@@ -36,7 +49,7 @@ export default defineTool({
     "DO NOT USE FOR details about a specific issue → use get_sentry_resource",
     "",
     "<examples>",
-    "search_issues(organizationSlug='my-org', naturalLanguageQuery='critical bugs from last week')",
+    "search_issues(organizationSlug='my-org', query='critical bugs from last week')",
     "search_issues(organizationSlug='my-org', query='is:unresolved is:unassigned', sort='freq')",
     "search_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', projectSlugOrId='my-project')",
     "</examples>",
@@ -49,21 +62,11 @@ export default defineTool({
   ].join("\n"),
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
-    naturalLanguageQuery: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe(
-        "Natural language description of issues to search for. When provided, an embedded agent translates this into the correct query and sort params.",
-      ),
     query: z
       .string()
       .trim()
       .default("is:unresolved")
-      .describe(
-        "Sentry issue search query syntax. Used when naturalLanguageQuery is not provided.",
-      ),
+      .describe("Natural language or Sentry issue search query syntax."),
     sort: z
       .enum(["date", "freq", "new", "user"])
       .default("date")
@@ -89,7 +92,7 @@ export default defineTool({
       .boolean()
       .default(false)
       .describe(
-        "Include explanation of how the query was translated (only applies with naturalLanguageQuery)",
+        "Include explanation of how the query was translated or repaired",
       ),
   },
   annotations: {
@@ -114,16 +117,8 @@ export default defineTool({
     let sort: "date" | "freq" | "new" | "user";
     let explanation: string | undefined;
 
-    if (params.naturalLanguageQuery) {
-      // NL mode: use embedded agent to refine params
-      if (!hasAgentProvider()) {
-        throw new ConfigurationError(
-          "Natural language search requires an AI provider (OPENAI_API_KEY or ANTHROPIC_API_KEY). " +
-            "Use the 'query' parameter with Sentry search syntax instead.",
-        );
-      }
-
-      // Convert project slug to ID if needed - required for the agent's field discovery
+    if (hasAgentProvider()) {
+      // Agent mode: repair either natural language or already-structured params.
       let projectId: string | undefined;
       if (params.projectSlugOrId) {
         if (isNumericId(params.projectSlugOrId)) {
@@ -138,7 +133,10 @@ export default defineTool({
       }
 
       const agentResult = await searchIssuesAgent({
-        query: params.naturalLanguageQuery,
+        query: buildIssueSearchRepairPrompt({
+          query: params.query,
+          sort: params.sort,
+        }),
         organizationSlug: params.organizationSlug,
         apiService,
         projectId,
@@ -165,12 +163,12 @@ export default defineTool({
     // Build output with explanation first (if requested and NL was used), then results
     let output = "";
 
-    if (params.includeExplanation && params.naturalLanguageQuery) {
-      output += `# Search Results for "${params.naturalLanguageQuery}"\n\n`;
+    if (params.includeExplanation && explanation) {
+      output += `# Search Results for "${params.query}"\n\n`;
       output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
 
       output += `## Query Translation\n`;
-      output += `Natural language: "${params.naturalLanguageQuery}"\n`;
+      output += `Input query: "${params.query}"\n`;
       output += `Sentry query: \`${query}\``;
       output += `\nSort: ${sort}`;
       output += `\n\n`;
@@ -188,7 +186,7 @@ export default defineTool({
         regionUrl: params.regionUrl ?? undefined,
         host: context.sentryHost,
         protocol: context.sentryProtocol,
-        naturalLanguageQuery: params.naturalLanguageQuery,
+        inputQuery: params.query,
         skipHeader: true,
       });
     } else {
@@ -200,7 +198,7 @@ export default defineTool({
         regionUrl: params.regionUrl ?? undefined,
         host: context.sentryHost,
         protocol: context.sentryProtocol,
-        naturalLanguageQuery: params.naturalLanguageQuery,
+        inputQuery: params.query,
         skipHeader: false,
       });
     }

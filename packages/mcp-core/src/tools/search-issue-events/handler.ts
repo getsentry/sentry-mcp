@@ -10,11 +10,34 @@ import {
   ParamProjectSlug,
 } from "../../schema";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
-import { ConfigurationError, UserInputError } from "../../errors";
+import { UserInputError } from "../../errors";
 import { searchIssueEventsAgent } from "./agent";
 import { formatErrorResults } from "../search-events/formatters";
 import { RECOMMENDED_FIELDS } from "./config";
 import { parseIssueParams } from "./utils";
+
+function buildIssueEventSearchRepairPrompt(params: {
+  query?: string;
+  sort?: string;
+  statsPeriod?: string;
+}): string {
+  return [
+    "Fix this Sentry issue event search request.",
+    "The query may be natural language or already-valid Sentry event search syntax.",
+    "Preserve valid explicit parameters, but correct query syntax, fields, sort, and time range when they conflict or would fail.",
+    "",
+    `User query: ${params.query || "(empty)"}`,
+    "Current parameters:",
+    JSON.stringify(
+      {
+        sort: params.sort ?? null,
+        statsPeriod: params.statsPeriod ?? null,
+      },
+      null,
+      2,
+    ),
+  ].join("\n");
+}
 
 export default defineTool({
   name: "search_issue_events",
@@ -23,8 +46,7 @@ export default defineTool({
   description: [
     "Search and filter events within a specific issue.",
     "",
-    "Provide `naturalLanguageQuery` to let an embedded agent determine the correct filters,",
-    "or use `query` and `sort` directly with Sentry search syntax.",
+    "Provide `query` as natural language or Sentry event search syntax. When an embedded agent is configured, it fixes filters, fields, sort, and time range before running.",
     "",
     "The tool automatically constrains results to the specified issue.",
     "",
@@ -37,7 +59,7 @@ export default defineTool({
     "For cross-issue searches use search_issues. For single issue or event details use get_sentry_resource.",
     "",
     "<examples>",
-    "search_issue_events(issueId='MCP-41', organizationSlug='my-org', naturalLanguageQuery='from last hour')",
+    "search_issue_events(issueId='MCP-41', organizationSlug='my-org', query='from last hour')",
     "search_issue_events(issueId='MCP-41', organizationSlug='my-org', query='environment:production')",
     "search_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', statsPeriod='7d')",
     "</examples>",
@@ -63,23 +85,12 @@ export default defineTool({
         "Full Sentry issue URL (e.g., 'https://sentry.io/organizations/my-org/issues/123/'). Includes both organization and issue ID.",
       ),
 
-    // Natural language query for filtering (optional)
-    naturalLanguageQuery: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe(
-        "Natural language description of what events to find within this issue. When provided, an embedded agent determines the correct filters, fields, sort, and time range.",
-      ),
-
-    // Direct Sentry syntax parameters
     query: z
       .string()
       .trim()
       .optional()
       .describe(
-        "Sentry event search query syntax for filtering within the issue. Used when naturalLanguageQuery is not provided.",
+        "Natural language or Sentry event search query syntax for filtering within the issue.",
       ),
     sort: z
       .string()
@@ -90,9 +101,7 @@ export default defineTool({
     statsPeriod: z
       .string()
       .optional()
-      .describe(
-        "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided.",
-      ),
+      .describe("Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."),
 
     // Optional context parameters
     projectSlug: ParamProjectSlug.nullable()
@@ -115,7 +124,7 @@ export default defineTool({
       .boolean()
       .default(false)
       .describe(
-        "Include explanation of how the query was translated (only applies with naturalLanguageQuery)",
+        "Include explanation of how the query was translated or repaired",
       ),
   },
   annotations: {
@@ -167,17 +176,14 @@ export default defineTool({
     let timeParams: { statsPeriod?: string; start?: string; end?: string };
     let explanation: string | undefined;
 
-    if (params.naturalLanguageQuery) {
-      // NL mode: use embedded agent to determine filters
-      if (!hasAgentProvider()) {
-        throw new ConfigurationError(
-          "Natural language search requires an AI provider (OPENAI_API_KEY or ANTHROPIC_API_KEY). " +
-            "Use the 'query' parameter with Sentry search syntax instead.",
-        );
-      }
-
+    if (hasAgentProvider()) {
+      // Agent mode: repair either natural language or already-structured params.
       const agentResult = await searchIssueEventsAgent({
-        query: params.naturalLanguageQuery,
+        query: buildIssueEventSearchRepairPrompt({
+          query: params.query,
+          sort: params.sort,
+          statsPeriod: params.statsPeriod,
+        }),
         organizationSlug,
         apiService,
         projectId,
@@ -254,13 +260,13 @@ export default defineTool({
       );
     }
 
-    const naturalLanguageContext = params.naturalLanguageQuery
-      ? `Events in issue ${issueId}: ${params.naturalLanguageQuery}`
+    const naturalLanguageContext = params.query
+      ? `Events in issue ${issueId}: ${params.query}`
       : `Events in issue ${issueId}`;
 
     return formatErrorResults({
       eventData: eventsResponse,
-      naturalLanguageQuery: naturalLanguageContext,
+      inputQuery: naturalLanguageContext,
       includeExplanation: params.includeExplanation,
       apiService,
       organizationSlug,

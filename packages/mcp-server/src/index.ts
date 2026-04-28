@@ -228,9 +228,7 @@ async function main() {
       console.warn(
         "Warning: No LLM API key found (OPENAI_API_KEY or ANTHROPIC_API_KEY).",
       );
-      console.warn(
-        "The naturalLanguageQuery feature and use_sentry tool will be unavailable.",
-      );
+      console.warn("Agent-assisted search and use_sentry will be unavailable.");
       console.warn(
         "Search tools still work with direct Sentry query syntax via the 'query' parameter.",
       );

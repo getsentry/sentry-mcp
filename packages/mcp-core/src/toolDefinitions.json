@@ -772,7 +772,7 @@
   },
   {
     "name": "search_events",
-    "description": "Search Sentry events and replays. This is the ONLY tool for counts/statistics on event datasets.\n\nProvide `naturalLanguageQuery` to let an embedded agent determine dataset, query, fields, and sort,\nor provide these directly with Sentry search syntax.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'total tokens'\n2. Individual events with timestamps: 'error logs from last hour'\n\nDatasets:\n- errors: Exception/crash events with stack traces, usually grouped into issues\n- logs: Application log entries, including error-severity log messages\n- spans: Raw trace/span events for performance, AI/LLM calls, requests, and operations\n- metrics: Metric rows and aggregates, including counters, gauges, distributions, and metric values\n- profiles: Transaction and continuous profile results, profile IDs, and profiled transactions\n- replays: Session replay results such as rage clicks, dead clicks, visited pages, and replay users\nIf the user says logs, log messages, error logs, or warning logs, choose logs instead of errors.\n\nReplay searches on this tool return replay lists only. Replay count()/avg()/sum() aggregations are not supported.\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', naturalLanguageQuery='how many errors today')\nsearch_events(organizationSlug='my-org', dataset='errors', query='level:error')\nsearch_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\nsearch_events(organizationSlug='my-org', dataset='spans', query='span.op:db', sort='-span.duration')\nsearch_events(organizationSlug='my-org', dataset='replays', query='count_errors:>0', sort='-count_errors')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
+    "description": "Search Sentry events and replays. Use for event counts/statistics.\n\n`query` can be natural language or Sentry search syntax. With an agent configured, it fixes dataset, query, fields, and sort before running.\n\nSupports TWO query types:\n1. AGGREGATIONS (counts, sums, averages): 'how many errors', 'total tokens'\n2. Individual events with timestamps: 'error logs from last hour'\n\nDatasets:\n- errors: Exception/crash events with stack traces, usually grouped into issues\n- logs: Application log entries, including error-severity log messages\n- spans: Raw trace/span events for performance, AI/LLM calls, requests, and operations\n- metrics: Metric rows and aggregates: counters, gauges, distributions, values\n- profiles: Transaction/continuous profile results, profile IDs, profiled transactions\n- replays: Session replay results: rage clicks, dead clicks, visited pages, replay users\nIf the user says logs, log messages, error logs, or warning logs, choose logs instead of errors.\n\nReplay searches return replay lists only; replay count()/avg()/sum() are not supported.\n\nDO NOT USE for grouped issue lists → use search_issues\n\n<examples>\nsearch_events(organizationSlug='my-org', query='how many errors today')\nsearch_events(organizationSlug='my-org', dataset='errors', query='level:error')\nsearch_events(organizationSlug='my-org', dataset='errors', fields=['issue', 'count()'], sort='-count()')\nsearch_events(organizationSlug='my-org', dataset='spans', query='span.op:db', sort='-span.duration')\nsearch_events(organizationSlug='my-org', dataset='replays', query='count_errors:>0', sort='-count_errors')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- Use fields with aggregate functions like count(), avg(), sum() for statistics\n- Sort by -count() for most common, -timestamp for newest\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -780,19 +780,14 @@
           "type": "string",
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
-        "naturalLanguageQuery": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Natural language description of what you want to search for. When provided, an embedded agent determines the dataset, query, fields, and sort."
-        },
         "dataset": {
           "type": "string",
           "enum": ["spans", "errors", "logs", "metrics", "profiles", "replays"],
-          "description": "Dataset to query when naturalLanguageQuery is not provided: errors, logs, spans, metrics, profiles, or replays."
+          "description": "Initial dataset hint: errors, logs, spans, metrics, profiles, or replays. The agent may correct this when configured."
         },
         "query": {
           "type": "string",
-          "description": "Sentry event search query syntax. Used when naturalLanguageQuery is not provided."
+          "description": "Natural language or Sentry event search query syntax."
         },
         "fields": {
           "anyOf": [
@@ -858,7 +853,7 @@
         },
         "statsPeriod": {
           "type": "string",
-          "description": "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided."
+          "description": "Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."
         },
         "regionUrl": {
           "anyOf": [
@@ -883,7 +878,7 @@
         "includeExplanation": {
           "type": "boolean",
           "default": false,
-          "description": "Include explanation of how the query was translated (only applies with naturalLanguageQuery)"
+          "description": "Include explanation of how the query was translated or repaired"
         }
       },
       "required": ["organizationSlug"],
@@ -894,7 +889,7 @@
   },
   {
     "name": "search_issue_events",
-    "description": "Search and filter events within a specific issue.\n\nProvide `naturalLanguageQuery` to let an embedded agent determine the correct filters,\nor use `query` and `sort` directly with Sentry search syntax.\n\nThe tool automatically constrains results to the specified issue.\n\nCommon Query Filters:\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n- user.email:alice@example.com - Filter by user\n- trace:TRACE_ID - Filter by trace ID\n\nFor cross-issue searches use search_issues. For single issue or event details use get_sentry_resource.\n\n<examples>\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', naturalLanguageQuery='from last hour')\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='environment:production')\nsearch_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', statsPeriod='7d')\n</examples>",
+    "description": "Search and filter events within a specific issue.\n\nProvide `query` as natural language or Sentry event search syntax. When an embedded agent is configured, it fixes filters, fields, sort, and time range before running.\n\nThe tool automatically constrains results to the specified issue.\n\nCommon Query Filters:\n- environment:production - Filter by environment\n- release:1.0.0 - Filter by release version\n- user.email:alice@example.com - Filter by user\n- trace:TRACE_ID - Filter by trace ID\n\nFor cross-issue searches use search_issues. For single issue or event details use get_sentry_resource.\n\n<examples>\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='from last hour')\nsearch_issue_events(issueId='MCP-41', organizationSlug='my-org', query='environment:production')\nsearch_issue_events(issueUrl='https://sentry.io/.../issues/123/', query='release:v1.0.0', statsPeriod='7d')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -920,14 +915,9 @@
           "format": "uri",
           "description": "Full Sentry issue URL (e.g., 'https://sentry.io/organizations/my-org/issues/123/'). Includes both organization and issue ID."
         },
-        "naturalLanguageQuery": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Natural language description of what events to find within this issue. When provided, an embedded agent determines the correct filters, fields, sort, and time range."
-        },
         "query": {
           "type": "string",
-          "description": "Sentry event search query syntax for filtering within the issue. Used when naturalLanguageQuery is not provided."
+          "description": "Natural language or Sentry event search query syntax for filtering within the issue."
         },
         "sort": {
           "type": "string",
@@ -935,7 +925,7 @@
         },
         "statsPeriod": {
           "type": "string",
-          "description": "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided."
+          "description": "Initial time period hint: 1h, 24h, 7d, 14d, 30d, etc."
         },
         "projectSlug": {
           "anyOf": [
@@ -973,7 +963,7 @@
         "includeExplanation": {
           "type": "boolean",
           "default": false,
-          "description": "Include explanation of how the query was translated (only applies with naturalLanguageQuery)"
+          "description": "Include explanation of how the query was translated or repaired"
         }
       },
       "additionalProperties": false,
@@ -983,7 +973,7 @@
   },
   {
     "name": "search_issues",
-    "description": "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.\n\nProvide `naturalLanguageQuery` to let an embedded agent determine the correct query and sort params,\nor use `query` and `sort` directly with Sentry search syntax.\n\nReturns grouped issues with metadata like title, status, and user count.\n\nCommon Query Syntax:\n- is:unresolved / is:resolved / is:ignored\n- level:error / level:warning\n- firstSeen:-24h / lastSeen:-7d\n- assigned:me / assignedOrSuggested:me\n- issueCategory:feedback\n- environment:production\n- userCount:>100\n\nDO NOT USE FOR COUNTS/AGGREGATIONS → use search_events\nDO NOT USE FOR individual events with timestamps → use search_events\nDO NOT USE FOR details about a specific issue → use get_sentry_resource\n\n<examples>\nsearch_issues(organizationSlug='my-org', naturalLanguageQuery='critical bugs from last week')\nsearch_issues(organizationSlug='my-org', query='is:unresolved is:unassigned', sort='freq')\nsearch_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', projectSlugOrId='my-project')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
+    "description": "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.\n\nProvide `query` as natural language or Sentry issue search syntax. When an embedded agent is configured, it fixes query and sort before running.\n\nReturns grouped issues with metadata like title, status, and user count.\n\nCommon Query Syntax:\n- is:unresolved / is:resolved / is:ignored\n- level:error / level:warning\n- firstSeen:-24h / lastSeen:-7d\n- assigned:me / assignedOrSuggested:me\n- issueCategory:feedback\n- environment:production\n- userCount:>100\n\nDO NOT USE FOR COUNTS/AGGREGATIONS → use search_events\nDO NOT USE FOR individual events with timestamps → use search_events\nDO NOT USE FOR details about a specific issue → use get_sentry_resource\n\n<examples>\nsearch_issues(organizationSlug='my-org', query='critical bugs from last week')\nsearch_issues(organizationSlug='my-org', query='is:unresolved is:unassigned', sort='freq')\nsearch_issues(organizationSlug='my-org', query='level:error firstSeen:-24h', projectSlugOrId='my-project')\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlugOrId>.\n- Parse org/project notation directly without calling find_organizations or find_projects.\n- The projectSlugOrId parameter accepts both project slugs (e.g., 'my-project') and numeric IDs (e.g., '123456').\n</hints>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -991,15 +981,10 @@
           "type": "string",
           "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
         },
-        "naturalLanguageQuery": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Natural language description of issues to search for. When provided, an embedded agent translates this into the correct query and sort params."
-        },
         "query": {
           "type": "string",
           "default": "is:unresolved",
-          "description": "Sentry issue search query syntax. Used when naturalLanguageQuery is not provided."
+          "description": "Natural language or Sentry issue search query syntax."
         },
         "sort": {
           "type": "string",
@@ -1042,7 +1027,7 @@
         "includeExplanation": {
           "type": "boolean",
           "default": false,
-          "description": "Include explanation of how the query was translated (only applies with naturalLanguageQuery)"
+          "description": "Include explanation of how the query was translated or repaired"
         }
       },
       "required": ["organizationSlug"],

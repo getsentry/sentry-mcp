@@ -294,7 +294,7 @@ Some tools (`search_events` and `search_issues`) embed AI agents to handle compl
 // Tool handler delegates to embedded agent
 async handler(params, context) {
   // 1. Embedded agent translates natural language
-  const translated = await translateQuery(params.naturalLanguageQuery, ...);
+  const translated = await translateQuery(params.query, ...);
   
   // 2. Tool executes the translated query
   const results = await apiService.searchEvents(translated.query, ...);
