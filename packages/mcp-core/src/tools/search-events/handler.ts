@@ -281,11 +281,18 @@ export default defineTool({
         );
       }
 
-      const replayTimeParams = {
-        statsPeriod: timeParams.statsPeriod ?? DEFAULT_REPLAY_STATS_PERIOD,
-        start: timeParams.start,
-        end: timeParams.end,
-      };
+      const replayTimeParams: {
+        statsPeriod?: string;
+        start?: string;
+        end?: string;
+      } = { ...timeParams };
+      if (
+        !replayTimeParams.statsPeriod &&
+        !replayTimeParams.start &&
+        !replayTimeParams.end
+      ) {
+        replayTimeParams.statsPeriod = DEFAULT_REPLAY_STATS_PERIOD;
+      }
 
       const replays = await apiService.searchReplays({
         organizationSlug,

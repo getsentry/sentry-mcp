@@ -752,6 +752,61 @@ describe("search_events", () => {
     expect(result).toContain("2 errors");
   });
 
+  it("should not add default statsPeriod to replay absolute time ranges", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "replays",
+        "url:*checkout*",
+        [],
+        undefined,
+        "-started_at",
+        {
+          start: "2025-01-15T00:00:00Z",
+          end: "2025-01-16T00:00:00Z",
+        },
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/replays/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("query")).toBe("url:*checkout*");
+          expect(url.searchParams.get("sort")).toBe("-started_at");
+          expect(url.searchParams.get("start")).toBe("2025-01-15T00:00:00Z");
+          expect(url.searchParams.get("end")).toBe("2025-01-16T00:00:00Z");
+          expect(url.searchParams.has("statsPeriod")).toBe(false);
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "checkout replays yesterday",
+        limit: 10,
+        includeExplanation: true,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).not.toContain("statsPeriod=14d");
+    expect(result).toContain("2025-01-15");
+    expect(result).toContain("2025-01-16");
+  });
+
   it("should handle errors dataset queries", async () => {
     // Mock AI response for errors dataset
     mockGenerateText.mockResolvedValueOnce(
