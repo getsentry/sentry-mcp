@@ -80,10 +80,6 @@ function finalizeResponse(
 //      - Public metadata endpoints → restrictive read-only CORS (`*`, GET only)
 //      - Everything else → strip all CORS headers the library added
 
-// Sentry tag values are truncated server-side to 200 chars; do it here so
-// the value the Sentry UI shows matches what we put on the scope.
-const USER_AGENT_TAG_MAX_LENGTH = 200;
-
 const wrappedOAuthProvider = {
   fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
     const url = new URL(request.url);
@@ -94,10 +90,7 @@ const wrappedOAuthProvider = {
     // aren't tag-indexed.
     const userAgent = request.headers.get("user-agent");
     if (userAgent) {
-      Sentry.setTag(
-        "user_agent",
-        userAgent.slice(0, USER_AGENT_TAG_MAX_LENGTH),
-      );
+      Sentry.setTag("user_agent", userAgent);
     }
 
     // --- Phase 1: Intercept preflight before the library can respond ---
