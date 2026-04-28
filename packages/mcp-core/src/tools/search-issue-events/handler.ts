@@ -77,19 +77,19 @@ export default defineTool({
     query: z
       .string()
       .trim()
-      .default("")
+      .optional()
       .describe(
         "Sentry event search query syntax for filtering within the issue. Used when naturalLanguageQuery is not provided.",
       ),
     sort: z
       .string()
-      .default("-timestamp")
+      .optional()
       .describe(
         "Sort field (prefix with - for descending). Default: -timestamp",
       ),
     statsPeriod: z
       .string()
-      .default("14d")
+      .optional()
       .describe(
         "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided.",
       ),
@@ -204,10 +204,10 @@ export default defineTool({
         : { statsPeriod: "14d" };
     } else {
       // Direct mode: use provided params as-is
-      query = params.query;
+      query = params.query ?? "";
       fields = RECOMMENDED_FIELDS;
-      sortParam = params.sort;
-      timeParams = { statsPeriod: params.statsPeriod };
+      sortParam = params.sort ?? "-timestamp";
+      timeParams = { statsPeriod: params.statsPeriod ?? "14d" };
     }
 
     // Execute search using issue-specific endpoint

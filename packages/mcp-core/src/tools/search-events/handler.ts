@@ -93,21 +93,21 @@ export default defineTool({
       ),
     dataset: z
       .enum(SEARCH_EVENTS_DATASETS)
-      .default("errors")
+      .optional()
       .describe(
         "Dataset to query when naturalLanguageQuery is not provided: errors, logs, spans, metrics, profiles, or replays.",
       ),
     query: z
       .string()
       .trim()
-      .default("")
+      .optional()
       .describe(
         "Sentry event search query syntax. Used when naturalLanguageQuery is not provided.",
       ),
     fields: z
       .array(z.string())
       .nullable()
-      .default(null)
+      .optional()
       .describe(
         "Fields to return for event datasets. If not specified, uses sensible defaults. Include aggregate functions like count(), avg() for statistics. Leave null for dataset='replays'.",
       ),
@@ -115,7 +115,7 @@ export default defineTool({
       .string()
       .trim()
       .nullable()
-      .default(null)
+      .optional()
       .describe(
         "Sort field (prefix with - for descending). If omitted, event datasets default to -timestamp and replays default to -started_at. Use -count() for event aggregations. For dataset='replays', use replay sorts like -started_at or -count_errors.",
       ),
@@ -126,13 +126,13 @@ export default defineTool({
         z.array(z.string().trim().min(1)).min(1),
       ])
       .nullable()
-      .default(null)
+      .optional()
       .describe(
         "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead.",
       ),
     statsPeriod: z
       .string()
-      .default("14d")
+      .optional()
       .describe(
         "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided.",
       ),
@@ -163,7 +163,13 @@ export default defineTool({
     setTag("organization.slug", organizationSlug);
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
-    if (!params.naturalLanguageQuery && params.dataset !== "replays" && params.environment) {
+    const inputDataset = params.dataset ?? "errors";
+
+    if (
+      !params.naturalLanguageQuery &&
+      inputDataset !== "replays" &&
+      params.environment
+    ) {
       throw new UserInputError(
         "The `environment` parameter is only supported for dataset='replays'. For other datasets, include environment filtering in the query string instead.",
       );
@@ -184,11 +190,7 @@ export default defineTool({
     let sortParam: string;
     let timeParams: { statsPeriod?: string; start?: string; end?: string };
     let explanation: string | undefined;
-    let environment:
-      | string
-      | string[]
-      | null
-      | undefined = params.environment;
+    let environment: string | string[] | null | undefined = params.environment;
 
     if (params.naturalLanguageQuery) {
       if (!hasAgentProvider()) {
@@ -240,10 +242,10 @@ export default defineTool({
             : RECOMMENDED_FIELDS[normalizeEventsDataset(dataset)].basic;
       }
     } else {
-      dataset = params.dataset;
-      sentryQuery = params.query;
+      dataset = inputDataset;
+      sentryQuery = params.query ?? "";
       sortParam = params.sort || DEFAULT_EVENTS_SORT;
-      timeParams = { statsPeriod: params.statsPeriod };
+      timeParams = { statsPeriod: params.statsPeriod ?? "14d" };
       fields =
         dataset === "replays"
           ? []

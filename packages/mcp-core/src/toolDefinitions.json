@@ -788,12 +788,10 @@
         "dataset": {
           "type": "string",
           "enum": ["spans", "errors", "logs", "metrics", "profiles", "replays"],
-          "default": "errors",
           "description": "Dataset to query when naturalLanguageQuery is not provided: errors, logs, spans, metrics, profiles, or replays."
         },
         "query": {
           "type": "string",
-          "default": "",
           "description": "Sentry event search query syntax. Used when naturalLanguageQuery is not provided."
         },
         "fields": {
@@ -808,7 +806,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Fields to return for event datasets. If not specified, uses sensible defaults. Include aggregate functions like count(), avg() for statistics. Leave null for dataset='replays'."
         },
         "sort": {
@@ -820,7 +817,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Sort field (prefix with - for descending). If omitted, event datasets default to -timestamp and replays default to -started_at. Use -count() for event aggregations. For dataset='replays', use replay sorts like -started_at or -count_errors."
         },
         "projectSlug": {
@@ -858,12 +854,10 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional environment filter for dataset='replays'. Use a string for one environment or an array for multiple. For other datasets, filter environment in the query string instead."
         },
         "statsPeriod": {
           "type": "string",
-          "default": "14d",
           "description": "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided."
         },
         "regionUrl": {
@@ -933,17 +927,14 @@
         },
         "query": {
           "type": "string",
-          "default": "",
           "description": "Sentry event search query syntax for filtering within the issue. Used when naturalLanguageQuery is not provided."
         },
         "sort": {
           "type": "string",
-          "default": "-timestamp",
           "description": "Sort field (prefix with - for descending). Default: -timestamp"
         },
         "statsPeriod": {
           "type": "string",
-          "default": "14d",
           "description": "Time period: 1h, 24h, 7d, 14d, 30d, etc. Used when naturalLanguageQuery is not provided."
         },
         "projectSlug": {
