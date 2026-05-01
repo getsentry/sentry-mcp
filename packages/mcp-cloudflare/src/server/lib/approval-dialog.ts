@@ -200,6 +200,10 @@ export interface ApprovalDialogOptions {
     projectSlug: string | null;
   } | null;
   /**
+   * The specific redirect URI selected for this authorization request.
+   */
+  redirectUri?: string | null;
+  /**
    * Arbitrary state data to pass through the approval flow
    * Will be encoded in the form and returned when approval is complete
    */
@@ -275,7 +279,7 @@ export async function renderApprovalDialog(
   request: Request,
   options: ApprovalDialogOptions,
 ): Promise<Response> {
-  const { client, server, scope, state, cookieSecret } = options;
+  const { client, server, scope, redirectUri, state, cookieSecret } = options;
 
   // Use static skill definitions bundled at build time
   const skills: SkillDefinition[] = skillDefinitions as SkillDefinition[];
@@ -317,25 +321,23 @@ export async function renderApprovalDialog(
     ? sanitizeHtml(sanitizeHrefUrl(client.tosUri))
     : "";
 
-  // Get redirect URIs
-  const redirectUris =
-    client?.redirectUris && client.redirectUris.length > 0
-      ? client.redirectUris.map((uri) => sanitizeHtml(uri))
-      : [];
+  const redirectWarningUri =
+    typeof redirectUri === "string" && redirectUri.length > 0
+      ? sanitizeHtml(redirectUri)
+      : client?.redirectUris?.length === 1
+        ? sanitizeHtml(client.redirectUris[0])
+        : null;
 
-  // Generate redirect URI warnings
-  const redirectWarningsHtml = redirectUris
-    .map((uri) => {
-      return `
+  const redirectWarningsHtml = redirectWarningUri
+    ? `
         <div class="redirect-warning">
-          <div class="redirect-uri-display">${uri}</div>
+          <div class="redirect-uri-display">${redirectWarningUri}</div>
           <div class="redirect-warning-text">
             After approval, you will be redirected to this URL. Only approve if you recognize and trust this destination.
           </div>
         </div>
-      `;
-    })
-    .join("");
+      `
+    : "";
 
   const scopeHtml = scope
     ? `
