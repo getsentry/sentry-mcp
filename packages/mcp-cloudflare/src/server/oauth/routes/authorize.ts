@@ -165,6 +165,7 @@ export default new Hono<{ Bindings: Env }>()
         name: "Sentry MCP",
       },
       scope: approvalScope,
+      redirectUri: oauthReqInfoWithResource.redirectUri,
       state: { oauthReqInfo: oauthReqInfoWithResource },
       cookieSecret: c.env.COOKIE_SECRET,
     });

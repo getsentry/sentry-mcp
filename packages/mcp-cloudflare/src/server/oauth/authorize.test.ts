@@ -58,6 +58,39 @@ describe("oauth authorize routes", () => {
       expect(html).toContain("<form");
       expect(html).toContain('name="state"');
     });
+
+    it("renders only the requested redirect URI when the client has multiple registered URIs", async () => {
+      mockOAuthProvider.parseAuthRequest.mockResolvedValueOnce({
+        clientId: "test-client",
+        redirectUri: "https://example.com/requested-callback",
+        scope: ["read"],
+        state: "orig",
+      });
+      mockOAuthProvider.lookupClient.mockResolvedValueOnce({
+        clientId: "test-client",
+        clientName: "Test Client",
+        redirectUris: [
+          "https://example.com/requested-callback",
+          "https://example.com/another-callback",
+          "https://example.com/fallback-callback",
+        ],
+        tokenEndpointAuthMethod: "client_secret_basic",
+      });
+
+      const request = new Request("http://localhost/oauth/authorize", {
+        method: "GET",
+      });
+      const response = await app.fetch(request, testEnv as Env);
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain("https://example.com/requested-callback");
+      expect(html).not.toContain("https://example.com/another-callback");
+      expect(html).not.toContain("https://example.com/fallback-callback");
+      expect(
+        html.match(/After approval, you will be redirected to this URL\./g),
+      ).toHaveLength(1);
+    });
   });
 
   describe("POST /oauth/authorize", () => {
