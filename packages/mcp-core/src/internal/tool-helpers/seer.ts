@@ -130,6 +130,10 @@ export function getOutputForAutofixStep(
         body += `${entry.code_snippet_and_analysis}\n\n`;
       }
     }
+    if (!body.trim()) {
+      return heading;
+    }
+
     return wrapSeerAnalysisOutput({
       output: body,
       runId: options.runId,
@@ -146,6 +150,10 @@ export function getOutputForAutofixStep(
       if (entry.code_snippet_and_analysis) {
         body += `${entry.code_snippet_and_analysis}\n\n`;
       }
+    }
+
+    if (!body.trim()) {
+      return heading;
     }
 
     if (typedStep.status === "FAILED") {
