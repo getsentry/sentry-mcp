@@ -81,11 +81,17 @@ function wrapSeerAnalysisOutput({
   output,
   runId,
   step,
+  includeProvenanceTags,
 }: {
   output: string;
   runId?: number;
   step: string;
+  includeProvenanceTags: boolean;
 }): string {
+  if (!includeProvenanceTags) {
+    return `${output.trimEnd()}\n`;
+  }
+
   const attrs = [
     runId === undefined ? null : `run_id="${escapeXmlAttribute(runId)}"`,
     `step="${escapeXmlAttribute(step)}"`,
@@ -96,8 +102,9 @@ function wrapSeerAnalysisOutput({
 
 export function getOutputForAutofixStep(
   step: z.infer<typeof AutofixRunStepSchema>,
-  options: { runId?: number } = {},
+  options: { runId?: number; includeProvenanceTags?: boolean } = {},
 ) {
+  const includeProvenanceTags = options.includeProvenanceTags ?? true;
   const heading = `## ${step.title}\n\n`;
 
   if (step.status === "FAILED") {
@@ -127,6 +134,7 @@ export function getOutputForAutofixStep(
       output: body,
       runId: options.runId,
       step: step.key,
+      includeProvenanceTags,
     });
   }
 
@@ -150,6 +158,7 @@ export function getOutputForAutofixStep(
       output: body,
       runId: options.runId,
       step: step.key,
+      includeProvenanceTags,
     });
   }
 
@@ -172,6 +181,7 @@ export function getOutputForAutofixStep(
       output: body,
       runId: options.runId,
       step: step.key,
+      includeProvenanceTags,
     });
   }
 

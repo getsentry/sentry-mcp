@@ -1654,7 +1654,9 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
         parts.push(solutionDescription.trim());
       } else {
         // Fallback to extracting from output if no description
-        const solutionOutput = getOutputForAutofixStep(solutionStep);
+        const solutionOutput = getOutputForAutofixStep(solutionStep, {
+          includeProvenanceTags: false,
+        });
         const lines = solutionOutput.split("\n");
         const firstParagraph = lines.find(
           (line) =>
