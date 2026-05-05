@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startMockServer } from "@sentry/mcp-server-mocks";
-import { afterEach } from "vitest";
+import { afterEach, beforeEach } from "vitest";
 import type { ServerContext } from "./types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +31,12 @@ type ManagedEnvKey = (typeof MANAGED_ENV_KEYS)[number];
 const originalEnv = new Map<ManagedEnvKey, string | undefined>(
   MANAGED_ENV_KEYS.map((key) => [key, process.env[key]]),
 );
+
+beforeEach(() => {
+  for (const key of MANAGED_ENV_KEYS) {
+    Reflect.deleteProperty(process.env, key);
+  }
+});
 
 afterEach(() => {
   for (const key of MANAGED_ENV_KEYS) {

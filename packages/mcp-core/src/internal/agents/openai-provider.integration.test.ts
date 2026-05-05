@@ -12,7 +12,7 @@
  * - #623: structuredOutputs causing validation errors with nullable fields
  * - 405 errors from unsupported parameters (reasoningEffort)
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { searchIssuesAgent } from "../../tools/search-issues/agent";
@@ -45,14 +45,21 @@ const mswServer = setupServer(
 );
 
 describe("OpenAI Provider Integration", () => {
-  const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY);
+  const openAIKey = process.env.OPENAI_API_KEY;
+  const hasOpenAIKey = Boolean(openAIKey);
 
   beforeAll(() => {
     if (hasOpenAIKey) {
+      mswServer.listen({ onUnhandledRequest: "bypass" });
+    }
+  });
+
+  beforeEach(() => {
+    if (openAIKey) {
+      process.env.OPENAI_API_KEY = openAIKey;
       // Explicitly set OpenAI provider to ensure we test OpenAI even if
       // ANTHROPIC_API_KEY is also set (auto-detect prefers Anthropic)
       setAgentProvider("openai");
-      mswServer.listen({ onUnhandledRequest: "bypass" });
     }
   });
 

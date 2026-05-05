@@ -48,8 +48,6 @@ function buildTraceSpan({
 describe("get_trace_details", () => {
   beforeEach(() => {
     process.env.OPENAI_API_KEY = "test-key";
-    Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
-    Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
   });
 
   it("serializes with valid trace ID", async () => {
@@ -163,9 +161,9 @@ describe("get_trace_details", () => {
   });
 
   it("falls back to direct search_events guidance when agent search is unavailable", async () => {
-    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
-    Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
-    Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
+    process.env.OPENAI_API_KEY = "";
+    process.env.ANTHROPIC_API_KEY = "";
+    process.env.EMBEDDED_AGENT_PROVIDER = "";
 
     const result = await getTraceDetails.handler(
       {

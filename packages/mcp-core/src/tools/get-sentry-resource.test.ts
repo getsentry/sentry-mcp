@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   mswServer,
@@ -50,12 +50,6 @@ function callHandler(params: {
 }
 
 describe("get_sentry_resource", () => {
-  beforeEach(() => {
-    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
-    Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
-    Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
-  });
-
   // ─── URL mode: issue URLs ──────────────────────────────────────────────────
   describe("URL mode — issue URLs", () => {
     it("resolves issue from subdomain URL (my-org.sentry.io)", async () => {

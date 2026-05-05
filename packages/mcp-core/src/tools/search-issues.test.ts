@@ -67,8 +67,6 @@ describe("search_issues", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = "test-key";
-    // Resolve provider conflict when ANTHROPIC_API_KEY is also set in the env
-    Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
     mockGenerateText.mockResolvedValue(mockAIResponse());
   });
 
