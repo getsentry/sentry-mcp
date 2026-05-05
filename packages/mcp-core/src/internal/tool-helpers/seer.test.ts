@@ -109,5 +109,33 @@ describe("seer-utils", () => {
 
       expect(output).toBe("## Proposed Solution\n\n");
     });
+
+    it("does not stringify null solution descriptions", () => {
+      const output = getOutputForAutofixStep({
+        type: "solution",
+        key: "solution",
+        index: 0,
+        status: "COMPLETED",
+        title: "Proposed Solution",
+        output_stream: null,
+        progress: [],
+        description: null,
+        solution: [
+          {
+            code_snippet_and_analysis:
+              "Use the canonical issue identifier before retrying.",
+            is_active: true,
+            is_most_important_event: true,
+            relevant_code_file: null,
+            timeline_item_type: "internal_code",
+            title: "Normalize the issue identifier",
+          },
+        ],
+      });
+
+      expect(output).toContain("Normalize the issue identifier");
+      expect(output).not.toContain("null");
+      expect(output).not.toContain("undefined");
+    });
   });
 });

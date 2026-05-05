@@ -144,7 +144,10 @@ export function getOutputForAutofixStep(
 
   if (step.type === "solution") {
     const typedStep = step as z.infer<typeof AutofixRunStepSolutionSchema>;
-    let body = `${typedStep.description}\n\n`;
+    let body =
+      typeof typedStep.description === "string"
+        ? `${typedStep.description}\n\n`
+        : "";
     for (const entry of typedStep.solution) {
       body += `**${entry.title}**\n`;
       if (entry.code_snippet_and_analysis) {
