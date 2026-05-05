@@ -1680,15 +1680,16 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ReplayList> {
+    const timeParams = new URLSearchParams();
+    this.applyTimeParams(timeParams, statsPeriod, start, end);
+
     // The SDK's field type is a strict enum, but the API accepts arbitrary strings.
     // We also need extra query params (project as string) not in the SDK type.
     const sdkQuery: Record<string, unknown> = {
       query,
       per_page: limit,
       sort,
-      statsPeriod,
-      start,
-      end,
+      ...Object.fromEntries(timeParams),
       environment: environment
         ? Array.isArray(environment)
           ? environment

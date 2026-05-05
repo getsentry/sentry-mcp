@@ -636,7 +636,7 @@ describe("search_issue_events", () => {
       http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
         const url = new URL(request.url);
         expect(url.searchParams.get("query")).toBe("environment:production");
-        // sort is not a supported query param in the SDK's listAnIssueSEvents
+        expect(url.searchParams.get("sort")).toBe("-timestamp");
         expect(url.searchParams.get("statsPeriod")).toBe("7d");
         return HttpResponse.json([
           {

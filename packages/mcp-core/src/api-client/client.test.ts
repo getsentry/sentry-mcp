@@ -482,8 +482,7 @@ describe("listOrganizations", () => {
     let callCount = 0;
     globalThis.fetch = vi.fn().mockImplementation((input: string | Request) => {
       callCount++;
-      const url =
-        typeof input === "string" ? input : (input as Request).url;
+      const url = typeof input === "string" ? input : (input as Request).url;
       if (url.includes("/users/me/regions/")) {
         return Promise.resolve(
           new Response(JSON.stringify(mockRegionsResponse), {
@@ -533,8 +532,7 @@ describe("listOrganizations", () => {
     let callCount = 0;
     globalThis.fetch = vi.fn().mockImplementation((input: string | Request) => {
       callCount++;
-      const url =
-        typeof input === "string" ? input : (input as Request).url;
+      const url = typeof input === "string" ? input : (input as Request).url;
       if (url.includes("/organizations/")) {
         return Promise.resolve(
           new Response(JSON.stringify(mockOrgs), {
@@ -565,8 +563,7 @@ describe("listOrganizations", () => {
     ];
 
     globalThis.fetch = vi.fn().mockImplementation((input: string | Request) => {
-      const url =
-        typeof input === "string" ? input : (input as Request).url;
+      const url = typeof input === "string" ? input : (input as Request).url;
       if (url.includes("/users/me/regions/")) {
         return Promise.resolve({
           ok: false,
@@ -1076,6 +1073,51 @@ describe("API query builders", () => {
       expect(url).toContain("/api/0/organizations/test-org/replays/");
       expect(url).toContain("query=count_errors%3A%3E0");
       expect(url).toContain("sort=-count_errors");
+
+      const parsedUrl = new URL(url);
+      expect(parsedUrl.searchParams.getAll("environment")).toEqual([
+        "production",
+        "staging",
+      ]);
+      expect(parsedUrl.searchParams.get("statsPeriod")).toBe("24h");
+    });
+
+    it("should reject conflicting replay time parameters", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = makeSdkMock({ data: [] });
+
+      await expect(
+        apiService.searchReplays({
+          organizationSlug: "test-org",
+          statsPeriod: "24h",
+          start: "2025-01-01T00:00:00Z",
+          end: "2025-01-02T00:00:00Z",
+        }),
+      ).rejects.toThrow("Cannot use both statsPeriod and start/end parameters");
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it("should require paired replay start and end parameters", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = makeSdkMock({ data: [] });
+
+      await expect(
+        apiService.searchReplays({
+          organizationSlug: "test-org",
+          start: "2025-01-01T00:00:00Z",
+        }),
+      ).rejects.toThrow(
+        "Both start and end parameters must be provided together",
+      );
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
   });
 
