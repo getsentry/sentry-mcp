@@ -168,7 +168,9 @@ export default defineTool({
         output += `## Analysis ${getStatusDisplayName(existingStatus)}\n\n`;
 
         for (const step of autofixState.autofix.steps) {
-          output += getOutputForAutofixStep(step);
+          output += getOutputForAutofixStep(step, {
+            runId: autofixState.autofix.run_id,
+          });
           output += "\n";
         }
 
@@ -206,7 +208,9 @@ export default defineTool({
 
         // Add all step outputs
         for (const step of autofixState.autofix.steps) {
-          output += getOutputForAutofixStep(step);
+          output += getOutputForAutofixStep(step, {
+            runId: autofixState.autofix.run_id,
+          });
           output += "\n";
         }
 
@@ -281,7 +285,9 @@ export default defineTool({
     if (autofixState.autofix) {
       output += `**Current Status**: ${getStatusDisplayName(autofixState.autofix.status)}\n\n`;
       for (const step of autofixState.autofix.steps) {
-        output += getOutputForAutofixStep(step);
+        output += getOutputForAutofixStep(step, {
+          runId: autofixState.autofix.run_id,
+        });
         output += "\n";
       }
     }

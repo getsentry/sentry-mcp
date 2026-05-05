@@ -69,64 +69,111 @@ export function getHumanInterventionGuidance(status: string): string {
   return "";
 }
 
+function escapeXmlAttribute(value: string | number): string {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function wrapSeerAnalysisOutput({
+  output,
+  runId,
+  step,
+}: {
+  output: string;
+  runId?: number;
+  step: string;
+}): string {
+  const attrs = [
+    runId === undefined ? null : `run_id="${escapeXmlAttribute(runId)}"`,
+    `step="${escapeXmlAttribute(step)}"`,
+  ].filter(Boolean);
+
+  return `<seer_analysis ${attrs.join(" ")}>\n${output.trimEnd()}\n</seer_analysis>\n`;
+}
+
 export function getOutputForAutofixStep(
   step: z.infer<typeof AutofixRunStepSchema>,
+  options: { runId?: number } = {},
 ) {
-  let output = `## ${step.title}\n\n`;
+  const heading = `## ${step.title}\n\n`;
 
   if (step.status === "FAILED") {
-    output += `**Sentry hit an error completing this step.\n\n`;
-    return output;
+    return `${heading}**Sentry hit an error completing this step.\n\n`;
   }
 
   if (step.status !== "COMPLETED") {
-    output += `**Sentry is still working on this step. Please check back in a minute.**\n\n`;
-    return output;
+    return `${heading}**Sentry is still working on this step. Please check back in a minute.**\n\n`;
   }
 
   if (step.type === "root_cause_analysis") {
     const typedStep = step as z.infer<
       typeof AutofixRunStepRootCauseAnalysisSchema
     >;
+    let body = "";
 
     for (const cause of typedStep.causes) {
       if (cause.description) {
-        output += `${cause.description}\n\n`;
+        body += `${cause.description}\n\n`;
       }
       for (const entry of cause.root_cause_reproduction) {
-        output += `**${entry.title}**\n\n`;
-        output += `${entry.code_snippet_and_analysis}\n\n`;
+        body += `**${entry.title}**\n\n`;
+        body += `${entry.code_snippet_and_analysis}\n\n`;
       }
     }
-    return output;
+    return wrapSeerAnalysisOutput({
+      output: body,
+      runId: options.runId,
+      step: step.key,
+    });
   }
 
   if (step.type === "solution") {
     const typedStep = step as z.infer<typeof AutofixRunStepSolutionSchema>;
-    output += `${typedStep.description}\n\n`;
+    let body = `${typedStep.description}\n\n`;
     for (const entry of typedStep.solution) {
-      output += `**${entry.title}**\n`;
-      output += `${entry.code_snippet_and_analysis}\n\n`;
+      body += `**${entry.title}**\n`;
+      if (entry.code_snippet_and_analysis) {
+        body += `${entry.code_snippet_and_analysis}\n\n`;
+      }
     }
 
     if (typedStep.status === "FAILED") {
-      output += `**Sentry hit an error completing this step.\n\n`;
+      body += `**Sentry hit an error completing this step.\n\n`;
     } else if (typedStep.status !== "COMPLETED") {
-      output += `**Sentry is still working on this step.**\n\n`;
+      body += `**Sentry is still working on this step.**\n\n`;
     }
 
-    return output;
+    return wrapSeerAnalysisOutput({
+      output: body,
+      runId: options.runId,
+      step: step.key,
+    });
   }
 
   const typedStep = step as z.infer<typeof AutofixRunStepDefaultSchema>;
+  let body = "";
+  let hasGeneratedOutput = false;
   if (typedStep.insights && typedStep.insights.length > 0) {
+    hasGeneratedOutput = true;
     for (const entry of typedStep.insights) {
-      output += `**${entry.insight}**\n`;
-      output += `${entry.justification}\n\n`;
+      body += `**${entry.insight}**\n`;
+      body += `${entry.justification}\n\n`;
     }
   } else if (step.output_stream) {
-    output += `${step.output_stream}\n`;
+    hasGeneratedOutput = true;
+    body += `${step.output_stream}\n`;
   }
 
-  return output;
+  if (hasGeneratedOutput) {
+    return wrapSeerAnalysisOutput({
+      output: body,
+      runId: options.runId,
+      step: step.key,
+    });
+  }
+
+  return heading;
 }
