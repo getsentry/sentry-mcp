@@ -1,34 +1,45 @@
-import { z } from "zod";
 import {
-  listYourOrganizations as sdkListYourOrganizations,
-  retrieveAnOrganization as sdkRetrieveAnOrganization,
-  listAnOrganization_sTeams as sdkListAnOrganizationSTeams,
-  createANewTeam as sdkCreateANewTeam,
-  listAnOrganization_sProjects as sdkListAnOrganizationSProjects,
-  retrieveAProject as sdkRetrieveAProject,
-  createANewProject as sdkCreateANewProject,
-  updateAProject as sdkUpdateAProject,
+  type Options,
   addATeamToAProject as sdkAddATeamToAProject,
   createANewClientKey as sdkCreateANewClientKey,
+  createANewProject as sdkCreateANewProject,
+  createANewTeam as sdkCreateANewTeam,
   listAProject_sClientKeys as sdkListAProjectSClientKeys,
-  listAnOrganization_sReleases as sdkListAnOrganizationSReleases,
-  listAnOrganization_sIssues as sdkListAnOrganizationSIssues,
-  retrieveAnIssueEvent as sdkRetrieveAnIssueEvent,
   listAnIssue_sEvents as sdkListAnIssueSEvents,
-  startSeerIssueFix as sdkStartSeerIssueFix,
-  retrieveSeerIssueFixState as sdkRetrieveSeerIssueFixState,
+  listAnOrganization_sIssues as sdkListAnOrganizationSIssues,
+  listAnOrganization_sProjects as sdkListAnOrganizationSProjects,
+  listAnOrganization_sReleases as sdkListAnOrganizationSReleases,
   listAnOrganization_sReplays as sdkListAnOrganizationSReplays,
-  retrieveAnIssue as sdkRetrieveAnIssue,
-  retrieveTagDetails as sdkRetrieveTagDetails,
-  retrieveCustomIntegrationIssueLinksForTheGivenSentryIssue as sdkRetrieveCustomIntegrationIssueLinks,
-  retrieveAReplayInstance as sdkRetrieveAReplayInstance,
-  retrieveACountOfReplaysForAGivenIssueOrTransaction as sdkRetrieveACountOfReplays,
+  listAnOrganization_sTeams as sdkListAnOrganizationSTeams,
   listRecordingSegments as sdkListRecordingSegments,
-  updateAnIssue as sdkUpdateAnIssue,
+  listYourOrganizations as sdkListYourOrganizations,
   queryExploreEventsInTableFormat as sdkQueryExploreEvents,
-  type Options,
+  retrieveACountOfReplaysForAGivenIssueOrTransaction as sdkRetrieveACountOfReplays,
+  retrieveAProject as sdkRetrieveAProject,
+  retrieveAReplayInstance as sdkRetrieveAReplayInstance,
+  retrieveAnIssue as sdkRetrieveAnIssue,
+  retrieveAnIssueEvent as sdkRetrieveAnIssueEvent,
+  retrieveAnOrganization as sdkRetrieveAnOrganization,
+  retrieveCustomIntegrationIssueLinksForTheGivenSentryIssue as sdkRetrieveCustomIntegrationIssueLinks,
+  retrieveSeerIssueFixState as sdkRetrieveSeerIssueFixState,
+  retrieveTagDetails as sdkRetrieveTagDetails,
+  startSeerIssueFix as sdkStartSeerIssueFix,
+  updateAProject as sdkUpdateAProject,
+  updateAnIssue as sdkUpdateAnIssue,
 } from "@sentry/api";
+import { z } from "zod";
+import { ConfigurationError } from "../errors";
+import { logIssue, logWarn } from "../telem/logging";
+import type { SentryProtocol } from "../types";
 import {
+  type EventsDataset,
+  isMetricsDataset,
+  isProfilesDataset,
+  normalizeEventsDataset,
+} from "../utils/events-datasets";
+import {
+  type DashboardUrlOptions,
+  type TraceMetricIdentifier,
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
   getAIConversationUrl as getAIConversationUrlUtil,
   getDashboardUrl as getDashboardUrlUtil,
@@ -43,83 +54,77 @@ import {
   getTraceMetricsExploreUrl,
   getTraceUrl as getTraceUrlUtil,
   isSentryHost,
-  type DashboardUrlOptions,
-  type TraceMetricIdentifier,
 } from "../utils/url-utils";
 import { isNumericId } from "../utils/slug-validation";
+import { USER_AGENT } from "../version";
+import { ApiNotFoundError, ApiValidationError, createApiError } from "./errors";
 import {
-  isMetricsDataset,
-  isProfilesDataset,
-  normalizeEventsDataset,
-  type EventsDataset,
-} from "../utils/events-datasets";
-import { logIssue, logWarn } from "../telem/logging";
-import {
-  OrganizationListSchema,
-  OrganizationSchema,
+  AIConversationSpanListSchema,
+  ApiErrorSchema,
+  AutofixRunSchema,
+  AutofixRunStateSchema,
+  ClientKeyListSchema,
   ClientKeySchema,
-  TeamListSchema,
-  TeamSchema,
-  ProjectListSchema,
-  ProjectRepoLinkSchema,
-  ProjectSchema,
   CommitListSchema,
+  DashboardListSchema,
+  DashboardSchema,
   DeployListSchema,
-  MonitorCheckInListSchema,
-  MonitorListSchema,
-  MonitorSchema,
-  MonitorStatsSchema,
-  RepositoryListSchema,
-  ReleaseDetailsSchema,
-  ReleaseListSchema,
+  ErrorsSearchResponseSchema,
+  EventAttachmentListSchema,
+  EventSchema,
+  ExternalIssueListSchema,
+  FlamegraphSchema,
   IssueActivityListResponseSchema,
+  IssueAlertRuleListSchema,
   IssueCommentListSchema,
   IssueCommentSchema,
   IssueListSchema,
   IssueSchema,
   IssueTagValuesSchema,
-  ExternalIssueListSchema,
-  EventSchema,
-  EventAttachmentListSchema,
-  ErrorsSearchResponseSchema,
-  SpansSearchResponseSchema,
-  TagListSchema,
-  ApiErrorSchema,
-  ClientKeyListSchema,
-  AutofixRunSchema,
-  AutofixRunStateSchema,
-  DashboardListSchema,
-  DashboardSchema,
-  TraceMetaSchema,
-  TraceSchema,
-  UserSchema,
-  UserRegionsSchema,
-  IssueAlertRuleListSchema,
   MetricAlertRuleListSchema,
   MetricAlertRuleSchema,
-  FlamegraphSchema,
+  MonitorCheckInListSchema,
+  MonitorListSchema,
+  MonitorSchema,
+  MonitorStatsSchema,
+  OrganizationListSchema,
+  OrganizationSchema,
   ProfileChunkResponseSchema,
-  TransactionProfileSchema,
+  ProjectListSchema,
+  ProjectRepoLinkSchema,
+  ProjectSchema,
+  RepositoryListSchema,
+  ReleaseDetailsSchema,
+  ReleaseListSchema,
   ReplayDetailsSchema,
-  ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
+  ReplayListResponseSchema,
   ReplayRecordingSegmentsSchema,
-  AIConversationSpanListSchema,
+  SpansSearchResponseSchema,
+  TagListSchema,
+  TraceMetaSchema,
+  TraceSchema,
+  TeamListSchema,
+  TeamSchema,
+  TransactionProfileSchema,
+  UserRegionsSchema,
+  UserSchema,
 } from "./schema";
-import { ConfigurationError } from "../errors";
-import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
-import { USER_AGENT } from "../version";
-import type { SentryProtocol } from "../types";
 import type {
+  AIConversationSpanList,
   AutofixRun,
   AutofixRunState,
   ClientKey,
   ClientKeyList,
+  CommitList,
   Dashboard,
   DashboardListItem,
+  DeployList,
   Event,
   EventAttachment,
   EventAttachmentList,
+  ExternalIssueList,
+  Flamegraph,
   Issue,
   IssueActivityList,
   IssueAlertRule,
@@ -128,33 +133,28 @@ import type {
   IssueCommentList,
   IssueList,
   IssueTagValues,
-  ExternalIssueList,
-  CommitList,
-  DeployList,
+  MetricAlertRule,
+  MetricAlertRuleList,
   Monitor,
   MonitorCheckInList,
   MonitorList,
   MonitorStats,
-  MetricAlertRule,
-  MetricAlertRuleList,
   OrganizationList,
+  ProfileChunk,
   Project,
   ProjectList,
   ReleaseDetails,
   ReleaseList,
+  ReplayDetails,
+  ReplayList,
+  ReplayRecordingSegments,
   TagList,
   Team,
   TeamList,
   Trace,
   TraceMeta,
-  User,
-  Flamegraph,
-  ProfileChunk,
   TransactionProfile,
-  ReplayDetails,
-  ReplayList,
-  ReplayRecordingSegments,
-  AIConversationSpanList,
+  User,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -474,19 +474,27 @@ export class SentryApiService {
     if (result.error !== undefined) {
       const response: Response | undefined = result.response;
       if (response) {
-        const errorDetail =
-          typeof result.error === "string"
+        // Extract detail from the error object — the SDK parses JSON
+        // response bodies, so result.error is typically { detail: "..." }.
+        const rawDetail =
+          result.error &&
+          typeof result.error === "object" &&
+          "detail" in result.error
+            ? (result.error as { detail: unknown }).detail
+            : undefined;
+        const hasUsableDetail = rawDetail !== null && rawDetail !== undefined;
+        const detail = hasUsableDetail
+          ? typeof rawDetail === "string"
+            ? rawDetail
+            : JSON.stringify(rawDetail)
+          : typeof result.error === "string"
             ? result.error
-            : result.error &&
-                typeof result.error === "object" &&
-                "detail" in result.error
-              ? String((result.error as { detail: unknown }).detail)
-              : String(result.error);
+            : JSON.stringify(result.error);
 
         throw createApiError(
-          errorDetail,
+          `${context}: ${response.status} ${response.statusText ?? "Unknown"}`,
           response.status,
-          errorDetail,
+          detail,
           result.error,
         );
       }
@@ -1454,8 +1462,11 @@ export class SentryApiService {
     if (!this.isSaas()) {
       const result = await sdkListYourOrganizations({
         ...this.getSdkConfig(opts),
-        query: { query: params?.query },
-      });
+        query: { query: params?.query, per_page: 25 } as Record<
+          string,
+          unknown
+        >,
+      } as Parameters<typeof sdkListYourOrganizations>[0]);
       const data = this.unwrapSdkResult(result, "listOrganizations");
       return OrganizationListSchema.parse(data);
     }
@@ -1479,8 +1490,11 @@ export class SentryApiService {
                 ...opts,
                 host: new URL(region.url).host,
               }),
-              query: { query: params?.query },
-            });
+              query: { query: params?.query, per_page: 25 } as Record<
+                string,
+                unknown
+              >,
+            } as Parameters<typeof sdkListYourOrganizations>[0]);
             return this.unwrapSdkResult(
               regionResult,
               "listOrganizations(region)",
@@ -1500,8 +1514,11 @@ export class SentryApiService {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
         const result = await sdkListYourOrganizations({
           ...this.getSdkConfig(opts),
-          query: { query: params?.query },
-        });
+          query: { query: params?.query, per_page: 25 } as Record<
+            string,
+            unknown
+          >,
+        } as Parameters<typeof sdkListYourOrganizations>[0]);
         const data = this.unwrapSdkResult(result, "listOrganizations");
         return OrganizationListSchema.parse(data);
       }
@@ -1544,7 +1561,11 @@ export class SentryApiService {
     const result = await sdkListAnOrganizationSTeams({
       ...this.getSdkConfig(opts),
       path: { organization_id_or_slug: organizationSlug },
-    });
+      query: {
+        per_page: 25,
+        query: params?.query,
+      } as Record<string, unknown>,
+    } as Parameters<typeof sdkListAnOrganizationSTeams>[0]);
     const data = this.unwrapSdkResult(result, "listTeams");
     return TeamListSchema.parse(data);
   }
@@ -2642,7 +2663,9 @@ export class SentryApiService {
       ...this.getSdkConfig(opts),
       path: { organization_id_or_slug: organizationSlug },
       query: sdkQuery,
-    } as Options<Parameters<typeof sdkListAnOrganizationSReplays>[0] & { url: string }>);
+    } as Options<
+      Parameters<typeof sdkListAnOrganizationSReplays>[0] & { url: string }
+    >);
     const data = this.unwrapSdkResult(result, "searchReplays");
 
     return ReplayListResponseSchema.parse(data).data;
@@ -3127,12 +3150,14 @@ export class SentryApiService {
       },
       query: {
         query,
+        per_page: limit,
+        sort,
         statsPeriod,
         start,
         end,
         full,
-      },
-    });
+      } as Record<string, unknown>,
+    } as Parameters<typeof sdkListAnIssueSEvents>[0]);
     return this.unwrapSdkResult(result, "listEventsForIssue");
   }
 
@@ -3292,10 +3317,7 @@ export class SentryApiService {
       },
       query: { download: "true" } as Record<string, unknown>,
     } as Parameters<typeof sdkListRecordingSegments>[0]);
-    const data = this.unwrapSdkResult(
-      result,
-      "getReplayRecordingSegments",
-    );
+    const data = this.unwrapSdkResult(result, "getReplayRecordingSegments");
     return ReplayRecordingSegmentsSchema.parse(data);
   }
 
