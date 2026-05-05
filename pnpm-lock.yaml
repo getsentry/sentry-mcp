@@ -421,6 +421,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.26.0
         version: 1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+      '@sentry/api':
+        specifier: ^0.133.0
+        version: 0.133.0
       '@sentry/core':
         specifier: 'catalog:'
         version: 10.54.0
@@ -2326,6 +2329,10 @@ packages:
   '@sentry-internal/replay@10.54.0':
     resolution: {integrity: sha512-B7eicNhAomJ7bGihJO7mCw7pZ8FFo/THQgGPo85VR3FaJVCCot20WxVgvhjc7IVBQVlaaxSrnlUFvA+yHjszqQ==}
     engines: {node: '>=18'}
+
+  '@sentry/api@0.133.0':
+    resolution: {integrity: sha512-flfRUm9T9xgyNEWQqCiNv8wX4QlqOt63tM8dRMbeo26zD4+xEaL4KiaEnPC/W5rXCKg/03FBJysw7rEIuhiedQ==}
+    engines: {node: '>=22'}
 
   '@sentry/babel-plugin-component-annotate@4.6.1':
     resolution: {integrity: sha512-aSIk0vgBqv7PhX6/Eov+vlI4puCE0bRXzUG5HdCsHBpAfeMkI8Hva6kSOusnzKqs8bf04hU7s3Sf0XxGTj/1AA==}
@@ -7664,6 +7671,8 @@ snapshots:
     dependencies:
       '@sentry-internal/browser-utils': 10.54.0
       '@sentry/core': 10.54.0
+
+  '@sentry/api@0.133.0': {}
 
   '@sentry/babel-plugin-component-annotate@4.6.1': {}
 
