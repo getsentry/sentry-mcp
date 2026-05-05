@@ -2,6 +2,7 @@ import { config } from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startMockServer } from "@sentry/mcp-server-mocks";
+import { afterEach } from "vitest";
 import type { ServerContext } from "./types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +16,32 @@ config({ path: path.resolve(__dirname, "../.env") });
 
 // Load root .env second (for shared defaults - won't override local or shell vars)
 config({ path: path.join(rootDir, ".env") });
+
+const MANAGED_ENV_KEYS = [
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_MODEL",
+  "EMBEDDED_AGENT_PROVIDER",
+  "OPENAI_API_KEY",
+  "OPENAI_API_VERSION",
+  "OPENAI_MODEL",
+] as const;
+
+type ManagedEnvKey = (typeof MANAGED_ENV_KEYS)[number];
+
+const originalEnv = new Map<ManagedEnvKey, string | undefined>(
+  MANAGED_ENV_KEYS.map((key) => [key, process.env[key]]),
+);
+
+afterEach(() => {
+  for (const key of MANAGED_ENV_KEYS) {
+    const value = originalEnv.get(key);
+    if (value === undefined) {
+      Reflect.deleteProperty(process.env, key);
+    } else {
+      process.env[key] = value;
+    }
+  }
+});
 
 startMockServer({ ignoreOpenAI: true });
 

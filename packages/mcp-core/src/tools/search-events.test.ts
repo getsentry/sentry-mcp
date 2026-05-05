@@ -1,7 +1,7 @@
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { generateText } from "ai";
 import { http, HttpResponse } from "msw";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserInputError } from "../errors";
 import searchEvents from "./search-events";
 
@@ -99,21 +99,12 @@ describe("search_events", () => {
     } as any;
   };
 
-  const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
-
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.OPENAI_API_KEY = "test-key";
     // Resolve provider conflict when ANTHROPIC_API_KEY is also set in the env
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
     mockGenerateText.mockResolvedValue(mockAIResponse("errors"));
-  });
-
-  afterEach(() => {
-    // Restore original ANTHROPIC_API_KEY
-    if (savedAnthropicKey !== undefined) {
-      process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
-    }
   });
 
   it("should handle spans dataset queries", async () => {
