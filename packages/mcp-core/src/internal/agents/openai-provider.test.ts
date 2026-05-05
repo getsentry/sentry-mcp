@@ -6,8 +6,6 @@ import { getOpenAIModel, setOpenAIBaseUrl } from "./openai-provider.js";
 describe("openai-provider", () => {
   beforeEach(() => {
     setOpenAIBaseUrl(undefined);
-    Reflect.deleteProperty(process.env, "OPENAI_MODEL");
-    Reflect.deleteProperty(process.env, "OPENAI_API_VERSION");
   });
 
   afterEach(() => {

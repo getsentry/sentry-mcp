@@ -12,10 +12,6 @@ describe("provider-factory", () => {
     // Reset module state
     setAgentProvider(undefined);
     setAzureOpenAIBaseUrl(undefined);
-    // Clear environment variables
-    Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
-    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
-    Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
   });
 
   afterEach(() => {

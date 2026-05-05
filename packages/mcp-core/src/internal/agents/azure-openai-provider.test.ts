@@ -11,8 +11,6 @@ import {
 describe("azure-openai-provider", () => {
   beforeEach(() => {
     setAzureOpenAIBaseUrl(undefined);
-    Reflect.deleteProperty(process.env, "OPENAI_MODEL");
-    Reflect.deleteProperty(process.env, "OPENAI_API_VERSION");
   });
 
   afterEach(() => {
