@@ -2648,8 +2648,8 @@ export class SentryApiService {
       end,
       environment: environment
         ? Array.isArray(environment)
-          ? environment[0]
-          : environment
+          ? environment
+          : [environment]
         : undefined,
     };
     if (projectId) {
