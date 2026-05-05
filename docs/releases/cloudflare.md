@@ -109,7 +109,8 @@ const oAuthProvider = new OAuthProvider({
   authorizeEndpoint: "/oauth/authorize",
   tokenEndpoint: "/oauth/token",
   clientRegistrationEndpoint: "/oauth/register",
-  tokenExchangeCallback: (options) => tokenExchangeCallback(options, env),
+  tokenExchangeCallback: (options) =>
+    tokenExchangeCallback(options, env, request, clientFamily),
   scopesSupported: Object.keys(SCOPES),
   refreshTokenTTL: 30 * 24 * 60 * 60,
 });

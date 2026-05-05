@@ -1,3 +1,4 @@
+import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
 /**
  * MCP Server Configuration and Request Handling Infrastructure.
  *
@@ -19,35 +20,34 @@
  * ```
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
-  ServerRequest,
   ServerNotification,
+  ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  getActiveSpan,
+  setTag,
+  setUser,
+  wrapMcpServerWithSentry,
+} from "@sentry/core";
+import { isApiAuthenticationErrorDeep } from "./api-client";
+import { MCP_SERVER_NAME } from "./constants";
+import {
+  getConstraintKeysToFilter,
+  getConstraintParametersToInject,
+} from "./internal/constraint-helpers";
+import { formatErrorForUser } from "./internal/error-handling";
+import { type Skill, isEnabledBySkills } from "./skills";
+import { type LogIssueOptions, logIssue } from "./telem/logging";
 import tools from "./tools/index";
 import {
   type ToolConfig,
-  resolveDescription,
   isToolVisibleInMode,
+  resolveDescription,
 } from "./tools/types";
-import type { ServerContext, ProjectCapabilities } from "./types";
-import { isApiAuthenticationErrorDeep } from "./api-client";
-import {
-  setTag,
-  setUser,
-  getActiveSpan,
-  wrapMcpServerWithSentry,
-} from "@sentry/core";
-import { logIssue, type LogIssueOptions } from "./telem/logging";
-import { formatErrorForUser } from "./internal/error-handling";
+import type { ProjectCapabilities, ServerContext } from "./types";
 import { LIB_VERSION } from "./version";
-import { MCP_SERVER_NAME } from "./constants";
-import { isEnabledBySkills, type Skill } from "./skills";
-import {
-  getConstraintParametersToInject,
-  getConstraintKeysToFilter,
-} from "./internal/constraint-helpers";
 
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
@@ -307,9 +307,13 @@ function configureServer({
         }
 
         if (context.userId) {
-          setUser({
+          const user = {
             id: context.userId,
-          });
+            ...(context.userIpAddress
+              ? { ip_address: context.userIpAddress }
+              : {}),
+          };
+          setUser(user);
         }
         if (context.clientId) {
           setTag("client.id", context.clientId);

@@ -48,6 +48,7 @@ export type ServerContext = {
   accessToken: string;
   openaiBaseUrl?: string;
   userId?: string | null;
+  userIpAddress?: string | null;
   clientId?: string;
   /** Primary authorization method - granted skills for tool access control */
   grantedSkills?: Set<Skill> | ReadonlySet<Skill>;

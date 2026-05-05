@@ -277,7 +277,7 @@ When an MCP client's token expires:
 
 ```typescript
 // tokenExchangeCallback in src/server/oauth/helpers.ts
-export async function tokenExchangeCallback(options, env) {
+export async function tokenExchangeCallback(options, env, request, clientFamily) {
   // Only handle MCP refresh_token requests
   if (options.grantType !== "refresh_token") {
     return undefined;

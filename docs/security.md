@@ -157,6 +157,7 @@ Key endpoints:
 ```typescript
 interface ServerContext {
   userId?: string;
+  userIpAddress?: string;
   clientId: string;
   accessToken: string;
   grantedSkills: Set<Skill>;  // Primary authorization method

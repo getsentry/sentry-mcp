@@ -1,14 +1,25 @@
 import type { TokenExchangeCallbackOptions } from "@cloudflare/workers-oauth-provider";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkerProps } from "../types";
-const { logIssue, logWarn } = vi.hoisted(() => ({
-  logIssue: vi.fn(),
-  logWarn: vi.fn(),
-}));
+const { logIssue, logWarn, sentryMetricsCount, sentrySetUser } = vi.hoisted(
+  () => ({
+    logIssue: vi.fn(),
+    logWarn: vi.fn(),
+    sentryMetricsCount: vi.fn(),
+    sentrySetUser: vi.fn(),
+  }),
+);
 
 vi.mock("@sentry/mcp-core/telem/logging", () => ({
   logIssue,
   logWarn,
+}));
+
+vi.mock("@sentry/cloudflare", () => ({
+  metrics: {
+    count: sentryMetricsCount,
+  },
+  setUser: sentrySetUser,
 }));
 
 import {
@@ -48,6 +59,26 @@ function createRefreshOptions(
 
 const TEST_ENV = { SENTRY_HOST: "sentry.io" };
 
+function createTokenExchangeTelemetryRequest(): Request {
+  return new Request("https://mcp.sentry.dev/oauth/token", {
+    headers: {
+      "CF-Connecting-IP": "192.0.2.1",
+    },
+  });
+}
+
+function callTokenExchangeCallback(
+  options: TokenExchangeCallbackOptions,
+  clientFamily = "unknown",
+): ReturnType<typeof tokenExchangeCallback> {
+  return tokenExchangeCallback(
+    options,
+    TEST_ENV,
+    createTokenExchangeTelemetryRequest(),
+    clientFamily,
+  );
+}
+
 describe("tokenExchangeCallback", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -55,6 +86,8 @@ describe("tokenExchangeCallback", () => {
     logWarn.mockReset();
     logIssue.mockReturnValue(undefined);
     logWarn.mockReturnValue(undefined);
+    sentryMetricsCount.mockReset();
+    sentrySetUser.mockReset();
   });
 
   it("should return undefined for non-refresh_token grant types", async () => {
@@ -67,15 +100,33 @@ describe("tokenExchangeCallback", () => {
       props: {} as WorkerProps,
     };
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 
   it("should return undefined when no refresh token in props", async () => {
     const options = createRefreshOptions({ refreshToken: undefined });
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toBeUndefined();
+  });
+
+  it("sets user ID and IP address for refresh token telemetry", async () => {
+    const options = createRefreshOptions({
+      accessTokenExpiresAt: Date.now() + 10 * 60 * 1000,
+    });
+    const request = new Request("https://mcp.sentry.dev/oauth/token", {
+      headers: {
+        "CF-Connecting-IP": "192.0.2.1",
+      },
+    });
+
+    await tokenExchangeCallback(options, TEST_ENV, request, "claude");
+
+    expect(sentrySetUser).toHaveBeenCalledWith({
+      id: "user-id",
+      ip_address: "192.0.2.1",
+    });
   });
 
   it("should mark the grant invalid when the upstream token is truly expired", async () => {
@@ -90,7 +141,7 @@ describe("tokenExchangeCallback", () => {
       }),
     );
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toEqual({
       newProps: expect.objectContaining({
         upstreamTokenInvalid: true,
@@ -114,7 +165,7 @@ describe("tokenExchangeCallback", () => {
       }),
     );
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toEqual({
       newProps: expect.objectContaining({
         upstreamTokenInvalid: true,
@@ -138,7 +189,7 @@ describe("tokenExchangeCallback", () => {
       }),
     );
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 
@@ -150,7 +201,7 @@ describe("tokenExchangeCallback", () => {
 
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 
@@ -167,7 +218,7 @@ describe("tokenExchangeCallback", () => {
       }),
     );
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toBeUndefined();
   });
 
@@ -179,7 +230,7 @@ describe("tokenExchangeCallback", () => {
 
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toEqual({
       newProps: expect.objectContaining({
         accessToken: "old-access-token",
@@ -210,7 +261,7 @@ describe("tokenExchangeCallback", () => {
       ),
     );
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toEqual({
       newProps: expect.not.objectContaining({
         upstreamTokenInvalid: true,
@@ -231,7 +282,7 @@ describe("tokenExchangeCallback", () => {
       }),
     );
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toEqual({
       newProps: expect.objectContaining({
         upstreamTokenInvalid: true,
@@ -253,7 +304,7 @@ describe("tokenExchangeCallback", () => {
       }),
     );
 
-    const result = await tokenExchangeCallback(options, TEST_ENV);
+    const result = await callTokenExchangeCallback(options);
     expect(result).toEqual({
       newProps: expect.objectContaining({
         upstreamTokenInvalid: true,

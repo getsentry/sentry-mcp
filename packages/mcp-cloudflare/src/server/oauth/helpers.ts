@@ -2,7 +2,7 @@ import type {
   TokenExchangeCallbackOptions,
   TokenExchangeCallbackResult,
 } from "@cloudflare/workers-oauth-provider";
-import type { z } from "zod";
+import * as Sentry from "@sentry/cloudflare";
 import {
   ApiClientError,
   ApiRateLimitError,
@@ -10,9 +10,10 @@ import {
   SentryApiService,
 } from "@sentry/mcp-core/api-client";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import { TokenResponseSchema } from "./constants";
+import type { z } from "zod";
 import type { WorkerProps } from "../types";
-import * as Sentry from "@sentry/cloudflare";
+import { setSentryUserFromRequest } from "../utils/sentry-user";
+import { TokenResponseSchema } from "./constants";
 
 function escapeHtml(value: string): string {
   return value
@@ -550,7 +551,8 @@ async function probeUpstreamAccessToken(
 export async function tokenExchangeCallback(
   options: TokenExchangeCallbackOptions,
   env: TokenExchangeEnv,
-  clientFamily = "unknown",
+  request: Request,
+  clientFamily: string,
 ): Promise<TokenExchangeCallbackResult | undefined> {
   if (options.grantType !== "refresh_token") {
     return undefined;
@@ -558,7 +560,7 @@ export async function tokenExchangeCallback(
 
   const rawProps = options.props as StoredGrantProps;
 
-  Sentry.setUser({ id: rawProps.id });
+  setSentryUserFromRequest(request, rawProps.id);
 
   if (!rawProps.refreshToken) {
     // Stale grant from before refreshToken was stored in props.

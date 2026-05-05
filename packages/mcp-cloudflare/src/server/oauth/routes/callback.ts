@@ -1,9 +1,12 @@
-import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import * as Sentry from "@sentry/cloudflare";
+import { getScopesForSkills, parseSkills } from "@sentry/mcp-core/skills";
+import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import { Hono } from "hono";
 import { clientIdAlreadyApproved } from "../../lib/approval-dialog";
 import { resolveClientFamilyFromName } from "../../lib/client-family";
 import type { Env, WorkerProps } from "../../types";
+import { setSentryUserFromRequest } from "../../utils/sentry-user";
 import { SENTRY_TOKEN_URL } from "../constants";
 import {
   createOAuthFailureResponse,
@@ -11,10 +14,8 @@ import {
   getOAuthCallbackFailureDetails,
   validateResourceParameter,
 } from "../helpers";
-import { verifyAndParseState, type OAuthState } from "../state";
-import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
-import { parseSkills, getScopesForSkills } from "@sentry/mcp-core/skills";
 import { parseResourceMcpConstraints } from "../resource-scope";
+import { type OAuthState, verifyAndParseState } from "../state";
 
 /**
  * Extended AuthRequest that includes skills and resource parameter
@@ -319,7 +320,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     } as WorkerProps,
   });
 
-  Sentry.setUser({ id: payload.user.id });
+  setSentryUserFromRequest(c.req.raw, payload.user.id);
   // /oauth/callback is browser-navigated, so the User-Agent is the user's
   // browser, not the MCP client. Derive client family from the DCR-registered
   // client_name (resolved above).
