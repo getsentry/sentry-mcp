@@ -9,20 +9,21 @@
  */
 
 import type { ExportedHandler } from "@cloudflare/workers-types";
+import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
+import * as Sentry from "@sentry/cloudflare";
 import { buildServer } from "@sentry/mcp-core/server";
 import { parseSkills } from "@sentry/mcp-core/skills";
 import { logWarn } from "@sentry/mcp-core/telem/logging";
 import type { ServerContext } from "@sentry/mcp-core/types";
 import { createMcpHandler } from "agents/mcp";
-import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
-import * as Sentry from "@sentry/cloudflare";
+import { annotateResponseMetric } from "../metrics";
 import type { WorkerProps } from "../types";
 import type { Env } from "../types";
 import {
-  checkRateLimit,
   MCP_RATE_LIMIT_EXCEEDED_MESSAGE,
+  checkRateLimit,
 } from "../utils/rate-limiter";
-import { annotateResponseMetric } from "../metrics";
+import { setSentryUserFromRequest } from "../utils/sentry-user";
 import { resolveClientFamily } from "./client-family";
 import { verifyConstraintsAccess } from "./constraint-utils";
 
@@ -155,7 +156,10 @@ const mcpHandler: ExportedHandler<Env> = {
     const sentryHost = env.SENTRY_HOST || "sentry.io";
     const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
     const requestGrantId = getRequestGrantId(request);
-    Sentry.setUser({ id: userId });
+    const { ip_address: userIpAddress } = setSentryUserFromRequest(
+      request,
+      userId,
+    );
 
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported
@@ -311,6 +315,7 @@ const mcpHandler: ExportedHandler<Env> = {
     let upstreamUnauthorizedHandled = false;
     const serverContext: ServerContext = {
       userId,
+      userIpAddress,
       clientId,
       accessToken,
       grantedSkills: validSkills,

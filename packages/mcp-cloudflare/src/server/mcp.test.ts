@@ -36,7 +36,14 @@ function createOAuthApi() {
       tokenEndpoint: "/oauth/token",
       clientRegistrationEndpoint: "/oauth/register",
       tokenExchangeCallback: (options) =>
-        tokenExchangeCallback(options, workerEnv),
+        tokenExchangeCallback(
+          options,
+          workerEnv,
+          new Request("https://mcp.sentry.dev/oauth/token", {
+            headers: { "CF-Connecting-IP": "192.0.2.1" },
+          }),
+          "unknown",
+        ),
       scopesSupported: Object.keys(SCOPES),
     },
     workerEnv,

@@ -57,7 +57,7 @@ Attributes:
 - `probe_status` — upstream HTTP status on outcomes where a probe fired (`200` / `400` / `401` / `403` / `429` / `500` / …)
 - `probe_reason` — `rate_limit` / `server_error` / `unknown` on `verification_indeterminate`
 
-User is set via `Sentry.setUser({ id: rawProps.id })` in the callback, so metrics can be filtered by `user.id`. Sub-30d sign-outs surface via `mcp.oauth.grant_revoked{reason:upstream_rejected_in_use}`, not on this metric.
+User context is set from the stored user ID and current request, so metrics can be filtered by `user.id` and events retain the request IP when available. Sub-30d sign-outs surface via `mcp.oauth.grant_revoked{reason:upstream_rejected_in_use}`, not on this metric.
 
 ### `mcp.oauth.grant_revoked` (counter)
 
@@ -67,7 +67,7 @@ Attributes:
 
 - `reason` — `stale_props_no_refresh` / `upstream_rejected` / `upstream_rejected_in_use`
 - `client_family`
-- `user.id` (via `Sentry.setUser`)
+- `user.id` (via Sentry user context)
 
 `upstream_rejected_in_use` indicates Sentry returned 401 to a tool call while the stored access token still looked locally valid — the sub-30d sign-out signal users typically report. The grant is revoked via `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`, short-circuiting the death-spiral where subsequent refreshes kept handing out wrapper tokens backed by a dead upstream token.
 
