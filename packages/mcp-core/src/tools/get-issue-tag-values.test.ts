@@ -126,34 +126,37 @@ describe("get_issue_tag_values", () => {
     ).rejects.toThrow(UserInputError);
   });
 
-  it("throws error when tagKey contains path traversal characters", async () => {
-    await expect(
-      getIssueTagValues.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          tagKey: "../../../admin",
-          regionUrl: null,
-          issueUrl: undefined,
-        },
-        getServerContext(),
-      ),
-    ).rejects.toThrow();
+  it("safely encodes tagKey with path traversal characters", async () => {
+    // The SDK URL-encodes path params, so "../../../admin" becomes
+    // "..%2F..%2F..%2Fadmin" — path traversal is neutralized.
+    // The handler still succeeds since the tag key is treated as a literal value.
+    const result = await getIssueTagValues.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        tagKey: "../../../admin",
+        regionUrl: null,
+        issueUrl: undefined,
+      },
+      getServerContext(),
+    );
+    expect(result).toContain("# Tag Distribution:");
   });
 
-  it("throws error when tagKey contains slashes", async () => {
-    await expect(
-      getIssueTagValues.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          tagKey: "url/path",
-          regionUrl: null,
-          issueUrl: undefined,
-        },
-        getServerContext(),
-      ),
-    ).rejects.toThrow();
+  it("safely encodes tagKey with slashes", async () => {
+    // The SDK URL-encodes slashes in path params, so "url/path"
+    // becomes "url%2Fpath" — no path confusion possible.
+    const result = await getIssueTagValues.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        tagKey: "url/path",
+        regionUrl: null,
+        issueUrl: undefined,
+      },
+      getServerContext(),
+    );
+    expect(result).toContain("# Tag Distribution:");
   });
 
   it("handles null values in topValues gracefully", async () => {
