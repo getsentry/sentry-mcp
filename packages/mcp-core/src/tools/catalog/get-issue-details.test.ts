@@ -869,7 +869,7 @@ describe("get_issue_details", () => {
         },
       ),
     ).rejects.toThrowErrorMatchingInlineSnapshot(`
-      [ApiNotFoundError: The requested resource does not exist
+      [ApiNotFoundError: getIssue: 404 Not Found
       Please verify these parameters are correct:
         - organizationSlug: 'test-org'
         - issueId: 'NONEXISTENT-ISSUE-123']
