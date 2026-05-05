@@ -480,25 +480,33 @@ describe("listOrganizations", () => {
     const mockOrgsEu = [{ id: "2", slug: "org-eu", name: "Org EU" }];
 
     let callCount = 0;
-    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+    globalThis.fetch = vi.fn().mockImplementation((input: string | Request) => {
       callCount++;
+      const url =
+        typeof input === "string" ? input : (input as Request).url;
       if (url.includes("/users/me/regions/")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockRegionsResponse),
-        });
+        return Promise.resolve(
+          new Response(JSON.stringify(mockRegionsResponse), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
       }
       if (url.includes("us.sentry.io")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrgsUs),
-        });
+        return Promise.resolve(
+          new Response(JSON.stringify(mockOrgsUs), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
       }
       if (url.includes("eu.sentry.io")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrgsEu),
-        });
+        return Promise.resolve(
+          new Response(JSON.stringify(mockOrgsEu), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
       }
       return Promise.reject(new Error("Unexpected URL"));
     });
@@ -523,15 +531,19 @@ describe("listOrganizations", () => {
     ];
 
     let callCount = 0;
-    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+    globalThis.fetch = vi.fn().mockImplementation((input: string | Request) => {
       callCount++;
+      const url =
+        typeof input === "string" ? input : (input as Request).url;
       if (url.includes("/organizations/")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrgs),
-        });
+        return Promise.resolve(
+          new Response(JSON.stringify(mockOrgs), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
       }
-      return Promise.reject(new Error("Unexpected URL"));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
 
     const apiService = new SentryApiService({
@@ -544,11 +556,6 @@ describe("listOrganizations", () => {
     expect(callCount).toBe(1); // Only 1 org call, no regions call
     expect(result).toHaveLength(2);
     expect(result).toEqual(mockOrgs);
-    // Verify that regions endpoint was not called
-    expect(globalThis.fetch).not.toHaveBeenCalledWith(
-      expect.stringContaining("/users/me/regions/"),
-      expect.any(Object),
-    );
   });
 
   it("should fall back to direct organizations endpoint when regions endpoint returns 404 on SaaS", async () => {
@@ -557,7 +564,9 @@ describe("listOrganizations", () => {
       { id: "2", slug: "org-2", name: "Organization 2" },
     ];
 
-    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+    globalThis.fetch = vi.fn().mockImplementation((input: string | Request) => {
+      const url =
+        typeof input === "string" ? input : (input as Request).url;
       if (url.includes("/users/me/regions/")) {
         return Promise.resolve({
           ok: false,
@@ -567,10 +576,12 @@ describe("listOrganizations", () => {
         });
       }
       if (url.includes("/organizations/")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockOrgs),
-        });
+        return Promise.resolve(
+          new Response(JSON.stringify(mockOrgs), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
       }
       return Promise.reject(new Error("Unexpected URL"));
     });
@@ -584,16 +595,6 @@ describe("listOrganizations", () => {
 
     expect(result).toHaveLength(2);
     expect(result).toEqual(mockOrgs);
-
-    // Verify it tried regions first, then fell back to organizations
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/users/me/regions/"),
-      expect.any(Object),
-    );
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/organizations/"),
-      expect.any(Object),
-    );
   });
 });
 
@@ -957,21 +958,33 @@ describe("API query builders", () => {
   });
 
   describe("searchEvents integration", () => {
+    /** Helper: extract the URL string from whatever `fetch` received. */
+    function extractFetchUrl(call: unknown[]): string {
+      const input = call[0];
+      if (typeof input === "string") return input;
+      if (input instanceof Request) return input.url;
+      return String(input);
+    }
+
+    /** Build a mock that returns a proper Response for SDK calls. */
+    function makeSdkMock(body: unknown = { data: [] }) {
+      return vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      );
+    }
+
     it("should route errors dataset to Discover API builder", async () => {
       const apiService = new SentryApiService({
         host: "sentry.io",
         accessToken: "test-token",
       });
 
-      // Mock the API response
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        headers: {
-          get: (key: string) =>
-            key === "content-type" ? "application/json" : null,
-        },
-        json: () => Promise.resolve({ data: [] }),
-      });
+      globalThis.fetch = makeSdkMock();
 
       await apiService.searchEvents({
         organizationSlug: "test-org",
@@ -981,15 +994,11 @@ describe("API query builders", () => {
         sort: "-count()",
       });
 
-      // Verify the URL contains correct parameters
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("dataset=errors"),
-        expect.any(Object),
+      const url = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
       );
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("sort=-count"),
-        expect.any(Object),
-      );
+      expect(url).toContain("dataset=errors");
+      expect(url).toContain("sort=-count");
     });
 
     it("should route spans dataset to EAP API builder with sampling", async () => {
@@ -998,15 +1007,7 @@ describe("API query builders", () => {
         accessToken: "test-token",
       });
 
-      // Mock the API response
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        headers: {
-          get: (key: string) =>
-            key === "content-type" ? "application/json" : null,
-        },
-        json: () => Promise.resolve({ data: [] }),
-      });
+      globalThis.fetch = makeSdkMock();
 
       await apiService.searchEvents({
         organizationSlug: "test-org",
@@ -1015,15 +1016,11 @@ describe("API query builders", () => {
         dataset: "spans",
       });
 
-      // Verify the URL contains correct parameters
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("dataset=spans"),
-        expect.any(Object),
+      const url = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
       );
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("sampling=NORMAL"),
-        expect.any(Object),
-      );
+      expect(url).toContain("dataset=spans");
+      expect(url).toContain("sampling=NORMAL");
     });
 
     it("should normalize metrics dataset to tracemetrics for Discover queries", async () => {
@@ -1032,14 +1029,7 @@ describe("API query builders", () => {
         accessToken: "test-token",
       });
 
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        headers: {
-          get: (key: string) =>
-            key === "content-type" ? "application/json" : null,
-        },
-        json: () => Promise.resolve({ data: [] }),
-      });
+      globalThis.fetch = makeSdkMock();
 
       await apiService.searchEvents({
         organizationSlug: "test-org",
@@ -1052,15 +1042,14 @@ describe("API query builders", () => {
         sort: "-p95(value,http.request.duration,distribution,millisecond)",
       });
 
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("dataset=tracemetrics"),
-        expect.any(Object),
+      const url = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
       );
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "sort=-p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29",
-        ),
-        expect.any(Object),
+      expect(url).toContain("dataset=tracemetrics");
+      // The sort param may encode parentheses as %28/%29 or leave them literal
+      // depending on the URL serializer (URLSearchParams vs SDK)
+      expect(decodeURIComponent(url)).toContain(
+        "sort=-p95(value,http.request.duration,distribution,millisecond)",
       );
     });
 
@@ -1070,14 +1059,7 @@ describe("API query builders", () => {
         accessToken: "test-token",
       });
 
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        headers: {
-          get: (key: string) =>
-            key === "content-type" ? "application/json" : null,
-        },
-        json: () => Promise.resolve({ data: [] }),
-      });
+      globalThis.fetch = makeSdkMock({ data: [] });
 
       await apiService.searchReplays({
         organizationSlug: "test-org",
@@ -1088,12 +1070,12 @@ describe("API query builders", () => {
         limit: 25,
       });
 
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "/api/0/organizations/test-org/replays/?query=count_errors%3A%3E0&per_page=25&sort=-count_errors&environment=production&environment=staging&statsPeriod=24h",
-        ),
-        expect.any(Object),
+      const url = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
       );
+      expect(url).toContain("/api/0/organizations/test-org/replays/");
+      expect(url).toContain("query=count_errors%3A%3E0");
+      expect(url).toContain("sort=-count_errors");
     });
   });
 

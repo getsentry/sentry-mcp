@@ -1,5 +1,34 @@
 import { z } from "zod";
 import {
+  listYourOrganizations as sdkListYourOrganizations,
+  retrieveAnOrganization as sdkRetrieveAnOrganization,
+  listAnOrganization_sTeams as sdkListAnOrganizationSTeams,
+  createANewTeam as sdkCreateANewTeam,
+  listAnOrganization_sProjects as sdkListAnOrganizationSProjects,
+  retrieveAProject as sdkRetrieveAProject,
+  createANewProject as sdkCreateANewProject,
+  updateAProject as sdkUpdateAProject,
+  addATeamToAProject as sdkAddATeamToAProject,
+  createANewClientKey as sdkCreateANewClientKey,
+  listAProject_sClientKeys as sdkListAProjectSClientKeys,
+  listAnOrganization_sReleases as sdkListAnOrganizationSReleases,
+  listAnOrganization_sIssues as sdkListAnOrganizationSIssues,
+  retrieveAnIssueEvent as sdkRetrieveAnIssueEvent,
+  listAnIssue_sEvents as sdkListAnIssueSEvents,
+  startSeerIssueFix as sdkStartSeerIssueFix,
+  retrieveSeerIssueFixState as sdkRetrieveSeerIssueFixState,
+  listAnOrganization_sReplays as sdkListAnOrganizationSReplays,
+  retrieveAnIssue as sdkRetrieveAnIssue,
+  retrieveTagDetails as sdkRetrieveTagDetails,
+  retrieveCustomIntegrationIssueLinksForTheGivenSentryIssue as sdkRetrieveCustomIntegrationIssueLinks,
+  retrieveAReplayInstance as sdkRetrieveAReplayInstance,
+  retrieveACountOfReplaysForAGivenIssueOrTransaction as sdkRetrieveACountOfReplays,
+  listRecordingSegments as sdkListRecordingSegments,
+  updateAnIssue as sdkUpdateAnIssue,
+  queryExploreEventsInTableFormat as sdkQueryExploreEvents,
+  type Options,
+} from "@sentry/api";
+import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
   getIssueUrl as getIssueUrlUtil,
   getMonitorUrl as getMonitorUrlUtil,
@@ -210,6 +239,61 @@ export class SentryApiService {
   setHost(host: string) {
     this.host = host;
     this.apiPrefix = `${this.protocol}://${this.host}/api/0`;
+  }
+
+  /**
+   * Builds the common SDK configuration (baseUrl + auth headers) for an SDK call.
+   */
+  private getSdkConfig(opts?: RequestOptions): {
+    baseUrl: string;
+    headers: Record<string, string>;
+  } {
+    const host = opts?.host ?? this.host;
+    const headers: Record<string, string> = {
+      "User-Agent": USER_AGENT,
+    };
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+    return {
+      baseUrl: `${this.protocol}://${host}`,
+      headers,
+    };
+  }
+
+  /**
+   * Unwraps an SDK result (`{ data, error }` discriminated union) and converts
+   * errors to the existing MCP error types.
+   *
+   * @param result The SDK result to unwrap
+   * @param context A descriptive label for error messages (e.g. method name)
+   * @returns The data on success
+   * @throws {ApiError|ApiNotFoundError|ApiValidationError|Error} on failure
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private unwrapSdkResult<T>(result: any, context: string): T {
+    if (result.error !== undefined) {
+      const response: Response | undefined = result.response;
+      if (response) {
+        const errorDetail =
+          typeof result.error === "string"
+            ? result.error
+            : result.error &&
+                typeof result.error === "object" &&
+                "detail" in result.error
+              ? String((result.error as { detail: unknown }).detail)
+              : String(result.error);
+
+        throw createApiError(
+          errorDetail,
+          response.status,
+          errorDetail,
+          result.error,
+        );
+      }
+      throw new Error(`${context}: ${String(result.error)}`);
+    }
+    return result.data as T;
   }
 
   /**
@@ -1040,8 +1124,12 @@ export class SentryApiService {
 
     // For self-hosted instances, the regions endpoint doesn't exist
     if (!this.isSaas()) {
-      const body = await this.requestJSON(path, undefined, opts);
-      return OrganizationListSchema.parse(body);
+      const result = await sdkListYourOrganizations({
+        ...this.getSdkConfig(opts),
+        query: { query: params?.query },
+      });
+      const data = this.unwrapSdkResult(result, "listOrganizations");
+      return OrganizationListSchema.parse(data);
     }
 
     // For SaaS, try to use regions endpoint first
@@ -1057,12 +1145,19 @@ export class SentryApiService {
 
       const allOrganizations = (
         await Promise.all(
-          regionData.regions.map(async (region) =>
-            this.requestJSON(path, undefined, {
-              ...opts,
-              host: new URL(region.url).host,
-            }),
-          ),
+          regionData.regions.map(async (region) => {
+            const regionResult = await sdkListYourOrganizations({
+              ...this.getSdkConfig({
+                ...opts,
+                host: new URL(region.url).host,
+              }),
+              query: { query: params?.query },
+            });
+            return this.unwrapSdkResult(
+              regionResult,
+              "listOrganizations(region)",
+            );
+          }),
         )
       )
         .map((data) => OrganizationListSchema.parse(data))
@@ -1075,8 +1170,12 @@ export class SentryApiService {
       // fall back to direct organizations endpoint
       if (error instanceof ApiNotFoundError) {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
-        const body = await this.requestJSON(path, undefined, opts);
-        return OrganizationListSchema.parse(body);
+        const result = await sdkListYourOrganizations({
+          ...this.getSdkConfig(opts),
+          query: { query: params?.query },
+        });
+        const data = this.unwrapSdkResult(result, "listOrganizations");
+        return OrganizationListSchema.parse(data);
       }
 
       // Re-throw other errors
@@ -1092,12 +1191,12 @@ export class SentryApiService {
    * @returns Organization data
    */
   async getOrganization(organizationSlug: string, opts?: RequestOptions) {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/`,
-      undefined,
-      opts,
-    );
-    return OrganizationSchema.parse(body);
+    const result = await sdkRetrieveAnOrganization({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+    });
+    const data = this.unwrapSdkResult(result, "getOrganization");
+    return OrganizationSchema.parse(data);
   }
 
   /**
@@ -1114,16 +1213,12 @@ export class SentryApiService {
     params?: { query?: string },
     opts?: RequestOptions,
   ): Promise<TeamList> {
-    const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
-    if (params?.query) {
-      queryParams.set("query", params.query);
-    }
-    const queryString = queryParams.toString();
-    const path = `/organizations/${organizationSlug}/teams/?${queryString}`;
-
-    const body = await this.requestJSON(path, undefined, opts);
-    return TeamListSchema.parse(body);
+    const result = await sdkListAnOrganizationSTeams({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+    });
+    const data = this.unwrapSdkResult(result, "listTeams");
+    return TeamListSchema.parse(data);
   }
 
   /**
@@ -1146,15 +1241,13 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Team> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/teams/`,
-      {
-        method: "POST",
-        body: JSON.stringify({ name }),
-      },
-      opts,
-    );
-    return TeamSchema.parse(body);
+    const result = await sdkCreateANewTeam({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      body: { name },
+    });
+    const data = this.unwrapSdkResult(result, "createTeam");
+    return TeamSchema.parse(data);
   }
 
   /**
@@ -1171,16 +1264,17 @@ export class SentryApiService {
     params?: { query?: string },
     opts?: RequestOptions,
   ): Promise<ProjectList> {
-    const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
-    if (params?.query) {
-      queryParams.set("query", params.query);
-    }
-    const queryString = queryParams.toString();
-    const path = `/organizations/${organizationSlug}/projects/?${queryString}`;
-
-    const body = await this.requestJSON(path, undefined, opts);
-    return ProjectListSchema.parse(body);
+    // The SDK type doesn't include query/per_page params, but the API accepts them
+    const result = await sdkListAnOrganizationSProjects({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: {
+        query: params?.query,
+        per_page: "25",
+      } as Record<string, unknown>,
+    } as Parameters<typeof sdkListAnOrganizationSProjects>[0]);
+    const data = this.unwrapSdkResult(result, "listProjects");
+    return ProjectListSchema.parse(data);
   }
 
   /**
@@ -1202,12 +1296,15 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlugOrId}/`,
-      undefined,
-      opts,
-    );
-    return ProjectSchema.parse(body);
+    const result = await sdkRetrieveAProject({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        project_id_or_slug: projectSlugOrId,
+      },
+    });
+    const data = this.unwrapSdkResult(result, "getProject");
+    return ProjectSchema.parse(data);
   }
 
   /**
@@ -1235,21 +1332,19 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const createData: Record<string, any> = { name };
-    // Only include platform if it has a meaningful value (not null, undefined, or empty)
-    if (platform) {
-      createData.platform = platform;
-    }
-
-    const body = await this.requestJSON(
-      `/teams/${organizationSlug}/${teamSlug}/projects/`,
-      {
-        method: "POST",
-        body: JSON.stringify(createData),
+    const result = await sdkCreateANewProject({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        team_id_or_slug: teamSlug,
       },
-      opts,
-    );
-    return ProjectSchema.parse(body);
+      body: {
+        name,
+        ...(platform ? { platform } : {}),
+      },
+    });
+    const data = this.unwrapSdkResult(result, "createProject");
+    return ProjectSchema.parse(data);
   }
 
   /**
@@ -1280,21 +1375,20 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Project> {
-    const updateData: Record<string, any> = {};
-    // Only include fields that have meaningful values (truthy strings)
-    if (name) updateData.name = name;
-    if (slug) updateData.slug = slug;
-    if (platform) updateData.platform = platform;
-
-    const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/`,
-      {
-        method: "PUT",
-        body: JSON.stringify(updateData),
+    const result = await sdkUpdateAProject({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        project_id_or_slug: projectSlug,
       },
-      opts,
-    );
-    return ProjectSchema.parse(body);
+      body: {
+        ...(name ? { name } : {}),
+        ...(slug ? { slug } : {}),
+        ...(platform ? { platform } : {}),
+      },
+    });
+    const data = this.unwrapSdkResult(result, "updateProject");
+    return ProjectSchema.parse(data);
   }
 
   /**
@@ -1318,14 +1412,15 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<void> {
-    await this.request(
-      `/projects/${organizationSlug}/${projectSlug}/teams/${teamSlug}/`,
-      {
-        method: "POST",
-        body: JSON.stringify({}),
+    const result = await sdkAddATeamToAProject({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        project_id_or_slug: projectSlug,
+        team_id_or_slug: teamSlug,
       },
-      opts,
-    );
+    });
+    this.unwrapSdkResult(result, "addTeamToProject");
   }
 
   /**
@@ -1362,17 +1457,16 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ClientKey> {
-    const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/keys/`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-        }),
+    const result = await sdkCreateANewClientKey({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        project_id_or_slug: projectSlug,
       },
-      opts,
-    );
-    return ClientKeySchema.parse(body);
+      body: { name },
+    });
+    const data = this.unwrapSdkResult(result, "createClientKey");
+    return ClientKeySchema.parse(data);
   }
 
   /**
@@ -1394,12 +1488,15 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ClientKeyList> {
-    const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlug}/keys/`,
-      undefined,
-      opts,
-    );
-    return ClientKeyListSchema.parse(body);
+    const result = await sdkListAProjectSClientKeys({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        project_id_or_slug: projectSlug,
+      },
+    });
+    const data = this.unwrapSdkResult(result, "listClientKeys");
+    return ClientKeyListSchema.parse(data);
   }
 
   /**
@@ -1438,21 +1535,28 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ReleaseList> {
-    const searchQuery = new URLSearchParams();
-    if (query) {
-      searchQuery.set("query", query);
+    if (projectSlug) {
+      // Project-level releases endpoint not in SDK, use raw request
+      const searchQuery = new URLSearchParams();
+      if (query) {
+        searchQuery.set("query", query);
+      }
+      const path = `/projects/${organizationSlug}/${projectSlug}/releases/`;
+      const body = await this.requestJSON(
+        searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
+        undefined,
+        opts,
+      );
+      return ReleaseListSchema.parse(body);
     }
 
-    const path = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/releases/`
-      : `/organizations/${organizationSlug}/releases/`;
-
-    const body = await this.requestJSON(
-      searchQuery.toString() ? `${path}?${searchQuery.toString()}` : path,
-      undefined,
-      opts,
-    );
-    return ReleaseListSchema.parse(body);
+    const result = await sdkListAnOrganizationSReleases({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: { query },
+    });
+    const data = this.unwrapSdkResult(result, "listReleases");
+    return ReleaseListSchema.parse(data);
   }
 
   /**
@@ -1555,44 +1659,36 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ReplayList> {
-    const searchQuery = new URLSearchParams();
-
-    if (query) {
-      searchQuery.set("query", query);
-    }
-    if (limit !== undefined) {
-      searchQuery.set("per_page", String(limit));
-    }
+    // The SDK's field type is a strict enum, but the API accepts arbitrary strings.
+    // We also need extra query params (project as string) not in the SDK type.
+    const sdkQuery: Record<string, unknown> = {
+      query,
+      per_page: limit,
+      sort,
+      statsPeriod,
+      start,
+      end,
+      environment: environment
+        ? Array.isArray(environment)
+          ? environment[0]
+          : environment
+        : undefined,
+    };
     if (projectId) {
-      searchQuery.append("project", projectId);
-    }
-    if (sort) {
-      searchQuery.set("sort", sort);
-    }
-    if (environment) {
-      const environments = Array.isArray(environment)
-        ? environment
-        : [environment];
-      for (const value of environments) {
-        searchQuery.append("environment", value);
-      }
+      sdkQuery.project = [Number(projectId)];
     }
     if (fields && fields.length > 0) {
-      for (const field of fields) {
-        searchQuery.append("field", field);
-      }
+      sdkQuery.field = fields;
     }
-    this.applyTimeParams(searchQuery, statsPeriod, start, end);
 
-    const body = await this.requestJSON(
-      searchQuery.toString()
-        ? `/organizations/${organizationSlug}/replays/?${searchQuery.toString()}`
-        : `/organizations/${organizationSlug}/replays/`,
-      undefined,
-      opts,
-    );
+    const result = await sdkListAnOrganizationSReplays({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: sdkQuery,
+    } as Options<Parameters<typeof sdkListAnOrganizationSReplays>[0] & { url: string }>);
+    const data = this.unwrapSdkResult(result, "searchReplays");
 
-    return ReplayListResponseSchema.parse(body).data;
+    return ReplayListResponseSchema.parse(data).data;
   }
 
   /**
@@ -1756,20 +1852,32 @@ export class SentryApiService {
       sentryQuery.push(query);
     }
 
-    const queryParams = new URLSearchParams();
-    queryParams.set("per_page", String(limit));
-    if (sortBy) queryParams.set("sort", sortBy);
-    queryParams.set("statsPeriod", "24h");
-    queryParams.set("query", sentryQuery.join(" "));
+    if (projectSlug) {
+      // Project-level issues endpoint not in SDK, use raw request
+      const queryParams = new URLSearchParams();
+      queryParams.set("per_page", String(limit));
+      if (sortBy) queryParams.set("sort", sortBy);
+      queryParams.set("statsPeriod", "24h");
+      queryParams.set("query", sentryQuery.join(" "));
+      queryParams.append("collapse", "unhandled");
+      const apiUrl = `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`;
+      const body = await this.requestJSON(apiUrl, undefined, opts);
+      return IssueListSchema.parse(body);
+    }
 
-    queryParams.append("collapse", "unhandled");
-
-    const apiUrl = projectSlug
-      ? `/projects/${organizationSlug}/${projectSlug}/issues/?${queryParams.toString()}`
-      : `/organizations/${organizationSlug}/issues/?${queryParams.toString()}`;
-
-    const body = await this.requestJSON(apiUrl, undefined, opts);
-    return IssueListSchema.parse(body);
+    const result = await sdkListAnOrganizationSIssues({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: {
+        limit,
+        sort: sortBy,
+        statsPeriod: "24h",
+        query: sentryQuery.join(" "),
+        collapse: ["unhandled"],
+      },
+    });
+    const data = this.unwrapSdkResult(result, "listIssues");
+    return IssueListSchema.parse(data);
   }
 
   async getIssue(
@@ -1782,12 +1890,15 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Issue> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/`,
-      undefined,
-      opts,
-    );
-    return IssueSchema.parse(body);
+    const result = await sdkRetrieveAnIssue({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        issue_id: issueId,
+      },
+    });
+    const data = this.unwrapSdkResult(result, "getIssue");
+    return IssueSchema.parse(data);
   }
 
   /**
@@ -1827,12 +1938,16 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<IssueTagValues> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/tags/${tagKey}/`,
-      undefined,
-      opts,
-    );
-    return IssueTagValuesSchema.parse(body);
+    const result = await sdkRetrieveTagDetails({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        issue_id: issueId as unknown as number,
+        key: tagKey,
+      },
+    });
+    const data = this.unwrapSdkResult(result, "getIssueTagValues");
+    return IssueTagValuesSchema.parse(data);
   }
 
   /**
@@ -1857,12 +1972,15 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ExternalIssueList> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/external-issues/`,
-      undefined,
-      opts,
-    );
-    return ExternalIssueListSchema.parse(body);
+    const result = await sdkRetrieveCustomIntegrationIssueLinks({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        issue_id: issueId as unknown as number,
+      },
+    });
+    const data = this.unwrapSdkResult(result, "getIssueExternalLinks");
+    return ExternalIssueListSchema.parse(data);
   }
 
   async getEventForIssue(
@@ -1877,11 +1995,15 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Event> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/events/${eventId}/`,
-      undefined,
-      opts,
-    );
+    const result = await sdkRetrieveAnIssueEvent({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        issue_id: issueId as unknown as number,
+        event_id: eventId as "latest" | "oldest" | "recommended",
+      },
+    });
+    const body = this.unwrapSdkResult(result, "getEventForIssue");
 
     // Try to parse with known event schemas first
     const parseResult = EventSchema.safeParse(body);
@@ -1998,31 +2120,21 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ) {
-    const params = new URLSearchParams();
-
-    if (query) {
-      params.append("query", query);
-    }
-
-    params.append("per_page", String(limit));
-
-    if (sort) {
-      params.append("sort", sort);
-    }
-
-    if (statsPeriod) {
-      params.append("statsPeriod", statsPeriod);
-    } else if (start && end) {
-      params.append("start", start);
-      params.append("end", end);
-    }
-
-    if (full) {
-      params.append("full", "true");
-    }
-
-    const apiUrl = `/organizations/${organizationSlug}/issues/${issueId}/events/?${params.toString()}`;
-    return await this.requestJSON(apiUrl, undefined, opts);
+    const result = await sdkListAnIssueSEvents({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        issue_id: issueId as unknown as number,
+      },
+      query: {
+        query,
+        statsPeriod,
+        start,
+        end,
+        full,
+      },
+    });
+    return this.unwrapSdkResult(result, "listEventsForIssue");
   }
 
   async listEventAttachments(
@@ -2111,12 +2223,15 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ReplayDetails> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/replays/${replayId}/`,
-      undefined,
-      opts,
-    );
-    return z.object({ data: ReplayDetailsSchema }).parse(body).data;
+    const result = await sdkRetrieveAReplayInstance({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        replay_id: replayId,
+      },
+    });
+    const data = this.unwrapSdkResult(result, "getReplayDetails");
+    return z.object({ data: ReplayDetailsSchema }).parse(data).data;
   }
 
   async listReplayIdsForIssue(
@@ -2132,20 +2247,22 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<string[]> {
     const normalizedIssueId = String(issueId);
-    const queryParams = new URLSearchParams();
-    queryParams.set("returnIds", "true");
-    queryParams.set("query", `issue.id:[${normalizedIssueId}]`);
-    queryParams.set("data_source", dataSource);
-    queryParams.set("statsPeriod", "90d");
-    queryParams.append("project", "-1");
+    // The SDK type doesn't include returnIds, data_source, or project params,
+    // so we pass extra query params via cast.
+    const result = await sdkRetrieveACountOfReplays({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: {
+        query: `issue.id:[${normalizedIssueId}]`,
+        statsPeriod: "90d",
+        returnIds: "true",
+        data_source: dataSource,
+        project: "-1",
+      } as Record<string, unknown>,
+    } as Parameters<typeof sdkRetrieveACountOfReplays>[0]);
+    const data = this.unwrapSdkResult(result, "listReplayIdsForIssue");
 
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/replay-count/?${queryParams.toString()}`,
-      undefined,
-      opts,
-    );
-
-    const replayIdsByResource = ReplayIdsByResourceSchema.parse(body);
+    const replayIdsByResource = ReplayIdsByResourceSchema.parse(data);
     return replayIdsByResource[normalizedIssueId] ?? [];
   }
 
@@ -2161,12 +2278,21 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ReplayRecordingSegments> {
-    const body = await this.requestJSON(
-      `/projects/${organizationSlug}/${projectSlugOrId}/replays/${replayId}/recording-segments/?download=true`,
-      undefined,
-      opts,
+    // The SDK doesn't expose the `download` query param, so pass it via cast
+    const result = await sdkListRecordingSegments({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        project_id_or_slug: projectSlugOrId,
+        replay_id: replayId,
+      },
+      query: { download: "true" } as Record<string, unknown>,
+    } as Parameters<typeof sdkListRecordingSegments>[0]);
+    const data = this.unwrapSdkResult(
+      result,
+      "getReplayRecordingSegments",
     );
-    return ReplayRecordingSegmentsSchema.parse(body);
+    return ReplayRecordingSegmentsSchema.parse(data);
   }
 
   async updateIssue(
@@ -2195,16 +2321,9 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<Issue> {
-    const updateData: {
-      status?: string;
-      assignedTo?: string;
-      substatus?: string;
-      ignoreDuration?: number;
-      ignoreCount?: number;
-      ignoreWindow?: number;
-      ignoreUserCount?: number;
-      ignoreUserWindow?: number;
-    } = {};
+    // The SDK body type is stricter than what we send (extra fields like
+    // substatus, ignoreDuration, etc.), so we cast.
+    const updateData: Record<string, unknown> = {};
     if (status !== undefined) updateData.status = status;
     if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
     if (substatus !== undefined) updateData.substatus = substatus;
@@ -2219,15 +2338,16 @@ export class SentryApiService {
       updateData.ignoreUserWindow = ignoreUserWindow;
     }
 
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/`,
-      {
-        method: "PUT",
-        body: JSON.stringify(updateData),
+    const result = await sdkUpdateAnIssue({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        issue_id: issueId,
       },
-      opts,
-    );
-    return IssueSchema.parse(body);
+      body: updateData as Parameters<typeof sdkUpdateAnIssue>[0]["body"],
+    });
+    const data = this.unwrapSdkResult(result, "updateIssue");
+    return IssueSchema.parse(data);
   }
 
   // TODO: Sentry is not yet exposing a reasonable API to fetch trace data
@@ -2278,28 +2398,22 @@ export class SentryApiService {
       sentryQuery.push(`project:${projectSlug}`);
     }
 
-    const queryParams = new URLSearchParams();
-    queryParams.set("dataset", "errors");
-    queryParams.set("per_page", "10");
-    queryParams.set(
-      "sort",
-      `-${sortBy === "last_seen" ? "last_seen" : "count"}`,
-    );
-    queryParams.set("statsPeriod", "24h");
-    queryParams.append("field", "issue");
-    queryParams.append("field", "title");
-    queryParams.append("field", "project");
-    queryParams.append("field", "last_seen()");
-    queryParams.append("field", "count()");
-    queryParams.set("query", sentryQuery.join(" "));
-    // if (projectSlug) queryParams.set("project", projectSlug);
-
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
-
-    const body = await this.requestJSON(apiUrl, undefined, opts);
+    const result = await sdkQueryExploreEvents({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: {
+        dataset: "errors",
+        per_page: 10,
+        sort: `-${sortBy === "last_seen" ? "last_seen" : "count"}`,
+        statsPeriod: "24h",
+        field: ["issue", "title", "project", "last_seen()", "count()"],
+        query: sentryQuery.join(" "),
+      },
+    });
+    const data = this.unwrapSdkResult(result, "searchErrors");
     // TODO(dcramer): If you're using an older version of Sentry this API had a breaking change
     // meaning this endpoint will error.
-    return ErrorsSearchResponseSchema.parse(body).data;
+    return ErrorsSearchResponseSchema.parse(data).data;
   }
 
   async searchSpans(
@@ -2329,30 +2443,31 @@ export class SentryApiService {
       sentryQuery.push(`project:${projectSlug}`);
     }
 
-    const queryParams = new URLSearchParams();
-    queryParams.set("dataset", "spans");
-    queryParams.set("per_page", "10");
-    queryParams.set(
-      "sort",
-      `-${sortBy === "timestamp" ? "timestamp" : "span.duration"}`,
-    );
-    queryParams.set("allowAggregateConditions", "0");
-    queryParams.set("useRpc", "1");
-    queryParams.append("field", "id");
-    queryParams.append("field", "trace");
-    queryParams.append("field", "span.op");
-    queryParams.append("field", "span.description");
-    queryParams.append("field", "span.duration");
-    queryParams.append("field", "transaction");
-    queryParams.append("field", "project");
-    queryParams.append("field", "timestamp");
-    queryParams.set("query", sentryQuery.join(" "));
-    // if (projectSlug) queryParams.set("project", projectSlug);
-
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
-
-    const body = await this.requestJSON(apiUrl, undefined, opts);
-    return SpansSearchResponseSchema.parse(body).data;
+    // The SDK type doesn't include allowAggregateConditions or useRpc params
+    const result = await sdkQueryExploreEvents({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: {
+        dataset: "spans",
+        per_page: 10,
+        sort: `-${sortBy === "timestamp" ? "timestamp" : "span.duration"}`,
+        field: [
+          "id",
+          "trace",
+          "span.op",
+          "span.description",
+          "span.duration",
+          "transaction",
+          "project",
+          "timestamp",
+        ],
+        query: sentryQuery.join(" "),
+        allowAggregateConditions: "0",
+        useRpc: "1",
+      } as Record<string, unknown>,
+    } as Parameters<typeof sdkQueryExploreEvents>[0]);
+    const data = this.unwrapSdkResult(result, "searchSpans");
+    return SpansSearchResponseSchema.parse(data).data;
   }
 
   // ================================================================================
@@ -2527,6 +2642,8 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ) {
+    // Build the full query params using existing builders, then convert to SDK format.
+    // This preserves the dataset-specific logic (sort transforms, sampling, etc.)
     let queryParams: URLSearchParams;
     const normalizedDataset = normalizeEventsDataset(dataset);
 
@@ -2535,7 +2652,6 @@ export class SentryApiService {
       normalizedDataset === "tracemetrics" ||
       normalizedDataset === "profiles"
     ) {
-      // Use Discover API query builder
       queryParams = this.buildDiscoverApiQuery({
         query,
         fields,
@@ -2548,7 +2664,6 @@ export class SentryApiService {
         sort,
       });
     } else {
-      // Use EAP API query builder for spans and logs
       queryParams = this.buildEapApiQuery({
         query,
         fields,
@@ -2562,8 +2677,24 @@ export class SentryApiService {
       });
     }
 
-    const apiUrl = `/organizations/${organizationSlug}/events/?${queryParams.toString()}`;
-    return await this.requestJSON(apiUrl, undefined, opts);
+    // Convert URLSearchParams to SDK query format. Some params like `field` and
+    // `project` can appear multiple times, while the SDK expects `field` as string[].
+    const sdkQuery: Record<string, unknown> = {};
+    const multiValueKeys = new Set(["field", "project"]);
+    for (const key of new Set(queryParams.keys())) {
+      if (multiValueKeys.has(key)) {
+        sdkQuery[key] = queryParams.getAll(key);
+      } else {
+        sdkQuery[key] = queryParams.get(key);
+      }
+    }
+
+    const result = await sdkQueryExploreEvents({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: sdkQuery,
+    } as Parameters<typeof sdkQueryExploreEvents>[0]);
+    return this.unwrapSdkResult(result, "searchEvents");
   }
 
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
@@ -2581,18 +2712,19 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<AutofixRun> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          event_id: eventId,
-          instruction,
-        }),
+    const result = await sdkStartSeerIssueFix({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        issue_id: issueId as unknown as number,
       },
-      opts,
-    );
-    return AutofixRunSchema.parse(body);
+      body: {
+        event_id: eventId,
+        instruction,
+      },
+    });
+    const data = this.unwrapSdkResult(result, "startAutofix");
+    return AutofixRunSchema.parse(data);
   }
 
   // GET https://us.sentry.io/api/0/issues/5485083130/autofix/
@@ -2606,12 +2738,15 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<AutofixRunState> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
-      undefined,
-      opts,
-    );
-    return AutofixRunStateSchema.parse(body);
+    const result = await sdkRetrieveSeerIssueFixState({
+      ...this.getSdkConfig(opts),
+      path: {
+        organization_id_or_slug: organizationSlug,
+        issue_id: issueId as unknown as number,
+      },
+    });
+    const data = this.unwrapSdkResult(result, "getAutofixState");
+    return AutofixRunStateSchema.parse(data);
   }
 
   /**
