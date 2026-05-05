@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   mswServer,
@@ -8,10 +8,6 @@ import {
   traceMixedFixture,
 } from "@sentry/mcp-server-mocks";
 import getTraceDetails from "./get-trace-details.js";
-
-const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
-const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
-const originalEmbeddedAgentProvider = process.env.EMBEDDED_AGENT_PROVIDER;
 
 /** Register the same handler on sentry.io and us.sentry.io (org fixture resolves region). */
 function httpGetRegional(
@@ -54,26 +50,6 @@ describe("get_trace_details", () => {
     process.env.OPENAI_API_KEY = "test-key";
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
     Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
-  });
-
-  afterAll(() => {
-    if (originalOpenAIApiKey === undefined) {
-      Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
-    } else {
-      process.env.OPENAI_API_KEY = originalOpenAIApiKey;
-    }
-
-    if (originalAnthropicApiKey === undefined) {
-      Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
-    } else {
-      process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
-    }
-
-    if (originalEmbeddedAgentProvider === undefined) {
-      Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
-    } else {
-      process.env.EMBEDDED_AGENT_PROVIDER = originalEmbeddedAgentProvider;
-    }
   });
 
   it("serializes with valid trace ID", async () => {

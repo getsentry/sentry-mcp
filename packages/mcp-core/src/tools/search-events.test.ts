@@ -700,9 +700,10 @@ describe("search_events", () => {
             "url:*checkout* count_errors:>0",
           );
           expect(url.searchParams.get("sort")).toBe("-count_errors");
-          // The SDK's replay endpoint only accepts a single environment string,
-          // so only the first element of the array is sent.
-          expect(url.searchParams.get("environment")).toBe("production");
+          expect(url.searchParams.getAll("environment")).toEqual([
+            "production",
+            "staging",
+          ]);
           expect(url.searchParams.get("statsPeriod")).toBe("24h");
           return HttpResponse.json({
             data: [

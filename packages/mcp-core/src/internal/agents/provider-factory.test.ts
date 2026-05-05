@@ -8,43 +8,17 @@ import { setAzureOpenAIBaseUrl } from "./azure-openai-provider.js";
 import { ConfigurationError } from "../../errors.js";
 
 describe("provider-factory", () => {
-  const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
-  const originalOpenAIKey = process.env.OPENAI_API_KEY;
-  const originalProviderEnv = process.env.EMBEDDED_AGENT_PROVIDER;
-
   beforeEach(() => {
     // Reset module state
     setAgentProvider(undefined);
     setAzureOpenAIBaseUrl(undefined);
     // Clear environment variables
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-    delete process.env.ANTHROPIC_API_KEY;
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-    delete process.env.OPENAI_API_KEY;
-    // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-    delete process.env.EMBEDDED_AGENT_PROVIDER;
+    Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
   });
 
   afterEach(() => {
-    // Restore original environment
-    if (originalAnthropicKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-      delete process.env.ANTHROPIC_API_KEY;
-    } else {
-      process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
-    }
-    if (originalOpenAIKey === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-      delete process.env.OPENAI_API_KEY;
-    } else {
-      process.env.OPENAI_API_KEY = originalOpenAIKey;
-    }
-    if (originalProviderEnv === undefined) {
-      // biome-ignore lint/performance/noDelete: Required to properly unset environment variable
-      delete process.env.EMBEDDED_AGENT_PROVIDER;
-    } else {
-      process.env.EMBEDDED_AGENT_PROVIDER = originalProviderEnv;
-    }
     setAgentProvider(undefined);
     setAzureOpenAIBaseUrl(undefined);
   });

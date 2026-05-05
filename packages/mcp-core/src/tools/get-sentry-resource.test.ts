@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   mswServer,
@@ -11,10 +11,6 @@ import {
   eventFixture,
 } from "@sentry/mcp-server-mocks";
 import getSentryResource from "./get-sentry-resource.js";
-
-const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
-const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
-const originalEmbeddedAgentProvider = process.env.EMBEDDED_AGENT_PROVIDER;
 
 const baseContext = {
   constraints: {
@@ -58,26 +54,6 @@ describe("get_sentry_resource", () => {
     Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
     Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
     Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
-  });
-
-  afterAll(() => {
-    if (originalOpenAIApiKey === undefined) {
-      Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
-    } else {
-      process.env.OPENAI_API_KEY = originalOpenAIApiKey;
-    }
-
-    if (originalAnthropicApiKey === undefined) {
-      Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
-    } else {
-      process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey;
-    }
-
-    if (originalEmbeddedAgentProvider === undefined) {
-      Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
-    } else {
-      process.env.EMBEDDED_AGENT_PROVIDER = originalEmbeddedAgentProvider;
-    }
   });
 
   // ─── URL mode: issue URLs ──────────────────────────────────────────────────
