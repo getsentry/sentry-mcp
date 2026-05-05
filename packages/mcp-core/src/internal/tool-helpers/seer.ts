@@ -159,12 +159,6 @@ export function getOutputForAutofixStep(
       return heading;
     }
 
-    if (typedStep.status === "FAILED") {
-      body += `**Sentry hit an error completing this step.\n\n`;
-    } else if (typedStep.status !== "COMPLETED") {
-      body += `**Sentry is still working on this step.**\n\n`;
-    }
-
     return wrapSeerAnalysisOutput({
       output: body,
       runId: options.runId,
