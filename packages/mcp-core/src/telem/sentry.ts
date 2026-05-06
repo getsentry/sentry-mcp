@@ -93,11 +93,32 @@ function scrubValue(value: unknown, depth = 0): [unknown, boolean, string[]] {
  * and applies custom fingerprinting for specific error types.
  */
 export function sentryBeforeSend(event: any, hint: any): any {
+  const firstException = event?.exception?.values?.[0];
+
+  // Drop JsonRpcError_-32603 events caused by client-side Zod validation
+  // failures on the MCP `initialize` request (missing protocolVersion,
+  // capabilities, clientInfo). The MCP SDK wraps these as -32603 (Internal
+  // Error) even though they are bad-client-request errors, causing the Sentry
+  // MCP transport integration to capture them as server errors. Returning null
+  // prevents them from being reported to Sentry.
+  if (firstException?.type === "JsonRpcError_-32603") {
+    try {
+      const parsed = JSON.parse(firstException.value);
+      if (
+        Array.isArray(parsed) &&
+        parsed.some((e: any) => e.code === "invalid_type")
+      ) {
+        return null;
+      }
+    } catch {
+      // Not a JSON array — fall through and capture normally
+    }
+  }
+
   // Custom fingerprinting for AI SDK API call errors.
   // These errors share the same stack trace but have different messages
   // (e.g., "Country, region, or territory not supported", temperature issues).
   // Without custom fingerprinting, they all get grouped into a single issue.
-  const firstException = event?.exception?.values?.[0];
   if (firstException?.type === "AI_APICallError" && firstException.value) {
     event.fingerprint = ["AI_APICallError", firstException.value];
   }
