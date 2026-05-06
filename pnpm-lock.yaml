@@ -422,8 +422,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
       '@sentry/api':
-        specifier: ^0.133.0
-        version: 0.133.0
+        specifier: ^0.141.0
+        version: 0.141.0(zod@3.25.76)
       '@sentry/core':
         specifier: 'catalog:'
         version: 10.54.0
@@ -2330,9 +2330,14 @@ packages:
     resolution: {integrity: sha512-B7eicNhAomJ7bGihJO7mCw7pZ8FFo/THQgGPo85VR3FaJVCCot20WxVgvhjc7IVBQVlaaxSrnlUFvA+yHjszqQ==}
     engines: {node: '>=18'}
 
-  '@sentry/api@0.133.0':
-    resolution: {integrity: sha512-flfRUm9T9xgyNEWQqCiNv8wX4QlqOt63tM8dRMbeo26zD4+xEaL4KiaEnPC/W5rXCKg/03FBJysw7rEIuhiedQ==}
+  '@sentry/api@0.141.0':
+    resolution: {integrity: sha512-6DAEAhHnE/bkiUsCIGY4V9fPWVg2sc0Wn0ualQ4xEEurKQgtbafhJyZuuwCfTwT/nYldHosjGfLoWFNdXj9tWA==}
     engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.24.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
 
   '@sentry/babel-plugin-component-annotate@4.6.1':
     resolution: {integrity: sha512-aSIk0vgBqv7PhX6/Eov+vlI4puCE0bRXzUG5HdCsHBpAfeMkI8Hva6kSOusnzKqs8bf04hU7s3Sf0XxGTj/1AA==}
@@ -7672,7 +7677,9 @@ snapshots:
       '@sentry-internal/browser-utils': 10.54.0
       '@sentry/core': 10.54.0
 
-  '@sentry/api@0.133.0': {}
+  '@sentry/api@0.141.0(zod@3.25.76)':
+    optionalDependencies:
+      zod: 3.25.76
 
   '@sentry/babel-plugin-component-annotate@4.6.1': {}
 
