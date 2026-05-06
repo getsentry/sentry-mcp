@@ -293,7 +293,7 @@ export class SentryApiService {
             : JSON.stringify(result.error);
 
         throw createApiError(
-          `${context}: ${response.status} ${response.statusText ?? "Unknown"}`,
+          detail,
           response.status,
           detail,
           result.error,
