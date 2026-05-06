@@ -1119,6 +1119,74 @@ describe("API query builders", () => {
       );
       expect(globalThis.fetch).not.toHaveBeenCalled();
     });
+
+    it("should prefer statsPeriod over absolute time params for issue events", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = makeSdkMock([]);
+
+      await apiService.listEventsForIssue({
+        organizationSlug: "test-org",
+        issueId: "123",
+        query: "environment:production",
+        limit: 25,
+        sort: "-timestamp",
+        statsPeriod: "24h",
+        start: "2025-01-01T00:00:00Z",
+        end: "2025-01-02T00:00:00Z",
+      });
+
+      const url = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
+      );
+      const parsedUrl = new URL(url);
+
+      expect(parsedUrl.searchParams.get("query")).toBe(
+        "environment:production",
+      );
+      expect(parsedUrl.searchParams.get("per_page")).toBe("25");
+      expect(parsedUrl.searchParams.get("sort")).toBe("-timestamp");
+      expect(parsedUrl.searchParams.get("statsPeriod")).toBe("24h");
+      expect(parsedUrl.searchParams.has("start")).toBe(false);
+      expect(parsedUrl.searchParams.has("end")).toBe(false);
+    });
+
+    it("should omit full for issue events unless explicitly requested", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = makeSdkMock([]);
+
+      await apiService.listEventsForIssue({
+        organizationSlug: "test-org",
+        issueId: "123",
+        statsPeriod: "24h",
+      });
+
+      const defaultUrl = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0],
+      );
+      expect(new URL(defaultUrl).searchParams.has("full")).toBe(false);
+
+      await apiService.listEventsForIssue({
+        organizationSlug: "test-org",
+        issueId: "123",
+        statsPeriod: "24h",
+        full: true,
+      });
+
+      const fullUrl = extractFetchUrl(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[1],
+      );
+      expect(["1", "true"]).toContain(
+        new URL(fullUrl).searchParams.get("full"),
+      );
+    });
   });
 
   describe("Web URL builders", () => {
