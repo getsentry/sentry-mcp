@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { SentryApiService } from "./client";
 import { ConfigurationError } from "../errors";
+import { ApiPermissionError } from "./errors";
 
 describe("getIssueUrl", () => {
   it("should work with sentry.io", () => {
@@ -975,6 +976,18 @@ describe("API query builders", () => {
       );
     }
 
+    function makeSdkErrorMock(body: unknown, status: number, statusText = "") {
+      return vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status,
+            statusText,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      );
+    }
+
     it("should route errors dataset to Discover API builder", async () => {
       const apiService = new SentryApiService({
         host: "sentry.io",
@@ -1186,6 +1199,39 @@ describe("API query builders", () => {
       expect(["1", "true"]).toContain(
         new URL(fullUrl).searchParams.get("full"),
       );
+    });
+
+    it("should detect multi-project access errors from SDK error details", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+
+      globalThis.fetch = makeSdkErrorMock(
+        {
+          detail: "You do not have the multi project stream feature enabled",
+        },
+        403,
+        "Forbidden",
+      );
+
+      try {
+        await apiService.listEventsForIssue({
+          organizationSlug: "test-org",
+          issueId: "123",
+          statsPeriod: "24h",
+        });
+        throw new Error("Expected listEventsForIssue to reject");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiPermissionError);
+        expect(error).toHaveProperty(
+          "message",
+          "You do not have access to query across multiple projects. Please select a project for your query.",
+        );
+        expect((error as ApiPermissionError).isMultiProjectAccessError()).toBe(
+          true,
+        );
+      }
     });
   });
 

@@ -256,11 +256,12 @@ export function createApiError(
   let improvedMessage = message;
 
   // Handle the multi-project access error that comes in various forms
+  const knownErrorText = `${message}\n${detail ?? ""}`;
   if (
-    message.includes(
+    knownErrorText.includes(
       "You do not have the multi project stream feature enabled",
     ) ||
-    message.includes("You cannot view events from multiple projects")
+    knownErrorText.includes("You cannot view events from multiple projects")
   ) {
     improvedMessage =
       "You do not have access to query across multiple projects. Please select a project for your query.";
