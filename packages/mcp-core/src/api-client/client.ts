@@ -1619,7 +1619,7 @@ export class SentryApiService {
       path: { organization_id_or_slug: organizationSlug },
       query: {
         query: params?.query,
-        per_page: "25",
+        per_page: 25,
       } as Record<string, unknown>,
     } as Parameters<typeof sdkListAnOrganizationSProjects>[0]);
     const data = this.unwrapSdkResult(result, "listProjects");
@@ -3143,21 +3143,32 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ) {
+    const sdkQuery: Record<string, unknown> = {
+      per_page: limit,
+    };
+    if (query) {
+      sdkQuery.query = query;
+    }
+    if (sort) {
+      sdkQuery.sort = sort;
+    }
+    if (statsPeriod) {
+      sdkQuery.statsPeriod = statsPeriod;
+    } else if (start && end) {
+      sdkQuery.start = start;
+      sdkQuery.end = end;
+    }
+    if (full) {
+      sdkQuery.full = true;
+    }
+
     const result = await sdkListAnIssueSEvents({
       ...this.getSdkConfig(opts),
       path: {
         organization_id_or_slug: organizationSlug,
         issue_id: issueId as unknown as number,
       },
-      query: {
-        query,
-        per_page: limit,
-        sort,
-        statsPeriod,
-        start,
-        end,
-        full,
-      } as Record<string, unknown>,
+      query: sdkQuery,
     } as Parameters<typeof sdkListAnIssueSEvents>[0]);
     return this.unwrapSdkResult(result, "listEventsForIssue");
   }
