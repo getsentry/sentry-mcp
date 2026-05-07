@@ -25,7 +25,9 @@ The first hook lives in:
 - `.agents/skills/issue-triage/SKILL.md` for reusable triage instructions.
 - `.github/workflows/issue-triage.yml` for the `issues.opened` trigger.
 
-The handler runs the triage as separate structured steps:
+The handler runs the triage through one larger `issue-triage` skill with deterministic stages. Before each model stage, TypeScript fetches a fresh trusted context object containing the current issue snapshot and repository labels. The model receives that context, the stage name, prior stage results, and a typed result schema.
+
+The stages are:
 
 1. Search for duplicate issues.
 2. Close confirmed duplicates with a comment pointing at the canonical issue.

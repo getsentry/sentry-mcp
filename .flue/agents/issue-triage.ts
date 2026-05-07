@@ -79,6 +79,72 @@ const gh = defineCommand("gh", {
 const git = defineCommand("git");
 const pnpm = defineCommand("pnpm");
 
+type IssueContext = {
+  issueNumber: number;
+  repository?: string;
+  issue: unknown;
+  labels: unknown;
+  fetchedAt: string;
+};
+
+function repoArg(repository?: string) {
+  return repository ? ` --repo ${repository}` : "";
+}
+
+async function readJsonCommand(
+  session: FlueSession,
+  command: string,
+  description: string,
+) {
+  const result = await session.shell(command, {
+    commands: [gh],
+    timeout: 60_000,
+  });
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `${description} failed: ${result.stderr || result.stdout}`.trim(),
+    );
+  }
+
+  try {
+    return JSON.parse(result.stdout) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${description} returned invalid JSON: ${message}`);
+  }
+}
+
+async function readIssueContext(
+  session: FlueSession,
+  issueNumber: number,
+  repository?: string,
+): Promise<IssueContext> {
+  const repo = repoArg(repository);
+  const issue = await readJsonCommand(
+    session,
+    `gh issue view ${issueNumber}${repo} --json title,body,author,labels,comments,url,state,createdAt,updatedAt`,
+    "Fetching issue context",
+  );
+  const labels = await readJsonCommand(
+    session,
+    `gh label list${repo} --limit 200 --json name,description`,
+    "Fetching repository labels",
+  );
+  const context: IssueContext = {
+    issueNumber,
+    issue,
+    labels,
+    fetchedAt: new Date().toISOString(),
+  };
+
+  if (repository) {
+    context.repository = repository;
+  }
+
+  return context;
+}
+
 async function prepareRepository(
   session: FlueSession,
   issueNumber: number,
@@ -166,19 +232,35 @@ export default async function ({ init, payload }: FlueContext) {
   const session = await agent.session();
   const commands = [gh, git, pnpm];
 
+  const initialContext = await readIssueContext(
+    session,
+    issueNumber,
+    repository,
+  );
   const duplicateSearch = await session.skill("issue-triage", {
-    args: { step: "search-duplicates", issueNumber, repository },
+    args: {
+      stage: "search-duplicates",
+      issueNumber,
+      repository,
+      context: initialContext,
+    },
     commands: [gh],
     result: duplicateSearchSchema,
     timeout: 300_000,
   });
 
   if (duplicateSearch.status === "duplicate" && duplicateSearch.duplicate) {
+    const closureContext = await readIssueContext(
+      session,
+      issueNumber,
+      repository,
+    );
     const closure = await session.skill("issue-triage", {
       args: {
-        step: "close-duplicate",
+        stage: "close-duplicate",
         issueNumber,
         repository,
+        context: closureContext,
         duplicateSearch,
       },
       commands: [gh],
@@ -208,11 +290,17 @@ export default async function ({ init, payload }: FlueContext) {
     repository,
   );
 
+  const diagnosisContext = await readIssueContext(
+    session,
+    issueNumber,
+    repository,
+  );
   const diagnosis = await session.skill("issue-triage", {
     args: {
-      step: "diagnose-and-validate",
+      stage: "diagnose-and-validate",
       issueNumber,
       repository,
+      context: diagnosisContext,
       repositoryContext,
       duplicateSearch,
     },
@@ -221,11 +309,17 @@ export default async function ({ init, payload }: FlueContext) {
     timeout: 900_000,
   });
 
+  const updateContext = await readIssueContext(
+    session,
+    issueNumber,
+    repository,
+  );
   const update = await session.skill("issue-triage", {
     args: {
-      step: "apply-triage-update",
+      stage: "apply-triage-update",
       issueNumber,
       repository,
+      context: updateContext,
       repositoryContext,
       duplicateSearch,
       diagnosis,
