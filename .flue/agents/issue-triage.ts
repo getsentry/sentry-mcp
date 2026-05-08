@@ -469,7 +469,7 @@ function selectTriageComment(
     return undefined;
   }
 
-  return diagnosis.triage_comment?.trim() || buildIssueUpdateComment(diagnosis);
+  return diagnosis.triage_comment?.trim();
 }
 
 async function applyTriageUpdate(
