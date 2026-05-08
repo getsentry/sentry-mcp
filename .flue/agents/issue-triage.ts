@@ -56,15 +56,14 @@ const diagnosisSchema = v.object({
   summary: v.string(),
   evidence: v.array(v.string()),
   labels_to_apply: v.array(v.string()),
-  should_update_issue: v.boolean(),
+  should_update_title: v.boolean(),
   proposed_title: v.optional(v.string()),
-  proposed_body: v.optional(v.string()),
+  proposed_comment: v.string(),
   needs_human_review: v.boolean(),
 });
 
 const updateSchema = v.object({
   title_updated: v.boolean(),
-  body_updated: v.boolean(),
   labels_applied: v.array(v.string()),
   comment_posted: v.boolean(),
   needs_human_review: v.boolean(),
@@ -405,7 +404,6 @@ export default async function ({ init, payload }: FlueContext) {
     labels_applied: update.labels_applied,
     comment_posted: update.comment_posted,
     title_updated: update.title_updated,
-    body_updated: update.body_updated,
     needs_human_review: update.needs_human_review,
     summary: update.summary,
   };
