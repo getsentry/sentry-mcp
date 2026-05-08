@@ -59,16 +59,17 @@ Inputs include `duplicateSearch`. Use its `duplicate` value as the canonical iss
 1. Use `context` for the current issue and labels.
 2. Re-read the canonical issue if needed.
 3. Apply an existing duplicate label only if one exists, for example `duplicate` or `Duplicate`.
-4. Add a comment that links the canonical issue:
+4. Add a comment that links the canonical issue. Do not include issue titles, bodies, or comments in shell arguments; write the comment body to a temporary file and pass it with `--body-file`.
 
 ```md
-Thanks for the report. This appears to duplicate #<number>: <canonical title>.
+Thanks for the report. This appears to duplicate #<number>.
 
 Closing this so discussion and updates stay in one place. Please follow #<number> for progress.
 ```
 
-5. Close the current issue with:
-   - `gh issue close <issueNumber> --reason "not planned" --comment "<comment>"`
+5. Post and close the current issue with:
+   - `gh issue comment <issueNumber> --body-file <file>`
+   - `gh issue close <issueNumber> --reason duplicate --duplicate-of <number>`
    - Include `--repo <repository>` when provided.
 
 Return whether the close succeeded, the canonical duplicate, labels applied, comment status, and a short summary.

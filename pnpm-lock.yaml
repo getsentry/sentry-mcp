@@ -180,6 +180,7 @@ catalogs:
 
 overrides:
   '@modelcontextprotocol/sdk': ^1.26.0
+  fast-xml-parser: 5.7.2
   undici: ^7.24.4
 
 importers:
@@ -3814,10 +3815,6 @@ packages:
 
   fast-xml-builder@1.1.9:
     resolution: {integrity: sha512-jcyKVSEX13iseJqg7n/KWw+xnu/7fdrZ333Fac54KjHDIELVCfDDJXYIm6DTJ0Su4gSzrhqiK0DzY/wZbF40mw==}
-
-  fast-xml-parser@5.3.3:
-    resolution: {integrity: sha512-2O3dkPAAC6JavuMm8+4+pgTk+5hoAs+CjZ+sWcQLkX9+/tHRuTkQh/Oaifr8qDmZ8iEHb771Ea6G8CdwkrgvYA==}
-    hasBin: true
 
   fast-xml-parser@5.7.2:
     resolution: {integrity: sha512-P7oW7tLbYnhOLQk/Gv7cZgzgMPP/XN03K02/Jy6Y/NHzyIAIpxuZIM/YqAkfiXFPxA2CTm7NtCijK9EDu09u2w==}
@@ -9541,10 +9538,6 @@ snapshots:
     dependencies:
       path-expression-matcher: 1.5.0
 
-  fast-xml-parser@5.3.3:
-    dependencies:
-      strnum: 2.3.0
-
   fast-xml-parser@5.7.2:
     dependencies:
       '@nodable/entities': 2.1.0
@@ -10013,7 +10006,7 @@ snapshots:
   just-bash@2.14.4:
     dependencies:
       diff: 8.0.2
-      fast-xml-parser: 5.3.3
+      fast-xml-parser: 5.7.2
       file-type: 21.3.4
       ini: 6.0.0
       minimatch: 10.2.5

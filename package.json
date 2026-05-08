@@ -79,6 +79,7 @@
     ],
     "overrides": {
       "@modelcontextprotocol/sdk": "^1.26.0",
+      "fast-xml-parser": "5.7.2",
       "undici": "^7.24.4"
     }
   },
