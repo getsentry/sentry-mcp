@@ -81,8 +81,6 @@ const updateSchema = v.object({
   labels_applied: v.array(v.string()),
   comment_posted: v.boolean(),
   needs_human_review: v.boolean(),
-  disposition: dispositionSchema,
-  rewrite_mode: rewriteModeSchema,
   summary: v.string(),
 });
 
@@ -445,8 +443,6 @@ async function applyTriageUpdate(
       labels_applied: [],
       comment_posted: false,
       needs_human_review: true,
-      disposition: "unclear",
-      rewrite_mode: "none",
       summary: "Skipped triage update because the issue is already closed.",
     };
   }
@@ -496,8 +492,6 @@ async function applyTriageUpdate(
     labels_applied: labelsApplied,
     comment_posted: commentPosted,
     needs_human_review: diagnosis.needs_human_review,
-    disposition: diagnosis.disposition,
-    rewrite_mode: diagnosis.rewrite_mode,
     summary:
       changed.length > 0
         ? `Updated issue ${changed.join(", ")}.`
