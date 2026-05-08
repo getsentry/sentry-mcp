@@ -27,6 +27,19 @@ const categorySchema = v.picklist([
   "maintenance",
   "unknown",
 ]);
+const dispositionSchema = v.picklist([
+  "actionable",
+  "needs_more_info",
+  "low_actionability",
+  "impractical_scope",
+  "unclear",
+]);
+const rewriteModeSchema = v.picklist([
+  "none",
+  "light_cleanup",
+  "technical_diagnosis",
+  "scope_clarification",
+]);
 
 const duplicateCandidateSchema = v.object({
   number: v.pipe(v.number(), v.integer(), v.minValue(1)),
@@ -43,20 +56,26 @@ const duplicateSearchSchema = v.object({
   candidates: v.array(duplicateCandidateSchema),
   rationale: v.string(),
 });
+type DuplicateSearch = v.InferOutput<typeof duplicateSearchSchema>;
 
 const diagnosisSchema = v.object({
   severity: severitySchema,
   category: categorySchema,
+  disposition: dispositionSchema,
+  rewrite_mode: rewriteModeSchema,
   validity: v.picklist(["confirmed", "likely", "not_reproducible", "unclear"]),
   summary: v.string(),
   evidence: v.array(v.string()),
   labels_to_apply: v.array(v.string()),
+  should_comment: v.boolean(),
   should_update_issue: v.boolean(),
   proposed_title: v.optional(v.string()),
   proposed_body: v.optional(v.string()),
+  triage_comment: v.optional(v.string()),
   update_comment: v.optional(v.string()),
   needs_human_review: v.boolean(),
 });
+type Diagnosis = v.InferOutput<typeof diagnosisSchema>;
 
 const updateSchema = v.object({
   title_updated: v.boolean(),
@@ -66,6 +85,45 @@ const updateSchema = v.object({
   needs_human_review: v.boolean(),
   summary: v.string(),
 });
+
+function summarizeAgentFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("404 status code")) {
+    return "The triage model returned a provider error before producing structured output.";
+  }
+
+  if (message.includes("Gateway Timeout")) {
+    return "The triage model timed out before producing structured output.";
+  }
+
+  return "The triage agent failed before producing structured output.";
+}
+
+function buildDuplicateSearchFailure(error: unknown): DuplicateSearch {
+  return {
+    status: "uncertain",
+    candidates: [],
+    rationale: summarizeAgentFailure(error),
+  };
+}
+
+function buildDiagnosisFailure(error: unknown): Diagnosis {
+  return {
+    severity: "low",
+    category: "unknown",
+    disposition: "unclear",
+    rewrite_mode: "none",
+    validity: "unclear",
+    summary:
+      "Automated triage could not complete, so the issue is left unchanged for maintainer review.",
+    evidence: [summarizeAgentFailure(error)],
+    labels_to_apply: [],
+    should_comment: false,
+    should_update_issue: false,
+    needs_human_review: true,
+  };
+}
 
 const gh = defineCommand("gh", {
   env: {
@@ -356,17 +414,34 @@ function buildIssueUpdateComment(
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 3);
-  const lines = [
-    "Triage bot here.",
-    "",
-    "I tightened the issue description after checking the report and repository context so the current concern is easier to scan.",
-  ];
+  const lines = ["Triage bot here.", ""];
+
+  switch (diagnosis.rewrite_mode) {
+    case "light_cleanup":
+      lines.push(
+        "I did a light cleanup so the issue is easier to scan without changing the ask.",
+      );
+      break;
+    case "scope_clarification":
+      lines.push(
+        "I trimmed this to the current ask and what is still missing for maintainers.",
+      );
+      break;
+    case "technical_diagnosis":
+      lines.push(
+        "I updated the issue with the repository context that seemed relevant.",
+      );
+      break;
+    case "none":
+      lines.push("I added a short triage note for maintainer review.");
+      break;
+  }
 
   if (diagnosis.summary.trim()) {
     lines.push("", `Current read: ${diagnosis.summary.trim()}`);
   }
 
-  if (evidence.length > 0) {
+  if (diagnosis.rewrite_mode === "technical_diagnosis" && evidence.length > 0) {
     lines.push("", "What I checked:");
     for (const item of evidence) {
       lines.push(`- ${item}`);
@@ -376,6 +451,25 @@ function buildIssueUpdateComment(
   lines.push("", "A maintainer will take it from here.");
 
   return lines.join("\n");
+}
+
+function selectTriageComment(
+  diagnosis: v.InferOutput<typeof diagnosisSchema>,
+  bodyUpdated: boolean,
+) {
+  if (bodyUpdated) {
+    return (
+      diagnosis.update_comment?.trim() ||
+      diagnosis.triage_comment?.trim() ||
+      buildIssueUpdateComment(diagnosis)
+    );
+  }
+
+  if (!diagnosis.should_comment) {
+    return undefined;
+  }
+
+  return diagnosis.triage_comment?.trim();
 }
 
 async function applyTriageUpdate(
@@ -415,12 +509,14 @@ async function applyTriageUpdate(
       diagnosis.proposed_body,
     );
 
-    if (bodyUpdated) {
-      commentPosted = await postComment(
-        session,
-        context,
-        diagnosis.update_comment?.trim() || buildIssueUpdateComment(diagnosis),
-      );
+    const comment = selectTriageComment(diagnosis, bodyUpdated);
+    if (comment) {
+      commentPosted = await postComment(session, context, comment);
+    }
+  } else {
+    const comment = selectTriageComment(diagnosis, false);
+    if (comment) {
+      commentPosted = await postComment(session, context, comment);
     }
   }
 
@@ -428,6 +524,7 @@ async function applyTriageUpdate(
     titleUpdated ? "title" : null,
     bodyUpdated ? "body" : null,
     labelsApplied.length > 0 ? "labels" : null,
+    commentPosted ? "comment" : null,
   ].filter(Boolean);
 
   return {
@@ -566,17 +663,25 @@ export default async function ({ init, payload }: FlueContext) {
     issueNumber,
     repository,
   );
-  const duplicateSearch = await session.skill("issue-triage", {
-    args: {
-      stage: "search-duplicates",
-      issueNumber,
-      repository,
-      context: initialContext,
-    },
-    commands: [gh],
-    result: duplicateSearchSchema,
-    timeout: 300_000,
-  });
+  let duplicateSearch: DuplicateSearch;
+  try {
+    duplicateSearch = await session.skill("issue-triage", {
+      args: {
+        stage: "search-duplicates",
+        issueNumber,
+        repository,
+        context: initialContext,
+      },
+      commands: [gh],
+      result: duplicateSearchSchema,
+      timeout: 300_000,
+    });
+  } catch (error) {
+    console.warn(
+      `[issue-triage] Duplicate search failed: ${summarizeAgentFailure(error)}`,
+    );
+    duplicateSearch = buildDuplicateSearchFailure(error);
+  }
 
   if (duplicateSearch.status === "duplicate") {
     if (!duplicateSearch.duplicate) {
@@ -620,19 +725,27 @@ export default async function ({ init, payload }: FlueContext) {
     issueNumber,
     repository,
   );
-  const diagnosis = await session.skill("issue-triage", {
-    args: {
-      stage: "diagnose-and-validate",
-      issueNumber,
-      repository,
-      context: diagnosisContext,
-      repositoryContext,
-      duplicateSearch,
-    },
-    commands,
-    result: diagnosisSchema,
-    timeout: 900_000,
-  });
+  let diagnosis: Diagnosis;
+  try {
+    diagnosis = await session.skill("issue-triage", {
+      args: {
+        stage: "diagnose-and-validate",
+        issueNumber,
+        repository,
+        context: diagnosisContext,
+        repositoryContext,
+        duplicateSearch,
+      },
+      commands,
+      result: diagnosisSchema,
+      timeout: 900_000,
+    });
+  } catch (error) {
+    console.warn(
+      `[issue-triage] Diagnosis failed: ${summarizeAgentFailure(error)}`,
+    );
+    diagnosis = buildDiagnosisFailure(error);
+  }
 
   const updateContext = await readIssueContext(
     session,
@@ -654,6 +767,8 @@ export default async function ({ init, payload }: FlueContext) {
     ],
     severity: diagnosis.severity,
     category: diagnosis.category,
+    disposition: diagnosis.disposition,
+    rewrite_mode: diagnosis.rewrite_mode,
     validity: diagnosis.validity,
     labels_applied: update.labels_applied,
     comment_posted: update.comment_posted,
