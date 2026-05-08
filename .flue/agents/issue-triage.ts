@@ -79,7 +79,7 @@ const gh = defineCommand("gh", {
 const git = defineCommand("git");
 const pnpm = defineCommand("pnpm");
 
-// Multi-turn calls against OpenAI reasoning models (gpt-5, o-series, ...) fail
+// Multi-turn calls against OpenAI reasoning models (gpt-5, gpt-5.5, o-series, ...) fail
 // with `Items are not persisted when 'store' is set to false` because pi-ai —
 // the LLM client Flue uses internally — hardcodes `store: false` on the
 // OpenAI Responses API and replays `rs_*` reasoning IDs verbatim on the next
@@ -279,7 +279,7 @@ export default async function ({ init, payload }: FlueContext) {
   const { issueNumber, repository } = v.parse(payloadSchema, payload);
   const agent = await init({
     sandbox: "local",
-    model: process.env.FLUE_TRIAGE_MODEL || "openai/gpt-5",
+    model: process.env.FLUE_TRIAGE_MODEL || "openai/gpt-5.5",
   });
   const session = await agent.session();
   enableEncryptedReasoning(session);
