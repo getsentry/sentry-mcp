@@ -28,6 +28,16 @@ Use `context.issue` as the source of truth for the current title, body, comments
 - Only apply labels that already exist in the repository.
 - Prefer conservative decisions when evidence is weak. Do not close uncertain duplicates.
 
+### Shell sandbox limits
+
+The sandbox runs a simulated bash. External commands such as `gh` and `git` are bridged through a host shim that **does not forward stdin from the simulated shell into the real process**. This has two important consequences:
+
+- **Never** use shell stdin redirection (`<`, `<<`, `<<<`) or process substitution to feed input into `gh`, `git`, or any other bridged command. The redirected bytes are read by the simulated shell but are never piped to the spawned process. The command will hang forever waiting on stdin and may corrupt the issue when it is finally killed.
+- **Never** use `--body-file -`, `--body -`, or any other "read from stdin" flag with `gh`. There is no usable stdin. Always pass content via a real file path on disk (for example `/workspace/<file>.md`) using the explicit `--body-file <path>` or `--body "<inline>"` forms.
+- **Never** chain a mutating `gh issue edit` with a verification command using `&&`. Run mutations in their own bash invocation so a hang in the mutation cannot also block any follow-up work.
+
+If you need to pass multi-line content to a bridged command, write it to a file first (with the `write` tool or `cat > path <<'EOF' ... EOF`) and then reference that file with `--body-file <path>`.
+
 ## Stage: `search-duplicates`
 
 Goal: determine whether the new issue is a confirmed duplicate.
@@ -59,7 +69,7 @@ Inputs include `duplicateSearch`. Use its `duplicate` value as the canonical iss
 1. Use `context` for the current issue and labels.
 2. Re-read the canonical issue if needed.
 3. Apply an existing duplicate label only if one exists, for example `duplicate` or `Duplicate`.
-4. Add a comment that links the canonical issue. Do not include issue titles, bodies, or comments in shell arguments; write the comment body to a temporary file and pass it with `--body-file`.
+4. Add a comment that links the canonical issue. Do not include issue titles, bodies, or comments in shell arguments; write the comment body to a real file path (for example `/workspace/issue-<issueNumber>-comment.md`) and pass it with `--body-file <path>`. Do not use `--body-file -` or stdin redirection — see [Shell sandbox limits](#shell-sandbox-limits).
 
 ```md
 Thanks for the report. This appears to duplicate #<number>.
@@ -68,9 +78,10 @@ Closing this so discussion and updates stay in one place. Please follow #<number
 ```
 
 5. Post and close the current issue with:
-   - `gh issue comment <issueNumber> --body-file <file>`
+   - `gh issue comment <issueNumber> --body-file <path>`
    - `gh issue close <issueNumber> --reason duplicate --duplicate-of <number>`
    - Include `--repo <repository>` when provided.
+   - Run each `gh` mutation in its own bash invocation. Do not chain mutations together with `&&` or chain a mutation with a verification call.
 
 Return whether the close succeeded, the canonical duplicate, labels applied, comment status, and a short summary.
 
@@ -151,13 +162,17 @@ Inputs include `diagnosis`. Use `context` for the current issue and labels. Muta
 1. Re-fetch issue state before mutating only if needed to avoid editing a closed or changed issue.
 2. Apply only labels from `diagnosis.labels_to_apply` that exist in `context.labels`.
 3. If `diagnosis.should_update_issue` is true:
-   - Use `gh issue edit <issueNumber> --title ...` when `proposed_title` is present.
-   - Use `gh issue edit <issueNumber> --body-file <file>` when `proposed_body` is present.
+   - Write the proposed body to a real file (for example `/workspace/issue-<issueNumber>-body.md`) using the `write` tool or a `cat > path <<'EOF' ... EOF` heredoc before invoking `gh`.
+   - Use `gh issue edit <issueNumber> --title "..." --body-file <path>` in a single invocation when both `proposed_title` and `proposed_body` are present, or run the title-only and body-only forms in separate bash invocations.
+   - **Never** use `--body-file -` or any shell stdin redirection (`<`, `<<`, `<<<`) with `gh`. The bridged `gh` shim does not forward stdin and the command will hang and then wipe the issue body when it is killed. See [Shell sandbox limits](#shell-sandbox-limits).
    - The updated body must keep the exact original report from `context.issue` in the footer using the "Original Report" details block.
 4. Post a concise comment when it adds useful context:
    - Summarize validation that succeeded or failed.
    - Ask for missing reproduction details when validity is `unclear`.
    - For security-sensitive reports, avoid exploit details and request maintainer review.
+   - Use `gh issue comment <issueNumber> --body-file <path>` with a real file path; do not use `--body-file -` or stdin redirection.
 5. Do not close non-duplicate issues.
+6. Run each `gh` mutation in its own bash invocation. Do not chain a mutation (`gh issue edit`, `gh issue comment`, `gh issue close`) with a follow-up read (`gh issue view`) using `&&` — a hang in the mutation will block the entire chain and exhaust the stage timeout.
+7. Do not re-run the same `gh issue edit` to verify a previous edit. If the first invocation returned exit code 0, trust it and move on.
 
 Return title/body update status, labels applied, comment status, human-review status, and a short summary.
