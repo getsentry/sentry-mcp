@@ -89,7 +89,7 @@ Return whether the close succeeded, the canonical duplicate, labels applied, com
 
 Goal: diagnose the issue and judge whether the report is valid or needs correction.
 
-Inputs include `repositoryContext`. Use `context` for the current issue and labels. If `repositoryContext.checkoutAvailable` is true, inspect code under `repositoryContext.repoPath`.
+Inputs include `repositoryContext` and `duplicateSearch`. Use `context` for the current issue and labels. If `repositoryContext.checkoutAvailable` is true, inspect code under `repositoryContext.repoPath`. Treat `duplicateSearch.candidates` (which may include both open and closed issues) as candidate related tickets — they were not strong enough to close as a duplicate, but they may still describe related work, prior fixes, follow-ups, or the same subsystem.
 
 1. Read `AGENTS.md`, relevant docs, and neighboring files before making claims about expected behavior.
 2. Diagnose the concern:
@@ -102,10 +102,17 @@ Inputs include `repositoryContext`. Use `context` for the current issue and labe
    - Run targeted tests, typechecks, or package scripts only when they are directly relevant and reasonably scoped.
    - Do not run broad or destructive commands unless the repo documentation makes them the standard validation path.
    - If dependencies are missing or validation is too expensive, say so in `evidence` and mark validity conservatively.
-4. Decide whether the original ticket accurately describes the concern.
+4. Review `duplicateSearch.candidates` and any related issues you discovered while searching the repo. For each one you decide to cite:
+   - Confirm the connection is concrete (same subsystem, prior attempt at the same fix, blocked-by, follow-up to a closed fix, etc.). Do not link issues just because they share a label or topic.
+   - Closed issues are fair game and often the most useful — link the issue that fixed or rejected the same concern, the regression source, or the prior decision.
+   - Prefer linking inline in `Analysis` or `Next Steps` where the link adds context to a specific bullet (for example "regression of #123" or "previously rejected in #456 (closed, wontfix)").
+   - If a related ticket is worth surfacing but does not fit naturally inside a bullet, list it in the `References` section of the body template instead of forcing it inline.
+   - Use short GitHub-style references (`#123`) for issues in the same repository. Use full `owner/repo#123` form only for cross-repo links.
+5. Decide whether the original ticket accurately describes the concern.
    - If it is misleading, underspecified, or mixes symptoms with a different root concern, set `should_update_issue` to true.
    - Propose a clearer title and body using the template below.
    - The "Original report" footer must preserve the title and body from `context.issue`, not a paraphrase.
+   - If `should_update_issue` is false but you found related tickets worth recording, surface them through the comment posted in `apply-triage-update` instead of rewriting the body.
 
 ### Output style
 
@@ -141,6 +148,11 @@ Use this body template when updating the issue. Keep the leading callout exactly
 - [Concrete action for maintainers or reporter.]
 - [Concrete action.]
 
+## References
+
+- #[number] — [why this ticket is related, e.g. "prior fix for the same crash, reverted in <commit>"]
+- [owner/repo#number] — [why this cross-repo ticket is related]
+
 ---
 
 <details>
@@ -153,7 +165,7 @@ Use this body template when updating the issue. Keep the leading callout exactly
 </details>
 ```
 
-Omit `Analysis` or `Next Steps` if there is nothing concrete to put there. Never omit `Problem` or the original-report footer.
+Omit `Analysis`, `Next Steps`, or `References` if there is nothing concrete to put there — an empty `References` section is worse than none. Never omit `Problem` or the original-report footer. Only include a ticket in `References` if you could not reasonably link it inline; do not duplicate inline links here.
 
 Return:
 
@@ -171,7 +183,7 @@ Return:
 
 Goal: apply non-duplicate triage results to the issue.
 
-Inputs include `diagnosis`. Use `context` for the current issue and labels. Mutations must be based on `diagnosis`, not free-form reinterpretation.
+Inputs include `diagnosis` and `duplicateSearch`. Use `context` for the current issue and labels. Mutations must be based on `diagnosis`, not free-form reinterpretation. `duplicateSearch.candidates` is available so that comments can cite related open or closed tickets when the diagnosis did not already pull them inline into the body.
 
 1. Re-fetch issue state before mutating only if needed to avoid editing a closed or changed issue.
 2. Apply only labels from `diagnosis.labels_to_apply` that exist in `context.labels`.
@@ -184,6 +196,7 @@ Inputs include `diagnosis`. Use `context` for the current issue and labels. Muta
    - Summarize validation that succeeded or failed.
    - Ask for missing reproduction details when validity is `unclear`.
    - For security-sensitive reports, avoid exploit details and request maintainer review.
+   - When `diagnosis.should_update_issue` is false but `duplicateSearch.candidates` contains tickets that are clearly related (including closed ones), link them in the comment with one short phrase explaining the connection. Skip this if the rewritten body already cites the same tickets.
    - Use `gh issue comment <issueNumber> --body-file <path>` with a real file path; do not use `--body-file -` or stdin redirection.
 5. Do not close non-duplicate issues.
 6. Run each `gh` mutation in its own bash invocation. Do not chain a mutation (`gh issue edit`, `gh issue comment`, `gh issue close`) with a follow-up read (`gh issue view`) using `&&` — a hang in the mutation will block the entire chain and exhaust the stage timeout.
