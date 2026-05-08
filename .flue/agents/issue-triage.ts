@@ -225,9 +225,18 @@ async function prepareRepository(
 
 export default async function ({ init, payload }: FlueContext) {
   const { issueNumber, repository } = v.parse(payloadSchema, payload);
+  // Default to gpt-4.1 (non-reasoning) instead of gpt-5: pi-ai's
+  // OpenAI Responses provider hardcodes `store: false` and replays
+  // emitted `rs_*` reasoning items verbatim on the next turn, which
+  // 404s on every multi-turn call against any reasoning model. Flue
+  // 0.3.11 doesn't expose a reasoning option, so we cannot ask pi-ai
+  // to send `include: ["reasoning.encrypted_content"]`. Switch back
+  // to a reasoning model once @flue/sdk ships with thinkingLevel /
+  // reasoning support (withastro/flue#69, merged but unreleased).
+  // Refs: badlogic/pi-mono#3369, badlogic/pi-mono#1504.
   const agent = await init({
     sandbox: "local",
-    model: process.env.FLUE_TRIAGE_MODEL || "openai/gpt-5",
+    model: process.env.FLUE_TRIAGE_MODEL || "openai/gpt-4.1",
   });
   const session = await agent.session();
   const commands = [gh, git, pnpm];
