@@ -39,9 +39,9 @@ The workflow needs:
 
 - Node.js 22. The workflow sets this up with `actions/setup-node`.
 - `OPENAI_API_KEY` as a GitHub Actions secret.
-- Optional `FLUE_TRIAGE_MODEL` as a GitHub Actions variable. Defaults to `openai/gpt-4.1`.
+- Optional `FLUE_TRIAGE_MODEL` as a GitHub Actions variable. Defaults to `openai/gpt-5`.
 
-  We default to a non-reasoning OpenAI model because [`@mariozechner/pi-ai`](https://github.com/badlogic/pi-mono) — the LLM client Flue uses internally — hardcodes `store: false` on the OpenAI Responses API while still replaying `rs_*` reasoning items on the next turn. Reasoning models (e.g. `openai/gpt-5`) emit those items, so every multi-turn call 404s with `Items are not persisted when 'store' is set to false`. `@flue/sdk` 0.3.11 does not expose a reasoning option, so we cannot make pi-ai request `include: ["reasoning.encrypted_content"]` either. Switch to a reasoning model once a Flue release ships [`reasoning`/`thinkingLevel`](https://github.com/withastro/flue/pull/69) plumbing (merged into Flue `main` but not yet released), or once pi-ai picks up [#1504](https://github.com/badlogic/pi-mono/pull/1504) / [#3369](https://github.com/badlogic/pi-mono/issues/3369).
+  Reasoning models work despite a known pi-ai bug because the agent installs a small `onPayload` hook on the Flue session's pi-agent-core harness that adds `include: ["reasoning.encrypted_content"]` to every OpenAI Responses request. Without it, every multi-turn call against `openai/gpt-5` (or any other reasoning model) 404s with `Items are not persisted when 'store' is set to false`: [`@mariozechner/pi-ai`](https://github.com/badlogic/pi-mono) hardcodes `store: false` on the OpenAI Responses API while still replaying the `rs_*` reasoning IDs from earlier turns. With encrypted content inlined the replay carries the full reasoning blob, so OpenAI never has to look the IDs up. Drop the hook once @flue/sdk exposes [`reasoning`/`thinkingLevel`](https://github.com/withastro/flue/pull/69) (merged into Flue `main` but unreleased) or pi-ai stops hardcoding `store: false` ([badlogic/pi-mono#3369](https://github.com/badlogic/pi-mono/issues/3369), [pi-mono#1504](https://github.com/badlogic/pi-mono/pull/1504)).
 
 Run it locally with:
 

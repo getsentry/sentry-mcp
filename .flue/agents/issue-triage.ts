@@ -79,6 +79,58 @@ const gh = defineCommand("gh", {
 const git = defineCommand("git");
 const pnpm = defineCommand("pnpm");
 
+// Multi-turn calls against OpenAI reasoning models (gpt-5, o-series, ...) fail
+// with `Items are not persisted when 'store' is set to false` because pi-ai —
+// the LLM client Flue uses internally — hardcodes `store: false` on the
+// OpenAI Responses API and replays `rs_*` reasoning IDs verbatim on the next
+// turn. The supported escape hatch is to ask OpenAI to inline the encrypted
+// reasoning blob (`include: ["reasoning.encrypted_content"]`); pi-ai's
+// `convertResponsesMessages` then ships that blob back instead of trying to
+// look the ID up server-side, so no `store=true` (and no provider-side
+// retention) is required.
+//
+// Flue 0.3.11 doesn't expose a `reasoning`/`thinkingLevel` knob, so we reach
+// into the Session's pi-agent-core harness and install an `onPayload` hook —
+// pi-ai already invokes this hook to let callers mutate the final request
+// payload right before it goes to the model. Drop this once @flue/sdk gates
+// reasoning publicly (withastro/flue#69, merged but unreleased) or pi-ai
+// stops hardcoding `store: false` (badlogic/pi-mono#3369).
+type ResponsesPayload = {
+  include?: string[];
+  reasoning?: { effort?: string; summary?: string };
+};
+type ResponsesModel = { api?: string; reasoning?: boolean };
+type Harness = {
+  onPayload?: (
+    params: ResponsesPayload,
+    model: ResponsesModel,
+  ) => ResponsesPayload | undefined;
+};
+type SessionWithHarness = FlueSession & { harness: Harness };
+
+const REASONING_RESPONSES_APIS = new Set([
+  "openai-responses",
+  "azure-openai-responses",
+]);
+
+function enableEncryptedReasoning(session: FlueSession) {
+  const harness = (session as SessionWithHarness).harness;
+  if (!harness || typeof harness !== "object") {
+    return;
+  }
+  harness.onPayload = (params, model) => {
+    if (!model?.reasoning || !REASONING_RESPONSES_APIS.has(model.api ?? "")) {
+      return params;
+    }
+    const include = new Set(
+      Array.isArray(params.include) ? params.include : [],
+    );
+    include.add("reasoning.encrypted_content");
+    params.include = Array.from(include);
+    return params;
+  };
+}
+
 type IssueContext = {
   issueNumber: number;
   repository?: string;
@@ -225,20 +277,12 @@ async function prepareRepository(
 
 export default async function ({ init, payload }: FlueContext) {
   const { issueNumber, repository } = v.parse(payloadSchema, payload);
-  // Default to gpt-4.1 (non-reasoning) instead of gpt-5: pi-ai's
-  // OpenAI Responses provider hardcodes `store: false` and replays
-  // emitted `rs_*` reasoning items verbatim on the next turn, which
-  // 404s on every multi-turn call against any reasoning model. Flue
-  // 0.3.11 doesn't expose a reasoning option, so we cannot ask pi-ai
-  // to send `include: ["reasoning.encrypted_content"]`. Switch back
-  // to a reasoning model once @flue/sdk ships with thinkingLevel /
-  // reasoning support (withastro/flue#69, merged but unreleased).
-  // Refs: badlogic/pi-mono#3369, badlogic/pi-mono#1504.
   const agent = await init({
     sandbox: "local",
-    model: process.env.FLUE_TRIAGE_MODEL || "openai/gpt-4.1",
+    model: process.env.FLUE_TRIAGE_MODEL || "openai/gpt-5",
   });
   const session = await agent.session();
+  enableEncryptedReasoning(session);
   const commands = [gh, git, pnpm];
 
   const initialContext = await readIssueContext(
