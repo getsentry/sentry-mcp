@@ -183,6 +183,11 @@ overrides:
   fast-xml-parser: 5.7.2
   undici: ^7.24.4
 
+patchedDependencies:
+  '@mariozechner/pi-ai@0.73.1':
+    hash: 116714648ce38973c07bc9327b21b0f422407b8a1c832ecbb4362b8b3cc54157
+    path: patches/@mariozechner__pi-ai@0.73.1.patch
+
 importers:
 
   .:
@@ -7081,7 +7086,7 @@ snapshots:
       '@cloudflare/shell': 0.3.6(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ai@6.0.64(zod@3.25.76))(zod@3.25.76)
       '@hono/node-server': 1.19.9(hono@4.11.4)
       '@mariozechner/pi-agent-core': 0.73.1(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ws@8.18.0)(zod@3.25.76)
-      '@mariozechner/pi-ai': 0.73.1(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ws@8.18.0)(zod@3.25.76)
+      '@mariozechner/pi-ai': 0.73.1(patch_hash=116714648ce38973c07bc9327b21b0f422407b8a1c832ecbb4362b8b3cc54157)(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ws@8.18.0)(zod@3.25.76)
       '@modelcontextprotocol/sdk': 1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
       '@valibot/to-json-schema': 1.7.0(valibot@1.4.0(typescript@5.8.3))
       esbuild: 0.25.5
@@ -7411,7 +7416,7 @@ snapshots:
 
   '@mariozechner/pi-agent-core@0.73.1(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ws@8.18.0)(zod@3.25.76)':
     dependencies:
-      '@mariozechner/pi-ai': 0.73.1(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ws@8.18.0)(zod@3.25.76)
+      '@mariozechner/pi-ai': 0.73.1(patch_hash=116714648ce38973c07bc9327b21b0f422407b8a1c832ecbb4362b8b3cc54157)(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ws@8.18.0)(zod@3.25.76)
       typebox: 1.1.38
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
@@ -7422,7 +7427,7 @@ snapshots:
       - ws
       - zod
 
-  '@mariozechner/pi-ai@0.73.1(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ws@8.18.0)(zod@3.25.76)':
+  '@mariozechner/pi-ai@0.73.1(patch_hash=116714648ce38973c07bc9327b21b0f422407b8a1c832ecbb4362b8b3cc54157)(@modelcontextprotocol/sdk@1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(ws@8.18.0)(zod@3.25.76)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1(zod@3.25.76)
       '@aws-sdk/client-bedrock-runtime': 3.1045.0
