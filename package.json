@@ -27,6 +27,7 @@
     "deploy": "turbo deploy",
     "eval": "dotenv -e .env -e .env.local -- turbo eval",
     "eval:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run eval:ci",
+    "flue:issue-triage": "flue run issue-triage --target node",
     "format": "biome format --write",
     "lint": "biome lint",
     "lint:fix": "biome lint --fix",
@@ -44,6 +45,7 @@
   },
   "dependencies": {
     "@biomejs/biome": "catalog:",
+    "@flue/sdk": "catalog:",
     "@types/node": "catalog:",
     "dotenv": "catalog:",
     "dotenv-cli": "catalog:",
@@ -53,6 +55,7 @@
     "tsx": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:",
+    "valibot": "catalog:",
     "vitest": "catalog:",
     "vitest-evals": "catalog:"
   },
@@ -76,10 +79,12 @@
     ],
     "overrides": {
       "@modelcontextprotocol/sdk": "^1.26.0",
+      "fast-xml-parser": "5.7.2",
       "undici": "^7.24.4"
     }
   },
   "devDependencies": {
+    "@flue/cli": "catalog:",
     "@types/json-schema": "^7.0.15"
   }
 }
