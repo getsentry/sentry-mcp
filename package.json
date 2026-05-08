@@ -81,9 +81,6 @@
       "@modelcontextprotocol/sdk": "^1.26.0",
       "fast-xml-parser": "5.7.2",
       "undici": "^7.24.4"
-    },
-    "patchedDependencies": {
-      "@mariozechner/pi-ai@0.73.1": "patches/@mariozechner__pi-ai@0.73.1.patch"
     }
   },
   "devDependencies": {
