@@ -46,7 +46,7 @@ A confirmed duplicate must describe the same underlying bug, request, or documen
 Return:
 
 - `status`: `duplicate`, `unique`, or `uncertain`
-- `duplicate`: only when `status` is `duplicate`
+- `duplicate`: required when `status` is `duplicate`; omit otherwise
 - `candidates`: up to five best candidates with confidence and reason
 - `rationale`: concise evidence for the decision
 

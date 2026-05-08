@@ -249,7 +249,13 @@ export default async function ({ init, payload }: FlueContext) {
     timeout: 300_000,
   });
 
-  if (duplicateSearch.status === "duplicate" && duplicateSearch.duplicate) {
+  if (duplicateSearch.status === "duplicate") {
+    if (!duplicateSearch.duplicate) {
+      throw new Error(
+        `Duplicate search returned duplicate status without a canonical issue for #${issueNumber}.`,
+      );
+    }
+
     const closureContext = await readIssueContext(
       session,
       issueNumber,
