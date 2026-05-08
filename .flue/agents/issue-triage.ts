@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { FlueContext, FlueSession } from "@flue/sdk/client";
 import { defineCommand } from "@flue/sdk/node";
 import * as v from "valibot";
@@ -26,7 +29,7 @@ const categorySchema = v.picklist([
 ]);
 
 const duplicateCandidateSchema = v.object({
-  number: v.number(),
+  number: v.pipe(v.number(), v.integer(), v.minValue(1)),
   title: v.string(),
   url: v.string(),
   state: v.string(),
@@ -41,14 +44,6 @@ const duplicateSearchSchema = v.object({
   rationale: v.string(),
 });
 
-const duplicateClosureSchema = v.object({
-  closed: v.boolean(),
-  duplicate_issue: duplicateCandidateSchema,
-  comment_posted: v.boolean(),
-  labels_applied: v.array(v.string()),
-  summary: v.string(),
-});
-
 const diagnosisSchema = v.object({
   severity: severitySchema,
   category: categorySchema,
@@ -59,6 +54,7 @@ const diagnosisSchema = v.object({
   should_update_issue: v.boolean(),
   proposed_title: v.optional(v.string()),
   proposed_body: v.optional(v.string()),
+  update_comment: v.optional(v.string()),
   needs_human_review: v.boolean(),
 });
 
@@ -79,22 +75,8 @@ const gh = defineCommand("gh", {
 const git = defineCommand("git");
 const pnpm = defineCommand("pnpm");
 
-// Multi-turn calls against OpenAI reasoning models (gpt-5, gpt-5.5, o-series, ...) fail
-// with `Items are not persisted when 'store' is set to false` because pi-ai —
-// the LLM client Flue uses internally — hardcodes `store: false` on the
-// OpenAI Responses API and replays `rs_*` reasoning IDs verbatim on the next
-// turn. The supported escape hatch is to ask OpenAI to inline the encrypted
-// reasoning blob (`include: ["reasoning.encrypted_content"]`); pi-ai's
-// `convertResponsesMessages` then ships that blob back instead of trying to
-// look the ID up server-side, so no `store=true` (and no provider-side
-// retention) is required.
-//
-// Flue 0.3.11 doesn't expose a `reasoning`/`thinkingLevel` knob, so we reach
-// into the Session's pi-agent-core harness and install an `onPayload` hook —
-// pi-ai already invokes this hook to let callers mutate the final request
-// payload right before it goes to the model. Drop this once @flue/sdk gates
-// reasoning publicly (withastro/flue#69, merged but unreleased) or pi-ai
-// stops hardcoding `store: false` (badlogic/pi-mono#3369).
+// pi-ai currently replays OpenAI Responses reasoning IDs with store=false.
+// Inline encrypted reasoning until Flue/pi-ai expose this cleanly.
 type ResponsesPayload = {
   include?: string[];
   reasoning?: { effort?: string; summary?: string };
@@ -139,8 +121,69 @@ type IssueContext = {
   fetchedAt: string;
 };
 
+function shellQuote(value: string) {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
 function repoArg(repository?: string) {
-  return repository ? ` --repo ${repository}` : "";
+  return repository ? ` --repo ${shellQuote(repository)}` : "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getIssueState(context: IssueContext) {
+  if (!isRecord(context.issue) || typeof context.issue.state !== "string") {
+    return null;
+  }
+  return context.issue.state.toLowerCase();
+}
+
+function getIssueTitle(context: IssueContext) {
+  if (!isRecord(context.issue) || typeof context.issue.title !== "string") {
+    return "";
+  }
+  return context.issue.title;
+}
+
+function getIssueBody(context: IssueContext) {
+  if (!isRecord(context.issue) || typeof context.issue.body !== "string") {
+    return "";
+  }
+  return context.issue.body;
+}
+
+function existingLabels(context: IssueContext) {
+  if (!Array.isArray(context.labels)) {
+    return new Map<string, string>();
+  }
+
+  const labels = new Map<string, string>();
+  for (const label of context.labels) {
+    if (isRecord(label) && typeof label.name === "string") {
+      labels.set(label.name.toLowerCase(), label.name);
+    }
+  }
+  return labels;
+}
+
+function filterExistingLabels(context: IssueContext, labels: string[]) {
+  const available = existingLabels(context);
+  const result = new Map<string, string>();
+
+  for (const label of labels) {
+    const existing = available.get(label.toLowerCase());
+    if (existing) {
+      result.set(existing.toLowerCase(), existing);
+    }
+  }
+
+  return Array.from(result.values());
+}
+
+function findDuplicateLabel(context: IssueContext) {
+  return existingLabels(context).get("duplicate") ?? null;
 }
 
 async function readJsonCommand(
@@ -165,6 +208,239 @@ async function readJsonCommand(
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`${description} returned invalid JSON: ${message}`);
   }
+}
+
+async function runGhCommand(
+  session: FlueSession,
+  command: string,
+  description: string,
+) {
+  const result = await session.shell(command, {
+    commands: [gh],
+    timeout: 60_000,
+  });
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `${description} failed: ${result.stderr || result.stdout}`.trim(),
+    );
+  }
+}
+
+async function withGhBodyFile<T>(
+  prefix: string,
+  body: string,
+  callback: (path: string) => Promise<T>,
+) {
+  const dir = await mkdtemp(join(tmpdir(), "issue-triage-"));
+  const path = join(dir, `${prefix}.md`);
+
+  await writeFile(path, body, "utf8");
+
+  try {
+    return await callback(path);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function applyLabels(
+  session: FlueSession,
+  context: IssueContext,
+  labels: string[],
+) {
+  const repo = repoArg(context.repository);
+  const applied: string[] = [];
+
+  for (const label of filterExistingLabels(context, labels)) {
+    await runGhCommand(
+      session,
+      `gh issue edit ${context.issueNumber}${repo} --add-label ${shellQuote(label)}`,
+      `Applying label ${label}`,
+    );
+    applied.push(label);
+  }
+
+  return applied;
+}
+
+async function editIssueTitle(
+  session: FlueSession,
+  context: IssueContext,
+  title?: string,
+) {
+  const nextTitle = title?.trim();
+  if (!nextTitle || nextTitle === getIssueTitle(context).trim()) {
+    return false;
+  }
+
+  await runGhCommand(
+    session,
+    `gh issue edit ${context.issueNumber}${repoArg(context.repository)} --title ${shellQuote(nextTitle)}`,
+    "Updating issue title",
+  );
+  return true;
+}
+
+async function editIssueBody(
+  session: FlueSession,
+  context: IssueContext,
+  body?: string,
+) {
+  const nextBody = body?.trim();
+  if (!nextBody || nextBody === getIssueBody(context).trim()) {
+    return false;
+  }
+
+  await withGhBodyFile(`issue-${context.issueNumber}-body`, nextBody, (path) =>
+    runGhCommand(
+      session,
+      `gh issue edit ${context.issueNumber}${repoArg(context.repository)} --body-file ${shellQuote(path)}`,
+      "Updating issue body",
+    ),
+  );
+  return true;
+}
+
+async function postComment(
+  session: FlueSession,
+  context: IssueContext,
+  body?: string,
+) {
+  if (!body?.trim()) {
+    return false;
+  }
+
+  await withGhBodyFile(
+    `issue-${context.issueNumber}-comment`,
+    body.trim(),
+    (path) =>
+      runGhCommand(
+        session,
+        `gh issue comment ${context.issueNumber}${repoArg(context.repository)} --body-file ${shellQuote(path)}`,
+        "Posting issue comment",
+      ),
+  );
+  return true;
+}
+
+async function closeDuplicate(
+  session: FlueSession,
+  context: IssueContext,
+  duplicate: v.InferOutput<typeof duplicateCandidateSchema>,
+) {
+  const duplicateLabel = findDuplicateLabel(context);
+  const labelsApplied = duplicateLabel
+    ? await applyLabels(session, context, [duplicateLabel])
+    : [];
+  const comment = [
+    `Thanks for the report. This appears to duplicate #${duplicate.number}.`,
+    "",
+    `Closing this so discussion and updates stay in one place. Please follow #${duplicate.number} for progress.`,
+  ].join("\n");
+
+  await postComment(session, context, comment);
+  await runGhCommand(
+    session,
+    `gh issue close ${context.issueNumber}${repoArg(context.repository)} --reason duplicate --duplicate-of ${duplicate.number}`,
+    "Closing duplicate issue",
+  );
+
+  return labelsApplied;
+}
+
+function buildIssueUpdateComment(
+  diagnosis: v.InferOutput<typeof diagnosisSchema>,
+) {
+  const evidence = diagnosis.evidence
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  const lines = [
+    "Triage bot here.",
+    "",
+    "I tightened the issue description after checking the report and repository context so the current concern is easier to scan.",
+  ];
+
+  if (diagnosis.summary.trim()) {
+    lines.push("", `Current read: ${diagnosis.summary.trim()}`);
+  }
+
+  if (evidence.length > 0) {
+    lines.push("", "What I checked:");
+    for (const item of evidence) {
+      lines.push(`- ${item}`);
+    }
+  }
+
+  lines.push("", "A maintainer will take it from here.");
+
+  return lines.join("\n");
+}
+
+async function applyTriageUpdate(
+  session: FlueSession,
+  context: IssueContext,
+  diagnosis: v.InferOutput<typeof diagnosisSchema>,
+): Promise<v.InferOutput<typeof updateSchema>> {
+  if (getIssueState(context) === "closed") {
+    return {
+      title_updated: false,
+      body_updated: false,
+      labels_applied: [],
+      comment_posted: false,
+      needs_human_review: true,
+      summary: "Skipped triage update because the issue is already closed.",
+    };
+  }
+
+  const labelsApplied = await applyLabels(
+    session,
+    context,
+    diagnosis.labels_to_apply,
+  );
+  let titleUpdated = false;
+  let bodyUpdated = false;
+  let commentPosted = false;
+
+  if (diagnosis.should_update_issue) {
+    titleUpdated = await editIssueTitle(
+      session,
+      context,
+      diagnosis.proposed_title,
+    );
+    bodyUpdated = await editIssueBody(
+      session,
+      context,
+      diagnosis.proposed_body,
+    );
+
+    if (bodyUpdated) {
+      commentPosted = await postComment(
+        session,
+        context,
+        diagnosis.update_comment?.trim() || buildIssueUpdateComment(diagnosis),
+      );
+    }
+  }
+
+  const changed = [
+    titleUpdated ? "title" : null,
+    bodyUpdated ? "body" : null,
+    labelsApplied.length > 0 ? "labels" : null,
+  ].filter(Boolean);
+
+  return {
+    title_updated: titleUpdated,
+    body_updated: bodyUpdated,
+    labels_applied: labelsApplied,
+    comment_posted: commentPosted,
+    needs_human_review: diagnosis.needs_human_review,
+    summary:
+      changed.length > 0
+        ? `Updated issue ${changed.join(", ")}.`
+        : "No issue update was needed.",
+  };
 }
 
 async function readIssueContext(
@@ -242,7 +518,7 @@ async function prepareRepository(
 
   const clonePath = `.flue-issue-triage-${issueNumber}`;
   const clone = await session.shell(
-    `gh repo clone ${repository} ${clonePath} -- --filter=blob:none`,
+    `gh repo clone ${shellQuote(repository)} ${shellQuote(clonePath)} -- --filter=blob:none`,
     {
       commands: [gh],
       timeout: 300_000,
@@ -314,32 +590,22 @@ export default async function ({ init, payload }: FlueContext) {
       issueNumber,
       repository,
     );
-    const closure = await session.skill("issue-triage", {
-      args: {
-        stage: "close-duplicate",
-        issueNumber,
-        repository,
-        context: closureContext,
-        duplicateSearch,
-      },
-      commands: [gh],
-      result: duplicateClosureSchema,
-      timeout: 300_000,
-    });
+    const labelsApplied = await closeDuplicate(
+      session,
+      closureContext,
+      duplicateSearch.duplicate,
+    );
 
     return {
-      outcome: closure.closed ? "duplicate_closed" : "duplicate_closure_failed",
+      outcome: "duplicate_closed",
       steps: [
         { name: "search-duplicates", result: duplicateSearch.status },
-        {
-          name: "close-duplicate",
-          result: closure.closed ? "closed" : "failed",
-        },
+        { name: "close-duplicate", result: "closed" },
       ],
-      duplicate: closure.duplicate_issue,
-      labels_applied: closure.labels_applied,
-      comment_posted: closure.comment_posted,
-      summary: closure.summary,
+      duplicate: duplicateSearch.duplicate,
+      labels_applied: labelsApplied,
+      comment_posted: true,
+      summary: `Closed as a duplicate of #${duplicateSearch.duplicate.number}.`,
     };
   }
 
@@ -373,20 +639,7 @@ export default async function ({ init, payload }: FlueContext) {
     issueNumber,
     repository,
   );
-  const update = await session.skill("issue-triage", {
-    args: {
-      stage: "apply-triage-update",
-      issueNumber,
-      repository,
-      context: updateContext,
-      repositoryContext,
-      duplicateSearch,
-      diagnosis,
-    },
-    commands: [gh],
-    result: updateSchema,
-    timeout: 300_000,
-  });
+  const update = await applyTriageUpdate(session, updateContext, diagnosis);
 
   return {
     outcome: update.needs_human_review ? "needs_human_review" : "triaged",

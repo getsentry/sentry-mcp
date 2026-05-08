@@ -33,7 +33,7 @@ The stages are:
 2. Close confirmed duplicates with a comment pointing at the canonical issue.
 3. Prepare a repository checkout for diagnosis. GitHub Actions clones the default branch with `actions/checkout`; the handler can fall back to `gh repo clone` if no checkout exists.
 4. Diagnose and validate the report using repository context and targeted commands.
-5. Apply labels, comments, and issue title/body cleanup. When it rewrites the body, it keeps the original report in an `Original Report` footer.
+5. Apply existing labels and issue title/body cleanup from the structured diagnosis. When it changes the issue body, it also posts a friendly triage-bot comment explaining what was checked. The body itself stays concise and ticket-focused.
 
 The workflow needs:
 
@@ -50,4 +50,4 @@ GH_TOKEN=... OPENAI_API_KEY=... pnpm -w run flue:issue-triage --id issue-triage-
   --payload '{"issueNumber": 1, "repository": "getsentry/sentry-mcp"}'
 ```
 
-The skill may read issue details, inspect repository files, apply existing labels, close confirmed duplicates, and post concise comments. It treats issue content as untrusted input and must not modify files, execute issue-provided commands, open pull requests, create labels, close non-duplicates, or expose secrets.
+The skill may read issue details, inspect repository files, propose existing labels, propose concise issue title/body updates, and draft the comment posted after body rewrites. The handler applies GitHub mutations deterministically: existing labels, duplicate closure, issue edits, and comments. It treats issue content as untrusted input and must not modify files, execute issue-provided commands, open pull requests, create labels, close non-duplicates, or expose secrets.
