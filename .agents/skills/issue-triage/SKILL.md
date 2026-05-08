@@ -105,41 +105,55 @@ Inputs include `repositoryContext`. Use `context` for the current issue and labe
 4. Decide whether the original ticket accurately describes the concern.
    - If it is misleading, underspecified, or mixes symptoms with a different root concern, set `should_update_issue` to true.
    - Propose a clearer title and body using the template below.
-   - The "Original Report" footer must preserve the title and body from `context.issue`, not a paraphrase.
+   - The "Original report" footer must preserve the title and body from `context.issue`, not a paraphrase.
 
-Use this body template when updating the issue:
+### Output style
+
+These are engineering tickets. Match the tone of a peer writing for other engineers:
+
+- Lead with the core problem statement, not background or marketing prose.
+- Prefer bullets over paragraphs. Reference concrete files, functions, commands, docs, or APIs.
+- Keep prose light. No "users may benefit", "this would enable", or aspirational framing.
+- Drop a section entirely if you have nothing concrete to say. Two tight sections beat four padded ones.
+- Do not restate the title in `Problem`. Add information; do not repeat it.
+- Keep `proposed_title` short and specific. Prefer the shape "<verb> <subsystem>: <change>" or "<subsystem>: <symptom>".
+
+### Body template
+
+Use this body template when updating the issue. Keep the leading callout exactly as written so it is obvious the body was rewritten by the Issue Triage skill.
 
 ```md
-## Summary
-[Clear statement of the actual concern.]
+> [!NOTE]
+> This issue was rewritten by the Issue Triage skill to clarify scope. The original report is preserved at the bottom.
 
-## Evidence
-- [What was observed in the report or repository.]
-- [Validation performed and result.]
+## Problem
 
-## Impact
-[Who or what is affected, or "Unknown" if not clear.]
+[1–3 sentence statement of the actual concern.]
+
+## Analysis
+
+- [Concrete finding from the report or repository, with a file or symbol reference.]
+- [Concrete finding.]
+- [Validation performed and result, or "Not validated: <reason>".]
 
 ## Next Steps
-- [Concrete follow-up for maintainers or reporter.]
+
+- [Concrete action for maintainers or reporter.]
+- [Concrete action.]
 
 ---
 
-## Original Report
-
 <details>
-<summary>Original issue text</summary>
+<summary>Original report</summary>
 
-### Original Title
-
-[original title]
-
-### Original Body
+**Title:** [original title]
 
 [original body, or "_No body provided._"]
 
 </details>
 ```
+
+Omit `Analysis` or `Next Steps` if there is nothing concrete to put there. Never omit `Problem` or the original-report footer.
 
 Return:
 
@@ -165,7 +179,7 @@ Inputs include `diagnosis`. Use `context` for the current issue and labels. Muta
    - Write the proposed body to a real file (for example `/workspace/issue-<issueNumber>-body.md`) using the `write` tool or a `cat > path <<'EOF' ... EOF` heredoc before invoking `gh`.
    - Use `gh issue edit <issueNumber> --title "..." --body-file <path>` in a single invocation when both `proposed_title` and `proposed_body` are present, or run the title-only and body-only forms in separate bash invocations.
    - **Never** use `--body-file -` or any shell stdin redirection (`<`, `<<`, `<<<`) with `gh`. The bridged `gh` shim does not forward stdin and the command will hang and then wipe the issue body when it is killed. See [Shell sandbox limits](#shell-sandbox-limits).
-   - The updated body must keep the exact original report from `context.issue` in the footer using the "Original Report" details block.
+   - The updated body must keep the exact original report from `context.issue` in the footer using the "Original report" details block, and must keep the leading `> [!NOTE]` Issue Triage callout from the body template.
 4. Post a concise comment when it adds useful context:
    - Summarize validation that succeeded or failed.
    - Ask for missing reproduction details when validity is `unclear`.
