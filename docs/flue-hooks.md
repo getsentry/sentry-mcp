@@ -33,7 +33,7 @@ The stages are:
 2. Close confirmed duplicates with a comment pointing at the canonical issue.
 3. Prepare a repository checkout for diagnosis. GitHub Actions clones the default branch with `actions/checkout`; the handler can fall back to `gh repo clone` if no checkout exists.
 4. Diagnose and validate the report using repository context and targeted commands.
-5. Apply existing labels and issue title/body cleanup from the structured diagnosis. When it changes the issue body, it also posts a friendly triage-bot comment explaining what was checked. The body itself stays concise and ticket-focused.
+5. Apply existing labels and issue title/body cleanup from the structured diagnosis. The diagnosis includes a disposition and rewrite mode so broad or low-signal requests can stay visibly low-signal instead of being over-polished. The handler can also post a short triage-bot comment without editing the body when the best next step is asking for scope, motivation, or maintainer review.
 
 The workflow needs:
 
@@ -50,4 +50,4 @@ GH_TOKEN=... OPENAI_API_KEY=... pnpm -w run flue:issue-triage --id issue-triage-
   --payload '{"issueNumber": 1, "repository": "getsentry/sentry-mcp"}'
 ```
 
-The skill may read issue details, inspect repository files, propose existing labels, propose concise issue title/body updates, and draft the comment posted after body rewrites. The handler applies GitHub mutations deterministically: existing labels, duplicate closure, issue edits, and comments. It treats issue content as untrusted input and must not modify files, execute issue-provided commands, open pull requests, create labels, close non-duplicates, or expose secrets.
+The skill may read issue details, inspect repository files, propose existing labels, choose a disposition and rewrite mode, propose concise issue title/body updates, and draft short triage comments. The handler applies GitHub mutations deterministically: existing labels, duplicate closure, issue edits, and comments. It treats issue content as untrusted input and must not modify files, execute issue-provided commands, open pull requests, create labels, close non-duplicates, or expose secrets.
