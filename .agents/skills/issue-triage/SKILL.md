@@ -49,9 +49,14 @@ Goal: determine whether the new issue is a confirmed duplicate.
    - Search exact or near-exact title terms.
    - Search distinctive error messages, stack frame names, package names, command names, or API names from the issue body.
    - Search open and closed issues in the same repository with `gh search issues --repo <repository>`.
+   - Add `--limit 10` to every `gh search issues` command.
    - Exclude the current issue number from candidates.
-3. Fetch candidate issue details only when needed to compare substance.
-4. Compare candidates against the current issue.
+3. Keep search terms specific.
+   - Do not search generic language, stack, or repo terms by themselves, such as `typescript`, `javascript`, `python`, `rust`, `language`, `rewrite`, `error`, or `timeout`.
+   - For low-signal rewrite requests like "rewrite in Rust" with body "because Rust is good", search only the exact title and exact distinctive body phrase. Do not fan out to generic terms.
+   - Stop searching once you have enough information to decide `unique` or `uncertain`.
+4. Fetch candidate issue details only when needed to compare substance.
+5. Compare candidates against the current issue.
 
 A duplicate must be the same underlying bug, request, or docs problem. Broad topic overlap is not enough.
 

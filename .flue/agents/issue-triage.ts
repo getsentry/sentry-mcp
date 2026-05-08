@@ -56,6 +56,7 @@ const duplicateSearchSchema = v.object({
   candidates: v.array(duplicateCandidateSchema),
   rationale: v.string(),
 });
+type DuplicateSearch = v.InferOutput<typeof duplicateSearchSchema>;
 
 const diagnosisSchema = v.object({
   severity: severitySchema,
@@ -74,6 +75,7 @@ const diagnosisSchema = v.object({
   update_comment: v.optional(v.string()),
   needs_human_review: v.boolean(),
 });
+type Diagnosis = v.InferOutput<typeof diagnosisSchema>;
 
 const updateSchema = v.object({
   title_updated: v.boolean(),
@@ -83,6 +85,45 @@ const updateSchema = v.object({
   needs_human_review: v.boolean(),
   summary: v.string(),
 });
+
+function summarizeAgentFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("404 status code")) {
+    return "The triage model returned a provider error before producing structured output.";
+  }
+
+  if (message.includes("Gateway Timeout")) {
+    return "The triage model timed out before producing structured output.";
+  }
+
+  return "The triage agent failed before producing structured output.";
+}
+
+function buildDuplicateSearchFailure(error: unknown): DuplicateSearch {
+  return {
+    status: "uncertain",
+    candidates: [],
+    rationale: summarizeAgentFailure(error),
+  };
+}
+
+function buildDiagnosisFailure(error: unknown): Diagnosis {
+  return {
+    severity: "low",
+    category: "unknown",
+    disposition: "unclear",
+    rewrite_mode: "none",
+    validity: "unclear",
+    summary:
+      "Automated triage could not complete, so the issue is left unchanged for maintainer review.",
+    evidence: [summarizeAgentFailure(error)],
+    labels_to_apply: [],
+    should_comment: false,
+    should_update_issue: false,
+    needs_human_review: true,
+  };
+}
 
 const gh = defineCommand("gh", {
   env: {
@@ -622,17 +663,25 @@ export default async function ({ init, payload }: FlueContext) {
     issueNumber,
     repository,
   );
-  const duplicateSearch = await session.skill("issue-triage", {
-    args: {
-      stage: "search-duplicates",
-      issueNumber,
-      repository,
-      context: initialContext,
-    },
-    commands: [gh],
-    result: duplicateSearchSchema,
-    timeout: 300_000,
-  });
+  let duplicateSearch: DuplicateSearch;
+  try {
+    duplicateSearch = await session.skill("issue-triage", {
+      args: {
+        stage: "search-duplicates",
+        issueNumber,
+        repository,
+        context: initialContext,
+      },
+      commands: [gh],
+      result: duplicateSearchSchema,
+      timeout: 300_000,
+    });
+  } catch (error) {
+    console.warn(
+      `[issue-triage] Duplicate search failed: ${summarizeAgentFailure(error)}`,
+    );
+    duplicateSearch = buildDuplicateSearchFailure(error);
+  }
 
   if (duplicateSearch.status === "duplicate") {
     if (!duplicateSearch.duplicate) {
@@ -676,19 +725,27 @@ export default async function ({ init, payload }: FlueContext) {
     issueNumber,
     repository,
   );
-  const diagnosis = await session.skill("issue-triage", {
-    args: {
-      stage: "diagnose-and-validate",
-      issueNumber,
-      repository,
-      context: diagnosisContext,
-      repositoryContext,
-      duplicateSearch,
-    },
-    commands,
-    result: diagnosisSchema,
-    timeout: 900_000,
-  });
+  let diagnosis: Diagnosis;
+  try {
+    diagnosis = await session.skill("issue-triage", {
+      args: {
+        stage: "diagnose-and-validate",
+        issueNumber,
+        repository,
+        context: diagnosisContext,
+        repositoryContext,
+        duplicateSearch,
+      },
+      commands,
+      result: diagnosisSchema,
+      timeout: 900_000,
+    });
+  } catch (error) {
+    console.warn(
+      `[issue-triage] Diagnosis failed: ${summarizeAgentFailure(error)}`,
+    );
+    diagnosis = buildDiagnosisFailure(error);
+  }
 
   const updateContext = await readIssueContext(
     session,
