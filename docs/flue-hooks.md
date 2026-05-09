@@ -30,7 +30,7 @@ The handler runs the triage through one larger `issue-triage` skill with determi
 The stages are:
 
 1. Search for duplicate issues.
-2. Close confirmed duplicates with a comment pointing at the canonical issue.
+2. Close confirmed duplicates with a comment pointing at the canonical issue. If the canonical issue is already closed as `not planned`, the hook closes the new issue as `not planned` too so the original resolution carries over.
 3. Prepare a repository checkout for diagnosis. GitHub Actions clones the default branch with `actions/checkout`; the handler can fall back to `gh repo clone` if no checkout exists.
 4. Diagnose and validate the report using repository context and targeted commands.
 5. Apply existing labels and issue title/body cleanup from the structured diagnosis. The diagnosis includes a disposition and rewrite mode so broad or low-signal requests can stay visibly low-signal instead of being over-polished. The handler can also post a short triage-bot comment without editing the body when the best next step is asking for scope, motivation, or maintainer review. If a model stage fails before returning structured output, the handler leaves the issue unchanged and reports `needs_human_review` instead of failing the workflow.
@@ -38,8 +38,9 @@ The stages are:
 The workflow needs:
 
 - Node.js 22. The workflow sets this up with `actions/setup-node`.
-- `OPENAI_API_KEY` as a GitHub Actions secret.
-- Optional `FLUE_TRIAGE_MODEL` as a GitHub Actions variable. Defaults to `openai/gpt-5`.
+- `FLUE_OPENAI_API_KEY` as a GitHub Actions secret for the model call. The workflow still falls back to `OPENAI_API_KEY` for compatibility.
+- Optional `FLUE_TRIAGE_MODEL` as a GitHub Actions variable. Defaults to `openai/gpt-5.5`.
+- Optional `FLUE_CLIENT_ID` GitHub Actions variable (the GitHub App client ID) and `FLUE_PRIVATE_KEY` secret for a GitHub App installation token. When set, comments and issue closes come from that app bot instead of `github-actions`; the current bot persona is SentryIntern. When unset, the workflow falls back to `GITHUB_TOKEN`.
 - The workflow runs for bot-authored issues too, because Sentry-created issues appear as bot submissions and still need triage.
 
   Reasoning models work despite a known pi-ai bug because the agent installs a small `onPayload` hook on the Flue session's pi-agent-core harness that adds `include: ["reasoning.encrypted_content"]` to every OpenAI Responses request. Without it, every multi-turn call against `openai/gpt-5` (or any other reasoning model) 404s with `Items are not persisted when 'store' is set to false`: [`@mariozechner/pi-ai`](https://github.com/badlogic/pi-mono) hardcodes `store: false` on the OpenAI Responses API while still replaying the `rs_*` reasoning IDs from earlier turns. With encrypted content inlined the replay carries the full reasoning blob, so OpenAI never has to look the IDs up. Drop the hook once @flue/sdk exposes [`reasoning`/`thinkingLevel`](https://github.com/withastro/flue/pull/69) (merged into Flue `main` but unreleased) or pi-ai stops hardcoding `store: false` ([badlogic/pi-mono#3369](https://github.com/badlogic/pi-mono/issues/3369), [pi-mono#1504](https://github.com/badlogic/pi-mono/pull/1504)).
@@ -47,8 +48,8 @@ The workflow needs:
 Run it locally with:
 
 ```bash
-GH_TOKEN=... OPENAI_API_KEY=... pnpm -w run flue:issue-triage --id issue-triage-local \
+GH_TOKEN=... FLUE_OPENAI_API_KEY=... pnpm -w run flue:issue-triage --id issue-triage-local \
   --payload '{"issueNumber": 1, "repository": "getsentry/sentry-mcp"}'
 ```
 
-The skill may read issue details, inspect repository files, propose existing labels, choose a disposition and rewrite mode, propose concise issue title/body updates, and draft short triage comments. The handler applies GitHub mutations deterministically: existing labels, duplicate closure, issue edits, and comments. It treats issue content as untrusted input and must not modify files, execute issue-provided commands, open pull requests, create labels, close non-duplicates, or expose secrets.
+The skill may read issue details, inspect repository files, propose existing labels, choose a disposition and rewrite mode, propose concise issue title/body updates, and draft short triage comments. The handler applies GitHub mutations deterministically: existing labels, duplicate closure, inherited `not planned` closure for duplicates of wontfix tickets, issue edits, and comments. It also ensures each posted comment's first sentence identifies the issue triage bot. It treats issue content as untrusted input and must not modify files, execute issue-provided commands, open pull requests, create labels, close non-duplicates, or expose secrets.

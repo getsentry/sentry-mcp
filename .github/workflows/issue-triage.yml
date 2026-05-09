@@ -11,6 +11,9 @@ jobs:
     permissions:
       contents: read
       issues: write
+    env:
+      FLUE_CLIENT_ID: ${{ vars.FLUE_CLIENT_ID }}
+      FLUE_PRIVATE_KEY: ${{ secrets.FLUE_PRIVATE_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -47,10 +50,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Create issue triage bot token
+        id: issue-triage-app-token
+        if: ${{ env.FLUE_CLIENT_ID != '' && env.FLUE_PRIVATE_KEY != '' }}
+        uses: actions/create-github-app-token@v3.1.1
+        with:
+          client-id: ${{ env.FLUE_CLIENT_ID }}
+          private-key: ${{ env.FLUE_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: read
+          permission-issues: write
+
       - name: Run triage agent
         env:
-          GH_TOKEN: ${{ github.token }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_TOKEN: ${{ steps.issue-triage-app-token.outputs.token || github.token }}
+          OPENAI_API_KEY: ${{ secrets.FLUE_OPENAI_API_KEY || secrets.OPENAI_API_KEY }}
           FLUE_TRIAGE_MODEL: ${{ vars.FLUE_TRIAGE_MODEL }}
         run: |
           pnpm -w run flue:issue-triage --id "issue-triage-${{ github.event.issue.number }}" \

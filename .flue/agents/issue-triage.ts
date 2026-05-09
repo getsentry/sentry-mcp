@@ -57,6 +57,7 @@ const duplicateSearchSchema = v.object({
   rationale: v.string(),
 });
 type DuplicateSearch = v.InferOutput<typeof duplicateSearchSchema>;
+type DuplicateCandidate = v.InferOutput<typeof duplicateCandidateSchema>;
 
 const diagnosisSchema = v.object({
   severity: severitySchema,
@@ -244,6 +245,63 @@ function findDuplicateLabel(context: IssueContext) {
   return existingLabels(context).get("duplicate") ?? null;
 }
 
+export const TRIAGE_BOT_INTRO = ":wave: I'm the issue triage bot.";
+
+function getFirstParagraph(value: string) {
+  return value.trim().split(/\n\s*\n/, 1)[0] ?? "";
+}
+
+function getFirstSentence(value: string) {
+  const firstParagraph = getFirstParagraph(value);
+  const sentenceEnd = firstParagraph.search(/[.!?](?:\s|$)/);
+
+  if (sentenceEnd === -1) {
+    return firstParagraph;
+  }
+
+  return firstParagraph.slice(0, sentenceEnd + 1);
+}
+
+export function hasIssueTriageBotIntro(body: string) {
+  return /\bissue triage bot\b/i.test(getFirstSentence(body));
+}
+
+export function withIssueTriageBotIntro(body?: string) {
+  const trimmed = body?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (hasIssueTriageBotIntro(trimmed)) {
+    return trimmed;
+  }
+
+  return `${TRIAGE_BOT_INTRO}\n\n${trimmed}`;
+}
+
+function normalizeStateReason(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+export function wasClosedAsNotPlanned(issue: unknown) {
+  if (!isRecord(issue)) {
+    return false;
+  }
+
+  const state =
+    typeof issue.state === "string" ? issue.state.toLowerCase() : "";
+  return (
+    state === "closed" &&
+    ["not_planned", "wontfix", "wont_fix"].includes(
+      normalizeStateReason(issue.stateReason),
+    )
+  );
+}
+
 async function readJsonCommand(
   session: FlueSession,
   command: string,
@@ -365,13 +423,14 @@ async function postComment(
   context: IssueContext,
   body?: string,
 ) {
-  if (!body?.trim()) {
+  const comment = withIssueTriageBotIntro(body);
+  if (!comment) {
     return false;
   }
 
   await withGhBodyFile(
     `issue-${context.issueNumber}-comment`,
-    body.trim(),
+    comment,
     (path) =>
       runGhCommand(
         session,
@@ -382,27 +441,64 @@ async function postComment(
   return true;
 }
 
+async function readIssueClosureContext(
+  session: FlueSession,
+  issueNumber: number,
+  repository?: string,
+) {
+  return readJsonCommand(
+    session,
+    `gh issue view ${issueNumber}${repoArg(repository)} --json number,title,state,stateReason,url`,
+    `Fetching canonical duplicate #${issueNumber}`,
+  );
+}
+
+export function buildDuplicateClosureComment(
+  duplicate: DuplicateCandidate,
+  closeAsNotPlanned: boolean,
+) {
+  if (closeAsNotPlanned) {
+    return [
+      `Quick triage read: this matches #${duplicate.number}, which was already closed as not planned.`,
+      "",
+      "I'm closing this with the same resolution so we do not keep two copies of the same ask open.",
+    ].join("\n");
+  }
+
+  return [
+    `Quick triage read: this looks like the same request as #${duplicate.number}.`,
+    "",
+    `I'm keeping the thread tidy by closing this one so updates stay on #${duplicate.number}.`,
+  ].join("\n");
+}
+
 async function closeDuplicate(
   session: FlueSession,
   context: IssueContext,
-  duplicate: v.InferOutput<typeof duplicateCandidateSchema>,
+  duplicate: DuplicateCandidate,
+  canonicalIssue?: unknown,
 ) {
   const duplicateLabel = findDuplicateLabel(context);
   const labelsApplied = duplicateLabel
     ? await applyLabels(session, context, [duplicateLabel])
     : [];
-  const comment = [
-    `Thanks for the report. This appears to duplicate #${duplicate.number}.`,
-    "",
-    `Closing this so discussion and updates stay in one place. Please follow #${duplicate.number} for progress.`,
-  ].join("\n");
+  const closeAsNotPlanned = wasClosedAsNotPlanned(canonicalIssue);
+  const comment = buildDuplicateClosureComment(duplicate, closeAsNotPlanned);
 
   await postComment(session, context, comment);
-  await runGhCommand(
-    session,
-    `gh issue close ${context.issueNumber}${repoArg(context.repository)} --reason duplicate --duplicate-of ${duplicate.number}`,
-    "Closing duplicate issue",
-  );
+  if (closeAsNotPlanned) {
+    await runGhCommand(
+      session,
+      `gh issue close ${context.issueNumber}${repoArg(context.repository)} --reason ${shellQuote("not planned")}`,
+      "Closing issue as not planned",
+    );
+  } else {
+    await runGhCommand(
+      session,
+      `gh issue close ${context.issueNumber}${repoArg(context.repository)} --reason duplicate --duplicate-of ${duplicate.number}`,
+      "Closing duplicate issue",
+    );
+  }
 
   return labelsApplied;
 }
@@ -414,31 +510,29 @@ function buildIssueUpdateComment(
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 3);
-  const lines = ["Triage bot here.", ""];
+  const lines = [TRIAGE_BOT_INTRO, ""];
 
   switch (diagnosis.rewrite_mode) {
     case "light_cleanup":
       lines.push(
-        "I did a light cleanup so the issue is easier to scan without changing the ask.",
+        "I gave the report a quick cleanup so the concrete ask is easier to scan without changing it.",
       );
       break;
     case "scope_clarification":
       lines.push(
-        "I trimmed this to the current ask and what is still missing for maintainers.",
+        "I trimmed this to the actual ask and what maintainers still need.",
       );
       break;
     case "technical_diagnosis":
-      lines.push(
-        "I updated the issue with the repository context that seemed relevant.",
-      );
+      lines.push("I added the repo context that looks relevant for this one.");
       break;
     case "none":
-      lines.push("I added a short triage note for maintainer review.");
+      lines.push("I added a quick triage note for maintainer review.");
       break;
   }
 
   if (diagnosis.summary.trim()) {
-    lines.push("", `Current read: ${diagnosis.summary.trim()}`);
+    lines.push("", `Quick triage read: ${diagnosis.summary.trim()}`);
   }
 
   if (diagnosis.rewrite_mode === "technical_diagnosis" && evidence.length > 0) {
@@ -650,6 +744,10 @@ async function prepareRepository(
 
 export default async function ({ init, payload }: FlueContext) {
   const { issueNumber, repository } = v.parse(payloadSchema, payload);
+  if (!process.env.OPENAI_API_KEY && process.env.FLUE_OPENAI_API_KEY) {
+    process.env.OPENAI_API_KEY = process.env.FLUE_OPENAI_API_KEY;
+  }
+
   const agent = await init({
     sandbox: "local",
     model: process.env.FLUE_TRIAGE_MODEL || "openai/gpt-5.5",
@@ -695,22 +793,43 @@ export default async function ({ init, payload }: FlueContext) {
       issueNumber,
       repository,
     );
+    let canonicalIssue: unknown;
+    try {
+      canonicalIssue = await readIssueClosureContext(
+        session,
+        duplicateSearch.duplicate.number,
+        repository,
+      );
+    } catch (error) {
+      console.warn(
+        `[issue-triage] Canonical duplicate lookup failed: ${summarizeAgentFailure(error)}`,
+      );
+    }
     const labelsApplied = await closeDuplicate(
       session,
       closureContext,
       duplicateSearch.duplicate,
+      canonicalIssue,
     );
+    const closedAsNotPlanned = wasClosedAsNotPlanned(canonicalIssue);
 
     return {
-      outcome: "duplicate_closed",
+      outcome: closedAsNotPlanned
+        ? "duplicate_closed_as_not_planned"
+        : "duplicate_closed",
       steps: [
         { name: "search-duplicates", result: duplicateSearch.status },
-        { name: "close-duplicate", result: "closed" },
+        {
+          name: "close-duplicate",
+          result: closedAsNotPlanned ? "closed_as_not_planned" : "closed",
+        },
       ],
       duplicate: duplicateSearch.duplicate,
       labels_applied: labelsApplied,
       comment_posted: true,
-      summary: `Closed as a duplicate of #${duplicateSearch.duplicate.number}.`,
+      summary: closedAsNotPlanned
+        ? `Closed as not planned because #${duplicateSearch.duplicate.number} was already closed as not planned.`
+        : `Closed as a duplicate of #${duplicateSearch.duplicate.number}.`,
     };
   }
 
