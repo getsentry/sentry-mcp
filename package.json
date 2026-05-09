@@ -27,7 +27,6 @@
     "deploy": "turbo deploy",
     "eval": "dotenv -e .env -e .env.local -- turbo eval",
     "eval:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run eval:ci",
-    "flue:issue-triage": "flue run issue-triage --target node",
     "format": "biome format --write",
     "lint": "biome lint",
     "lint:fix": "biome lint --fix",
@@ -38,14 +37,13 @@
     "cli": "pnpm run --filter ./packages/mcp-test-client start",
     "agent-cli-test": "pnpm run --filter ./packages/agent-cli-test start",
     "start:stdio": "pnpm --stream run --filter ./packages/mcp-server start",
-    "test": "vitest run .flue/agents/issue-triage.test.ts && dotenv -e .env -e .env.local -- turbo test",
-    "test:ci": "CI=true vitest run .flue/agents/issue-triage.test.ts --reporter=default --reporter=junit --outputFile=flue-hooks.junit.xml && CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
+    "test": "dotenv -e .env -e .env.local -- turbo test",
+    "test:ci": "CI=true dotenv -e .env -e .env.local -- pnpm --stream -r run test:ci",
     "test:watch": "dotenv -e .env -e .env.local -- turbo test:watch",
     "tsc": "turbo tsc"
   },
   "dependencies": {
     "@biomejs/biome": "catalog:",
-    "@flue/sdk": "catalog:",
     "@types/node": "catalog:",
     "dotenv": "catalog:",
     "dotenv-cli": "catalog:",
@@ -55,7 +53,6 @@
     "tsx": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:",
-    "valibot": "catalog:",
     "vitest": "catalog:",
     "vitest-evals": "catalog:"
   },
@@ -84,7 +81,6 @@
     }
   },
   "devDependencies": {
-    "@flue/cli": "catalog:",
     "@types/json-schema": "^7.0.15"
   }
 }
