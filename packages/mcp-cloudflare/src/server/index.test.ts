@@ -231,4 +231,84 @@ describe("worker entrypoint", () => {
       'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp/sentry"',
     );
   });
+
+  it("replaces an existing resource_metadata with the path-specific one (RFC 9110 §11.2)", async () => {
+    // The Cloudflare OAuth provider library emits its own resource_metadata
+    // pointing at the origin (which 404s on this deployment). We must replace
+    // it rather than append, so the challenge contains exactly one
+    // resource_metadata parameter.
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate":
+            'Bearer realm="OAuth", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource", error="invalid_token", error_description="Missing or invalid access token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    const header = response.headers.get("WWW-Authenticate")!;
+    expect(header).toBe(
+      'Bearer realm="OAuth", error="invalid_token", error_description="Missing or invalid access token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp"',
+    );
+    // Defensive: ensure resource_metadata only appears once.
+    expect(header.match(/resource_metadata\s*=/gi)?.length).toBe(1);
+  });
+
+  it("removes pre-existing resource_metadata even when it appears first in the challenge", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate":
+            'Bearer resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource", error="invalid_token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    const header = response.headers.get("WWW-Authenticate")!;
+    expect(header).toBe(
+      'Bearer error="invalid_token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp"',
+    );
+    expect(header.match(/resource_metadata\s*=/gi)?.length).toBe(1);
+  });
+
+  it("ignores commas inside quoted error_description values when parsing the challenge", async () => {
+    mockOAuthProviderFetch.mockResolvedValueOnce(
+      new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate":
+            'Bearer realm="OAuth", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource", error="invalid_token", error_description="Missing, invalid, or expired access token"',
+        },
+      }),
+    );
+
+    const response = await handler.fetch!(
+      new Request("https://mcp.sentry.dev/mcp"),
+      env,
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    const header = response.headers.get("WWW-Authenticate")!;
+    expect(header).toBe(
+      'Bearer realm="OAuth", error="invalid_token", error_description="Missing, invalid, or expired access token", resource_metadata="https://mcp.sentry.dev/.well-known/oauth-protected-resource/mcp"',
+    );
+    expect(header.match(/resource_metadata\s*=/gi)?.length).toBe(1);
+  });
 });

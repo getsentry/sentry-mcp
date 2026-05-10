@@ -26,9 +26,63 @@ import {
 import { setSentryUserFromRequest } from "./utils/sentry-user";
 
 /**
+ * Splits a WWW-Authenticate Bearer challenge into its scheme and individual
+ * `auth-param`s while respecting quoted-string commas. Returns `null` when
+ * the header doesn't follow the `<scheme> <params>` shape we expect.
+ */
+function splitChallenge(
+  headerValue: string,
+): { scheme: string; params: string[] } | null {
+  const firstSpace = headerValue.indexOf(" ");
+  if (firstSpace === -1) return { scheme: headerValue, params: [] };
+  const scheme = headerValue.slice(0, firstSpace);
+  const rest = headerValue.slice(firstSpace + 1).trim();
+
+  const params: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let escaping = false;
+  for (let i = 0; i < rest.length; i++) {
+    const c = rest[i];
+    if (escaping) {
+      current += c;
+      escaping = false;
+      continue;
+    }
+    if (inQuotes && c === "\\") {
+      current += c;
+      escaping = true;
+      continue;
+    }
+    if (c === '"') {
+      inQuotes = !inQuotes;
+      current += c;
+      continue;
+    }
+    if (!inQuotes && c === ",") {
+      const trimmed = current.trim();
+      if (trimmed) params.push(trimmed);
+      current = "";
+      continue;
+    }
+    current += c;
+  }
+  if (inQuotes) return null;
+  const trimmed = current.trim();
+  if (trimmed) params.push(trimmed);
+  return { scheme, params };
+}
+
+/**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
  * `resource_metadata` parameter in the WWW-Authenticate header so
  * clients can discover the protected-resource metadata endpoint.
+ *
+ * The underlying OAuth library may already set its own `resource_metadata`
+ * pointing at the (path-less) origin metadata URL, which 404s on this
+ * deployment. We strip any pre-existing `resource_metadata` parameter and
+ * replace it with our path-specific one so the challenge contains exactly
+ * one such param, as required by RFC 9110 §11.2.
  */
 function patchWwwAuthenticate(response: Response, url: URL): Response {
   if (response.status !== 401 || !url.pathname.startsWith("/mcp")) {
@@ -40,11 +94,26 @@ function patchWwwAuthenticate(response: Response, url: URL): Response {
   }
   const prmUrl = `${url.protocol}//${url.host}/.well-known/oauth-protected-resource${url.pathname}${url.search}`;
   const newResponse = new Response(response.body, response);
-  // RFC 7235: first param is space-separated from scheme, subsequent params are comma-separated
-  const separator = existing.includes(" ") ? "," : "";
+
+  const parsed = splitChallenge(existing);
+  if (!parsed) {
+    // Fall back to a freshly built challenge if the existing header doesn't
+    // parse cleanly; better to send a single valid challenge than to risk
+    // emitting another malformed one.
+    newResponse.headers.set(
+      "WWW-Authenticate",
+      `Bearer resource_metadata="${prmUrl}"`,
+    );
+    return newResponse;
+  }
+
+  const filteredParams = parsed.params.filter(
+    (p) => !/^resource_metadata\s*=/i.test(p),
+  );
+  filteredParams.push(`resource_metadata="${prmUrl}"`);
   newResponse.headers.set(
     "WWW-Authenticate",
-    `${existing}${separator} resource_metadata="${prmUrl}"`,
+    `${parsed.scheme} ${filteredParams.join(", ")}`,
   );
   return newResponse;
 }
