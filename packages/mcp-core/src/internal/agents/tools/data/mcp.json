@@ -1,65 +1,29 @@
 {
   "namespace": "mcp",
-  "description": "Model Context Protocol attributes for MCP tool calls and sessions",
+  "description": "Model Context Protocol semantic convention attributes",
   "attributes": {
-    "mcp.tool.name": {
-      "description": "Tool name (e.g., search_issues, search_events)",
+    "mcp.method.name": {
+      "description": "The name of the request or notification method.",
+      "type": "string",
+      "examples": ["initialize", "tools/call", "resources/read"]
+    },
+    "mcp.protocol.version": {
+      "description": "The version of the Model Context Protocol used.",
+      "type": "string",
+      "examples": ["2025-06-18"]
+    },
+    "mcp.resource.uri": {
+      "description": "The value of the resource URI.",
       "type": "string",
       "examples": [
-        "search_issues",
-        "search_events",
-        "get_issue_details",
-        "update_issue"
+        "postgres://database/customers/schema",
+        "file:///home/user/documents/report.pdf"
       ]
     },
     "mcp.session.id": {
-      "description": "MCP session identifier",
-      "type": "string"
-    },
-    "mcp.transport": {
-      "description": "MCP transport protocol used",
+      "description": "Identifies an MCP session.",
       "type": "string",
-      "examples": ["stdio", "http", "websocket"]
-    },
-    "mcp.request.id": {
-      "description": "MCP request identifier",
-      "type": "string"
-    },
-    "mcp.response.status": {
-      "description": "MCP response status",
-      "type": "string",
-      "examples": ["success", "error"]
-    },
-    "mcp.client.name": {
-      "description": "Name of the MCP client application",
-      "type": "string",
-      "examples": [
-        "Cursor",
-        "Claude Code",
-        "VSCode MCP Extension",
-        "sentry-mcp-stdio"
-      ]
-    },
-    "mcp.client.version": {
-      "description": "Version of the MCP client application",
-      "type": "string",
-      "examples": ["0.16.0", "1.0.0", "2.3.1"]
-    },
-    "mcp.server.name": {
-      "description": "Name of the MCP server application",
-      "type": "string",
-      "examples": ["Sentry MCP Server", "GitHub MCP Server", "Slack MCP Server"]
-    },
-    "mcp.server.version": {
-      "description": "Version of the MCP server application",
-      "type": "string",
-      "examples": ["0.1.0", "1.2.3", "2.0.0"]
-    },
-    "mcp.protocol.version": {
-      "description": "MCP protocol version being used",
-      "type": "string",
-      "examples": ["2024-11-05", "1.0", "2.0"]
+      "examples": ["191c4850af6c49e08843a3f6c80e5046"]
     }
-  },
-  "custom": true
+  }
 }

@@ -29,20 +29,20 @@ MCP client ──(tool call)──> /mcp ──> mcp-handler ──> tool handle
 | Mode | Trigger | Currently visible in telemetry | Detected by |
 |---|---|---|---|
 | **Natural 30d expiry** | Upstream `expires_at` passes | Yes | Probe path in `tokenExchangeCallback` → `upstream_rejected` |
-| **Premature Sentry-side invalidation (SSO / org / password / admin)** | Sentry revokes before `expires_at` | Yes | Tool call surfaces 401 → `grant_revoked{reason:upstream_rejected_in_use}` + grant revoked via `onUpstreamUnauthorized` callback |
-| **Stale grants from before `refreshToken` was stored in props** | Old grants from pre-#537 deploys | Yes | `mcp-handler` → `grant_revoked{reason:stale_props_no_refresh}` |
-| **Client-side state loss (DCR state reset, fresh install, reinstall)** | Client drops its stored `client_id`/`refresh_token` | Indirectly | High `/oauth/register` volume and `register:callback` ratio per `client_family` |
+| **Premature Sentry-side invalidation (SSO / org / password / admin)** | Sentry revokes before `expires_at` | Yes | Tool call surfaces 401 → `app.oauth.grant_revoked.reason:upstream_rejected_in_use` + grant revoked via `onUpstreamUnauthorized` callback |
+| **Stale grants from before `refreshToken` was stored in props** | Old grants from pre-#537 deploys | Yes | `mcp-handler` → `app.oauth.grant_revoked.reason:stale_props_no_refresh` |
+| **Client-side state loss (DCR state reset, fresh install, reinstall)** | Client drops its stored `client_id`/`refresh_token` | Indirectly | High `/oauth/register` volume and `register:callback` ratio per `app.client.family` |
 | **Invalid redirect URI at authorize** | Client sends an `redirect_uri` that's not registered | Yes | Log `OAuth authorization failed: Invalid redirect URI` with `clientId`/`redirectUri`/`registeredUris`/`clientName` |
-| **Upstream probe transient (5xx / rate limit / network)** | Sentry side instability | Yes | `token_exchange{outcome:verification_indeterminate, probe_reason:…}` (does not force sign-out) |
+| **Upstream probe transient (5xx / rate limit / network)** | Sentry side instability | Yes | `app.oauth.token_exchange.outcome:verification_indeterminate` with `app.oauth.probe.reason` (does not force sign-out) |
 | **Same-user concurrent session interference** | Another session of the same user re-authorizes | Resolved by passing `revokeExistingGrants: false` — see Gap #4 below | n/a after fix |
 
 ## Telemetry surface
 
 All metrics live in the `mcp-server` project on Sentry. Attribute values deliberately avoid the substring `"token"` because Sentry's default PII scrubber replaces those values with `[Filtered]` at ingest (see PR #916 for the migration).
 
-### `mcp.oauth.token_exchange` (counter)
+### `app.oauth.token_exchange` (counter)
 
-Fired for every `grant_type=refresh_token` request. Splits by `outcome`:
+Fired for every `grant_type=refresh_token` request. Splits by `app.oauth.token_exchange.outcome`:
 
 - `cached_valid_local` — fast path, local expiry still in future by >2 min
 - `cached_valid_probed` — probe confirmed still valid, `accessTokenExpiresAt` extended by 2h
@@ -51,42 +51,42 @@ Fired for every `grant_type=refresh_token` request. Splits by `outcome`:
 
 Attributes:
 
-- `outcome` — see above
-- `client_family` — bucketed User-Agent (`claude-code`, `cursor`, `codex`, `copilot`, `claude-desktop`, `opencode`, `reactor-netty`, `java-http-client`, `go-http-client`, `python`, `bun`, `node`, `other`, `unknown`)
-- `grant_shape` — currently always `refreshable`
-- `probe_status` — upstream HTTP status on outcomes where a probe fired (`200` / `400` / `401` / `403` / `429` / `500` / …)
-- `probe_reason` — `rate_limit` / `server_error` / `unknown` on `verification_indeterminate`
+- `app.oauth.token_exchange.outcome` — see above
+- `app.client.family` — bucketed User-Agent (`claude-code`, `cursor`, `codex`, `copilot`, `claude-desktop`, `opencode`, `reactor-netty`, `java-http-client`, `go-http-client`, `python`, `bun`, `node`, `other`, `unknown`)
+- `app.oauth.grant.shape` — currently always `refreshable`
+- `app.oauth.probe.status_code` — upstream HTTP status on outcomes where a probe fired (`200` / `400` / `401` / `403` / `429` / `500` / …)
+- `app.oauth.probe.reason` — `rate_limit` / `server_error` / `unknown` on `verification_indeterminate`
 
-User context is set from the stored user ID and current request, so metrics can be filtered by `user.id` and events retain the request IP when available. Sub-30d sign-outs surface via `mcp.oauth.grant_revoked{reason:upstream_rejected_in_use}`, not on this metric.
+User context is set from the stored user ID and current request, so metrics can be filtered by `user.id` and events retain the request IP when available. Sub-30d sign-outs surface via `app.oauth.grant_revoked` with `app.oauth.grant_revoked.reason:upstream_rejected_in_use`, not on this metric.
 
-### `mcp.oauth.grant_revoked` (counter)
+### `app.oauth.grant_revoked` (counter)
 
 Fired when we revoke a stored grant — either the MCP handler on a subsequent request, or the `onUpstreamUnauthorized` callback on a mid-session 401.
 
 Attributes:
 
-- `reason` — `stale_props_no_refresh` / `upstream_rejected` / `upstream_rejected_in_use`
-- `client_family`
+- `app.oauth.grant_revoked.reason` — `stale_props_no_refresh` / `upstream_rejected` / `upstream_rejected_in_use`
+- `app.client.family`
 - `user.id` (via Sentry user context)
 
 `upstream_rejected_in_use` indicates Sentry returned 401 to a tool call while the stored access token still looked locally valid — the sub-30d sign-out signal users typically report. The grant is revoked via `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`, short-circuiting the death-spiral where subsequent refreshes kept handing out wrapper tokens backed by a dead upstream token.
 
-### `mcp.oauth.callback_completed` (counter)
+### `app.oauth.callback_completed` (counter)
 
 Fired on a successful `/oauth/callback`. Pairs with `grant_revoked` to derive per-user session lifetime.
 
 Attributes:
 
-- `client_family` — resolved from the DCR-registered `client_name` (not the browser User-Agent, which is always a browser string on this endpoint)
+- `app.client.family` — resolved from the DCR-registered `client_name` (not the browser User-Agent, which is always a browser string on this endpoint)
 - `user.id`
 
-### `mcp.oauth.register` (counter)
+### `app.oauth.register` (counter)
 
 Fired from the `wrappedOAuthProvider` after the library handles a successful `/oauth/register`.
 
 Attributes:
 
-- `client_family` — from the client's User-Agent (accurate here — DCR is hit directly by the MCP client, not via browser)
+- `app.client.family` — from the client's User-Agent (accurate here — DCR is hit directly by the MCP client, not via browser)
 
 ### Structured logs
 
@@ -99,38 +99,38 @@ Copy/paste-ready. All use the Sentry MCP's `search_events` natural-language quer
 ### Is a specific user being revoked?
 
 ```
-metric mcp.oauth.grant_revoked filtered by user.id:"<id>" sum of value grouped by reason over 30 days
+metric app.oauth.grant_revoked filtered by user.id:"<id>" sum of value grouped by app.oauth.grant_revoked.reason over 30 days
 ```
 
 ### Per-client sign-out rate
 
 ```
-metric mcp.oauth.grant_revoked sum of value grouped by client_family, reason over 24 hours
+metric app.oauth.grant_revoked sum of value grouped by app.client.family, app.oauth.grant_revoked.reason over 24 hours
 ```
 
 ### Probe-failure status distribution (is Sentry ever returning 403/400?)
 
 ```
-metric mcp.oauth.token_exchange filtered by outcome:upstream_rejected sum of value grouped by probe_status over 7 days
+metric app.oauth.token_exchange filtered by app.oauth.token_exchange.outcome:upstream_rejected sum of value grouped by app.oauth.probe.status_code over 7 days
 ```
 
 ### Session-lifetime proxy (callbacks vs revocations per client)
 
 ```
-metric mcp.oauth.callback_completed sum of value grouped by client_family over 7 days
-metric mcp.oauth.grant_revoked sum of value grouped by client_family over 7 days
+metric app.oauth.callback_completed sum of value grouped by app.client.family over 7 days
+metric app.oauth.grant_revoked sum of value grouped by app.client.family over 7 days
 ```
 
 ### Register storm attribution
 
 ```
-metric mcp.oauth.register sum of value grouped by client_family over 7 days
+metric app.oauth.register sum of value grouped by app.client.family over 7 days
 ```
 
 ### Upstream instability bucket
 
 ```
-metric mcp.oauth.token_exchange filtered by outcome:verification_indeterminate sum of value grouped by probe_reason over 24 hours
+metric app.oauth.token_exchange filtered by app.oauth.token_exchange.outcome:verification_indeterminate sum of value grouped by app.oauth.probe.reason over 24 hours
 ```
 
 ### Invalid redirect URI failures by client
@@ -150,7 +150,7 @@ After:
 - `handleApiError` re-throws `ApiAuthenticationError` unwrapped.
 - `server.ts` tool-handler catch detects it (walking `error.cause` up to 3 levels) and invokes `context.onUpstreamUnauthorized`.
 - `use_sentry`'s tool wrapper does the same check before re-throwing, so 401s inside the embedded agent aren't absorbed by the AI SDK.
-- The Cloudflare transport's `onUpstreamUnauthorized` emits `grant_revoked{reason:upstream_rejected_in_use}` and calls `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`. `workers-oauth-provider` stores tokens under `token:userId:grantId:*` in KV and validates every access token via a KV lookup, so revoking the grant invalidates all outstanding wrapper tokens too — the client's next `/mcp` request gets a 401 and is forced into a clean re-auth.
+- The Cloudflare transport's `onUpstreamUnauthorized` emits `app.oauth.grant_revoked` with `app.oauth.grant_revoked.reason:upstream_rejected_in_use` and calls `env.OAUTH_PROVIDER.revokeGrant` under `ctx.waitUntil`. `workers-oauth-provider` stores tokens under `token:userId:grantId:*` in KV and validates every access token via a KV lookup, so revoking the grant invalidates all outstanding wrapper tokens too — the client's next `/mcp` request gets a 401 and is forced into a clean re-auth.
 - `formatErrorForUser` returns "Authorization Expired — please re-authorize" instead of falling through to the generic Input Error template.
 
 ### Gap #2 — `handleApiError` misclassified 401 — **closed**
@@ -159,7 +159,7 @@ Fixed alongside Gap #1. `ApiAuthenticationError` now propagates unwrapped and tr
 
 ### Gap #3 — tool-call `clientInfo` lost on stateless transport
 
-`mcp.client.name` is `null` on 100% of tool-call spans because `createMcpHandler` (from `agents@0.3.10`) creates a fresh `WorkerTransport` per request, and `clientInfo` is only captured during `initialize`. Closing this would require persisting `clientInfo` keyed by MCP session id (e.g., in `MCP_CACHE` KV) and reinjecting it per-request. Not blocking for OAuth diagnosis — user-agent family is an adequate substitute — but worth fixing for tool-level telemetry.
+`app.client.name` is `null` on 100% of tool-call spans because `createMcpHandler` (from `agents@0.3.10`) creates a fresh `WorkerTransport` per request, and `clientInfo` is only captured during `initialize`. Closing this would require persisting `clientInfo` keyed by MCP session id (e.g., in `MCP_CACHE` KV) and reinjecting it per-request. Not blocking for OAuth diagnosis — user-agent family is an adequate substitute — but worth fixing for tool-level telemetry.
 
 ### Gap #4 — Same-user concurrent session interference — **closed**
 
@@ -172,19 +172,19 @@ Trade-off: KV storage holds extra grant entries (each up to 30d). Not a real con
 ## Runbook — "a user says they got signed out"
 
 1. **Check `grant_revoked` for the user** over the relevant window:
-   `metric mcp.oauth.grant_revoked filtered by user.id:"<id>" grouped by reason over 30 days`
+   `metric app.oauth.grant_revoked filtered by user.id:"<id>" grouped by app.oauth.grant_revoked.reason over 30 days`
 2. **Interpret the `reason`:**
    - `upstream_rejected_in_use` — Sentry invalidated the token mid-session (SSO / org / password / admin revocation). Most common for sub-30d sign-outs. The grant was revoked automatically; user should re-auth cleanly on next request.
    - `upstream_rejected` — natural 30d expiry (probe path). Expected.
    - `stale_props_no_refresh` — legacy grant predating PR #537. Expected, one-time.
 3. **If no revocations are recorded** (reason counts are empty), the user hasn't been revoked server-side. Either they're still authenticated and the perception is wrong, OR the client lost local state and re-registered without going through `/oauth/callback`:
-   - Check `mcp.oauth.register grouped by client_family` for that client — high register:callback ratio (claude-code and cursor re-register on every cold start) is normal client behavior, not a server-side sign-out.
+   - Check `app.oauth.register grouped by app.client.family` for that client — high register:callback ratio (claude-code and cursor re-register on every cold start) is normal client behavior, not a server-side sign-out.
 4. **If reporting a specific time**, query `POST /oauth/token` transactions for that `user.id` around that timestamp. Transaction duration and child `GET /api/0/auth/` span tell you whether probes fired.
 
 ## Related PRs
 
 - #916 — restored sign-out telemetry (scrubber rename) and reduced probe volume.
 - #917 — carried probe status as a metric attribute.
-- #918 — added `client_family`, user tagging, `callback_completed` / `register` metrics, `probe_reason`, structured Invalid-redirect-URI fields.
+- #918 — added client family, user tagging, `callback_completed` / `register` metrics, probe reason, structured Invalid-redirect-URI fields.
 - #919 — added `expired_on_schedule` on `upstream_rejected`. Removed in #920 once we realized the probe path can't produce `"false"` by construction.
-- #920 — closes Gaps #1 and #2 via tool-call 401 detection, grant revocation, and `grant_revoked{reason:upstream_rejected_in_use}`. Also removes the unreachable `expired_on_schedule` attribute and its `upstreamExpiresAt` grant field.
+- #920 — closes Gaps #1 and #2 via tool-call 401 detection, grant revocation, and `app.oauth.grant_revoked.reason:upstream_rejected_in_use`. Also removes the unreachable `expired_on_schedule` attribute and its `upstreamExpiresAt` grant field.

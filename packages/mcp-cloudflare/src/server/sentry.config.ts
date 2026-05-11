@@ -15,8 +15,8 @@ export default function getSentryConfig(env: Env): SentryConfig {
     beforeSend: sentryBeforeSend,
     initialScope: {
       tags: {
-        "mcp.server_version": LIB_VERSION,
-        "sentry.host": env.SENTRY_HOST,
+        "app.server.version": LIB_VERSION,
+        "app.upstream.host": env.SENTRY_HOST,
       },
     },
     ...(versionId ? { release: versionId } : {}),

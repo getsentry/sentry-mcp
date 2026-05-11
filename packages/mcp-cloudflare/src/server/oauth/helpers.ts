@@ -448,9 +448,9 @@ function recordTokenExchangeOutcome(
   outcome: TokenExchangeOutcome,
   attributes?: Record<string, string>,
 ): void {
-  Sentry.metrics.count("mcp.oauth.token_exchange", 1, {
+  Sentry.metrics.count("app.oauth.token_exchange", 1, {
     attributes: {
-      outcome,
+      "app.oauth.token_exchange.outcome": outcome,
       ...attributes,
     },
   });
@@ -588,8 +588,8 @@ export async function tokenExchangeCallback(
     const remainingMs = expiresAt - Date.now();
     if (remainingMs > SAFE_WINDOW_MS) {
       recordTokenExchangeOutcome("cached_valid_local", {
-        grant_shape: "refreshable",
-        client_family: clientFamily,
+        "app.oauth.grant.shape": "refreshable",
+        "app.client.family": clientFamily,
       });
       return buildSuccessfulTokenExchangeResult(
         props,
@@ -609,14 +609,14 @@ export async function tokenExchangeCallback(
   // Metric attribute (not span attribute): Sentry.getActiveSpan() is
   // undefined inside tokenExchangeCallback.
   const outcomeAttributes: Record<string, string> = {
-    grant_shape: "refreshable",
-    client_family: clientFamily,
+    "app.oauth.grant.shape": "refreshable",
+    "app.client.family": clientFamily,
   };
   if (typeof status === "number") {
-    outcomeAttributes.probe_status = String(status);
+    outcomeAttributes["app.oauth.probe.status_code"] = String(status);
   }
   if (reason) {
-    outcomeAttributes.probe_reason = reason;
+    outcomeAttributes["app.oauth.probe.reason"] = reason;
   }
   switch (outcome) {
     case "cached_valid_probed": {

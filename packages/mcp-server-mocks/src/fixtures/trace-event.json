@@ -110,10 +110,10 @@
   "tags": [
     { "key": "environment", "value": "cloudflare" },
     { "key": "level", "value": "info" },
-    { "key": "mcp.server_version", "value": "0.17.1" },
+    { "key": "app.server.version", "value": "0.17.1" },
     { "key": "release", "value": "eece3c53-694c-4362-b599-95fc591a6cc7" },
     { "key": "runtime.name", "value": "cloudflare" },
-    { "key": "sentry.host", "value": "sentry.io" },
+    { "key": "app.upstream.host", "value": "sentry.io" },
     { "key": "transaction", "value": "POST /mcp" },
     { "key": "url", "value": "https://mcp.sentry.dev/mcp" },
     {

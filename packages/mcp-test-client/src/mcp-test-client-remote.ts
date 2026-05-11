@@ -22,7 +22,7 @@ export async function connectToRemoteMCPServer(
       {
         name: "mcp.connect/http",
         attributes: {
-          "mcp.transport": "http",
+          "app.transport": "http",
           "gen_ai.conversation.id": sessionId,
           "service.version": LIB_VERSION,
         },

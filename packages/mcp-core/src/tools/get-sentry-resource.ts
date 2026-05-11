@@ -475,7 +475,7 @@ export default defineTool({
       setTag("trace.span_id", resolved.spanId);
     }
 
-    getActiveSpan()?.setAttribute("sentry-mcp.resource-type", resolved.type);
+    getActiveSpan()?.setAttribute("app.resource.type", resolved.type);
 
     // Recognized but not yet fully supported types return guidance messages
     if (resolved.type === "monitor" || resolved.type === "release") {

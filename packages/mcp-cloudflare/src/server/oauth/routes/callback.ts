@@ -324,9 +324,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // /oauth/callback is browser-navigated, so the User-Agent is the user's
   // browser, not the MCP client. Derive client family from the DCR-registered
   // client_name (resolved above).
-  Sentry.metrics.count("mcp.oauth.callback_completed", 1, {
+  Sentry.metrics.count("app.oauth.callback_completed", 1, {
     attributes: {
-      client_family: resolveClientFamilyFromName(registeredClientName),
+      "app.client.family": resolveClientFamilyFromName(registeredClientName),
     },
   });
 

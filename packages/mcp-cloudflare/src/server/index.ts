@@ -198,8 +198,8 @@ const wrappedOAuthProvider = {
       url.pathname === "/oauth/register" &&
       response.ok
     ) {
-      Sentry.metrics.count("mcp.oauth.register", 1, {
-        attributes: { client_family: clientFamily },
+      Sentry.metrics.count("app.oauth.register", 1, {
+        attributes: { "app.client.family": clientFamily },
       });
     }
 

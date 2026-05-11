@@ -19,7 +19,7 @@ export async function connectToMCPServer(
       {
         name: "mcp.connect/stdio",
         attributes: {
-          "mcp.transport": "stdio",
+          "app.transport": "stdio",
           "gen_ai.conversation.id": sessionId,
           "service.version": LIB_VERSION,
         },

@@ -260,12 +260,12 @@ async function main() {
     beforeSend: sentryBeforeSend,
     initialScope: {
       tags: {
-        "mcp.server_version": LIB_VERSION,
-        "mcp.transport": "stdio",
-        "mcp.agent_mode": cli.agent ? "true" : "false",
-        "mcp.experimental_mode": cli.experimental ? "true" : "false",
-        "sentry.host": cfg.sentryHost,
-        "mcp.mcp-url": cfg.mcpUrl,
+        "app.server.version": LIB_VERSION,
+        "app.transport": "stdio",
+        "app.server.mode.agent": cli.agent ? "true" : "false",
+        "app.server.mode.experimental": cli.experimental ? "true" : "false",
+        "app.upstream.host": cfg.sentryHost,
+        "app.url.full": cfg.mcpUrl,
       },
     },
     release: process.env.SENTRY_RELEASE,

@@ -184,8 +184,7 @@
     },
     {
       "namespace": "mcp",
-      "description": "Model Context Protocol attributes for MCP tool calls and sessions",
-      "custom": true
+      "description": "Model Context Protocol semantic convention attributes"
     },
     {
       "namespace": "messaging",
