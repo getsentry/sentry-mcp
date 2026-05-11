@@ -25,10 +25,39 @@ import {
 } from "./utils/rate-limiter";
 import { setSentryUserFromRequest } from "./utils/sentry-user";
 
+const AUTH_PARAM_SEPARATOR = /,\s*(?=[A-Za-z_][A-Za-z0-9_-]*\s*=)/;
+const AUTH_CHALLENGE = /^(\S+)(?:\s+(.+))?$/;
+const RESOURCE_METADATA_PARAM = /^resource_metadata\s*=/i;
+
+function replaceResourceMetadataParam(
+  headerValue: string,
+  resourceMetadataUrl: string,
+): string {
+  const match = headerValue.match(AUTH_CHALLENGE);
+  if (!match) {
+    return headerValue;
+  }
+
+  const [, scheme, params = ""] = match;
+  const filteredParams = params
+    .split(AUTH_PARAM_SEPARATOR)
+    .map((param) => param.trim())
+    .filter((param) => param && !RESOURCE_METADATA_PARAM.test(param));
+
+  filteredParams.push(`resource_metadata="${resourceMetadataUrl}"`);
+  return `${scheme} ${filteredParams.join(", ")}`;
+}
+
 /**
  * RFC 9728 §3.1: Patch 401 responses on MCP routes to include a
  * `resource_metadata` parameter in the WWW-Authenticate header so
  * clients can discover the protected-resource metadata endpoint.
+ *
+ * The underlying OAuth library may already set its own `resource_metadata`
+ * pointing at the (path-less) origin metadata URL, which 404s on this
+ * deployment. We strip any pre-existing `resource_metadata` parameter and
+ * replace it with our path-specific one so the challenge contains exactly
+ * one such param, as required by RFC 9110 §11.2.
  */
 function patchWwwAuthenticate(response: Response, url: URL): Response {
   if (response.status !== 401 || !url.pathname.startsWith("/mcp")) {
@@ -40,11 +69,10 @@ function patchWwwAuthenticate(response: Response, url: URL): Response {
   }
   const prmUrl = `${url.protocol}//${url.host}/.well-known/oauth-protected-resource${url.pathname}${url.search}`;
   const newResponse = new Response(response.body, response);
-  // RFC 7235: first param is space-separated from scheme, subsequent params are comma-separated
-  const separator = existing.includes(" ") ? "," : "";
+
   newResponse.headers.set(
     "WWW-Authenticate",
-    `${existing}${separator} resource_metadata="${prmUrl}"`,
+    replaceResourceMetadataParam(existing, prmUrl),
   );
   return newResponse;
 }
