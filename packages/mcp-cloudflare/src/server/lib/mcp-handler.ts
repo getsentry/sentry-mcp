@@ -182,10 +182,10 @@ const mcpHandler: ExportedHandler<Env> = {
     // scrubber doesn't replace them with "[Filtered]" on ingest.
     if (!rawProps.refreshToken) {
       if (requestGrantId) {
-        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+        Sentry.metrics.count("app.oauth.grant_revoked", 1, {
           attributes: {
-            reason: "stale_props_no_refresh",
-            client_family: clientFamily,
+            "app.oauth.grant_revoked.reason": "stale_props_no_refresh",
+            "app.client.family": clientFamily,
           },
         });
       }
@@ -201,10 +201,10 @@ const mcpHandler: ExportedHandler<Env> = {
 
     if (rawProps.upstreamTokenInvalid) {
       if (requestGrantId) {
-        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+        Sentry.metrics.count("app.oauth.grant_revoked", 1, {
           attributes: {
-            reason: "upstream_rejected",
-            client_family: clientFamily,
+            "app.oauth.grant_revoked.reason": "upstream_rejected",
+            "app.client.family": clientFamily,
           },
         });
       }
@@ -335,10 +335,10 @@ const mcpHandler: ExportedHandler<Env> = {
           });
           return;
         }
-        Sentry.metrics.count("mcp.oauth.grant_revoked", 1, {
+        Sentry.metrics.count("app.oauth.grant_revoked", 1, {
           attributes: {
-            reason: "upstream_rejected_in_use",
-            client_family: clientFamily,
+            "app.oauth.grant_revoked.reason": "upstream_rejected_in_use",
+            "app.client.family": clientFamily,
           },
         });
         ctx.waitUntil(

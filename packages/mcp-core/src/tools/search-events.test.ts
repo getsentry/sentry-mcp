@@ -1499,7 +1499,7 @@ describe("search_events", () => {
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
         "spans",
-        "has:mcp.tool.name AND has:user_agent.original",
+        "has:gen_ai.tool.name AND has:user_agent.original",
         ["user_agent.original", "count()"],
         undefined,
         "-count()",
@@ -1515,7 +1515,7 @@ describe("search_events", () => {
           const url = new URL(request.url);
           expect(url.searchParams.get("dataset")).toBe("spans");
           expect(url.searchParams.get("query")).toBe(
-            "has:mcp.tool.name AND has:user_agent.original",
+            "has:gen_ai.tool.name AND has:user_agent.original",
           );
           expect(url.searchParams.get("sort")).toBe("-count"); // API transforms count() to count
           expect(url.searchParams.get("statsPeriod")).toBe("24h");

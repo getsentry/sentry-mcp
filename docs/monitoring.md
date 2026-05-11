@@ -27,7 +27,7 @@ export async function createTracedToolHandler<T extends ToolName>(
     name,
     async (context: ServerContext, params: ToolParams<T>) => {
       const attributes = {
-        "mcp.tool.name": name,
+        "gen_ai.tool.name": name,
         ...extractMcpParameters(params),
       };
 
@@ -133,21 +133,32 @@ process.on("uncaughtException", (error) => {
 Sentry follows OpenTelemetry semantic conventions for consistent observability.
 
 ### MCP Attributes (Model Context Protocol)
-Based on [OpenTelemetry MCP conventions](https://github.com/open-telemetry/semantic-conventions/blob/3097fb0af5b9492b0e3f55dc5f6c21a3dc2be8df/docs/registry/attributes/mcp.md) (currently in **draft form**):
+Based on the current [OpenTelemetry MCP conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/mcp/), keep `mcp.*` limited to the documented MCP semantic attributes:
 
-- `mcp.method.name` - The name of the request or notification method (e.g., "notifications/cancelled", "initialize", "notifications/initialized")
-- `mcp.prompt.name` - The name of the prompt or prompt template provided in the request or response (e.g., "analyze-code")
-- `mcp.request.argument.<key>` - Additional arguments passed to the request within `params` object (e.g., "mcp.request.argument.location='Seattle, WA'", "mcp.request.argument.a='42'")
-- `mcp.request.id` - A unique identifier for the request (e.g., "42")
-- `mcp.resource.uri` - The value of the resource uri (e.g., "postgres://database/customers/schema", "file:///home/user/documents/report.pdf")
+- `mcp.method.name` - The name of the request or notification method (e.g., "notifications/cancelled", "initialize", "tools/call")
+- `mcp.protocol.version` - The MCP protocol version (e.g., "2025-06-18")
+- `mcp.resource.uri` - The value of the resource URI (e.g., "postgres://database/customers/schema", "file:///home/user/documents/report.pdf")
 - `mcp.session.id` - Identifies MCP session (e.g., "191c4850af6c49e08843a3f6c80e5046")
-- `mcp.tool.name` - The name of the tool provided in the request (e.g., "get-weather", "execute_command")
 
-### Custom MCP Attributes
-These are custom attributes - *not in draft spec* - we've added to enhance MCP observability:
+Current MCP spans also use related OpenTelemetry attributes outside the `mcp.*` namespace:
 
-- `mcp.resource.name` - The name of the resource (e.g., "sentry-docs-platform", "sentry-query-syntax")
-- `mcp.transport` - The transport method used for MCP communication (values: "http", "sse", "stdio")
+- `gen_ai.prompt.name` - The prompt or prompt template name
+- `gen_ai.tool.name` - The tool name
+- `jsonrpc.request.id` - The JSON-RPC request ID
+- `rpc.response.status_code` - The JSON-RPC response status or error code
+- `network.transport` - Transport protocol (`pipe` for stdio, `tcp` or `quic` for HTTP)
+
+### Application-Owned Attributes
+These are Sentry MCP application attributes that are not part of the MCP semantic convention:
+
+- `app.resource.type` - Resolved Sentry resource type for `get_sentry_resource`
+- `app.transport` - The product transport label (values: "http", "sse", "stdio")
+- `app.constraint.organization_slug` - Session organization constraint
+- `app.constraint.project_slug` - Session project constraint
+- `app.server.mode.agent` - Whether stdio started in agent mode
+- `app.server.mode.experimental` - Whether experimental tools are enabled
+- `app.upstream.host` - Upstream Sentry host configured for the server
+- `app.url.full` - MCP URL configured for stdio
 
 ### User Agent Tracking
 
@@ -165,7 +176,7 @@ Based on [OpenTelemetry network conventions](https://github.com/open-telemetry/s
 ### GenAI Attributes (Generative AI)
 Based on [OpenTelemetry GenAI conventions](https://github.com/open-telemetry/semantic-conventions/blob/main/docs/registry/attributes/gen-ai.md):
 
-- `gen_ai.system` - The AI system being used (e.g., "anthropic")
+- `gen_ai.provider.name` - The AI provider name (e.g., "anthropic")
 - `gen_ai.request.model` - Name of the GenAI model
 - `gen_ai.request.max_tokens` - Maximum tokens to generate
 - `gen_ai.operation.name` - Type of operation (e.g., "chat")
@@ -177,10 +188,8 @@ Follows the format: `{mcp.method.name} {target}` per OpenTelemetry MCP semantic 
 
 - Tools: `tools/call {tool_name}` (e.g., `tools/call find_issues`)
 - Prompts: `prompts/get {prompt_name}` (e.g., `prompts/get analyze-code`)
-- Resources: `resources/read {resource_uri}` (e.g., `resources/read https://github.com/...`)
-- Client: `mcp.client/{target}` (e.g., `mcp.client/agent`)
-- Connect: `mcp.connect/{transport}` (e.g., `mcp.connect/stdio`)
-- Auth: `mcp.auth/{method}` (e.g., `mcp.auth/oauth`)
+- Resources: `resources/read` by default. Do not include resource URIs in span names unless explicitly opted in because they can be high-cardinality.
+- Connect/auth spans may use local names such as `mcp.connect/stdio` and `mcp.auth/oauth`; these are span names, not semantic attribute namespaces.
 
 **Note**: Span names are flexible and can be adjusted based on your needs. However, attribute names MUST follow the OpenTelemetry semantic conventions exactly as specified above.
 
@@ -188,13 +197,13 @@ Follows the format: `{mcp.method.name} {target}` per OpenTelemetry MCP semantic 
 ```typescript
 // MCP Tool Execution
 {
-  "mcp.tool.name": "find_issues",
+  "gen_ai.tool.name": "find_issues",
   "mcp.session.id": "191c4850af6c49e08843a3f6c80e5046"
 }
 
 // GenAI Agent
 {
-  "gen_ai.system": "anthropic",
+  "gen_ai.provider.name": "anthropic",
   "gen_ai.request.model": "claude-3-5-sonnet-20241022",
   "gen_ai.operation.name": "chat",
   "gen_ai.usage.input_tokens": 150,
@@ -205,7 +214,7 @@ Follows the format: `{mcp.method.name} {target}` per OpenTelemetry MCP semantic 
 {
   "network.transport": "pipe",  // "pipe" for stdio, "tcp" for SSE
   "mcp.session.id": "191c4850af6c49e08843a3f6c80e5046",
-  "mcp.transport": "stdio",  // Custom attribute: "stdio" or "sse"
+  "app.transport": "stdio",  // Custom attribute: "stdio" or "sse"
   "service.version": "1.2.3"  // Version of the MCP server/client
 }
 
@@ -213,8 +222,8 @@ Follows the format: `{mcp.method.name} {target}` per OpenTelemetry MCP semantic 
 {
   "mcp.session.id": "191c4850af6c49e08843a3f6c80e5046",
   "network.transport": "pipe",  // "pipe" for stdio, "tcp" for SSE
-  "mcp.transport": "stdio",  // Custom attribute: "stdio" or "sse"
-  "gen_ai.system": "anthropic",
+  "app.transport": "stdio",  // Custom attribute: "stdio" or "sse"
+  "gen_ai.provider.name": "anthropic",
   "gen_ai.request.model": "claude-3-5-sonnet-20241022",
   "gen_ai.operation.name": "chat",
   "service.version": "1.2.3"  // Version of the MCP client
@@ -241,30 +250,30 @@ Follows the format: `{mcp.method.name} {target}` per OpenTelemetry MCP semantic 
 For Cloudflare HTTP traffic we send custom Metrics product counters through the
 JavaScript SDK metrics API:
 
-- `mcp.server.response` - Count of tracked HTTP responses
+- `app.server.response` - Count of tracked HTTP responses
 
 Shared low-cardinality attributes:
 
 - `http.request.method` - HTTP method
 - `http.route` - Normalized route template
 - `http.response.status_code` - Final HTTP status code
-- `http.status_class` - Status family such as `2xx` or `4xx`
-- `sentry.route.group` - Coarse route family: `mcp`, `oauth`, `chat`, or `search`
+- `app.response.status_class` - Status family such as `2xx` or `4xx`
+- `app.route.group` - Coarse route family: `mcp`, `oauth`, `chat`, or `search`
 
 Optional local rate-limit attributes:
 
-- `sentry.response.reason` - `local_rate_limit`
-- `sentry.rate_limit.scope` - `ip` or `user`
+- `app.response.reason` - `local_rate_limit`
+- `app.rate_limit.scope` - `ip` or `user`
 
 Interpretation:
 
-- Use `sum(mcp.server.response)` grouped by `http.route` and
+- Use `sum(app.server.response)` grouped by `http.route` and
   `http.response.status_code` for response rates
-- Use `sum(mcp.server.response)` filtered by
-  `sentry.response.reason=local_rate_limit` to measure when we rate-limited the
+- Use `sum(app.server.response)` filtered by
+  `app.response.reason=local_rate_limit` to measure when we rate-limited the
   customer
-- Upstream/provider 429s increment `mcp.server.response` with status `429`, but
-  do not include `sentry.response.reason`
+- Upstream/provider 429s increment `app.server.response` with status `429`, but
+  do not include `app.response.reason`
 
 ### Traces Configuration
 ```typescript

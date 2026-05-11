@@ -57,7 +57,7 @@ export async function runAgent(
           "service.version": LIB_VERSION,
           "gen_ai.conversation.id": sessionId,
           "gen_ai.agent.name": "sentry-mcp-agent",
-          "gen_ai.system": "openai",
+          "gen_ai.provider.name": "openai",
           "gen_ai.request.model": model,
           "gen_ai.operation.name": "chat",
         },

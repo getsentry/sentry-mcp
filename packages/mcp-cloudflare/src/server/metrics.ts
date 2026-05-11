@@ -8,7 +8,7 @@ type TrackedRoute = {
   route: string;
 };
 
-const RESPONSE_METRIC_NAME = "mcp.server.response";
+const RESPONSE_METRIC_NAME = "app.server.response";
 const RESPONSE_REASON_HEADER = "x-sentry-response-reason";
 const RATE_LIMIT_SCOPE_HEADER = "x-sentry-rate-limit-scope";
 
@@ -92,7 +92,7 @@ function getMetricAttributes(
   return {
     "http.request.method": request.method,
     "http.route": trackedRoute.route,
-    "sentry.route.group": trackedRoute.group,
+    "app.route.group": trackedRoute.group,
   };
 }
 
@@ -166,15 +166,15 @@ export function recordResponseMetric(
 
   const responseAttributes: Record<string, string | number> = {
     "http.response.status_code": response.status,
-    "http.status_class": getStatusClass(response.status),
+    "app.response.status_class": getStatusClass(response.status),
   };
 
   if (options?.responseReason) {
-    responseAttributes["sentry.response.reason"] = options.responseReason;
+    responseAttributes["app.response.reason"] = options.responseReason;
   }
 
   if (options?.rateLimitScope) {
-    responseAttributes["sentry.rate_limit.scope"] = options.rateLimitScope;
+    responseAttributes["app.rate_limit.scope"] = options.rateLimitScope;
   }
 
   Sentry.metrics.count(RESPONSE_METRIC_NAME, 1, {

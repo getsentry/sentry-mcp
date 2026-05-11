@@ -136,7 +136,8 @@ https://us.sentry.io/api/0/organizations/sentry/events/?dataset=spans&field=ai.m
 Instead of using `span.op` patterns, use `has:` queries for more flexible attribute-based filtering:
 - HTTP requests: `has:request.url` instead of `span.op:http*`
 - Database queries: `has:db.statement` or `has:db.system` instead of `span.op:db*`
-- AI/LLM calls: `has:ai.model.id` or `has:mcp.tool.name`
+- AI/LLM calls: `has:ai.model.id`
+- MCP tool calls: `has:gen_ai.tool.name`
 
 ### Aggregate Functions
 
@@ -207,8 +208,8 @@ Dataset: metrics
 
 ### Tool Calls by Model (Aggregate)
 ```
-Query: has:mcp.tool.name
-Fields: ["ai.model.id", "mcp.tool.name", "count()"]
+Query: has:gen_ai.tool.name
+Fields: ["ai.model.id", "gen_ai.tool.name", "count()"]
 Sort: -count()
 Dataset: spans
 ```

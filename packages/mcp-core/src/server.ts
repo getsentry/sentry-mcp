@@ -288,19 +288,19 @@ function configureServer({
         params: any,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
       ) => {
-        // Get active span (mcp.server span) and attach more attributes to it
+        // Get the active MCP server span and attach request-scoped attributes.
         const activeSpan = getActiveSpan();
 
         if (activeSpan) {
           if (context.constraints.organizationSlug) {
             activeSpan.setAttribute(
-              "sentry-mcp.constraint-organization",
+              "app.constraint.organization_slug",
               context.constraints.organizationSlug,
             );
           }
           if (context.constraints.projectSlug) {
             activeSpan.setAttribute(
-              "sentry-mcp.constraint-project",
+              "app.constraint.project_slug",
               context.constraints.projectSlug,
             );
           }

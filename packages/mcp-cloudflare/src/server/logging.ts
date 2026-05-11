@@ -15,8 +15,8 @@ export function createRequestLogger(
     logInfo(`${c.req.method} ${url.pathname}`, {
       loggerScope,
       extra: {
-        status: c.res.status,
-        duration_ms: Date.now() - start,
+        "http.response.status_code": c.res.status,
+        "app.request.duration_ms": Date.now() - start,
       },
     });
   };

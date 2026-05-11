@@ -62,7 +62,7 @@ describe("otel-semantics-lookup", () => {
       expect(result).toContain("`http.response.status_code`");
     });
 
-    it("should show custom namespace note for mcp", async () => {
+    it("should return MCP semantic attributes", async () => {
       const result = await lookupOtelSemantics(
         "mcp",
         "spans",
@@ -70,7 +70,12 @@ describe("otel-semantics-lookup", () => {
         "test-org",
       );
 
-      expect(result).toContain("**Note:** This is a custom namespace");
+      expect(result).toContain("# OpenTelemetry Semantic Conventions: mcp");
+      expect(result).toContain("`mcp.method.name`");
+      expect(result).toContain("`mcp.protocol.version`");
+      expect(result).toContain("`mcp.resource.uri`");
+      expect(result).toContain("`mcp.session.id`");
+      expect(result).not.toContain("**Note:** This is a custom namespace");
     });
 
     it("should handle invalid namespace", async () => {

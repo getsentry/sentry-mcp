@@ -57,7 +57,7 @@ export async function startStdio(server: McpServer, context: ServerContext) {
       {
         name: "mcp.server/stdio",
         attributes: {
-          "mcp.transport": "stdio",
+          "app.transport": "stdio",
           "network.transport": "pipe",
           "service.version": LIB_VERSION,
         },

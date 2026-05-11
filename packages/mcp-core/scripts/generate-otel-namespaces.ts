@@ -339,7 +339,7 @@ async function generateNamespaceFiles() {
       const existingJson = JSON.parse(existingContent);
 
       // Skip if this appears to be a custom namespace (not from OpenTelemetry)
-      if (existingJson.namespace === "mcp" || existingJson.custom === true) {
+      if (existingJson.custom === true) {
         console.log(`⏭️  Skipping custom namespace: ${namespace}`);
         skipped++;
         continue;
@@ -424,56 +424,43 @@ function generateNamespacesIndex(
   );
 }
 
-// Add MCP namespace as a custom one
+// Add MCP namespace from the current OpenTelemetry MCP draft.
 function generateMcpNamespace() {
   const mcpNamespace: JsonNamespace = {
     namespace: "mcp",
-    description:
-      "Model Context Protocol attributes for MCP tool calls and sessions",
+    description: "Model Context Protocol semantic convention attributes",
     attributes: {
-      "mcp.tool.name": {
-        description: "Tool name (e.g., find_issues, search_events)",
+      "mcp.method.name": {
+        description: "The name of the request or notification method.",
+        type: "string",
+        examples: ["initialize", "tools/call", "resources/read"],
+      },
+      "mcp.protocol.version": {
+        description: "The version of the Model Context Protocol used.",
+        type: "string",
+        examples: ["2025-06-18"],
+      },
+      "mcp.resource.uri": {
+        description: "The value of the resource URI.",
         type: "string",
         examples: [
-          "find_issues",
-          "search_events",
-          "get_issue_details",
-          "update_issue",
+          "postgres://database/customers/schema",
+          "file:///home/user/documents/report.pdf",
         ],
       },
       "mcp.session.id": {
-        description: "MCP session identifier",
+        description: "Identifies an MCP session.",
         type: "string",
-      },
-      "mcp.transport": {
-        description: "MCP transport protocol used",
-        type: "string",
-        examples: ["stdio", "http", "websocket"],
-      },
-      "mcp.request.id": {
-        description: "MCP request identifier",
-        type: "string",
-      },
-      "mcp.response.status": {
-        description: "MCP response status",
-        type: "string",
-        examples: ["success", "error"],
+        examples: ["191c4850af6c49e08843a3f6c80e5046"],
       },
     },
   };
 
   const outputPath = resolve(DATA_DIR, "mcp.json");
-  const content = JSON.stringify(
-    {
-      ...mcpNamespace,
-      custom: true, // Mark as custom so it doesn't get overwritten
-    },
-    null,
-    2,
-  );
+  const content = JSON.stringify(mcpNamespace, null, 2);
 
   writeFileSync(outputPath, content);
-  console.log("✅ Generated custom MCP namespace");
+  console.log("✅ Generated MCP namespace");
 }
 
 // Run the script

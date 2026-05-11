@@ -42,10 +42,9 @@ The JSON files are imported directly in the TypeScript code and bundled by tsdow
 
 ### Custom Namespaces
 
-Some namespaces are maintained manually for attributes not yet in the OpenTelemetry specification:
-
-- **mcp.json** - Model Context Protocol attributes (custom)
-- Any file marked with `"custom": true` will be skipped during regeneration
+Namespaces are generated from OpenTelemetry semantic conventions by default.
+Files marked with `"custom": true` are reserved for manually maintained
+attributes and are skipped during regeneration.
 
 ## Usage
 
@@ -68,10 +67,7 @@ The `otel-semantics-lookup.ts` tool reads these JSON files to provide semantic g
 - **service** - Service identification (name, version, instance)
 - **error** - Error information (type, message, stack)
 - **user** - User identification (id, email, name)
-
-### Custom Namespaces
-
-- **mcp** - Model Context Protocol operations (tool calls, sessions)
+- **mcp** - Model Context Protocol attributes (methods, resources, sessions)
 
 ## Regeneration Process
 
@@ -89,14 +85,14 @@ data/
 ├── http.json              # HTTP attributes
 ├── rpc.json               # RPC attributes
 ├── messaging.json         # Messaging attributes
-├── mcp.json               # MCP attributes (custom)
+├── mcp.json               # MCP semantic convention attributes
 └── [other-namespaces].json
 ```
 
 ## Maintenance
 
 - **OpenTelemetry files**: Regenerate periodically to stay current with specifications
-- **Custom files**: Update manually as needed for new MCP or Sentry-specific attributes
+- **Custom files**: Update manually as needed for non-OpenTelemetry attributes
 - **Validation**: Ensure all files follow the expected JSON schema format
 
-The embedded AI agent uses these definitions to provide accurate semantic guidance when users query for things like "agent calls" (maps to gen_ai.*) vs "tool calls" (maps to mcp.*).
+The embedded AI agent uses these definitions to provide accurate semantic guidance when users query for things like "agent calls" or "tool calls" (maps to gen_ai.*) vs MCP protocol fields (maps to mcp.*).
