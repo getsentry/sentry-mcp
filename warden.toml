@@ -34,3 +34,13 @@ paths = [
 [[skills.triggers]]
 type = "pull_request"
 actions = ["opened", "synchronize", "reopened"]
+
+[[skills]]
+name = "code-review"
+
+[[skills.triggers]]
+type = "pull_request"
+actions = ["opened", "synchronize", "reopened"]
+
+[[skills.triggers]]
+type = "local"
