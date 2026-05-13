@@ -41,6 +41,13 @@
 import type { z } from "zod";
 import type {
   AssignedToSchema,
+  AutofixExplorerArtifactSchema,
+  AutofixExplorerBlockSchema,
+  AutofixExplorerCodingAgentStateSchema,
+  AutofixExplorerFilePatchSchema,
+  AutofixExplorerRepoPRStateSchema,
+  AutofixExplorerStatusSchema,
+  AutofixExplorerStepSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   ClientKeyListSchema,
@@ -117,6 +124,21 @@ export type EventAttachment = z.infer<typeof EventAttachmentSchema>;
 export type Tag = z.infer<typeof TagSchema>;
 export type AutofixRun = z.infer<typeof AutofixRunSchema>;
 export type AutofixRunState = z.infer<typeof AutofixRunStateSchema>;
+export type AutofixExplorerStatus = z.infer<typeof AutofixExplorerStatusSchema>;
+export type AutofixExplorerStep = z.infer<typeof AutofixExplorerStepSchema>;
+export type AutofixExplorerBlock = z.infer<typeof AutofixExplorerBlockSchema>;
+export type AutofixExplorerArtifact = z.infer<
+  typeof AutofixExplorerArtifactSchema
+>;
+export type AutofixExplorerFilePatch = z.infer<
+  typeof AutofixExplorerFilePatchSchema
+>;
+export type AutofixExplorerRepoPRState = z.infer<
+  typeof AutofixExplorerRepoPRStateSchema
+>;
+export type AutofixExplorerCodingAgentState = z.infer<
+  typeof AutofixExplorerCodingAgentStateSchema
+>;
 export type AssignedTo = z.infer<typeof AssignedToSchema>;
 export type ReplayDetails = z.infer<typeof ReplayDetailsSchema>;
 export type ReplayList = z.infer<typeof ReplayListResponseSchema>["data"];

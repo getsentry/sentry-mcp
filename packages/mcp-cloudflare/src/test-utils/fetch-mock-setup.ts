@@ -467,14 +467,14 @@ export function registerFetchMockInterceptors(fetchMock: FetchMockLike) {
     // ===== Autofix =====
     pool
       .intercept({
-        path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/?mode=explorer",
       })
       .reply(200, { autofix: null }, { headers: JSON_HEADERS })
       .persist();
 
     pool
       .intercept({
-        path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/",
+        path: "/api/0/organizations/sentry-mcp-evals/issues/PEATED-A8/autofix/?mode=explorer",
       })
       .reply(200, autofixStateFixture, { headers: JSON_HEADERS })
       .persist();

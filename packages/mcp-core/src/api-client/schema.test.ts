@@ -615,22 +615,27 @@ describe("AutofixRunSchema", () => {
 });
 
 describe("AutofixRunStateSchema", () => {
-  it("accepts explorer-style autofix state without legacy steps", () => {
+  it("parses an explorer-mode autofix state with blocks and artifacts", () => {
     const state = AutofixRunStateSchema.parse(autofixStateExplorerFixture);
 
-    expect(state.autofix?.steps).toEqual([]);
-    expect(state.autofix?.blocks).toEqual([
-      {
-        type: "root_cause",
-        title: "Investigate failing request",
-        status: "COMPLETED",
+    expect(state.autofix?.status).toBe("processing");
+    expect(state.autofix?.run_id).toBe(21831);
+    const blocks = state.autofix?.blocks ?? [];
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]?.message.metadata?.step).toBe("root_cause");
+    expect(blocks[1]?.message.metadata?.step).toBe("solution");
+    expect(blocks[0]?.artifacts?.[0]?.key).toBe("root_cause");
+  });
+
+  it("defaults missing blocks arrays to []", () => {
+    const state = AutofixRunStateSchema.parse({
+      autofix: {
+        run_id: 1,
+        status: "processing",
       },
-      {
-        type: "solution",
-        title: "Draft fix plan",
-        status: "IN_PROGRESS",
-      },
-    ]);
+    });
+
+    expect(state.autofix?.blocks).toEqual([]);
   });
 });
 

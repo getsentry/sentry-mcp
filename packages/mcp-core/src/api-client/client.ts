@@ -40,6 +40,7 @@ import {
   TagListSchema,
   ApiErrorSchema,
   ClientKeyListSchema,
+  type AutofixExplorerStepSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   TraceMetaSchema,
@@ -2566,36 +2567,51 @@ export class SentryApiService {
     return await this.requestJSON(apiUrl, undefined, opts);
   }
 
-  // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
+  // POST https://us.sentry.io/api/0/issues/5485083130/autofix/?mode=explorer
+  //
+  // Explorer mode advances the run one logical step at a time. A new run is
+  // created when `runId` is omitted (allowed only for `step: "root_cause"`);
+  // later steps must reuse the original run via `runId`.
   async startAutofix(
     {
       organizationSlug,
       issueId,
-      eventId,
-      instruction = "",
+      step,
+      runId,
+      userContext,
+      insertIndex,
     }: {
       organizationSlug: string;
       issueId: string;
-      eventId?: string;
-      instruction?: string;
+      step: z.infer<typeof AutofixExplorerStepSchema>;
+      runId?: number;
+      userContext?: string;
+      insertIndex?: number;
     },
     opts?: RequestOptions,
   ): Promise<AutofixRun> {
+    const payload: Record<string, unknown> = { step };
+    if (runId !== undefined) {
+      payload.run_id = runId;
+    }
+    if (userContext !== undefined && userContext !== "") {
+      payload.user_context = userContext;
+    }
+    if (insertIndex !== undefined) {
+      payload.insert_index = insertIndex;
+    }
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/?mode=explorer`,
       {
         method: "POST",
-        body: JSON.stringify({
-          event_id: eventId,
-          instruction,
-        }),
+        body: JSON.stringify(payload),
       },
       opts,
     );
     return AutofixRunSchema.parse(body);
   }
 
-  // GET https://us.sentry.io/api/0/issues/5485083130/autofix/
+  // GET https://us.sentry.io/api/0/issues/5485083130/autofix/?mode=explorer
   async getAutofixState(
     {
       organizationSlug,
@@ -2607,7 +2623,7 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<AutofixRunState> {
     const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/?mode=explorer`,
       undefined,
       opts,
     );
