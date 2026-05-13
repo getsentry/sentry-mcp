@@ -52,11 +52,11 @@ describe("app", () => {
       expect(text).toBe(
         [
           "User-agent: *",
-          "Allow: /$",
-          "Allow: /.well-known/",
+          "Disallow: /oauth/",
+          "Disallow: /api/",
           "Allow: /mcp.json",
-          "Allow: /llms.txt",
-          "Disallow: /",
+          "Disallow: /mcp",
+          "Disallow: /sse",
         ].join("\n"),
       );
     });
