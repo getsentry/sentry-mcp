@@ -40,6 +40,8 @@ import {
   TagListSchema,
   ApiErrorSchema,
   ClientKeyListSchema,
+  type AutofixExplorerStepSchema,
+  AutofixExplorerRunStateSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   TraceMetaSchema,
@@ -59,6 +61,7 @@ import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
 import { USER_AGENT } from "../version";
 import type { SentryProtocol } from "../types";
 import type {
+  AutofixExplorerRunState,
   AutofixRun,
   AutofixRunState,
   ClientKey,
@@ -2612,6 +2615,69 @@ export class SentryApiService {
       opts,
     );
     return AutofixRunStateSchema.parse(body);
+  }
+
+  // POST https://us.sentry.io/api/0/issues/5485083130/autofix/?mode=explorer
+  //
+  // Explorer mode advances the run one logical step at a time. A new run is
+  // created when `runId` is omitted (allowed only for `step: "root_cause"`);
+  // later steps must reuse the original run via `runId`.
+  async startAutofixExplorer(
+    {
+      organizationSlug,
+      issueId,
+      step,
+      runId,
+      userContext,
+      insertIndex,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      step: z.infer<typeof AutofixExplorerStepSchema>;
+      runId?: number;
+      userContext?: string;
+      insertIndex?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<AutofixRun> {
+    const payload: Record<string, unknown> = { step };
+    if (runId !== undefined) {
+      payload.run_id = runId;
+    }
+    if (userContext !== undefined && userContext !== "") {
+      payload.user_context = userContext;
+    }
+    if (insertIndex !== undefined) {
+      payload.insert_index = insertIndex;
+    }
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/?mode=explorer`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      opts,
+    );
+    return AutofixRunSchema.parse(body);
+  }
+
+  // GET https://us.sentry.io/api/0/issues/5485083130/autofix/?mode=explorer
+  async getAutofixExplorerState(
+    {
+      organizationSlug,
+      issueId,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<AutofixExplorerRunState> {
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/autofix/?mode=explorer`,
+      undefined,
+      opts,
+    );
+    return AutofixExplorerRunStateSchema.parse(body);
   }
 
   /**

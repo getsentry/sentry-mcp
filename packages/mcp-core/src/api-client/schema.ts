@@ -874,6 +874,162 @@ export const AutofixRunStateSchema = z.object({
     .nullable(),
 });
 
+/**
+ * Status values emitted by the explorer-mode autofix run. Upstream type:
+ * `static/app/components/events/autofix/useExplorerAutofix.tsx`.
+ */
+export const AutofixExplorerStatusSchema = z.enum([
+  "processing",
+  "completed",
+  "error",
+  "awaiting_user_input",
+]);
+
+/**
+ * Steps the client can ask the autofix run to advance through. A new run
+ * starts with `root_cause`; later steps must reuse the original `run_id`.
+ */
+export const AutofixExplorerStepSchema = z.enum([
+  "root_cause",
+  "solution",
+  "code_changes",
+]);
+
+/**
+ * Diff metadata for a single file in a code-changes block. The upstream
+ * `patch` object carries extra fields (hunks, source/target paths); only the
+ * fields we surface are spelled out, the rest stay in passthrough.
+ */
+export const AutofixExplorerFilePatchSchema = z
+  .object({
+    repo_name: z.string(),
+    diff: z.string().optional(),
+    patch: z
+      .object({
+        path: z.string(),
+        added: z.number().optional(),
+        removed: z.number().optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+/**
+ * Inline artifact attached to a block. The shape of `data` depends on the
+ * artifact `key` (e.g. `root_cause`, `solution`), so it's `unknown` here and
+ * narrowed at the call site.
+ */
+export const AutofixExplorerArtifactSchema = z
+  .object({
+    key: z.string(),
+    data: z.unknown().nullable(),
+    reason: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * One block in the explorer-mode autofix stream. Blocks arrive in order; a
+ * block with `message.metadata.step` set starts a new section
+ * (root_cause / solution / code_changes / etc.).
+ */
+export const AutofixExplorerBlockSchema = z
+  .object({
+    id: z.string(),
+    timestamp: z.string().optional(),
+    loading: z.boolean().optional(),
+    message: z
+      .object({
+        role: z.string(),
+        content: z.string(),
+        metadata: z
+          .object({
+            step: z.string().optional(),
+          })
+          .passthrough()
+          .nullable()
+          .optional(),
+        tool_calls: z.array(z.unknown()).optional(),
+        thinking_content: z.string().optional(),
+      })
+      .passthrough(),
+    artifacts: z.array(AutofixExplorerArtifactSchema).optional(),
+    merged_file_patches: z.array(AutofixExplorerFilePatchSchema).optional(),
+    file_patches: z.array(AutofixExplorerFilePatchSchema).optional(),
+  })
+  .passthrough();
+
+/**
+ * PR creation state, one entry per repo. Most fields can be null while a PR
+ * is being created.
+ */
+export const AutofixExplorerRepoPRStateSchema = z
+  .object({
+    repo_name: z.string(),
+    branch_name: z.string().nullable().optional(),
+    commit_sha: z.string().nullable().optional(),
+    pr_creation_error: z.string().nullable().optional(),
+    pr_creation_status: z
+      .enum(["creating", "completed", "error"])
+      .nullable()
+      .optional(),
+    pr_id: z.number().nullable().optional(),
+    pr_number: z.number().nullable().optional(),
+    pr_url: z.string().nullable().optional(),
+    title: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+export const AutofixExplorerCodingAgentStateSchema = z
+  .object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    provider: z.string().optional(),
+    started_at: z.string().optional(),
+    status: z.string().optional(),
+    agent_url: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Full response from the explorer-mode autofix GET endpoint
+ * (`/organizations/{org}/issues/{id}/autofix/?mode=explorer`). The endpoint is
+ * still marked experimental upstream, so passthroughs are used to stay
+ * resilient to additive changes.
+ *
+ * Upstream source of truth in getsentry/sentry:
+ * - `src/sentry/seer/endpoints/group_ai_autofix.py`
+ * - `static/app/components/events/autofix/useExplorerAutofix.tsx`
+ */
+export const AutofixExplorerRunStateSchema = z.object({
+  autofix: z
+    .object({
+      run_id: z.number(),
+      status: AutofixExplorerStatusSchema,
+      updated_at: z.string().nullable().optional(),
+      blocks: z.preprocess(
+        (value) => value ?? [],
+        z.array(AutofixExplorerBlockSchema),
+      ),
+      pending_user_input: z
+        .object({
+          id: z.string(),
+          input_type: z.string(),
+          data: z.record(z.string(), z.unknown()).optional(),
+        })
+        .passthrough()
+        .nullable()
+        .optional(),
+      repo_pr_states: z
+        .record(z.string(), AutofixExplorerRepoPRStateSchema)
+        .optional(),
+      coding_agents: z
+        .record(z.string(), AutofixExplorerCodingAgentStateSchema)
+        .optional(),
+    })
+    .passthrough()
+    .nullable(),
+});
+
 export const EventAttachmentSchema = z.object({
   id: z.string(),
   name: z.string(),

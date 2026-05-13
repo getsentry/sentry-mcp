@@ -1,20 +1,61 @@
 {
   "autofix": {
     "run_id": 21831,
-    "status": "IN_PROGRESS",
+    "status": "completed",
+    "updated_at": "2026-04-22T12:00:00Z",
     "blocks": [
       {
-        "type": "root_cause",
-        "title": "Investigate failing request",
-        "status": "COMPLETED"
+        "id": "block-1",
+        "timestamp": "2026-04-22T11:55:00Z",
+        "message": {
+          "role": "assistant",
+          "content": "Looking at the failing request to figure out why it errored.",
+          "metadata": { "step": "root_cause" }
+        },
+        "artifacts": [
+          {
+            "key": "root_cause",
+            "reason": "Found the failing handler.",
+            "data": {
+              "one_line_description": "The failing request hit an unguarded null in the cache layer.",
+              "five_whys": [
+                "The cache returned null.",
+                "The fallback path threw."
+              ],
+              "reproduction_steps": ["Send a cache miss request to `/v1/lookup`."]
+            }
+          }
+        ]
       },
       {
-        "type": "solution",
-        "title": "Draft fix plan",
-        "status": "IN_PROGRESS"
+        "id": "block-2",
+        "timestamp": "2026-04-22T11:59:00Z",
+        "message": {
+          "role": "assistant",
+          "content": "Proposing fix plan.",
+          "metadata": { "step": "solution" }
+        },
+        "artifacts": [
+          {
+            "key": "solution",
+            "reason": "Plan ready for review.",
+            "data": {
+              "one_line_summary": "Guard the cache fallback path against null values.",
+              "steps": [
+                {
+                  "title": "Wrap cache fallback in a null guard",
+                  "description": "Return an empty payload instead of throwing when the cache misses."
+                },
+                {
+                  "title": "Add a regression test",
+                  "description": "Exercise the null path so a future regression is caught."
+                }
+              ]
+            }
+          }
+        ]
       }
     ],
-    "updated_at": "2026-04-22T12:00:00Z",
     "pending_user_input": null,
     "repo_pr_states": {},
     "coding_agents": {}

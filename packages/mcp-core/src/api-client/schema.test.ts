@@ -8,8 +8,8 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { describe, expect, it } from "vitest";
 import {
+  AutofixExplorerRunStateSchema,
   AutofixRunSchema,
-  AutofixRunStateSchema,
   ClientKeySchema,
   EventSchema,
   FlamegraphSchema,
@@ -614,23 +614,31 @@ describe("AutofixRunSchema", () => {
   });
 });
 
-describe("AutofixRunStateSchema", () => {
-  it("accepts explorer-style autofix state without legacy steps", () => {
-    const state = AutofixRunStateSchema.parse(autofixStateExplorerFixture);
+describe("AutofixExplorerRunStateSchema", () => {
+  it("parses the explorer fixture with typed blocks and artifacts", () => {
+    const state = AutofixExplorerRunStateSchema.parse(
+      autofixStateExplorerFixture,
+    );
 
-    expect(state.autofix?.steps).toEqual([]);
-    expect(state.autofix?.blocks).toEqual([
-      {
-        type: "root_cause",
-        title: "Investigate failing request",
-        status: "COMPLETED",
+    expect(state.autofix?.status).toBe("completed");
+    expect(state.autofix?.run_id).toBe(21831);
+
+    const blocks = state.autofix?.blocks ?? [];
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]?.message.metadata?.step).toBe("root_cause");
+    expect(blocks[1]?.message.metadata?.step).toBe("solution");
+    expect(blocks[0]?.artifacts?.[0]?.key).toBe("root_cause");
+  });
+
+  it("defaults missing blocks arrays to []", () => {
+    const state = AutofixExplorerRunStateSchema.parse({
+      autofix: {
+        run_id: 1,
+        status: "processing",
       },
-      {
-        type: "solution",
-        title: "Draft fix plan",
-        status: "IN_PROGRESS",
-      },
-    ]);
+    });
+
+    expect(state.autofix?.blocks).toEqual([]);
   });
 });
 
