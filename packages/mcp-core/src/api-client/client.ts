@@ -40,8 +40,7 @@ import {
   TagListSchema,
   ApiErrorSchema,
   ClientKeyListSchema,
-  type AutofixExplorerStepSchema,
-  AutofixExplorerRunStateSchema,
+  type AutofixStepSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
   TraceMetaSchema,
@@ -61,7 +60,6 @@ import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
 import { USER_AGENT } from "../version";
 import type { SentryProtocol } from "../types";
 import type {
-  AutofixExplorerRunState,
   AutofixRun,
   AutofixRunState,
   ClientKey,
@@ -2569,60 +2567,12 @@ export class SentryApiService {
     return await this.requestJSON(apiUrl, undefined, opts);
   }
 
-  // POST https://us.sentry.io/api/0/issues/5485083130/autofix/
-  async startAutofix(
-    {
-      organizationSlug,
-      issueId,
-      eventId,
-      instruction = "",
-    }: {
-      organizationSlug: string;
-      issueId: string;
-      eventId?: string;
-      instruction?: string;
-    },
-    opts?: RequestOptions,
-  ): Promise<AutofixRun> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          event_id: eventId,
-          instruction,
-        }),
-      },
-      opts,
-    );
-    return AutofixRunSchema.parse(body);
-  }
-
-  // GET https://us.sentry.io/api/0/issues/5485083130/autofix/
-  async getAutofixState(
-    {
-      organizationSlug,
-      issueId,
-    }: {
-      organizationSlug: string;
-      issueId: string;
-    },
-    opts?: RequestOptions,
-  ): Promise<AutofixRunState> {
-    const body = await this.requestJSON(
-      `/organizations/${organizationSlug}/issues/${issueId}/autofix/`,
-      undefined,
-      opts,
-    );
-    return AutofixRunStateSchema.parse(body);
-  }
-
   // POST https://us.sentry.io/api/0/issues/5485083130/autofix/?mode=explorer
   //
   // Explorer mode advances the run one logical step at a time. A new run is
   // created when `runId` is omitted (allowed only for `step: "root_cause"`);
   // later steps must reuse the original run via `runId`.
-  async startAutofixExplorer(
+  async startAutofix(
     {
       organizationSlug,
       issueId,
@@ -2633,7 +2583,7 @@ export class SentryApiService {
     }: {
       organizationSlug: string;
       issueId: string;
-      step: z.infer<typeof AutofixExplorerStepSchema>;
+      step: z.infer<typeof AutofixStepSchema>;
       runId?: number;
       userContext?: string;
       insertIndex?: number;
@@ -2662,7 +2612,7 @@ export class SentryApiService {
   }
 
   // GET https://us.sentry.io/api/0/issues/5485083130/autofix/?mode=explorer
-  async getAutofixExplorerState(
+  async getAutofixState(
     {
       organizationSlug,
       issueId,
@@ -2671,13 +2621,13 @@ export class SentryApiService {
       issueId: string;
     },
     opts?: RequestOptions,
-  ): Promise<AutofixExplorerRunState> {
+  ): Promise<AutofixRunState> {
     const body = await this.requestJSON(
       `/organizations/${organizationSlug}/issues/${issueId}/autofix/?mode=explorer`,
       undefined,
       opts,
     );
-    return AutofixExplorerRunStateSchema.parse(body);
+    return AutofixRunStateSchema.parse(body);
   }
 
   /**

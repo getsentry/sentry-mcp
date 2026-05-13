@@ -7,7 +7,6 @@
  */
 import type { z } from "zod";
 import type {
-  AutofixRunStepRootCauseAnalysisSchema,
   DefaultEventSchema,
   ErrorEntrySchema,
   ErrorEventSchema,
@@ -30,7 +29,8 @@ import type {
 } from "../api-client/types";
 import { logIssue } from "../telem/logging";
 import {
-  getOutputForAutofixStep,
+  findCompletedSection,
+  getOrderedAutofixSections,
   getStatusDisplayName,
   isTerminalStatus,
 } from "./tool-helpers/seer";
@@ -1624,87 +1624,64 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
   parts.push("## Seer Analysis");
   parts.push("");
 
-  // Show status first
+  // Show status first when the run is still in flight.
   const statusDisplay = getStatusDisplayName(autofix.status);
   if (!isTerminalStatus(autofix.status)) {
     parts.push(`**Status:** ${statusDisplay}`);
     parts.push("");
   }
 
-  // Show summary of what we have so far
-  if (autofix.steps.length > 0) {
-    const completedSteps = autofix.steps.filter(
-      (step) => step.status === "COMPLETED",
-    );
+  const sections = getOrderedAutofixSections(autofix);
+  const solutionSection = findCompletedSection(sections, "solution");
+  const rootCauseSection = findCompletedSection(sections, "root_cause");
 
-    // Find the solution step if available
-    const solutionStep = completedSteps.find(
-      (step) => step.type === "solution",
+  if (solutionSection) {
+    const artifact = solutionSection.artifacts.find(
+      (a) => a.key === "solution",
     );
-
-    if (solutionStep) {
-      // For solution steps, use the description directly
-      const solutionDescription = solutionStep.description;
-      if (
-        solutionDescription &&
-        typeof solutionDescription === "string" &&
-        solutionDescription.trim()
-      ) {
+    const summary =
+      artifact?.data &&
+      typeof artifact.data === "object" &&
+      typeof (artifact.data as Record<string, unknown>).one_line_summary ===
+        "string"
+        ? ((artifact.data as Record<string, unknown>)
+            .one_line_summary as string)
+        : undefined;
+    if (summary?.trim()) {
+      parts.push("**Summary:**");
+      parts.push(summary.trim());
+    } else {
+      // Fallback: surface the first substantive assistant message in the
+      // solution section so we still give the reader something concrete.
+      const blockContent = solutionSection.blocks
+        .map((block) => block.message?.content?.trim())
+        .find((content) => content && content.length > 50);
+      if (blockContent) {
         parts.push("**Summary:**");
-        parts.push(solutionDescription.trim());
-      } else {
-        // Fallback to extracting from output if no description
-        const solutionOutput = getOutputForAutofixStep(solutionStep, {
-          includeProvenanceTags: false,
-        });
-        const lines = solutionOutput.split("\n");
-        const firstParagraph = lines.find(
-          (line) =>
-            line.trim().length > 50 &&
-            !line.startsWith("#") &&
-            !line.startsWith("*"),
-        );
-        if (firstParagraph) {
-          parts.push("**Summary:**");
-          parts.push(firstParagraph.trim());
-        }
-      }
-    } else if (completedSteps.length > 0) {
-      // Show what steps have been completed so far
-      const rootCauseStep = completedSteps.find(
-        (step) => step.type === "root_cause_analysis",
-      );
-
-      if (rootCauseStep) {
-        const typedStep = rootCauseStep as z.infer<
-          typeof AutofixRunStepRootCauseAnalysisSchema
-        >;
-        if (
-          typedStep.causes &&
-          typedStep.causes.length > 0 &&
-          typedStep.causes[0].description
-        ) {
-          parts.push("**Root Cause Identified:**");
-          parts.push(typedStep.causes[0].description.trim());
-        }
-      } else {
-        // Show generic progress
-        parts.push(
-          `**Progress:** ${completedSteps.length} of ${autofix.steps.length} steps completed`,
-        );
+        parts.push(blockContent);
       }
     }
-  } else {
-    // No steps yet - check for terminal states first
+  } else if (rootCauseSection) {
+    const artifact = rootCauseSection.artifacts.find(
+      (a) => a.key === "root_cause",
+    );
+    const description =
+      artifact?.data &&
+      typeof artifact.data === "object" &&
+      typeof (artifact.data as Record<string, unknown>).one_line_description ===
+        "string"
+        ? ((artifact.data as Record<string, unknown>)
+            .one_line_description as string)
+        : undefined;
+    if (description?.trim()) {
+      parts.push("**Root Cause Identified:**");
+      parts.push(description.trim());
+    }
+  } else if (sections.length === 0) {
     if (isTerminalStatus(autofix.status)) {
-      if (autofix.status === "FAILED" || autofix.status === "ERROR") {
+      if (autofix.status === "error") {
         parts.push("**Status:** Analysis failed.");
-      } else if (autofix.status === "CANCELLED") {
-        parts.push("**Status:** Analysis was cancelled.");
-      } else if (
-        autofix.status === "NEED_MORE_INFORMATION" ||
-        autofix.status === "WAITING_FOR_USER_RESPONSE"
-      ) {
+      } else if (autofix.status === "awaiting_user_input") {
         parts.push(
           "**Status:** Analysis paused - additional information needed.",
         );
@@ -1712,20 +1689,17 @@ function formatSeerSummary(autofixState: AutofixRunState | undefined): string {
     } else {
       parts.push("Analysis has started but no results yet.");
     }
+  } else {
+    parts.push(
+      `**Progress:** ${sections.filter((s) => s.status === "completed").length} of ${sections.length} sections completed`,
+    );
   }
 
-  // Add specific messages for terminal states when steps exist
-  if (autofix.steps.length > 0 && isTerminalStatus(autofix.status)) {
-    if (autofix.status === "FAILED" || autofix.status === "ERROR") {
+  if (sections.length > 0 && isTerminalStatus(autofix.status)) {
+    if (autofix.status === "error") {
       parts.push("");
       parts.push("**Status:** Analysis failed.");
-    } else if (autofix.status === "CANCELLED") {
-      parts.push("");
-      parts.push("**Status:** Analysis was cancelled.");
-    } else if (
-      autofix.status === "NEED_MORE_INFORMATION" ||
-      autofix.status === "WAITING_FOR_USER_RESPONSE"
-    ) {
+    } else if (autofix.status === "awaiting_user_input") {
       parts.push("");
       parts.push(
         "**Status:** Analysis paused - additional information needed.",

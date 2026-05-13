@@ -952,24 +952,46 @@ export const restHandlers = buildHandlers([
       HttpResponse.json({
         autofix: {
           run_id: 13,
-          request: { project_id: 4505138086019073 },
-          status: "COMPLETED",
-          updated_at: "2025-04-09T22:39:50.778146",
-          steps: [
+          status: "completed",
+          updated_at: "2025-04-09T22:39:50.778146Z",
+          blocks: [
             {
-              type: "root_cause_analysis",
-              key: "root_cause_analysis",
-              index: 0,
-              status: "COMPLETED",
-              title: "1. **Root Cause Analysis**",
-              output_stream: null,
-              progress: [],
-              description: "The analysis has completed successfully.",
-              causes: [
+              id: "block-1",
+              timestamp: "2025-04-09T22:35:00Z",
+              message: {
+                role: "assistant",
+                content: "The analysis has completed successfully.",
+                metadata: { step: "root_cause" },
+              },
+              artifacts: [
                 {
-                  description: "The analysis has completed successfully.",
-                  id: 1,
-                  root_cause_reproduction: [],
+                  key: "root_cause",
+                  reason: "Analysis complete.",
+                  data: {
+                    one_line_description:
+                      "The analysis has completed successfully.",
+                    five_whys: [],
+                    reproduction_steps: [],
+                  },
+                },
+              ],
+            },
+            {
+              id: "block-2",
+              timestamp: "2025-04-09T22:36:00Z",
+              message: {
+                role: "assistant",
+                content: "Proposed fix plan ready.",
+                metadata: { step: "solution" },
+              },
+              artifacts: [
+                {
+                  key: "solution",
+                  reason: "Plan complete.",
+                  data: {
+                    one_line_summary: "Plan recorded for review.",
+                    steps: [],
+                  },
                 },
               ],
             },

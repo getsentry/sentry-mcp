@@ -10,15 +10,24 @@ import {
   getStatusDisplayName,
   isTerminalStatus,
   getHumanInterventionGuidance,
-  getOutputForAutofixStep,
+  getOutputForAutofixSection,
+  getOrderedAutofixSections,
+  hasSection,
+  findCompletedSection,
   SEER_POLLING_INTERVAL,
   SEER_TIMEOUT,
   SEER_MAX_RETRIES,
   SEER_INITIAL_RETRY_DELAY,
+  type AutofixSection,
 } from "../internal/tool-helpers/seer";
 import { retryWithBackoff } from "../internal/fetch-utils";
 import type { ServerContext } from "../types";
 import { ApiError, ApiServerError } from "../api-client/index";
+import type {
+  AutofixStep,
+  AutofixRunState,
+  SentryApiService,
+} from "../api-client/index";
 import {
   ParamOrganizationSlug,
   ParamRegionUrl,
@@ -26,10 +35,116 @@ import {
   ParamIssueUrl,
 } from "../schema";
 
+const SHOULD_RETRY = (error: unknown) =>
+  error instanceof ApiServerError || !(error instanceof ApiError);
+
+async function fetchAutofixState({
+  apiService,
+  organizationSlug,
+  issueId,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  issueId: string;
+}): Promise<AutofixRunState> {
+  return retryWithBackoff(
+    () => apiService.getAutofixState({ organizationSlug, issueId }),
+    {
+      maxRetries: SEER_MAX_RETRIES,
+      initialDelay: SEER_INITIAL_RETRY_DELAY,
+      shouldRetry: SHOULD_RETRY,
+    },
+  );
+}
+
+interface StepWaitResult {
+  state: AutofixRunState;
+  outcome: "completed" | "timeout" | "needs_input" | "errored";
+  section?: AutofixSection;
+}
+
+/**
+ * Polls the explorer endpoint until `targetStep` reports `completed` (or the
+ * run hits a terminal state for a different reason). The function uses the
+ * same retry/back-off behavior as the previous step polling loop.
+ */
+async function waitForSection({
+  apiService,
+  organizationSlug,
+  issueId,
+  targetStep,
+  initialState,
+}: {
+  apiService: SentryApiService;
+  organizationSlug: string;
+  issueId: string;
+  targetStep: AutofixStep;
+  initialState: AutofixRunState;
+}): Promise<StepWaitResult> {
+  let state = initialState;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < SEER_TIMEOUT) {
+    if (!state.autofix) {
+      return { state, outcome: "errored" };
+    }
+
+    const sections = getOrderedAutofixSections(state.autofix);
+    const section = findCompletedSection(sections, targetStep);
+    if (section) {
+      return { state, outcome: "completed", section };
+    }
+
+    if (state.autofix.status === "awaiting_user_input") {
+      return { state, outcome: "needs_input" };
+    }
+    if (state.autofix.status === "error") {
+      return { state, outcome: "errored" };
+    }
+    if (
+      state.autofix.status === "completed" &&
+      !hasSection(sections, targetStep)
+    ) {
+      // Run completed without ever producing the target section.
+      return { state, outcome: "errored" };
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, SEER_POLLING_INTERVAL));
+
+    try {
+      state = await fetchAutofixState({
+        apiService,
+        organizationSlug,
+        issueId,
+      });
+    } catch {
+      // Swallow transient errors and let the loop retry; retryWithBackoff has
+      // already exhausted retries before giving up.
+    }
+  }
+
+  return { state, outcome: "timeout" };
+}
+
+function renderRunInstructions({
+  issueUrl,
+  organizationSlug,
+  issueId,
+}: {
+  issueUrl: string | undefined;
+  organizationSlug: string;
+  issueId: string;
+}): string {
+  if (issueUrl) {
+    return `analyze_issue_with_seer(issueUrl="${issueUrl}")`;
+  }
+  return `analyze_issue_with_seer(organizationSlug="${organizationSlug}", issueId="${issueId}")`;
+}
+
 export default defineTool({
   name: "analyze_issue_with_seer",
-  skills: ["seer"], // Only available in seer skill
-  requiredScopes: [], // No Sentry API scopes required - authorization via 'seer' skill
+  skills: ["seer"],
+  requiredScopes: [],
   description: [
     "Use Seer to analyze production errors and get detailed root cause analysis with specific code fixes.",
     "",
@@ -41,13 +156,12 @@ export default defineTool({
     "",
     "What this tool provides:",
     "- Root cause analysis with code-level explanations",
-    "- Specific file locations and line numbers where errors occur",
-    "- Concrete code fixes you can apply",
-    "- Step-by-step implementation guidance",
+    "- A proposed solution with concrete steps",
+    "- Pointers to file locations relevant to the fix",
     "",
     "This tool automatically:",
     "1. Checks if analysis already exists (instant results)",
-    "2. Starts new AI analysis if needed (~2-5 minutes)",
+    "2. Runs the root cause step, then the solution step (~2-5 minutes total)",
     "3. Returns complete fix recommendations",
     "",
     "<examples>",
@@ -106,203 +220,193 @@ export default defineTool({
       projectSlug: context.constraints.projectSlug,
     });
 
-    let output = `# Seer Analysis for Issue ${parsedIssueId}\n\n`;
+    const issueId = parsedIssueId!;
+    const retryHint = renderRunInstructions({
+      issueUrl: params.issueUrl,
+      organizationSlug: orgSlug,
+      issueId,
+    });
 
-    // Step 1: Check if analysis already exists
-    let autofixState = await retryWithBackoff(
-      () =>
-        apiService.getAutofixState({
-          organizationSlug: orgSlug,
-          issueId: parsedIssueId!,
-        }),
-      {
-        maxRetries: SEER_MAX_RETRIES,
-        initialDelay: SEER_INITIAL_RETRY_DELAY,
-        shouldRetry: (error) => {
-          // Retry on server errors (5xx) or non-API errors (network issues)
-          return (
-            error instanceof ApiServerError || !(error instanceof ApiError)
-          );
-        },
-      },
-    );
+    let output = `# Seer Analysis for Issue ${issueId}\n\n`;
 
-    // Step 2: Start analysis if none exists
-    if (!autofixState.autofix) {
+    let state = await fetchAutofixState({
+      apiService,
+      organizationSlug: orgSlug,
+      issueId,
+    });
+
+    let runId: number | undefined = state.autofix?.run_id;
+    if (state.autofix) {
+      output += `Found existing analysis (Run ID: ${state.autofix.run_id})\n\n`;
+    } else {
       output += `Starting new analysis...\n\n`;
       const startResult = await apiService.startAutofix({
         organizationSlug: orgSlug,
-        issueId: parsedIssueId,
-        instruction: params.instruction,
+        issueId,
+        step: "root_cause",
+        userContext: params.instruction,
       });
-      output += `Analysis started with Run ID: ${startResult.run_id}\n\n`;
+      runId = startResult.run_id;
+      output += `Analysis started with Run ID: ${runId}\n\n`;
 
-      // Give it a moment to initialize
+      // Give the run a moment to register before the first poll.
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Refresh state with retry logic
-      autofixState = await retryWithBackoff(
-        () =>
-          apiService.getAutofixState({
-            organizationSlug: orgSlug,
-            issueId: parsedIssueId!,
-          }),
-        {
-          maxRetries: SEER_MAX_RETRIES,
-          initialDelay: SEER_INITIAL_RETRY_DELAY,
-          shouldRetry: (error) => {
-            // Retry on server errors (5xx) or non-API errors (network issues)
-            return (
-              error instanceof ApiServerError || !(error instanceof ApiError)
-            );
-          },
-        },
-      );
-    } else {
-      output += `Found existing analysis (Run ID: ${autofixState.autofix.run_id})\n\n`;
-
-      // Check if existing analysis is already complete
-      const existingStatus = autofixState.autofix.status;
-      if (isTerminalStatus(existingStatus)) {
-        // Return results immediately, no polling needed
-        output += `## Analysis ${getStatusDisplayName(existingStatus)}\n\n`;
-
-        for (const step of autofixState.autofix.steps) {
-          output += getOutputForAutofixStep(step, {
-            runId: autofixState.autofix.run_id,
-          });
-          output += "\n";
-        }
-
-        if (existingStatus !== "COMPLETED") {
-          output += `\n**Status**: ${existingStatus}\n`;
-          output += getHumanInterventionGuidance(existingStatus);
-          output += "\n";
-        }
-
-        return output;
-      }
+      state = await fetchAutofixState({
+        apiService,
+        organizationSlug: orgSlug,
+        issueId,
+      });
     }
 
-    // Step 3: Poll until complete or timeout (only for non-terminal states)
-    const startTime = Date.now();
-    let lastStatus = "";
-    let consecutiveErrors = 0;
+    // Drive the explorer flow: root_cause → solution. Each step waits for its
+    // own section to land before kicking off the next one.
+    const stepsToRun: AutofixStep[] = ["root_cause", "solution"];
 
-    while (Date.now() - startTime < SEER_TIMEOUT) {
-      if (!autofixState.autofix) {
-        output += `Error: Analysis state lost. Please try again by running:\n`;
-        output += `\`\`\`\n`;
-        output += params.issueUrl
-          ? `analyze_issue_with_seer(issueUrl="${params.issueUrl}")`
-          : `analyze_issue_with_seer(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`;
-        output += `\n\`\`\`\n`;
-        return output;
+    for (const step of stepsToRun) {
+      const sections = state.autofix
+        ? getOrderedAutofixSections(state.autofix)
+        : [];
+
+      // If the section already exists and is completed, skip ahead.
+      if (findCompletedSection(sections, step)) {
+        continue;
       }
 
-      const status = autofixState.autofix.status;
-
-      // Check if completed (terminal state)
-      if (isTerminalStatus(status)) {
-        output += `## Analysis ${getStatusDisplayName(status)}\n\n`;
-
-        // Add all step outputs
-        for (const step of autofixState.autofix.steps) {
-          output += getOutputForAutofixStep(step, {
-            runId: autofixState.autofix.run_id,
+      // If the section hasn't been started yet, ask the server to start it.
+      // (For `root_cause` on a fresh run we already issued the POST above; this
+      // covers the existing-run case where solution hasn't run yet.)
+      if (!hasSection(sections, step) && runId !== undefined) {
+        // Don't POST a follow-up step against a run that already settled.
+        // For example, an existing run with `status: "error"` and only a
+        // completed `root_cause` section should not have `solution` kicked
+        // off — render what's there and exit.
+        if (state.autofix && state.autofix.status !== "processing") {
+          output += await renderPartialOutput({
+            state,
+            retryHint,
+            timedOut: false,
           });
-          output += "\n";
-        }
-
-        if (status !== "COMPLETED") {
-          output += `\n**Status**: ${status}\n`;
-          output += getHumanInterventionGuidance(status);
-        }
-
-        return output;
-      }
-
-      // Update status if changed
-      if (status !== lastStatus) {
-        const activeStep = autofixState.autofix.steps.find(
-          (step) =>
-            step.status === "PROCESSING" || step.status === "IN_PROGRESS",
-        );
-        if (activeStep) {
-          output += `Processing: ${activeStep.title}...\n`;
-        }
-        lastStatus = status;
-      }
-
-      // Wait before next poll
-      await new Promise((resolve) =>
-        setTimeout(resolve, SEER_POLLING_INTERVAL),
-      );
-
-      // Refresh state with error handling
-      try {
-        autofixState = await retryWithBackoff(
-          () =>
-            apiService.getAutofixState({
-              organizationSlug: orgSlug,
-              issueId: parsedIssueId!,
-            }),
-          {
-            maxRetries: SEER_MAX_RETRIES,
-            initialDelay: SEER_INITIAL_RETRY_DELAY,
-            shouldRetry: (error) => {
-              // Retry on server errors (5xx) or non-API errors (network issues)
-              return (
-                error instanceof ApiServerError || !(error instanceof ApiError)
-              );
-            },
-          },
-        );
-        consecutiveErrors = 0; // Reset error counter on success
-      } catch (error) {
-        consecutiveErrors++;
-
-        // If we've had too many consecutive errors, give up
-        if (consecutiveErrors >= 3) {
-          output += `\n## Error During Analysis\n\n`;
-          output += `Unable to retrieve analysis status after multiple attempts.\n`;
-          output += `Error: ${error instanceof Error ? error.message : String(error)}\n\n`;
-          output += `You can check the status later by running the same command again:\n`;
-          output += `\`\`\`\n`;
-          output += params.issueUrl
-            ? `analyze_issue_with_seer(issueUrl="${params.issueUrl}")`
-            : `analyze_issue_with_seer(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`;
-          output += `\n\`\`\`\n`;
           return output;
         }
 
-        // Log the error but continue polling
-        output += `Temporary error retrieving status (attempt ${consecutiveErrors}/3), retrying...\n`;
+        try {
+          await apiService.startAutofix({
+            organizationSlug: orgSlug,
+            issueId,
+            step,
+            runId,
+          });
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          state = await fetchAutofixState({
+            apiService,
+            organizationSlug: orgSlug,
+            issueId,
+          });
+        } catch (error) {
+          output += `\n## Error During Analysis\n\n`;
+          output += `Unable to start the ${step.replace(/_/g, " ")} step.\n`;
+          output += `Error: ${error instanceof Error ? error.message : String(error)}\n\n`;
+          output += `You can retry by running:\n\`\`\`\n${retryHint}\n\`\`\`\n`;
+          return output;
+        }
       }
-    }
 
-    // Show current progress
-    if (autofixState.autofix) {
-      output += `**Current Status**: ${getStatusDisplayName(autofixState.autofix.status)}\n\n`;
-      for (const step of autofixState.autofix.steps) {
-        output += getOutputForAutofixStep(step, {
-          runId: autofixState.autofix.run_id,
+      const waitResult = await waitForSection({
+        apiService,
+        organizationSlug: orgSlug,
+        issueId,
+        targetStep: step,
+        initialState: state,
+      });
+
+      state = waitResult.state;
+
+      if (waitResult.outcome === "timeout") {
+        output += await renderPartialOutput({
+          state,
+          retryHint,
+          timedOut: true,
         });
-        output += "\n";
+        return output;
+      }
+
+      if (waitResult.outcome === "needs_input") {
+        output += await renderPartialOutput({
+          state,
+          retryHint,
+          timedOut: false,
+        });
+        return output;
+      }
+
+      if (waitResult.outcome === "errored") {
+        output += `\n## Error During Analysis\n\n`;
+        const status = state.autofix?.status ?? "error";
+        output += `Run ended in status: ${status}\n\n`;
+        output += `You can retry by running:\n\`\`\`\n${retryHint}\n\`\`\`\n`;
+        return output;
       }
     }
 
-    // Timeout reached
-    output += `\n## Analysis Timed Out\n\n`;
-    output += `The analysis is taking longer than expected (>${SEER_TIMEOUT / 1000}s).\n\n`;
+    if (!state.autofix) {
+      output += `\nError: Analysis state lost. Please try again by running:\n\`\`\`\n${retryHint}\n\`\`\`\n`;
+      return output;
+    }
 
-    output += `\nYou can check the status later by running the same command again:\n`;
-    output += `\`\`\`\n`;
-    output += params.issueUrl
-      ? `analyze_issue_with_seer(issueUrl="${params.issueUrl}")`
-      : `analyze_issue_with_seer(organizationSlug="${orgSlug}", issueId="${parsedIssueId}")`;
-    output += `\n\`\`\`\n`;
+    output += `## Analysis ${getStatusDisplayName(state.autofix.status)}\n\n`;
+    const sections = getOrderedAutofixSections(state.autofix);
+    const pullRequests = Object.values(state.autofix.repo_pr_states ?? {});
+    for (const section of sections) {
+      output += getOutputForAutofixSection(section, {
+        runId: state.autofix.run_id,
+        pullRequests,
+      });
+      output += "\n";
+    }
+    if (
+      isTerminalStatus(state.autofix.status) &&
+      state.autofix.status !== "completed"
+    ) {
+      output += `\n**Status**: ${state.autofix.status}\n`;
+      output += getHumanInterventionGuidance(state.autofix.status);
+    }
 
     return output;
   },
 });
+
+async function renderPartialOutput({
+  state,
+  retryHint,
+  timedOut,
+}: {
+  state: AutofixRunState;
+  retryHint: string;
+  timedOut: boolean;
+}): Promise<string> {
+  let output = "";
+  if (state.autofix) {
+    output += `**Current Status**: ${getStatusDisplayName(state.autofix.status)}\n\n`;
+    const sections = getOrderedAutofixSections(state.autofix);
+    const pullRequests = Object.values(state.autofix.repo_pr_states ?? {});
+    for (const section of sections) {
+      output += getOutputForAutofixSection(section, {
+        runId: state.autofix.run_id,
+        pullRequests,
+      });
+      output += "\n";
+    }
+  }
+
+  if (timedOut) {
+    output += `\n## Analysis Timed Out\n\n`;
+    output += `The analysis is taking longer than expected (>${SEER_TIMEOUT / 1000}s).\n\n`;
+  } else if (state.autofix?.status === "awaiting_user_input") {
+    output += getHumanInterventionGuidance(state.autofix.status);
+  }
+
+  output += `\nYou can check the status later by running the same command again:\n`;
+  output += `\`\`\`\n${retryHint}\n\`\`\`\n`;
+  return output;
+}

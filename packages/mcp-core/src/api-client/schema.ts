@@ -747,138 +747,11 @@ export const AutofixRunSchema = z
   })
   .passthrough();
 
-const AutofixStatusSchema = z.enum([
-  "PENDING",
-  "PROCESSING",
-  "IN_PROGRESS",
-  "NEED_MORE_INFORMATION",
-  "COMPLETED",
-  "FAILED",
-  "ERROR",
-  "CANCELLED",
-  "WAITING_FOR_USER_RESPONSE",
-]);
-
-const AutofixRunStepBaseSchema = z.object({
-  type: z.string(),
-  key: z.string(),
-  index: z.number(),
-  status: AutofixStatusSchema,
-  title: z.string(),
-  output_stream: z.string().nullable(),
-  progress: z.array(
-    z.object({
-      data: z.unknown().nullable(),
-      message: z.string(),
-      timestamp: z.string(),
-      type: z.enum(["INFO", "WARNING", "ERROR"]),
-    }),
-  ),
-});
-
-export const AutofixRunStepDefaultSchema = AutofixRunStepBaseSchema.extend({
-  type: z.literal("default"),
-  insights: z
-    .array(
-      z.object({
-        change_diff: z.unknown().nullable(),
-        generated_at_memory_index: z.number(),
-        insight: z.string(),
-        justification: z.string(),
-        type: z.literal("insight"),
-      }),
-    )
-    .nullable(),
-}).passthrough();
-
-export const AutofixRunStepRootCauseAnalysisSchema =
-  AutofixRunStepBaseSchema.extend({
-    type: z.literal("root_cause_analysis"),
-    causes: z.array(
-      z.object({
-        description: z.string(),
-        id: z.number(),
-        root_cause_reproduction: z.array(
-          z.object({
-            code_snippet_and_analysis: z.string(),
-            is_most_important_event: z.boolean(),
-            relevant_code_file: z
-              .object({
-                file_path: z.string(),
-                repo_name: z.string(),
-              })
-              .nullable(),
-            timeline_item_type: z.string(),
-            title: z.string(),
-          }),
-        ),
-      }),
-    ),
-  }).passthrough();
-
-export const AutofixRunStepSolutionSchema = AutofixRunStepBaseSchema.extend({
-  type: z.literal("solution"),
-  solution: z.array(
-    z.object({
-      code_snippet_and_analysis: z.string().nullable(),
-      is_active: z.boolean(),
-      is_most_important_event: z.boolean(),
-      relevant_code_file: z.null(),
-      timeline_item_type: z.union([
-        z.literal("internal_code"),
-        z.literal("repro_test"),
-      ]),
-      title: z.string(),
-    }),
-  ),
-}).passthrough();
-
-export const AutofixRunStepSchema = z.union([
-  AutofixRunStepDefaultSchema,
-  AutofixRunStepRootCauseAnalysisSchema,
-  AutofixRunStepSolutionSchema,
-  AutofixRunStepBaseSchema.passthrough(),
-]);
-
-/**
- * The Seer autofix GET endpoint is explicitly experimental and currently has
- * two materially different payload shapes:
- * - legacy `get_autofix_state(...).dict()` responses with `request` and `steps`
- * - explorer responses with `blocks`, `pending_user_input`, and coding-agent
- *   metadata but no `steps`
- *
- * We normalize missing `steps` to `[]` so existing formatting code keeps
- * working even if the server returns the explorer shape.
- *
- * Upstream source of truth in getsentry/sentry:
- * - `src/sentry/seer/endpoints/group_ai_autofix.py`
- * - `src/sentry/seer/autofix/types.py` (`AutofixStateResponse`)
- */
-export const AutofixRunStateSchema = z.object({
-  autofix: z
-    .object({
-      run_id: z.number(),
-      request: z.unknown().optional(),
-      updated_at: z.string().nullable().optional(),
-      status: AutofixStatusSchema,
-      steps: z.preprocess(
-        (value) => value ?? [],
-        z.array(AutofixRunStepSchema),
-      ),
-      blocks: z.array(z.unknown()).optional(),
-      pending_user_input: z.unknown().nullable().optional(),
-      repo_pr_states: z.record(z.string(), z.unknown()).optional(),
-      coding_agents: z.record(z.string(), z.unknown()).optional(),
-    })
-    .passthrough()
-    .nullable(),
-});
-
 /**
  * Status values emitted by the explorer-mode autofix run. Upstream type:
  * `static/app/components/events/autofix/useExplorerAutofix.tsx`.
  */
-export const AutofixExplorerStatusSchema = z.enum([
+export const AutofixStatusSchema = z.enum([
   "processing",
   "completed",
   "error",
@@ -889,7 +762,7 @@ export const AutofixExplorerStatusSchema = z.enum([
  * Steps the client can ask the autofix run to advance through. A new run
  * starts with `root_cause`; later steps must reuse the original `run_id`.
  */
-export const AutofixExplorerStepSchema = z.enum([
+export const AutofixStepSchema = z.enum([
   "root_cause",
   "solution",
   "code_changes",
@@ -900,7 +773,7 @@ export const AutofixExplorerStepSchema = z.enum([
  * `patch` object carries extra fields (hunks, source/target paths); only the
  * fields we surface are spelled out, the rest stay in passthrough.
  */
-export const AutofixExplorerFilePatchSchema = z
+export const AutofixFilePatchSchema = z
   .object({
     repo_name: z.string(),
     diff: z.string().optional(),
@@ -919,7 +792,7 @@ export const AutofixExplorerFilePatchSchema = z
  * artifact `key` (e.g. `root_cause`, `solution`), so it's `unknown` here and
  * narrowed at the call site.
  */
-export const AutofixExplorerArtifactSchema = z
+export const AutofixArtifactSchema = z
   .object({
     key: z.string(),
     data: z.unknown().nullable(),
@@ -932,7 +805,7 @@ export const AutofixExplorerArtifactSchema = z
  * block with `message.metadata.step` set starts a new section
  * (root_cause / solution / code_changes / etc.).
  */
-export const AutofixExplorerBlockSchema = z
+export const AutofixBlockSchema = z
   .object({
     id: z.string(),
     timestamp: z.string().optional(),
@@ -952,9 +825,9 @@ export const AutofixExplorerBlockSchema = z
         thinking_content: z.string().optional(),
       })
       .passthrough(),
-    artifacts: z.array(AutofixExplorerArtifactSchema).optional(),
-    merged_file_patches: z.array(AutofixExplorerFilePatchSchema).optional(),
-    file_patches: z.array(AutofixExplorerFilePatchSchema).optional(),
+    artifacts: z.array(AutofixArtifactSchema).optional(),
+    merged_file_patches: z.array(AutofixFilePatchSchema).optional(),
+    file_patches: z.array(AutofixFilePatchSchema).optional(),
   })
   .passthrough();
 
@@ -962,7 +835,7 @@ export const AutofixExplorerBlockSchema = z
  * PR creation state, one entry per repo. Most fields can be null while a PR
  * is being created.
  */
-export const AutofixExplorerRepoPRStateSchema = z
+export const AutofixRepoPRStateSchema = z
   .object({
     repo_name: z.string(),
     branch_name: z.string().nullable().optional(),
@@ -979,7 +852,7 @@ export const AutofixExplorerRepoPRStateSchema = z
   })
   .passthrough();
 
-export const AutofixExplorerCodingAgentStateSchema = z
+export const AutofixCodingAgentStateSchema = z
   .object({
     id: z.string().optional(),
     name: z.string().optional(),
@@ -1000,16 +873,13 @@ export const AutofixExplorerCodingAgentStateSchema = z
  * - `src/sentry/seer/endpoints/group_ai_autofix.py`
  * - `static/app/components/events/autofix/useExplorerAutofix.tsx`
  */
-export const AutofixExplorerRunStateSchema = z.object({
+export const AutofixRunStateSchema = z.object({
   autofix: z
     .object({
       run_id: z.number(),
-      status: AutofixExplorerStatusSchema,
+      status: AutofixStatusSchema,
       updated_at: z.string().nullable().optional(),
-      blocks: z.preprocess(
-        (value) => value ?? [],
-        z.array(AutofixExplorerBlockSchema),
-      ),
+      blocks: z.preprocess((value) => value ?? [], z.array(AutofixBlockSchema)),
       pending_user_input: z
         .object({
           id: z.string(),
@@ -1019,11 +889,9 @@ export const AutofixExplorerRunStateSchema = z.object({
         .passthrough()
         .nullable()
         .optional(),
-      repo_pr_states: z
-        .record(z.string(), AutofixExplorerRepoPRStateSchema)
-        .optional(),
+      repo_pr_states: z.record(z.string(), AutofixRepoPRStateSchema).optional(),
       coding_agents: z
-        .record(z.string(), AutofixExplorerCodingAgentStateSchema)
+        .record(z.string(), AutofixCodingAgentStateSchema)
         .optional(),
     })
     .passthrough()

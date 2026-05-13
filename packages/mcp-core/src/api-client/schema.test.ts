@@ -8,8 +8,8 @@ import {
 } from "@sentry/mcp-server-mocks";
 import { describe, expect, it } from "vitest";
 import {
-  AutofixExplorerRunStateSchema,
   AutofixRunSchema,
+  AutofixRunStateSchema,
   ClientKeySchema,
   EventSchema,
   FlamegraphSchema,
@@ -614,11 +614,9 @@ describe("AutofixRunSchema", () => {
   });
 });
 
-describe("AutofixExplorerRunStateSchema", () => {
+describe("AutofixRunStateSchema", () => {
   it("parses the explorer fixture with typed blocks and artifacts", () => {
-    const state = AutofixExplorerRunStateSchema.parse(
-      autofixStateExplorerFixture,
-    );
+    const state = AutofixRunStateSchema.parse(autofixStateExplorerFixture);
 
     expect(state.autofix?.status).toBe("completed");
     expect(state.autofix?.run_id).toBe(21831);
@@ -631,7 +629,7 @@ describe("AutofixExplorerRunStateSchema", () => {
   });
 
   it("defaults missing blocks arrays to []", () => {
-    const state = AutofixExplorerRunStateSchema.parse({
+    const state = AutofixRunStateSchema.parse({
       autofix: {
         run_id: 1,
         status: "processing",
