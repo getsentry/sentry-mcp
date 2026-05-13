@@ -133,7 +133,7 @@ process.on("uncaughtException", (error) => {
 Sentry follows OpenTelemetry semantic conventions for consistent observability.
 
 ### MCP Attributes (Model Context Protocol)
-Based on the current [OpenTelemetry MCP conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/mcp/), keep `mcp.*` limited to the documented MCP semantic attributes:
+Based on the current [OpenTelemetry MCP conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/mcp/), the standard MCP semantic attributes are:
 
 - `mcp.method.name` - The name of the request or notification method (e.g., "notifications/cancelled", "initialize", "tools/call")
 - `mcp.protocol.version` - The MCP protocol version (e.g., "2025-06-18")
@@ -147,6 +147,7 @@ Current MCP spans also use related OpenTelemetry attributes outside the `mcp.*` 
 - `jsonrpc.request.id` - The JSON-RPC request ID
 - `rpc.response.status_code` - The JSON-RPC response status or error code
 - `network.transport` - Transport protocol (`pipe` for stdio, `tcp` or `quic` for HTTP)
+- `gen_ai.tool.call.arguments.<key>` - Per-key effective tool arguments after constraints
 
 ### Application-Owned Attributes
 These are Sentry MCP application attributes that are not part of the MCP semantic convention:
