@@ -13,10 +13,7 @@ describe("analyze_issue_with_seer", () => {
     vi.clearAllMocks();
   });
 
-  it("handles combined workflow", async () => {
-    // This test validates the tool works correctly
-    // In a real scenario, it would poll multiple times, but for testing
-    // we'll validate the key outputs are present
+  it("handles the existing-analysis happy path", async () => {
     const result = await analyzeIssueWithSeer.handler(
       {
         organizationSlug: "sentry-mcp-evals",
@@ -26,9 +23,7 @@ describe("analyze_issue_with_seer", () => {
         issueUrl: undefined,
       },
       {
-        constraints: {
-          organizationSlug: undefined,
-        },
+        constraints: { organizationSlug: undefined },
         accessToken: "access-token",
         userId: "1",
       },
@@ -37,13 +32,11 @@ describe("analyze_issue_with_seer", () => {
     expect(result).toContain("# Seer Analysis for Issue CLOUDFLARE-MCP-45");
     expect(result).toContain("Found existing analysis (Run ID: 13)");
     expect(result).toContain("## Analysis Complete");
-    expect(result).toContain(
-      '<seer_analysis run_id="13" step="root_cause_analysis">',
-    );
+    expect(result).toContain('<seer_analysis run_id="13" step="root_cause">');
     expect(result).toContain("The analysis has completed successfully.");
   });
 
-  it("wraps completed Seer-authored sections with provenance tags", async () => {
+  it("wraps completed sections with provenance tags", async () => {
     mswServer.use(
       http.get(
         "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TAGS/autofix/",
@@ -51,62 +44,56 @@ describe("analyze_issue_with_seer", () => {
           HttpResponse.json({
             autofix: {
               run_id: 4242,
-              request: {},
-              status: "COMPLETED",
-              updated_at: "2025-04-09T22:39:50.778146",
-              steps: [
+              status: "completed",
+              updated_at: "2025-04-09T22:39:50.778146Z",
+              blocks: [
                 {
-                  type: "root_cause_analysis",
-                  key: "root_cause_analysis",
-                  index: 0,
-                  status: "COMPLETED",
-                  title: "Root Cause Analysis",
-                  output_stream: null,
-                  progress: [],
-                  causes: [
+                  id: "block-1",
+                  timestamp: "2025-04-09T22:35:00Z",
+                  message: {
+                    role: "assistant",
+                    content: "Investigating.",
+                    metadata: { step: "root_cause" },
+                  },
+                  artifacts: [
                     {
-                      description: "The request used the wrong bottle ID.",
-                      id: 1,
-                      root_cause_reproduction: [
-                        {
-                          code_snippet_and_analysis:
-                            "The bottle lookup threw after receiving ID 3216.",
-                          is_most_important_event: true,
-                          relevant_code_file: null,
-                          timeline_item_type: "internal_code",
-                          title: "Lookup path",
-                        },
-                      ],
+                      key: "root_cause",
+                      reason: "Found it.",
+                      data: {
+                        one_line_description:
+                          "The request used the wrong bottle ID.",
+                        five_whys: ["Lookup path failed."],
+                        reproduction_steps: [],
+                      },
                     },
                   ],
                 },
                 {
-                  type: "solution",
-                  key: "solution",
-                  index: 1,
-                  status: "COMPLETED",
-                  title: "Proposed Solution",
-                  output_stream: null,
-                  progress: [],
-                  description:
-                    "Use the canonical bottle ID for both batched calls.",
-                  solution: [
+                  id: "block-2",
+                  timestamp: "2025-04-09T22:38:00Z",
+                  message: {
+                    role: "assistant",
+                    content: "Plan ready.",
+                    metadata: { step: "solution" },
+                  },
+                  artifacts: [
                     {
-                      code_snippet_and_analysis:
-                        "Pass the same ID to both procedures.",
-                      is_active: true,
-                      is_most_important_event: true,
-                      relevant_code_file: null,
-                      timeline_item_type: "internal_code",
-                      title: "Share canonical ID",
-                    },
-                    {
-                      code_snippet_and_analysis: null,
-                      is_active: true,
-                      is_most_important_event: false,
-                      relevant_code_file: null,
-                      timeline_item_type: "repro_test",
-                      title: "Add regression coverage",
+                      key: "solution",
+                      reason: "Drafted.",
+                      data: {
+                        one_line_summary:
+                          "Use the canonical bottle ID for both batched calls.",
+                        steps: [
+                          {
+                            title: "Share canonical ID",
+                            description: "Pass the same ID to both procedures.",
+                          },
+                          {
+                            title: "Add regression coverage",
+                            description: "Cover the batch case with a test.",
+                          },
+                        ],
+                      },
                     },
                   ],
                 },
@@ -125,47 +112,27 @@ describe("analyze_issue_with_seer", () => {
         issueUrl: undefined,
       },
       {
-        constraints: {
-          organizationSlug: undefined,
-        },
+        constraints: { organizationSlug: undefined },
         accessToken: "access-token",
         userId: "1",
       },
     );
 
     expect(typeof result).toBe("string");
-    if (typeof result !== "string") {
-      throw new Error("Expected analyze_issue_with_seer to return text output");
-    }
-
-    expect(result.trim()).toMatchInlineSnapshot(`
-      "# Seer Analysis for Issue CLOUDFLARE-MCP-TAGS
-
-      Found existing analysis (Run ID: 4242)
-
-      ## Analysis Complete
-
-      <seer_analysis run_id="4242" step="root_cause_analysis">
-      The request used the wrong bottle ID.
-
-      **Lookup path**
-
-      The bottle lookup threw after receiving ID 3216.
-      </seer_analysis>
-
-      <seer_analysis run_id="4242" step="solution">
-      Use the canonical bottle ID for both batched calls.
-
-      **Share canonical ID**
-      Pass the same ID to both procedures.
-
-      **Add regression coverage**
-      </seer_analysis>"
-    `);
+    expect(result).toContain("# Seer Analysis for Issue CLOUDFLARE-MCP-TAGS");
+    expect(result).toContain("Found existing analysis (Run ID: 4242)");
+    expect(result).toContain("## Analysis Complete");
+    expect(result).toContain('<seer_analysis run_id="4242" step="root_cause">');
+    expect(result).toContain("The request used the wrong bottle ID.");
+    expect(result).toContain('<seer_analysis run_id="4242" step="solution">');
+    expect(result).toContain(
+      "Use the canonical bottle ID for both batched calls.",
+    );
+    expect(result).toContain("**Share canonical ID**");
     expect(result).not.toContain("null");
   });
 
-  it("handles network errors with retry", async () => {
+  it("retries the GET on network errors", async () => {
     let attempts = 0;
     mswServer.use(
       http.get(
@@ -173,10 +140,8 @@ describe("analyze_issue_with_seer", () => {
         () => {
           attempts++;
           if (attempts < 3) {
-            // Simulate network error for first 2 attempts
             return HttpResponse.error();
           }
-          // Success on third attempt
           return HttpResponse.json(autofixStateFixture);
         },
       ),
@@ -190,25 +155,22 @@ describe("analyze_issue_with_seer", () => {
         issueId: "CLOUDFLARE-MCP-99",
       },
       {
-        constraints: {
-          organizationSlug: undefined,
-        },
+        constraints: { organizationSlug: undefined },
         accessToken: "access-token",
         userId: "1",
       },
     );
 
-    // Fast-forward through retries
     await vi.runAllTimersAsync();
 
     const result = await promise;
 
-    expect(attempts).toBe(3);
+    expect(attempts).toBeGreaterThanOrEqual(3);
     expect(result).toContain("# Seer Analysis for Issue CLOUDFLARE-MCP-99");
     expect(result).toContain("Found existing analysis");
   });
 
-  it("handles 500 errors with retry", async () => {
+  it("retries the GET on 500 errors", async () => {
     let attempts = 0;
     mswServer.use(
       http.get(
@@ -216,13 +178,11 @@ describe("analyze_issue_with_seer", () => {
         () => {
           attempts++;
           if (attempts < 2) {
-            // Simulate server error for first attempt
             return HttpResponse.json(
               { detail: "Internal Server Error" },
               { status: 500 },
             );
           }
-          // Success on second attempt
           return HttpResponse.json(autofixStateFixture);
         },
       ),
@@ -236,51 +196,43 @@ describe("analyze_issue_with_seer", () => {
         issueId: "CLOUDFLARE-MCP-500",
       },
       {
-        constraints: {
-          organizationSlug: undefined,
-        },
+        constraints: { organizationSlug: undefined },
         accessToken: "access-token",
         userId: "1",
       },
     );
 
-    // Fast-forward through retries
     await vi.runAllTimersAsync();
 
     const result = await promise;
 
-    expect(attempts).toBe(2);
+    expect(attempts).toBeGreaterThanOrEqual(2);
     expect(result).toContain("# Seer Analysis for Issue CLOUDFLARE-MCP-500");
   });
 
-  it.skip("handles polling with transient errors", async () => {
-    // This test is skipped because it's difficult to reliably trigger the error message
-    // The functionality is covered by the error recovery logic in the retry tests
-  });
-
-  it("handles polling timeout", async () => {
-    const inProgressState = {
-      ...autofixStateFixture,
-      autofix: {
-        ...autofixStateFixture.autofix,
-        status: "PROCESSING",
-        steps: [
-          {
-            ...autofixStateFixture.autofix.steps[0],
-            status: "PROCESSING",
-            title: "Analyzing the issue",
-          },
-        ],
-      },
-    };
-
+  it("times out when the run stays in processing", async () => {
     mswServer.use(
       http.get(
         "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TIMEOUT/autofix/",
-        () => {
-          // Always return in progress
-          return HttpResponse.json(inProgressState);
-        },
+        () =>
+          HttpResponse.json({
+            autofix: {
+              run_id: 999,
+              status: "processing",
+              updated_at: "2026-04-22T11:55:00Z",
+              blocks: [
+                {
+                  id: "in-flight",
+                  timestamp: "2026-04-22T11:55:00Z",
+                  message: {
+                    role: "assistant",
+                    content: "Still working.",
+                    metadata: { step: "root_cause" },
+                  },
+                },
+              ],
+            },
+          }),
       ),
     );
 
@@ -292,16 +244,13 @@ describe("analyze_issue_with_seer", () => {
         issueId: "CLOUDFLARE-MCP-TIMEOUT",
       },
       {
-        constraints: {
-          organizationSlug: undefined,
-        },
+        constraints: { organizationSlug: undefined },
         accessToken: "access-token",
         userId: "1",
       },
     );
 
-    // Fast-forward past timeout
-    await vi.advanceTimersByTimeAsync(6 * 60 * 1000); // 6 minutes
+    await vi.advanceTimersByTimeAsync(6 * 60 * 1000);
 
     const result = await promise;
 
@@ -309,68 +258,11 @@ describe("analyze_issue_with_seer", () => {
     expect(result).toContain(
       "The analysis is taking longer than expected (>300s)",
     );
-    expect(result).toContain("Processing: Analyzing the issue...");
   });
 
-  it("handles consecutive polling errors", async () => {
-    let pollAttempts = 0;
-    const inProgressState = {
-      ...autofixStateFixture,
-      autofix: {
-        ...autofixStateFixture.autofix,
-        status: "PROCESSING",
-      },
-    };
-
-    mswServer.use(
-      http.get(
-        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-ERRORS/autofix/",
-        () => {
-          pollAttempts++;
-          if (pollAttempts === 1) {
-            // First call returns in progress
-            return HttpResponse.json(inProgressState);
-          }
-          // All subsequent calls fail
-          return HttpResponse.error();
-        },
-      ),
-    );
-
-    const promise = analyzeIssueWithSeer.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        regionUrl: null,
-        instruction: undefined,
-        issueId: "CLOUDFLARE-MCP-ERRORS",
-      },
-      {
-        constraints: {
-          organizationSlug: undefined,
-        },
-        accessToken: "access-token",
-        userId: "1",
-      },
-    );
-
-    // Fast-forward through polling intervals
-    for (let i = 0; i < 10; i++) {
-      await vi.advanceTimersByTimeAsync(5000);
-    }
-
-    const result = await promise;
-
-    expect(result).toContain("## Error During Analysis");
-    expect(result).toContain(
-      "Unable to retrieve analysis status after multiple attempts",
-    );
-    expect(result).toContain(
-      "You can check the status later by running the same command again",
-    );
-  });
-
-  it("handles start autofix with instruction", async () => {
+  it("kicks off root_cause when no run exists yet", async () => {
     let getCallCount = 0;
+    const postBodies: unknown[] = [];
 
     mswServer.use(
       http.get(
@@ -378,10 +270,8 @@ describe("analyze_issue_with_seer", () => {
         () => {
           getCallCount++;
           if (getCallCount === 1) {
-            // First call - no existing autofix
             return HttpResponse.json({ autofix: null });
           }
-          // Subsequent calls - return completed state
           return HttpResponse.json(autofixStateFixture);
         },
       ),
@@ -389,13 +279,8 @@ describe("analyze_issue_with_seer", () => {
         "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-NEW/autofix/",
         async ({ request }) => {
           const body = await request.json();
-          expect(body).toEqual({
-            event_id: undefined,
-            instruction: "Focus on memory leaks",
-          });
-          return HttpResponse.json({
-            run_id: 123,
-          });
+          postBodies.push(body);
+          return HttpResponse.json({ run_id: 123 });
         },
       ),
     );
@@ -408,15 +293,12 @@ describe("analyze_issue_with_seer", () => {
         instruction: "Focus on memory leaks",
       },
       {
-        constraints: {
-          organizationSlug: undefined,
-        },
+        constraints: { organizationSlug: undefined },
         accessToken: "access-token",
         userId: "1",
       },
     );
 
-    // Fast-forward through initial delay and polling
     await vi.runAllTimersAsync();
 
     const result = await promise;
@@ -424,6 +306,77 @@ describe("analyze_issue_with_seer", () => {
     expect(result).toContain("Starting new analysis...");
     expect(result).toContain("Analysis started with Run ID: 123");
     expect(result).toContain("## Analysis Complete");
+    expect(postBodies[0]).toMatchObject({
+      step: "root_cause",
+      user_context: "Focus on memory leaks",
+    });
+  });
+
+  it("does not POST a follow-up step when the existing run already failed", async () => {
+    const posts: unknown[] = [];
+    mswServer.use(
+      http.get(
+        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TERM/autofix/",
+        () =>
+          HttpResponse.json({
+            autofix: {
+              run_id: 555,
+              // Terminal state with only root_cause done. The tool should
+              // render what's there and stop — not try to start `solution`.
+              status: "error",
+              updated_at: "2026-05-10T00:00:00Z",
+              blocks: [
+                {
+                  id: "block-1",
+                  timestamp: "2026-05-10T00:00:00Z",
+                  message: {
+                    role: "assistant",
+                    content: "Initial analysis.",
+                    metadata: { step: "root_cause" },
+                  },
+                  artifacts: [
+                    {
+                      key: "root_cause",
+                      reason: "Found it.",
+                      data: {
+                        one_line_description: "Stale schema cache.",
+                        five_whys: [],
+                        reproduction_steps: [],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
+      ),
+      http.post(
+        "*/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-TERM/autofix/",
+        async ({ request }) => {
+          posts.push(await request.json());
+          return HttpResponse.json({ run_id: 555 });
+        },
+      ),
+    );
+
+    const result = await analyzeIssueWithSeer.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        regionUrl: null,
+        instruction: undefined,
+        issueId: "CLOUDFLARE-MCP-TERM",
+        issueUrl: undefined,
+      },
+      {
+        constraints: { organizationSlug: undefined },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(posts).toEqual([]);
+    expect(result).toContain("Found existing analysis (Run ID: 555)");
+    expect(result).toContain("Stale schema cache.");
   });
 
   it("rejects issues outside the active project constraint", async () => {

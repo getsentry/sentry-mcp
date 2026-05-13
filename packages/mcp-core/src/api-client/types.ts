@@ -41,16 +41,15 @@
 import type { z } from "zod";
 import type {
   AssignedToSchema,
-  AutofixExplorerArtifactSchema,
-  AutofixExplorerBlockSchema,
-  AutofixExplorerCodingAgentStateSchema,
-  AutofixExplorerFilePatchSchema,
-  AutofixExplorerRepoPRStateSchema,
-  AutofixExplorerRunStateSchema,
-  AutofixExplorerStatusSchema,
-  AutofixExplorerStepSchema,
+  AutofixArtifactSchema,
+  AutofixBlockSchema,
+  AutofixCodingAgentStateSchema,
+  AutofixFilePatchSchema,
+  AutofixRepoPRStateSchema,
   AutofixRunSchema,
   AutofixRunStateSchema,
+  AutofixStatusSchema,
+  AutofixStepSchema,
   ClientKeyListSchema,
   ClientKeySchema,
   DefaultEventSchema,
@@ -125,23 +124,14 @@ export type EventAttachment = z.infer<typeof EventAttachmentSchema>;
 export type Tag = z.infer<typeof TagSchema>;
 export type AutofixRun = z.infer<typeof AutofixRunSchema>;
 export type AutofixRunState = z.infer<typeof AutofixRunStateSchema>;
-export type AutofixExplorerStatus = z.infer<typeof AutofixExplorerStatusSchema>;
-export type AutofixExplorerStep = z.infer<typeof AutofixExplorerStepSchema>;
-export type AutofixExplorerBlock = z.infer<typeof AutofixExplorerBlockSchema>;
-export type AutofixExplorerArtifact = z.infer<
-  typeof AutofixExplorerArtifactSchema
->;
-export type AutofixExplorerFilePatch = z.infer<
-  typeof AutofixExplorerFilePatchSchema
->;
-export type AutofixExplorerRepoPRState = z.infer<
-  typeof AutofixExplorerRepoPRStateSchema
->;
-export type AutofixExplorerCodingAgentState = z.infer<
-  typeof AutofixExplorerCodingAgentStateSchema
->;
-export type AutofixExplorerRunState = z.infer<
-  typeof AutofixExplorerRunStateSchema
+export type AutofixStatus = z.infer<typeof AutofixStatusSchema>;
+export type AutofixStep = z.infer<typeof AutofixStepSchema>;
+export type AutofixBlock = z.infer<typeof AutofixBlockSchema>;
+export type AutofixArtifact = z.infer<typeof AutofixArtifactSchema>;
+export type AutofixFilePatch = z.infer<typeof AutofixFilePatchSchema>;
+export type AutofixRepoPRState = z.infer<typeof AutofixRepoPRStateSchema>;
+export type AutofixCodingAgentState = z.infer<
+  typeof AutofixCodingAgentStateSchema
 >;
 export type AssignedTo = z.infer<typeof AssignedToSchema>;
 export type ReplayDetails = z.infer<typeof ReplayDetailsSchema>;
