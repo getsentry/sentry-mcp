@@ -43,6 +43,7 @@ the pivots and recipes below.
 | `app.resource.type` | resolved Sentry resource type | spans | resource dispatch |
 | `app.constraint.organization_slug` | active organization constraint | spans | constrained session behavior |
 | `app.constraint.project_slug` | active project constraint | spans | constrained session behavior |
+| `gen_ai.tool.call.arguments.<key>` | effective tool arguments | spans | called tool input |
 | `app.client.family` | bucketed MCP client family | metrics | client-specific OAuth behavior |
 | `app.oauth.token_exchange.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
 | `app.oauth.grant_revoked.reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
@@ -116,7 +117,7 @@ Tool execution timeline for a slow or failing tool.
 
 ```text
 dataset=spans query='gen_ai.tool.name:"<tool_name>"'
-fields=timestamp,trace,span_id,span.op,span.duration,gen_ai.tool.name,app.constraint.organization_slug,app.constraint.project_slug,error.type
+fields=timestamp,trace,span_id,span.op,span.duration,gen_ai.tool.name,app.constraint.organization_slug,app.constraint.project_slug,gen_ai.tool.call.arguments.organizationSlug,gen_ai.tool.call.arguments.projectSlugOrId,error.type
 sort=-timestamp
 ```
 
@@ -230,6 +231,8 @@ Attributes: `gen_ai.provider.name`, `gen_ai.request.model`,
 - `app.*` fields are Sentry MCP application-owned attributes for product
   concepts that are not part of the MCP semantic convention, such as OAuth
   outcomes, route groups, constraints, and local response reasons.
+- `gen_ai.tool.call.arguments.<key>` intentionally extends GenAI semconv with
+  per-key tool arguments after constraints.
 - Keep metric attributes low-cardinality. Avoid raw URLs, tokens, prompts,
   full request bodies, or other high-cardinality or sensitive values.
 - Do not log secrets. Authorization headers and access tokens must remain

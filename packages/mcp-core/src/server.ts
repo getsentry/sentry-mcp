@@ -26,6 +26,7 @@ import type {
   ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
+  type SpanAttributeValue,
   getActiveSpan,
   setTag,
   setUser,
@@ -333,7 +334,21 @@ function configureServer({
           const paramsWithConstraints = {
             ...params,
             ...applicableConstraints,
-          };
+          } as Record<string, unknown>;
+
+          if (activeSpan) {
+            // Intentional GenAI semconv extension: per-key attrs like http.request.header.<key>.
+            for (const [key, value] of Object.entries(paramsWithConstraints)) {
+              const attributeValue =
+                value == null || typeof value === "object"
+                  ? JSON.stringify(value)
+                  : value;
+              activeSpan.setAttribute(
+                `gen_ai.tool.call.arguments.${key}`,
+                attributeValue as SpanAttributeValue | undefined,
+              );
+            }
+          }
 
           const output = await tool.handler(paramsWithConstraints, context);
 
