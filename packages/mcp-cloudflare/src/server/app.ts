@@ -133,11 +133,11 @@ const app = new Hono<{
     return c.text(
       [
         "User-agent: *",
-        "Allow: /$",
-        "Allow: /.well-known/",
+        "Disallow: /oauth/",
+        "Disallow: /api/",
         "Allow: /mcp.json",
-        "Allow: /llms.txt",
-        "Disallow: /",
+        "Disallow: /mcp",
+        "Disallow: /sse",
       ].join("\n"),
     );
   })
