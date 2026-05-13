@@ -174,12 +174,13 @@ describe("cli/finalize", () => {
       accessToken: "tok",
       unknownArgs: [],
     });
-    expect(cfg.finalSkills.size).toBe(5); // All skills: inspect, triage, project-management, seer, docs
+    expect(cfg.finalSkills.size).toBe(6);
     expect(cfg.finalSkills.has("inspect")).toBe(true);
     expect(cfg.finalSkills.has("triage")).toBe(true);
     expect(cfg.finalSkills.has("project-management")).toBe(true);
     expect(cfg.finalSkills.has("seer")).toBe(true);
     expect(cfg.finalSkills.has("docs")).toBe(true);
+    expect(cfg.finalSkills.has("preprod")).toBe(true);
   });
 
   // --disable-skills tests
@@ -190,11 +191,12 @@ describe("cli/finalize", () => {
       unknownArgs: [],
     });
     expect(cfg.finalSkills.has("seer")).toBe(false);
-    expect(cfg.finalSkills.size).toBe(4);
+    expect(cfg.finalSkills.size).toBe(5);
     expect(cfg.finalSkills.has("inspect")).toBe(true);
     expect(cfg.finalSkills.has("triage")).toBe(true);
     expect(cfg.finalSkills.has("project-management")).toBe(true);
     expect(cfg.finalSkills.has("docs")).toBe(true);
+    expect(cfg.finalSkills.has("preprod")).toBe(true);
   });
 
   it("removes disabled skills when combined with --skills", () => {
@@ -239,7 +241,7 @@ describe("cli/finalize", () => {
     });
     expect(cfg.finalSkills.has("seer")).toBe(false);
     expect(cfg.finalSkills.has("docs")).toBe(false);
-    expect(cfg.finalSkills.size).toBe(3);
+    expect(cfg.finalSkills.size).toBe(4);
   });
 
   it("silently ignores disabling a skill not in the active set", () => {

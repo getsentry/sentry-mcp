@@ -19,6 +19,7 @@ allowedTools:
   - get_doc
   - get_event_attachment
   - get_issue_tag_values
+  - get_latest_base_snapshot
   - get_profile_details
   - get_replay_details
   - get_sentry_resource

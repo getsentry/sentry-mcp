@@ -6,6 +6,7 @@ import type {
   ImageContent,
   EmbeddedResource,
 } from "@modelcontextprotocol/sdk/types.js";
+import { blobToBase64 } from "../internal/blob-utils";
 import {
   ParamOrganizationSlug,
   ParamProjectSlug,
@@ -81,18 +82,12 @@ export default defineTool({
 
       if (isBinary) {
         const isImage = attachment.attachment.mimetype?.startsWith("image/");
-        // Base64 encode the binary attachment content
-        // and add to the content as an embedded resource
-        const uint8Array = new Uint8Array(await attachment.blob.arrayBuffer());
-        let binary = "";
-        for (let i = 0; i < uint8Array.byteLength; i++) {
-          binary += String.fromCharCode(uint8Array[i]);
-        }
+        const base64 = await blobToBase64(attachment.blob);
         if (isImage) {
           const image: ImageContent = {
             type: "image",
             mimeType: attachment.attachment.mimetype,
-            data: btoa(binary),
+            data: base64,
           };
           contentParts.push(image);
         } else {
@@ -101,7 +96,7 @@ export default defineTool({
             resource: {
               uri: `file://${attachment.filename}`,
               mimeType: attachment.attachment.mimetype,
-              blob: btoa(binary),
+              blob: base64,
             },
           };
           contentParts.push(resource);

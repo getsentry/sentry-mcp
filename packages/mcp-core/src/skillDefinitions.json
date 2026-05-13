@@ -49,8 +49,8 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, and breadcrumbs.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n</examples>",
-        "requiredScopes": ["event:read"]
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, breadcrumbs, and preprod snapshots.\nSnapshot URLs with ?selectedSnapshot= return the specific image and full metadata.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n\n### Snapshot diff summary\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/')\n\n### View a specific snapshot image\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')\n</examples>",
+        "requiredScopes": ["event:read", "project:read"]
       },
       {
         "name": "search_events",
@@ -99,8 +99,8 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, and breadcrumbs.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n</examples>",
-        "requiredScopes": ["event:read"]
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, breadcrumbs, and preprod snapshots.\nSnapshot URLs with ?selectedSnapshot= return the specific image and full metadata.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n\n### Snapshot diff summary\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/')\n\n### View a specific snapshot image\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')\n</examples>",
+        "requiredScopes": ["event:read", "project:read"]
       },
       {
         "name": "search_events",
@@ -179,8 +179,8 @@
       },
       {
         "name": "get_sentry_resource",
-        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, and breadcrumbs.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n</examples>",
-        "requiredScopes": ["event:read"]
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, breadcrumbs, and preprod snapshots.\nSnapshot URLs with ?selectedSnapshot= return the specific image and full metadata.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n\n### Snapshot diff summary\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/')\n\n### View a specific snapshot image\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')\n</examples>",
+        "requiredScopes": ["event:read", "project:read"]
       },
       {
         "name": "search_events",
@@ -256,6 +256,41 @@
         "name": "update_project",
         "description": "Update project settings in Sentry, such as name, slug, platform, and team assignment.\n\nBe careful when using this tool!\n\nUse this tool when you need to:\n- Update a project's name or slug to fix onboarding mistakes\n- Change the platform assigned to a project\n- Update team assignment for a project\n\n<examples>\n### Update a project's name and slug\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='old-project', name='New Project Name', slug='new-project-slug')\n```\n\n### Assign a project to a different team\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', teamSlug='backend-team')\n```\n\n### Update platform\n\n```\nupdate_project(organizationSlug='my-organization', projectSlug='my-project', platform='python')\n```\n\n</examples>\n\n<hints>\n- If the user passes a parameter in the form of name/otherName, it's likely in the format of <organizationSlug>/<projectSlug>.\n- Team assignment is handled separately from other project settings\n- If any parameter is ambiguous, you should clarify with the user what they meant.\n- When updating the slug, the project will be accessible at the new slug after the update\n</hints>",
         "requiredScopes": ["project:write"]
+      },
+      {
+        "name": "whoami",
+        "description": "Identify the authenticated user in Sentry.\n\nUse this tool when you need to:\n- Get the user's name and email address.",
+        "requiredScopes": []
+      }
+    ]
+  },
+  {
+    "id": "preprod",
+    "name": "Preprod Snapshots",
+    "description": "Inspect visual regression snapshot tests from CI — view changed images and diff masks",
+    "defaultEnabled": false,
+    "order": 6,
+    "toolCount": 5,
+    "tools": [
+      {
+        "name": "find_organizations",
+        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "requiredScopes": ["org:read"]
+      },
+      {
+        "name": "find_projects",
+        "description": "Find projects in Sentry.\n\nUse this tool when you need to:\n- View projects in a Sentry organization\n- Find a project's slug to aid other tool requests\n- Search for specific projects by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "requiredScopes": ["project:read"]
+      },
+      {
+        "name": "get_latest_base_snapshot",
+        "description": "Get the most recent base-build snapshot for a given app, returning a compact list of all images.\n\nUse this tool when you need to:\n- Find what the current UI looks like for an app (latest screenshots from the main/default branch)\n- Look up a specific screen or component from the most recent baseline build\n- Browse available screenshots before requesting specific images\n\nBase builds are snapshots on the default branch (no comparison). This endpoint returns\ncompact image metadata (display_name, image_file_name, group, description) for every image.\n\n<examples>\n### Get the latest base snapshot for an app\n\n```\nget_latest_base_snapshot(organizationSlug=\"sentry\", appId=\"com.emergetools.hackernews\")\n```\n\n### Get the latest base snapshot for a specific branch\n\n```\nget_latest_base_snapshot(organizationSlug=\"sentry\", appId=\"com.emergetools.hackernews\", branch=\"main\")\n```\n</examples>\n\n<hints>\n- The response includes compact metadata per image. Scan the list to find images matching what you need.\n- To view a specific image, use get_sentry_resource(url='<snapshot_url>?selectedSnapshot=<image_file_name>').\n- If you need to investigate a specific snapshot comparison, use get_sentry_resource with the snapshot URL.\n</hints>",
+        "requiredScopes": ["project:read"]
+      },
+      {
+        "name": "get_sentry_resource",
+        "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, breadcrumbs, and preprod snapshots.\nSnapshot URLs with ?selectedSnapshot= return the specific image and full metadata.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n\n### Snapshot diff summary\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/')\n\n### View a specific snapshot image\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')\n</examples>",
+        "requiredScopes": ["event:read", "project:read"]
       },
       {
         "name": "whoami",

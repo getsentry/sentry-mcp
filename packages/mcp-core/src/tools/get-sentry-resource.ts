@@ -18,6 +18,7 @@ import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
 import getProfileDetails from "./get-profile-details";
 import getReplayDetails from "./get-replay-details";
+import getSnapshotDetails from "./get-snapshot-details";
 
 /** Types with full API integration. */
 export const FULLY_SUPPORTED_TYPES = [
@@ -37,7 +38,8 @@ export type RecognizedType = "monitor" | "release";
 export type ResolvedResourceType =
   | FullySupportedType
   | RecognizedType
-  | "profile";
+  | "profile"
+  | "snapshot";
 
 export interface ResolvedResourceParams {
   type: ResolvedResourceType;
@@ -60,6 +62,9 @@ export interface ResolvedResourceParams {
   monitorSlug?: string;
   // Release params
   releaseVersion?: string;
+  // Snapshot params
+  snapshotId?: string;
+  selectedSnapshot?: string;
 }
 
 export function resolveResourceParams(params: {
@@ -321,6 +326,17 @@ function resolveFromParsedUrl(
         organizationSlug,
         releaseVersion: parsed.releaseVersion,
       };
+
+    case "snapshot":
+      if (!parsed.snapshotId) {
+        throw new UserInputError("Could not extract snapshot ID from URL.");
+      }
+      return {
+        type: "snapshot",
+        organizationSlug,
+        snapshotId: parsed.snapshotId,
+        selectedSnapshot: parsed.selectedSnapshot,
+      };
   }
 }
 
@@ -401,13 +417,14 @@ function generateUnsupportedResourceMessage(
 
 export default defineTool({
   name: "get_sentry_resource",
-  skills: ["inspect", "triage", "seer"], // Preserve legacy issue-detail access for triage and Seer workflows.
-  requiredScopes: ["event:read"],
+  skills: ["inspect", "triage", "seer", "preprod"],
+  requiredScopes: ["event:read", "project:read"],
 
   description: [
     "Fetch a Sentry resource by URL or by type and ID.",
     "",
-    "Supports issues, events, traces, spans, replays, and breadcrumbs.",
+    "Supports issues, events, traces, spans, replays, breadcrumbs, and preprod snapshots.",
+    "Snapshot URLs with ?selectedSnapshot= return the specific image and full metadata.",
     "Trace lookups return a condensed overview by default.",
     "",
     "For `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.",
@@ -427,6 +444,12 @@ export default defineTool({
     "",
     "### Replay by ID",
     "get_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')",
+    "",
+    "### Snapshot diff summary",
+    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/')",
+    "",
+    "### View a specific snapshot image",
+    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')",
     "</examples>",
   ].join("\n"),
 
@@ -578,6 +601,18 @@ export default defineTool({
             end: resolved.end,
             regionUrl: context.constraints.regionUrl ?? null,
             focusOnUserCode: true,
+          },
+          context,
+        );
+
+      case "snapshot":
+        return getSnapshotDetails.handler(
+          {
+            snapshotUrl: params.url ?? null,
+            organizationSlug: resolved.organizationSlug,
+            snapshotId: resolved.snapshotId ?? null,
+            selectedSnapshot: resolved.selectedSnapshot ?? null,
+            regionUrl: context.constraints.regionUrl ?? null,
           },
           context,
         );

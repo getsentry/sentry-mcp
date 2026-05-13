@@ -2865,4 +2865,78 @@ export class SentryApiService {
 
     return response.chunks[0];
   }
+
+  async getSnapshotDetails({
+    organizationSlug,
+    snapshotId,
+    compactMetadata = true,
+  }: {
+    organizationSlug: string;
+    snapshotId: string;
+    compactMetadata?: boolean;
+  }): Promise<unknown> {
+    const params = new URLSearchParams();
+    if (compactMetadata) {
+      params.set("compact_metadata", "true");
+    }
+    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/${encodeURIComponent(snapshotId)}/?${params.toString()}`;
+    return this.requestJSON(path);
+  }
+
+  async getSnapshotImageDetail({
+    organizationSlug,
+    snapshotId,
+    imageIdentifier,
+  }: {
+    organizationSlug: string;
+    snapshotId: string;
+    imageIdentifier: string;
+  }): Promise<unknown> {
+    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/${encodeURIComponent(snapshotId)}/images/${imageIdentifier}/`;
+    return this.requestJSON(path);
+  }
+
+  async fetchImageByUrl(
+    imageUrl: string,
+  ): Promise<{ blob: Blob; contentType: string }> {
+    const response = imageUrl.startsWith("https://")
+      ? await fetch(imageUrl)
+      : await this.request(
+          imageUrl.startsWith("/api/0")
+            ? imageUrl.slice("/api/0".length)
+            : imageUrl,
+        );
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch image: ${response.status} ${response.statusText}`,
+      );
+    }
+    const blob = await response.blob();
+    return {
+      blob,
+      contentType: response.headers.get("content-type") ?? "image/png",
+    };
+  }
+
+  async getLatestBaseSnapshot({
+    organizationSlug,
+    appId,
+    branch,
+    project,
+    compactMetadata = true,
+  }: {
+    organizationSlug: string;
+    appId: string;
+    branch?: string;
+    project?: string;
+    compactMetadata?: boolean;
+  }): Promise<unknown> {
+    const params = new URLSearchParams();
+    params.set("app_id", appId);
+    if (branch) params.set("branch", branch);
+    if (project) params.set("project", project);
+    if (compactMetadata) params.set("compact_metadata", "true");
+    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/latest-base/?${params.toString()}`;
+    return this.requestJSON(path);
+  }
 }
