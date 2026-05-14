@@ -425,6 +425,72 @@ describe("search_events", () => {
     expect(result).toContain('"tags[sequence]": "42"');
   });
 
+  it("should not duplicate environment filters after agent repair", async () => {
+    const query =
+      'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';
+    const repairedQuery = `${query} environment:production has:span.status`;
+    const fields = ["tags[type]", "count()"];
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        repairedQuery,
+        ["span.status", "count()"],
+        undefined,
+        "-count()",
+        { statsPeriod: "24h" },
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(repairedQuery);
+          expect(url.searchParams.getAll("field")).toEqual(fields);
+
+          return HttpResponse.json({
+            data: [
+              {
+                "tags[type]": "Unified",
+                "count()": 3,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields,
+        sort: null,
+        statsPeriod: "7d",
+        environment: "production",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalled();
+  });
+
   it("should accept repaired structured trace queries that preserve the original filters", async () => {
     const query =
       'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';

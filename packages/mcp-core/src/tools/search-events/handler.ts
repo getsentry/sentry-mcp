@@ -126,6 +126,9 @@ function appendSearchFilter(query: string, filter?: string): string {
   if (!filter) {
     return trimmedQuery;
   }
+  if (tokenizeSearchQuery(trimmedQuery).includes(filter)) {
+    return trimmedQuery;
+  }
   return [trimmedQuery, filter].filter(Boolean).join(" ");
 }
 
