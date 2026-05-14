@@ -11,7 +11,8 @@ export type Skill =
   | "triage"
   | "project-management"
   | "seer"
-  | "docs";
+  | "docs"
+  | "preprod";
 
 // Central registry with metadata (used by OAuth UI)
 export interface SkillDefinition {
@@ -59,6 +60,14 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
     description: "Create and modify projects, teams, and DSNs",
     defaultEnabled: false,
     order: 5,
+  },
+  preprod: {
+    id: "preprod",
+    name: "Preprod Snapshots",
+    description:
+      "Inspect visual regression snapshot tests from CI — view changed images and diff masks",
+    defaultEnabled: false,
+    order: 6,
   },
 };
 

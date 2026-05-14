@@ -23,6 +23,8 @@ import searchIssueEvents from "./search-issue-events";
 import useSentry from "./use-sentry";
 import getProfileDetails from "./get-profile-details";
 import getSentryResource from "./get-sentry-resource";
+import getSnapshotDetails from "./get-snapshot-details";
+import getLatestBaseSnapshot from "./get-latest-base-snapshot";
 
 // Default export: object mapping tool names to tools
 export default {
@@ -53,6 +55,8 @@ export default {
   use_sentry: useSentry,
   get_profile_details: getProfileDetails,
   get_sentry_resource: getSentryResource,
+  get_snapshot_details: getSnapshotDetails,
+  get_latest_base_snapshot: getLatestBaseSnapshot,
 } as const;
 
 // Type export

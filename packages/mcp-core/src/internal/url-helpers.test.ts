@@ -400,6 +400,86 @@ describe("parseSentryUrl", () => {
     });
   });
 
+  describe("snapshot URLs", () => {
+    it("parses snapshot URL with subdomain", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/preprod/snapshots/231949/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": undefined,
+          "snapshotId": "231949",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("parses snapshot URL with selectedSnapshot query param", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/preprod/snapshots/231949/?selectedSnapshot=login_screen.png",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": "login_screen.png",
+          "snapshotId": "231949",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("parses snapshot URL with encoded selectedSnapshot", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/preprod/snapshots/241539/?selectedSnapshot=static%2Fapp%2Fcomponents%2Fcore%2Falert.png",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": "static/app/components/core/alert.png",
+          "snapshotId": "241539",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("parses snapshot URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.io/organizations/my-org/preprod/snapshots/12345/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": undefined,
+          "snapshotId": "12345",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("parses snapshot URL without trailing slash", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/preprod/snapshots/99999"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "selectedSnapshot": undefined,
+          "snapshotId": "99999",
+          "type": "snapshot",
+        }
+      `);
+    });
+
+    it("returns unknown for /preprod/ without snapshots path", () => {
+      const result = parseSentryUrl(
+        "https://my-org.sentry.io/preprod/something-else/",
+      );
+      expect(result.type).toBe("unknown");
+    });
+  });
+
   describe("performance summary URLs", () => {
     it("extracts transaction from performance summary URL", () => {
       expect(

@@ -1,0 +1,140 @@
+import { z } from "zod";
+import { setTag } from "@sentry/core";
+import { defineTool } from "../internal/tool-helpers/define";
+import { apiServiceFromContext } from "../internal/tool-helpers/api";
+import type { ServerContext } from "../types";
+import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+
+export default defineTool({
+  name: "get_latest_base_snapshot",
+  skills: ["preprod"],
+  requiredScopes: ["project:read"],
+  description: [
+    "Get the most recent base-build snapshot for a given app, returning a compact list of all images.",
+    "",
+    "Use this tool when you need to:",
+    "- Find what the current UI looks like for an app (latest screenshots from the main/default branch)",
+    "- Look up a specific screen or component from the most recent baseline build",
+    "- Browse available screenshots before requesting specific images",
+    "",
+    "Base builds are snapshots on the default branch (no comparison). This endpoint returns",
+    "compact image metadata (display_name, image_file_name, group, description) for every image.",
+    "",
+    "<examples>",
+    "### Get the latest base snapshot for an app",
+    "",
+    "```",
+    'get_latest_base_snapshot(organizationSlug="sentry", appId="com.emergetools.hackernews")',
+    "```",
+    "",
+    "### Get the latest base snapshot for a specific branch",
+    "",
+    "```",
+    'get_latest_base_snapshot(organizationSlug="sentry", appId="com.emergetools.hackernews", branch="main")',
+    "```",
+    "</examples>",
+    "",
+    "<hints>",
+    "- The response includes compact metadata per image. Scan the list to find images matching what you need.",
+    "- To view a specific image, use get_sentry_resource(url='<snapshot_url>?selectedSnapshot=<image_file_name>').",
+    "- If you need to investigate a specific snapshot comparison, use get_sentry_resource with the snapshot URL.",
+    "</hints>",
+  ].join("\n"),
+  inputSchema: {
+    organizationSlug: ParamOrganizationSlug,
+    appId: z
+      .string()
+      .trim()
+      .describe(
+        "The app identifier (e.g. 'com.emergetools.hackernews'). Required.",
+      ),
+    branch: z
+      .string()
+      .trim()
+      .describe(
+        "Filter by git branch (e.g. 'main'). Omit to use the app's default branch.",
+      )
+      .nullable()
+      .default(null),
+    project: z
+      .string()
+      .trim()
+      .describe(
+        "Project ID for scoping. Recommended if app_id is not unique across projects.",
+      )
+      .nullable()
+      .default(null),
+    regionUrl: ParamRegionUrl.nullable().default(null),
+  },
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
+  async handler(params, context: ServerContext) {
+    setTag("organization.slug", params.organizationSlug);
+
+    const apiService = apiServiceFromContext(context, {
+      regionUrl: params.regionUrl ?? undefined,
+    });
+
+    const data = (await apiService.getLatestBaseSnapshot({
+      organizationSlug: params.organizationSlug,
+      appId: params.appId,
+      branch: params.branch ?? undefined,
+      project: params.project ?? undefined,
+      compactMetadata: true,
+    })) as Record<string, unknown>;
+
+    const snapshotId = data.id as string | undefined;
+    const images = (data.images as Array<Record<string, unknown>>) || [];
+    const appInfo = data.app_info as Record<string, unknown> | undefined;
+    const vcsInfo = data.vcs_info as Record<string, unknown> | undefined;
+
+    const snapshotUrl = snapshotId
+      ? `https://${params.organizationSlug}.sentry.io/preprod/snapshots/${snapshotId}/`
+      : null;
+
+    const sections: string[] = [];
+
+    sections.push(
+      `# Latest Base Snapshot for **${params.appId}** in **${params.organizationSlug}**`,
+    );
+
+    sections.push("\n## Summary\n");
+    if (snapshotUrl) sections.push(`- **URL**: ${snapshotUrl}`);
+    if (snapshotId) sections.push(`- **Snapshot ID**: ${snapshotId}`);
+    if (appInfo) {
+      if (appInfo.name) sections.push(`- **App Name**: ${appInfo.name}`);
+      if (appInfo.platform)
+        sections.push(`- **Platform**: ${appInfo.platform}`);
+    }
+    if (vcsInfo) {
+      if (vcsInfo.head_ref)
+        sections.push(
+          `- **Branch**: ${vcsInfo.head_ref} (\`${String(vcsInfo.head_sha ?? "").slice(0, 8)}\`)`,
+        );
+    }
+    sections.push(`- **Total Images**: ${images.length}`);
+
+    if (images.length > 0) {
+      sections.push("\n## Images\n");
+      for (const img of images) {
+        const name = img.display_name || img.image_file_name || "unknown";
+        const group = img.group ? ` (${img.group})` : "";
+        const file =
+          img.image_file_name && img.image_file_name !== img.display_name
+            ? ` — file: \`${img.image_file_name}\``
+            : "";
+        sections.push(`- \`${name}\`${group}${file}`);
+      }
+    }
+
+    sections.push(
+      snapshotUrl
+        ? `\n## Next Steps\n\n- To view a specific image, use \`get_sentry_resource(url="${snapshotUrl}?selectedSnapshot=<image_file_name>")\``
+        : "\n## Next Steps\n\n- To view a specific image, use `get_sentry_resource` with the snapshot URL + `?selectedSnapshot=<image_file_name>`",
+    );
+
+    return sections.join("\n");
+  },
+});

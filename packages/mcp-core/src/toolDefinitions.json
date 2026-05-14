@@ -478,6 +478,66 @@
     "requiredScopes": ["event:read"]
   },
   {
+    "name": "get_latest_base_snapshot",
+    "description": "Get the most recent base-build snapshot for a given app, returning a compact list of all images.\n\nUse this tool when you need to:\n- Find what the current UI looks like for an app (latest screenshots from the main/default branch)\n- Look up a specific screen or component from the most recent baseline build\n- Browse available screenshots before requesting specific images\n\nBase builds are snapshots on the default branch (no comparison). This endpoint returns\ncompact image metadata (display_name, image_file_name, group, description) for every image.\n\n<examples>\n### Get the latest base snapshot for an app\n\n```\nget_latest_base_snapshot(organizationSlug=\"sentry\", appId=\"com.emergetools.hackernews\")\n```\n\n### Get the latest base snapshot for a specific branch\n\n```\nget_latest_base_snapshot(organizationSlug=\"sentry\", appId=\"com.emergetools.hackernews\", branch=\"main\")\n```\n</examples>\n\n<hints>\n- The response includes compact metadata per image. Scan the list to find images matching what you need.\n- To view a specific image, use get_sentry_resource(url='<snapshot_url>?selectedSnapshot=<image_file_name>').\n- If you need to investigate a specific snapshot comparison, use get_sentry_resource with the snapshot URL.\n</hints>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "organizationSlug": {
+          "type": "string",
+          "description": "The organization's slug. You can find a existing list of organizations you have access to using the `find_organizations()` tool."
+        },
+        "appId": {
+          "type": "string",
+          "description": "The app identifier (e.g. 'com.emergetools.hackernews'). Required."
+        },
+        "branch": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Filter by git branch (e.g. 'main'). Omit to use the app's default branch."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Filter by git branch (e.g. 'main'). Omit to use the app's default branch.",
+          "default": null
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Project ID for scoping. Recommended if app_id is not unique across projects."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Project ID for scoping. Recommended if app_id is not unique across projects.",
+          "default": null
+        },
+        "regionUrl": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The region URL for the organization you're querying, if known. For Sentry's Cloud Service (sentry.io), this is typically the region-specific URL like 'https://us.sentry.io'. For self-hosted Sentry installations, this parameter is usually not needed and should be omitted. You can find the correct regionUrl from the organization details using the `find_organizations()` tool.",
+          "default": null
+        }
+      },
+      "required": ["organizationSlug", "appId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "requiredScopes": ["project:read"]
+  },
+  {
     "name": "get_profile_details",
     "description": "Inspect a specific Sentry profile in detail.\n\nUSE THIS TOOL WHEN:\n- User shares a transaction profile URL and wants the details\n- User has a profile ID and wants a concise summary plus raw sample structure\n- User needs to inspect a continuous profile session by profiler ID and time range\n\nRETURNS:\n- Transaction profile summary with profile URL, transaction, trace, release, and runtime details\n- Sample structure summaries such as frame count, sample count, stacks, and thread breakdown\n- Top frames by occurrence for a quick hotspot overview\n\nNOTE: This tool supports two profile modes.\n- Transaction profiles: pass `profileUrl` or `organizationSlug` + `projectSlugOrId` + `profileId`\n- Continuous profiles: pass `profileUrl` or `organizationSlug` + `projectSlugOrId` + `profilerId` + `start` + `end`\n\n<examples>\n### Transaction profile URL\n```\nget_profile_details(\n  profileUrl='https://my-org.sentry.io/explore/profiling/profile/backend/cfe78a5c892d4a64a962d837673398d2/flamegraph/'\n)\n```\n\n### Transaction profile by ID\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profileId='cfe78a5c892d4a64a962d837673398d2'\n)\n```\n\n### Continuous profile by session\n```\nget_profile_details(\n  organizationSlug='my-org',\n  projectSlugOrId='backend',\n  profilerId='041bde57b9844e36b8b7e5734efae5f7',\n  start='2024-01-01T00:00:00Z',\n  end='2024-01-01T01:00:00Z'\n)\n```\n</examples>",
     "inputSchema": {
@@ -575,7 +635,7 @@
   },
   {
     "name": "get_sentry_resource",
-    "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, and breadcrumbs.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n</examples>",
+    "description": "Fetch a Sentry resource by URL or by type and ID.\n\nSupports issues, events, traces, spans, replays, breadcrumbs, and preprod snapshots.\nSnapshot URLs with ?selectedSnapshot= return the specific image and full metadata.\nTrace lookups return a condensed overview by default.\n\nFor `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.\n\n<examples>\n### From a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')\n\n### Breadcrumbs from a Sentry URL\nget_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')\n\n### By type and ID\nget_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')\n\n### Span by trace and span ID\nget_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')\n\n### Replay by ID\nget_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')\n\n### Snapshot diff summary\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/')\n\n### View a specific snapshot image\nget_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')\n</examples>",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -601,7 +661,7 @@
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
-    "requiredScopes": ["event:read"]
+    "requiredScopes": ["event:read", "project:read"]
   },
   {
     "name": "search_docs",
