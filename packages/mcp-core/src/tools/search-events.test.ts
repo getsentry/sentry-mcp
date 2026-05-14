@@ -238,7 +238,7 @@ describe("search_events", () => {
 
   it("should append environment filters for structured trace searches", async () => {
     const query =
-      'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';
+      'transaction:"VPN connections" message:"environment: prod" tags[type]:Unified tags[country]:CN';
     const fields = ["tags[type]", "count()"];
 
     mswServer.use(

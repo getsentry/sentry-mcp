@@ -123,7 +123,7 @@ function formatEnvironmentFilter(
 
 function appendSearchFilter(query: string, filter?: string): string {
   const trimmedQuery = query.trim();
-  if (!filter || /\benvironment\s*:/.test(trimmedQuery)) {
+  if (!filter) {
     return trimmedQuery;
   }
   return [trimmedQuery, filter].filter(Boolean).join(" ");
