@@ -127,12 +127,18 @@ type RequestOptions = {
 
 export type TraceItemType = "spans" | "logs" | "tracemetrics";
 export type TraceItemAttributeType = "string" | "number" | "boolean";
+export type TraceItemAttributeSourceType = "sentry" | "user";
+
+export type TraceItemAttributeSource = {
+  source_type: TraceItemAttributeSourceType;
+  is_transformed_alias?: boolean;
+};
 
 export type TraceItemAttribute = {
   key: string;
   name: string;
   type: TraceItemAttributeType;
-  attributeSource?: unknown;
+  attributeSource?: TraceItemAttributeSource;
   secondaryAliases?: string[];
 };
 
@@ -150,6 +156,26 @@ function isTraceItemAttributeType(
   value: unknown,
 ): value is TraceItemAttributeType {
   return value === "string" || value === "number" || value === "boolean";
+}
+
+function isTraceItemAttributeSourceType(
+  value: unknown,
+): value is TraceItemAttributeSourceType {
+  return value === "sentry" || value === "user";
+}
+
+function parseTraceItemAttributeSource(
+  value: unknown,
+): TraceItemAttributeSource | undefined {
+  if (!isRecord(value) || !isTraceItemAttributeSourceType(value.source_type)) {
+    return undefined;
+  }
+
+  const source: TraceItemAttributeSource = { source_type: value.source_type };
+  if (typeof value.is_transformed_alias === "boolean") {
+    source.is_transformed_alias = value.is_transformed_alias;
+  }
+  return source;
 }
 
 function parseTraceItemAttributes(
@@ -174,8 +200,11 @@ function parseTraceItemAttributes(
         : fallbackType,
     };
 
-    if (value.attributeSource !== undefined) {
-      attribute.attributeSource = value.attributeSource;
+    const attributeSource = parseTraceItemAttributeSource(
+      value.attributeSource,
+    );
+    if (attributeSource) {
+      attribute.attributeSource = attributeSource;
     }
     if (Array.isArray(value.secondaryAliases)) {
       attribute.secondaryAliases = value.secondaryAliases.filter(

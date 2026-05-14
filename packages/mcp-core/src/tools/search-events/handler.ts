@@ -97,6 +97,38 @@ function hasFields(fields?: string[] | null): fields is string[] {
   return Array.isArray(fields) && fields.length > 0;
 }
 
+function formatSearchValue(value: string): string {
+  return /^[^\s"',[\]]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+function formatEnvironmentFilter(
+  environment?: string | string[] | null,
+): string | undefined {
+  if (!environment) {
+    return undefined;
+  }
+
+  const environments = Array.isArray(environment) ? environment : [environment];
+  if (environments.length === 0) {
+    return undefined;
+  }
+  if (environments.length === 1) {
+    const environmentValue = environments[0];
+    return environmentValue === undefined
+      ? undefined
+      : `environment:${formatSearchValue(environmentValue)}`;
+  }
+  return `environment:[${environments.map(formatSearchValue).join(",")}]`;
+}
+
+function appendSearchFilter(query: string, filter?: string): string {
+  const trimmedQuery = query.trim();
+  if (!filter || /\benvironment\s*:/.test(trimmedQuery)) {
+    return trimmedQuery;
+  }
+  return [trimmedQuery, filter].filter(Boolean).join(" ");
+}
+
 function buildSearchRepairPrompt(params: {
   query?: string;
   dataset: PublicEventsDataset | "replays";
@@ -242,11 +274,17 @@ export default defineTool({
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
     const inputDataset = params.dataset ?? "errors";
+    const hasStructuredQuery = looksLikeSentrySearchSyntax(params.query);
+    const canApplyEnvironmentFilter =
+      inputDataset !== "replays" &&
+      isTraceItemDataset(inputDataset) &&
+      hasStructuredQuery;
 
     if (
       !hasAgentProvider() &&
       inputDataset !== "replays" &&
-      params.environment
+      params.environment &&
+      !canApplyEnvironmentFilter
     ) {
       throw new UserInputError(
         "The `environment` parameter is only supported for dataset='replays'. For other datasets, include environment filtering in the query string instead.",
@@ -271,7 +309,6 @@ export default defineTool({
     let environment: string | string[] | null | undefined = params.environment;
 
     const explicitSort = params.sort?.trim() || undefined;
-    const hasStructuredQuery = looksLikeSentrySearchSyntax(params.query);
     const hasExplicitDataset = params.dataset !== undefined;
     const hasExplicitFields = hasFields(params.fields);
     const hasExplicitSort = explicitSort !== undefined;
@@ -280,11 +317,14 @@ export default defineTool({
       hasExplicitDataset && isTraceItemDataset(inputDataset);
     const shouldTrustStructuredTraceSearch =
       hasStructuredQuery && hasExplicitTraceItemDataset;
+    const explicitStructuredTraceQuery = shouldTrustStructuredTraceSearch
+      ? appendSearchFilter(
+          params.query ?? "",
+          formatEnvironmentFilter(params.environment),
+        )
+      : (params.query ?? "");
     const canRunWithoutAgent =
-      shouldTrustStructuredTraceSearch &&
-      hasExplicitFields &&
-      hasExplicitSort &&
-      !(params.environment && inputDataset !== "replays");
+      shouldTrustStructuredTraceSearch && hasExplicitFields && hasExplicitSort;
 
     if (hasAgentProvider() && !canRunWithoutAgent) {
       const agentResult = await searchEventsAgent({
@@ -319,7 +359,7 @@ export default defineTool({
         ? inputDataset
         : parsed.dataset;
       sentryQuery = shouldTrustStructuredTraceSearch
-        ? (params.query ?? "")
+        ? explicitStructuredTraceQuery
         : parsed.query || "";
       sortParam =
         shouldTrustExplicitSearchParams && explicitSort
@@ -345,7 +385,9 @@ export default defineTool({
       }
     } else {
       dataset = inputDataset;
-      sentryQuery = params.query ?? "";
+      sentryQuery = shouldTrustStructuredTraceSearch
+        ? explicitStructuredTraceQuery
+        : (params.query ?? "");
       sortParam = explicitSort || defaultSortForDataset(dataset);
       timeParams = { statsPeriod: params.statsPeriod ?? "14d" };
       fields =

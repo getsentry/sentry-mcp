@@ -1116,6 +1116,7 @@ describe("API query builders", () => {
                   key: "tags[enabled,boolean]",
                   name: "enabled",
                   attributeType: "boolean",
+                  attributeSource: { source_type: "user" },
                 },
               ]
             : [
@@ -1123,6 +1124,10 @@ describe("API query builders", () => {
                   key: "tags[type]",
                   name: "type",
                   attributeType: "string",
+                  attributeSource: {
+                    source_type: "sentry",
+                    is_transformed_alias: true,
+                  },
                 },
               ];
 
@@ -1151,11 +1156,16 @@ describe("API query builders", () => {
           key: "tags[type]",
           name: "type",
           type: "string",
+          attributeSource: {
+            source_type: "sentry",
+            is_transformed_alias: true,
+          },
         },
         {
           key: "tags[enabled,boolean]",
           name: "enabled",
           type: "boolean",
+          attributeSource: { source_type: "user" },
         },
       ]);
       expect(urls).toHaveLength(2);

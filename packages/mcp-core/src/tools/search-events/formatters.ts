@@ -32,7 +32,11 @@ export interface ExecutedSearch {
 }
 
 function formatInlineCode(value: string): string {
-  return `\`${value.replace(/`/g, "\\`")}\``;
+  const backtickRuns = value.match(/`+/g) ?? [];
+  const fenceLength =
+    backtickRuns.reduce((max, run) => Math.max(max, run.length), 0) + 1;
+  const fence = "`".repeat(fenceLength);
+  return `${fence}${value}${fence}`;
 }
 
 function formatExecutedTimeRange(timeRange?: SearchTimeRange): string {
