@@ -36,7 +36,10 @@ function formatInlineCode(value: string): string {
   const fenceLength =
     backtickRuns.reduce((max, run) => Math.max(max, run.length), 0) + 1;
   const fence = "`".repeat(fenceLength);
-  return `${fence}${value}${fence}`;
+  const needsPadding = value.startsWith("`") || value.endsWith("`");
+  return needsPadding
+    ? `${fence} ${value} ${fence}`
+    : `${fence}${value}${fence}`;
 }
 
 function formatExecutedTimeRange(timeRange?: SearchTimeRange): string {
