@@ -130,7 +130,54 @@ function appendSearchFilter(query: string, filter?: string): string {
 }
 
 function tokenizeSearchQuery(query: string): string[] {
-  return query.split(/\s+/).filter(Boolean);
+  const tokens: string[] = [];
+  let currentToken = "";
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+
+  for (const char of query) {
+    if (escaped) {
+      currentToken += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      currentToken += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      currentToken += char;
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      currentToken += char;
+      quote = char;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (currentToken) {
+        tokens.push(currentToken);
+        currentToken = "";
+      }
+      continue;
+    }
+
+    currentToken += char;
+  }
+
+  if (currentToken) {
+    tokens.push(currentToken);
+  }
+
+  return tokens;
 }
 
 function containsSearchToken(query: string, token: string): boolean {

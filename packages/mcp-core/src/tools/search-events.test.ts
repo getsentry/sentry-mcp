@@ -555,6 +555,71 @@ describe("search_events", () => {
     expect(mockGenerateText).toHaveBeenCalled();
   });
 
+  it("should reject repaired structured trace queries with modified quoted filter values", async () => {
+    const query =
+      'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';
+    const fields = ["tags[type]", "tags[sequence]", "count()"];
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        'transaction:"VPN adventures" connections" tags[type]:Unified tags[country]:CN has:span.status',
+        ["span.status", "count()"],
+        undefined,
+        "-count()",
+        { statsPeriod: "24h" },
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(query);
+          expect(url.searchParams.getAll("field")).toEqual(fields);
+
+          return HttpResponse.json({
+            data: [
+              {
+                "tags[type]": "Unified",
+                "tags[sequence]": "2",
+                "count()": 1,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields,
+        sort: null,
+        statsPeriod: "7d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalled();
+  });
+
   it("should handle metrics dataset queries", async () => {
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
