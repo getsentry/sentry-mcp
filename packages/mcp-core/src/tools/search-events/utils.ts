@@ -21,6 +21,38 @@ export type FlexibleEventData = Record<string, unknown>;
 
 const DEFAULT_MAX_VALUE_LENGTH = 200;
 const DEFAULT_MAX_ARRAY_ITEMS = 20;
+const SENTRY_SEARCH_TOKEN_PATTERN =
+  /(^|\s)!?([A-Za-z_][A-Za-z0-9_.[\],-]*):(?=\S)(?!\/\/)/g;
+const KNOWN_SENTRY_SEARCH_KEYS = new Set([
+  "browser",
+  "device",
+  "duration",
+  "environment",
+  "error.type",
+  "http.status_code",
+  "issue",
+  "level",
+  "message",
+  "os",
+  "project",
+  "release",
+  "severity",
+  "span.action",
+  "span.description",
+  "span.module",
+  "span.op",
+  "span.status",
+  "timestamp",
+  "trace",
+  "transaction",
+  "transaction.duration",
+  "transaction.op",
+  "url",
+  "user",
+  "user.email",
+  "user.id",
+  "user.username",
+]);
 
 // Helper to safely get a string value from event data
 export function getStringValue(
@@ -51,7 +83,31 @@ export function looksLikeSentrySearchSyntax(query?: string): boolean {
   if (!trimmedQuery) {
     return false;
   }
-  return /(^|\s)!?[\w.[\],-]+\s*:/.test(trimmedQuery);
+
+  for (const match of trimmedQuery.matchAll(SENTRY_SEARCH_TOKEN_PATTERN)) {
+    const key = match[2];
+    if (!key) {
+      continue;
+    }
+
+    if (/^tags\[[^\]]+\]$/.test(key)) {
+      return true;
+    }
+
+    if (key !== key.toLowerCase()) {
+      continue;
+    }
+
+    if (KNOWN_SENTRY_SEARCH_KEYS.has(key) || /[.[\],]/.test(key)) {
+      return true;
+    }
+
+    if (/^[a-z_][a-z0-9_-]*$/.test(key)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function isPrimitive(

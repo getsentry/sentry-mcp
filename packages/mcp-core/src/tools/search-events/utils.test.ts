@@ -206,6 +206,19 @@ describe("search query helpers", () => {
         'transaction:"VPN connections" tags[type]:Unified tags[country]:CN',
       ),
     ).toBe(true);
+    expect(looksLikeSentrySearchSyntax("span.op:http.client")).toBe(true);
+    expect(looksLikeSentrySearchSyntax("http.status_code:500")).toBe(true);
+    expect(looksLikeSentrySearchSyntax("customer:acme")).toBe(true);
+    expect(looksLikeSentrySearchSyntax('!transaction:"healthcheck"')).toBe(
+      true,
+    );
+  });
+
+  it("should ignore common natural language colon patterns", () => {
+    expect(looksLikeSentrySearchSyntax("open http://example.com")).toBe(false);
+    expect(looksLikeSentrySearchSyntax("started at 10:30")).toBe(false);
+    expect(looksLikeSentrySearchSyntax("Note: show slow spans")).toBe(false);
+    expect(looksLikeSentrySearchSyntax("ERROR: service is down")).toBe(false);
   });
 });
 

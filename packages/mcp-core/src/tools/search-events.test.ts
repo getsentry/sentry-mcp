@@ -292,6 +292,70 @@ describe("search_events", () => {
     expect(mockGenerateText).not.toHaveBeenCalled();
   });
 
+  it("should repair trace queries with natural language colon patterns", async () => {
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        'span.op:"http.client"',
+        ["span.op", "span.duration"],
+        undefined,
+        "-span.duration",
+        { statsPeriod: "24h" },
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe('span.op:"http.client"');
+          expect(url.searchParams.getAll("field")).toEqual([
+            "span.op",
+            "span.duration",
+          ]);
+
+          return HttpResponse.json({
+            data: [
+              {
+                "span.op": "http.client",
+                "span.duration": 123,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query:
+          "Find slow spans for http://example.com at 10:30. Note: failed requests",
+        dataset: "spans",
+        fields: ["span.op", "span.duration"],
+        sort: "-span.duration",
+        statsPeriod: "24h",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalled();
+  });
+
   it("should preserve structured query filters and explicit fields after agent repair", async () => {
     const query =
       'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';
