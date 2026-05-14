@@ -93,7 +93,7 @@ export default defineTool({
     "",
     "Replay searches return replay lists only; replay count()/avg()/sum() are not supported.",
     "",
-    "DO NOT USE for grouped issue lists → use search_issues",
+    "NOT for grouped issue lists (use search_issues) or app screenshots/images (use get_latest_base_snapshot).",
     "",
     "<examples>",
     "search_events(organizationSlug='my-org', query='how many errors today')",
