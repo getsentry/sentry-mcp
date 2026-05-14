@@ -121,12 +121,16 @@ const snapshotFixture = {
   unchanged: [],
 };
 
-const imageDetailFixture = {
+const headImageInfo = {
+  content_hash: "abc123",
   display_name: "login_screen.png",
   group: "auth",
   image_file_name: "snapshots-iphone-16/auth_login_screen.png",
   width: 1080,
   height: 1920,
+  description: null,
+  image_url:
+    "/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen.png/download/",
   context: {
     preview: {
       container_display_name: "Auth Login",
@@ -134,11 +138,75 @@ const imageDetailFixture = {
     },
     simulator: { device_name: "iPhone 16" },
   },
+};
+
+const baseImageInfo = {
+  content_hash: "def456",
+  display_name: "login_screen.png",
+  group: "auth",
+  image_file_name: "snapshots-iphone-16/auth_login_screen.png",
+  width: 1080,
+  height: 1920,
+  description: null,
   image_url:
-    "/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen.png/download/",
+    "/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen_base.png/download/",
+};
+
+const changedImageDetailFixture = {
+  image_file_name: "snapshots-iphone-16/auth_login_screen.png",
+  comparison_status: "changed",
+  head_image: headImageInfo,
+  base_image: baseImageInfo,
+  diff_image_url:
+    "/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen_diff.png/download/",
+  diff_percentage: 0.125,
+  previous_image_file_name: null,
+};
+
+const addedImageDetailFixture = {
+  image_file_name: "snapshots-iphone-16/auth_login_screen.png",
+  comparison_status: "added",
+  head_image: headImageInfo,
+  base_image: null,
+  diff_image_url: null,
+  diff_percentage: null,
+  previous_image_file_name: null,
+};
+
+const removedImageDetailFixture = {
+  image_file_name: "snapshots-iphone-16/auth_login_screen.png",
+  comparison_status: "removed",
+  head_image: null,
+  base_image: baseImageInfo,
+  diff_image_url: null,
+  diff_percentage: null,
+  previous_image_file_name: null,
+};
+
+const renamedImageDetailFixture = {
+  image_file_name: "snapshots-iphone-16/auth_login_screen.png",
+  comparison_status: "renamed",
+  head_image: headImageInfo,
+  base_image: {
+    ...baseImageInfo,
+    image_file_name: "snapshots-iphone-16/old_login.png",
+  },
+  diff_image_url: null,
+  diff_percentage: null,
+  previous_image_file_name: "snapshots-iphone-16/old_login.png",
 };
 
 const fakePng = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+const fakeJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+
+const IMAGE_DETAIL_PATH =
+  "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/login_screen.png/";
+const HEAD_DOWNLOAD_PATH =
+  "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen.png/download/";
+const BASE_DOWNLOAD_PATH =
+  "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen_base.png/download/";
+const DIFF_DOWNLOAD_PATH =
+  "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen_diff.png/download/";
 
 function setupSnapshotMock() {
   mswServer.use(
@@ -150,19 +218,47 @@ function setupSnapshotMock() {
   );
 }
 
-function setupImageMocks() {
+function setupChangedImageMocks() {
   mswServer.use(
     http.get(
-      "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/login_screen.png/",
-      () => HttpResponse.json(imageDetailFixture),
+      IMAGE_DETAIL_PATH,
+      () => HttpResponse.json(changedImageDetailFixture),
       { once: true },
     ),
     http.get(
-      "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen.png/download/",
+      HEAD_DOWNLOAD_PATH,
       () =>
-        new HttpResponse(fakePng, {
-          headers: { "content-type": "image/png" },
+        new HttpResponse(fakePng, { headers: { "content-type": "image/png" } }),
+      { once: true },
+    ),
+    http.get(
+      BASE_DOWNLOAD_PATH,
+      () =>
+        new HttpResponse(fakeJpeg, {
+          headers: { "content-type": "image/jpeg" },
         }),
+      { once: true },
+    ),
+    http.get(
+      DIFF_DOWNLOAD_PATH,
+      () =>
+        new HttpResponse(fakePng, { headers: { "content-type": "image/png" } }),
+      { once: true },
+    ),
+  );
+}
+
+function setupAddedImageMocks() {
+  mswServer.use(
+    http.get(
+      IMAGE_DETAIL_PATH,
+      () => HttpResponse.json(addedImageDetailFixture),
+      { once: true },
+    ),
+    http.get(
+      HEAD_DOWNLOAD_PATH,
+      () =>
+        new HttpResponse(fakePng, { headers: { "content-type": "image/png" } }),
       { once: true },
     ),
   );
@@ -376,8 +472,8 @@ describe("get_snapshot_details", () => {
     expect(text).toContain("`Dark mode` (Content View)");
   });
 
-  it("fetches image metadata and binary when selectedSnapshot is provided", async () => {
-    setupImageMocks();
+  it("returns head, base, and diff images for changed comparison", async () => {
+    setupChangedImageMocks();
     const result = await getSnapshotDetails.handler(
       {
         snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
@@ -393,32 +489,170 @@ describe("get_snapshot_details", () => {
     const imageParts = parts.filter(
       (p): p is ImageContent => p.type === "image",
     );
-    expect(textParts[0]!.text).toContain("login_screen.png");
+    expect(textParts[0]!.text).toContain("**Status**: changed");
+    expect(textParts[0]!.text).toContain("**Diff**: 12.5%");
     expect(textParts[0]!.text).toContain("**Group**: auth");
     expect(textParts[0]!.text).toContain("1080×1920");
-    expect(textParts[0]!.text).not.toContain("image_url");
-    expect(imageParts.length).toBe(1);
+    expect(textParts[0]!.text).toContain("**Container**: Auth Login");
+    expect(textParts[0]!.text).toContain("**Device**: iPhone 16");
+    expect(imageParts.length).toBe(3);
     expect(imageParts[0]!.mimeType).toBe("image/png");
-    expect(textParts[0]!.text).toMatchInlineSnapshot(`
-      "## login_screen.png
-
-      - **Display Name**: login_screen.png
-      - **Group**: auth
-      - **File**: \`snapshots-iphone-16/auth_login_screen.png\`
-      - **Dimensions**: 1080×1920
-      - **Container**: Auth Login
-      - **Device**: iPhone 16"
-    `);
+    expect(imageParts[1]!.mimeType).toBe("image/jpeg");
+    expect(imageParts[2]!.mimeType).toBe("image/png");
+    expect(textParts[1]!.text).toBe("### Head (current)");
+    expect(textParts[2]!.text).toBe("### Base (previous)");
+    expect(textParts[3]!.text).toBe("### Diff Mask");
   });
 
-  it("throws when selectedSnapshot image has no image_url", async () => {
+  it("returns only head image for added comparison", async () => {
+    setupAddedImageMocks();
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: "login_screen.png",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const parts = result as (TextContent | ImageContent)[];
+    const textParts = parts.filter((p): p is TextContent => p.type === "text");
+    const imageParts = parts.filter(
+      (p): p is ImageContent => p.type === "image",
+    );
+    expect(textParts[0]!.text).toContain("**Status**: added");
+    expect(textParts[0]!.text).not.toContain("**Diff**:");
+    expect(imageParts.length).toBe(1);
+    expect(imageParts[0]!.mimeType).toBe("image/png");
+    expect(textParts[1]!.text).toBe("### Head (current)");
+  });
+
+  it("returns only base image for removed comparison", async () => {
+    mswServer.use(
+      http.get(
+        IMAGE_DETAIL_PATH,
+        () => HttpResponse.json(removedImageDetailFixture),
+        { once: true },
+      ),
+      http.get(
+        BASE_DOWNLOAD_PATH,
+        () =>
+          new HttpResponse(fakePng, {
+            headers: { "content-type": "image/png" },
+          }),
+        { once: true },
+      ),
+    );
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: "login_screen.png",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const parts = result as (TextContent | ImageContent)[];
+    const imageParts = parts.filter(
+      (p): p is ImageContent => p.type === "image",
+    );
+    const textParts = parts.filter((p): p is TextContent => p.type === "text");
+    expect(textParts[0]!.text).toContain("**Status**: removed");
+    expect(imageParts.length).toBe(1);
+    expect(textParts[1]!.text).toBe("### Base (previous)");
+  });
+
+  it("shows previous_image_file_name for renamed images", async () => {
+    mswServer.use(
+      http.get(
+        IMAGE_DETAIL_PATH,
+        () => HttpResponse.json(renamedImageDetailFixture),
+        { once: true },
+      ),
+      http.get(
+        HEAD_DOWNLOAD_PATH,
+        () =>
+          new HttpResponse(fakePng, {
+            headers: { "content-type": "image/png" },
+          }),
+        { once: true },
+      ),
+      http.get(
+        BASE_DOWNLOAD_PATH,
+        () =>
+          new HttpResponse(fakePng, {
+            headers: { "content-type": "image/png" },
+          }),
+        { once: true },
+      ),
+    );
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: "login_screen.png",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const parts = result as (TextContent | ImageContent)[];
+    const textParts = parts.filter((p): p is TextContent => p.type === "text");
+    expect(textParts[0]!.text).toContain("**Status**: renamed");
+    expect(textParts[0]!.text).toContain(
+      "**Previous File**: `snapshots-iphone-16/old_login.png`",
+    );
+  });
+
+  it("detects image type from magic bytes when content-type is application/octet-stream", async () => {
+    mswServer.use(
+      http.get(
+        IMAGE_DETAIL_PATH,
+        () => HttpResponse.json(addedImageDetailFixture),
+        { once: true },
+      ),
+      http.get(
+        HEAD_DOWNLOAD_PATH,
+        () =>
+          new HttpResponse(fakePng, {
+            headers: { "content-type": "application/octet-stream" },
+          }),
+        { once: true },
+      ),
+    );
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: "login_screen.png",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const parts = result as (TextContent | ImageContent)[];
+    const imageParts = parts.filter(
+      (p): p is ImageContent => p.type === "image",
+    );
+    expect(imageParts.length).toBe(1);
+    expect(imageParts[0]!.mimeType).toBe("image/png");
+  });
+
+  it("throws when no image data is available", async () => {
     mswServer.use(
       http.get(
         "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/missing.png/",
         () =>
           HttpResponse.json({
-            display_name: "missing.png",
-            group: null,
+            image_file_name: "missing.png",
+            comparison_status: null,
+            head_image: null,
+            base_image: null,
+            diff_image_url: null,
+            diff_percentage: null,
+            previous_image_file_name: null,
           }),
         { once: true },
       ),
@@ -434,6 +668,6 @@ describe("get_snapshot_details", () => {
         },
         getServerContext(),
       ),
-    ).rejects.toThrow("No image_url returned");
+    ).rejects.toThrow("No image data returned");
   });
 });

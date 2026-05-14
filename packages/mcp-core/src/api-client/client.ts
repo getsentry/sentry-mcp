@@ -2912,10 +2912,12 @@ export class SentryApiService {
       );
     }
     const blob = await response.blob();
-    return {
-      blob,
-      contentType: response.headers.get("content-type") ?? "image/png",
-    };
+    let contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) {
+      const { detectImageMimeType } = await import("../internal/blob-utils.js");
+      contentType = (await detectImageMimeType(blob)) ?? contentType;
+    }
+    return { blob, contentType };
   }
 
   async getLatestBaseSnapshot({

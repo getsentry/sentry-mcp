@@ -25,6 +25,43 @@ interface SnapshotDiffPair {
   diff?: number | null;
 }
 
+interface SnapshotImageContext {
+  preview?: { container_display_name?: string; display_name?: string };
+  simulator?: { device_name?: string };
+  test_name?: string;
+}
+
+interface SnapshotImageInfo {
+  content_hash?: string;
+  display_name?: string | null;
+  group?: string | null;
+  image_file_name?: string;
+  width?: number;
+  height?: number;
+  description?: string | null;
+  image_url?: string;
+  context?: SnapshotImageContext;
+  [key: string]: unknown;
+}
+
+interface SnapshotImageDetailResponse {
+  image_file_name?: string;
+  comparison_status?:
+    | "added"
+    | "removed"
+    | "changed"
+    | "unchanged"
+    | "renamed"
+    | "errored"
+    | "skipped"
+    | null;
+  head_image?: SnapshotImageInfo | null;
+  base_image?: SnapshotImageInfo | null;
+  diff_image_url?: string | null;
+  diff_percentage?: number | null;
+  previous_image_file_name?: string | null;
+}
+
 function getImageDisplayName(img: SnapshotImageEntry): string {
   return img.display_name || img.image_file_name || "unknown";
 }
@@ -133,64 +170,110 @@ export default defineTool({
   },
 });
 
+function formatImageMetadata(img: SnapshotImageInfo): string[] {
+  const lines: string[] = [];
+  if (img.display_name) lines.push(`- **Display Name**: ${img.display_name}`);
+  if (img.group) lines.push(`- **Group**: ${img.group}`);
+  if (img.image_file_name) lines.push(`- **File**: \`${img.image_file_name}\``);
+  if (img.width || img.height)
+    lines.push(`- **Dimensions**: ${img.width}×${img.height}`);
+  if (img.description) lines.push(`- **Description**: ${img.description}`);
+  if (img.context?.preview?.container_display_name)
+    lines.push(
+      `- **Container**: ${img.context.preview.container_display_name}`,
+    );
+  if (img.context?.simulator?.device_name)
+    lines.push(`- **Device**: ${img.context.simulator.device_name}`);
+  if (img.context?.test_name)
+    lines.push(`- **Test**: ${img.context.test_name}`);
+  return lines;
+}
+
+async function fetchAndAppendImage(
+  apiService: ReturnType<typeof apiServiceFromContext>,
+  imageUrl: string,
+  label: string,
+  parts: (TextContent | ImageContent)[],
+): Promise<void> {
+  const { blob, contentType } = await apiService.fetchImageByUrl(imageUrl);
+  if (!contentType.startsWith("image/")) {
+    parts.push({
+      type: "text",
+      text: `(${label}: unexpected content type ${contentType})`,
+    });
+    return;
+  }
+  parts.push({ type: "text", text: `### ${label}` });
+  parts.push({
+    type: "image",
+    data: await blobToBase64(blob),
+    mimeType: contentType,
+  });
+}
+
 async function fetchSnapshotImage(
   apiService: ReturnType<typeof apiServiceFromContext>,
   organizationSlug: string,
   snapshotId: string,
   imageName: string,
 ): Promise<(TextContent | ImageContent)[]> {
-  const imageDetail = (await apiService.getSnapshotImageDetail({
+  const detail = (await apiService.getSnapshotImageDetail({
     organizationSlug,
     snapshotId,
     imageIdentifier: imageName,
-  })) as Record<string, unknown>;
+  })) as SnapshotImageDetailResponse;
 
-  const imageUrl = imageDetail.image_url as string | undefined;
-  if (!imageUrl) {
+  const headImage = detail.head_image;
+  const baseImage = detail.base_image;
+  const status = detail.comparison_status;
+
+  if (!headImage?.image_url && !baseImage?.image_url) {
     throw new UserInputError(
-      `No image_url returned for "${imageName}". The image may not exist in this snapshot.`,
+      `No image data returned for "${imageName}". The image may not exist in this snapshot.`,
     );
   }
 
-  const { image_url: _url, ...metadata } = imageDetail;
   const lines: string[] = [`## ${imageName}\n`];
-  if (metadata.display_name)
-    lines.push(`- **Display Name**: ${metadata.display_name}`);
-  if (metadata.group) lines.push(`- **Group**: ${metadata.group}`);
-  if (metadata.image_file_name)
-    lines.push(`- **File**: \`${metadata.image_file_name}\``);
-  if (metadata.width || metadata.height)
-    lines.push(`- **Dimensions**: ${metadata.width}×${metadata.height}`);
-  if (metadata.description)
-    lines.push(`- **Description**: ${metadata.description}`);
-  const context = metadata.context as Record<string, unknown> | undefined;
-  if (context) {
-    const preview = context.preview as Record<string, unknown> | undefined;
-    if (preview?.container_display_name)
-      lines.push(`- **Container**: ${preview.container_display_name}`);
-    const simulator = context.simulator as Record<string, unknown> | undefined;
-    if (simulator?.device_name)
-      lines.push(`- **Device**: ${simulator.device_name}`);
-    const test = context.test_name as string | undefined;
-    if (test) lines.push(`- **Test**: ${test}`);
-  }
+  if (status) lines.push(`- **Status**: ${status}`);
+  if (detail.diff_percentage != null)
+    lines.push(
+      `- **Diff**: ${Math.round(detail.diff_percentage * 10000) / 100}%`,
+    );
+  if (detail.previous_image_file_name)
+    lines.push(`- **Previous File**: \`${detail.previous_image_file_name}\``);
+
+  const primary = headImage ?? baseImage;
+  if (primary) lines.push(...formatImageMetadata(primary));
 
   const contentParts: (TextContent | ImageContent)[] = [
     { type: "text", text: lines.join("\n") },
   ];
 
-  const { blob, contentType } = await apiService.fetchImageByUrl(imageUrl);
-  if (!contentType.startsWith("image/")) {
-    contentParts.push({
-      type: "text",
-      text: `(Unexpected content type: ${contentType})`,
-    });
-  } else {
-    contentParts.push({
-      type: "image",
-      data: await blobToBase64(blob),
-      mimeType: contentType,
-    });
+  if (headImage?.image_url) {
+    await fetchAndAppendImage(
+      apiService,
+      headImage.image_url,
+      "Head (current)",
+      contentParts,
+    );
+  }
+
+  if (baseImage?.image_url && baseImage.image_url !== headImage?.image_url) {
+    await fetchAndAppendImage(
+      apiService,
+      baseImage.image_url,
+      "Base (previous)",
+      contentParts,
+    );
+  }
+
+  if (detail.diff_image_url) {
+    await fetchAndAppendImage(
+      apiService,
+      detail.diff_image_url,
+      "Diff Mask",
+      contentParts,
+    );
   }
 
   return contentParts;
