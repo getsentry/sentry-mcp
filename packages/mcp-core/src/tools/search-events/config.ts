@@ -28,8 +28,9 @@ Before constructing ANY query, you MUST verify field availability:
 2. This includes ALL fields: custom attributes, database fields, HTTP fields, AI fields, user fields, etc.
 3. Fields vary by project based on what data is being sent to Sentry
 4. Using an unverified field WILL cause your query to fail with "field not found" errors
-5. The datasetAttributes tool tells you EXACTLY which fields are available
-6. Replay fields vary by project too, so use replayFields before constructing replay queries
+5. For spans, logs, and metrics, datasetAttributes can validate exact field names with attributes and can list likely fields using substringMatch/query/attributeTypes
+6. A broad datasetAttributes listing is a discovery preview and may be truncated; do not treat absence from the preview as proof that a user-supplied field is invalid
+7. Replay fields vary by project too, so use replayFields before constructing replay queries
 
 TOOL USAGE GUIDELINES:
 1. Use datasetAttributes tool to discover available fields for your chosen dataset
@@ -37,6 +38,8 @@ TOOL USAGE GUIDELINES:
 3. Use otelSemantics tool when you need specific OpenTelemetry semantic convention attributes
 4. Use whoami tool when queries contain "me" references for user.id or user.email fields
 5. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - use the appropriate field discovery tool instead of guessing field names
+6. When the user already supplied Sentry search syntax for spans/logs/metrics, call datasetAttributes with exact attributes from the query or fields before dropping or renaming them
+7. Use datasetAttributes substringMatch, query, and attributeTypes for targeted lookup when broad field discovery is truncated
 
 CRITICAL - TOOL RESPONSE HANDLING:
 All tools return responses in this format: {error?: string, result?: data}

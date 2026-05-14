@@ -5,6 +5,7 @@ import {
   fetchCustomAttributes,
   formatEventValue,
   formatKnownUserValue,
+  looksLikeSentrySearchSyntax,
 } from "./utils";
 import { SentryApiService } from "../../api-client";
 import * as logging from "../../telem/logging";
@@ -192,6 +193,19 @@ describe("formatEventValue", () => {
       const result = formatEventValue("abcdef", { maxLength: 3 });
       expect(result).toBe("abc");
     });
+  });
+});
+
+describe("search query helpers", () => {
+  it("should detect structured Sentry search syntax", () => {
+    expect(looksLikeSentrySearchSyntax("vpn connections from China")).toBe(
+      false,
+    );
+    expect(
+      looksLikeSentrySearchSyntax(
+        'transaction:"VPN connections" tags[type]:Unified tags[country]:CN',
+      ),
+    ).toBe(true);
   });
 });
 
@@ -463,6 +477,87 @@ describe("fetchCustomAttributes", () => {
           "metric.name": "string",
           "metric.type": "string",
           value: "number",
+        },
+      });
+    });
+
+    it("should pass targeted trace item attribute filters through to Sentry", async () => {
+      const requests: URLSearchParams[] = [];
+
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+          ({ request }) => {
+            const url = new URL(request.url);
+            requests.push(url.searchParams);
+
+            const attributeType = url.searchParams.get("attributeType");
+            if (attributeType === "string") {
+              return HttpResponse.json([
+                {
+                  key: "tags[type]",
+                  name: "type",
+                  attributeType: "string",
+                },
+              ]);
+            }
+            if (attributeType === "number") {
+              return HttpResponse.json([
+                {
+                  key: "tags[sequence,number]",
+                  name: "sequence",
+                  attributeType: "number",
+                },
+              ]);
+            }
+            if (attributeType === "boolean") {
+              return HttpResponse.json([
+                {
+                  key: "tags[enabled,boolean]",
+                  name: "enabled",
+                  attributeType: "boolean",
+                },
+              ]);
+            }
+            return HttpResponse.json([]);
+          },
+        ),
+      );
+
+      const result = await fetchCustomAttributes(
+        apiService,
+        "test-org",
+        "spans",
+        "123",
+        { statsPeriod: "7d" },
+        {
+          attributeTypes: ["string", "number", "boolean"],
+          substringMatch: "tags[",
+          query: 'transaction:"VPN connections"',
+        },
+      );
+
+      expect(requests).toHaveLength(3);
+      expect(
+        requests.map((params) => params.get("attributeType")).sort(),
+      ).toEqual(["boolean", "number", "string"]);
+      for (const params of requests) {
+        expect(params.get("itemType")).toBe("spans");
+        expect(params.get("project")).toBe("123");
+        expect(params.get("statsPeriod")).toBe("7d");
+        expect(params.get("substringMatch")).toBe("tags[");
+        expect(params.get("query")).toBe('transaction:"VPN connections"');
+      }
+      expect(result).toEqual({
+        attributes: {
+          "tags[type]": "type",
+          "tags[sequence,number]": "sequence",
+          "tags[enabled,boolean]": "enabled",
+        },
+        fieldTypes: {
+          "tags[type]": "string",
+          "tags[sequence,number]": "number",
+          "tags[enabled,boolean]": "boolean",
         },
       });
     });

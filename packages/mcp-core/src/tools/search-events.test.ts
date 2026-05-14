@@ -165,6 +165,146 @@ describe("search_events", () => {
     expect(result).toContain("db.query");
   });
 
+  it("should execute complete structured search requests without agent rewriting", async () => {
+    const query =
+      'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';
+    const fields = [
+      "tags[type]",
+      "tags[sequence]",
+      "span.status",
+      "tags[reason]",
+      "count()",
+    ];
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(query);
+          expect(url.searchParams.getAll("field")).toEqual(fields);
+          expect(url.searchParams.get("sort")).toBe("-count");
+          expect(url.searchParams.get("statsPeriod")).toBe("7d");
+
+          return HttpResponse.json({
+            data: [
+              {
+                "tags[type]": "Unified",
+                "tags[sequence]": "42",
+                "span.status": "ok",
+                "tags[reason]": "allowed",
+                "count()": 3,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields,
+        sort: "-count()",
+        statsPeriod: "7d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(result).toContain('"tags[type]": "Unified"');
+    expect(result).toContain(
+      '- Query: `transaction:"VPN connections" tags[type]:Unified tags[country]:CN`',
+    );
+    expect(result).toContain(
+      "- Fields: `tags[type]`, `tags[sequence]`, `span.status`, `tags[reason]`, `count()`",
+    );
+  });
+
+  it("should preserve structured query filters and explicit fields after agent repair", async () => {
+    const query =
+      'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';
+    const fields = ["tags[type]", "tags[sequence]", "count()"];
+
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "spans",
+        'transaction:"VPN connections" tags[country]:CN',
+        ["span.status", "count()"],
+        undefined,
+        "-count()",
+        { statsPeriod: "24h" },
+      ),
+    );
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("dataset")).toBe("spans");
+          expect(url.searchParams.get("query")).toBe(query);
+          expect(url.searchParams.getAll("field")).toEqual(fields);
+          expect(url.searchParams.get("sort")).toBe("-count");
+          expect(url.searchParams.get("statsPeriod")).toBe("7d");
+
+          return HttpResponse.json({
+            data: [
+              {
+                "tags[type]": "Unified",
+                "tags[sequence]": "42",
+                "count()": 3,
+              },
+            ],
+          });
+        },
+      ),
+    );
+
+    const result = await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query,
+        dataset: "spans",
+        fields,
+        sort: null,
+        statsPeriod: "7d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).toHaveBeenCalled();
+    expect(result).toContain('"tags[type]": "Unified"');
+    expect(result).toContain('"tags[sequence]": "42"');
+  });
+
   it("should handle metrics dataset queries", async () => {
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
@@ -226,6 +366,13 @@ describe("search_events", () => {
       "# Search Results for "slow request duration metrics"
 
       ⚠️ **IMPORTANT**: Display these metric aggregates as a data table with proper column alignment, grouping labels, and units.
+
+      ## Executed Search
+      - Dataset: \`metrics\`
+      - Query: \`(empty)\`
+      - Fields: \`transaction\`, \`p95(value,http.request.duration,distribution,millisecond)\`, \`count(value,http.request.duration,distribution,millisecond)\`
+      - Sort: \`-p95(value,http.request.duration,distribution,millisecond)\`
+      - Time range: Last 14d
 
       **View these results in Sentry**:
       https://test-org.sentry.io/explore/metrics/?statsPeriod=14d&metric=%7B%22metric%22%3A%7B%22name%22%3A%22http.request.duration%22%2C%22type%22%3A%22distribution%22%2C%22unit%22%3A%22millisecond%22%7D%2C%22query%22%3A%22%22%2C%22aggregateFields%22%3A%5B%7B%22yAxes%22%3A%5B%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%5D%7D%2C%7B%22yAxes%22%3A%5B%22count%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%5D%7D%2C%7B%22groupBy%22%3A%22transaction%22%7D%5D%2C%22aggregateSortBys%22%3A%5B%7B%22field%22%3A%22p95%28value%2Chttp.request.duration%2Cdistribution%2Cmillisecond%29%22%2C%22kind%22%3A%22desc%22%7D%5D%2C%22mode%22%3A%22aggregate%22%7D

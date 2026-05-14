@@ -125,6 +125,69 @@ type RequestOptions = {
   host?: string;
 };
 
+export type TraceItemType = "spans" | "logs" | "tracemetrics";
+export type TraceItemAttributeType = "string" | "number" | "boolean";
+
+export type TraceItemAttribute = {
+  key: string;
+  name: string;
+  type: TraceItemAttributeType;
+  attributeSource?: unknown;
+  secondaryAliases?: string[];
+};
+
+export type TraceItemAttributeValidationResult = {
+  valid: boolean;
+  type?: TraceItemAttributeType;
+  error?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isTraceItemAttributeType(
+  value: unknown,
+): value is TraceItemAttributeType {
+  return value === "string" || value === "number" || value === "boolean";
+}
+
+function parseTraceItemAttributes(
+  body: unknown,
+  fallbackType: TraceItemAttributeType,
+): TraceItemAttribute[] {
+  if (!Array.isArray(body)) {
+    return [];
+  }
+
+  const attributes: TraceItemAttribute[] = [];
+  for (const value of body) {
+    if (!isRecord(value) || typeof value.key !== "string") {
+      continue;
+    }
+
+    const attribute: TraceItemAttribute = {
+      key: value.key,
+      name: typeof value.name === "string" ? value.name : value.key,
+      type: isTraceItemAttributeType(value.attributeType)
+        ? value.attributeType
+        : fallbackType,
+    };
+
+    if (value.attributeSource !== undefined) {
+      attribute.attributeSource = value.attributeSource;
+    }
+    if (Array.isArray(value.secondaryAliases)) {
+      attribute.secondaryAliases = value.secondaryAliases.filter(
+        (alias): alias is string => typeof alias === "string",
+      );
+    }
+    attributes.push(attribute);
+  }
+
+  return attributes;
+}
+
 /**
  * Sentry API client service for interacting with Sentry's REST API.
  *
@@ -1617,90 +1680,132 @@ export class SentryApiService {
       statsPeriod,
       start,
       end,
+      attributeTypes = ["string", "number"],
+      substringMatch,
+      query,
     }: {
       organizationSlug: string;
-      itemType?: "spans" | "logs" | "tracemetrics";
+      itemType?: TraceItemType;
+      project?: string;
+      statsPeriod?: string;
+      start?: string;
+      end?: string;
+      attributeTypes?: TraceItemAttributeType[];
+      substringMatch?: string;
+      query?: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<TraceItemAttribute[]> {
+    const uniqueAttributeTypes = Array.from(new Set(attributeTypes));
+    const attributeResponses = await Promise.all(
+      uniqueAttributeTypes.map((attributeType) =>
+        this.fetchTraceItemAttributesByType(
+          organizationSlug,
+          itemType,
+          attributeType,
+          project,
+          statsPeriod,
+          start,
+          end,
+          substringMatch,
+          query,
+          opts,
+        ),
+      ),
+    );
+
+    return attributeResponses.flat();
+  }
+
+  async validateTraceItemAttributes(
+    {
+      organizationSlug,
+      itemType = "spans",
+      attributes,
+      project,
+      statsPeriod,
+      start,
+      end,
+    }: {
+      organizationSlug: string;
+      itemType?: TraceItemType;
+      attributes: string[];
       project?: string;
       statsPeriod?: string;
       start?: string;
       end?: string;
     },
     opts?: RequestOptions,
-  ): Promise<Array<{ key: string; name: string; type: "string" | "number" }>> {
-    // Fetch both string and number attributes
-    const [stringAttributes, numberAttributes] = await Promise.all([
-      this.fetchTraceItemAttributesByType(
-        organizationSlug,
-        itemType,
-        "string",
-        project,
-        statsPeriod,
-        start,
-        end,
-        opts,
-      ),
-      this.fetchTraceItemAttributesByType(
-        organizationSlug,
-        itemType,
-        "number",
-        project,
-        statsPeriod,
-        start,
-        end,
-        opts,
-      ),
-    ]);
+  ): Promise<Record<string, TraceItemAttributeValidationResult>> {
+    const queryParams = new URLSearchParams();
+    queryParams.set("itemType", itemType);
+    if (project) {
+      queryParams.set("project", project);
+    }
+    this.applyTimeParams(queryParams, statsPeriod, start, end);
 
-    // Combine attributes with explicit type information
-    const allAttributes: Array<{
-      key: string;
-      name: string;
-      type: "string" | "number";
-    }> = [];
+    const body = await this.requestJSON(
+      `/organizations/${organizationSlug}/trace-items/attributes/validate/?${queryParams.toString()}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ attributes }),
+      },
+      opts,
+    );
 
-    // Add string attributes
-    for (const attr of stringAttributes) {
-      allAttributes.push({
-        key: attr.key,
-        name: attr.name || attr.key,
-        type: "string",
-      });
+    if (!isRecord(body) || !isRecord(body.attributes)) {
+      return {};
     }
 
-    // Add number attributes
-    for (const attr of numberAttributes) {
-      allAttributes.push({
-        key: attr.key,
-        name: attr.name || attr.key,
-        type: "number",
-      });
+    const results: Record<string, TraceItemAttributeValidationResult> = {};
+    for (const [attribute, value] of Object.entries(body.attributes)) {
+      if (!isRecord(value) || typeof value.valid !== "boolean") {
+        continue;
+      }
+      const validationResult: TraceItemAttributeValidationResult = {
+        valid: value.valid,
+      };
+      if (isTraceItemAttributeType(value.type)) {
+        validationResult.type = value.type;
+      }
+      if (typeof value.error === "string") {
+        validationResult.error = value.error;
+      }
+      results[attribute] = validationResult;
     }
-
-    return allAttributes;
+    return results;
   }
 
   private async fetchTraceItemAttributesByType(
     organizationSlug: string,
-    itemType: "spans" | "logs" | "tracemetrics",
-    attributeType: "string" | "number",
+    itemType: TraceItemType,
+    attributeType: TraceItemAttributeType,
     project?: string,
     statsPeriod?: string,
     start?: string,
     end?: string,
+    substringMatch?: string,
+    query?: string,
     opts?: RequestOptions,
-  ): Promise<any> {
+  ): Promise<TraceItemAttribute[]> {
     const queryParams = new URLSearchParams();
     queryParams.set("itemType", itemType);
     queryParams.set("attributeType", attributeType);
     if (project) {
       queryParams.set("project", project);
     }
+    if (substringMatch) {
+      queryParams.set("substringMatch", substringMatch);
+    }
+    if (query) {
+      queryParams.set("query", query);
+    }
     this.applyTimeParams(queryParams, statsPeriod, start, end);
 
     const url = `/organizations/${organizationSlug}/trace-items/attributes/?${queryParams.toString()}`;
 
     const body = await this.requestJSON(url, undefined, opts);
-    return Array.isArray(body) ? body : [];
+    return parseTraceItemAttributes(body, attributeType);
   }
 
   /**

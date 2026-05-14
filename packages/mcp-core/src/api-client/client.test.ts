@@ -1097,6 +1097,138 @@ describe("API query builders", () => {
     });
   });
 
+  describe("trace item attributes", () => {
+    it("should list targeted attribute types with query filters", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+      const urls: string[] = [];
+
+      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+        urls.push(url);
+        const requestUrl = new URL(url);
+        const attributeType = requestUrl.searchParams.get("attributeType");
+        const body =
+          attributeType === "boolean"
+            ? [
+                {
+                  key: "tags[enabled,boolean]",
+                  name: "enabled",
+                  attributeType: "boolean",
+                },
+              ]
+            : [
+                {
+                  key: "tags[type]",
+                  name: "type",
+                  attributeType: "string",
+                },
+              ];
+
+        return Promise.resolve({
+          ok: true,
+          headers: {
+            get: (key: string) =>
+              key === "content-type" ? "application/json" : null,
+          },
+          json: () => Promise.resolve(body),
+        });
+      });
+
+      const result = await apiService.listTraceItemAttributes({
+        organizationSlug: "test-org",
+        itemType: "spans",
+        project: "123",
+        statsPeriod: "7d",
+        attributeTypes: ["string", "boolean"],
+        substringMatch: "tags[",
+        query: 'transaction:"VPN connections"',
+      });
+
+      expect(result).toEqual([
+        {
+          key: "tags[type]",
+          name: "type",
+          type: "string",
+        },
+        {
+          key: "tags[enabled,boolean]",
+          name: "enabled",
+          type: "boolean",
+        },
+      ]);
+      expect(urls).toHaveLength(2);
+      for (const url of urls) {
+        const params = new URL(url).searchParams;
+        expect(params.get("itemType")).toBe("spans");
+        expect(params.get("project")).toBe("123");
+        expect(params.get("statsPeriod")).toBe("7d");
+        expect(params.get("substringMatch")).toBe("tags[");
+        expect(params.get("query")).toBe('transaction:"VPN connections"');
+      }
+      expect(
+        urls.map((url) => new URL(url).searchParams.get("attributeType")),
+      ).toEqual(["string", "boolean"]);
+    });
+
+    it("should validate exact trace item attributes", async () => {
+      const apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+      let requestUrl: string | undefined;
+      let requestOptions: RequestInit | undefined;
+
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((url: string, options: RequestInit) => {
+          requestUrl = url;
+          requestOptions = options;
+          return Promise.resolve({
+            ok: true,
+            headers: {
+              get: (key: string) =>
+                key === "content-type" ? "application/json" : null,
+            },
+            json: () =>
+              Promise.resolve({
+                attributes: {
+                  "tags[type]": { valid: true, type: "string" },
+                  "tags[missing]": {
+                    valid: false,
+                    error: "Unknown attribute: tags[missing]",
+                  },
+                },
+              }),
+          });
+        });
+
+      const result = await apiService.validateTraceItemAttributes({
+        organizationSlug: "test-org",
+        itemType: "spans",
+        attributes: ["tags[type]", "tags[missing]"],
+        project: "123",
+        statsPeriod: "7d",
+      });
+
+      expect(result).toEqual({
+        "tags[type]": { valid: true, type: "string" },
+        "tags[missing]": {
+          valid: false,
+          error: "Unknown attribute: tags[missing]",
+        },
+      });
+      expect(requestUrl).toContain(
+        "/api/0/organizations/test-org/trace-items/attributes/validate/?itemType=spans&project=123&statsPeriod=7d",
+      );
+      expect(requestOptions?.method).toBe("POST");
+      expect(JSON.parse(String(requestOptions?.body))).toEqual({
+        attributes: ["tags[type]", "tags[missing]"],
+      });
+    });
+  });
+
   describe("Web URL builders", () => {
     describe("buildDiscoverUrl", () => {
       it("should build correct URL for errors dataset on SaaS", () => {

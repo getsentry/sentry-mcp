@@ -17,6 +17,68 @@ export function formatExplanation(explanation: string): string {
   return `## How I interpreted your query\n\n${explanation}`;
 }
 
+interface SearchTimeRange {
+  statsPeriod?: string;
+  start?: string;
+  end?: string;
+}
+
+export interface ExecutedSearch {
+  dataset: string;
+  query: string;
+  fields?: string[];
+  sort?: string;
+  timeRange?: SearchTimeRange;
+}
+
+function formatInlineCode(value: string): string {
+  return `\`${value.replace(/`/g, "\\`")}\``;
+}
+
+function formatExecutedTimeRange(timeRange?: SearchTimeRange): string {
+  if (!timeRange) {
+    return "Last 14d";
+  }
+  if (timeRange.statsPeriod) {
+    return `Last ${timeRange.statsPeriod}`;
+  }
+  if (timeRange.start && timeRange.end) {
+    return `${timeRange.start} to ${timeRange.end}`;
+  }
+  return "Last 14d";
+}
+
+export function formatExecutedSearch(executedSearch?: ExecutedSearch): string {
+  if (!executedSearch) {
+    return "";
+  }
+
+  const fields =
+    executedSearch.fields === undefined
+      ? undefined
+      : executedSearch.fields.length > 0
+        ? executedSearch.fields.map(formatInlineCode).join(", ")
+        : "(none)";
+
+  const lines = [
+    "## Executed Search",
+    `- Dataset: ${formatInlineCode(executedSearch.dataset)}`,
+    `- Query: ${formatInlineCode(executedSearch.query || "(empty)")}`,
+  ];
+
+  if (fields !== undefined) {
+    lines.push(`- Fields: ${fields}`);
+  }
+  if (executedSearch.sort) {
+    lines.push(`- Sort: ${formatInlineCode(executedSearch.sort)}`);
+  }
+  lines.push(
+    `- Time range: ${formatExecutedTimeRange(executedSearch.timeRange)}`,
+  );
+
+  return `${lines.join("\n")}\n\n`;
+}
+
 /**
  * Common parameters for event formatters
  */
@@ -30,6 +92,7 @@ export interface FormatEventResultsParams {
   sentryQuery: string;
   fields: string[];
   explanation?: string;
+  executedSearch?: ExecutedSearch;
 }
 
 function formatUserFieldLines(
@@ -83,6 +146,8 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
     output += formatExplanation(explanation);
     output += `\n\n`;
   }
+
+  output += formatExecutedSearch(params.executedSearch);
 
   output += `**View these results in Sentry**:\n${explorerUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
@@ -216,6 +281,8 @@ export function formatLogResults(params: FormatEventResultsParams): string {
     output += formatExplanation(explanation);
     output += `\n\n`;
   }
+
+  output += formatExecutedSearch(params.executedSearch);
 
   output += `**View these results in Sentry**:\n${explorerUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
@@ -372,6 +439,8 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
     output += formatExplanation(explanation);
     output += `\n\n`;
   }
+
+  output += formatExecutedSearch(params.executedSearch);
 
   output += `**View these results in Sentry**:\n${explorerUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
@@ -559,6 +628,8 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
     output += `\n\n`;
   }
 
+  output += formatExecutedSearch(params.executedSearch);
+
   output += `**View these results in Sentry**:\n${explorerUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
 
@@ -702,6 +773,8 @@ export function formatTraceMetricsResults(
     output += formatExplanation(explanation);
     output += `\n\n`;
   }
+
+  output += formatExecutedSearch(params.executedSearch);
 
   output += `**View these results in Sentry**:\n${explorerUrl}\n`;
   output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
