@@ -825,6 +825,39 @@ export const restHandlers = buildHandlers([
     fetch: () => HttpResponse.json(tagsFixture),
   },
   {
+    method: "post",
+    path: "/api/0/organizations/sentry-mcp-evals/trace-items/attributes/validate/",
+    fetch: async ({ request }) => {
+      const body = (await request.json().catch(() => null)) as unknown;
+      const attributesValue =
+        typeof body === "object" && body !== null && "attributes" in body
+          ? body.attributes
+          : undefined;
+      const attributes = Array.isArray(attributesValue)
+        ? attributesValue.filter(
+            (attribute): attribute is string => typeof attribute === "string",
+          )
+        : [];
+
+      return HttpResponse.json({
+        attributes: Object.fromEntries(
+          attributes.map((attribute) => [
+            attribute,
+            {
+              valid: true,
+              type:
+                attribute.includes("sequence") ||
+                attribute.includes("count") ||
+                attribute.includes("duration")
+                  ? "number"
+                  : "string",
+            },
+          ]),
+        ),
+      });
+    },
+  },
+  {
     method: "get",
     path: "/api/0/organizations/sentry-mcp-evals/trace-items/attributes/",
     fetch: ({ request }) => {
