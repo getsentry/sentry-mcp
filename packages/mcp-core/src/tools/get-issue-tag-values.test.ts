@@ -126,34 +126,20 @@ describe("get_issue_tag_values", () => {
     ).rejects.toThrow(UserInputError);
   });
 
-  it("throws error when tagKey contains path traversal characters", async () => {
-    await expect(
-      getIssueTagValues.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          tagKey: "../../../admin",
-          regionUrl: null,
-          issueUrl: undefined,
-        },
-        getServerContext(),
-      ),
-    ).rejects.toThrow();
+  it("rejects tagKey with path traversal characters in the input schema", () => {
+    expect(() =>
+      getIssueTagValues.inputSchema.tagKey.parse("../../../admin"),
+    ).toThrow(
+      /Tag key must contain only alphanumeric characters, dots, hyphens, and underscores/,
+    );
   });
 
-  it("throws error when tagKey contains slashes", async () => {
-    await expect(
-      getIssueTagValues.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          tagKey: "url/path",
-          regionUrl: null,
-          issueUrl: undefined,
-        },
-        getServerContext(),
-      ),
-    ).rejects.toThrow();
+  it("rejects tagKey with slashes in the input schema", () => {
+    expect(() =>
+      getIssueTagValues.inputSchema.tagKey.parse("url/path"),
+    ).toThrow(
+      /Tag key must contain only alphanumeric characters, dots, hyphens, and underscores/,
+    );
   });
 
   it("handles null values in topValues gracefully", async () => {

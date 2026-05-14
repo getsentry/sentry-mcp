@@ -1000,8 +1000,7 @@ export const restHandlers = buildHandlers([
   {
     method: "post",
     path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/teams/:teamSlug/",
-    fetch: async ({ request, params }) => {
-      const body = (await request.json()) as any;
+    fetch: async ({ params }) => {
       const teamSlug = params.teamSlug as string;
       return HttpResponse.json({
         ...teamFixture,

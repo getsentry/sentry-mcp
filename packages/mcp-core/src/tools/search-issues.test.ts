@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchIssues from "./search-issues";
 import { generateText } from "ai";
+import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServerContext } from "../types";
+import searchIssues from "./search-issues";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -282,8 +282,9 @@ describe("search_issues", () => {
     mswServer.use(
       http.get("*/api/0/organizations/*/issues/", ({ request }) => {
         const url = new URL(request.url);
-        const perPage = url.searchParams.get("per_page");
-        expect(perPage).toBe("25");
+        // The SDK sends `limit` (not `per_page`) for this endpoint
+        const limit = url.searchParams.get("limit");
+        expect(limit).toBe("25");
         return HttpResponse.json([]);
       }),
     );

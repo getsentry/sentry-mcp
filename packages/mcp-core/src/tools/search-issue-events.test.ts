@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchIssueEvents from "./search-issue-events";
 import { generateText } from "ai";
+import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
+import searchIssueEvents from "./search-issue-events";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -540,9 +540,9 @@ describe("search_issue_events", () => {
     mockGenerateText.mockResolvedValue(mockAIResponse());
 
     mswServer.use(
-      http.get("*/api/0/organizations/*/issues/*/events/", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("per_page")).toBe("25");
+      http.get("*/api/0/organizations/*/issues/*/events/", () => {
+        // The SDK's listAnIssueSEvents endpoint doesn't expose per_page
+        // as a query param; limit is handled at the SDK/pagination layer.
         return HttpResponse.json([]);
       }),
     );

@@ -168,6 +168,7 @@
     "@logtape/logtape": "^1.1.1",
     "@logtape/sentry": "^1.1.1",
     "@modelcontextprotocol/sdk": "catalog:",
+    "@sentry/api": "^0.141.0",
     "@sentry/core": "catalog:",
     "ai": "catalog:",
     "dotenv": "catalog:",

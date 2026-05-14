@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchEvents from "./search-events";
 import { generateText } from "ai";
+import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserInputError } from "../errors";
+import searchEvents from "./search-events";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
