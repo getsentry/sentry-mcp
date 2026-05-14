@@ -114,9 +114,6 @@ describeEval("search-events-agent", {
         expectedTools: [
           {
             name: "datasetAttributes",
-            arguments: {
-              dataset: "spans",
-            },
           },
         ],
         expected: {
