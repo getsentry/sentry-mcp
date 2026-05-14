@@ -129,6 +129,24 @@ function appendSearchFilter(query: string, filter?: string): string {
   return [trimmedQuery, filter].filter(Boolean).join(" ");
 }
 
+function choosePreservingRepairedQuery(params: {
+  originalQuery: string;
+  repairedQuery?: string | null;
+  filter?: string;
+}): string {
+  const originalQuery = params.originalQuery.trim();
+  const repairedQuery = params.repairedQuery?.trim();
+  if (!repairedQuery) {
+    return appendSearchFilter(originalQuery, params.filter);
+  }
+
+  if (!originalQuery || repairedQuery.includes(originalQuery)) {
+    return appendSearchFilter(repairedQuery, params.filter);
+  }
+
+  return appendSearchFilter(originalQuery, params.filter);
+}
+
 function buildSearchRepairPrompt(params: {
   query?: string;
   dataset: PublicEventsDataset | "replays";
@@ -317,11 +335,9 @@ export default defineTool({
       hasExplicitDataset && isTraceItemDataset(inputDataset);
     const shouldTrustStructuredTraceSearch =
       hasStructuredQuery && hasExplicitTraceItemDataset;
+    const environmentFilter = formatEnvironmentFilter(params.environment);
     const explicitStructuredTraceQuery = shouldTrustStructuredTraceSearch
-      ? appendSearchFilter(
-          params.query ?? "",
-          formatEnvironmentFilter(params.environment),
-        )
+      ? appendSearchFilter(params.query ?? "", environmentFilter)
       : (params.query ?? "");
     const canRunWithoutAgent =
       shouldTrustStructuredTraceSearch && hasExplicitFields && hasExplicitSort;
@@ -359,7 +375,11 @@ export default defineTool({
         ? inputDataset
         : parsed.dataset;
       sentryQuery = shouldTrustStructuredTraceSearch
-        ? explicitStructuredTraceQuery
+        ? choosePreservingRepairedQuery({
+            originalQuery: params.query ?? "",
+            repairedQuery: parsed.query,
+            filter: environmentFilter,
+          })
         : parsed.query || "";
       sortParam =
         shouldTrustExplicitSearchParams && explicitSort
