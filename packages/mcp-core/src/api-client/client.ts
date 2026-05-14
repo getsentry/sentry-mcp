@@ -2915,7 +2915,7 @@ export class SentryApiService {
     let contentType = response.headers.get("content-type") ?? "";
     if (!contentType.startsWith("image/")) {
       const { detectImageMimeType } = await import("../internal/blob-utils.js");
-      contentType = (await detectImageMimeType(blob)) ?? "image/png";
+      contentType = (await detectImageMimeType(blob)) ?? contentType;
     }
     return { blob, contentType };
   }
