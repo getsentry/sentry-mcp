@@ -66,7 +66,7 @@ export const SKILLS: Record<Skill, SkillDefinition> = {
     name: "Preprod Snapshots",
     description:
       "Inspect visual regression snapshot tests from CI — view changed images and diff masks",
-    defaultEnabled: false,
+    defaultEnabled: true,
     order: 6,
   },
 };
