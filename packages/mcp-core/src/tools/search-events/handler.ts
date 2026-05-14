@@ -129,6 +129,21 @@ function appendSearchFilter(query: string, filter?: string): string {
   return [trimmedQuery, filter].filter(Boolean).join(" ");
 }
 
+function tokenizeSearchQuery(query: string): string[] {
+  return query.split(/\s+/).filter(Boolean);
+}
+
+function containsSearchToken(query: string, token: string): boolean {
+  const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|\\s)${escapedToken}(?=\\s|$)`).test(query);
+}
+
+function preservesSearchTokens(originalQuery: string, repairedQuery: string) {
+  return tokenizeSearchQuery(originalQuery).every((token) =>
+    containsSearchToken(repairedQuery, token),
+  );
+}
+
 function choosePreservingRepairedQuery(params: {
   originalQuery: string;
   repairedQuery?: string | null;
@@ -140,7 +155,7 @@ function choosePreservingRepairedQuery(params: {
     return appendSearchFilter(originalQuery, params.filter);
   }
 
-  if (!originalQuery || repairedQuery.includes(originalQuery)) {
+  if (!originalQuery || preservesSearchTokens(originalQuery, repairedQuery)) {
     return appendSearchFilter(repairedQuery, params.filter);
   }
 
