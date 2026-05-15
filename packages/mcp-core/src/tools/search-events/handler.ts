@@ -28,7 +28,7 @@ import {
   PUBLIC_EVENTS_DATASETS,
   type PublicEventsDataset,
 } from "../../utils/events-datasets";
-import { isAggregateQuery } from "./utils";
+import { isAggregateQuery, looksLikeSentrySearchSyntax } from "./utils";
 import {
   DEFAULT_REPLAY_SORT,
   DEFAULT_REPLAY_STATS_PERIOD,
@@ -38,6 +38,179 @@ import {
 
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 const DEFAULT_EVENTS_SORT = "-timestamp";
+
+function defaultSortForDataset(dataset: PublicEventsDataset | "replays") {
+  return dataset === "replays" ? DEFAULT_REPLAY_SORT : DEFAULT_EVENTS_SORT;
+}
+
+function defaultFieldsForDataset(dataset: PublicEventsDataset): string[] {
+  return RECOMMENDED_FIELDS[normalizeEventsDataset(dataset)].basic;
+}
+
+function resolveEventFields({
+  dataset,
+  explicitFields,
+  agentFields,
+  trustExplicitFields,
+}: {
+  dataset: PublicEventsDataset;
+  explicitFields?: string[] | null;
+  agentFields?: string[];
+  trustExplicitFields: boolean;
+}): string[] {
+  if (trustExplicitFields && explicitFields && explicitFields.length > 0) {
+    return explicitFields;
+  }
+  if (agentFields && agentFields.length > 0) {
+    return agentFields;
+  }
+  return defaultFieldsForDataset(dataset);
+}
+
+function parseAgentTimeRange(
+  timeRange: unknown,
+): { statsPeriod?: string; start?: string; end?: string } | undefined {
+  if (typeof timeRange !== "object" || timeRange === null) {
+    return undefined;
+  }
+
+  if ("statsPeriod" in timeRange && typeof timeRange.statsPeriod === "string") {
+    return { statsPeriod: timeRange.statsPeriod };
+  }
+  if (
+    "start" in timeRange &&
+    "end" in timeRange &&
+    typeof timeRange.start === "string" &&
+    typeof timeRange.end === "string"
+  ) {
+    return { start: timeRange.start, end: timeRange.end };
+  }
+
+  return undefined;
+}
+
+function isTraceItemDataset(dataset: PublicEventsDataset | "replays"): boolean {
+  return dataset === "spans" || dataset === "logs" || dataset === "metrics";
+}
+
+function hasFields(fields?: string[] | null): fields is string[] {
+  return Array.isArray(fields) && fields.length > 0;
+}
+
+function formatSearchValue(value: string): string {
+  return /^[^\s"',[\]]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+function formatEnvironmentFilter(
+  environment?: string | string[] | null,
+): string | undefined {
+  if (!environment) {
+    return undefined;
+  }
+
+  const environments = Array.isArray(environment) ? environment : [environment];
+  if (environments.length === 0) {
+    return undefined;
+  }
+  if (environments.length === 1) {
+    const environmentValue = environments[0];
+    return environmentValue === undefined
+      ? undefined
+      : `environment:${formatSearchValue(environmentValue)}`;
+  }
+  return `environment:[${environments.map(formatSearchValue).join(",")}]`;
+}
+
+function appendSearchFilter(query: string, filter?: string): string {
+  const trimmedQuery = query.trim();
+  if (!filter) {
+    return trimmedQuery;
+  }
+  if (tokenizeSearchQuery(trimmedQuery).includes(filter)) {
+    return trimmedQuery;
+  }
+  return [trimmedQuery, filter].filter(Boolean).join(" ");
+}
+
+function tokenizeSearchQuery(query: string): string[] {
+  const tokens: string[] = [];
+  let currentToken = "";
+  let quote: '"' | "'" | null = null;
+  let escaped = false;
+
+  for (const char of query) {
+    if (escaped) {
+      currentToken += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      currentToken += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      currentToken += char;
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      currentToken += char;
+      quote = char;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (currentToken) {
+        tokens.push(currentToken);
+        currentToken = "";
+      }
+      continue;
+    }
+
+    currentToken += char;
+  }
+
+  if (currentToken) {
+    tokens.push(currentToken);
+  }
+
+  return tokens;
+}
+
+function containsSearchToken(query: string, token: string): boolean {
+  const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|\\s)${escapedToken}(?=\\s|$)`).test(query);
+}
+
+function preservesSearchTokens(originalQuery: string, repairedQuery: string) {
+  return tokenizeSearchQuery(originalQuery).every((token) =>
+    containsSearchToken(repairedQuery, token),
+  );
+}
+
+function choosePreservingRepairedQuery(params: {
+  originalQuery: string;
+  repairedQuery?: string | null;
+  filter?: string;
+}): string {
+  const originalQuery = params.originalQuery.trim();
+  const repairedQuery = params.repairedQuery?.trim();
+  if (!repairedQuery) {
+    return appendSearchFilter(originalQuery, params.filter);
+  }
+
+  if (!originalQuery || preservesSearchTokens(originalQuery, repairedQuery)) {
+    return appendSearchFilter(repairedQuery, params.filter);
+  }
+
+  return appendSearchFilter(originalQuery, params.filter);
+}
 
 function buildSearchRepairPrompt(params: {
   query?: string;
@@ -51,6 +224,9 @@ function buildSearchRepairPrompt(params: {
     "Fix this Sentry event search request.",
     "The query may be natural language or already-valid Sentry search syntax.",
     "Preserve valid explicit parameters, but correct dataset, query syntax, fields, sort, and time range when they conflict or would fail.",
+    "If the user query already uses Sentry search syntax, treat its filters as authoritative unless validation proves a field is invalid.",
+    "For spans, logs, and metrics, use datasetAttributes exact attribute validation for explicit fields or query filters before dropping or renaming them.",
+    "A broad datasetAttributes result may be truncated, so absence from that preview does not prove an explicit field is invalid.",
     "For non-replay datasets, convert environment parameters into query filters. For replays, keep environment in the separate environment parameter.",
     "",
     `User query: ${params.query || "(empty)"}`,
@@ -181,11 +357,17 @@ export default defineTool({
     if (params.projectSlug) setTag("project.slug", params.projectSlug);
 
     const inputDataset = params.dataset ?? "errors";
+    const hasStructuredQuery = looksLikeSentrySearchSyntax(params.query);
+    const canApplyEnvironmentFilter =
+      inputDataset !== "replays" &&
+      isTraceItemDataset(inputDataset) &&
+      hasStructuredQuery;
 
     if (
       !hasAgentProvider() &&
       inputDataset !== "replays" &&
-      params.environment
+      params.environment &&
+      !canApplyEnvironmentFilter
     ) {
       throw new UserInputError(
         "The `environment` parameter is only supported for dataset='replays'. For other datasets, include environment filtering in the query string instead.",
@@ -209,7 +391,23 @@ export default defineTool({
     let explanation: string | undefined;
     let environment: string | string[] | null | undefined = params.environment;
 
-    if (hasAgentProvider()) {
+    const explicitSort = params.sort?.trim() || undefined;
+    const hasExplicitDataset = params.dataset !== undefined;
+    const hasExplicitFields = hasFields(params.fields);
+    const hasExplicitSort = explicitSort !== undefined;
+    const hasExplicitStatsPeriod = params.statsPeriod !== undefined;
+    const hasExplicitTraceItemDataset =
+      hasExplicitDataset && isTraceItemDataset(inputDataset);
+    const shouldTrustStructuredTraceSearch =
+      hasStructuredQuery && hasExplicitTraceItemDataset;
+    const environmentFilter = formatEnvironmentFilter(params.environment);
+    const explicitStructuredTraceQuery = shouldTrustStructuredTraceSearch
+      ? appendSearchFilter(params.query ?? "", environmentFilter)
+      : (params.query ?? "");
+    const canRunWithoutAgent =
+      shouldTrustStructuredTraceSearch && hasExplicitFields && hasExplicitSort;
+
+    if (hasAgentProvider() && !canRunWithoutAgent) {
       const agentResult = await searchEventsAgent({
         query: buildSearchRepairPrompt({
           query: params.query,
@@ -225,52 +423,62 @@ export default defineTool({
       });
 
       const parsed = agentResult.result;
+      const shouldTrustExplicitSearchParams =
+        shouldTrustStructuredTraceSearch ||
+        (hasStructuredQuery && parsed.dataset === inputDataset);
 
-      if (!parsed.sort?.trim()) {
+      if (
+        !parsed.sort?.trim() &&
+        !(shouldTrustExplicitSearchParams && hasExplicitSort)
+      ) {
         throw new UserInputError(
           `Search Events Agent response missing required 'sort' parameter. Received: ${JSON.stringify(parsed, null, 2)}. The agent must specify how to sort results (e.g., '-timestamp' for newest first).`,
         );
       }
 
-      dataset = parsed.dataset;
-      sentryQuery = parsed.query || "";
-      sortParam = parsed.sort.trim();
+      dataset = shouldTrustStructuredTraceSearch
+        ? inputDataset
+        : parsed.dataset;
+      sentryQuery = shouldTrustStructuredTraceSearch
+        ? choosePreservingRepairedQuery({
+            originalQuery: params.query ?? "",
+            repairedQuery: parsed.query,
+            filter: environmentFilter,
+          })
+        : parsed.query || "";
+      sortParam =
+        shouldTrustExplicitSearchParams && explicitSort
+          ? explicitSort
+          : parsed.sort?.trim() || defaultSortForDataset(dataset);
       explanation = parsed.explanation;
-      environment = parsed.environment;
+      environment = params.environment ?? parsed.environment;
 
-      timeParams = {};
-      if (parsed.timeRange) {
-        if ("statsPeriod" in parsed.timeRange) {
-          timeParams.statsPeriod = parsed.timeRange.statsPeriod;
-        } else if ("start" in parsed.timeRange && "end" in parsed.timeRange) {
-          timeParams.start = parsed.timeRange.start;
-          timeParams.end = parsed.timeRange.end;
-        }
-      } else {
-        timeParams.statsPeriod = "14d";
-      }
+      timeParams =
+        shouldTrustExplicitSearchParams && hasExplicitStatsPeriod
+          ? { statsPeriod: params.statsPeriod }
+          : (parseAgentTimeRange(parsed.timeRange) ?? { statsPeriod: "14d" });
 
       if (dataset === "replays") {
         fields = [];
       } else {
-        const requestedFields = parsed.fields || [];
-        fields =
-          requestedFields.length > 0
-            ? requestedFields
-            : RECOMMENDED_FIELDS[normalizeEventsDataset(dataset)].basic;
+        fields = resolveEventFields({
+          dataset,
+          explicitFields: params.fields,
+          agentFields: parsed.fields,
+          trustExplicitFields: shouldTrustExplicitSearchParams,
+        });
       }
     } else {
       dataset = inputDataset;
-      sentryQuery = params.query ?? "";
-      sortParam =
-        params.sort ||
-        (dataset === "replays" ? DEFAULT_REPLAY_SORT : DEFAULT_EVENTS_SORT);
+      sentryQuery = shouldTrustStructuredTraceSearch
+        ? explicitStructuredTraceQuery
+        : (params.query ?? "");
+      sortParam = explicitSort || defaultSortForDataset(dataset);
       timeParams = { statsPeriod: params.statsPeriod ?? "14d" };
       fields =
         dataset === "replays"
           ? []
-          : (params.fields ??
-            RECOMMENDED_FIELDS[normalizeEventsDataset(dataset)].basic);
+          : (params.fields ?? defaultFieldsForDataset(dataset));
     }
 
     if (dataset === "replays") {
@@ -324,6 +532,13 @@ export default defineTool({
         environment,
         explanation,
         timeRange: replayTimeParams,
+        executedSearch: {
+          dataset,
+          query: sentryQuery,
+          fields: [],
+          sort: replaySort,
+          timeRange: replayTimeParams,
+        },
       });
     }
 
@@ -401,6 +616,13 @@ export default defineTool({
       sentryQuery,
       fields,
       explanation,
+      executedSearch: {
+        dataset,
+        query: sentryQuery,
+        fields,
+        sort: sortParam,
+        timeRange: timeParams,
+      },
     };
 
     switch (dataset) {

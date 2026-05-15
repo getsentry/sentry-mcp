@@ -106,6 +106,35 @@ describeEval("search-events-agent", {
         },
       },
       {
+        // User-supplied Sentry syntax should remain authoritative. The agent
+        // can validate fields, but it should not rewrite or drop explicit
+        // filters/fields while translating the request.
+        input:
+          'In spans, search for transaction:"VPN connections" tags[type]:Unified tags[country]:CN over the last 7 days. Return tags[type], tags[sequence], and count(), sorted by count descending.',
+        expectedTools: [
+          {
+            name: "datasetAttributes",
+          },
+        ],
+        expected: {
+          dataset: "spans",
+          query: (value: unknown) =>
+            typeof value === "string" &&
+            [
+              'transaction:"VPN connections"',
+              "tags[type]:Unified",
+              "tags[country]:CN",
+            ].every((token) => value.includes(token)),
+          fields: (value: unknown) =>
+            Array.isArray(value) &&
+            ["tags[type]", "tags[sequence]", "count()"].every((field) =>
+              value.includes(field),
+            ),
+          sort: "-count()",
+          timeRange: { statsPeriod: "7d" },
+        },
+      },
+      {
         // Query requiring equation field calculation
         input: "How many total tokens did we consume yesterday",
         expectedTools: [

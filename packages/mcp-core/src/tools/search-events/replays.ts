@@ -1,4 +1,5 @@
 import type { ReplayDetails, SentryApiService } from "../../api-client";
+import { formatExecutedSearch, type ExecutedSearch } from "./formatters";
 
 export const DEFAULT_REPLAY_SORT = "-started_at";
 export const DEFAULT_REPLAY_STATS_PERIOD = "14d";
@@ -56,6 +57,7 @@ export interface FormatReplayResultsParams {
   environment?: string | string[] | null;
   explanation?: string;
   timeRange?: ReplayTimeRange;
+  executedSearch?: ExecutedSearch;
 }
 
 export function isValidReplaySort(sort: string): boolean {
@@ -95,6 +97,8 @@ export function formatReplayResults(params: FormatReplayResultsParams): string {
       output += `## How I interpreted your query\n\n${explanation}\n\n`;
     }
   }
+
+  output += formatExecutedSearch(params.executedSearch);
 
   output += `**View these results in Sentry**:\n${searchUrl}\n`;
   output +=
