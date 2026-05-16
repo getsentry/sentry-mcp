@@ -46,10 +46,10 @@ team:write
 event:write
 ```
 
-Launch the transport:
+Launch the transport with your token in the environment:
 
 ```shell
-npx @sentry/mcp-server@latest --access-token=sentry-user-token
+SENTRY_ACCESS_TOKEN=sentry-user-token npx @sentry/mcp-server@latest
 ```
 
 Need to connect to a self-hosted deployment? Add <code>--host</code> (hostname
@@ -61,13 +61,13 @@ Some features (like Seer) may not be available on self-hosted instances. You can
 disable specific skills to prevent unsupported tools from being exposed:
 
 ```shell
-npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.example.com --disable-skills=seer
+SENTRY_ACCESS_TOKEN=TOKEN npx @sentry/mcp-server@latest --host=sentry.example.com --disable-skills=seer
 ```
 
 For self-hosted instances without TLS:
 
 ```shell
-npx @sentry/mcp-server@latest --access-token=TOKEN --host=sentry.internal:9000 --insecure-http
+SENTRY_ACCESS_TOKEN=TOKEN npx @sentry/mcp-server@latest --host=sentry.internal:9000 --insecure-http
 ```
 
 #### Environment Variables
@@ -222,7 +222,7 @@ pnpm -w run cli --agent "who am I?"
 pnpm -w run cli --mcp-host=https://mcp.sentry.dev "query"
 
 # Test with local stdio mode (requires SENTRY_ACCESS_TOKEN)
-pnpm -w run cli --access-token=TOKEN "query"
+SENTRY_ACCESS_TOKEN=TOKEN pnpm -w run cli "query"
 ```
 
 Note: The CLI defaults to `http://localhost:5173`. Override with `--mcp-host` or set `MCP_URL` environment variable.

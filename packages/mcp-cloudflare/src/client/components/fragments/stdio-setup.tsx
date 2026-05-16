@@ -10,10 +10,10 @@ const orderedSkills = [...skillDefinitions].sort((a, b) => a.order - b.order);
 
 export default function StdioSetup() {
   const mcpStdioSnippet = `npx ${NPM_PACKAGE_NAME}@latest`;
+  const mcpStdioWithTokenSnippet = `SENTRY_ACCESS_TOKEN=sentry-user-token ${mcpStdioSnippet}`;
 
   const selfHostedHostExample = [
-    `${mcpStdioSnippet}`,
-    "--access-token=sentry-user-token",
+    `${mcpStdioWithTokenSnippet}`,
     "--host=sentry.example.com",
   ].join(" \\\n  ");
 
@@ -60,10 +60,7 @@ export default function StdioSetup() {
         </ul>
         <p>Now wire up that token to the MCP configuration:</p>
         <CodeSnippet
-          snippet={[
-            `${mcpStdioSnippet}`,
-            "--access-token=sentry-user-token",
-          ].join(" \\\n  ")}
+          snippet={mcpStdioWithTokenSnippet}
         />
         <div className="mt-6">
           <h4 className="text-base font-semibold text-slate-100">
