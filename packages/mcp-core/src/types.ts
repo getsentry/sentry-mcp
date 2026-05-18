@@ -50,6 +50,8 @@ export type ServerContext = {
   userId?: string | null;
   userIpAddress?: string | null;
   clientId?: string;
+  /** Unique identifier for this MCP session, used for cross-call correlation in telemetry */
+  sessionId?: string;
   /** Primary authorization method - granted skills for tool access control */
   grantedSkills?: Set<Skill> | ReadonlySet<Skill>;
   // URL-based session constraints

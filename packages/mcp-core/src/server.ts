@@ -307,6 +307,10 @@ function configureServer({
           }
         }
 
+        if (activeSpan && context.sessionId) {
+          activeSpan.setAttribute("mcp.session.id", context.sessionId);
+        }
+
         if (context.userId) {
           const user = {
             id: context.userId,

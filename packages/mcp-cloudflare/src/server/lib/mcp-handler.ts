@@ -310,6 +310,15 @@ const mcpHandler: ExportedHandler<Env> = {
 
     const constraints = verification.constraints;
 
+    // Extract MCP session ID from the protocol layer for cross-call correlation.
+    // Streamable HTTP: mcp-session-id header (absent on initialize, present after).
+    // SSE: sessionId query parameter.
+    // Absent on the initialize request — left undefined rather than fabricating one.
+    const sessionId =
+      request.headers.get("mcp-session-id") ||
+      url.searchParams.get("sessionId") ||
+      undefined;
+
     // Build complete ServerContext from OAuth props + verified constraints.
     // Latched so use_sentry's multi-tool runs revoke at most once per request.
     let upstreamUnauthorizedHandled = false;
@@ -325,6 +334,7 @@ const mcpHandler: ExportedHandler<Env> = {
       agentMode: isAgentMode,
       experimentalMode: isExperimentalMode,
       transport: "http",
+      sessionId,
       onUpstreamUnauthorized: () => {
         if (upstreamUnauthorizedHandled) return;
         upstreamUnauthorizedHandled = true;

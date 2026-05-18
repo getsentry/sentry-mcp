@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { setUser } from "@sentry/core";
+import { setUser, getActiveSpan } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "./server";
 import type { ToolConfig } from "./tools/types";
@@ -110,6 +110,93 @@ describe("buildServer", () => {
         id: "user-123",
         ip_address: "192.0.2.1",
       });
+    });
+
+    it("sets session ID as span attribute for tool calls", async () => {
+      const mockSpan = {
+        setAttribute: vi.fn(),
+        setStatus: vi.fn(),
+        recordException: vi.fn(),
+      };
+      vi.mocked(getActiveSpan).mockReturnValue(
+        mockSpan as unknown as ReturnType<typeof getActiveSpan>,
+      );
+
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          userId: "user-123",
+          sessionId: "test-session-abc",
+        },
+        tools: {
+          example_tool: createMockTool("example_tool", {
+            annotations: { readOnlyHint: true },
+          }),
+        },
+      });
+      const registeredTools = (
+        server as unknown as {
+          _registeredTools: Record<
+            string,
+            {
+              handler: (
+                params: Record<string, unknown>,
+                extra: unknown,
+              ) => Promise<unknown>;
+            }
+          >;
+        }
+      )._registeredTools;
+
+      await registeredTools.example_tool?.handler({}, {});
+
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        "mcp.session.id",
+        "test-session-abc",
+      );
+    });
+
+    it("does not set session ID span attribute when sessionId is absent", async () => {
+      const mockSpan = {
+        setAttribute: vi.fn(),
+        setStatus: vi.fn(),
+        recordException: vi.fn(),
+      };
+      vi.mocked(getActiveSpan).mockReturnValue(
+        mockSpan as unknown as ReturnType<typeof getActiveSpan>,
+      );
+
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          userId: "user-123",
+        },
+        tools: {
+          example_tool: createMockTool("example_tool", {
+            annotations: { readOnlyHint: true },
+          }),
+        },
+      });
+      const registeredTools = (
+        server as unknown as {
+          _registeredTools: Record<
+            string,
+            {
+              handler: (
+                params: Record<string, unknown>,
+                extra: unknown,
+              ) => Promise<unknown>;
+            }
+          >;
+        }
+      )._registeredTools;
+
+      await registeredTools.example_tool?.handler({}, {});
+
+      expect(mockSpan.setAttribute).not.toHaveBeenCalledWith(
+        "mcp.session.id",
+        expect.anything(),
+      );
     });
   });
 
