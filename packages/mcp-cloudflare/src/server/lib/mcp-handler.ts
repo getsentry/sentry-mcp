@@ -374,6 +374,7 @@ const mcpHandler: ExportedHandler<Env> = {
     // Run MCP handler - context already captured in closures
     return createMcpHandler(server, {
       route: url.pathname,
+      sessionIdGenerator: () => crypto.randomUUID(),
     })(request, env, ctx);
   },
 };
