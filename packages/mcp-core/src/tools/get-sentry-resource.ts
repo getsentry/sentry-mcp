@@ -30,6 +30,8 @@ export const FULLY_SUPPORTED_TYPES = [
   "ai_conversation",
   "breadcrumbs",
   "replay",
+  "snapshot",
+  "snapshotImage",
 ] as const;
 export type FullySupportedType = (typeof FULLY_SUPPORTED_TYPES)[number];
 
@@ -40,8 +42,7 @@ export type RecognizedType = "monitor" | "release";
 export type ResolvedResourceType =
   | FullySupportedType
   | RecognizedType
-  | "profile"
-  | "snapshot";
+  | "profile";
 
 export interface ResolvedResourceParams {
   type: ResolvedResourceType;
@@ -166,6 +167,24 @@ export function resolveResourceParams(params: {
         organizationSlug,
         replayId: resourceId,
       };
+
+    case "snapshot":
+      return {
+        type: "snapshot",
+        organizationSlug,
+        snapshotId: resourceId,
+      };
+
+    case "snapshotImage": {
+      const { snapshotId, imageName } =
+        parseSnapshotImageResourceId(resourceId);
+      return {
+        type: "snapshotImage",
+        organizationSlug,
+        snapshotId,
+        selectedSnapshot: imageName,
+      };
+    }
   }
 }
 
@@ -367,6 +386,24 @@ function resolveFromParsedUrl(
   }
 }
 
+function parseSnapshotImageResourceId(resourceId: string): {
+  snapshotId: string;
+  imageName: string;
+} {
+  const separatorIndex = resourceId.indexOf(":");
+
+  if (separatorIndex <= 0 || separatorIndex === resourceId.length - 1) {
+    throw new UserInputError(
+      "Snapshot image resourceId must use the format `<snapshotId>:<image_file_name>`.",
+    );
+  }
+
+  return {
+    snapshotId: resourceId.slice(0, separatorIndex),
+    imageName: resourceId.slice(separatorIndex + 1),
+  };
+}
+
 function parseSpanResourceId(resourceId: string): {
   traceId: string;
   spanId: string;
@@ -450,45 +487,29 @@ export default defineTool({
   requiredScopes: ["event:read", "project:read"],
 
   description: [
-    "Fetch a Sentry resource by URL or by type and ID. Pass a Sentry URL directly and the resource type is auto-detected.",
+    "Fetch a Sentry resource by URL, or by resourceType plus resourceId.",
+    "Pass a Sentry URL directly when possible; the resource type is auto-detected.",
     "",
-    "Supports issues, events, traces, spans, AI conversations, replays, breadcrumbs, and preprod snapshots.",
-    "Sentry URLs require authentication that this tool handles.",
+    "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.",
     "Trace lookups return a condensed overview by default.",
     "",
     "For preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):",
     "- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)",
     "- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata (append &imageResolution=full for original bytes)",
     "",
-    "For `resourceType='span'`, pass `resourceId` as `<traceId>:<spanId>`.",
+    "Resource IDs:",
+    "- span: <traceId>:<spanId>",
+    "- snapshot: <snapshotId>",
+    "- snapshotImage: <snapshotId>:<image_file_name>",
     "",
     "<examples>",
-    "### From a Sentry URL",
     "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
-    "",
-    "### Breadcrumbs from a Sentry URL",
-    "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/', resourceType='breadcrumbs')",
-    "",
-    "### By type and ID",
     "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
-    "",
-    "### Span by trace and span ID",
-    "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='a4d1aae7216b47ff8117cf4e09ce9d0a:aa8e7f3384ef4ff5')",
-    "",
-    "### Replay by ID",
-    "get_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')",
-    "",
-    "### AI conversation by ID",
+    "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')",
     "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
-    "",
-    "### Investigate a failed snapshot test from CI",
-    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/')",
-    "",
-    "### View a specific changed snapshot image preview",
+    "get_sentry_resource(resourceType='snapshot', organizationSlug='my-org', resourceId='241539')",
+    "get_sentry_resource(resourceType='snapshotImage', organizationSlug='my-org', resourceId='241539:login_screen.png')",
     "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')",
-    "",
-    "### View a specific changed snapshot image at full resolution",
-    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png&imageResolution=full')",
     "</examples>",
   ].join("\n"),
 
@@ -510,10 +531,12 @@ export default defineTool({
         "ai_conversation",
         "breadcrumbs",
         "replay",
+        "snapshot",
+        "snapshotImage",
       ])
       .optional()
       .describe(
-        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL.",
+        "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL. Use `snapshot` with a snapshot artifact ID, or `snapshotImage` with `<snapshotId>:<image_file_name>`.",
       ),
 
     resourceId: z
@@ -521,7 +544,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, or `traceId:spanId` for span resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, snapshot artifact ID, `<snapshotId>:<image_file_name>` for snapshot image resources, or `traceId:spanId` for span resources. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
@@ -664,6 +687,7 @@ export default defineTool({
         );
 
       case "snapshot":
+      case "snapshotImage":
         return getSnapshotDetails.handler(
           {
             snapshotUrl: params.url ?? null,
