@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { blobToBase64, detectImageMimeType } from "./blob-utils.js";
+import { decode as decodePng, encode as encodePng } from "fast-png";
+import jpeg from "jpeg-js";
+import {
+  blobToBase64,
+  createImagePreview,
+  detectImageMimeType,
+} from "./blob-utils.js";
 
 describe("blob-utils", () => {
   describe("blobToBase64", () => {
@@ -7,6 +13,121 @@ describe("blob-utils", () => {
       const blob = new Blob([new Uint8Array([1, 2, 3])]);
       const result = await blobToBase64(blob);
       expect(result).toBe(Buffer.from([1, 2, 3]).toString("base64"));
+    });
+  });
+
+  describe("createImagePreview", () => {
+    it("resizes PNG previews within the max dimension while preserving aspect ratio", async () => {
+      const source = encodePng({
+        width: 4,
+        height: 2,
+        data: new Uint8Array([
+          255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255, 255,
+          0, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255,
+        ]),
+        depth: 8,
+        channels: 4,
+      });
+
+      const preview = await createImagePreview(
+        new Blob([source], { type: "image/png" }),
+        "image/png",
+        { maxDimension: 2 },
+      );
+
+      expect(preview).not.toBeNull();
+      expect(preview!.contentType).toBe("image/png");
+      expect(preview!.width).toBe(2);
+      expect(preview!.height).toBe(1);
+      expect(preview!.resized).toBe(true);
+
+      const decoded = decodePng(await preview!.blob.arrayBuffer());
+      expect(decoded.width).toBe(2);
+      expect(decoded.height).toBe(1);
+    });
+
+    it("resizes 16-bit PNG previews within the max dimension while preserving aspect ratio", async () => {
+      const source = encodePng({
+        width: 4,
+        height: 2,
+        data: new Uint16Array([
+          65535, 0, 0, 65535, 0, 65535, 0, 65535, 0, 0, 65535, 65535, 65535,
+          65535, 0, 65535, 65535, 0, 65535, 65535, 0, 65535, 65535, 65535,
+          65535, 65535, 65535, 65535, 0, 0, 0, 65535,
+        ]),
+        depth: 16,
+        channels: 4,
+      });
+
+      const preview = await createImagePreview(
+        new Blob([source], { type: "image/png" }),
+        "image/png",
+        { maxDimension: 2 },
+      );
+
+      expect(preview).not.toBeNull();
+      expect(preview!.contentType).toBe("image/png");
+      expect(preview!.width).toBe(2);
+      expect(preview!.height).toBe(1);
+      expect(preview!.resized).toBe(true);
+
+      const decoded = decodePng(await preview!.blob.arrayBuffer());
+      expect(decoded.width).toBe(2);
+      expect(decoded.height).toBe(1);
+      expect(decoded.depth).toBe(8);
+    });
+
+    it("resizes JPEG previews within the max dimension while preserving aspect ratio", async () => {
+      const source = jpeg.encode(
+        {
+          width: 4,
+          height: 2,
+          data: new Uint8Array([
+            255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255,
+            255, 0, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0,
+            255,
+          ]),
+        },
+        80,
+      ).data;
+
+      const preview = await createImagePreview(
+        new Blob([source], { type: "image/jpeg" }),
+        "image/jpeg",
+        { maxDimension: 2 },
+      );
+
+      expect(preview).not.toBeNull();
+      expect(preview!.contentType).toBe("image/jpeg");
+      expect(preview!.width).toBe(2);
+      expect(preview!.height).toBe(1);
+      expect(preview!.resized).toBe(true);
+    });
+
+    it("returns original bytes when image is already within preview dimensions", async () => {
+      const source = jpeg.encode(
+        {
+          width: 2,
+          height: 1,
+          data: new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255]),
+        },
+        80,
+      ).data;
+      const blob = new Blob([source], { type: "image/jpeg" });
+
+      const preview = await createImagePreview(blob, "image/jpeg", {
+        maxDimension: 1024,
+      });
+
+      expect(preview).not.toBeNull();
+      expect(preview!.blob).toBe(blob);
+      expect(preview!.contentType).toBe("image/jpeg");
+      expect(preview!.width).toBe(2);
+      expect(preview!.height).toBe(1);
+      expect(preview!.resized).toBe(false);
+      expect(Buffer.from(await preview!.blob.arrayBuffer())).toEqual(
+        Buffer.from(source),
+      );
     });
   });
 
