@@ -121,6 +121,8 @@ const snapshotFixture = {
   unchanged: [],
 };
 
+const LONG_CONTEXT_VALUE = "x".repeat(220);
+
 const headImageInfo = {
   content_hash: "abc123",
   display_name: "login_screen.png",
@@ -132,11 +134,35 @@ const headImageInfo = {
   image_url:
     "/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen.png/download/",
   context: {
+    empty_object: {},
+    empty_string: "",
+    metadata: {
+      enabled: true,
+      metrics: {
+        attempts: 2,
+        ratio: 0.25,
+      },
+      unsupported_array: ["hidden"],
+      unsupported_null: null,
+    },
+    deep: {
+      level1: {
+        level2: {
+          level3: {
+            level4: {
+              level5: "visible",
+            },
+          },
+        },
+      },
+    },
+    long_value: LONG_CONTEXT_VALUE,
     preview: {
       container_display_name: "Auth Login",
       display_name: "login_screen.png",
     },
     simulator: { device_name: "iPhone 16" },
+    test_name: "LoginUITests.testLoginScreen",
   },
 };
 
@@ -621,8 +647,28 @@ describe("get_snapshot_details", () => {
     expect(textParts[0]!.text).toContain("**Diff**: 12.5%");
     expect(textParts[0]!.text).toContain("**Group**: auth");
     expect(textParts[0]!.text).toContain("1080×1920");
-    expect(textParts[0]!.text).toContain("**Container**: Auth Login");
-    expect(textParts[0]!.text).toContain("**Device**: iPhone 16");
+    expect(textParts[0]!.text).toContain("### Context");
+    expect(textParts[0]!.text).toContain(
+      "- **metadata**:\n  - **enabled**: true\n  - **metrics**:\n    - **attempts**: 2\n    - **ratio**: 0.25",
+    );
+    expect(textParts[0]!.text).toContain("          - **level5**: visible");
+    expect(textParts[0]!.text).toContain(
+      `- **long_value**: ${LONG_CONTEXT_VALUE}`,
+    );
+    expect(textParts[0]!.text).not.toContain("more context lines omitted");
+    expect(textParts[0]!.text).toContain(
+      "- **preview**:\n  - **container_display_name**: Auth Login\n  - **display_name**: login_screen.png",
+    );
+    expect(textParts[0]!.text).toContain(
+      "- **simulator**:\n  - **device_name**: iPhone 16",
+    );
+    expect(textParts[0]!.text).toContain(
+      "- **test_name**: LoginUITests.testLoginScreen",
+    );
+    expect(textParts[0]!.text).not.toContain("empty_object");
+    expect(textParts[0]!.text).not.toContain("empty_string");
+    expect(textParts[0]!.text).not.toContain("unsupported_array");
+    expect(textParts[0]!.text).not.toContain("unsupported_null");
     expect(imageParts.length).toBe(3);
     expect(imageParts[0]!.mimeType).toBe("image/png");
     expect(imageParts[1]!.mimeType).toBe("image/jpeg");
