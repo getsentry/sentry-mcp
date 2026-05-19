@@ -47,6 +47,8 @@ the pivots and recipes below.
 | `app.client.family` | bucketed MCP client family | metrics | client-specific OAuth behavior |
 | `app.oauth.token_exchange.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
 | `app.oauth.grant_revoked.reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
+| `app.oauth.skill` | OAuth skill granted during approval | metrics | per-skill adoption |
+| `app.oauth.skill.<skill>.granted` | skill granted on an MCP request | spans | tool behavior by enabled skills |
 | `app.oauth.probe.status_code` | upstream probe HTTP status | metrics | Sentry token validity probe result |
 | `app.oauth.probe.reason` | indeterminate probe bucket | metrics | upstream instability |
 | `app.upstream.host` | configured Sentry host | tags | host-specific behavior |
@@ -113,13 +115,24 @@ fields=timestamp,metric,app.client.family,value
 aggregate=sum(value) by metric,app.client.family
 ```
 
+OAuth skill adoption by client family.
+
+```text
+dataset=metrics query='metric:app.oauth.skill_granted'
+fields=timestamp,metric,app.oauth.skill,app.client.family,value
+aggregate=sum(value) by app.oauth.skill,app.client.family
+```
+
 Tool execution timeline for a slow or failing tool.
 
 ```text
-dataset=spans query='gen_ai.tool.name:"<tool_name>"'
+dataset=spans query='gen_ai.tool.name:"<tool_name>" app.oauth.skill.<skill>.granted:true'
 fields=timestamp,trace,span_id,span.op,span.duration,gen_ai.tool.name,app.constraint.organization_slug,app.constraint.project_slug,gen_ai.tool.call.arguments.organizationSlug,gen_ai.tool.call.arguments.projectSlugOrId,error.type
 sort=-timestamp
 ```
+
+Use the skill id with `-` replaced by `_` in span attribute keys, such as
+`app.oauth.skill.project_management.granted`.
 
 Resource dispatch behavior for `get_sentry_resource`.
 
@@ -165,11 +178,13 @@ Users report sign-outs, refresh loops, DCR churn, or callback/register
 imbalance.
 
 Metrics: `app.oauth.token_exchange`, `app.oauth.grant_revoked`,
-`app.oauth.callback_completed`, `app.oauth.register`
+`app.oauth.callback_completed`, `app.oauth.skill_granted`,
+`app.oauth.register`
 
 Attributes: `app.oauth.token_exchange.outcome`, `app.oauth.grant.shape`,
 `app.oauth.probe.status_code`, `app.oauth.probe.reason`,
-`app.oauth.grant_revoked.reason`, `app.client.family`, `user.id`
+`app.oauth.grant_revoked.reason`, `app.oauth.skill`,
+`app.client.family`, `user.id`
 
 ### MCP Tool Execution
 
@@ -180,7 +195,7 @@ Spans: tool call spans and downstream Sentry API spans
 
 Attributes: `gen_ai.tool.name`, `mcp.session.id`,
 `app.constraint.organization_slug`, `app.constraint.project_slug`,
-`app.transport`, `user.id`
+`app.oauth.skill.<skill>.granted`, `app.transport`, `user.id`
 
 ### Resource Resolution
 

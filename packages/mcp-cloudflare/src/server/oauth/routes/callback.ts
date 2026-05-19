@@ -324,11 +324,20 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
   // /oauth/callback is browser-navigated, so the User-Agent is the user's
   // browser, not the MCP client. Derive client family from the DCR-registered
   // client_name (resolved above).
+  const clientFamily = resolveClientFamilyFromName(registeredClientName);
   Sentry.metrics.count("app.oauth.callback_completed", 1, {
     attributes: {
-      "app.client.family": resolveClientFamilyFromName(registeredClientName),
+      "app.client.family": clientFamily,
     },
   });
+  for (const skill of grantedSkills) {
+    Sentry.metrics.count("app.oauth.skill_granted", 1, {
+      attributes: {
+        "app.oauth.skill": skill,
+        "app.client.family": clientFamily,
+      },
+    });
+  }
 
   // Use manual redirect instead of Response.redirect() to allow middleware to add headers
   return c.redirect(redirectTo);
