@@ -49,6 +49,59 @@ function buildTraceSpan({
   };
 }
 
+function buildTraceSpanNode({
+  children = [],
+  data = {},
+  duration,
+  eventId,
+  name,
+  op,
+  parentSpanId,
+  spanId,
+  tags = {},
+}: {
+  children?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>;
+  duration: number;
+  eventId: string;
+  name?: string | null;
+  op: string;
+  parentSpanId: string | null;
+  spanId: string;
+  tags?: Record<string, unknown>;
+}) {
+  return {
+    additional_attributes: data,
+    children,
+    data: {},
+    description: null,
+    duration,
+    end_timestamp: 1713805460 + duration / 1000,
+    errors: [],
+    event_id: eventId,
+    hash: `hash-${spanId}`,
+    is_segment: true,
+    name,
+    occurrences: [],
+    op,
+    organization: null,
+    parent_span_id: parentSpanId,
+    profile_id: "",
+    profiler_id: "",
+    project_id: 4509109107622913,
+    project_slug: "mcp-server",
+    same_process_as_parent: true,
+    sdk_name: "sentry.javascript.node",
+    span_id: spanId,
+    start_timestamp: 1713805460,
+    status: "ok",
+    tags,
+    timestamp: 1713805460 + duration / 1000,
+    trace: "e4d1aae7216b47ff8117cf4e09ce9d0e",
+    transaction_id: eventId,
+  };
+}
+
 describe("get_trace_details", () => {
   beforeEach(() => {
     process.env.OPENAI_API_KEY = "test-key";
@@ -516,6 +569,348 @@ describe("get_trace_details", () => {
       - **Search errors**: \`search_events(organizationSlug='sentry-mcp-evals', query='show error events from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
       - **Search logs**: \`search_events(organizationSlug='sentry-mcp-evals', query='show logs from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
     `);
+  });
+
+  it("renders semantic labels for common OpenTelemetry span attributes", async () => {
+    const traceId = "e4d1aae7216b47ff8117cf4e09ce9d0e";
+    const processSpan = buildTraceSpanNode({
+      duration: 4050,
+      eventId: "55555555555555555555555555555555",
+      name: "process.exec",
+      op: "process.exec",
+      parentSpanId: "4444444444444444",
+      spanId: "5555555555555555",
+      data: {
+        "process.command": "git",
+        "process.exit.code": 0,
+      },
+    });
+    const toolSpan = buildTraceSpanNode({
+      children: [processSpan],
+      duration: 4107,
+      eventId: "44444444444444444444444444444444",
+      name: "execute_tool",
+      op: "gen_ai.execute_tool",
+      parentSpanId: "2222222222222222",
+      spanId: "4444444444444444",
+      data: {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "search_events",
+      },
+    });
+    const httpClientSpan = buildTraceSpanNode({
+      duration: 21455,
+      eventId: "33333333333333333333333333333333",
+      name: "POST",
+      op: "http.client",
+      parentSpanId: "2222222222222222",
+      spanId: "3333333333333333",
+      data: {
+        "http.request.method": "POST",
+        "http.response.status_code": 200,
+        "url.full": "https://api.anthropic.com/v1/messages?api_key=filtered",
+      },
+    });
+    const genAiSpan = buildTraceSpanNode({
+      children: [httpClientSpan, toolSpan],
+      duration: 123419,
+      eventId: "22222222222222222222222222222222",
+      name: "ai.generate_assistant_reply",
+      op: "gen_ai.invoke_agent",
+      parentSpanId: "1111111111111111",
+      spanId: "2222222222222222",
+      data: {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.provider.name": "anthropic",
+        "gen_ai.request.model": "claude-opus-4.6",
+      },
+    });
+    const dbSpan = buildTraceSpanNode({
+      duration: 44,
+      eventId: "66666666666666666666666666666666",
+      name: "db",
+      op: "db.query",
+      parentSpanId: "1111111111111111",
+      spanId: "6666666666666666",
+      data: {
+        "db.collection.name": "issues",
+        "db.operation.name": "SELECT",
+        "db.response.status_code": "OK",
+        "db.system.name": "postgresql",
+      },
+    });
+    const rpcSpan = buildTraceSpanNode({
+      duration: 65,
+      eventId: "77777777777777777777777777777777",
+      name: "grpc",
+      op: "rpc.client",
+      parentSpanId: "1111111111111111",
+      spanId: "7777777777777777",
+      data: {
+        "rpc.method": "FetchTrace",
+        "rpc.response.status_code": "OK",
+        "rpc.service": "sentry.trace.v1.TraceService",
+        "rpc.system.name": "grpc",
+      },
+    });
+    const messagingSpan = buildTraceSpanNode({
+      duration: 37,
+      eventId: "88888888888888888888888888888888",
+      name: "publish",
+      op: "messaging.publish",
+      parentSpanId: "1111111111111111",
+      spanId: "8888888888888888",
+      data: {
+        "messaging.destination.name": "trace-events",
+        "messaging.operation.type": "publish",
+        "messaging.system": "kafka",
+      },
+    });
+    const mcpSpan = buildTraceSpanNode({
+      duration: 28,
+      eventId: "99999999999999999999999999999999",
+      name: "mcp",
+      op: "mcp.request",
+      parentSpanId: "1111111111111111",
+      spanId: "9999999999999999",
+      data: {
+        "gen_ai.tool.name": "search_events",
+        "mcp.method.name": "tools/call",
+        "rpc.response.status_code": "OK",
+      },
+    });
+    const graphqlSpan = buildTraceSpanNode({
+      duration: 31,
+      eventId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      name: "GraphQL Operation",
+      op: "graphql.execute",
+      parentSpanId: "1111111111111111",
+      spanId: "aaaaaaaaaaaaaaaa",
+      data: {
+        "graphql.operation.name": "TraceDetails",
+        "graphql.operation.type": "query",
+      },
+    });
+    const faasSpan = buildTraceSpanNode({
+      duration: 52,
+      eventId: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      name: "lambda",
+      op: "faas.invoke",
+      parentSpanId: "1111111111111111",
+      spanId: "bbbbbbbbbbbbbbbb",
+      data: {
+        "faas.coldstart": true,
+        "faas.invoked_name": "trace-worker",
+        "faas.invoked_provider": "aws",
+        "faas.invoked_region": "us-west-2",
+        "faas.trigger": "timer",
+      },
+    });
+    const objectStoreSpan = buildTraceSpanNode({
+      duration: 73,
+      eventId: "cccccccccccccccccccccccccccccccc",
+      name: "S3.PutObject",
+      op: "aws.s3",
+      parentSpanId: "1111111111111111",
+      spanId: "cccccccccccccccc",
+      data: {
+        "aws.s3.bucket": "trace-artifacts",
+        "aws.s3.key": "runs/abc.json",
+        "cloud.region": "us-west-2",
+        "rpc.method": "PutObject",
+      },
+    });
+    const cloudEventsSpan = buildTraceSpanNode({
+      duration: 19,
+      eventId: "dddddddddddddddddddddddddddddddd",
+      name: "event",
+      op: "event.process",
+      parentSpanId: "1111111111111111",
+      spanId: "dddddddddddddddd",
+      data: {
+        "cloudevents.event_spec_version": "1.0",
+        "cloudevents.event_subject": "trace/e4d1",
+        "cloudevents.event_type": "com.sentry.trace.created",
+      },
+    });
+    const cicdSpan = buildTraceSpanNode({
+      duration: 88,
+      eventId: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      name: "ci",
+      op: "cicd.pipeline",
+      parentSpanId: "1111111111111111",
+      spanId: "eeeeeeeeeeeeeeee",
+      data: {
+        "cicd.pipeline.action.name": "BUILD",
+        "cicd.pipeline.name": "mcp-core",
+        "cicd.pipeline.result": "success",
+      },
+    });
+    const featureFlagSpan = buildTraceSpanNode({
+      duration: 12,
+      eventId: "ffffffffffffffffffffffffffffffff",
+      name: "flag",
+      op: "feature_flag.evaluate",
+      parentSpanId: "1111111111111111",
+      spanId: "ffffffffffffffff",
+      data: {
+        "feature_flag.key": "semantic-trace-rendering",
+        "feature_flag.provider.name": "flagsmith",
+        "feature_flag.result.reason": "targeting_match",
+        "feature_flag.result.variant": "on",
+      },
+    });
+    const cloudProviderSpan = buildTraceSpanNode({
+      duration: 21,
+      eventId: "abababababababababababababababab",
+      name: "AWS SDK",
+      op: "aws.sdk",
+      parentSpanId: "1111111111111111",
+      spanId: "abababababababab",
+      data: {
+        "cloud.region": "us-east-1",
+        "rpc.method": "DynamoDB.GetItem",
+        "rpc.system.name": "aws-api",
+      },
+    });
+    const exceptionSpan = buildTraceSpanNode({
+      duration: 13,
+      eventId: "acacacacacacacacacacacacacacacac",
+      name: "job failed",
+      op: "exception",
+      parentSpanId: "1111111111111111",
+      spanId: "acacacacacacacac",
+      data: {
+        "exception.type": "ValueError",
+      },
+    });
+    const errorSpan = buildTraceSpanNode({
+      duration: 11,
+      eventId: "12121212121212121212121212121212",
+      name: "background job",
+      op: "internal",
+      parentSpanId: "1111111111111111",
+      spanId: "1212121212121212",
+      data: {
+        "error.type": "timeout",
+      },
+    });
+    const rootSpan = buildTraceSpanNode({
+      children: [
+        genAiSpan,
+        dbSpan,
+        rpcSpan,
+        messagingSpan,
+        mcpSpan,
+        graphqlSpan,
+        faasSpan,
+        objectStoreSpan,
+        cloudEventsSpan,
+        cicdSpan,
+        featureFlagSpan,
+        cloudProviderSpan,
+        exceptionSpan,
+        errorSpan,
+      ],
+      duration: 3,
+      eventId: "11111111111111111111111111111111",
+      name: "POST",
+      op: "http.server",
+      parentSpanId: null,
+      spanId: "1111111111111111",
+      data: {
+        "http.request.method": "POST",
+        "http.response.status_code": 201,
+        "http.route": "/api/internal/turn-resume",
+      },
+    });
+
+    mswServer.use(
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace-meta/${traceId}/`,
+        () =>
+          HttpResponse.json({
+            logs: 0,
+            errors: 0,
+            performance_issues: 0,
+            span_count: 18,
+            transaction_child_count_map: [],
+            span_count_map: {},
+          }),
+      ),
+      ...httpGetRegional(
+        `https://sentry.io/api/0/organizations/sentry-mcp-evals/trace/${traceId}/`,
+        () => HttpResponse.json([rootSpan]),
+      ),
+    );
+
+    const result = await getTraceDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        traceId,
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(result).toContain(
+      "POST /api/internal/turn-resume [11111111 · http.server · 201 · 3ms]",
+    );
+    expect(result).toContain(
+      "invoke_agent anthropic/claude-opus-4.6 [22222222 · gen_ai.invoke_agent · 123419ms]",
+    );
+    expect(result).toContain(
+      "POST api.anthropic.com/v1/messages [33333333 · http.client · 200 · 21455ms]",
+    );
+    expect(result).toContain(
+      "execute_tool search_events [44444444 · gen_ai.execute_tool · 4107ms]",
+    );
+    expect(result).toContain("git [55555555 · process.exec · exit:0 · 4050ms]");
+    expect(result).toContain(
+      "SELECT issues [66666666 · db.query · postgresql · OK · 44ms]",
+    );
+    expect(result).toContain(
+      "sentry.trace.v1.TraceService/FetchTrace [77777777 · rpc.client · grpc · OK · 65ms]",
+    );
+    expect(result).toContain(
+      "publish trace-events [88888888 · messaging.publish · kafka · 37ms]",
+    );
+    expect(result).toContain(
+      "tools/call search_events [99999999 · mcp.request · OK · 28ms]",
+    );
+    expect(result).toContain(
+      "query TraceDetails [aaaaaaaa · graphql.execute · 31ms]",
+    );
+    expect(result).toContain(
+      "timer trace-worker [bbbbbbbb · faas.invoke · aws · us-west-2 · coldstart · 52ms]",
+    );
+    expect(result).toContain(
+      "PutObject trace-artifacts/runs/abc.json [cccccccc · aws.s3 · us-west-2 · 73ms]",
+    );
+    expect(result).toContain(
+      "com.sentry.trace.created trace/e4d1 [dddddddd · event.process · cloudevents:1.0 · 19ms]",
+    );
+    expect(result).toContain(
+      "BUILD mcp-core [eeeeeeee · cicd.pipeline · success · 88ms]",
+    );
+    expect(result).toContain(
+      "semantic-trace-rendering on [ffffffff · feature_flag.evaluate · flagsmith · targeting_match · 12ms]",
+    );
+    expect(result).toContain(
+      "DynamoDB.GetItem [abababab · aws.sdk · aws-api · us-east-1 · 21ms]",
+    );
+    expect(result).toContain(
+      "job failed [acacacac · exception · ValueError · 13ms]",
+    );
+    expect(result).toContain(
+      "background job [12121212 · internal · timeout · 11ms]",
+    );
   });
 
   it("fetches enough spans to resolve focused spans in large traces", async () => {
