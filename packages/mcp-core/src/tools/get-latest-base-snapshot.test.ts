@@ -64,8 +64,8 @@ describe("get_latest_base_snapshot", () => {
     expect(text).toContain("com.emergetools.hackernews");
     expect(text).toContain("**Snapshot ID**: 232800");
     expect(text).toContain("**Total Images**: 2");
-    expect(text).toContain("`Home Screen` (Main)");
-    expect(text).toContain("`Settings` (Settings)");
+    expect(text).toContain("main_home_screen.png — Home Screen — Main");
+    expect(text).toContain("settings_page.png — Settings — Settings");
     expect(text).toContain("**App Name**: HackerNews");
     expect(text).toContain("**Platform**: ios");
     expect(text).toContain("**Branch**: main (`abc123de`)");
@@ -84,13 +84,71 @@ describe("get_latest_base_snapshot", () => {
 
       ## Images
 
-      - \`Home Screen\` (Main) — file: \`snapshots-iphone/main_home_screen.png\`
-      - \`Settings\` (Settings) — file: \`snapshots-iphone/settings_page.png\`
+      **Snapshot Images:**
+      └── snapshots-iphone/
+          ├── main_home_screen.png — Home Screen — Main
+          └── settings_page.png — Settings — Settings
 
       ## Next Steps
 
       - To view a specific image, use \`get_sentry_resource(url="https://sentry.sentry.io/preprod/snapshots/232800/?selectedSnapshot=<image_file_name>")\`"
     `);
+  });
+
+  it("groups large latest-base image lists by shared path prefixes", async () => {
+    const largeLatestBaseFixture = {
+      ...latestBaseFixture,
+      images: [
+        {
+          display_name: "Kenya",
+          group: "FeaturedProductCard",
+          image_file_name:
+            "snapshots-iphone-17e/test_CoffeeProductCards.swift_FeaturedProductCard_Kenya.png",
+        },
+        {
+          display_name: "Ethiopia",
+          group: "FeaturedProductCard",
+          image_file_name:
+            "snapshots-iphone-17e/test_CoffeeProductCards.swift_FeaturedProductCard_Ethiopia.png",
+        },
+        {
+          display_name: "Kenya",
+          group: "FeaturedProductCard",
+          image_file_name:
+            "snapshots-iphone-17-pro-max/test_CoffeeProductCards.swift_FeaturedProductCard_Kenya.png",
+        },
+      ],
+    };
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/latest-base/",
+        () => HttpResponse.json(largeLatestBaseFixture),
+        { once: true },
+      ),
+    );
+
+    const result = await getLatestBaseSnapshot.handler(
+      {
+        organizationSlug: "sentry",
+        appId: "com.emergetools.hackernews",
+        branch: null,
+        project: null,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const text = result as string;
+
+    expect(text).toContain("**Total Images**: 3");
+    expect(text).toContain("├── snapshots-iphone-17e/");
+    expect(text).toContain("└── snapshots-iphone-17-pro-max/");
+    expect(text).toContain(
+      "test_CoffeeProductCards.swift_FeaturedProductCard_Ethiopia.png — Ethiopia — FeaturedProductCard",
+    );
+    expect(text).toContain(
+      "test_CoffeeProductCards.swift_FeaturedProductCard_Kenya.png — Kenya — FeaturedProductCard",
+    );
   });
 
   it("passes branch filter to endpoint", async () => {
