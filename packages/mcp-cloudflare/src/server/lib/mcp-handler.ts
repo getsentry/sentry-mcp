@@ -34,6 +34,10 @@ type OAuthExecutionContext = ExecutionContext & {
   props?: Record<string, unknown>;
 };
 
+function getSkillGrantedAttributeName(skill: string): string {
+  return `app.oauth.skill.${skill.replaceAll("-", "_")}.granted`;
+}
+
 function escapeAuthenticateHeaderValue(value: string): string {
   return value
     .replaceAll("\\", "\\\\")
@@ -248,6 +252,11 @@ const mcpHandler: ExportedHandler<Env> = {
         "Authorization failed: No valid skills were granted. Please re-authorize and select at least one permission.",
         { status: 400 },
       );
+    }
+
+    const activeSpan = Sentry.getActiveSpan();
+    for (const skill of Array.from(validSkills).sort()) {
+      activeSpan?.setAttribute(getSkillGrantedAttributeName(skill), true);
     }
 
     const rateLimitResult = await checkRateLimit(

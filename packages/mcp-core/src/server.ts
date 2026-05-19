@@ -50,6 +50,10 @@ import {
 import type { ProjectCapabilities, ServerContext } from "./types";
 import { LIB_VERSION } from "./version";
 
+function getSkillGrantedAttributeName(skill: Skill): string {
+  return `app.oauth.skill.${skill.replaceAll("-", "_")}.granted`;
+}
+
 /**
  * Creates and configures a complete MCP server with Sentry instrumentation.
  *
@@ -179,6 +183,9 @@ function configureServer({
   const grantedSkills: Set<Skill> | undefined = context.grantedSkills
     ? new Set<Skill>(context.grantedSkills)
     : undefined;
+  const grantedSkillIds = grantedSkills
+    ? Array.from(grantedSkills).sort()
+    : undefined;
 
   server.server.onerror = (error) => {
     const transportLogOptions: LogIssueOptions = {
@@ -304,6 +311,14 @@ function configureServer({
               "app.constraint.project_slug",
               context.constraints.projectSlug,
             );
+          }
+          if (grantedSkillIds?.length) {
+            for (const skill of grantedSkillIds) {
+              activeSpan.setAttribute(
+                getSkillGrantedAttributeName(skill),
+                true,
+              );
+            }
           }
         }
 
