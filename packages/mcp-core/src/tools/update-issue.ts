@@ -820,7 +820,7 @@ export default defineTool({
     }
 
     if (params.reason) {
-      output += `- A comment with the reason was posted to the issue's activity\n`;
+      output += `- **Comment posted**: "${params.reason}"\n`;
     }
 
     return output;

@@ -845,7 +845,9 @@ describe("update_issue", () => {
     expect(commentPosted).toEqual({
       text: "Resolved because the root cause was fixed in PR #123",
     });
-    expect(result).toContain("reason was posted");
+    expect(result).toContain(
+      '**Comment posted**: "Resolved because the root cause was fixed in PR #123"',
+    );
   });
 
   it("does not post a comment when reason is not provided", async () => {
