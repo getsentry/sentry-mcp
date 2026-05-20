@@ -2364,6 +2364,28 @@ export class SentryApiService {
     return IssueSchema.parse(body);
   }
 
+  async createIssueComment(
+    {
+      organizationSlug,
+      issueId,
+      text,
+    }: {
+      organizationSlug: string;
+      issueId: string;
+      text: string;
+    },
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.requestJSON(
+      `/organizations/${organizationSlug}/issues/${issueId}/notes/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      },
+      opts,
+    );
+  }
+
   // TODO: Sentry is not yet exposing a reasonable API to fetch trace data
   // async getTrace({
   //   organizationSlug,

@@ -794,4 +794,195 @@ describe("update_issue", () => {
       ),
     ).rejects.toThrow("`ignoreWindowMinutes` requires `ignoreCount`");
   });
+
+  it("posts reason as a comment when updating issue status", async () => {
+    let commentPosted: { text: string } | undefined;
+    const currentIssue = createIssue({
+      status: "unresolved",
+      statusDetails: {},
+    });
+    const updatedIssue = createIssue({
+      status: "resolved",
+      statusDetails: {},
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(updatedIssue),
+      ),
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/notes/",
+        async ({ request }) => {
+          commentPosted = (await request.json()) as { text: string };
+          return HttpResponse.json({
+            id: "12345",
+            text: commentPosted.text,
+            type: "note",
+            dateCreated: new Date().toISOString(),
+          });
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+        reason: "Resolved because the root cause was fixed in PR #123",
+      },
+      serverContext,
+    );
+
+    expect(commentPosted).toEqual({
+      text: "Resolved because the root cause was fixed in PR #123",
+    });
+    expect(result).toContain(
+      '**Comment posted**: "Resolved because the root cause was fixed in PR #123"',
+    );
+  });
+
+  it("does not post a comment when reason is not provided", async () => {
+    let commentPosted = false;
+    const currentIssue = createIssue({
+      status: "unresolved",
+      statusDetails: {},
+    });
+    const updatedIssue = createIssue({
+      status: "resolved",
+      statusDetails: {},
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(updatedIssue),
+      ),
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/notes/",
+        () => {
+          commentPosted = true;
+          return HttpResponse.json({});
+        },
+      ),
+    );
+
+    await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(commentPosted).toBe(false);
+  });
+
+  it("posts reason as a comment even when no state changes are needed", async () => {
+    let commentPosted: { text: string } | undefined;
+    const currentIssue = createIssue({
+      status: "resolved",
+      statusDetails: {},
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/notes/",
+        async ({ request }) => {
+          commentPosted = (await request.json()) as { text: string };
+          return HttpResponse.json({
+            id: "12345",
+            text: commentPosted.text,
+            type: "note",
+            dateCreated: new Date().toISOString(),
+          });
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+        reason: "Confirmed this is no longer an issue after deploy",
+      },
+      serverContext,
+    );
+
+    expect(commentPosted).toEqual({
+      text: "Confirmed this is no longer an issue after deploy",
+    });
+    expect(result).toContain("No changes were needed.");
+    expect(result).toContain(
+      '**Comment posted**: "Confirmed this is no longer an issue after deploy"',
+    );
+  });
+
+  it("does not throw when comment posting fails after a successful update", async () => {
+    const currentIssue = createIssue({
+      status: "unresolved",
+      statusDetails: {},
+    });
+    const updatedIssue = createIssue({
+      status: "resolved",
+      statusDetails: {},
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(updatedIssue),
+      ),
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/notes/",
+        () => HttpResponse.json({ detail: "Rate limited" }, { status: 429 }),
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+        reason: "Resolving because fix deployed",
+      },
+      serverContext,
+    );
+
+    // Update succeeded — output should show it
+    expect(result).toContain("**Status**: unresolved → **resolved**");
+    // Comment failure should be reported gracefully, not thrown
+    expect(result).toContain("**Comment not posted**");
+  });
 });

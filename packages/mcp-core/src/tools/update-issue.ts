@@ -6,6 +6,7 @@ import {
   parseIssueParams,
 } from "../internal/tool-helpers/issue";
 import { formatAssignedTo } from "../internal/tool-helpers/formatting";
+import { logIssue } from "../telem/logging";
 import { UserInputError } from "../errors";
 import type { Issue } from "../api-client/types";
 import type { ServerContext } from "../types";
@@ -22,6 +23,7 @@ import {
   ParamIgnoreWindowMinutes,
   ParamIgnoreUserCount,
   ParamIgnoreUserWindowMinutes,
+  ParamReason,
 } from "../schema";
 
 type IgnoreMode =
@@ -561,6 +563,58 @@ function buildIgnoreUpdate(
   throw new UserInputError("Unsupported ignore mode");
 }
 
+type ReasonCommentResult =
+  | { posted: true }
+  | { posted: false; skipped: true }
+  | { posted: false; error: string };
+
+async function tryPostReasonComment(
+  apiService: {
+    createIssueComment: (params: {
+      organizationSlug: string;
+      issueId: string;
+      text: string;
+    }) => Promise<void>;
+  },
+  organizationSlug: string,
+  issueId: string,
+  reason: string | undefined,
+): Promise<ReasonCommentResult> {
+  if (!reason) {
+    return { posted: false, skipped: true };
+  }
+  try {
+    await apiService.createIssueComment({
+      organizationSlug,
+      issueId,
+      text: reason,
+    });
+    return { posted: true };
+  } catch (error) {
+    logIssue(error);
+    return {
+      posted: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function formatReasonCommentLine(
+  reason: string | undefined,
+  result: ReasonCommentResult,
+): string {
+  if (!reason || ("skipped" in result && result.skipped)) {
+    return "";
+  }
+  if (result.posted) {
+    return `- **Comment posted**: "${reason}"\n`;
+  }
+  if ("error" in result) {
+    return `- **Comment not posted**: ${result.error}\n`;
+  }
+  return "";
+}
+
 export default defineTool({
   name: "update_issue",
   skills: ["triage"], // Only available in triage skill
@@ -577,6 +631,7 @@ export default defineTool({
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='forever')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='untilOccurrenceCount', ignoreCount=100, ignoreWindowMinutes=60)",
+    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', reason='Ignoring because this is expected noise from the staging deploy')",
     "```",
     "</examples>",
     "",
@@ -590,6 +645,7 @@ export default defineTool({
     "- Ignore modes: `untilEscalating`, `forever`, `forDuration`, `untilOccurrenceCount`, `untilUserCount`.",
     "- Matching ignore inputs are `ignoreDurationMinutes`, `ignoreCount` + optional `ignoreWindowMinutes`, or `ignoreUserCount` + optional `ignoreUserWindowMinutes`.",
     "- To switch an already ignored issue between `untilEscalating`, `forever`, and condition-based ignore modes, first set `status='unresolved'`, then ignore it again with the new rule.",
+    "- `reason` is optional. When provided, it will be posted as a comment on the issue's activity feed explaining why the action was taken.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -605,11 +661,12 @@ export default defineTool({
     ignoreWindowMinutes: ParamIgnoreWindowMinutes.optional(),
     ignoreUserCount: ParamIgnoreUserCount.optional(),
     ignoreUserWindowMinutes: ParamIgnoreUserWindowMinutes.optional(),
+    reason: ParamReason.optional(),
   },
   annotations: {
     readOnlyHint: false,
     destructiveHint: true,
-    idempotentHint: true,
+    idempotentHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -706,12 +763,21 @@ export default defineTool({
     );
 
     if (!updateStatus && !updateAssignedTo && !updateIgnore) {
-      return buildNoChangesOutput({
-        issue: currentIssue,
-        organizationSlug: orgSlug,
-        ignoreState: currentIgnoreState,
-        issueUrl: requestedIssueUrl,
-      });
+      const commentResult = await tryPostReasonComment(
+        apiService,
+        orgSlug,
+        parsedIssueId!,
+        params.reason,
+      );
+
+      return (
+        buildNoChangesOutput({
+          issue: currentIssue,
+          organizationSlug: orgSlug,
+          ignoreState: currentIgnoreState,
+          issueUrl: requestedIssueUrl,
+        }) + formatReasonCommentLine(params.reason, commentResult)
+      );
     }
 
     // Update the issue
@@ -727,6 +793,13 @@ export default defineTool({
       ignoreUserCount: updateIgnore?.ignoreUserCount,
       ignoreUserWindow: updateIgnore?.ignoreUserWindow,
     });
+
+    const commentResult = await tryPostReasonComment(
+      apiService,
+      orgSlug,
+      parsedIssueId!,
+      params.reason,
+    );
 
     const updatedIgnoreState = getIgnoreState(updatedIssue, ignoreUpdate);
     const currentStatusDisplay = getIssueStatusDisplay(currentIssue);
@@ -796,6 +869,8 @@ export default defineTool({
     ) {
       output += `- ${updatedIgnoreState.message}\n`;
     }
+
+    output += formatReasonCommentLine(params.reason, commentResult);
 
     return output;
   },
