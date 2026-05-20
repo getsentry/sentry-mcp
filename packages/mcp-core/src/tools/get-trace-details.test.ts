@@ -611,6 +611,31 @@ describe("get_trace_details", () => {
         "url.full": "https://api.anthropic.com/v1/messages?api_key=filtered",
       },
     });
+    const httpMethodOnlySpan = buildTraceSpanNode({
+      duration: 16,
+      eventId: "13131313131313131313131313131313",
+      name: "post",
+      op: "http.client",
+      parentSpanId: "1111111111111111",
+      spanId: "1313131313131313",
+      data: {
+        "http.request.method": "post",
+        "http.response.status_code": 204,
+      },
+    });
+    const httpServerTargetSpan = buildTraceSpanNode({
+      duration: 17,
+      eventId: "14141414141414141414141414141414",
+      name: "GET",
+      op: "http.client",
+      parentSpanId: "1111111111111111",
+      spanId: "1414141414141414",
+      data: {
+        "http.request.method": "GET",
+        "server.address": "api.example.com",
+        "server.port": 443,
+      },
+    });
     const genAiSpan = buildTraceSpanNode({
       children: [httpClientSpan, toolSpan],
       duration: 123419,
@@ -637,6 +662,19 @@ describe("get_trace_details", () => {
         "db.operation.name": "SELECT",
         "db.response.status_code": "OK",
         "db.system.name": "postgresql",
+      },
+    });
+    const dbServerTargetSpan = buildTraceSpanNode({
+      duration: 41,
+      eventId: "15151515151515151515151515151515",
+      name: "db",
+      op: "db.query",
+      parentSpanId: "1111111111111111",
+      spanId: "1515151515151515",
+      data: {
+        "db.operation.name": "SELECT",
+        "db.system.name": "postgresql",
+        "server.address": "db.internal",
       },
     });
     const rpcSpan = buildTraceSpanNode({
@@ -798,7 +836,10 @@ describe("get_trace_details", () => {
     const rootSpan = buildTraceSpanNode({
       children: [
         genAiSpan,
+        httpMethodOnlySpan,
+        httpServerTargetSpan,
         dbSpan,
+        dbServerTargetSpan,
         rpcSpan,
         messagingSpan,
         mcpSpan,
@@ -833,7 +874,7 @@ describe("get_trace_details", () => {
             logs: 0,
             errors: 0,
             performance_issues: 0,
-            span_count: 18,
+            span_count: 21,
             transaction_child_count_map: [],
             span_count_map: {},
           }),
@@ -868,12 +909,19 @@ describe("get_trace_details", () => {
     expect(result).toContain(
       "POST api.anthropic.com/v1/messages [33333333 · http.client · 200 · 21455ms]",
     );
+    expect(result).toContain("POST [13131313 · http.client · 204 · 16ms]");
+    expect(result).toContain(
+      "GET api.example.com:443 [14141414 · http.client · 17ms]",
+    );
     expect(result).toContain(
       "execute_tool search_events [44444444 · gen_ai.execute_tool · 4107ms]",
     );
     expect(result).toContain("git [55555555 · process.exec · exit:0 · 4050ms]");
     expect(result).toContain(
       "SELECT issues [66666666 · db.query · postgresql · OK · 44ms]",
+    );
+    expect(result).toContain(
+      "SELECT db.internal [15151515 · db.query · postgresql · 41ms]",
     );
     expect(result).toContain(
       "sentry.trace.v1.TraceService/FetchTrace [77777777 · rpc.client · grpc · OK · 65ms]",

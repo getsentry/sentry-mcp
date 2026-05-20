@@ -75,10 +75,12 @@ function formatHttpSpanDisplay(
   const method = canonicalizeHttpMethod(
     getSpanAttributeString(span, ["http.request.method"]),
   );
-  const target = getHttpTarget(span);
   const statusCode = getSpanAttributeString(span, [
     "http.response.status_code",
   ]);
+  const target = getHttpTarget(span, {
+    includeServerTarget: Boolean(method || statusCode),
+  });
   const errorType = getErrorType(span);
 
   if (!method && !target && !statusCode) {
@@ -521,7 +523,10 @@ function getGenAiModelIdentifier(span: TraceSpan): string | undefined {
   return `${provider}/${model}`;
 }
 
-function getHttpTarget(span: TraceSpan): string | undefined {
+function getHttpTarget(
+  span: TraceSpan,
+  { includeServerTarget = false }: { includeServerTarget?: boolean } = {},
+): string | undefined {
   const route = getSpanAttributeString(
     span,
     ["http.route", "url.template"],
@@ -551,7 +556,7 @@ function getHttpTarget(span: TraceSpan): string | undefined {
     return formatHttpTarget(path);
   }
 
-  if (serverTarget) {
+  if (includeServerTarget && serverTarget) {
     return formatHttpTarget(serverTarget);
   }
 
@@ -586,8 +591,13 @@ function formatHttpLabel({
     return target;
   }
 
-  if (method && fallbackLabel !== method && fallbackLabel !== "unnamed") {
-    return fallbackLabel.startsWith(`${method} `)
+  const normalizedFallbackLabel = fallbackLabel.toUpperCase();
+  if (
+    method &&
+    normalizedFallbackLabel !== method &&
+    fallbackLabel !== "unnamed"
+  ) {
+    return normalizedFallbackLabel.startsWith(`${method} `)
       ? fallbackLabel
       : joinDisplayParts([method, fallbackLabel]);
   }
@@ -616,6 +626,11 @@ function formatObjectStoreTarget(
 
 function formatHttpTarget(value: string): string {
   const trimmed = value.trim();
+
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    const withoutFragment = trimmed.split("#", 1)[0];
+    return withoutFragment.split("?", 1)[0];
+  }
 
   try {
     const url = new URL(trimmed);
