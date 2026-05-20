@@ -46,6 +46,8 @@ export type ServerContext = {
   sentryProtocol?: SentryProtocol;
   mcpUrl?: string;
   accessToken: string;
+  /** Resolved AI agent family (e.g. "claude-code", "cursor") from the MCP client's User-Agent */
+  clientFamily?: string | null;
   openaiBaseUrl?: string;
   userId?: string | null;
   userIpAddress?: string | null;

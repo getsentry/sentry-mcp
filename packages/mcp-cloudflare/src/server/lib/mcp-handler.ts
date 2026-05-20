@@ -326,6 +326,7 @@ const mcpHandler: ExportedHandler<Env> = {
       userId,
       userIpAddress,
       clientId,
+      clientFamily,
       accessToken,
       grantedSkills: validSkills,
       constraints,
