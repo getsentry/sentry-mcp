@@ -64,7 +64,7 @@ export function formatSemanticSpanDisplay(
   const label = formatDisplayPart(display.label, SPAN_LABEL_MAX_LENGTH);
   return {
     label: label || "unnamed",
-    metadata: formatSemanticMetadata(display.metadata, label || fallbackLabel),
+    metadata: formatSemanticMetadata(display.metadata),
   };
 }
 
@@ -483,13 +483,17 @@ function formatExceptionSpanDisplay(
     fallbackLabel === "unnamed"
       ? exceptionType || exceptionMessage || fallbackLabel
       : fallbackLabel;
+  const metadata =
+    fallbackLabel === "unnamed"
+      ? []
+      : compactStrings([
+          exceptionType,
+          exceptionType ? undefined : exceptionMessage,
+        ]);
 
   return {
     label,
-    metadata: compactStrings([
-      exceptionType,
-      exceptionType ? undefined : exceptionMessage,
-    ]),
+    metadata,
   };
 }
 
@@ -743,7 +747,7 @@ function getErrorType(span: TraceSpan): string | undefined {
   return getSpanAttributeString(span, ["error.type"]);
 }
 
-function formatSemanticMetadata(values: unknown[], label: string): string[] {
+function formatSemanticMetadata(values: unknown[]): string[] {
   const metadata: string[] = [];
   const seen = new Set<string>();
 

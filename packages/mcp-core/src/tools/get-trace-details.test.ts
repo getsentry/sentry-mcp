@@ -849,6 +849,17 @@ describe("get_trace_details", () => {
         "exception.type": "ValueError",
       },
     });
+    const unnamedExceptionSpan = buildTraceSpanNode({
+      duration: 14,
+      eventId: "18181818181818181818181818181818",
+      name: null,
+      op: "exception",
+      parentSpanId: "1111111111111111",
+      spanId: "1818181818181818",
+      data: {
+        "exception.type": "TypeError",
+      },
+    });
     const errorSpan = buildTraceSpanNode({
       duration: 11,
       eventId: "12121212121212121212121212121212",
@@ -880,6 +891,7 @@ describe("get_trace_details", () => {
         featureFlagSpan,
         cloudProviderSpan,
         exceptionSpan,
+        unnamedExceptionSpan,
         errorSpan,
       ],
       duration: 3,
@@ -903,7 +915,7 @@ describe("get_trace_details", () => {
             logs: 0,
             errors: 0,
             performance_issues: 0,
-            span_count: 23,
+            span_count: 24,
             transaction_child_count_map: [],
             span_count_map: {},
           }),
@@ -991,6 +1003,7 @@ describe("get_trace_details", () => {
     expect(result).toContain(
       "job failed [acacacac · exception · ValueError · 13ms]",
     );
+    expect(result).toContain("TypeError [18181818 · exception · 14ms]");
     expect(result).toContain(
       "background job [12121212 · internal · timeout · 11ms]",
     );
