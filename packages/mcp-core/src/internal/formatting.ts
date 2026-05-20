@@ -1940,7 +1940,8 @@ export function formatIssueOutput({
   output += `- To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='${organizationSlug}', issueId='${issue.shortId}', query='your query')\`\n`;
   if (traceId) {
     output += `- To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='${organizationSlug}', resourceId='${traceId}')\`\n`;
-    output += `- To find related spans or logs, use \`search_events(organizationSlug='${organizationSlug}', query='trace:${traceId}')\`\n`;
+    output += `- To search related spans, use \`search_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\`\n`;
+    output += `- To search related logs, use \`search_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\`\n`;
   }
   if (experimentalMode) {
     output += `- To see the trail of events leading up to this error, use \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
