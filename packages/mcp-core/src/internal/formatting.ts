@@ -1927,11 +1927,22 @@ export function formatIssueOutput({
     output += "\n";
   }
 
+  const traceId =
+    typeof event.contexts?.trace?.trace_id === "string" &&
+    event.contexts.trace.trace_id.length > 0
+      ? event.contexts.trace.trace_id
+      : undefined;
+
   output += "# Using this information\n\n";
   output += `- You can reference the IssueID in commit messages (e.g. \`Fixes ${issue.shortId}\`) to automatically close the issue when the commit is merged.\n`;
   output +=
     "- The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.\n";
   output += `- To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='${organizationSlug}', issueId='${issue.shortId}', query='your query')\`\n`;
+  if (traceId) {
+    output += `- To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='${organizationSlug}', resourceId='${traceId}')\`\n`;
+    output += `- To search related spans, use \`search_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\`\n`;
+    output += `- To search related logs, use \`search_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\`\n`;
+  }
   if (experimentalMode) {
     output += `- To see the trail of events leading up to this error, use \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
   }
