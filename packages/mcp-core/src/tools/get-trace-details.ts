@@ -4,6 +4,7 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import { hasAgentProvider } from "../internal/agents/provider-factory";
 import { resolveRegionUrlForOrganization } from "../internal/tool-helpers/resolve-region-url";
 import type { SentryApiService, Trace, TraceSpan } from "../api-client";
+import { formatSemanticSpanDisplay } from "./trace-semantic-display.js";
 import { UserInputError } from "../errors";
 import type { ServerContext } from "../types";
 import {
@@ -216,8 +217,8 @@ function getTraceFetchLimit(
 interface SelectedSpan {
   id: string;
   op: string;
-  name: string | null;
-  description: string;
+  displayName: string;
+  metadata: string[];
   duration: number;
   is_transaction: boolean;
   children: SelectedSpan[];
@@ -420,11 +421,13 @@ function createBranchStatsGetter(): (span: TraceSpan) => SpanBranchStats {
 }
 
 function createSelectedSpan(span: TraceSpan, level: number): SelectedSpan {
+  const display = formatSemanticSpanDisplay(span);
+
   return {
     id: getTraceSpanId(span),
     op: span.op || "unknown",
-    name: typeof span.name === "string" ? span.name : null,
-    description: span.description || span.transaction || "unnamed",
+    displayName: display.label,
+    metadata: display.metadata,
     duration: span.duration || 0,
     is_transaction: Boolean(span.is_transaction),
     children: [],
@@ -465,8 +468,8 @@ function enqueueSelectedChildren(
 const fakeRootTemplate = (traceId: string): SelectedSpan => ({
   id: traceId,
   op: "trace",
-  name: null,
-  description: `Trace ${traceId.substring(0, 8)}`,
+  displayName: "trace",
+  metadata: [],
   duration: 0, // Traces don't have duration
   is_transaction: false,
   children: [],
@@ -482,13 +485,7 @@ const fakeRootTemplate = (traceId: string): SelectedSpan => ({
  * @returns A formatted display name for the span
  */
 function formatSpanDisplayName(span: SelectedSpan): string {
-  // For the fake trace root, just return "trace"
-  if (span.op === "trace") {
-    return "trace";
-  }
-
-  // Use span.name if available (OTEL-native), otherwise use description
-  return span.name?.trim() || span.description || "unnamed";
+  return span.displayName;
 }
 
 /**
@@ -524,9 +521,14 @@ function renderSpanTree(spans: SelectedSpan[]): string[] {
         : "unknown";
 
       // Don't show 'default' operations as they're not meaningful
-      const opDisplay = span.op === "default" ? "" : ` · ${span.op}`;
+      const metadataParts = [
+        shortId,
+        ...(span.op === "default" ? [] : [span.op]),
+        ...span.metadata,
+        duration,
+      ];
       lines.push(
-        `${prefix}${connector}${displayName} [${shortId}${opDisplay} · ${duration}]`,
+        `${prefix}${connector}${displayName} [${metadataParts.join(" · ")}]`,
       );
     }
 
@@ -937,7 +939,7 @@ function formatDuration(durationMs: number | undefined): string {
 }
 
 function formatTraceSpanDescription(span: TraceSpan): string {
-  return span.name?.trim() || span.description || span.transaction || "unnamed";
+  return formatSemanticSpanDisplay(span).label;
 }
 
 function buildSpanUrl(traceUrl: string, spanId: string): string {
