@@ -752,6 +752,9 @@ describe("get_trace_details", () => {
       spanId: "9999999999999999",
       data: {
         "gen_ai.tool.name": "search_events",
+        "http.request.method": "POST",
+        "http.response.status_code": 200,
+        "url.path": "/mcp",
         "mcp.method.name": "tools/call",
         "rpc.response.status_code": "OK",
       },

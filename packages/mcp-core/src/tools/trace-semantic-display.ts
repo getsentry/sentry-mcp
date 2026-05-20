@@ -15,8 +15,8 @@ const SPAN_METADATA_MAX_LENGTH = 64;
 const SPAN_ATTRIBUTE_MAX_LENGTH = 2048;
 
 const SEMANTIC_SPAN_FORMATTERS: SpanDisplayFormatter[] = [
-  formatHttpSpanDisplay,
   formatMcpSpanDisplay,
+  formatHttpSpanDisplay,
   formatGenAiSpanDisplay,
   formatDatabaseSpanDisplay,
   formatGraphqlSpanDisplay,
