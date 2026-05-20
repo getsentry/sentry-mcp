@@ -259,7 +259,7 @@ describe("get_issue_details", () => {
       - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
       - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
       - To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To find related spans or logs, use \`search_events(organizationSlug='sentry-mcp-evals', naturalLanguageQuery='spans or logs for trace 3032af8bcdfe4423b937fc5c041d5d82')\`
+      - To find related spans or logs, use \`search_events(organizationSlug='sentry-mcp-evals', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });
@@ -517,7 +517,7 @@ describe("get_issue_details", () => {
       - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
       - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
       - To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To find related spans or logs, use \`search_events(organizationSlug='sentry-mcp-evals', naturalLanguageQuery='spans or logs for trace 3032af8bcdfe4423b937fc5c041d5d82')\`
+      - To find related spans or logs, use \`search_events(organizationSlug='sentry-mcp-evals', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });
@@ -801,7 +801,7 @@ describe("get_issue_details", () => {
       - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
       - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
       - To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To find related spans or logs, use \`search_events(organizationSlug='sentry-mcp-evals', naturalLanguageQuery='spans or logs for trace 3032af8bcdfe4423b937fc5c041d5d82')\`
+      - To find related spans or logs, use \`search_events(organizationSlug='sentry-mcp-evals', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });
