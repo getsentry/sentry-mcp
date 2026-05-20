@@ -690,8 +690,8 @@ function getSpanAttributeString(
   keys: string[],
   maxLength = SPAN_METADATA_MAX_LENGTH,
 ): string | undefined {
-  for (const source of getSpanAttributeSources(span)) {
-    for (const key of keys) {
+  for (const key of keys) {
+    for (const source of getSpanAttributeSources(span)) {
       if (Object.prototype.hasOwnProperty.call(source, key)) {
         const value = formatDisplayPart(source[key], maxLength);
         if (value) {

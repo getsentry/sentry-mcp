@@ -672,7 +672,10 @@ describe("get_trace_details", () => {
       data: {
         "gen_ai.operation.name": "invoke_agent",
         "gen_ai.provider.name": "anthropic",
-        "gen_ai.request.model": "claude-opus-4.6",
+        "gen_ai.request.model": "claude-haiku-unused",
+      },
+      tags: {
+        "gen_ai.response.model": "claude-opus-4.6",
       },
     });
     const dbSpan = buildTraceSpanNode({
