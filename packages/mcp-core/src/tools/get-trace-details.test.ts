@@ -636,6 +636,19 @@ describe("get_trace_details", () => {
         "server.port": 443,
       },
     });
+    const httpVersionedPathSpan = buildTraceSpanNode({
+      duration: 18,
+      eventId: "16161616161616161616161616161616",
+      name: "GET",
+      op: "http.client",
+      parentSpanId: "1111111111111111",
+      spanId: "1616161616161616",
+      data: {
+        "http.request.method": "GET",
+        "http.response.status_code": 200,
+        "url.path": "/api/v200/resources",
+      },
+    });
     const genAiSpan = buildTraceSpanNode({
       children: [httpClientSpan, toolSpan],
       duration: 123419,
@@ -689,6 +702,20 @@ describe("get_trace_details", () => {
         "rpc.response.status_code": "OK",
         "rpc.service": "sentry.trace.v1.TraceService",
         "rpc.system.name": "grpc",
+      },
+    });
+    const rpcSubstringStatusSpan = buildTraceSpanNode({
+      duration: 24,
+      eventId: "17171717171717171717171717171717",
+      name: "workflow",
+      op: "rpc.client",
+      parentSpanId: "1111111111111111",
+      spanId: "1717171717171717",
+      data: {
+        "rpc.method": "Run",
+        "rpc.response.status_code": "OK",
+        "rpc.service": "bookings_workflow",
+        "rpc.system.name": "temporal",
       },
     });
     const messagingSpan = buildTraceSpanNode({
@@ -838,9 +865,11 @@ describe("get_trace_details", () => {
         genAiSpan,
         httpMethodOnlySpan,
         httpServerTargetSpan,
+        httpVersionedPathSpan,
         dbSpan,
         dbServerTargetSpan,
         rpcSpan,
+        rpcSubstringStatusSpan,
         messagingSpan,
         mcpSpan,
         graphqlSpan,
@@ -874,7 +903,7 @@ describe("get_trace_details", () => {
             logs: 0,
             errors: 0,
             performance_issues: 0,
-            span_count: 21,
+            span_count: 23,
             transaction_child_count_map: [],
             span_count_map: {},
           }),
@@ -914,6 +943,9 @@ describe("get_trace_details", () => {
       "GET api.example.com:443 [14141414 · http.client · 17ms]",
     );
     expect(result).toContain(
+      "GET /api/v200/resources [16161616 · http.client · 200 · 18ms]",
+    );
+    expect(result).toContain(
       "execute_tool search_events [44444444 · gen_ai.execute_tool · 4107ms]",
     );
     expect(result).toContain("git [55555555 · process.exec · exit:0 · 4050ms]");
@@ -925,6 +957,9 @@ describe("get_trace_details", () => {
     );
     expect(result).toContain(
       "sentry.trace.v1.TraceService/FetchTrace [77777777 · rpc.client · grpc · OK · 65ms]",
+    );
+    expect(result).toContain(
+      "bookings_workflow/Run [17171717 · rpc.client · temporal · OK · 24ms]",
     );
     expect(result).toContain(
       "publish trace-events [88888888 · messaging.publish · kafka · 37ms]",

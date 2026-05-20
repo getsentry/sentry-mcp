@@ -117,7 +117,10 @@ function formatGenAiSpanDisplay(
 
   return {
     label,
-    metadata: compactStrings([model, errorType]),
+    metadata: compactStrings([
+      subject === model ? undefined : model,
+      errorType,
+    ]),
   };
 }
 
@@ -743,7 +746,6 @@ function getErrorType(span: TraceSpan): string | undefined {
 function formatSemanticMetadata(values: unknown[], label: string): string[] {
   const metadata: string[] = [];
   const seen = new Set<string>();
-  const normalizedLabel = label.toLowerCase();
 
   for (const value of values) {
     const displayValue = formatDisplayPart(value, SPAN_METADATA_MAX_LENGTH);
@@ -752,7 +754,7 @@ function formatSemanticMetadata(values: unknown[], label: string): string[] {
     }
 
     const key = displayValue.toLowerCase();
-    if (seen.has(key) || normalizedLabel.includes(key)) {
+    if (seen.has(key)) {
       continue;
     }
 
