@@ -204,6 +204,14 @@ export const ParamIgnoreUserWindowMinutes = z
     "Optional time window in minutes for ignoreUserCount. If omitted, Sentry counts all future affected users.",
   );
 
+export const ParamReason = z
+  .string()
+  .trim()
+  .min(1)
+  .describe(
+    "Optional reason for taking this action. When provided, it will be posted as a comment on the issue's activity feed.",
+  );
+
 export const ParamSentryGuide = z
   .enum(SENTRY_GUIDES)
   .describe(

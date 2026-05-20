@@ -22,6 +22,7 @@ import {
   ParamIgnoreWindowMinutes,
   ParamIgnoreUserCount,
   ParamIgnoreUserWindowMinutes,
+  ParamReason,
 } from "../schema";
 
 type IgnoreMode =
@@ -577,6 +578,7 @@ export default defineTool({
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='forever')",
     "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', ignoreMode='untilOccurrenceCount', ignoreCount=100, ignoreWindowMinutes=60)",
+    "update_issue(organizationSlug='my-org', issueId='PROJECT-123', status='ignored', reason='Ignoring because this is expected noise from the staging deploy')",
     "```",
     "</examples>",
     "",
@@ -590,6 +592,7 @@ export default defineTool({
     "- Ignore modes: `untilEscalating`, `forever`, `forDuration`, `untilOccurrenceCount`, `untilUserCount`.",
     "- Matching ignore inputs are `ignoreDurationMinutes`, `ignoreCount` + optional `ignoreWindowMinutes`, or `ignoreUserCount` + optional `ignoreUserWindowMinutes`.",
     "- To switch an already ignored issue between `untilEscalating`, `forever`, and condition-based ignore modes, first set `status='unresolved'`, then ignore it again with the new rule.",
+    "- `reason` is optional. When provided, it will be posted as a comment on the issue's activity feed explaining why the action was taken.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -605,6 +608,7 @@ export default defineTool({
     ignoreWindowMinutes: ParamIgnoreWindowMinutes.optional(),
     ignoreUserCount: ParamIgnoreUserCount.optional(),
     ignoreUserWindowMinutes: ParamIgnoreUserWindowMinutes.optional(),
+    reason: ParamReason.optional(),
   },
   annotations: {
     readOnlyHint: false,
@@ -706,6 +710,15 @@ export default defineTool({
     );
 
     if (!updateStatus && !updateAssignedTo && !updateIgnore) {
+      // Even when no state changes are needed, post the reason as a comment if provided
+      if (params.reason) {
+        await apiService.createIssueComment({
+          organizationSlug: orgSlug,
+          issueId: parsedIssueId!,
+          text: params.reason,
+        });
+      }
+
       return buildNoChangesOutput({
         issue: currentIssue,
         organizationSlug: orgSlug,
@@ -727,6 +740,15 @@ export default defineTool({
       ignoreUserCount: updateIgnore?.ignoreUserCount,
       ignoreUserWindow: updateIgnore?.ignoreUserWindow,
     });
+
+    // Post the reason as a comment on the issue's activity feed
+    if (params.reason) {
+      await apiService.createIssueComment({
+        organizationSlug: orgSlug,
+        issueId: parsedIssueId!,
+        text: params.reason,
+      });
+    }
 
     const updatedIgnoreState = getIgnoreState(updatedIssue, ignoreUpdate);
     const currentStatusDisplay = getIssueStatusDisplay(currentIssue);
@@ -795,6 +817,10 @@ export default defineTool({
       (statusChanged || ignoreBehaviorChanged)
     ) {
       output += `- ${updatedIgnoreState.message}\n`;
+    }
+
+    if (params.reason) {
+      output += `- A comment with the reason was posted to the issue's activity\n`;
     }
 
     return output;

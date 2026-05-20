@@ -1046,6 +1046,19 @@ export const restHandlers = buildHandlers([
     },
   },
   {
+    method: "post",
+    path: "/api/0/organizations/:org/issues/:issueId/notes/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as { text: string };
+      return HttpResponse.json({
+        id: "12345",
+        text: body.text,
+        type: "note",
+        dateCreated: new Date().toISOString(),
+      });
+    },
+  },
+  {
     method: "put",
     path: "/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
     fetch: async ({ request }) => {
