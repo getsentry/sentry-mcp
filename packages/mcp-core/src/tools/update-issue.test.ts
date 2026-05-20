@@ -941,4 +941,48 @@ describe("update_issue", () => {
       '**Comment posted**: "Confirmed this is no longer an issue after deploy"',
     );
   });
+
+  it("does not throw when comment posting fails after a successful update", async () => {
+    const currentIssue = createIssue({
+      status: "unresolved",
+      statusDetails: {},
+    });
+    const updatedIssue = createIssue({
+      status: "resolved",
+      statusDetails: {},
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(updatedIssue),
+      ),
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/notes/",
+        () => HttpResponse.json({ detail: "Rate limited" }, { status: 429 }),
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+        reason: "Resolving because fix deployed",
+      },
+      serverContext,
+    );
+
+    // Update succeeded — output should show it
+    expect(result).toContain("**Status**: unresolved → **resolved**");
+    // Comment failure should be reported gracefully, not thrown
+    expect(result).toContain("**Comment not posted**");
+  });
 });

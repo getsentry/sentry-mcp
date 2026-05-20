@@ -6,6 +6,7 @@ import {
   parseIssueParams,
 } from "../internal/tool-helpers/issue";
 import { formatAssignedTo } from "../internal/tool-helpers/formatting";
+import { logIssue } from "../telem/logging";
 import { UserInputError } from "../errors";
 import type { Issue } from "../api-client/types";
 import type { ServerContext } from "../types";
@@ -562,6 +563,58 @@ function buildIgnoreUpdate(
   throw new UserInputError("Unsupported ignore mode");
 }
 
+type ReasonCommentResult =
+  | { posted: true }
+  | { posted: false; skipped: true }
+  | { posted: false; error: string };
+
+async function tryPostReasonComment(
+  apiService: {
+    createIssueComment: (params: {
+      organizationSlug: string;
+      issueId: string;
+      text: string;
+    }) => Promise<void>;
+  },
+  organizationSlug: string,
+  issueId: string,
+  reason: string | undefined,
+): Promise<ReasonCommentResult> {
+  if (!reason) {
+    return { posted: false, skipped: true };
+  }
+  try {
+    await apiService.createIssueComment({
+      organizationSlug,
+      issueId,
+      text: reason,
+    });
+    return { posted: true };
+  } catch (error) {
+    logIssue(error);
+    return {
+      posted: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function formatReasonCommentLine(
+  reason: string | undefined,
+  result: ReasonCommentResult,
+): string {
+  if (!reason || ("skipped" in result && result.skipped)) {
+    return "";
+  }
+  if (result.posted) {
+    return `- **Comment posted**: "${reason}"\n`;
+  }
+  if ("error" in result) {
+    return `- **Comment not posted**: ${result.error}\n`;
+  }
+  return "";
+}
+
 export default defineTool({
   name: "update_issue",
   skills: ["triage"], // Only available in triage skill
@@ -710,27 +763,21 @@ export default defineTool({
     );
 
     if (!updateStatus && !updateAssignedTo && !updateIgnore) {
-      // Even when no state changes are needed, post the reason as a comment if provided
-      if (params.reason) {
-        await apiService.createIssueComment({
+      const commentResult = await tryPostReasonComment(
+        apiService,
+        orgSlug,
+        parsedIssueId!,
+        params.reason,
+      );
+
+      return (
+        buildNoChangesOutput({
+          issue: currentIssue,
           organizationSlug: orgSlug,
-          issueId: parsedIssueId!,
-          text: params.reason,
-        });
-      }
-
-      let noChangesOutput = buildNoChangesOutput({
-        issue: currentIssue,
-        organizationSlug: orgSlug,
-        ignoreState: currentIgnoreState,
-        issueUrl: requestedIssueUrl,
-      });
-
-      if (params.reason) {
-        noChangesOutput += `\n**Comment posted**: "${params.reason}"\n`;
-      }
-
-      return noChangesOutput;
+          ignoreState: currentIgnoreState,
+          issueUrl: requestedIssueUrl,
+        }) + formatReasonCommentLine(params.reason, commentResult)
+      );
     }
 
     // Update the issue
@@ -747,14 +794,12 @@ export default defineTool({
       ignoreUserWindow: updateIgnore?.ignoreUserWindow,
     });
 
-    // Post the reason as a comment on the issue's activity feed
-    if (params.reason) {
-      await apiService.createIssueComment({
-        organizationSlug: orgSlug,
-        issueId: parsedIssueId!,
-        text: params.reason,
-      });
-    }
+    const commentResult = await tryPostReasonComment(
+      apiService,
+      orgSlug,
+      parsedIssueId!,
+      params.reason,
+    );
 
     const updatedIgnoreState = getIgnoreState(updatedIssue, ignoreUpdate);
     const currentStatusDisplay = getIssueStatusDisplay(currentIssue);
@@ -825,9 +870,7 @@ export default defineTool({
       output += `- ${updatedIgnoreState.message}\n`;
     }
 
-    if (params.reason) {
-      output += `- **Comment posted**: "${params.reason}"\n`;
-    }
+    output += formatReasonCommentLine(params.reason, commentResult);
 
     return output;
   },
