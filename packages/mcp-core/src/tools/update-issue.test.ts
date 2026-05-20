@@ -937,5 +937,8 @@ describe("update_issue", () => {
       text: "Confirmed this is no longer an issue after deploy",
     });
     expect(result).toContain("No changes were needed.");
+    expect(result).toContain(
+      '**Comment posted**: "Confirmed this is no longer an issue after deploy"',
+    );
   });
 });

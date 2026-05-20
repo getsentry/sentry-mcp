@@ -613,7 +613,7 @@ export default defineTool({
   annotations: {
     readOnlyHint: false,
     destructiveHint: true,
-    idempotentHint: true,
+    idempotentHint: false,
     openWorldHint: true,
   },
   async handler(params, context: ServerContext) {
@@ -719,12 +719,18 @@ export default defineTool({
         });
       }
 
-      return buildNoChangesOutput({
+      let noChangesOutput = buildNoChangesOutput({
         issue: currentIssue,
         organizationSlug: orgSlug,
         ignoreState: currentIgnoreState,
         issueUrl: requestedIssueUrl,
       });
+
+      if (params.reason) {
+        noChangesOutput += `\n**Comment posted**: "${params.reason}"\n`;
+      }
+
+      return noChangesOutput;
     }
 
     // Update the issue
