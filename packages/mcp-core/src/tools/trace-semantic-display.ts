@@ -14,18 +14,6 @@ const SPAN_LABEL_MAX_LENGTH = 160;
 const SPAN_METADATA_MAX_LENGTH = 64;
 const SPAN_ATTRIBUTE_MAX_LENGTH = 2048;
 
-const HTTP_METHODS = new Set([
-  "CONNECT",
-  "DELETE",
-  "GET",
-  "HEAD",
-  "OPTIONS",
-  "PATCH",
-  "POST",
-  "PUT",
-  "TRACE",
-]);
-
 const SEMANTIC_SPAN_FORMATTERS: SpanDisplayFormatter[] = [
   formatHttpSpanDisplay,
   formatMcpSpanDisplay,
@@ -72,9 +60,9 @@ function formatHttpSpanDisplay(
   span: TraceSpan,
   fallbackLabel: string,
 ): SemanticSpanDisplay | null {
-  const method = canonicalizeHttpMethod(
-    getSpanAttributeString(span, ["http.request.method"]),
-  );
+  const method = getSpanAttributeString(span, [
+    "http.request.method",
+  ])?.toUpperCase();
   const statusCode = getSpanAttributeString(span, [
     "http.response.status_code",
   ]);
@@ -647,18 +635,6 @@ function formatHttpTarget(value: string): string {
     const withoutFragment = trimmed.split("#", 1)[0];
     return withoutFragment.split("?", 1)[0];
   }
-}
-
-function canonicalizeHttpMethod(value: unknown): string | undefined {
-  const method = formatDisplayPart(
-    value,
-    SPAN_METADATA_MAX_LENGTH,
-  )?.toUpperCase();
-  if (!method || (!HTTP_METHODS.has(method) && method !== "_OTHER")) {
-    return undefined;
-  }
-
-  return method;
 }
 
 function formatOperationLabel(

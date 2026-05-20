@@ -623,6 +623,18 @@ describe("get_trace_details", () => {
         "http.response.status_code": 204,
       },
     });
+    const httpExtensionMethodSpan = buildTraceSpanNode({
+      duration: 15,
+      eventId: "19191919191919191919191919191919",
+      name: "propfind",
+      op: "http.client",
+      parentSpanId: "1111111111111111",
+      spanId: "1919191919191919",
+      data: {
+        "http.request.method": "propfind",
+        "http.response.status_code": 207,
+      },
+    });
     const httpServerTargetSpan = buildTraceSpanNode({
       duration: 17,
       eventId: "14141414141414141414141414141414",
@@ -875,6 +887,7 @@ describe("get_trace_details", () => {
       children: [
         genAiSpan,
         httpMethodOnlySpan,
+        httpExtensionMethodSpan,
         httpServerTargetSpan,
         httpVersionedPathSpan,
         dbSpan,
@@ -915,7 +928,7 @@ describe("get_trace_details", () => {
             logs: 0,
             errors: 0,
             performance_issues: 0,
-            span_count: 24,
+            span_count: 25,
             transaction_child_count_map: [],
             span_count_map: {},
           }),
@@ -951,6 +964,7 @@ describe("get_trace_details", () => {
       "POST api.anthropic.com/v1/messages [33333333 · http.client · 200 · 21455ms]",
     );
     expect(result).toContain("POST [13131313 · http.client · 204 · 16ms]");
+    expect(result).toContain("PROPFIND [19191919 · http.client · 207 · 15ms]");
     expect(result).toContain(
       "GET api.example.com:443 [14141414 · http.client · 17ms]",
     );
