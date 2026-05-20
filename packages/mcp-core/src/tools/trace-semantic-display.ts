@@ -291,13 +291,14 @@ function formatFaasSpanDisplay(
   ]);
   const cron = getSpanAttributeString(span, ["faas.cron"]);
   const errorType = getErrorType(span);
+  const isColdStart = coldStart === "true";
 
   if (
     !trigger &&
     !name &&
     !provider &&
     !region &&
-    !coldStart &&
+    !isColdStart &&
     !documentOperation &&
     !documentTarget &&
     !cron
@@ -315,7 +316,7 @@ function formatFaasSpanDisplay(
     metadata: compactStrings([
       provider,
       region,
-      coldStart === "true" ? "coldstart" : undefined,
+      isColdStart ? "coldstart" : undefined,
       errorType,
     ]),
   };

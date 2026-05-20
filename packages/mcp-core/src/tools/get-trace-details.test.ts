@@ -862,6 +862,7 @@ describe("get_trace_details", () => {
       spanId: "acacacacacacacac",
       data: {
         "exception.type": "ValueError",
+        "faas.coldstart": false,
       },
     });
     const unnamedExceptionSpan = buildTraceSpanNode({
