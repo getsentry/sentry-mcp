@@ -158,7 +158,7 @@ These are Sentry MCP application attributes that are not part of the MCP semanti
 - `app.constraint.project_slug` - Session project constraint
 - `app.server.mode.agent` - Whether stdio started in agent mode
 - `app.server.mode.experimental` - Whether experimental tools are enabled
-- `app.oauth.skill.<skill>.granted` - Per-skill boolean attributes for skills granted to the MCP request. Skill ids are normalized with `-` replaced by `_`
+- `app.consent.skill.<skill>.granted` - Per-skill boolean attributes for skills granted to the MCP request. Skill ids are normalized with `-` replaced by `_`
 - `app.upstream.host` - Upstream Sentry host configured for the server
 - `app.url.full` - MCP URL configured for stdio
 

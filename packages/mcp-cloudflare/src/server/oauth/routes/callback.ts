@@ -331,9 +331,9 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
     },
   });
   for (const skill of grantedSkills) {
-    Sentry.metrics.count("app.oauth.skill_granted", 1, {
+    Sentry.metrics.count("app.consent.skill_granted", 1, {
       attributes: {
-        "app.oauth.skill": skill,
+        "app.consent.skill": skill,
         "app.client.family": clientFamily,
       },
     });
