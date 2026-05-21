@@ -10,6 +10,7 @@ type ToolCall = {
   name: string;
   spanId: string;
   timestamp: number;
+  durationMs: number;
   status?: string;
   arguments?: string;
   input?: string;
@@ -20,10 +21,26 @@ type ConversationMessage = {
   content: string;
   timestamp: number;
   spanId: string;
-  agentName?: string;
-  model?: string;
   userEmail?: string;
-  toolCalls?: ToolCall[];
+};
+
+type ConversationTurn = {
+  turn: number;
+  spanId: string;
+  traceId: string;
+  project: string;
+  started: number;
+  ended: number;
+  durationMs: number;
+  user?: ConversationMessage;
+  assistant?: ConversationMessage;
+  toolCalls: ToolCall[];
+  metadata: {
+    agentName?: string;
+    model?: string;
+    totalTokens: number;
+    status?: string;
+  };
 };
 
 function numeric(value: string | number | null | undefined): number {
@@ -189,13 +206,16 @@ function buildToolCall(span: AIConversationSpan): ToolCall | null {
     name,
     spanId: span.span_id,
     timestamp: span["precise.start_ts"],
+    durationMs: Math.round(
+      (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
+    ),
     status: span["span.status"],
     arguments: span["gen_ai.tool.call.arguments"],
     input: span["gen_ai.tool.input"],
   };
 }
 
-function extractMessages(spans: AIConversationSpan[]): ConversationMessage[] {
+function extractTurns(spans: AIConversationSpan[]): ConversationTurn[] {
   const sorted = [...spans].sort(
     (a, b) => a["precise.start_ts"] - b["precise.start_ts"],
   );
@@ -203,9 +223,8 @@ function extractMessages(spans: AIConversationSpan[]): ConversationMessage[] {
     (span) => getOperationType(span) === "ai_client",
   );
   const toolSpans = sorted.filter((span) => getOperationType(span) === "tool");
-  const messages: ConversationMessage[] = [];
 
-  for (const [index, span] of aiClientSpans.entries()) {
+  return aiClientSpans.map((span, index) => {
     const nextTimestamp =
       index < aiClientSpans.length - 1
         ? aiClientSpans[index + 1]!["precise.start_ts"]
@@ -221,31 +240,59 @@ function extractMessages(spans: AIConversationSpan[]): ConversationMessage[] {
       .filter((toolCall): toolCall is ToolCall => toolCall !== null);
 
     const userContent = extractUserContent(span);
-    if (userContent) {
-      messages.push({
-        role: "user",
-        content: userContent,
-        timestamp: span["precise.start_ts"],
-        spanId: span.span_id,
-        userEmail: span["user.email"],
-      });
-    }
-
     const assistantContent = extractAssistantContent(span);
-    if (assistantContent) {
-      messages.push({
-        role: "assistant",
-        content: assistantContent,
-        timestamp: span["precise.finish_ts"],
-        spanId: span.span_id,
+
+    return {
+      turn: index + 1,
+      spanId: span.span_id,
+      traceId: span.trace,
+      project: span.project,
+      started: span["precise.start_ts"],
+      ended: span["precise.finish_ts"],
+      durationMs: Math.round(
+        (span["precise.finish_ts"] - span["precise.start_ts"]) * 1000,
+      ),
+      user: userContent
+        ? {
+            role: "user",
+            content: userContent,
+            timestamp: span["precise.start_ts"],
+            spanId: span.span_id,
+            userEmail: span["user.email"],
+          }
+        : undefined,
+      assistant: assistantContent
+        ? {
+            role: "assistant",
+            content: assistantContent,
+            timestamp: span["precise.finish_ts"],
+            spanId: span.span_id,
+          }
+        : undefined,
+      toolCalls,
+      metadata: {
         agentName: span["gen_ai.agent.name"],
         model: span["gen_ai.response.model"] ?? span["gen_ai.request.model"],
-        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-      });
+        totalTokens: numeric(span["gen_ai.usage.total_tokens"]),
+        status: span["span.status"],
+      },
+    };
+  });
+}
+
+function flattenMessages(turns: ConversationTurn[]): ConversationMessage[] {
+  const messages: ConversationMessage[] = [];
+
+  for (const turn of turns) {
+    if (turn.user) {
+      messages.push(turn.user);
+    }
+    if (turn.assistant) {
+      messages.push(turn.assistant);
     }
   }
 
-  return messages.sort((a, b) => a.timestamp - b.timestamp);
+  return messages;
 }
 
 function formatTimestamp(timestamp: number): string {
@@ -259,13 +306,97 @@ function truncate(value: string, maxLength = 600): string {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  return `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : 1)}s`;
+}
+
+function formatMaybeJson(value: string): string {
+  const parsed = parseJson(value);
+  const formatted =
+    typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2);
+  return truncate(formatted, 1200);
+}
+
+function formatIndentedCodeBlock(value: string): string[] {
+  return [
+    "  ```json",
+    ...formatMaybeJson(value)
+      .split("\n")
+      .map((line) => `  ${line}`),
+    "  ```",
+  ];
+}
+
+function formatTurn(turn: ConversationTurn): string[] {
+  const metadata = [
+    turn.metadata.model,
+    turn.metadata.agentName,
+    turn.metadata.totalTokens > 0
+      ? `${turn.metadata.totalTokens} tokens`
+      : null,
+    formatDuration(turn.durationMs),
+    turn.metadata.status,
+  ].filter((item): item is string => Boolean(item));
+
+  const output = [
+    `### Turn ${turn.turn} - ${formatTimestamp(turn.started)}`,
+    "",
+    metadata.length > 0 ? `_${metadata.join(" | ")}_` : null,
+    metadata.length > 0 ? "" : null,
+    turn.user ? "**User**" : null,
+    turn.user ? "" : null,
+    turn.user ? truncate(turn.user.content) : null,
+    turn.user ? "" : null,
+    turn.assistant ? "**Assistant**" : null,
+    turn.assistant ? "" : null,
+    turn.assistant ? truncate(turn.assistant.content) : null,
+    turn.assistant ? "" : null,
+  ].filter((line): line is string => line !== null);
+
+  if (turn.toolCalls.length > 0) {
+    output.push("**Tools**", "");
+
+    for (const toolCall of turn.toolCalls) {
+      output.push(
+        `- ${toolCall.name} (${toolCall.spanId})${toolCall.status ? ` - ${toolCall.status}` : ""} - ${formatDuration(toolCall.durationMs)}`,
+      );
+
+      if (toolCall.arguments) {
+        output.push(
+          "",
+          "  Arguments:",
+          "",
+          ...formatIndentedCodeBlock(toolCall.arguments),
+        );
+      }
+
+      if (toolCall.input && toolCall.input !== toolCall.arguments) {
+        output.push(
+          "",
+          "  Input:",
+          "",
+          ...formatIndentedCodeBlock(toolCall.input),
+        );
+      }
+    }
+
+    output.push("");
+  }
+
+  return output;
+}
+
 function buildConversationArtifact(
   apiService: SentryApiService,
   organizationSlug: string,
   conversationId: string,
   spans: AIConversationSpan[],
 ) {
-  const messages = extractMessages(spans);
+  const turns = extractTurns(spans);
+  const messages = flattenMessages(turns);
   const traceIds = [...new Set(spans.map((span) => span.trace))].sort();
   const projects = [...new Set(spans.map((span) => span.project))].sort();
   const startTimestamp = Math.min(
@@ -284,6 +415,7 @@ function buildConversationArtifact(
     traceIds,
     projects,
     spanCount: spans.length,
+    turnCount: turns.length,
     messageCount: messages.length,
     toolCallCount: spans.filter((span) => getOperationType(span) === "tool")
       .length,
@@ -291,8 +423,9 @@ function buildConversationArtifact(
       (sum, span) => sum + numeric(span["gen_ai.usage.total_tokens"]),
       0,
     ),
+    turns,
     messages,
-    spans,
+    spanIds: spans.map((span) => span.span_id),
   };
 }
 
@@ -303,7 +436,7 @@ export default defineTool({
   requiredScopes: ["event:read", "project:read"],
 
   description:
-    "Fetch a structured AI conversation transcript and raw span artifact by conversation ID.",
+    "Fetch a structured AI conversation transcript by conversation ID.",
 
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
@@ -362,6 +495,7 @@ export default defineTool({
       `**Ended**: ${formatTimestamp(artifact.endTimestamp)}`,
       `**Projects**: ${artifact.projects.join(", ") || "None"}`,
       `**Trace IDs**: ${artifact.traceIds.join(", ") || "None"}`,
+      `**Turns**: ${artifact.turnCount}`,
       `**Messages**: ${artifact.messageCount}`,
       `**Tool Calls**: ${artifact.toolCallCount}`,
       `**Spans**: ${artifact.spanCount}`,
@@ -373,23 +507,7 @@ export default defineTool({
       "",
       "## Transcript",
       "",
-      ...artifact.messages.flatMap((message) => [
-        `### ${message.role === "user" ? "User" : "Assistant"} - ${formatTimestamp(message.timestamp)}`,
-        "",
-        truncate(message.content),
-        "",
-        ...(message.toolCalls?.length
-          ? [
-              "**Tool calls for this turn**:",
-              "",
-              ...message.toolCalls.map(
-                (toolCall) =>
-                  `- ${toolCall.name} (${toolCall.spanId})${toolCall.status ? ` - ${toolCall.status}` : ""}`,
-              ),
-              "",
-            ]
-          : []),
-      ]),
+      ...artifact.turns.flatMap(formatTurn),
       "## Structured Artifact",
       "",
       "```json",

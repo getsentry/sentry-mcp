@@ -116,6 +116,7 @@ describe("get_ai_conversation_details", () => {
       **Ended**: 2024-04-22T17:03:25.000Z
       **Projects**: mcp-server
       **Trace IDs**: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      **Turns**: 2
       **Messages**: 4
       **Tool Calls**: 1
       **Spans**: 3
@@ -127,23 +128,47 @@ describe("get_ai_conversation_details", () => {
 
       ## Transcript
 
-      ### User - 2024-04-22T17:03:20.000Z
+      ### Turn 1 - 2024-04-22T17:03:20.000Z
+
+      _gpt-5-mini-2026-05-01 | triage-agent | 42 tokens | 1.5s | ok_
+
+      **User**
 
       What failed in production?
 
-      ### Assistant - 2024-04-22T17:03:21.500Z
+      **Assistant**
 
       The checkout worker is timing out.
 
-      **Tool calls for this turn**:
+      **Tools**
 
-      - search_events (2222222222222222) - ok
+      - search_events (2222222222222222) - ok - 300ms
 
-      ### User - 2024-04-22T17:03:24.000Z
+        Arguments:
+
+        \`\`\`json
+        {
+          "query": "level:error"
+        }
+        \`\`\`
+
+        Input:
+
+        \`\`\`json
+        {
+          "organizationSlug": "test-org"
+        }
+        \`\`\`
+
+      ### Turn 2 - 2024-04-22T17:03:24.000Z
+
+      _58 tokens | 1s | ok_
+
+      **User**
 
       Can you inspect the failing event?
 
-      ### Assistant - 2024-04-22T17:03:25.000Z
+      **Assistant**
 
       I found the timeout stack trace.
 
@@ -163,9 +188,77 @@ describe("get_ai_conversation_details", () => {
           "mcp-server"
         ],
         "spanCount": 3,
+        "turnCount": 2,
         "messageCount": 4,
         "toolCallCount": 1,
         "totalTokens": 100,
+        "turns": [
+          {
+            "turn": 1,
+            "spanId": "1111111111111111",
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "project": "mcp-server",
+            "started": 1713805400,
+            "ended": 1713805401.5,
+            "durationMs": 1500,
+            "user": {
+              "role": "user",
+              "content": "What failed in production?",
+              "timestamp": 1713805400,
+              "spanId": "1111111111111111",
+              "userEmail": "dev@example.com"
+            },
+            "assistant": {
+              "role": "assistant",
+              "content": "The checkout worker is timing out.",
+              "timestamp": 1713805401.5,
+              "spanId": "1111111111111111"
+            },
+            "toolCalls": [
+              {
+                "name": "search_events",
+                "spanId": "2222222222222222",
+                "timestamp": 1713805401.7,
+                "durationMs": 300,
+                "status": "ok",
+                "arguments": "{\\"query\\":\\"level:error\\"}",
+                "input": "{\\"organizationSlug\\":\\"test-org\\"}"
+              }
+            ],
+            "metadata": {
+              "agentName": "triage-agent",
+              "model": "gpt-5-mini-2026-05-01",
+              "totalTokens": 42,
+              "status": "ok"
+            }
+          },
+          {
+            "turn": 2,
+            "spanId": "3333333333333333",
+            "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "project": "mcp-server",
+            "started": 1713805404,
+            "ended": 1713805405,
+            "durationMs": 1000,
+            "user": {
+              "role": "user",
+              "content": "Can you inspect the failing event?",
+              "timestamp": 1713805404,
+              "spanId": "3333333333333333"
+            },
+            "assistant": {
+              "role": "assistant",
+              "content": "I found the timeout stack trace.",
+              "timestamp": 1713805405,
+              "spanId": "3333333333333333"
+            },
+            "toolCalls": [],
+            "metadata": {
+              "totalTokens": 58,
+              "status": "ok"
+            }
+          }
+        ],
         "messages": [
           {
             "role": "user",
@@ -178,19 +271,7 @@ describe("get_ai_conversation_details", () => {
             "role": "assistant",
             "content": "The checkout worker is timing out.",
             "timestamp": 1713805401.5,
-            "spanId": "1111111111111111",
-            "agentName": "triage-agent",
-            "model": "gpt-5-mini-2026-05-01",
-            "toolCalls": [
-              {
-                "name": "search_events",
-                "spanId": "2222222222222222",
-                "timestamp": 1713805401.7,
-                "status": "ok",
-                "arguments": "{\\"query\\":\\"level:error\\"}",
-                "input": "{\\"organizationSlug\\":\\"test-org\\"}"
-              }
-            ]
+            "spanId": "1111111111111111"
           },
           {
             "role": "user",
@@ -205,59 +286,10 @@ describe("get_ai_conversation_details", () => {
             "spanId": "3333333333333333"
           }
         ],
-        "spans": [
-          {
-            "gen_ai.conversation.id": "conv-123",
-            "span_id": "1111111111111111",
-            "trace": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "parent_span": null,
-            "precise.start_ts": 1713805400,
-            "precise.finish_ts": 1713805401.5,
-            "project": "mcp-server",
-            "project.id": 4509109107622913,
-            "span.name": "gen_ai.chat",
-            "span.status": "ok",
-            "gen_ai.operation.type": "ai_client",
-            "gen_ai.input.messages": "[{\\"role\\":\\"system\\",\\"content\\":\\"You are a helpful assistant.\\"},{\\"role\\":\\"user\\",\\"content\\":\\"What failed in production?\\"}]",
-            "gen_ai.output.messages": "[{\\"role\\":\\"assistant\\",\\"content\\":\\"The checkout worker is timing out.\\"}]",
-            "gen_ai.usage.total_tokens": 42,
-            "gen_ai.request.model": "gpt-5-mini",
-            "gen_ai.response.model": "gpt-5-mini-2026-05-01",
-            "gen_ai.agent.name": "triage-agent",
-            "user.email": "dev@example.com"
-          },
-          {
-            "gen_ai.conversation.id": "conv-123",
-            "span_id": "2222222222222222",
-            "trace": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "parent_span": "1111111111111111",
-            "precise.start_ts": 1713805401.7,
-            "precise.finish_ts": 1713805402,
-            "project": "mcp-server",
-            "project.id": 4509109107622913,
-            "span.name": "gen_ai.execute_tool",
-            "span.status": "ok",
-            "gen_ai.operation.type": "tool",
-            "gen_ai.tool.name": "search_events",
-            "gen_ai.tool.call.arguments": "{\\"query\\":\\"level:error\\"}",
-            "gen_ai.tool.input": "{\\"organizationSlug\\":\\"test-org\\"}"
-          },
-          {
-            "gen_ai.conversation.id": "conv-123",
-            "span_id": "3333333333333333",
-            "trace": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "parent_span": null,
-            "precise.start_ts": 1713805404,
-            "precise.finish_ts": 1713805405,
-            "project": "mcp-server",
-            "project.id": 4509109107622913,
-            "span.name": "gen_ai.chat",
-            "span.status": "ok",
-            "gen_ai.operation.type": "ai_client",
-            "gen_ai.input.messages": "[{\\"role\\":\\"user\\",\\"content\\":\\"Can you inspect the failing event?\\"}]",
-            "gen_ai.response.text": "I found the timeout stack trace.",
-            "gen_ai.usage.total_tokens": 58
-          }
+        "spanIds": [
+          "1111111111111111",
+          "2222222222222222",
+          "3333333333333333"
         ]
       }
       \`\`\`"
