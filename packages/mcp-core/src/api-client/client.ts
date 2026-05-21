@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   getContinuousProfileUrl as getContinuousProfileUrlUtil,
+  getAIConversationUrl as getAIConversationUrlUtil,
   getIssueUrl as getIssueUrlUtil,
   getMonitorUrl as getMonitorUrlUtil,
   getProfileUrl as getProfileUrlUtil,
@@ -53,6 +54,7 @@ import {
   ReplayListResponseSchema,
   ReplayIdsByResourceSchema,
   ReplayRecordingSegmentsSchema,
+  AIConversationSpanListSchema,
 } from "./schema";
 import { ConfigurationError } from "../errors";
 import { createApiError, ApiNotFoundError, ApiValidationError } from "./errors";
@@ -86,6 +88,7 @@ import type {
   ReplayDetails,
   ReplayList,
   ReplayRecordingSegments,
+  AIConversationSpanList,
 } from "./types";
 // TODO: this is shared - so ideally, for safety, it uses @sentry/core, but currently
 // logger isnt exposed (or rather, it is, but its not the right logger)
@@ -102,6 +105,25 @@ const NETWORK_ERROR_MESSAGES: Record<string, string> = {
   ETIMEDOUT: "Connection timed out. Check network connectivity.",
   ECONNRESET: "Connection reset. Try again in a moment.",
 };
+
+function getNextCursor(linkHeader: string | null): string | null {
+  if (!linkHeader) {
+    return null;
+  }
+
+  for (const link of linkHeader.split(",")) {
+    if (!link.includes('rel="next"') || !link.includes('results="true"')) {
+      continue;
+    }
+
+    const cursorMatch = link.match(/cursor="([^"]+)"/);
+    if (cursorMatch?.[1]) {
+      return cursorMatch[1];
+    }
+  }
+
+  return null;
+}
 
 /**
  * Custom error class for Sentry API responses.
@@ -641,6 +663,18 @@ export class SentryApiService {
       this.host,
       organizationSlug,
       replayId,
+      this.protocol,
+    );
+  }
+
+  getAIConversationUrl(
+    organizationSlug: string,
+    conversationId: string,
+  ): string {
+    return getAIConversationUrlUtil(
+      this.host,
+      organizationSlug,
+      conversationId,
       this.protocol,
     );
   }
@@ -2869,6 +2903,56 @@ export class SentryApiService {
       opts,
     );
     return TraceSchema.parse(body);
+  }
+
+  async getAIConversation(
+    {
+      organizationSlug,
+      conversationId,
+      project = "-1",
+      statsPeriod = "30d",
+      perPage = 1000,
+      maxPages = 10,
+    }: {
+      organizationSlug: string;
+      conversationId: string;
+      project?: string | string[];
+      statsPeriod?: string;
+      perPage?: number;
+      maxPages?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<AIConversationSpanList> {
+    const spans: AIConversationSpanList = [];
+    let cursor: string | null = null;
+
+    for (let page = 0; page < maxPages; page++) {
+      const queryParams = new URLSearchParams();
+      queryParams.set("per_page", String(perPage));
+      queryParams.set("statsPeriod", statsPeriod);
+      const projects = Array.isArray(project) ? project : [project];
+      for (const projectId of projects) {
+        queryParams.append("project", projectId);
+      }
+      if (cursor) {
+        queryParams.set("cursor", cursor);
+      }
+
+      const response = await this.request(
+        `/organizations/${organizationSlug}/ai-conversations/${encodeURIComponent(conversationId)}/?${queryParams.toString()}`,
+        undefined,
+        opts,
+      );
+      const body = await this.parseJsonResponse(response);
+      spans.push(...AIConversationSpanListSchema.parse(body));
+
+      cursor = getNextCursor(response.headers.get("link"));
+      if (!cursor) {
+        break;
+      }
+    }
+
+    return spans;
   }
 
   /**

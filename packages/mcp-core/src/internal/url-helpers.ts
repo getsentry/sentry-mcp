@@ -15,6 +15,7 @@ export type SentryResourceType =
   | "issue"
   | "trace"
   | "profile"
+  | "ai_conversation"
   | "event"
   | "replay"
   | "monitor"
@@ -35,6 +36,8 @@ export interface ParsedSentryUrl {
   issueId?: string;
   /** Trace ID (for trace URLs) */
   traceId?: string;
+  /** AI conversation ID (for Explore conversation URLs) */
+  conversationId?: string;
   /** Span ID (for trace URLs with span focus, from query param) */
   spanId?: string;
   /** Event ID (for event URLs) */
@@ -72,6 +75,7 @@ export interface ParsedSentryUrl {
  * - Trace: `/explore/traces/trace/{traceId}` or `/performance/trace/{traceId}`
  * - Profile: `/explore/profiling/profile/{project}/{profileId}/flamegraph/`
  * - Continuous profile: `/explore/profiling/profile/{project}/flamegraph/` with query params
+ * - AI conversation: `/explore/conversations/{conversationId}/`
  * - Replay: `/explore/replays/{replayId}/` or `/replays/{replayId}/`
  * - Monitor: `/crons/{monitorSlug}/` or `/monitors/{monitorSlug}/`
  * - Release: `/releases/{version}/`
@@ -189,6 +193,28 @@ function extractOrganizationSlug(parsedUrl: URL, pathParts: string[]): string {
   );
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractPathGroup(
+  pathParts: string[],
+  patterns: RegExp[],
+  groupName: string,
+): string | undefined {
+  const path = pathParts.join("/");
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(path);
+    const value = match?.groups?.[groupName];
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Identifies the resource type and extracts relevant identifiers.
  */
@@ -219,6 +245,26 @@ function identifyResource(
       profilerId,
       start,
       end,
+    };
+  }
+
+  // AI conversation URL: /explore/conversations/{conversationId}/
+  const conversationId = extractPathGroup(
+    pathParts,
+    [
+      /^explore\/conversations\/(?<conversationId>[^/]+)$/,
+      /^organizations\/[^/]+\/explore\/conversations\/(?<conversationId>[^/]+)$/,
+      new RegExp(
+        `^${escapeRegex(organizationSlug)}\\/explore\\/conversations\\/(?<conversationId>[^/]+)$`,
+      ),
+    ],
+    "conversationId",
+  );
+  if (conversationId) {
+    return {
+      type: "ai_conversation",
+      organizationSlug,
+      conversationId,
     };
   }
 
