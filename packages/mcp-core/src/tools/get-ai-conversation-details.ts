@@ -206,13 +206,15 @@ function extractMessages(spans: AIConversationSpan[]): ConversationMessage[] {
   const messages: ConversationMessage[] = [];
 
   for (const [index, span] of aiClientSpans.entries()) {
-    const previousTimestamp =
-      index > 0 ? aiClientSpans[index - 1]!["precise.finish_ts"] : 0;
+    const nextTimestamp =
+      index < aiClientSpans.length - 1
+        ? aiClientSpans[index + 1]!["precise.start_ts"]
+        : Number.POSITIVE_INFINITY;
     const toolCalls = toolSpans
       .filter((toolSpan) => {
         const timestamp = toolSpan["precise.start_ts"];
         return (
-          timestamp > previousTimestamp && timestamp < span["precise.start_ts"]
+          timestamp >= span["precise.start_ts"] && timestamp < nextTimestamp
         );
       })
       .map(buildToolCall)
@@ -378,7 +380,7 @@ export default defineTool({
         "",
         ...(message.toolCalls?.length
           ? [
-              "**Tool calls before this response**:",
+              "**Tool calls for this turn**:",
               "",
               ...message.toolCalls.map(
                 (toolCall) =>

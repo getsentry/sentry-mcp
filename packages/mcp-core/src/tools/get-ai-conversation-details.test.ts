@@ -135,6 +135,10 @@ describe("get_ai_conversation_details", () => {
 
       The checkout worker is timing out.
 
+      **Tool calls for this turn**:
+
+      - search_events (2222222222222222) - ok
+
       ### User - 2024-04-22T17:03:24.000Z
 
       Can you inspect the failing event?
@@ -142,10 +146,6 @@ describe("get_ai_conversation_details", () => {
       ### Assistant - 2024-04-22T17:03:25.000Z
 
       I found the timeout stack trace.
-
-      **Tool calls before this response**:
-
-      - search_events (2222222222222222) - ok
 
       ## Structured Artifact
 
@@ -180,7 +180,17 @@ describe("get_ai_conversation_details", () => {
             "timestamp": 1713805401.5,
             "spanId": "1111111111111111",
             "agentName": "triage-agent",
-            "model": "gpt-5-mini-2026-05-01"
+            "model": "gpt-5-mini-2026-05-01",
+            "toolCalls": [
+              {
+                "name": "search_events",
+                "spanId": "2222222222222222",
+                "timestamp": 1713805401.7,
+                "status": "ok",
+                "arguments": "{\\"query\\":\\"level:error\\"}",
+                "input": "{\\"organizationSlug\\":\\"test-org\\"}"
+              }
+            ]
           },
           {
             "role": "user",
@@ -192,17 +202,7 @@ describe("get_ai_conversation_details", () => {
             "role": "assistant",
             "content": "I found the timeout stack trace.",
             "timestamp": 1713805405,
-            "spanId": "3333333333333333",
-            "toolCalls": [
-              {
-                "name": "search_events",
-                "spanId": "2222222222222222",
-                "timestamp": 1713805401.7,
-                "status": "ok",
-                "arguments": "{\\"query\\":\\"level:error\\"}",
-                "input": "{\\"organizationSlug\\":\\"test-org\\"}"
-              }
-            ]
+            "spanId": "3333333333333333"
           }
         ],
         "spans": [
@@ -329,5 +329,44 @@ describe("get_ai_conversation_details", () => {
     expect(result).toContain('"spanId": "repeat-ai-1"');
     expect(result).toContain('"spanId": "repeat-ai-2"');
     expect(result).toContain("- search_events (repeat-tool-1) - ok");
+  });
+
+  it("attaches tool calls after the final AI client span", async () => {
+    mockConversationEndpoint("test-org", "conv-final-tool", [
+      {
+        ...conversationSpans[0],
+        "gen_ai.conversation.id": "conv-final-tool",
+        "precise.start_ts": 1713805400,
+        "precise.finish_ts": 1713805401,
+        span_id: "final-ai-1",
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", content: "check the latest event" },
+        ]),
+        "gen_ai.output.messages": JSON.stringify([
+          { role: "assistant", content: "I will inspect that event." },
+        ]),
+      },
+      {
+        ...conversationSpans[1],
+        "gen_ai.conversation.id": "conv-final-tool",
+        "precise.start_ts": 1713805402,
+        "precise.finish_ts": 1713805403,
+        span_id: "final-tool-1",
+        "gen_ai.tool.name": "get_issue_details",
+      },
+    ]);
+
+    const result = await getAIConversationDetails.handler(
+      {
+        organizationSlug: "test-org",
+        conversationId: "conv-final-tool",
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("**Tool Calls**: 1");
+    expect(result).toContain("- get_issue_details (final-tool-1) - ok");
+    expect(result).toContain('"toolCallCount": 1');
+    expect(result).toContain('"toolCalls": [');
   });
 });
