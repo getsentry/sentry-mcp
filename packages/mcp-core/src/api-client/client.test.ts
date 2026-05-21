@@ -457,6 +457,76 @@ describe("network error handling", () => {
   });
 });
 
+describe("request headers", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("should send MCP client headers when clientId and clientName are set", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "1",
+          name: "Test User",
+          email: "test@example.com",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+      clientId: "abc123",
+      clientName: "Claude Code",
+    });
+
+    await apiService.getAuthenticatedUser();
+
+    const [, requestInit] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    expect(requestInit.headers["X-Sentry-MCP-Client-Id"]).toBe("abc123");
+    expect(requestInit.headers["X-Sentry-MCP-Client-Name"]).toBe("Claude Code");
+  });
+
+  it("should not send MCP client headers when clientId and clientName are not set", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "1",
+          name: "Test User",
+          email: "test@example.com",
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    await apiService.getAuthenticatedUser();
+
+    const [, requestInit] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    expect(requestInit.headers["X-Sentry-MCP-Client-Id"]).toBeUndefined();
+    expect(requestInit.headers["X-Sentry-MCP-Client-Name"]).toBeUndefined();
+  });
+});
+
 describe("listOrganizations", () => {
   let originalFetch: typeof globalThis.fetch;
 

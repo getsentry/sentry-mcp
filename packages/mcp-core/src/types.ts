@@ -46,6 +46,8 @@ export type ServerContext = {
   sentryProtocol?: SentryProtocol;
   mcpUrl?: string;
   accessToken: string;
+  /** DCR-registered client name (freeform, as provided during Dynamic Client Registration) */
+  clientName?: string | null;
   openaiBaseUrl?: string;
   userId?: string | null;
   userIpAddress?: string | null;

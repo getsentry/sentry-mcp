@@ -20,6 +20,7 @@ export type WorkerProps = {
   accessTokenExpiresAt?: number; // Cached validity deadline; extended on successful probe.
   upstreamTokenInvalid?: boolean;
   clientId: string;
+  clientName?: string;
   scope: string;
   /**
    * @deprecated grantedScopes is deprecated and will be removed on Jan 1, 2026.
