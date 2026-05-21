@@ -157,6 +157,7 @@ const mcpHandler: ExportedHandler<Env> = {
     const userId = rawProps.id as string;
     const accessToken = rawProps.accessToken as string;
     const clientId = rawProps.clientId as string;
+    const clientName = rawProps.clientName;
     const sentryHost = env.SENTRY_HOST || "sentry.io";
     const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
     const requestGrantId = getRequestGrantId(request);
@@ -326,7 +327,7 @@ const mcpHandler: ExportedHandler<Env> = {
       userId,
       userIpAddress,
       clientId,
-      clientFamily,
+      clientName,
       accessToken,
       grantedSkills: validSkills,
       constraints,

@@ -307,6 +307,7 @@ export default new Hono<{ Bindings: Env }>().get("/", async (c) => {
       // unnecessary upstream refresh calls when still valid
       accessTokenExpiresAt,
       clientId: oauthReqInfo.clientId,
+      clientName: registeredClientName,
       scope: oauthReqInfo.scope.join(" "),
       // Scopes derived from skills - for backward compatibility with old MCP clients
       // that don't support grantedSkills and only understand grantedScopes

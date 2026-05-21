@@ -263,7 +263,8 @@ function parseTraceItemAttributes(
  */
 export class SentryApiService {
   private accessToken: string | null;
-  private clientFamily: string | null;
+  private clientId: string | null;
+  private clientName: string | null;
   protected host: string;
   protected protocol: SentryProtocol;
   protected apiPrefix: string;
@@ -276,21 +277,25 @@ export class SentryApiService {
    * @param config Configuration object
    * @param config.accessToken OAuth access token for authentication (optional for some endpoints)
    * @param config.host Sentry hostname (e.g. "sentry.io", "sentry.example.com")
-   * @param config.clientFamily Resolved AI agent family (e.g. "claude-code", "cursor")
+   * @param config.clientId DCR-registered OAuth client ID
+   * @param config.clientName DCR-registered OAuth client name
    */
   constructor({
     accessToken = null,
     host = "sentry.io",
     protocol = "https",
-    clientFamily = null,
+    clientId = null,
+    clientName = null,
   }: {
     accessToken?: string | null;
     host?: string;
     protocol?: SentryProtocol;
-    clientFamily?: string | null;
+    clientId?: string | null;
+    clientName?: string | null;
   }) {
     this.accessToken = accessToken;
-    this.clientFamily = clientFamily;
+    this.clientId = clientId;
+    this.clientName = clientName;
     this.host = host;
     this.protocol = protocol;
     this.apiPrefix = `${protocol}://${host}/api/0`;
@@ -389,8 +394,11 @@ export class SentryApiService {
     if (this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;
     }
-    if (this.clientFamily) {
-      headers["X-Sentry-Client-Family"] = this.clientFamily;
+    if (this.clientId) {
+      headers["X-Sentry-MCP-Client-Id"] = this.clientId;
+    }
+    if (this.clientName) {
+      headers["X-Sentry-MCP-Client-Name"] = this.clientName;
     }
 
     // Check if fetch is available, otherwise provide a helpful error message

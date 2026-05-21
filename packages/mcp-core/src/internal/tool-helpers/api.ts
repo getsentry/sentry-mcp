@@ -32,7 +32,8 @@ export function apiServiceFromContext(
     host,
     protocol: context.sentryProtocol,
     accessToken: context.accessToken,
-    clientFamily: context.clientFamily,
+    clientId: context.clientId,
+    clientName: context.clientName,
   });
 }
 
