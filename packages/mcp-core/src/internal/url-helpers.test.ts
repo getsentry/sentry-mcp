@@ -232,6 +232,43 @@ describe("parseSentryUrl", () => {
     });
   });
 
+  describe("AI conversation URLs", () => {
+    it("parses AI conversation URL with subdomain", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/explore/conversations/conv-123/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "conversationId": "conv-123",
+          "organizationSlug": "my-org",
+          "type": "ai_conversation",
+        }
+      `);
+    });
+
+    it("parses AI conversation URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.io/organizations/my-org/explore/conversations/conv-123/",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "conversationId": "conv-123",
+          "organizationSlug": "my-org",
+          "type": "ai_conversation",
+        }
+      `);
+    });
+
+    it("does not parse unrelated conversations path segments", () => {
+      const result = parseSentryUrl(
+        "https://sentry.io/organizations/my-org/settings/projects/conversations/keys/",
+      );
+      expect(result.type).toBe("unknown");
+    });
+  });
+
   describe("replay URLs", () => {
     it("parses canonical replay URL with subdomain", () => {
       expect(

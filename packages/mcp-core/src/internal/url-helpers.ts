@@ -193,6 +193,28 @@ function extractOrganizationSlug(parsedUrl: URL, pathParts: string[]): string {
   );
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractPathGroup(
+  pathParts: string[],
+  patterns: RegExp[],
+  groupName: string,
+): string | undefined {
+  const path = pathParts.join("/");
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(path);
+    const value = match?.groups?.[groupName];
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Identifies the resource type and extracts relevant identifiers.
  */
@@ -227,16 +249,23 @@ function identifyResource(
   }
 
   // AI conversation URL: /explore/conversations/{conversationId}/
-  const conversationsIndex = pathParts.indexOf("conversations");
-  if (conversationsIndex !== -1) {
-    const conversationId = pathParts[conversationsIndex + 1];
-    if (conversationId) {
-      return {
-        type: "ai_conversation",
-        organizationSlug,
-        conversationId,
-      };
-    }
+  const conversationId = extractPathGroup(
+    pathParts,
+    [
+      /^explore\/conversations\/(?<conversationId>[^/]+)$/,
+      /^organizations\/[^/]+\/explore\/conversations\/(?<conversationId>[^/]+)$/,
+      new RegExp(
+        `^${escapeRegex(organizationSlug)}\\/explore\\/conversations\\/(?<conversationId>[^/]+)$`,
+      ),
+    ],
+    "conversationId",
+  );
+  if (conversationId) {
+    return {
+      type: "ai_conversation",
+      organizationSlug,
+      conversationId,
+    };
   }
 
   // Replay URL: /explore/replays/{replayId}/ or /replays/{replayId}/
