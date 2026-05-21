@@ -35,7 +35,7 @@ type OAuthExecutionContext = ExecutionContext & {
 };
 
 function getSkillGrantedAttributeName(skill: string): string {
-  return `app.oauth.skill.${skill.replaceAll("-", "_")}.granted`;
+  return `app.consent.skill.${skill.replaceAll("-", "_")}.granted`;
 }
 
 function escapeAuthenticateHeaderValue(value: string): string {
