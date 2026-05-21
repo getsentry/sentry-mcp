@@ -12,7 +12,7 @@ const baseContext = {
   userId: "1",
 };
 
-const conversationSpans = [
+const conversationSpans: Array<Record<string, unknown>> = [
   {
     "gen_ai.conversation.id": "conv-123",
     parent_span: null,
