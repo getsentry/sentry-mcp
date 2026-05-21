@@ -1049,6 +1049,58 @@ export const TraceSchema = z.array(
   z.union([TraceSpanSchema, TraceIssueSchema]),
 );
 
+const NullableStringOrNumberSchema = z
+  .union([z.string(), z.number()])
+  .nullable()
+  .optional();
+const NullableOptionalStringSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((value) => value ?? undefined);
+
+export const AIConversationSpanSchema = z
+  .object({
+    "gen_ai.conversation.id": z.string(),
+    span_id: z.string(),
+    trace: z.string(),
+    parent_span: z.string().nullable().optional(),
+    "precise.start_ts": z.number(),
+    "precise.finish_ts": z.number(),
+    project: z.string(),
+    "project.id": z.union([z.string(), z.number()]),
+    "span.name": NullableOptionalStringSchema,
+    "span.status": NullableOptionalStringSchema,
+    "span.op": NullableOptionalStringSchema,
+    "span.description": NullableOptionalStringSchema,
+    "span.duration": z.number().optional(),
+    transaction: NullableOptionalStringSchema,
+    is_transaction: z.boolean().optional(),
+    "gen_ai.cost.total_tokens": NullableStringOrNumberSchema,
+    "gen_ai.operation.type": NullableOptionalStringSchema,
+    "gen_ai.input.messages": NullableOptionalStringSchema,
+    "gen_ai.output.messages": NullableOptionalStringSchema,
+    "gen_ai.system_instructions": NullableOptionalStringSchema,
+    "gen_ai.tool.definitions": NullableOptionalStringSchema,
+    "gen_ai.request.messages": NullableOptionalStringSchema,
+    "gen_ai.response.object": NullableOptionalStringSchema,
+    "gen_ai.response.text": NullableOptionalStringSchema,
+    "gen_ai.tool.name": NullableOptionalStringSchema,
+    "gen_ai.tool.call.arguments": NullableOptionalStringSchema,
+    "gen_ai.tool.input": NullableOptionalStringSchema,
+    "gen_ai.usage.total_tokens": NullableStringOrNumberSchema,
+    "gen_ai.request.model": NullableOptionalStringSchema,
+    "gen_ai.response.model": NullableOptionalStringSchema,
+    "gen_ai.agent.name": NullableOptionalStringSchema,
+    "user.id": NullableOptionalStringSchema,
+    "user.email": NullableOptionalStringSchema,
+    "user.username": NullableOptionalStringSchema,
+    "user.ip": NullableOptionalStringSchema,
+  })
+  .passthrough();
+
+export const AIConversationSpanListSchema = z.array(AIConversationSpanSchema);
+
 /**
  * Schema for individual frames in a flamegraph.
  *

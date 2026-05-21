@@ -19,6 +19,7 @@ import getTraceDetails from "./get-trace-details";
 import getProfileDetails from "./get-profile-details";
 import getReplayDetails from "./get-replay-details";
 import getSnapshotDetails from "./get-snapshot-details";
+import getAIConversationDetails from "./get-ai-conversation-details";
 
 /** Types with full API integration. */
 export const FULLY_SUPPORTED_TYPES = [
@@ -26,6 +27,7 @@ export const FULLY_SUPPORTED_TYPES = [
   "event",
   "trace",
   "span",
+  "ai_conversation",
   "breadcrumbs",
   "replay",
 ] as const;
@@ -50,6 +52,8 @@ export interface ResolvedResourceParams {
   // Trace/Span params
   traceId?: string;
   spanId?: string;
+  // AI conversation params
+  conversationId?: string;
   // Profile params
   projectSlug?: string;
   profileId?: string;
@@ -142,6 +146,13 @@ export function resolveResourceParams(params: {
       };
     }
 
+    case "ai_conversation":
+      return {
+        type: "ai_conversation",
+        organizationSlug,
+        conversationId: resourceId,
+      };
+
     case "breadcrumbs":
       return {
         type: "breadcrumbs",
@@ -186,7 +197,7 @@ function resolveFromParsedUrl(
     }
     throw new UserInputError(
       "Could not determine resource type from URL. " +
-        "Supported URL patterns: issues, events, traces, profiles, replays, monitors, and releases.",
+        "Supported URL patterns: issues, events, traces, AI conversations, profiles, replays, monitors, and releases.",
     );
   }
 
@@ -268,6 +279,18 @@ function resolveFromParsedUrl(
         organizationSlug,
         traceId: parsed.traceId,
         spanId: parsed.spanId,
+      };
+
+    case "ai_conversation":
+      if (!parsed.conversationId) {
+        throw new UserInputError(
+          "Could not extract AI conversation ID from URL.",
+        );
+      }
+      return {
+        type: "ai_conversation",
+        organizationSlug,
+        conversationId: parsed.conversationId,
       };
 
     case "profile":
@@ -423,7 +446,7 @@ export default defineTool({
   description: [
     "Fetch a Sentry resource by URL or by type and ID. Pass a Sentry URL directly and the resource type is auto-detected.",
     "",
-    "Supports issues, events, traces, spans, replays, breadcrumbs, and preprod snapshots.",
+    "Supports issues, events, traces, spans, AI conversations, replays, breadcrumbs, and preprod snapshots.",
     "Sentry URLs require authentication that this tool handles.",
     "Trace lookups return a condensed overview by default.",
     "",
@@ -449,6 +472,9 @@ export default defineTool({
     "### Replay by ID",
     "get_sentry_resource(resourceType='replay', organizationSlug='my-org', resourceId='7e07485f-12f9-416b-8b14-26260799b51f')",
     "",
+    "### AI conversation by ID",
+    "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
+    "",
     "### Investigate a failed snapshot test from CI",
     "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/')",
     "",
@@ -467,7 +493,15 @@ export default defineTool({
       ),
 
     resourceType: z
-      .enum(["issue", "event", "trace", "span", "breadcrumbs", "replay"])
+      .enum([
+        "issue",
+        "event",
+        "trace",
+        "span",
+        "ai_conversation",
+        "breadcrumbs",
+        "replay",
+      ])
       .optional()
       .describe(
         "Resource type. With a URL, can override the auto-detected type for breadcrumbs on an issue/event URL or for `trace` on a span-focused trace URL.",
@@ -478,7 +512,7 @@ export default defineTool({
       .trim()
       .optional()
       .describe(
-        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, replay ID, or `traceId:spanId` for span resources. Required when not using a URL.",
+        "Resource identifier: issue shortId (e.g., 'PROJECT-123'), event ID, trace ID, AI conversation ID, replay ID, or `traceId:spanId` for span resources. Required when not using a URL.",
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
@@ -551,6 +585,16 @@ export default defineTool({
             traceId: resolved.traceId!,
             spanId: resolved.spanId,
             regionUrl: context.constraints.regionUrl ?? null,
+          },
+          context,
+        );
+
+      case "ai_conversation":
+        return getAIConversationDetails.handler(
+          {
+            organizationSlug: resolved.organizationSlug,
+            conversationId: resolved.conversationId!,
+            regionUrl: context.constraints.regionUrl ?? undefined,
           },
           context,
         );

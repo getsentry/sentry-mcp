@@ -25,6 +25,7 @@ import getProfileDetails from "./get-profile-details";
 import getSentryResource from "./get-sentry-resource";
 import getSnapshotDetails from "./get-snapshot-details";
 import getLatestBaseSnapshot from "./get-latest-base-snapshot";
+import getAIConversationDetails from "./get-ai-conversation-details";
 
 // Default export: object mapping tool names to tools
 export default {
@@ -57,6 +58,7 @@ export default {
   get_sentry_resource: getSentryResource,
   get_snapshot_details: getSnapshotDetails,
   get_latest_base_snapshot: getLatestBaseSnapshot,
+  get_ai_conversation_details: getAIConversationDetails,
 } as const;
 
 // Type export

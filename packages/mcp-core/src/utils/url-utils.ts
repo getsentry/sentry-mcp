@@ -524,6 +524,27 @@ export function getReplayUrl(
   );
 }
 
+/**
+ * Generates a Sentry AI conversation URL.
+ * @param host The Sentry host
+ * @param organizationSlug Organization identifier
+ * @param conversationId AI conversation identifier
+ * @returns The complete AI conversation URL
+ */
+export function getAIConversationUrl(
+  host: string,
+  organizationSlug: string,
+  conversationId: string,
+  protocol: SentryProtocol = "https",
+): string {
+  return getSentryWebBaseUrl(
+    host,
+    organizationSlug,
+    `/explore/conversations/${conversationId}/`,
+    protocol,
+  );
+}
+
 export function getProfileUrl(
   host: string,
   organizationSlug: string,

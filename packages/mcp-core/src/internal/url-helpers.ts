@@ -15,6 +15,7 @@ export type SentryResourceType =
   | "issue"
   | "trace"
   | "profile"
+  | "ai_conversation"
   | "event"
   | "replay"
   | "monitor"
@@ -35,6 +36,8 @@ export interface ParsedSentryUrl {
   issueId?: string;
   /** Trace ID (for trace URLs) */
   traceId?: string;
+  /** AI conversation ID (for Explore conversation URLs) */
+  conversationId?: string;
   /** Span ID (for trace URLs with span focus, from query param) */
   spanId?: string;
   /** Event ID (for event URLs) */
@@ -72,6 +75,7 @@ export interface ParsedSentryUrl {
  * - Trace: `/explore/traces/trace/{traceId}` or `/performance/trace/{traceId}`
  * - Profile: `/explore/profiling/profile/{project}/{profileId}/flamegraph/`
  * - Continuous profile: `/explore/profiling/profile/{project}/flamegraph/` with query params
+ * - AI conversation: `/explore/conversations/{conversationId}/`
  * - Replay: `/explore/replays/{replayId}/` or `/replays/{replayId}/`
  * - Monitor: `/crons/{monitorSlug}/` or `/monitors/{monitorSlug}/`
  * - Release: `/releases/{version}/`
@@ -220,6 +224,19 @@ function identifyResource(
       start,
       end,
     };
+  }
+
+  // AI conversation URL: /explore/conversations/{conversationId}/
+  const conversationsIndex = pathParts.indexOf("conversations");
+  if (conversationsIndex !== -1) {
+    const conversationId = pathParts[conversationsIndex + 1];
+    if (conversationId) {
+      return {
+        type: "ai_conversation",
+        organizationSlug,
+        conversationId,
+      };
+    }
   }
 
   // Replay URL: /explore/replays/{replayId}/ or /replays/{replayId}/
