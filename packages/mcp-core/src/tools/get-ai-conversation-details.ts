@@ -204,8 +204,6 @@ function extractMessages(spans: AIConversationSpan[]): ConversationMessage[] {
   );
   const toolSpans = sorted.filter((span) => getOperationType(span) === "tool");
   const messages: ConversationMessage[] = [];
-  const seenUserContent = new Set<string>();
-  const seenAssistantContent = new Set<string>();
 
   for (const [index, span] of aiClientSpans.entries()) {
     const previousTimestamp =
@@ -221,11 +219,7 @@ function extractMessages(spans: AIConversationSpan[]): ConversationMessage[] {
       .filter((toolCall): toolCall is ToolCall => toolCall !== null);
 
     const userContent = extractUserContent(span);
-    if (
-      userContent &&
-      (userContent === "[Filtered]" || !seenUserContent.has(userContent))
-    ) {
-      seenUserContent.add(userContent);
+    if (userContent) {
       messages.push({
         role: "user",
         content: userContent,
@@ -236,12 +230,7 @@ function extractMessages(spans: AIConversationSpan[]): ConversationMessage[] {
     }
 
     const assistantContent = extractAssistantContent(span);
-    if (
-      assistantContent &&
-      (assistantContent === "[Filtered]" ||
-        !seenAssistantContent.has(assistantContent))
-    ) {
-      seenAssistantContent.add(assistantContent);
+    if (assistantContent) {
       messages.push({
         role: "assistant",
         content: assistantContent,

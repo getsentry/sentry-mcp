@@ -76,16 +76,20 @@ const conversationSpans = [
   },
 ];
 
-function mockConversationEndpoint(org = "test-org") {
+function mockConversationEndpoint(
+  org = "test-org",
+  conversationId = "conv-123",
+  spans = conversationSpans,
+) {
   mswServer.use(
     http.get(
-      `https://sentry.io/api/0/organizations/${org}/ai-conversations/conv-123/`,
+      `https://sentry.io/api/0/organizations/${org}/ai-conversations/${conversationId}/`,
       ({ request }) => {
         const url = new URL(request.url);
         expect(url.searchParams.get("statsPeriod")).toBe("30d");
         expect(url.searchParams.get("per_page")).toBe("1000");
         expect(url.searchParams.get("project")).toBe("-1");
-        return HttpResponse.json(conversationSpans);
+        return HttpResponse.json(spans);
       },
     ),
   );
@@ -272,5 +276,58 @@ describe("get_ai_conversation_details", () => {
 
     expect(result).toContain("# AI Conversation `conv-123`");
     expect(result).toContain("The checkout worker is timing out.");
+  });
+
+  it("preserves repeated messages and their distinct tool calls", async () => {
+    mockConversationEndpoint("test-org", "conv-repeat", [
+      {
+        ...conversationSpans[0],
+        "gen_ai.conversation.id": "conv-repeat",
+        "precise.start_ts": 1713805400,
+        "precise.finish_ts": 1713805401,
+        span_id: "repeat-ai-1",
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", content: "try again" },
+        ]),
+        "gen_ai.output.messages": JSON.stringify([
+          { role: "assistant", content: "I will retry that." },
+        ]),
+      },
+      {
+        ...conversationSpans[1],
+        "gen_ai.conversation.id": "conv-repeat",
+        "precise.start_ts": 1713805402,
+        "precise.finish_ts": 1713805403,
+        span_id: "repeat-tool-1",
+        "gen_ai.tool.name": "search_events",
+      },
+      {
+        ...conversationSpans[0],
+        "gen_ai.conversation.id": "conv-repeat",
+        "precise.start_ts": 1713805404,
+        "precise.finish_ts": 1713805405,
+        span_id: "repeat-ai-2",
+        "gen_ai.input.messages": JSON.stringify([
+          { role: "user", content: "try again" },
+        ]),
+        "gen_ai.output.messages": JSON.stringify([
+          { role: "assistant", content: "I will retry that." },
+        ]),
+      },
+    ]);
+
+    const result = await getAIConversationDetails.handler(
+      {
+        organizationSlug: "test-org",
+        conversationId: "conv-repeat",
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("**Messages**: 4");
+    expect(result).toContain('"messageCount": 4');
+    expect(result).toContain('"spanId": "repeat-ai-1"');
+    expect(result).toContain('"spanId": "repeat-ai-2"');
+    expect(result).toContain("- search_events (repeat-tool-1) - ok");
   });
 });
