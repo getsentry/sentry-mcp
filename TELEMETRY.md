@@ -78,7 +78,7 @@ sort=-timestamp
 HTTP response rates by route and status.
 
 ```text
-dataset=metrics query='metric:app.server.response http.route:"<route>"'
+dataset=tracemetrics query='metric:app.server.response http.route:"<route>"'
 fields=timestamp,metric,http.request.method,http.route,http.response.status_code,app.response.status_class,app.route.group,value
 aggregate=sum(value) by http.route,http.response.status_code
 ```
@@ -86,7 +86,7 @@ aggregate=sum(value) by http.route,http.response.status_code
 Local rate-limit volume and scope.
 
 ```text
-dataset=metrics query='metric:app.server.response app.response.reason:local_rate_limit'
+dataset=tracemetrics query='metric:app.server.response app.response.reason:local_rate_limit'
 fields=timestamp,metric,http.route,app.rate_limit.scope,user.id,value
 aggregate=sum(value) by http.route,app.rate_limit.scope
 ```
@@ -94,7 +94,7 @@ aggregate=sum(value) by http.route,app.rate_limit.scope
 OAuth refresh outcomes by client family.
 
 ```text
-dataset=metrics query='metric:app.oauth.token_exchange'
+dataset=tracemetrics query='metric:app.oauth.token_exchange'
 fields=timestamp,metric,app.oauth.token_exchange.outcome,app.oauth.grant.shape,app.client.family,app.oauth.probe.status_code,app.oauth.probe.reason,user.id,value
 aggregate=sum(value) by app.oauth.token_exchange.outcome,app.client.family
 ```
@@ -102,7 +102,7 @@ aggregate=sum(value) by app.oauth.token_exchange.outcome,app.client.family
 Grant revocations for sign-out reports.
 
 ```text
-dataset=metrics query='metric:app.oauth.grant_revoked user.id:"<user_id>"'
+dataset=tracemetrics query='metric:app.oauth.grant_revoked user.id:"<user_id>"'
 fields=timestamp,metric,app.oauth.grant_revoked.reason,app.client.family,user.id,value
 aggregate=sum(value) by app.oauth.grant_revoked.reason,app.client.family
 ```
@@ -110,7 +110,7 @@ aggregate=sum(value) by app.oauth.grant_revoked.reason,app.client.family
 Register and callback volume by client family.
 
 ```text
-dataset=metrics query='metric:app.oauth.register OR metric:app.oauth.callback_completed'
+dataset=tracemetrics query='metric:app.oauth.register OR metric:app.oauth.callback_completed'
 fields=timestamp,metric,app.client.family,value
 aggregate=sum(value) by metric,app.client.family
 ```
@@ -118,7 +118,7 @@ aggregate=sum(value) by metric,app.client.family
 OAuth skill adoption by client family.
 
 ```text
-dataset=metrics query='metric:app.consent.skill_granted'
+dataset=tracemetrics query='metric:app.consent.skill_granted'
 fields=timestamp,metric,app.consent.skill,app.client.family,value
 aggregate=sum(value) by app.consent.skill,app.client.family
 ```
