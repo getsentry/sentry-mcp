@@ -401,4 +401,39 @@ describe("get_ai_conversation_details", () => {
     expect(result).toContain('"toolCallCount": 1');
     expect(result).toContain('"toolCalls": [');
   });
+
+  it("counts only tool calls included in the transcript", async () => {
+    const unnamedToolSpan: Record<string, unknown> = {
+      ...conversationSpans[1],
+      "gen_ai.conversation.id": "conv-unnamed-tool",
+      "precise.start_ts": 1713805402,
+      "precise.finish_ts": 1713805403,
+      span_id: "unnamed-tool-1",
+      "gen_ai.tool.name": undefined,
+    };
+
+    mockConversationEndpoint("test-org", "conv-unnamed-tool", [
+      {
+        ...conversationSpans[0],
+        "gen_ai.conversation.id": "conv-unnamed-tool",
+        "precise.start_ts": 1713805400,
+        "precise.finish_ts": 1713805401,
+        span_id: "unnamed-ai-1",
+      },
+      unnamedToolSpan,
+    ]);
+
+    const result = await getAIConversationDetails.handler(
+      {
+        organizationSlug: "test-org",
+        conversationId: "conv-unnamed-tool",
+      },
+      baseContext,
+    );
+
+    expect(result).toContain("**Tool Calls**: 0");
+    expect(result).toContain('"toolCallCount": 0');
+    expect(result).toContain('"toolCalls": []');
+    expect(result).not.toContain("(unnamed-tool-1)");
+  });
 });

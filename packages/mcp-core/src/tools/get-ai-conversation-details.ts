@@ -417,8 +417,7 @@ function buildConversationArtifact(
     spanCount: spans.length,
     turnCount: turns.length,
     messageCount: messages.length,
-    toolCallCount: spans.filter((span) => getOperationType(span) === "tool")
-      .length,
+    toolCallCount: turns.reduce((sum, turn) => sum + turn.toolCalls.length, 0),
     totalTokens: spans.reduce(
       (sum, span) => sum + numeric(span["gen_ai.usage.total_tokens"]),
       0,
