@@ -1891,7 +1891,7 @@ export class SentryApiService {
     }
 
     const queryParams = new URLSearchParams();
-    queryParams.set("per_page", String(limit));
+    queryParams.set("limit", String(limit));
     if (sortBy) queryParams.set("sort", sortBy);
     queryParams.set("statsPeriod", "24h");
     queryParams.set("query", sentryQuery.join(" "));

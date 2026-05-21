@@ -282,8 +282,8 @@ describe("search_issues", () => {
     mswServer.use(
       http.get("*/api/0/organizations/*/issues/", ({ request }) => {
         const url = new URL(request.url);
-        const perPage = url.searchParams.get("per_page");
-        expect(perPage).toBe("25");
+        const limit = url.searchParams.get("limit");
+        expect(limit).toBe("25");
         return HttpResponse.json([]);
       }),
     );
