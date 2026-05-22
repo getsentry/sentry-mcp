@@ -18,8 +18,12 @@ import getIssueDetails from "./get-issue-details";
 import getTraceDetails from "./get-trace-details";
 import getProfileDetails from "./get-profile-details";
 import getReplayDetails from "./get-replay-details";
-import getSnapshotDetails from "./get-snapshot-details";
 import getAIConversationDetails from "./get-ai-conversation-details";
+import {
+  fetchSnapshotImage,
+  fetchSnapshotSummary,
+  resolveSnapshotImageResolutionFromResourceUrl,
+} from "./snapshot-handlers";
 
 /** Types with full API integration. */
 export const FULLY_SUPPORTED_TYPES = [
@@ -687,17 +691,29 @@ export default defineTool({
         );
 
       case "snapshot":
-      case "snapshotImage":
-        return getSnapshotDetails.handler(
-          {
-            snapshotUrl: params.url ?? null,
-            organizationSlug: resolved.organizationSlug,
-            snapshotId: resolved.snapshotId ?? null,
-            selectedSnapshot: resolved.selectedSnapshot ?? null,
-            regionUrl: context.constraints.regionUrl ?? null,
-          },
-          context,
+      case "snapshotImage": {
+        const apiService = apiServiceFromContext(context, {
+          regionUrl: context.constraints.regionUrl ?? undefined,
+        });
+
+        if (resolved.selectedSnapshot) {
+          return fetchSnapshotImage(
+            apiService,
+            resolved.organizationSlug,
+            resolved.snapshotId!,
+            resolved.selectedSnapshot,
+            resolveSnapshotImageResolutionFromResourceUrl(params.url),
+          );
+        }
+
+        return fetchSnapshotSummary(
+          apiService,
+          resolved.organizationSlug,
+          resolved.snapshotId!,
+          params.url ?? null,
+          { listImagesWhenNoDiffs: true, nextSteps: "resource-url" },
         );
+      }
 
       default: {
         const _exhaustiveCheck: never = resolved.type;

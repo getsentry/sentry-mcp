@@ -421,52 +421,6 @@ function identifyResource(
   };
 }
 
-export function parseSnapshotUrl(url: string): {
-  organizationSlug: string;
-  snapshotId: string;
-} | null {
-  try {
-    const parsed = parseSentryUrl(url);
-    if (parsed.type === "snapshot" && parsed.snapshotId) {
-      return {
-        organizationSlug: parsed.organizationSlug,
-        snapshotId: parsed.snapshotId,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function resolveSnapshotParams(params: {
-  snapshotUrl: string | null;
-  organizationSlug: string | null;
-  snapshotId: string | null;
-}): { organizationSlug: string; snapshotId: string } {
-  let organizationSlug = params.organizationSlug;
-  let snapshotId = params.snapshotId;
-
-  if (params.snapshotUrl) {
-    const parsed = parseSnapshotUrl(params.snapshotUrl);
-    if (!parsed) {
-      throw new UserInputError(
-        `Could not parse snapshot URL: ${params.snapshotUrl}. Expected format: https://{org}.sentry.io/preprod/snapshots/{id}/`,
-      );
-    }
-    organizationSlug = organizationSlug || parsed.organizationSlug;
-    snapshotId = snapshotId || parsed.snapshotId;
-  }
-
-  if (!organizationSlug || !snapshotId) {
-    throw new UserInputError(
-      "Provide either snapshotUrl or both organizationSlug and snapshotId.",
-    );
-  }
-
-  return { organizationSlug, snapshotId };
-}
-
 /**
  * Checks if a URL appears to be a Sentry profile URL.
  *

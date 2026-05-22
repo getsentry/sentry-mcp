@@ -4,6 +4,7 @@ import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import { isNumericId } from "../utils/slug-validation";
 import { renderSnapshotImageTreeSection } from "./snapshot-formatting";
 
 export default defineTool({
@@ -29,13 +30,13 @@ export default defineTool({
     "### Get the latest screenshots for an app",
     "",
     "```",
-    'get_latest_base_snapshot(organizationSlug="sentry", appId="sentry-frontend")',
+    'get_latest_base_snapshot(organizationSlug="sentry", appId="sentry-frontend", project="frontend")',
     "```",
     "",
     "### Get the latest screenshots for a specific branch",
     "",
     "```",
-    'get_latest_base_snapshot(organizationSlug="sentry", appId="sentry-frontend", branch="main")',
+    'get_latest_base_snapshot(organizationSlug="sentry", appId="sentry-frontend", project="frontend", branch="main")',
     "```",
     "</examples>",
     "",
@@ -65,7 +66,7 @@ export default defineTool({
       .string()
       .trim()
       .describe(
-        "Project ID for scoping. Recommended if app_id is not unique across projects.",
+        "Project slug or numeric ID for scoping (e.g. 'frontend'). Required when Sentry cannot infer the project from appId alone.",
       )
       .nullable()
       .default(null),
@@ -82,11 +83,18 @@ export default defineTool({
       regionUrl: params.regionUrl ?? undefined,
     });
 
+    const project = params.project ?? undefined;
+    const projectId = project && isNumericId(project) ? project : undefined;
+    const projectSlug = project && !isNumericId(project) ? project : undefined;
+    if (projectId) setTag("project.id", projectId);
+    if (projectSlug) setTag("project.slug", projectSlug);
+
     const data = (await apiService.getLatestBaseSnapshot({
       organizationSlug: params.organizationSlug,
       appId: params.appId,
       branch: params.branch ?? undefined,
-      project: params.project ?? undefined,
+      project: projectId,
+      projectSlug,
       compactMetadata: true,
     })) as Record<string, unknown>;
 
