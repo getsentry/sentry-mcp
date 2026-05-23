@@ -170,6 +170,7 @@ const wrappedOAuthProvider = {
     }
 
     const clientFamily = resolveClientFamily(request.headers.get("user-agent"));
+    Sentry.getActiveSpan()?.setAttribute("app.client.family", clientFamily);
 
     // --- Phase 2: Let the OAuth library handle the request ---
     // We normalize any CORS headers it returns in the response handling below.

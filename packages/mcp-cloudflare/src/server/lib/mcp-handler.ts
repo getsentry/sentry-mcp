@@ -166,6 +166,8 @@ const mcpHandler: ExportedHandler<Env> = {
       userId,
     );
 
+    Sentry.getActiveSpan()?.setAttribute("app.client.family", clientFamily);
+
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported
     if (!rawProps.grantedSkills) {
