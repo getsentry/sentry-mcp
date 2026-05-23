@@ -291,7 +291,7 @@ function resolveFromParsedUrl(
         type: "ai_conversation",
         organizationSlug,
         conversationId: parsed.conversationId,
-        projectSlug: parsed.projectSlug ?? params.projectSlug ?? undefined,
+        projectSlug: parsed.projectSlug,
         spanId: parsed.spanId,
         start: parsed.start,
         end: parsed.end,

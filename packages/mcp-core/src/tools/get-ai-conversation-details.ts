@@ -464,14 +464,14 @@ export default defineTool({
     });
 
     let projectId: string | undefined;
-    if (params.project) {
-      projectId = params.project;
-    } else if (context.constraints.projectSlug) {
+    if (context.constraints.projectSlug) {
       const constrainedProject = await apiService.getProject({
         organizationSlug: params.organizationSlug,
         projectSlugOrId: context.constraints.projectSlug,
       });
       projectId = String(constrainedProject.id);
+    } else if (params.project) {
+      projectId = params.project;
     }
 
     const spans = await apiService.getAIConversation(
