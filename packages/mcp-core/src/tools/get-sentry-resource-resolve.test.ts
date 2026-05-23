@@ -227,7 +227,7 @@ describe("resolveResourceParams", () => {
       ).toEqual<ResolvedResourceParams>({
         type: "profile",
         organizationSlug: "my-org",
-        projectSlug: "my-project",
+        projectSlugOrId: "my-project",
         profileId: undefined,
         profilerId: undefined,
         start: undefined,
@@ -243,7 +243,7 @@ describe("resolveResourceParams", () => {
       ).toEqual<ResolvedResourceParams>({
         type: "profile",
         organizationSlug: "my-org",
-        projectSlug: "my-project",
+        projectSlugOrId: "my-project",
         profileId: undefined,
         profilerId: "abc123",
         start: undefined,
@@ -259,7 +259,7 @@ describe("resolveResourceParams", () => {
       ).toEqual<ResolvedResourceParams>({
         type: "profile",
         organizationSlug: "sentry",
-        projectSlug: "sentry",
+        projectSlugOrId: "sentry",
         profileId: "cfe78a5c892d4a64",
         profilerId: undefined,
         start: undefined,
@@ -275,7 +275,7 @@ describe("resolveResourceParams", () => {
       ).toEqual<ResolvedResourceParams>({
         type: "profile",
         organizationSlug: "my-org",
-        projectSlug: "my-project",
+        projectSlugOrId: "my-project",
         profileId: undefined,
         profilerId: undefined,
         start: undefined,
@@ -291,7 +291,7 @@ describe("resolveResourceParams", () => {
       ).toEqual<ResolvedResourceParams>({
         type: "profile",
         organizationSlug: "my-org",
-        projectSlug: "my-project",
+        projectSlugOrId: "my-project",
         profileId: undefined,
         profilerId: undefined,
         start: undefined,
@@ -307,7 +307,7 @@ describe("resolveResourceParams", () => {
       ).toEqual<ResolvedResourceParams>({
         type: "profile",
         organizationSlug: "sentry",
-        projectSlug: "sentry",
+        projectSlugOrId: "sentry",
         profileId: "cfe78a5c",
         profilerId: undefined,
         start: undefined,
@@ -372,7 +372,7 @@ describe("resolveResourceParams", () => {
       ).toEqual<ResolvedResourceParams>({
         type: "monitor",
         organizationSlug: "my-org",
-        projectSlug: "my-project",
+        projectSlugOrId: "my-project",
         monitorSlug: "my-monitor",
       });
     });

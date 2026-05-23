@@ -55,7 +55,7 @@ export interface ResolvedResourceParams {
   // AI conversation params
   conversationId?: string;
   // Profile params
-  projectSlug?: string;
+  projectSlugOrId?: string;
   profileId?: string;
   profilerId?: string;
   start?: string;
@@ -291,14 +291,14 @@ function resolveFromParsedUrl(
         type: "ai_conversation",
         organizationSlug,
         conversationId: parsed.conversationId,
-        projectSlug: parsed.projectSlug,
+        projectSlugOrId: parsed.projectSlugOrId,
         spanId: parsed.spanId,
         start: parsed.start,
         end: parsed.end,
       };
 
     case "profile":
-      if (!parsed.projectSlug) {
+      if (!parsed.projectSlugOrId) {
         throw new UserInputError(
           "Could not extract project slug from profile URL.",
         );
@@ -306,10 +306,10 @@ function resolveFromParsedUrl(
       return {
         type: "profile",
         organizationSlug,
-        projectSlug: resolveScopedProjectSlug({
+        projectSlugOrId: resolveScopedProjectSlug({
           resourceLabel: "Profile",
           scopedProjectSlug: params.projectSlug,
-          urlProjectSlug: parsed.projectSlug,
+          urlProjectSlug: parsed.projectSlugOrId,
         }),
         profileId: parsed.profileId,
         profilerId: parsed.profilerId,
@@ -335,11 +335,11 @@ function resolveFromParsedUrl(
         type: "monitor",
         organizationSlug,
         monitorSlug: parsed.monitorSlug,
-        projectSlug: parsed.projectSlug
+        projectSlugOrId: parsed.projectSlugOrId
           ? resolveScopedProjectSlug({
               resourceLabel: "Monitor",
               scopedProjectSlug: params.projectSlug,
-              urlProjectSlug: parsed.projectSlug,
+              urlProjectSlug: parsed.projectSlugOrId,
             })
           : undefined,
       };
@@ -393,9 +393,9 @@ function generateUnsupportedResourceMessage(
 
   switch (type) {
     case "monitor": {
-      // Include projectSlug in URL when present
-      const monitorPath = resolved.projectSlug
-        ? `${resolved.projectSlug}/${resolved.monitorSlug}`
+      // Include projectSlugOrId in URL when present
+      const monitorPath = resolved.projectSlugOrId
+        ? `${resolved.projectSlugOrId}/${resolved.monitorSlug}`
         : (resolved.monitorSlug ?? "");
       const monitorUrl = apiService.getMonitorUrl(
         organizationSlug,
@@ -406,7 +406,9 @@ function generateUnsupportedResourceMessage(
         "",
         `**Organization**: ${organizationSlug}`,
         `**Monitor**: ${resolved.monitorSlug}`,
-        resolved.projectSlug ? `**Project**: ${resolved.projectSlug}` : "",
+        resolved.projectSlugOrId
+          ? `**Project**: ${resolved.projectSlugOrId}`
+          : "",
         "",
         "Cron monitor support is coming soon. In the meantime:",
         "",
@@ -598,7 +600,7 @@ export default defineTool({
           {
             organizationSlug: resolved.organizationSlug,
             conversationId: resolved.conversationId!,
-            project: resolved.projectSlug,
+            project: resolved.projectSlugOrId,
             regionUrl: context.constraints.regionUrl ?? undefined,
           },
           context,
@@ -647,7 +649,7 @@ export default defineTool({
           {
             profileUrl: params.url,
             organizationSlug: resolved.organizationSlug,
-            projectSlugOrId: resolved.projectSlug,
+            projectSlugOrId: resolved.projectSlugOrId,
             profileId: resolved.profileId,
             profilerId: resolved.profilerId,
             start: resolved.start,
