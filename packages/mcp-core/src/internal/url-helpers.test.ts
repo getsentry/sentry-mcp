@@ -241,7 +241,11 @@ describe("parseSentryUrl", () => {
       ).toMatchInlineSnapshot(`
         {
           "conversationId": "conv-123",
+          "end": undefined,
           "organizationSlug": "my-org",
+          "projectSlug": undefined,
+          "spanId": undefined,
+          "start": undefined,
           "type": "ai_conversation",
         }
       `);
@@ -255,7 +259,29 @@ describe("parseSentryUrl", () => {
       ).toMatchInlineSnapshot(`
         {
           "conversationId": "conv-123",
+          "end": undefined,
           "organizationSlug": "my-org",
+          "projectSlug": undefined,
+          "spanId": undefined,
+          "start": undefined,
+          "type": "ai_conversation",
+        }
+      `);
+    });
+
+    it("parses AI conversation URL with query params", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.sentry.io/explore/conversations/slack%3AC07P2KGJGG0%3A1779498759.814569/?start=2026-05-23T00:23:27.667Z&end=2026-05-23T02:34:56.137Z&project=4510944073809921&spanId=459a11ae308afc7b",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "conversationId": "slack:C07P2KGJGG0:1779498759.814569",
+          "end": "2026-05-23T02:34:56.137Z",
+          "organizationSlug": "sentry",
+          "projectSlug": "4510944073809921",
+          "spanId": "459a11ae308afc7b",
+          "start": "2026-05-23T00:23:27.667Z",
           "type": "ai_conversation",
         }
       `);

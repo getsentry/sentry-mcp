@@ -261,10 +261,19 @@ function identifyResource(
     "conversationId",
   );
   if (conversationId) {
+    const project = parsedUrl.searchParams.get("project") || undefined;
+    const spanId = parsedUrl.searchParams.get("spanId") || undefined;
+    const start = parsedUrl.searchParams.get("start") || undefined;
+    const end = parsedUrl.searchParams.get("end") || undefined;
+
     return {
       type: "ai_conversation",
       organizationSlug,
-      conversationId,
+      conversationId: decodeURIComponent(conversationId),
+      projectSlug: project,
+      spanId,
+      start,
+      end,
     };
   }
 

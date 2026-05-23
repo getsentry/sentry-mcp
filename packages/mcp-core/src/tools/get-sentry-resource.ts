@@ -291,6 +291,10 @@ function resolveFromParsedUrl(
         type: "ai_conversation",
         organizationSlug,
         conversationId: parsed.conversationId,
+        projectSlug: parsed.projectSlug ?? params.projectSlug ?? undefined,
+        spanId: parsed.spanId,
+        start: parsed.start,
+        end: parsed.end,
       };
 
     case "profile":
@@ -594,6 +598,7 @@ export default defineTool({
           {
             organizationSlug: resolved.organizationSlug,
             conversationId: resolved.conversationId!,
+            project: resolved.projectSlug,
             regionUrl: context.constraints.regionUrl ?? undefined,
           },
           context,
