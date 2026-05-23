@@ -42,8 +42,8 @@ export interface ParsedSentryUrl {
   spanId?: string;
   /** Event ID (for event URLs) */
   eventId?: string;
-  /** Project slug (for profile, monitor URLs) */
-  projectSlug?: string;
+  /** Project slug or numeric ID (for profile, monitor, and AI conversation URLs) */
+  projectSlugOrId?: string;
   /** Transaction profile ID from profile flamegraph URLs */
   profileId?: string;
   /** Profiler ID (for profile URLs, from query param) */
@@ -240,7 +240,7 @@ function identifyResource(
     return {
       type: "profile",
       organizationSlug,
-      projectSlug,
+      projectSlugOrId: projectSlug,
       profileId,
       profilerId,
       start,
@@ -261,10 +261,19 @@ function identifyResource(
     "conversationId",
   );
   if (conversationId) {
+    const project = parsedUrl.searchParams.get("project") || undefined;
+    const spanId = parsedUrl.searchParams.get("spanId") || undefined;
+    const start = parsedUrl.searchParams.get("start") || undefined;
+    const end = parsedUrl.searchParams.get("end") || undefined;
+
     return {
       type: "ai_conversation",
       organizationSlug,
-      conversationId,
+      conversationId: decodeURIComponent(conversationId),
+      projectSlugOrId: project,
+      spanId,
+      start,
+      end,
     };
   }
 
@@ -297,7 +306,7 @@ function identifyResource(
         return {
           type: "monitor",
           organizationSlug,
-          projectSlug: nextPart,
+          projectSlugOrId: nextPart,
           monitorSlug: afterNext,
         };
       }

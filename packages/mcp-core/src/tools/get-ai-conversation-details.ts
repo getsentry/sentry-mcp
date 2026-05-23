@@ -443,6 +443,13 @@ export default defineTool({
       .string()
       .trim()
       .describe("The AI conversation ID from gen_ai.conversation.id."),
+    project: z
+      .string()
+      .trim()
+      .optional()
+      .describe(
+        "Numeric project ID to scope the query. Falls back to context constraint or all projects.",
+      ),
     regionUrl: ParamRegionUrl.optional(),
   },
 
@@ -455,17 +462,23 @@ export default defineTool({
     const apiService = apiServiceFromContext(context, {
       regionUrl: params.regionUrl ?? undefined,
     });
-    const constrainedProject = context.constraints.projectSlug
-      ? await apiService.getProject({
-          organizationSlug: params.organizationSlug,
-          projectSlugOrId: context.constraints.projectSlug,
-        })
-      : null;
+
+    let projectId: string | undefined;
+    if (context.constraints.projectSlug) {
+      const constrainedProject = await apiService.getProject({
+        organizationSlug: params.organizationSlug,
+        projectSlugOrId: context.constraints.projectSlug,
+      });
+      projectId = String(constrainedProject.id);
+    } else if (params.project) {
+      projectId = params.project;
+    }
+
     const spans = await apiService.getAIConversation(
       {
         organizationSlug: params.organizationSlug,
         conversationId: params.conversationId,
-        project: constrainedProject ? String(constrainedProject.id) : "-1",
+        project: projectId ?? "-1",
       },
       undefined,
     );

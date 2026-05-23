@@ -50,7 +50,7 @@ function resolveProfileDetailsParams(params: {
     }
 
     const parsed = parseSentryUrl(params.profileUrl);
-    if (parsed.type !== "profile" || !parsed.projectSlug) {
+    if (parsed.type !== "profile" || !parsed.projectSlugOrId) {
       throw new UserInputError(
         "Invalid profile URL. URL must point to a Sentry profile resource.",
       );
@@ -67,7 +67,7 @@ function resolveProfileDetailsParams(params: {
         projectSlugOrId: resolveScopedProjectSlugOrId({
           resourceLabel: "Profile",
           scopedProjectSlugOrId: params.projectSlugOrId,
-          urlProjectSlug: parsed.projectSlug,
+          urlProjectSlug: parsed.projectSlugOrId,
         }),
         profileId: parsed.profileId,
       };
@@ -84,7 +84,7 @@ function resolveProfileDetailsParams(params: {
         projectSlugOrId: resolveScopedProjectSlugOrId({
           resourceLabel: "Profile",
           scopedProjectSlugOrId: params.projectSlugOrId,
-          urlProjectSlug: parsed.projectSlug,
+          urlProjectSlug: parsed.projectSlugOrId,
         }),
         profilerId: parsed.profilerId,
         start: parsed.start,

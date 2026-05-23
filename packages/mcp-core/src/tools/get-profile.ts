@@ -47,11 +47,11 @@ function resolveProfileParams(params: {
         scopedOrganizationSlug: params.organizationSlug,
         urlOrganizationSlug: parsed.organizationSlug,
       }),
-      projectSlugOrId: parsed.projectSlug
+      projectSlugOrId: parsed.projectSlugOrId
         ? resolveScopedProjectSlugOrId({
             resourceLabel: "Profile",
             scopedProjectSlugOrId: params.projectSlugOrId,
-            urlProjectSlug: parsed.projectSlug,
+            urlProjectSlug: parsed.projectSlugOrId,
           })
         : (params.projectSlugOrId ?? undefined),
       transactionName: params.transactionName ?? undefined,
