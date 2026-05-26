@@ -211,6 +211,7 @@ export default new Hono<{ Bindings: Env }>()
       skills,
     };
 
+    // Validate redirectUri first to prevent open redirects from error responses
     let client = null;
     try {
       client = await c.env.OAUTH_PROVIDER.lookupClient(
