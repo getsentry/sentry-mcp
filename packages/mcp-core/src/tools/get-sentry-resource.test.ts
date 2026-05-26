@@ -192,7 +192,7 @@ describe("get_sentry_resource", () => {
         `# Span \`aa8e7f3343113fbf\` in Trace \`${traceId}\` in **test-org**`,
       );
       expect(result).toContain(
-        "POST https://api.openai.com/v1/chat/completions [ad0f7c48 · http.client · 1708ms]",
+        "POST https://api.openai.com/v1/chat/completions [http.client · 1708ms · ad0f7c486cc0c787]",
       );
       expect(result).toContain("### Tags");
     });
@@ -249,8 +249,8 @@ describe("get_sentry_resource", () => {
 
         ## Child Snapshot
 
-        tools/call search_events [aa8e7f33 · function · 5203ms]
-           └─ POST https://api.openai.com/v1/chat/completions [ad0f7c48 · http.client · 1708ms]
+        tools/call search_events [function · 5203ms · aa8e7f3384ef4ff5]
+           └─ POST https://api.openai.com/v1/chat/completions [http.client · 1708ms · ad0f7c48fb294de3]
 
         *Child snapshot shows 1 of 1 descendant spans.*
 
@@ -335,9 +335,9 @@ describe("get_sentry_resource", () => {
 
         ## Next Steps
 
-        - **Search spans**: \`search_events(organizationSlug='test-org', dataset='spans', query='trace:${focusedTraceId}')\`
-        - **Search errors**: \`search_events(organizationSlug='test-org', dataset='errors', query='trace:${focusedTraceId}')\`
-        - **Search logs**: \`search_events(organizationSlug='test-org', dataset='logs', query='trace:${focusedTraceId}')\`"
+        - **Search spans**: \`search_events(organizationSlug='test-org', dataset='spans', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+        - **Search errors**: \`search_events(organizationSlug='test-org', dataset='errors', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+        - **Search logs**: \`search_events(organizationSlug='test-org', dataset='logs', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
       `);
     });
 

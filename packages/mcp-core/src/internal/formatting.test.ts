@@ -1955,10 +1955,10 @@ describe("formatEventOutput", () => {
         ### Span Tree (Limited to 10 spans)
 
         \`\`\`
-        GET /users [parent12 · http.server · 250ms]
-           ├─ SELECT * FROM users WHERE id = 1 [span1 · db.query · 3ms] [N+1]
-           ├─ SELECT * FROM users WHERE id = 2 [span2 · db.query · 4ms] [N+1]
-           └─ SELECT * FROM users WHERE id = 3 [span3 · db.query · 8ms] [N+1]
+        GET /users [http.server · 250ms · parent123]
+           ├─ SELECT * FROM users WHERE id = 1 [db.query · 3ms · span1] [N+1]
+           ├─ SELECT * FROM users WHERE id = 2 [db.query · 4ms · span2] [N+1]
+           └─ SELECT * FROM users WHERE id = 3 [db.query · 8ms · span3] [N+1]
         \`\`\`
 
         "
@@ -2022,9 +2022,9 @@ describe("formatEventOutput", () => {
         ### Span Tree (Limited to 10 spans)
 
         \`\`\`
-        GET /durations [parentDu · http.server · 1250ms]
-           ├─ SELECT * FROM durations WHERE bucket = 'fast' [spanA · db.query · 1ms] [N+1]
-           └─ SELECT * FROM durations WHERE bucket = 'slow' [spanB · db.query · 1500ms] [N+1]
+        GET /durations [http.server · 1250ms · parentDur]
+           ├─ SELECT * FROM durations WHERE bucket = 'fast' [db.query · 1ms · spanA] [N+1]
+           └─ SELECT * FROM durations WHERE bucket = 'slow' [db.query · 1500ms · spanB] [N+1]
         \`\`\`
 
         "
