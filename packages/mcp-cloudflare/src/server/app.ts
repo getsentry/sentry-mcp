@@ -1,8 +1,11 @@
 import { logIssue } from "@sentry/mcp-core/telem/logging";
+import * as Sentry from "@sentry/cloudflare";
 import { type Context, Hono } from "hono";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import { createScopedAuthorizationServerMetadataResponse } from "./authorization-server-metadata";
+import { resolveReferrerFamily } from "./lib/referer";
+import { sanitizeUtmSource } from "./lib/utm";
 import { createRequestLogger } from "./logging";
 import sentryOauth from "./oauth";
 import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
@@ -118,6 +121,23 @@ const app = new Hono<{
       },
     }),
   )
+  .use("*", async (c, next) => {
+    const span = Sentry.getActiveSpan();
+
+    const utmSource = sanitizeUtmSource(
+      new URL(c.req.url).searchParams.get("utm_source"),
+    );
+    if (utmSource) {
+      span?.setAttribute("app.utm_source", utmSource);
+    }
+
+    const referrerFamily = resolveReferrerFamily(c.req.header("referer"));
+    if (referrerFamily) {
+      span?.setAttribute("app.referrer.family", referrerFamily);
+    }
+
+    await next();
+  })
   // Content-negotiated homepage: serve markdown to agents, SPA to browsers
   .get("/", async (c, next) => {
     const accept = c.req.header("Accept") ?? "";
