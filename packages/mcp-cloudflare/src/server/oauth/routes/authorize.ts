@@ -162,13 +162,7 @@ export default new Hono<{ Bindings: Env }>()
     // }
 
     const client = await c.env.OAUTH_PROVIDER.lookupClient(clientId);
-    Sentry.metrics.count("app.oauth.consent_prompted", 1, {
-      attributes: {
-        "app.client.family": resolveClientFamilyFromName(client?.clientName),
-      },
-    });
-
-    return await renderApprovalDialog(c.req.raw, {
+    const response = await renderApprovalDialog(c.req.raw, {
       client,
       server: {
         name: "Sentry MCP",
@@ -178,6 +172,14 @@ export default new Hono<{ Bindings: Env }>()
       state: { oauthReqInfo: oauthReqInfoWithResource },
       cookieSecret: c.env.COOKIE_SECRET,
     });
+
+    Sentry.metrics.count("app.oauth.consent_prompted", 1, {
+      attributes: {
+        "app.client.family": resolveClientFamilyFromName(client?.clientName),
+      },
+    });
+
+    return response;
   })
 
   /**
