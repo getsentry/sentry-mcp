@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import * as Sentry from "@sentry/cloudflare";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import {
   renderApprovalDialog,
   parseRedirectApproval,
 } from "../../lib/approval-dialog";
+import { resolveClientFamilyFromName } from "../../lib/client-family";
 import type { Env } from "../../types";
 import { SENTRY_AUTH_URL } from "../constants";
 import {
@@ -159,8 +161,15 @@ export default new Hono<{ Bindings: Env }>()
     //   return redirectToUpstream(c.env, c.req.raw, oauthReqInfo);
     // }
 
+    const client = await c.env.OAUTH_PROVIDER.lookupClient(clientId);
+    Sentry.metrics.count("app.oauth.consent_prompted", 1, {
+      attributes: {
+        "app.client.family": resolveClientFamilyFromName(client?.clientName),
+      },
+    });
+
     return await renderApprovalDialog(c.req.raw, {
-      client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
+      client,
       server: {
         name: "Sentry MCP",
       },
@@ -202,9 +211,9 @@ export default new Hono<{ Bindings: Env }>()
       skills,
     };
 
-    // Validate redirectUri first to prevent open redirects from error responses
+    let client = null;
     try {
-      const client = await c.env.OAUTH_PROVIDER.lookupClient(
+      client = await c.env.OAUTH_PROVIDER.lookupClient(
         oauthReqWithSkills.clientId,
       );
       const uriIsAllowed =
@@ -258,6 +267,12 @@ export default new Hono<{ Bindings: Env }>()
       exp: now + 10 * 60 * 1000,
     };
     const signedState = await signState(payload, c.env.COOKIE_SECRET);
+
+    Sentry.metrics.count("app.oauth.consent_granted", 1, {
+      attributes: {
+        "app.client.family": resolveClientFamilyFromName(client?.clientName),
+      },
+    });
 
     return redirectToUpstream(
       c.env,
