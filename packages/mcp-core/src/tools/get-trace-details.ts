@@ -508,24 +508,26 @@ function renderSpanTree(spans: SelectedSpan[]): string[] {
   const lines: string[] = [];
 
   function renderSpan(span: SelectedSpan, prefix = "", isLast = true): void {
-    const shortId = span.id.substring(0, 8);
     const connector = prefix === "" ? "" : isLast ? "└─ " : "├─ ";
     const displayName = formatSpanDisplayName(span);
 
-    // Don't show duration for the fake trace root span
+    // Don't show duration or ID for the fake trace root span — the trace ID
+    // is already shown in the section header.
     if (span.op === "trace") {
-      lines.push(`${prefix}${connector}${displayName} [${shortId}]`);
+      lines.push(`${prefix}${connector}${displayName}`);
     } else {
       const duration = span.duration
         ? `${Math.round(span.duration)}ms`
         : "unknown";
 
-      // Don't show 'default' operations as they're not meaningful
+      // Full span ID goes last so the human-readable parts read first, but
+      // the ID is still easily extractable for follow-up get_trace_details calls.
+      // Don't show 'default' operations as they're not meaningful.
       const metadataParts = [
-        shortId,
         ...(span.op === "default" ? [] : [span.op]),
         ...span.metadata,
         duration,
+        span.id,
       ];
       lines.push(
         `${prefix}${connector}${displayName} [${metadataParts.join(" · ")}]`,

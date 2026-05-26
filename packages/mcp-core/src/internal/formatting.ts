@@ -1090,15 +1090,16 @@ function renderPerformanceSpanTree(spans: PerformanceSpan[]): string[] {
     const connector = prefix === "" ? "" : isLast ? "└─ " : "├─ ";
 
     const displayName = span.description?.trim() || span.op || "unnamed";
-    const shortId = span.span_id ? span.span_id.substring(0, 8) : "unknown";
+    const spanId = span.span_id ?? "unknown";
     const durationDisplay =
       span.duration > 0 ? `${Math.round(span.duration)}ms` : "unknown";
 
-    const metadataParts: string[] = [shortId];
+    // Full span ID goes last so human-readable parts read first.
+    const metadataParts: string[] = [];
     if (span.op && span.op !== "default") {
       metadataParts.push(span.op);
     }
-    metadataParts.push(durationDisplay);
+    metadataParts.push(durationDisplay, spanId);
 
     const line = `${prefix}${connector}${displayName} [${metadataParts.join(
       " · ",
