@@ -88,6 +88,7 @@ export default defineTool({
       params.snapshotId,
       params.imageIdentifier,
       params.imageResolution as SnapshotImageResolution,
+      { nextSteps: "snapshot-tools" },
     );
   },
 });

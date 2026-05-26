@@ -83,6 +83,7 @@ export default defineTool({
       {
         showUnmodified: params.showUnmodified,
         listImagesWhenNoDiffs: true,
+        nextSteps: "snapshot-tools",
       },
     );
   },

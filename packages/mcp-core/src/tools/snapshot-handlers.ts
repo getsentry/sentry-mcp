@@ -162,7 +162,7 @@ export async function fetchSnapshotImage(
   snapshotId: string,
   imageIdentifier: string,
   imageResolution: SnapshotImageResolution,
-  options: { nextSteps?: "resource-url" } = {},
+  options: { nextSteps?: "snapshot-tools" | "resource-url" } = {},
 ): Promise<(TextContent | ImageContent)[]> {
   const detail = (await apiService.getSnapshotImageDetail({
     organizationSlug,
