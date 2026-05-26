@@ -162,6 +162,7 @@ export async function fetchSnapshotImage(
   snapshotId: string,
   imageIdentifier: string,
   imageResolution: SnapshotImageResolution,
+  options: { nextSteps?: "resource-url" } = {},
 ): Promise<(TextContent | ImageContent)[]> {
   const detail = (await apiService.getSnapshotImageDetail({
     organizationSlug,
@@ -190,7 +191,9 @@ export async function fetchSnapshotImage(
   lines.push(`- **Image Resolution**: ${imageResolution}`);
   if (imageResolution === "preview") {
     lines.push(
-      '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`',
+      options.nextSteps === "resource-url"
+        ? "- **Full Resolution**: append `&imageResolution=full` to the snapshot URL"
+        : '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`',
     );
   }
 

@@ -930,6 +930,16 @@ describe("get_sentry_resource", () => {
         type: "text",
         text: expect.stringContaining("**Image Resolution**: preview"),
       });
+      expect(result[0]).toMatchObject({
+        type: "text",
+        text: expect.stringContaining(
+          "append `&imageResolution=full` to the snapshot URL",
+        ),
+      });
+      expect(result[0]).not.toMatchObject({
+        type: "text",
+        text: expect.stringContaining("get_snapshot_image"),
+      });
     });
 
     it("uses full resolution for snapshot image URL compatibility", async () => {

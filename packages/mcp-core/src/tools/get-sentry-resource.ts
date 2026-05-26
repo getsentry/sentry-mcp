@@ -703,6 +703,7 @@ export default defineTool({
             resolved.snapshotId!,
             resolved.selectedSnapshot,
             resolveSnapshotImageResolutionFromResourceUrl(params.url),
+            { nextSteps: "resource-url" },
           );
         }
 
