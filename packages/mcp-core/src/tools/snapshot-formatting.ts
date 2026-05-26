@@ -54,16 +54,7 @@ export function renderSnapshotImageTreeSection(
 }
 
 export function renderSnapshotImageContext(context: unknown): string[] {
-  if (!isPlainObject(context)) {
-    return [];
-  }
-
-  const contextLines = renderContextObject(context, 0);
-  if (contextLines.length === 0) {
-    return [];
-  }
-
-  return contextLines;
+  return isPlainObject(context) ? renderContextObject(context, 0) : [];
 }
 
 function createBranch(label: string): TreeBranch {
