@@ -597,10 +597,10 @@ describe("get_issue_details", () => {
       ### Span Tree (Limited to 10 spans)
 
       \`\`\`
-      GET /api/users [parent12 · http.server · 250ms]
-         ├─ SELECT * FROM users WHERE id = 1 [span001 · db.query · 5ms] [N+1]
-         ├─ SELECT * FROM users WHERE id = 2 [span002 · db.query · 5ms] [N+1]
-         └─ SELECT * FROM users WHERE id = 3 [span003 · db.query · 5ms] [N+1]
+      GET /api/users [http.server · 250ms · parent123]
+         ├─ SELECT * FROM users WHERE id = 1 [db.query · 5ms · span001] [N+1]
+         ├─ SELECT * FROM users WHERE id = 2 [db.query · 5ms · span002] [N+1]
+         └─ SELECT * FROM users WHERE id = 3 [db.query · 5ms · span003] [N+1]
       \`\`\`
 
       **Transaction:**
@@ -687,10 +687,10 @@ describe("get_issue_details", () => {
       ### Span Tree (Limited to 10 spans)
 
       \`\`\`
-      GET /api/users [parent12 · http.server · 250ms]
-         ├─ SELECT * FROM users WHERE id = 1 [span001 · db.query · 5ms] [N+1]
-         ├─ SELECT * FROM users WHERE id = 2 [span002 · db.query · 5ms] [N+1]
-         └─ SELECT * FROM users WHERE id = 3 [span003 · db.query · 5ms] [N+1]
+      GET /api/users [http.server · 250ms · parent123]
+         ├─ SELECT * FROM users WHERE id = 1 [db.query · 5ms · span001] [N+1]
+         ├─ SELECT * FROM users WHERE id = 2 [db.query · 5ms · span002] [N+1]
+         └─ SELECT * FROM users WHERE id = 3 [db.query · 5ms · span003] [N+1]
       \`\`\`
 
       **Transaction:**
