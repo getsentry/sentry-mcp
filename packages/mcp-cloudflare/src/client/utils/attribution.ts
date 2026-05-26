@@ -1,4 +1,4 @@
-import type { SpanJSON } from "@sentry/react";
+import type { spanToJSON } from "@sentry/react";
 
 export function resolveUtmSource(
   raw: string | null | undefined,
@@ -30,6 +30,8 @@ export function resolveReferrerFamily(
   }
   return "other";
 }
+
+type SpanJSON = ReturnType<typeof spanToJSON>;
 
 export function attributionBeforeSendSpan(span: SpanJSON): SpanJSON {
   if (span.op !== "pageload") return span;
