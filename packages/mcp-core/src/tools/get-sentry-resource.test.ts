@@ -52,6 +52,7 @@ function callHandler(params: {
     | "snapshotImage";
   resourceId?: string;
   organizationSlug?: string;
+  imageResolution?: "preview" | "full";
 }) {
   return getSentryResource.handler(params, baseContext);
 }
@@ -840,6 +841,13 @@ describe("get_sentry_resource", () => {
         "**URL**: https://sentry.sentry.io/preprod/snapshots/55/",
       );
       expect(result).toContain("**Images**: 0 total");
+      expect(result).toContain(
+        'get_sentry_resource(resourceType="snapshotImage", resourceId="55:<image_file_name>")',
+      );
+      expect(result).toContain(
+        '- To fetch original full-resolution image bytes, set `imageResolution="full"` in `get_sentry_resource`',
+      );
+      expect(result).not.toContain("?selectedSnapshot=");
     });
 
     it("fetches snapshot by URL and preserves no-diff image inventory compatibility", async () => {
@@ -1060,8 +1068,81 @@ describe("get_sentry_resource", () => {
       expect(result[0]).toMatchObject({
         text: expect.stringContaining(`- **File**: \`${imageFileName}\``),
       });
+      expect(result[0]).toMatchObject({
+        type: "text",
+        text: expect.stringContaining("**Image Resolution**: preview"),
+      });
+      expect(result[0]).toMatchObject({
+        type: "text",
+        text: expect.stringContaining(
+          '- **Full Resolution**: set `imageResolution="full"` in `get_sentry_resource`',
+        ),
+      });
+      expect(result[0]).not.toMatchObject({
+        type: "text",
+        text: expect.stringContaining("snapshot URL"),
+      });
       expect(result).toContainEqual(
         expect.objectContaining({ type: "image", mimeType: "image/png" }),
+      );
+    });
+
+    it("fetches full-resolution snapshot image via resourceId with imageResolution param", async () => {
+      const validPng = encodePng({
+        width: 1,
+        height: 1,
+        data: new Uint8Array([255, 0, 0, 255]),
+        depth: 8,
+        channels: 4,
+      });
+
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/55/images/login_screen.png/",
+          () =>
+            HttpResponse.json({
+              image_file_name: "login_screen.png",
+              comparison_status: "added",
+              head_image: {
+                image_file_name: "login_screen.png",
+                image_url:
+                  "/api/0/organizations/sentry/preprodartifacts/snapshots/55/images/head.png/download/",
+              },
+              base_image: null,
+              diff_image_url: null,
+            }),
+          { once: true },
+        ),
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/55/images/head.png/download/",
+          () =>
+            new HttpResponse(validPng, {
+              headers: { "Content-Type": "image/png" },
+            }),
+          { once: true },
+        ),
+      );
+
+      const result = await callHandler({
+        resourceType: "snapshotImage",
+        organizationSlug: "sentry",
+        resourceId: "55:login_screen.png",
+        imageResolution: "full",
+      });
+
+      expect(Array.isArray(result)).toBe(true);
+      if (!Array.isArray(result)) {
+        throw new Error("Expected snapshot image result parts");
+      }
+      expect(result[0]).toMatchObject({
+        type: "text",
+        text: expect.stringContaining("**Image Resolution**: full"),
+      });
+      expect(result).toContainEqual(
+        expect.objectContaining({
+          type: "image",
+          data: Buffer.from(validPng).toString("base64"),
+        }),
       );
     });
   });
@@ -1317,13 +1398,14 @@ describe("get_sentry_resource", () => {
       expect(getSentryResource.skills).toContain("inspect");
     });
 
-    it("has simplified 4-param schema", () => {
+    it("exposes the expected input schema", () => {
       const schemaKeys = Object.keys(getSentryResource.inputSchema);
       expect(schemaKeys).toEqual([
         "url",
         "resourceType",
         "resourceId",
         "organizationSlug",
+        "imageResolution",
       ]);
     });
   });

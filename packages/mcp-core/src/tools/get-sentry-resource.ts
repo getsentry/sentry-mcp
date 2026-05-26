@@ -499,7 +499,7 @@ export default defineTool({
     "",
     "For preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):",
     "- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)",
-    "- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata (append &imageResolution=full for original bytes)",
+    "- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Pass imageResolution='full' (or append &imageResolution=full to the URL) for original bytes.",
     "",
     "Resource IDs:",
     "- span: <traceId>:<spanId>",
@@ -513,6 +513,7 @@ export default defineTool({
     "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
     "get_sentry_resource(resourceType='snapshot', organizationSlug='my-org', resourceId='241539')",
     "get_sentry_resource(resourceType='snapshotImage', organizationSlug='my-org', resourceId='241539:login_screen.png')",
+    "get_sentry_resource(resourceType='snapshotImage', organizationSlug='my-org', resourceId='241539:login_screen.png', imageResolution='full')",
     "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')",
     "</examples>",
   ].join("\n"),
@@ -552,6 +553,13 @@ export default defineTool({
       ),
 
     organizationSlug: ParamOrganizationSlug.optional(),
+
+    imageResolution: z
+      .enum(["preview", "full"])
+      .optional()
+      .describe(
+        "Snapshot image resolution. Only applies to `snapshotImage` resources. Defaults to `preview`. When using the URL form, this overrides any `?imageResolution=` query parameter.",
+      ),
   },
 
   annotations: { readOnlyHint: true, openWorldHint: true },
@@ -696,14 +704,19 @@ export default defineTool({
           regionUrl: context.constraints.regionUrl ?? undefined,
         });
 
+        const nextSteps = params.url ? "resource-url" : "resource-id";
+
         if (resolved.selectedSnapshot) {
+          const imageResolution =
+            params.imageResolution ??
+            resolveSnapshotImageResolutionFromResourceUrl(params.url);
           return fetchSnapshotImage(
             apiService,
             resolved.organizationSlug,
             resolved.snapshotId!,
             resolved.selectedSnapshot,
-            resolveSnapshotImageResolutionFromResourceUrl(params.url),
-            { nextSteps: "resource-url" },
+            imageResolution,
+            { nextSteps },
           );
         }
 
@@ -712,7 +725,7 @@ export default defineTool({
           resolved.organizationSlug,
           resolved.snapshotId!,
           params.url ?? null,
-          { listImagesWhenNoDiffs: true, nextSteps: "resource-url" },
+          { listImagesWhenNoDiffs: true, nextSteps },
         );
       }
 

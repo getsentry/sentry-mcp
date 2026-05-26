@@ -78,6 +78,19 @@ export function resolveSnapshotImageResolutionFromResourceUrl(
   );
 }
 
+function fullResolutionHint(
+  nextSteps: "snapshot-tools" | "resource-url" | "resource-id" | undefined,
+): string {
+  switch (nextSteps) {
+    case "resource-url":
+      return "- **Full Resolution**: append `&imageResolution=full` to the snapshot URL";
+    case "resource-id":
+      return '- **Full Resolution**: set `imageResolution="full"` in `get_sentry_resource`';
+    default:
+      return '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`';
+  }
+}
+
 function countField(
   data: Record<string, unknown>,
   key: string,
@@ -162,7 +175,9 @@ export async function fetchSnapshotImage(
   snapshotId: string,
   imageIdentifier: string,
   imageResolution: SnapshotImageResolution,
-  options: { nextSteps?: "snapshot-tools" | "resource-url" } = {},
+  options: {
+    nextSteps?: "snapshot-tools" | "resource-url" | "resource-id";
+  } = {},
 ): Promise<(TextContent | ImageContent)[]> {
   const detail = (await apiService.getSnapshotImageDetail({
     organizationSlug,
@@ -190,11 +205,7 @@ export async function fetchSnapshotImage(
     lines.push(`- **Previous File**: \`${detail.previous_image_file_name}\``);
   lines.push(`- **Image Resolution**: ${imageResolution}`);
   if (imageResolution === "preview") {
-    lines.push(
-      options.nextSteps === "resource-url"
-        ? "- **Full Resolution**: append `&imageResolution=full` to the snapshot URL"
-        : '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`',
-    );
+    lines.push(fullResolutionHint(options.nextSteps));
   }
 
   const primary = headImage ?? baseImage;
@@ -276,7 +287,7 @@ export async function fetchSnapshotSummary(
   options: {
     showUnmodified?: boolean;
     listImagesWhenNoDiffs?: boolean;
-    nextSteps?: "snapshot-tools" | "resource-url";
+    nextSteps?: "snapshot-tools" | "resource-url" | "resource-id";
   } = {},
 ): Promise<string> {
   const data = (await apiService.getSnapshotDetails({
@@ -435,6 +446,10 @@ export async function fetchSnapshotSummary(
     const selectedImageUrl = `${resolvedSnapshotUrl}${separator}selectedSnapshot=<image_file_name>`;
     sections.push(
       `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${selectedImageUrl}")\`\n- To fetch original full-resolution image bytes, add \`&imageResolution=full\` to that URL`,
+    );
+  } else if (options.nextSteps === "resource-id") {
+    sections.push(
+      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(resourceType="snapshotImage", resourceId="${snapshotId}:<image_file_name>")\`\n- To fetch original full-resolution image bytes, set \`imageResolution="full"\` in \`get_sentry_resource\``,
     );
   } else {
     sections.push(
