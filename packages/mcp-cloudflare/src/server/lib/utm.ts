@@ -1,4 +1,4 @@
-export function sanitizeUtmSource(
+export function resolveUtmSource(
   raw: string | null | undefined,
 ): string | null {
   if (!raw) return null;

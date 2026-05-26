@@ -53,8 +53,8 @@ the pivots and recipes below.
 | `app.oauth.probe.reason` | indeterminate probe bucket | metrics | upstream instability |
 | `app.upstream.host` | configured Sentry host | tags | host-specific behavior |
 | `app.server.version` | MCP server package version | tags | release/version behavior |
-| `app.utm_source` | sanitized `utm_source` query param (e.g. `sentry-mcp-settings-docs-btn`) | spans | in-product attribution |
-| `app.referrer.family` | bucketed `Referer` host (`google`, `github`, `sentry`, `sentry-docs`, `other`) | spans | external traffic attribution |
+| `app.utm_source` | in-product `utm_source` query param | spans | in-product attribution |
+| `app.referrer.family` | low-cardinality bucket of the `Referer` host | spans | external traffic attribution |
 | `gen_ai.provider.name` | GenAI provider | spans, tags | provider-specific model behavior |
 | `gen_ai.request.model` | requested GenAI model | spans | model-specific behavior |
 | `user_agent.original` | original HTTP user agent | request data, spans | client identification |

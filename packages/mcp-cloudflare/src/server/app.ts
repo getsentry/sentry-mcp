@@ -5,7 +5,7 @@ import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import { createScopedAuthorizationServerMetadataResponse } from "./authorization-server-metadata";
 import { resolveReferrerFamily } from "./lib/referer";
-import { sanitizeUtmSource } from "./lib/utm";
+import { resolveUtmSource } from "./lib/utm";
 import { createRequestLogger } from "./logging";
 import sentryOauth from "./oauth";
 import { createProtectedResourceMetadataResponse } from "./protected-resource-metadata";
@@ -124,7 +124,7 @@ const app = new Hono<{
   .use("*", async (c, next) => {
     const span = Sentry.getActiveSpan();
 
-    const utmSource = sanitizeUtmSource(
+    const utmSource = resolveUtmSource(
       new URL(c.req.url).searchParams.get("utm_source"),
     );
     if (utmSource) {
