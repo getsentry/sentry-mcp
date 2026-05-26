@@ -80,7 +80,10 @@ export default defineTool({
       params.organizationSlug,
       params.snapshotId,
       null,
-      { showUnmodified: params.showUnmodified },
+      {
+        showUnmodified: params.showUnmodified,
+        listImagesWhenNoDiffs: true,
+      },
     );
   },
 });

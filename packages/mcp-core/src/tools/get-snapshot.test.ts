@@ -194,6 +194,37 @@ describe("get_snapshot", () => {
     );
   });
 
+  it("lists no-diff image inventory when diff sections are empty but images is populated", async () => {
+    setupSnapshotMock({
+      comparison_type: "diff",
+      state: "visible",
+      project_id: "12345",
+      images: [
+        {
+          display_name: "No Change Login",
+          group: "auth",
+          image_file_name: "snapshots-iphone-16/no_change_login.png",
+        },
+      ],
+      changed: [],
+      added: [],
+      removed: [],
+      renamed: [],
+      errored: [],
+      unchanged: [],
+      skipped: [],
+      total_count: 1,
+    });
+
+    const result = await callHandler();
+
+    expect(result).toContain("**Snapshot Images:**");
+    expect(result).toContain("no_change_login.png — No Change Login — auth");
+    expect(result).not.toContain(
+      "Re-run `get_snapshot` with `showUnmodified=true`",
+    );
+  });
+
   it("lists solo snapshot images and treats showUnmodified as a no-op", async () => {
     setupSnapshotMock({
       comparison_type: "solo",
