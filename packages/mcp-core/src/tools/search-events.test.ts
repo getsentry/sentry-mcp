@@ -425,6 +425,66 @@ describe("search_events", () => {
     expect(result).toContain('"tags[sequence]": "42"');
   });
 
+  it("should include the sort field even when caller's explicit fields omit it", async () => {
+    // When the caller passes a structured Sentry-syntax query plus explicit
+    // fields that don't include the sort field, the embedded agent adds the
+    // sort field to satisfy its own refinement — but the handler trusts the
+    // caller's explicit fields verbatim and drops the agent's repair. Sentry
+    // then rejects the request with 400 "Cannot sort by a field that is not
+    // selected."
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "errors",
+        "level:error",
+        ["title", "issue", "message", "timestamp"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    let capturedFields: string[] | undefined;
+    let capturedSort: string | null | undefined;
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          capturedFields = url.searchParams.getAll("field");
+          capturedSort = url.searchParams.get("sort");
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "level:error",
+        dataset: "errors",
+        fields: ["title", "issue", "message"],
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(capturedSort).toBe("-timestamp");
+    expect(capturedFields).toContain("timestamp");
+  });
+
   it("should not duplicate environment filters after agent repair", async () => {
     const query =
       'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';
