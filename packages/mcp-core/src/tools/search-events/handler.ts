@@ -546,10 +546,20 @@ export default defineTool({
     // fields. The embedded agent's schema enforces this, but the handler can
     // recombine the caller's explicit fields with a default or explicit sort
     // that the agent never saw — so re-check here.
+    //
+    // Skip the augment when the sort is non-aggregate but the existing fields
+    // are aggregate: adding a non-aggregate column to an aggregate query
+    // changes the GROUP BY and silently corrupts the result. Better to let
+    // Sentry's 400 propagate so the caller can fix the request explicitly.
     const sortField = sortParam.startsWith("-")
       ? sortParam.slice(1)
       : sortParam;
-    if (sortField && !fields.includes(sortField)) {
+    const sortIsAggregate = sortField.includes("(") && sortField.includes(")");
+    if (
+      sortField &&
+      !fields.includes(sortField) &&
+      (sortIsAggregate || !isAggregateQuery(fields))
+    ) {
       fields = [...fields, sortField];
     }
 
