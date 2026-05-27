@@ -508,13 +508,13 @@
           "anyOf": [
             {
               "type": "string",
-              "description": "Project slug or numeric ID for scoping (e.g. 'frontend'). Required when Sentry cannot infer the project from appId alone."
+              "description": "Project slug or numeric ID for scoping (e.g. 'frontend')."
             },
             {
               "type": "null"
             }
           ],
-          "description": "Project slug or numeric ID for scoping (e.g. 'frontend'). Required when Sentry cannot infer the project from appId alone.",
+          "description": "Project slug or numeric ID for scoping (e.g. 'frontend').",
           "default": null
         },
         "regionUrl": {

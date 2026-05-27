@@ -61,6 +61,36 @@ describe("getIssueUrl", () => {
   });
 });
 
+describe("getPreprodSnapshotUrl", () => {
+  it("should work with sentry.io", () => {
+    const apiService = new SentryApiService({ host: "sentry.io" });
+    const result = apiService.getPreprodSnapshotUrl("sentry", "12");
+    expect(result).toEqual("https://sentry.sentry.io/preprod/snapshots/12/");
+  });
+  it("should work with self-hosted", () => {
+    const apiService = new SentryApiService({ host: "sentry.example.com" });
+    const result = apiService.getPreprodSnapshotUrl("sentry", "12");
+    expect(result).toEqual(
+      "https://sentry.example.com/organizations/sentry/preprod/snapshots/12/",
+    );
+  });
+  it("should respect HTTP protocol for self-hosted", () => {
+    const apiService = new SentryApiService({
+      host: "localhost:8000",
+      protocol: "http",
+    });
+    const result = apiService.getPreprodSnapshotUrl("sentry", "12");
+    expect(result).toEqual(
+      "http://localhost:8000/organizations/sentry/preprod/snapshots/12/",
+    );
+  });
+  it("should use sentry.io (not regional) for SaaS web URL", () => {
+    const apiService = new SentryApiService({ host: "us.sentry.io" });
+    const result = apiService.getPreprodSnapshotUrl("sentry", "12");
+    expect(result).toEqual("https://sentry.sentry.io/preprod/snapshots/12/");
+  });
+});
+
 describe("getTraceUrl", () => {
   it("should work with sentry.io", () => {
     const apiService = new SentryApiService({ host: "sentry.io" });

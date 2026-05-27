@@ -65,9 +65,7 @@ export default defineTool({
     project: z
       .string()
       .trim()
-      .describe(
-        "Project slug or numeric ID for scoping (e.g. 'frontend'). Required when Sentry cannot infer the project from appId alone.",
-      )
+      .describe("Project slug or numeric ID for scoping (e.g. 'frontend').")
       .nullable()
       .default(null),
     regionUrl: ParamRegionUrl.nullable().default(null),
@@ -104,7 +102,7 @@ export default defineTool({
     const vcsInfo = data.vcs_info as Record<string, unknown> | undefined;
 
     const snapshotUrl = snapshotId
-      ? `https://${params.organizationSlug}.sentry.io/preprod/snapshots/${snapshotId}/`
+      ? apiService.getPreprodSnapshotUrl(params.organizationSlug, snapshotId)
       : null;
 
     const sections: string[] = [];

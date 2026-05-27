@@ -4,6 +4,7 @@ import {
   getAIConversationUrl as getAIConversationUrlUtil,
   getIssueUrl as getIssueUrlUtil,
   getMonitorUrl as getMonitorUrlUtil,
+  getPreprodSnapshotUrl as getPreprodSnapshotUrlUtil,
   getProfileUrl as getProfileUrlUtil,
   getProfilingExplorerUrl,
   getReleaseUrl as getReleaseUrlUtil,
@@ -3120,6 +3121,15 @@ export class SentryApiService {
     }
 
     return response.chunks[0];
+  }
+
+  getPreprodSnapshotUrl(organizationSlug: string, snapshotId: string): string {
+    return getPreprodSnapshotUrlUtil(
+      this.host,
+      organizationSlug,
+      snapshotId,
+      this.protocol,
+    );
   }
 
   async getSnapshotDetails({
