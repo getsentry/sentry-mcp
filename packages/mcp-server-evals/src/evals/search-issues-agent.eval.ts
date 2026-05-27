@@ -112,7 +112,7 @@ describeEval("search-issues-agent", {
         input: "sort by users is:for_review release:latest",
         expectedTools: [],
         expected: {
-          query: /(?=.*is:for_review)(?=.*release:latest)(?!.*sort:)/,
+          query: /^(?!.*sort:)(?=.*is:for_review)(?=.*release:latest)/,
           sort: "user",
         },
       },
@@ -121,7 +121,7 @@ describeEval("search-issues-agent", {
         input: "is:new is:regressed",
         expectedTools: [],
         expected: {
-          query: /(?=.*is:new)(?=.*is:regressed)(?!.*is:unresolved)/,
+          query: /^(?!.*is:unresolved)(?=.*is:new)(?=.*is:regressed)/,
           sort: "date",
         },
       },
