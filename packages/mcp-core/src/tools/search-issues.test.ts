@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
-import searchIssues from "./search-issues";
 import { generateText } from "ai";
+import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServerContext } from "../types";
+import searchIssues from "./search-issues";
 
 // Mock the AI SDK
 vi.mock("@ai-sdk/openai", () => {
@@ -167,6 +167,56 @@ describe("search_issues", () => {
     expect(mockGenerateText).not.toHaveBeenCalled();
     expect(result).toContain("PROJ-123");
     expect(result).toContain("Test Error");
+  });
+
+  it("should preserve explicit query syntax through agent repair", async () => {
+    const explicitQuery =
+      "is:for_review release:latest assigned:me issue.priority:high";
+    mockGenerateText.mockResolvedValue(mockAIResponse(explicitQuery, "date"));
+
+    mswServer.use(
+      http.get("*/api/0/organizations/*/issues/", ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("query")).toBe(explicitQuery);
+        expect(url.searchParams.get("sort")).toBe("date");
+        return HttpResponse.json([
+          {
+            id: "123",
+            shortId: "PROJ-123",
+            title: "Needs Review",
+            status: "unresolved",
+            count: "5",
+            userCount: 2,
+            firstSeen: "2025-01-15T10:00:00Z",
+            lastSeen: "2025-01-15T12:00:00Z",
+            permalink: "https://sentry.io/issues/123/",
+            culprit: "test.function",
+            project: {
+              id: "456",
+              slug: "test-project",
+              name: "Test Project",
+            },
+          },
+        ]);
+      }),
+    );
+
+    const result = await searchIssues.handler(
+      {
+        organizationSlug: "test-org",
+        query: explicitQuery,
+        sort: "date",
+        projectSlugOrId: null,
+        regionUrl: null,
+        limit: 10,
+        includeExplanation: false,
+      },
+      mockContext,
+    );
+
+    expect(mockGenerateText).toHaveBeenCalled();
+    expect(result).toContain("PROJ-123");
+    expect(result).toContain("Needs Review");
   });
 
   it("should handle project slug parameter", async () => {
