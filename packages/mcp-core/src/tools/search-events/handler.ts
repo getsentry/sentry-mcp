@@ -542,6 +542,17 @@ export default defineTool({
       });
     }
 
+    // Sentry rejects the request if the sort column isn't in the selected
+    // fields. The embedded agent's schema enforces this, but the handler can
+    // recombine the caller's explicit fields with a default or explicit sort
+    // that the agent never saw — so re-check here.
+    const sortField = sortParam.startsWith("-")
+      ? sortParam.slice(1)
+      : sortParam;
+    if (sortField && !fields.includes(sortField)) {
+      fields = [...fields, sortField];
+    }
+
     const requestFields =
       isMetricsDataset(dataset) && !isAggregateQuery(fields)
         ? Array.from(
