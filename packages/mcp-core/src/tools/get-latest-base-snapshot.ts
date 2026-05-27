@@ -4,6 +4,7 @@ import { defineTool } from "../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
+import { renderSnapshotImageTreeSection } from "./snapshot-formatting";
 
 export default defineTool({
   name: "get_latest_base_snapshot",
@@ -122,15 +123,12 @@ export default defineTool({
 
     if (images.length > 0) {
       sections.push("\n## Images\n");
-      for (const img of images) {
-        const name = img.display_name || img.image_file_name || "unknown";
-        const group = img.group ? ` (${img.group})` : "";
-        const file =
-          img.image_file_name && img.image_file_name !== img.display_name
-            ? ` — file: \`${img.image_file_name}\``
-            : "";
-        sections.push(`- \`${name}\`${group}${file}`);
-      }
+      sections.push(
+        ...renderSnapshotImageTreeSection(
+          "Snapshot Images",
+          images.map((image) => ({ image })),
+        ),
+      );
     }
 
     sections.push(

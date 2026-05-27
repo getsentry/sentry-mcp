@@ -11,13 +11,13 @@ import { UserInputError } from "../errors";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 import { resolveSnapshotParams } from "../internal/url-helpers";
 import { blobToBase64 } from "../internal/blob-utils";
-
-interface SnapshotImageEntry {
-  display_name?: string | null;
-  group?: string | null;
-  image_file_name?: string;
-  [key: string]: unknown;
-}
+import {
+  formatSnapshotDiffPercent,
+  getSnapshotImageDisplayName,
+  renderSnapshotImageTreeSection,
+  type SnapshotImageEntry,
+  type SnapshotImageTreeItem,
+} from "./snapshot-formatting";
 
 interface SnapshotDiffPair {
   base_image?: SnapshotImageEntry;
@@ -60,20 +60,6 @@ interface SnapshotImageDetailResponse {
   diff_image_url?: string | null;
   diff_percentage?: number | null;
   previous_image_file_name?: string | null;
-}
-
-function getImageDisplayName(img: SnapshotImageEntry): string {
-  return img.display_name || img.image_file_name || "unknown";
-}
-
-function formatImageLine(img: SnapshotImageEntry): string {
-  const name = getImageDisplayName(img);
-  const group = img.group ? ` (${img.group})` : "";
-  const file =
-    img.image_file_name && img.image_file_name !== img.display_name
-      ? ` — file: \`${img.image_file_name}\``
-      : "";
-  return `- \`${name}\`${group}${file}`;
 }
 
 export default defineTool({
@@ -170,6 +156,15 @@ export default defineTool({
   },
 });
 
+function countField(
+  data: Record<string, unknown>,
+  key: string,
+  fallback: number,
+): number {
+  const value = data[key];
+  return typeof value === "number" ? value : fallback;
+}
+
 function formatImageMetadata(img: SnapshotImageInfo): string[] {
   const lines: string[] = [];
   if (img.display_name) lines.push(`- **Display Name**: ${img.display_name}`);
@@ -237,7 +232,7 @@ async function fetchSnapshotImage(
   if (status) lines.push(`- **Status**: ${status}`);
   if (detail.diff_percentage != null)
     lines.push(
-      `- **Diff**: ${Math.round(detail.diff_percentage * 10000) / 100}%`,
+      `- **Diff**: ${formatSnapshotDiffPercent(detail.diff_percentage)}`,
     );
   if (detail.previous_image_file_name)
     lines.push(`- **Previous File**: \`${detail.previous_image_file_name}\``);
@@ -319,14 +314,16 @@ async function fetchSnapshotSummary(
     sections.push(`- **Project ID**: ${data.project_id}`);
   }
 
-  const changedCount = (data.changed_count as number) ?? changed.length;
-  const addedCount = (data.added_count as number) ?? added.length;
-  const removedCount = (data.removed_count as number) ?? removed.length;
-  const renamedCount = (data.renamed_count as number) ?? renamed.length;
-  const unchangedCount = (data.unchanged_count as number) ?? 0;
-  const erroredCount = (data.errored_count as number) ?? errored.length;
+  const totalCount = countField(data, "total_count", allImages.length);
+  const changedCount = countField(data, "changed_count", changed.length);
+  const addedCount = countField(data, "added_count", added.length);
+  const removedCount = countField(data, "removed_count", removed.length);
+  const renamedCount = countField(data, "renamed_count", renamed.length);
+  const unchangedCount = countField(data, "unchanged_count", 0);
+  const erroredCount = countField(data, "errored_count", errored.length);
+  const skippedCount = countField(data, "skipped_count", 0);
   sections.push(
-    `- **Images**: ${allImages.length} total (${changedCount} changed, ${addedCount} added, ${removedCount} removed, ${renamedCount} renamed, ${unchangedCount} unchanged, ${erroredCount} errored)`,
+    `- **Images**: ${totalCount} total (${changedCount} changed, ${addedCount} added, ${removedCount} removed, ${renamedCount} renamed, ${unchangedCount} unchanged, ${erroredCount} errored, ${skippedCount} skipped)`,
   );
 
   if (vcsInfo) {
@@ -359,53 +356,56 @@ async function fetchSnapshotSummary(
   if (hasDiffs) {
     sections.push("\n## Changes\n");
 
-    if (changed.length > 0) {
-      sections.push("**Changed:**");
-      for (const pair of changed) {
-        const img = pair.head_image ?? {};
-        const name = getImageDisplayName(img);
-        const group = img.group ? ` (${img.group})` : "";
-        const file =
-          img.image_file_name && img.image_file_name !== img.display_name
-            ? ` — file: \`${img.image_file_name}\``
-            : "";
-        const diff =
-          pair.diff != null
-            ? ` — ${Math.round(pair.diff * 10000) / 100}% diff`
-            : "";
-        sections.push(`- \`${name}\`${group}${file}${diff}`);
-      }
-    }
+    const sortedChanged = changed
+      .slice()
+      .sort((left, right) => (right.diff ?? -1) - (left.diff ?? -1));
 
-    if (added.length > 0) {
-      sections.push("\n**Added:**");
-      for (const img of added) sections.push(formatImageLine(img));
-    }
+    const diffSections: Array<{
+      title: string;
+      items: SnapshotImageTreeItem[];
+    }> = [
+      {
+        title: "Changed",
+        items: sortedChanged.map((pair) => ({
+          image: pair.head_image ?? {},
+          details:
+            pair.diff != null
+              ? [`${formatSnapshotDiffPercent(pair.diff)} diff`]
+              : [],
+        })),
+      },
+      { title: "Added", items: added.map((image) => ({ image })) },
+      { title: "Removed", items: removed.map((image) => ({ image })) },
+      {
+        title: "Renamed",
+        items: renamed.map((pair) => ({
+          image: pair.head_image ?? {},
+          details: [
+            `previous: ${getSnapshotImageDisplayName(pair.base_image ?? {})}`,
+          ],
+        })),
+      },
+      {
+        title: "Errored",
+        items: errored.map((pair) => ({ image: pair.head_image ?? {} })),
+      },
+    ];
 
-    if (removed.length > 0) {
-      sections.push("\n**Removed:**");
-      for (const img of removed) sections.push(formatImageLine(img));
+    const renderedDiffs = diffSections
+      .map(({ title, items }) => renderSnapshotImageTreeSection(title, items))
+      .filter((lines) => lines.length > 0);
+    for (const [index, lines] of renderedDiffs.entries()) {
+      if (index > 0) sections.push("");
+      sections.push(...lines);
     }
-
-    if (renamed.length > 0) {
-      sections.push("\n**Renamed:**");
-      for (const pair of renamed) {
-        const newName = getImageDisplayName(pair.head_image ?? {});
-        const oldName = getImageDisplayName(pair.base_image ?? {});
-        sections.push(`- \`${oldName}\` → \`${newName}\``);
-      }
-    }
-
-    if (errored.length > 0) {
-      sections.push("\n**Errored:**");
-      for (const pair of errored)
-        sections.push(formatImageLine(pair.head_image ?? {}));
-    }
-  }
-
-  if (allImages.length > 0) {
-    sections.push("\n## All Images\n");
-    for (const img of allImages) sections.push(formatImageLine(img));
+  } else if (allImages.length > 0) {
+    sections.push("\n## Images\n");
+    sections.push(
+      ...renderSnapshotImageTreeSection(
+        "Snapshot Images",
+        allImages.map((image) => ({ image })),
+      ),
+    );
   }
 
   sections.push(

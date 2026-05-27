@@ -291,15 +291,17 @@ describe("get_snapshot_details", () => {
     expect(text).toContain("**PR**: #789");
     expect(text).toContain("**Approval**: requires_approval");
     expect(text).toContain(
-      "`login_screen.png` (auth) — file: `snapshots-iphone-16/auth_login_screen.png` — 12.5% diff",
+      "auth_login_screen.png — 12.5% diff — login_screen.png — auth",
     );
     expect(text).toContain(
-      "`dashboard.png` (main) — file: `snapshots-iphone-16/main_dashboard.png` — 2.1% diff",
+      "main_dashboard.png — 2.1% diff — dashboard.png — main",
     );
     expect(text).toContain("**Added:**");
-    expect(text).toContain("`new_modal.png` (dialogs)");
+    expect(text).toContain("dialogs_new_modal.png — new_modal.png — dialogs");
     expect(text).toContain("**Renamed:**");
-    expect(text).toContain("`preferences_page.png` → `settings_page.png`");
+    expect(text).toContain(
+      "settings_page.png — previous: preferences_page.png — settings",
+    );
     expect(text).toContain("get_sentry_resource");
     expect(text).toMatchInlineSnapshot(`
       "# Snapshot 231949 in **sentry**
@@ -310,7 +312,7 @@ describe("get_snapshot_details", () => {
       - **Type**: diff
       - **State**: visible
       - **Project ID**: 12345
-      - **Images**: 4 total (2 changed, 1 added, 0 removed, 1 renamed, 10 unchanged, 0 errored)
+      - **Images**: 4 total (2 changed, 1 added, 0 removed, 1 renamed, 10 unchanged, 0 errored, 0 skipped)
 
       ## VCS Info
 
@@ -324,21 +326,17 @@ describe("get_snapshot_details", () => {
       ## Changes
 
       **Changed:**
-      - \`login_screen.png\` (auth) — file: \`snapshots-iphone-16/auth_login_screen.png\` — 12.5% diff
-      - \`dashboard.png\` (main) — file: \`snapshots-iphone-16/main_dashboard.png\` — 2.1% diff
+      └── snapshots-iphone-16/
+          ├── auth_login_screen.png — 12.5% diff — login_screen.png — auth
+          └── main_dashboard.png — 2.1% diff — dashboard.png — main
 
       **Added:**
-      - \`new_modal.png\` (dialogs) — file: \`snapshots-iphone-16/dialogs_new_modal.png\`
+      └── snapshots-iphone-16/
+          └── dialogs_new_modal.png — new_modal.png — dialogs
 
       **Renamed:**
-      - \`preferences_page.png\` → \`settings_page.png\`
-
-      ## All Images
-
-      - \`login_screen.png\` (auth) — file: \`snapshots-iphone-16/auth_login_screen.png\`
-      - \`dashboard.png\` (main) — file: \`snapshots-iphone-16/main_dashboard.png\`
-      - \`new_modal.png\` (dialogs) — file: \`snapshots-iphone-16/dialogs_new_modal.png\`
-      - \`settings_page.png\` (settings) — file: \`snapshots-iphone-16/settings_page.png\`
+      └── snapshots-iphone-16/
+          └── settings_page.png — previous: preferences_page.png — settings
 
       ## Next Steps
 
@@ -472,7 +470,134 @@ describe("get_snapshot_details", () => {
     );
     const text = result as string;
     expect(text).toContain("**Type**: solo");
-    expect(text).toContain("`Dark mode` (Content View)");
+    expect(text).toContain(
+      "Content_View_Dark_mode.png — Dark mode — Content View",
+    );
+  });
+
+  it("groups large diff summaries without listing unchanged details", async () => {
+    const largeFixture = {
+      ...snapshotFixture,
+      changed_count: 3,
+      added_count: 1,
+      removed_count: 1,
+      renamed_count: 1,
+      unchanged_count: 42,
+      errored_count: 1,
+      skipped_count: 2,
+      images: [
+        ...snapshotFixture.images,
+        {
+          display_name: "unchanged_detail.png",
+          group: "unchanged",
+          image_file_name: "snapshots-iphone-17e/unchanged_detail.png",
+        },
+      ],
+      changed: [
+        {
+          head_image: {
+            display_name: "Kenya",
+            group: "FeaturedProductCard",
+            image_file_name:
+              "snapshots-iphone-17e/test_CoffeeProductCards.swift_FeaturedProductCard_Kenya.png",
+          },
+          diff: 0.2605,
+        },
+        {
+          head_image: {
+            display_name: "Ethiopia",
+            group: "FeaturedProductCard",
+            image_file_name:
+              "snapshots-iphone-17e/test_CoffeeProductCards.swift_FeaturedProductCard_Ethiopia.png",
+          },
+          diff: 0.2341,
+        },
+        {
+          head_image: {
+            display_name: "Kenya",
+            group: "FeaturedProductCard",
+            image_file_name:
+              "snapshots-iphone-17-pro-max/test_CoffeeProductCards.swift_FeaturedProductCard_Kenya.png",
+          },
+          diff: 0.234,
+        },
+      ],
+      added: [
+        {
+          display_name: "New Cart",
+          group: "Cart",
+          image_file_name: "snapshots-iphone-17e/test_Cart.swift_NewCart.png",
+        },
+      ],
+      removed: [
+        {
+          display_name: "Old Cart",
+          group: "Cart",
+          image_file_name: "snapshots-iphone-17e/test_Cart.swift_OldCart.png",
+        },
+      ],
+      renamed: [
+        {
+          head_image: {
+            display_name: "Settings",
+            group: "Settings",
+            image_file_name:
+              "snapshots-iphone-17e/test_Settings.swift_Settings.png",
+          },
+          base_image: {
+            display_name: "Preferences",
+            group: "Settings",
+            image_file_name:
+              "snapshots-iphone-17e/test_Settings.swift_Preferences.png",
+          },
+        },
+      ],
+      errored: [
+        {
+          head_image: {
+            display_name: "Error State",
+            group: "Errors",
+            image_file_name:
+              "snapshots-iphone-17e/test_Error.swift_ErrorState.png",
+          },
+        },
+      ],
+    };
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/",
+        () => HttpResponse.json(largeFixture),
+        { once: true },
+      ),
+    );
+
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: null,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const text = result as string;
+
+    expect(text).toContain(
+      "3 changed, 1 added, 1 removed, 1 renamed, 42 unchanged, 1 errored, 2 skipped",
+    );
+    expect(text).toContain("└── snapshots-iphone-17-pro-max/");
+    expect(text).toContain("├── snapshots-iphone-17e/");
+    expect(text).toContain(
+      "test_CoffeeProductCards.swift_FeaturedProductCard_Kenya.png — 26.05% diff — Kenya — FeaturedProductCard",
+    );
+    expect(text).toContain("**Added:**");
+    expect(text).toContain("**Removed:**");
+    expect(text).toContain("**Renamed:**");
+    expect(text).toContain("**Errored:**");
+    expect(text).not.toContain("## All Images");
+    expect(text).not.toContain("unchanged_detail.png");
   });
 
   it("returns head, base, and diff images for changed comparison", async () => {
