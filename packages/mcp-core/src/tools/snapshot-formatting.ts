@@ -53,6 +53,19 @@ export function renderSnapshotImageTreeSection(
   return lines;
 }
 
+export function renderSnapshotImageContext(context: unknown): string[] {
+  if (!isPlainObject(context)) {
+    return [];
+  }
+
+  const contextLines = renderContextObject(context, 0);
+  if (contextLines.length === 0) {
+    return [];
+  }
+
+  return contextLines;
+}
+
 function createBranch(label: string): TreeBranch {
   return { kind: "branch", label, children: new Map(), leaves: [] };
 }
@@ -128,4 +141,50 @@ function renderEntry(
     lines.push(renderEntry(child, childPrefix, index === children.length - 1));
   }
   return lines.join("\n");
+}
+
+function renderContextObject(
+  context: Record<string, unknown>,
+  depth: number,
+): string[] {
+  const prefix = "  ".repeat(depth);
+  return Object.entries(context).flatMap(([key, value]) => {
+    const formatted = formatSupportedContextValue(value);
+    if (formatted !== null) {
+      return [`${prefix}- **${key}**: ${formatted}`];
+    }
+
+    if (!isPlainObject(value)) {
+      return [];
+    }
+
+    const children = renderContextObject(value, depth + 1);
+    return children.length > 0 ? [`${prefix}- **${key}**:`, ...children] : [];
+  });
+}
+
+function formatSupportedContextValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/\s+/g, " ");
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : null;
+  }
+
+  if (typeof value === "boolean") {
+    return String(value);
+  }
+
+  return null;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }

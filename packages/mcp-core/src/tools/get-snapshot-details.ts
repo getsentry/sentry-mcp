@@ -14,6 +14,7 @@ import { blobToBase64 } from "../internal/blob-utils";
 import {
   formatSnapshotDiffPercent,
   getSnapshotImageDisplayName,
+  renderSnapshotImageContext,
   renderSnapshotImageTreeSection,
   type SnapshotImageEntry,
   type SnapshotImageTreeItem,
@@ -25,12 +26,6 @@ interface SnapshotDiffPair {
   diff?: number | null;
 }
 
-interface SnapshotImageContext {
-  preview?: { container_display_name?: string; display_name?: string };
-  simulator?: { device_name?: string };
-  test_name?: string;
-}
-
 interface SnapshotImageInfo {
   content_hash?: string;
   display_name?: string | null;
@@ -40,7 +35,7 @@ interface SnapshotImageInfo {
   height?: number;
   description?: string | null;
   image_url?: string;
-  context?: SnapshotImageContext;
+  context?: unknown;
   [key: string]: unknown;
 }
 
@@ -173,14 +168,10 @@ function formatImageMetadata(img: SnapshotImageInfo): string[] {
   if (img.width || img.height)
     lines.push(`- **Dimensions**: ${img.width}×${img.height}`);
   if (img.description) lines.push(`- **Description**: ${img.description}`);
-  if (img.context?.preview?.container_display_name)
-    lines.push(
-      `- **Container**: ${img.context.preview.container_display_name}`,
-    );
-  if (img.context?.simulator?.device_name)
-    lines.push(`- **Device**: ${img.context.simulator.device_name}`);
-  if (img.context?.test_name)
-    lines.push(`- **Test**: ${img.context.test_name}`);
+  const contextLines = renderSnapshotImageContext(img.context);
+  if (contextLines.length > 0) {
+    lines.push("", "### Context", ...contextLines);
+  }
   return lines;
 }
 
