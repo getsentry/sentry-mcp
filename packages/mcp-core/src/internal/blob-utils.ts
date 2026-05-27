@@ -111,13 +111,23 @@ export async function createImagePreview(
     };
   }
 
-  const rgba = codec.decode(sourceBytes);
+  let rgba: RgbaImage | null;
+  try {
+    rgba = codec.decode(sourceBytes);
+  } catch {
+    return null;
+  }
   if (!rgba) {
     return null;
   }
 
   const resized = resizeRgbaToMaxDimension(rgba, maxDimension);
-  const encoded = codec.encode(resized, { jpegQuality });
+  let encoded: Uint8Array;
+  try {
+    encoded = codec.encode(resized, { jpegQuality });
+  } catch {
+    return null;
+  }
   return {
     blob: new Blob([encoded], { type: codec.contentType }),
     contentType: codec.contentType,

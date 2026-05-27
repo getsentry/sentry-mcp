@@ -129,6 +129,35 @@ describe("blob-utils", () => {
         Buffer.from(source),
       );
     });
+
+    it("returns null when the decoder throws on corrupt image bytes", async () => {
+      const valid = encodePng({
+        width: 4,
+        height: 2,
+        data: new Uint8Array([
+          255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255, 255,
+          0, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255,
+        ]),
+        depth: 8,
+        channels: 4,
+      });
+
+      // Preserve the PNG signature + IHDR (first 33 bytes) so dimension
+      // parsing succeeds, then scribble over the IDAT/CRC region to force
+      // fast-png's decoder to throw.
+      const corrupted = new Uint8Array(valid);
+      for (let i = 33; i < corrupted.length; i++) {
+        corrupted[i] = 0xff;
+      }
+
+      const preview = await createImagePreview(
+        new Blob([corrupted], { type: "image/png" }),
+        "image/png",
+        { maxDimension: 2 },
+      );
+
+      expect(preview).toBeNull();
+    });
   });
 
   describe("detectImageMimeType", () => {
