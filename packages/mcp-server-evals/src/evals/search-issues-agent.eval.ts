@@ -1,7 +1,7 @@
+import { SentryApiService } from "@sentry/mcp-core/api-client";
+import { searchIssuesAgent } from "@sentry/mcp-core/tools/search-issues/agent";
 import { describeEval } from "vitest-evals";
 import { ToolCallScorer } from "vitest-evals";
-import { searchIssuesAgent } from "@sentry/mcp-core/tools/search-issues/agent";
-import { SentryApiService } from "@sentry/mcp-core/api-client";
 import { StructuredOutputScorer } from "./utils/structuredOutputScorer";
 import "../setup-env";
 
@@ -20,7 +20,7 @@ describeEval("search-issues-agent", {
         },
       },
       {
-        // Query with "me" reference - should only require whoami
+        // Natural-language "me" reference should resolve through whoami.
         input: "Show me issues assigned to me",
         expectedTools: [
           {
@@ -30,31 +30,36 @@ describeEval("search-issues-agent", {
         ],
         expected: {
           query:
-            /assignedOrSuggested:test@example\.com|assigned:test@example\.com|assigned:me/, // Various valid forms
+            /assigned_or_suggested:test@example\.com|assigned:test@example\.com|assigned:me/, // Various valid forms
+          sort: "date",
+        },
+      },
+      {
+        // Explicit "me" is valid Sentry syntax and should not be resolved.
+        input: "assigned:me is:unresolved",
+        expectedTools: [],
+        expected: {
+          query: /(?=.*assigned:me)(?=.*is:unresolved)/,
           sort: "date",
         },
       },
       {
         // Complex query but with common fields - should NOT require tool calls
-        // NOTE: AI often incorrectly uses firstSeen instead of lastSeen - known limitation
         input: "Show me critical unhandled errors from the last 24 hours",
         expectedTools: [],
         expected: {
-          query: /level:error.*is:unresolved.*lastSeen:-24h/,
-          sort: "date",
+          query:
+            /(?=.*is:unresolved)(?=.*error\.handled:false)(?=.*lastSeen:-24h)/,
+          sort: /date|user/,
         },
       },
       {
-        // Query with custom/uncommon field that would require discovery
+        // Tag-presence query can be expressed directly with has:
         input: "Show me issues with custom.payment.failed tag",
-        expectedTools: [
-          {
-            name: "issueFields",
-            arguments: {}, // No arguments needed anymore
-          },
-        ],
+        expectedTools: [],
         expected: {
-          query: /custom\.payment\.failed|tags\[custom\.payment\.failed\]/, // Both syntaxes are valid for tags
+          query:
+            /has:custom\.payment\.failed|custom\.payment\.failed|tags\[custom\.payment\.failed\]/, // All are valid tag forms
           sort: "date", // Agent should always return a sort value
         },
       },
@@ -68,7 +73,8 @@ describeEval("search-issues-agent", {
           },
         ],
         expected: {
-          query: "kafka.consumer.group:orders-processor",
+          query:
+            /kafka\.consumer\.group:orders-processor|tags\[kafka\.consumer\.group\]:orders-processor/,
           sort: "date", // Agent should always return a sort value
         },
       },
@@ -89,6 +95,34 @@ describeEval("search-issues-agent", {
           query:
             /issue\.seer_actionability.*environment:production|environment:production.*issue\.seer_actionability/,
           sort: /date|user/,
+        },
+      },
+      {
+        // Explicit issue-search syntax should be preserved, not broadened.
+        input: "is:for_review release:latest assigned:me issue.priority:high",
+        expectedTools: [],
+        expected: {
+          query:
+            /(?=.*is:for_review)(?=.*release:latest)(?=.*assigned:me)(?=.*issue\.priority:high)/,
+          sort: "date",
+        },
+      },
+      {
+        // Mixed natural language may set sort, but explicit filters stay intact.
+        input: "sort by users is:for_review release:latest",
+        expectedTools: [],
+        expected: {
+          query: /(?=.*is:for_review)(?=.*release:latest)(?!.*sort:)/,
+          sort: "user",
+        },
+      },
+      {
+        // Valid inbox/substatus filters should not be generalized.
+        input: "is:new is:regressed",
+        expectedTools: [],
+        expected: {
+          query: /(?=.*is:new)(?=.*is:regressed)(?!.*is:unresolved)/,
+          sort: "date",
         },
       },
     ];

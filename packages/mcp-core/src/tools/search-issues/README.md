@@ -22,8 +22,8 @@ The AI agent has access to these shared agent tools from `../../agent-tools/`:
 
 ## Natural Language Examples
 
-- "critical bugs from last week" → `level:error is:unresolved lastSeen:-7d`
-- "issues assigned to me" → Uses whoami tool → `assignedOrSuggested:user@email.com`
+- "critical bugs from last week" → `is:unresolved lastSeen:-7d`
+- "issues assigned to me" → Uses whoami tool → `assigned_or_suggested:user@email.com`
 - "affecting 100+ users" → `userCount:>100`
 - "production errors" → `environment:production level:error`
 

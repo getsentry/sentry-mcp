@@ -1,13 +1,13 @@
-import { z } from "zod";
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import type { ServerContext } from "../../types";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
-import { validateSlugOrId, isNumericId } from "../../utils/slug-validation";
+import { z } from "zod";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { ParamOrganizationSlug, ParamRegionUrl } from "../../schema";
+import type { ServerContext } from "../../types";
+import { isNumericId, validateSlugOrId } from "../../utils/slug-validation";
 import { searchIssuesAgent } from "./agent";
-import { formatIssueResults, formatExplanation } from "./formatters";
+import { formatExplanation, formatIssueResults } from "./formatters";
 
 function buildIssueSearchRepairPrompt(params: {
   query: string;
@@ -15,8 +15,12 @@ function buildIssueSearchRepairPrompt(params: {
 }): string {
   return [
     "Fix this Sentry issue search request.",
-    "The query may be natural language or already-valid Sentry issue search syntax.",
-    "Preserve valid explicit parameters, but correct query syntax and sort when they conflict or would fail.",
+    "The query may be natural language, Sentry issue search syntax, or a mix of both.",
+    "Explicit Sentry search terms are authoritative. A token in field:value syntax must be preserved exactly unless Sentry would reject that specific token.",
+    "Magic values in explicit syntax, such as me and latest, are valid and must be preserved.",
+    "Do not remove, replace, broaden, simplify, or canonicalize valid explicit filters.",
+    "Only translate natural-language words around explicit filters, add missing filters that are clearly requested, or correct syntax that would fail.",
+    "Sort may be corrected when the requested sort conflicts with the user's intent, but sort must stay out of the query string.",
     "",
     `User query: ${params.query}`,
     "Current parameters:",
@@ -31,16 +35,18 @@ export default defineTool({
   description: [
     "Search for grouped issues/problems in Sentry - returns a LIST of issues, NOT counts or aggregations.",
     "",
-    "Provide `query` as natural language or Sentry issue search syntax. When an embedded agent is configured, it fixes query and sort before running.",
+    "Provide `query` as natural language or Sentry issue search syntax. When an embedded agent is configured, it fixes query and sort before running while preserving explicit Sentry search syntax.",
     "",
     "Returns grouped issues with metadata like title, status, and user count.",
     "",
     "Common Query Syntax:",
-    "- is:unresolved / is:resolved / is:ignored",
+    "- is:unresolved / is:resolved / is:ignored / is:for_review / is:new / is:regressed / is:escalating",
     "- level:error / level:warning",
     "- firstSeen:-24h / lastSeen:-7d",
-    "- assigned:me / assignedOrSuggested:me",
-    "- issueCategory:feedback",
+    "- assigned:me / assigned_or_suggested:me",
+    "- release:latest",
+    "- issue.category:feedback",
+    "- issue.priority:high",
     "- environment:production",
     "- userCount:>100",
     "",
@@ -118,7 +124,7 @@ export default defineTool({
     let explanation: string | undefined;
 
     if (hasAgentProvider()) {
-      // Agent mode: repair either natural language or already-structured params.
+      // Agent mode: repair requests before calling Sentry.
       let projectId: string | undefined;
       if (params.projectSlugOrId) {
         if (isNumericId(params.projectSlugOrId)) {

@@ -192,8 +192,18 @@ export function getFieldExamples(
 
   const issueExamples: Record<string, string[]> = {
     ...commonExamples,
-    assignedOrSuggested: ["email@example.com", "team-slug", "me"],
-    is: ["unresolved", "resolved", "ignored"],
+    assigned_or_suggested: ["email@example.com", "team-slug", "me"],
+    is: [
+      "unresolved",
+      "resolved",
+      "ignored",
+      "for_review",
+      "new",
+      "regressed",
+      "escalating",
+    ],
+    "issue.category": ["error", "feedback", "outage"],
+    "issue.priority": ["high", "medium", "low"],
   };
 
   const eventExamples: Record<string, string[]> = {
@@ -296,7 +306,16 @@ export function getCommonPatterns(dataset: string) {
     return [
       { pattern: "is:unresolved", description: "Open issues" },
       { pattern: "is:resolved", description: "Closed issues" },
+      { pattern: "is:for_review", description: "Issues in the review queue" },
       { pattern: "level:error", description: "Error level issues" },
+      {
+        pattern: "assigned_or_suggested:me",
+        description: "Issues assigned or suggested to the current user",
+      },
+      {
+        pattern: "issue.category:feedback",
+        description: "User feedback issues",
+      },
       {
         pattern: "firstSeen:-24h",
         description: "New issues from last 24 hours",
