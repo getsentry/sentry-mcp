@@ -1,15 +1,9 @@
-import { z } from "zod";
-import { setTag } from "@sentry/core";
 import type {
-  TextContent,
   ImageContent,
+  TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
-import { defineTool } from "../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../internal/tool-helpers/api";
-import type { ServerContext } from "../types";
+import type { SentryApiService } from "../api-client";
 import { UserInputError } from "../errors";
-import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
-import { resolveSnapshotParams } from "../internal/url-helpers";
 import {
   blobToBase64,
   createImagePreview,
@@ -61,111 +55,13 @@ interface SnapshotImageDetailResponse {
   previous_image_file_name?: string | null;
 }
 
-type SnapshotImageResolution = "preview" | "full";
+export type SnapshotImageResolution = "preview" | "full";
 
-export default defineTool({
-  name: "get_snapshot_details",
-  internalOnly: true,
-  skills: ["preprod"],
-  requiredScopes: ["project:read"],
-  description: [
-    "Get details of a preprod snapshot comparison, including image index and diff summary.",
-    "When selectedSnapshot is provided, fetches preview images and full metadata for that image by default.",
-    "",
-    "Use this tool when you need to:",
-    "- Investigate a failed snapshot test from CI",
-    "- Browse what images exist in a snapshot build",
-    "- View a specific image from a snapshot (via selectedSnapshot param or ?selectedSnapshot= in URL)",
-    "",
-    "Returns compact image metadata (display_name, image_file_name, group, description) for all images.",
-    "To view a specific image preview, use get_sentry_resource with a snapshot URL containing ?selectedSnapshot=<image_file_name>.",
-    "To fetch original full-resolution image bytes, append &imageResolution=full to that snapshot URL.",
-    "",
-    "<examples>",
-    "### Browse all images in a snapshot",
-    "",
-    "```",
-    'get_snapshot_details(snapshotUrl="https://sentry.sentry.io/preprod/snapshots/231949/")',
-    "```",
-    "",
-    "### View a specific image",
-    "",
-    "```",
-    'get_snapshot_details(snapshotUrl="https://sentry.sentry.io/preprod/snapshots/231949/?selectedSnapshot=login_screen.png")',
-    "```",
-    "",
-    "### View the original full-resolution image",
-    "",
-    "```",
-    'get_snapshot_details(snapshotUrl="https://sentry.sentry.io/preprod/snapshots/231949/?selectedSnapshot=login_screen.png&imageResolution=full")',
-    "```",
-    "</examples>",
-    "",
-    "<hints>",
-    "- Response includes compact metadata per image (display_name, image_file_name, group, description).",
-    "- To view an image preview, use get_sentry_resource with snapshot URL + ?selectedSnapshot=<image_file_name>.",
-    "- To view original full-resolution image bytes, append &imageResolution=full.",
-    "- The diff_percent field shows what percentage of pixels changed (0-100).",
-    "</hints>",
-  ].join("\n"),
-  inputSchema: {
-    snapshotUrl: z
-      .string()
-      .trim()
-      .describe(
-        "Full URL to the snapshot page, e.g. https://sentry.sentry.io/preprod/snapshots/231949/",
-      )
-      .nullable()
-      .default(null),
-    organizationSlug: ParamOrganizationSlug.nullable().default(null),
-    snapshotId: z
-      .string()
-      .trim()
-      .describe("The numeric snapshot artifact ID.")
-      .nullable()
-      .default(null),
-    selectedSnapshot: z
-      .string()
-      .trim()
-      .describe(
-        "Image file name to fetch. When provided, returns preview image bytes + full metadata instead of the snapshot summary.",
-      )
-      .nullable()
-      .default(null),
-    regionUrl: ParamRegionUrl.nullable().default(null),
-  },
-  annotations: {
-    readOnlyHint: true,
-    openWorldHint: true,
-  },
-  async handler(params, context: ServerContext) {
-    const { organizationSlug, snapshotId } = resolveSnapshotParams(params);
-    const imageResolution = resolveImageResolution(params.snapshotUrl);
-
-    setTag("organization.slug", organizationSlug);
-
-    const apiService = apiServiceFromContext(context, {
-      regionUrl: params.regionUrl ?? undefined,
-    });
-
-    if (params.selectedSnapshot) {
-      return fetchSnapshotImage(
-        apiService,
-        organizationSlug,
-        snapshotId,
-        params.selectedSnapshot,
-        imageResolution,
-      );
-    }
-
-    return fetchSnapshotSummary(
-      apiService,
-      organizationSlug,
-      snapshotId,
-      params.snapshotUrl,
-    );
-  },
-});
+function fullResolutionHint(
+  _nextSteps: "snapshot-tools" | "resource-url" | "resource-id" | undefined,
+): string {
+  return '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`';
+}
 
 function countField(
   data: Record<string, unknown>,
@@ -174,27 +70,6 @@ function countField(
 ): number {
   const value = data[key];
   return typeof value === "number" ? value : fallback;
-}
-
-function resolveImageResolution(
-  snapshotUrl: string | null,
-): SnapshotImageResolution {
-  if (!snapshotUrl) {
-    return "preview";
-  }
-
-  const value = new URL(snapshotUrl).searchParams.get("imageResolution");
-  if (!value) {
-    return "preview";
-  }
-
-  if (value === "full" || value === "preview") {
-    return value;
-  }
-
-  throw new UserInputError(
-    "Invalid imageResolution query value. Use imageResolution=full or omit it for preview images.",
-  );
 }
 
 function formatImageMetadata(img: SnapshotImageInfo): string[] {
@@ -212,8 +87,19 @@ function formatImageMetadata(img: SnapshotImageInfo): string[] {
   return lines;
 }
 
+async function createPreviewOrNull(
+  blob: Blob,
+  contentType: string,
+): Promise<ImagePreviewResult | null> {
+  try {
+    return await createImagePreview(blob, contentType);
+  } catch {
+    return null;
+  }
+}
+
 async function fetchAndAppendImage(
-  apiService: ReturnType<typeof apiServiceFromContext>,
+  apiService: SentryApiService,
   imageUrl: string,
   label: string,
   imageResolution: SnapshotImageResolution,
@@ -255,28 +141,20 @@ async function fetchAndAppendImage(
   });
 }
 
-async function createPreviewOrNull(
-  blob: Blob,
-  contentType: string,
-): Promise<ImagePreviewResult | null> {
-  try {
-    return await createImagePreview(blob, contentType);
-  } catch {
-    return null;
-  }
-}
-
-async function fetchSnapshotImage(
-  apiService: ReturnType<typeof apiServiceFromContext>,
+export async function fetchSnapshotImage(
+  apiService: SentryApiService,
   organizationSlug: string,
   snapshotId: string,
-  imageName: string,
+  imageIdentifier: string,
   imageResolution: SnapshotImageResolution,
+  options: {
+    nextSteps?: "snapshot-tools" | "resource-url" | "resource-id";
+  } = {},
 ): Promise<(TextContent | ImageContent)[]> {
   const detail = (await apiService.getSnapshotImageDetail({
     organizationSlug,
     snapshotId,
-    imageIdentifier: imageName,
+    imageIdentifier,
   })) as SnapshotImageDetailResponse;
 
   const headImage = detail.head_image;
@@ -285,11 +163,11 @@ async function fetchSnapshotImage(
 
   if (!headImage?.image_url && !baseImage?.image_url) {
     throw new UserInputError(
-      `No image data returned for "${imageName}". The image may not exist in this snapshot.`,
+      `No image data returned for "${imageIdentifier}". The image may not exist in this snapshot.`,
     );
   }
 
-  const lines: string[] = [`## ${imageName}\n`];
+  const lines: string[] = [`## ${imageIdentifier}\n`];
   if (status) lines.push(`- **Status**: ${status}`);
   if (detail.diff_percentage != null)
     lines.push(
@@ -299,9 +177,7 @@ async function fetchSnapshotImage(
     lines.push(`- **Previous File**: \`${detail.previous_image_file_name}\``);
   lines.push(`- **Image Resolution**: ${imageResolution}`);
   if (imageResolution === "preview") {
-    lines.push(
-      "- **Full Resolution**: append `&imageResolution=full` to the snapshot URL",
-    );
+    lines.push(fullResolutionHint(options.nextSteps));
   }
 
   const primary = headImage ?? baseImage;
@@ -344,11 +220,47 @@ async function fetchSnapshotImage(
   return contentParts;
 }
 
-async function fetchSnapshotSummary(
-  apiService: ReturnType<typeof apiServiceFromContext>,
+function isSnapshotDiffPair(
+  entry: SnapshotDiffPair | SnapshotImageEntry,
+): entry is SnapshotDiffPair {
+  return "head_image" in entry || "base_image" in entry;
+}
+
+function entryToTreeItem(
+  entry: SnapshotDiffPair | SnapshotImageEntry,
+  details: string[] = [],
+): SnapshotImageTreeItem {
+  if (isSnapshotDiffPair(entry)) {
+    const image: SnapshotImageEntry =
+      entry.head_image ?? entry.base_image ?? {};
+    return { image, details };
+  }
+
+  return { image: entry, details };
+}
+
+function renderTreeSections(
+  sections: Array<{ title: string; items: SnapshotImageTreeItem[] }>,
+): string[] {
+  return sections.flatMap(({ title, items }, index) => {
+    const lines = renderSnapshotImageTreeSection(title, items);
+    if (lines.length === 0) {
+      return [];
+    }
+    return index === 0 ? lines : ["", ...lines];
+  });
+}
+
+export async function fetchSnapshotSummary(
+  apiService: SentryApiService,
   organizationSlug: string,
   snapshotId: string,
-  snapshotUrl: string | null,
+  sourceUrlForDisplay: string | null,
+  options: {
+    showUnmodified?: boolean;
+    listImagesWhenNoDiffs?: boolean;
+    nextSteps?: "snapshot-tools" | "resource-url" | "resource-id";
+  } = {},
 ): Promise<string> {
   const data = (await apiService.getSnapshotDetails({
     organizationSlug,
@@ -367,9 +279,13 @@ async function fetchSnapshotSummary(
   const added = (data.added as SnapshotImageEntry[]) || [];
   const removed = (data.removed as SnapshotImageEntry[]) || [];
   const errored = (data.errored as SnapshotDiffPair[]) || [];
+  const unchanged =
+    (data.unchanged as Array<SnapshotDiffPair | SnapshotImageEntry>) || [];
+  const skipped =
+    (data.skipped as Array<SnapshotDiffPair | SnapshotImageEntry>) || [];
 
   const resolvedSnapshotUrl =
-    snapshotUrl ||
+    sourceUrlForDisplay ||
     `https://${organizationSlug}.sentry.io/preprod/snapshots/${snapshotId}/`;
 
   const sections: string[] = [];
@@ -389,9 +305,9 @@ async function fetchSnapshotSummary(
   const addedCount = countField(data, "added_count", added.length);
   const removedCount = countField(data, "removed_count", removed.length);
   const renamedCount = countField(data, "renamed_count", renamed.length);
-  const unchangedCount = countField(data, "unchanged_count", 0);
+  const unchangedCount = countField(data, "unchanged_count", unchanged.length);
   const erroredCount = countField(data, "errored_count", errored.length);
-  const skippedCount = countField(data, "skipped_count", 0);
+  const skippedCount = countField(data, "skipped_count", skipped.length);
   sections.push(
     `- **Images**: ${totalCount} total (${changedCount} changed, ${addedCount} added, ${removedCount} removed, ${renamedCount} renamed, ${unchangedCount} unchanged, ${erroredCount} errored, ${skippedCount} skipped)`,
   );
@@ -430,45 +346,39 @@ async function fetchSnapshotSummary(
       .slice()
       .sort((left, right) => (right.diff ?? -1) - (left.diff ?? -1));
 
-    const diffSections: Array<{
-      title: string;
-      items: SnapshotImageTreeItem[];
-    }> = [
-      {
-        title: "Changed",
-        items: sortedChanged.map((pair) => ({
-          image: pair.head_image ?? {},
-          details:
-            pair.diff != null
-              ? [`${formatSnapshotDiffPercent(pair.diff)} diff`]
-              : [],
-        })),
-      },
-      { title: "Added", items: added.map((image) => ({ image })) },
-      { title: "Removed", items: removed.map((image) => ({ image })) },
-      {
-        title: "Renamed",
-        items: renamed.map((pair) => ({
-          image: pair.head_image ?? {},
-          details: [
-            `previous: ${getSnapshotImageDisplayName(pair.base_image ?? {})}`,
-          ],
-        })),
-      },
-      {
-        title: "Errored",
-        items: errored.map((pair) => ({ image: pair.head_image ?? {} })),
-      },
-    ];
-
-    const renderedDiffs = diffSections
-      .map(({ title, items }) => renderSnapshotImageTreeSection(title, items))
-      .filter((lines) => lines.length > 0);
-    for (const [index, lines] of renderedDiffs.entries()) {
-      if (index > 0) sections.push("");
-      sections.push(...lines);
-    }
-  } else if (allImages.length > 0) {
+    sections.push(
+      ...renderTreeSections([
+        {
+          title: "Changed",
+          items: sortedChanged.map((pair) => ({
+            image: pair.head_image ?? {},
+            details:
+              pair.diff != null
+                ? [`${formatSnapshotDiffPercent(pair.diff)} diff`]
+                : [],
+          })),
+        },
+        { title: "Added", items: added.map((image) => ({ image })) },
+        { title: "Removed", items: removed.map((image) => ({ image })) },
+        {
+          title: "Renamed",
+          items: renamed.map((pair) => ({
+            image: pair.head_image ?? {},
+            details: [
+              `previous: ${getSnapshotImageDisplayName(pair.base_image ?? {})}`,
+            ],
+          })),
+        },
+        {
+          title: "Errored",
+          items: errored.map((pair) => ({ image: pair.head_image ?? {} })),
+        },
+      ]),
+    );
+  } else if (
+    (data.comparison_type === "solo" || options.listImagesWhenNoDiffs) &&
+    allImages.length > 0
+  ) {
     sections.push("\n## Images\n");
     sections.push(
       ...renderSnapshotImageTreeSection(
@@ -476,11 +386,48 @@ async function fetchSnapshotSummary(
         allImages.map((image) => ({ image })),
       ),
     );
+  } else if (
+    !options.showUnmodified &&
+    (unchangedCount > 0 || skippedCount > 0)
+  ) {
+    sections.push(
+      "\nNo changed images are shown in compact mode. Re-run `get_snapshot` with `showUnmodified=true` to list unchanged and skipped images.",
+    );
   }
 
-  sections.push(
-    `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${resolvedSnapshotUrl}?selectedSnapshot=<image_file_name>")\`\n- To fetch original full-resolution image bytes, append \`&imageResolution=full\` to the selected-image URL`,
-  );
+  if (options.showUnmodified && data.comparison_type !== "solo") {
+    const unmodifiedSections = renderTreeSections([
+      {
+        title: "Unchanged",
+        items: unchanged.map((entry) => entryToTreeItem(entry)),
+      },
+      {
+        title: "Skipped",
+        items: skipped.map((entry) => entryToTreeItem(entry)),
+      },
+    ]);
+
+    if (unmodifiedSections.length > 0) {
+      sections.push("\n## Unmodified\n");
+      sections.push(...unmodifiedSections);
+    }
+  }
+
+  if (options.nextSteps === "resource-url") {
+    const separator = resolvedSnapshotUrl.includes("?") ? "&" : "?";
+    const selectedImageUrl = `${resolvedSnapshotUrl}${separator}selectedSnapshot=<image_file_name>`;
+    sections.push(
+      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${selectedImageUrl}")\`\n- To fetch original full-resolution image bytes, use \`get_snapshot_image\``,
+    );
+  } else if (options.nextSteps === "resource-id") {
+    sections.push(
+      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(resourceType="snapshotImage", resourceId="${snapshotId}:<image_file_name>")\`\n- To fetch original full-resolution image bytes, use \`get_snapshot_image\``,
+    );
+  } else {
+    sections.push(
+      `\n## Next Steps\n\n- To view a specific image preview, use \`get_snapshot_image(organizationSlug="${organizationSlug}", snapshotId="${snapshotId}", imageIdentifier="<image_file_name>")\`\n- To fetch original full-resolution image bytes, set \`imageResolution="full"\` in \`get_snapshot_image\``,
+    );
+  }
 
   return sections.join("\n");
 }

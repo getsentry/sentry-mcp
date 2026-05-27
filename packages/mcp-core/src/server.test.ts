@@ -504,6 +504,9 @@ describe("buildServer", () => {
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
+      expect(toolNames).not.toContain("get_snapshot");
+      expect(toolNames).not.toContain("get_snapshot_image");
+      expect(toolNames).not.toContain("get_snapshot_details");
       // Currently no default tools are gated behind experimental visibility
       expect(toolNames.length).toBeGreaterThan(0);
     });
@@ -552,6 +555,33 @@ describe("buildServer", () => {
         expect(toolNames).toContain("get_sentry_resource");
         expect(toolNames).not.toContain("get_issue_details");
       }
+    });
+
+    it("exposes snapshot tools only when preprod skill is granted", () => {
+      const withoutPreprod = buildServer({
+        context: baseContext,
+      });
+      const withoutPreprodToolNames = getRegisteredToolNames(withoutPreprod);
+      expect(withoutPreprodToolNames).not.toContain("get_snapshot");
+      expect(withoutPreprodToolNames).not.toContain("get_snapshot_image");
+      expect(withoutPreprodToolNames).not.toContain("get_latest_base_snapshot");
+
+      const withPreprod = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set([
+            "inspect",
+            "triage",
+            "project-management",
+            "seer",
+            "preprod",
+          ]),
+        },
+      });
+      const withPreprodToolNames = getRegisteredToolNames(withPreprod);
+      expect(withPreprodToolNames).toContain("get_snapshot");
+      expect(withPreprodToolNames).toContain("get_snapshot_image");
+      expect(withPreprodToolNames).toContain("get_latest_base_snapshot");
     });
 
     it("exposes use_sentry safety annotations through tool metadata in agent mode", async () => {

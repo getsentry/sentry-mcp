@@ -151,6 +151,62 @@ describe("get_latest_base_snapshot", () => {
     );
   });
 
+  it("passes project slug to latest-base endpoint", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/latest-base/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("projectSlug")).toBe("internal");
+          expect(url.searchParams.get("project")).toBeNull();
+          return HttpResponse.json(latestBaseFixture);
+        },
+        { once: true },
+      ),
+    );
+
+    const result = await getLatestBaseSnapshot.handler(
+      {
+        organizationSlug: "sentry",
+        appId: "com.emergetools.hackernews",
+        branch: null,
+        project: "internal",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const text = result as string;
+    expect(text).toContain("**Snapshot ID**: 232800");
+  });
+
+  it("passes numeric project ID directly to endpoint", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/latest-base/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("project")).toBe("1");
+          expect(url.searchParams.get("projectSlug")).toBeNull();
+          return HttpResponse.json(latestBaseFixture);
+        },
+        { once: true },
+      ),
+    );
+
+    const result = await getLatestBaseSnapshot.handler(
+      {
+        organizationSlug: "sentry",
+        appId: "com.emergetools.hackernews",
+        branch: null,
+        project: "1",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const text = result as string;
+    expect(text).toContain("**Snapshot ID**: 232800");
+  });
+
   it("passes branch filter to endpoint", async () => {
     mswServer.use(
       http.get(

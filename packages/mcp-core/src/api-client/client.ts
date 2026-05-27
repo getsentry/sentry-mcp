@@ -3181,18 +3181,21 @@ export class SentryApiService {
     appId,
     branch,
     project,
+    projectSlug,
     compactMetadata = true,
   }: {
     organizationSlug: string;
     appId: string;
     branch?: string;
     project?: string;
+    projectSlug?: string;
     compactMetadata?: boolean;
   }): Promise<unknown> {
     const params = new URLSearchParams();
     params.set("app_id", appId);
     if (branch) params.set("branch", branch);
     if (project) params.set("project", project);
+    if (projectSlug) params.set("projectSlug", projectSlug);
     if (compactMetadata) params.set("compact_metadata", "true");
     const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/latest-base/?${params.toString()}`;
     return this.requestJSON(path);
