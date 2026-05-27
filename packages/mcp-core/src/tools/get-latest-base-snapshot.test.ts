@@ -65,7 +65,7 @@ describe("get_latest_base_snapshot", () => {
     expect(text).toContain("**Snapshot ID**: 232800");
     expect(text).toContain("**Total Images**: 2");
     expect(text).toContain("main_home_screen.png — Home Screen — Main");
-    expect(text).toContain("settings_page.png — Settings — Settings");
+    expect(text).toContain("settings_page.png — Settings");
     expect(text).toContain("**App Name**: HackerNews");
     expect(text).toContain("**Platform**: ios");
     expect(text).toContain("**Branch**: main (`abc123de`)");
@@ -87,7 +87,7 @@ describe("get_latest_base_snapshot", () => {
       **Snapshot Images:**
       └── snapshots-iphone/
           ├── main_home_screen.png — Home Screen — Main
-          └── settings_page.png — Settings — Settings
+          └── settings_page.png — Settings
 
       ## Next Steps
 

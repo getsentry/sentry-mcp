@@ -96,7 +96,7 @@ function formatLeafLabel(
   if (displayName !== leafName && displayName !== img.image_file_name) {
     suffixes.push(displayName);
   }
-  if (img.group) {
+  if (img.group && String(img.group) !== displayName) {
     suffixes.push(String(img.group));
   }
 
