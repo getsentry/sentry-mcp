@@ -1133,6 +1133,37 @@ export const restHandlers = buildHandlers([
       });
     },
   },
+  {
+    method: "get",
+    path: "/api/0/organizations/:organizationSlug/repos/",
+    fetch: () => {
+      return HttpResponse.json([
+        {
+          id: "101",
+          name: "getsentry/sentry",
+          provider: { id: "integrations:github", name: "GitHub" },
+          status: "active",
+          externalSlug: "getsentry/sentry",
+          externalId: "123456",
+          integrationId: "1",
+        },
+      ]);
+    },
+  },
+  {
+    method: "post",
+    path: "/api/0/projects/:organizationSlug/:projectSlug/repo/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json({
+        id: "1",
+        projectId: "4509109104082945",
+        repositoryId: String((body?.repositoryId as string | number) || "101"),
+        source: "scm_onboarding",
+        created: true,
+      });
+    },
+  },
 ]);
 
 // Add handlers for mcp.sentry.dev and localhost

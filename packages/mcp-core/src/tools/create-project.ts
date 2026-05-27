@@ -15,7 +15,7 @@ import {
 export default defineTool({
   name: "create_project",
   skills: ["project-management"], // Only available in project-management skill
-  requiredScopes: ["project:write", "team:read"],
+  requiredScopes: ["project:write", "team:read", "org:read"],
   description: [
     "Create a new project in Sentry (includes DSN automatically).",
     "",
@@ -24,6 +24,7 @@ export default defineTool({
     "- 'Set up a project for [app/service] with team [X]'",
     "- 'I need a new Sentry project'",
     "- Create project AND need DSN in one step",
+    "- 'Create a project for my-repo'",
     "",
     "DO NOT USE create_dsn after this - DSN is included in output.",
     "",
@@ -34,11 +35,16 @@ export default defineTool({
     "```",
     "create_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript')",
     "```",
+    "### Create project and link to a repository",
+    "```",
+    "create_project(organizationSlug='my-organization', teamSlug='my-team', name='my-project', platform='javascript', repository='getsentry/sentry')",
+    "```",
     "</examples>",
     "",
     "<hints>",
     "- If the user passes a parameter in the form of name/otherName, its likely in the format of <organizationSlug>/<teamSlug>.",
     "- If any parameter is ambiguous, you should clarify with the user what they meant.",
+    "- The repository parameter accepts a repo name (e.g. 'getsentry/sentry'). The repo must already be connected to the org via a VCS integration.",
     "</hints>",
   ].join("\n"),
   inputSchema: {
@@ -52,6 +58,14 @@ export default defineTool({
         "The name of the project to create. Typically this is commonly the name of the repository or service. It is only used as a visual label in Sentry.",
       ),
     platform: ParamPlatform.nullable().default(null),
+    repository: z
+      .string()
+      .trim()
+      .nullable()
+      .default(null)
+      .describe(
+        "Optional repository name to link to the project (e.g. 'getsentry/sentry'). The repo must already be connected to the organization via a VCS integration.",
+      ),
   },
   annotations: {
     readOnlyHint: false,
@@ -83,6 +97,34 @@ export default defineTool({
     } catch (err) {
       logIssue(err);
     }
+
+    let repoLinked = false;
+    let repoName: string | null = null;
+    if (params.repository) {
+      try {
+        const repos = await apiService.listRepos({
+          organizationSlug,
+          query: params.repository,
+        });
+        const match = repos.find(
+          (r) =>
+            r.name === params.repository ||
+            r.name.endsWith(`/${params.repository}`),
+        );
+        if (match) {
+          await apiService.linkProjectRepo({
+            organizationSlug,
+            projectSlug: project.slug,
+            repositoryId: match.id,
+          });
+          repoLinked = true;
+          repoName = match.name;
+        }
+      } catch (err) {
+        logIssue(err);
+      }
+    }
+
     let output = `# New Project in **${organizationSlug}**\n\n`;
     output += `**ID**: ${project.id}\n`;
     output += `**Slug**: ${project.slug}\n`;
@@ -91,6 +133,11 @@ export default defineTool({
       output += `**SENTRY_DSN**: ${clientKey?.dsn.public}\n\n`;
     } else {
       output += "**SENTRY_DSN**: There was an error fetching this value.\n\n";
+    }
+    if (repoLinked && repoName) {
+      output += `**Repository**: ${repoName} (linked)\n\n`;
+    } else if (params.repository) {
+      output += `**Repository**: Could not find repository "${params.repository}" in the organization. Make sure it's connected via a VCS integration.\n\n`;
     }
     output += "## Response Notes\n\n";
     output += `- Please tell the user the project slug and **SENTRY_DSN**.\n`;

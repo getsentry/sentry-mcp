@@ -29,7 +29,9 @@ import {
   TeamListSchema,
   TeamSchema,
   ProjectListSchema,
+  ProjectRepoLinkSchema,
   ProjectSchema,
+  RepositoryListSchema,
   ReleaseListSchema,
   IssueListSchema,
   IssueSchema,
@@ -1432,6 +1434,49 @@ export class SentryApiService {
       opts,
     );
     return ProjectSchema.parse(body);
+  }
+
+  async listRepos(
+    {
+      organizationSlug,
+      query,
+    }: {
+      organizationSlug: string;
+      query?: string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const params = new URLSearchParams();
+    if (query) {
+      params.set("query", query);
+    }
+    const qs = params.toString();
+    const url = `/organizations/${organizationSlug}/repos/${qs ? `?${qs}` : ""}`;
+    const body = await this.requestJSON(url, { method: "GET" }, opts);
+    return RepositoryListSchema.parse(body);
+  }
+
+  async linkProjectRepo(
+    {
+      organizationSlug,
+      projectSlug,
+      repositoryId,
+    }: {
+      organizationSlug: string;
+      projectSlug: string;
+      repositoryId: number | string;
+    },
+    opts?: RequestOptions,
+  ) {
+    const body = await this.requestJSON(
+      `/projects/${organizationSlug}/${projectSlug}/repo/`,
+      {
+        method: "POST",
+        body: JSON.stringify({ repositoryId }),
+      },
+      opts,
+    );
+    return ProjectRepoLinkSchema.parse(body);
   }
 
   /**
