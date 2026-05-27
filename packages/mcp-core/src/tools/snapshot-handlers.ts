@@ -57,38 +57,10 @@ interface SnapshotImageDetailResponse {
 
 export type SnapshotImageResolution = "preview" | "full";
 
-export function resolveSnapshotImageResolutionFromResourceUrl(
-  resourceUrl: string | null | undefined,
-): SnapshotImageResolution {
-  if (!resourceUrl) {
-    return "preview";
-  }
-
-  const value = new URL(resourceUrl).searchParams.get("imageResolution");
-  if (!value) {
-    return "preview";
-  }
-
-  if (value === "full" || value === "preview") {
-    return value;
-  }
-
-  throw new UserInputError(
-    "Invalid imageResolution query value. Use imageResolution=full or omit it for preview images.",
-  );
-}
-
 function fullResolutionHint(
-  nextSteps: "snapshot-tools" | "resource-url" | "resource-id" | undefined,
+  _nextSteps: "snapshot-tools" | "resource-url" | "resource-id" | undefined,
 ): string {
-  switch (nextSteps) {
-    case "resource-url":
-      return "- **Full Resolution**: append `&imageResolution=full` to the snapshot URL";
-    case "resource-id":
-      return '- **Full Resolution**: set `imageResolution="full"` in `get_sentry_resource`';
-    default:
-      return '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`';
-  }
+  return '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`';
 }
 
 function countField(
@@ -445,11 +417,11 @@ export async function fetchSnapshotSummary(
     const separator = resolvedSnapshotUrl.includes("?") ? "&" : "?";
     const selectedImageUrl = `${resolvedSnapshotUrl}${separator}selectedSnapshot=<image_file_name>`;
     sections.push(
-      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${selectedImageUrl}")\`\n- To fetch original full-resolution image bytes, add \`&imageResolution=full\` to that URL`,
+      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(url="${selectedImageUrl}")\`\n- To fetch original full-resolution image bytes, use \`get_snapshot_image\``,
     );
   } else if (options.nextSteps === "resource-id") {
     sections.push(
-      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(resourceType="snapshotImage", resourceId="${snapshotId}:<image_file_name>")\`\n- To fetch original full-resolution image bytes, set \`imageResolution="full"\` in \`get_sentry_resource\``,
+      `\n## Next Steps\n\n- To view a specific image preview, use \`get_sentry_resource(resourceType="snapshotImage", resourceId="${snapshotId}:<image_file_name>")\`\n- To fetch original full-resolution image bytes, use \`get_snapshot_image\``,
     );
   } else {
     sections.push(
