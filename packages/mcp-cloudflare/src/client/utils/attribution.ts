@@ -1,4 +1,4 @@
-import type { spanToJSON } from "@sentry/react";
+import * as Sentry from "@sentry/react";
 
 export function resolveUtmSource(
   raw: string | null | undefined,
@@ -31,20 +31,15 @@ export function resolveReferrerFamily(
   return "other";
 }
 
-type SpanJSON = ReturnType<typeof spanToJSON>;
-
-export function attributionBeforeSendSpan(span: SpanJSON): SpanJSON {
-  if (span.op !== "pageload") return span;
+export function resolveAttribution(): void {
+  const span = Sentry.getActiveSpan();
+  if (!span) return;
 
   const utmSource = resolveUtmSource(
     new URLSearchParams(window.location.search).get("utm_source"),
   );
-  const referrerFamily = resolveReferrerFamily(document.referrer);
+  if (utmSource) span.setAttribute("app.utm_source", utmSource);
 
-  span.data = {
-    ...span.data,
-    ...(utmSource && { "app.utm_source": utmSource }),
-    ...(referrerFamily && { "app.referrer.family": referrerFamily }),
-  };
-  return span;
+  const referrerFamily = resolveReferrerFamily(document.referrer);
+  if (referrerFamily) span.setAttribute("app.referrer.family", referrerFamily);
 }
