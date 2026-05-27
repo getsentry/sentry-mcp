@@ -98,7 +98,7 @@ export default defineTool({
       logIssue(err);
     }
 
-    let repoLinked = false;
+    let repoStatus: "linked" | "not_found" | "link_failed" | null = null;
     let repoName: string | null = null;
     if (params.repository) {
       try {
@@ -112,16 +112,24 @@ export default defineTool({
             r.name.endsWith(`/${params.repository}`),
         );
         if (match) {
-          await apiService.linkProjectRepo({
-            organizationSlug,
-            projectSlug: project.slug,
-            repositoryId: match.id,
-          });
-          repoLinked = true;
           repoName = match.name;
+          try {
+            await apiService.linkProjectRepo({
+              organizationSlug,
+              projectSlug: project.slug,
+              repositoryId: match.id,
+            });
+            repoStatus = "linked";
+          } catch (err) {
+            logIssue(err);
+            repoStatus = "link_failed";
+          }
+        } else {
+          repoStatus = "not_found";
         }
       } catch (err) {
         logIssue(err);
+        repoStatus = "not_found";
       }
     }
 
@@ -134,9 +142,11 @@ export default defineTool({
     } else {
       output += "**SENTRY_DSN**: There was an error fetching this value.\n\n";
     }
-    if (repoLinked && repoName) {
+    if (repoStatus === "linked" && repoName) {
       output += `**Repository**: ${repoName} (linked)\n\n`;
-    } else if (params.repository) {
+    } else if (repoStatus === "link_failed" && repoName) {
+      output += `**Repository**: Found ${repoName} but failed to link it to the project. Check permissions and try linking manually.\n\n`;
+    } else if (repoStatus === "not_found") {
       output += `**Repository**: Could not find repository "${params.repository}" in the organization. Make sure it's connected via a VCS integration.\n\n`;
     }
     output += "## Response Notes\n\n";
