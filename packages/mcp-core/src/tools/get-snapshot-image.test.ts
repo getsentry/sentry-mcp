@@ -150,6 +150,9 @@ describe("get_snapshot_image", () => {
     const { textParts, imageParts } = splitParts(result);
 
     expect(textParts[0]!.text).toContain("## login_screen.png");
+    expect(textParts[0]!.text).toContain(
+      "- **URL**: https://sentry.sentry.io/preprod/snapshots/231949/?selectedSnapshot=login_screen.png",
+    );
     expect(textParts[0]!.text).toContain("**Status**: changed");
     expect(textParts[0]!.text).toContain("**Diff**: 12.5%");
     expect(textParts[0]!.text).toContain("**Image Resolution**: preview");

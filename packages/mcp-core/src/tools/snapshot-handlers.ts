@@ -167,7 +167,13 @@ export async function fetchSnapshotImage(
     );
   }
 
+  const snapshotUrl = `${apiService.getPreprodSnapshotUrl(
+    organizationSlug,
+    snapshotId,
+  )}?selectedSnapshot=${encodeURIComponent(imageIdentifier)}`;
+
   const lines: string[] = [`## ${imageIdentifier}\n`];
+  lines.push(`- **URL**: ${snapshotUrl}`);
   if (status) lines.push(`- **Status**: ${status}`);
   if (detail.diff_percentage != null)
     lines.push(
@@ -282,7 +288,7 @@ export async function fetchSnapshotSummary(
 
   const resolvedSnapshotUrl =
     sourceUrlForDisplay ||
-    `https://${organizationSlug}.sentry.io/preprod/snapshots/${snapshotId}/`;
+    apiService.getPreprodSnapshotUrl(organizationSlug, snapshotId);
 
   const sections: string[] = [];
 

@@ -5,6 +5,7 @@ import {
   validateOpenAiBaseUrlThrows,
   getIssueUrl,
   getIssuesSearchUrl,
+  getPreprodSnapshotUrl,
   getReplaysSearchUrl,
   getReplayUrl,
   getTraceUrl,
@@ -158,6 +159,37 @@ describe("url-utils", () => {
       );
       expect(result).toBe(
         "http://sentry.internal:9000/organizations/myorg/issues/PROJ-123",
+      );
+    });
+  });
+
+  describe("getPreprodSnapshotUrl", () => {
+    it("should handle regional URLs correctly for SaaS", () => {
+      const result = getPreprodSnapshotUrl("us.sentry.io", "myorg", "12");
+      expect(result).toBe("https://myorg.sentry.io/preprod/snapshots/12/");
+    });
+
+    it("should handle standard sentry.io correctly", () => {
+      const result = getPreprodSnapshotUrl("sentry.io", "myorg", "12");
+      expect(result).toBe("https://myorg.sentry.io/preprod/snapshots/12/");
+    });
+
+    it("should handle self-hosted correctly", () => {
+      const result = getPreprodSnapshotUrl("sentry.example.com", "myorg", "12");
+      expect(result).toBe(
+        "https://sentry.example.com/organizations/myorg/preprod/snapshots/12/",
+      );
+    });
+
+    it("should support HTTP for self-hosted snapshot URLs when requested", () => {
+      const result = getPreprodSnapshotUrl(
+        "sentry.internal:9000",
+        "myorg",
+        "12",
+        "http",
+      );
+      expect(result).toBe(
+        "http://sentry.internal:9000/organizations/myorg/preprod/snapshots/12/",
       );
     });
   });
