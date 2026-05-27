@@ -425,6 +425,163 @@ describe("search_events", () => {
     expect(result).toContain('"tags[sequence]": "42"');
   });
 
+  it("should include the sort field even when caller's explicit fields omit it", async () => {
+    // Sentry rejects requests whose sort column isn't in the selected fields,
+    // so the handler must append the sort field before issuing the request.
+    mockGenerateText.mockResolvedValueOnce(
+      mockAIResponse(
+        "errors",
+        "level:error",
+        ["title", "issue", "message", "timestamp"],
+        undefined,
+        "-timestamp",
+      ),
+    );
+
+    let capturedFields: string[] | undefined;
+    let capturedSort: string | null | undefined;
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          capturedFields = url.searchParams.getAll("field");
+          capturedSort = url.searchParams.get("sort");
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: "level:error",
+        dataset: "errors",
+        fields: ["title", "issue", "message"],
+        sort: "-timestamp",
+        statsPeriod: "14d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(capturedSort).toBe("-timestamp");
+    expect(capturedFields).toContain("timestamp");
+  });
+
+  it("should not append a non-aggregate sort to aggregate fields", async () => {
+    // Adding a non-aggregate column to an aggregate query expands the
+    // GROUP BY and silently corrupts the result, so leave the request
+    // alone and let Sentry's 400 propagate.
+    let capturedFields: string[] | undefined;
+    let capturedSort: string | null | undefined;
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          capturedFields = url.searchParams.getAll("field");
+          capturedSort = url.searchParams.get("sort");
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: 'span.op:"db.query"',
+        dataset: "spans",
+        fields: ["span.op", "count()"],
+        sort: "-timestamp",
+        statsPeriod: "7d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(capturedSort).toBe("-timestamp");
+    expect(capturedFields).toEqual(["span.op", "count()"]);
+  });
+
+  it("should append an aggregate sort that isn't already in fields", async () => {
+    // Aggregate sort columns can safely be added to an aggregate query —
+    // Sentry treats them as additional aggregations, not GROUP BY columns.
+    let capturedFields: string[] | undefined;
+    let capturedSort: string | null | undefined;
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/events/",
+        ({ request }) => {
+          const url = new URL(request.url);
+          capturedFields = url.searchParams.getAll("field");
+          capturedSort = url.searchParams.get("sort");
+          return HttpResponse.json({ data: [] });
+        },
+      ),
+    );
+
+    await searchEvents.handler(
+      {
+        organizationSlug: "test-org",
+        regionUrl: null,
+        projectSlug: null,
+        query: 'span.op:"db.query"',
+        dataset: "spans",
+        fields: ["span.op", "count()"],
+        sort: "-count_unique(user.id)",
+        statsPeriod: "7d",
+        limit: 10,
+        includeExplanation: false,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          regionUrl: null,
+          projectSlug: null,
+        },
+        accessToken: "test-token",
+        userId: "1",
+      },
+    );
+
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    // The API client normalizes aggregate sort params: count_unique(user.id)
+    // becomes count_unique_user_id. Fields keep their original form.
+    expect(capturedSort).toBe("-count_unique_user_id");
+    expect(capturedFields).toEqual([
+      "span.op",
+      "count()",
+      "count_unique(user.id)",
+    ]);
+  });
+
   it("should not duplicate environment filters after agent repair", async () => {
     const query =
       'transaction:"VPN connections" tags[type]:Unified tags[country]:CN';

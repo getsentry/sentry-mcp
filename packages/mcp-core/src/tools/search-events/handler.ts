@@ -542,6 +542,32 @@ export default defineTool({
       });
     }
 
+    // Sentry rejects the request if the sort column isn't in the selected
+    // fields. The embedded agent's schema enforces this, but the handler can
+    // recombine the caller's explicit fields with a default or explicit sort
+    // that the agent never saw — so re-check here.
+    //
+    // Skip the augment when the sort is non-aggregate but the existing fields
+    // are aggregate: adding a non-aggregate column to an aggregate query
+    // changes the GROUP BY and silently corrupts the result. Better to let
+    // Sentry's 400 propagate so the caller can fix the request explicitly.
+    //
+    // Note: fields remain in function form (e.g. "count_unique(user.id)") and
+    // sortParam is also pre-normalization here. The API client normalizes
+    // aggregate sort params to underscore form (e.g. "count_unique_user_id")
+    // later, so an exact string match against fields is correct at this stage.
+    const sortField = sortParam.startsWith("-")
+      ? sortParam.slice(1)
+      : sortParam;
+    const sortIsAggregate = sortField.includes("(") && sortField.includes(")");
+    if (
+      sortField &&
+      !fields.includes(sortField) &&
+      (sortIsAggregate || !isAggregateQuery(fields))
+    ) {
+      fields = [...fields, sortField];
+    }
+
     const requestFields =
       isMetricsDataset(dataset) && !isAggregateQuery(fields)
         ? Array.from(
