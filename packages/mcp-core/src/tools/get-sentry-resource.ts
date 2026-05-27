@@ -507,9 +507,8 @@ export default defineTool({
     "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
     "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')",
     "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
-    "get_sentry_resource(resourceType='snapshot', organizationSlug='my-org', resourceId='241539')",
-    "get_sentry_resource(resourceType='snapshotImage', organizationSlug='my-org', resourceId='241539:login_screen.png')",
-    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/241539/?selectedSnapshot=login_screen.png')",
+    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')",
+    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')",
     "</examples>",
   ].join("\n"),
 
