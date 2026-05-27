@@ -201,6 +201,9 @@ const fakeJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
 
 const IMAGE_DETAIL_PATH =
   "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/login_screen.png/";
+const SLASH_IMAGE_IDENTIFIER =
+  "snapshots-iphone-17e/test_CoffeeProductCards.swift_FeaturedProductCard_Kenya.png";
+const SLASH_IMAGE_DETAIL_PATH = `https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/${encodeURIComponent(SLASH_IMAGE_IDENTIFIER)}/`;
 const HEAD_DOWNLOAD_PATH =
   "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/auth_login_screen.png/download/";
 const BASE_DOWNLOAD_PATH =
@@ -526,6 +529,51 @@ describe("get_snapshot_details", () => {
     expect(imageParts.length).toBe(1);
     expect(imageParts[0]!.mimeType).toBe("image/png");
     expect(textParts[1]!.text).toBe("### Head (current)");
+  });
+
+  it("encodes slash-containing selected image identifiers as one path segment", async () => {
+    const slashImageDetailFixture = {
+      ...addedImageDetailFixture,
+      image_file_name: SLASH_IMAGE_IDENTIFIER,
+      head_image: {
+        ...headImageInfo,
+        image_file_name: SLASH_IMAGE_IDENTIFIER,
+      },
+    };
+
+    mswServer.use(
+      http.get(
+        SLASH_IMAGE_DETAIL_PATH,
+        () => HttpResponse.json(slashImageDetailFixture),
+        { once: true },
+      ),
+      http.get(
+        HEAD_DOWNLOAD_PATH,
+        () =>
+          new HttpResponse(fakePng, {
+            headers: { "content-type": "image/png" },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: SLASH_IMAGE_IDENTIFIER,
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+
+    const parts = result as (TextContent | ImageContent)[];
+    const textParts = parts.filter((p): p is TextContent => p.type === "text");
+    expect(textParts[0]!.text).toContain(`## ${SLASH_IMAGE_IDENTIFIER}`);
+    expect(textParts[0]!.text).toContain(
+      `- **File**: \`${SLASH_IMAGE_IDENTIFIER}\``,
+    );
   });
 
   it("returns only base image for removed comparison", async () => {

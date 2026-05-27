@@ -3148,7 +3148,7 @@ export class SentryApiService {
     snapshotId: string;
     imageIdentifier: string;
   }): Promise<unknown> {
-    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/${encodeURIComponent(snapshotId)}/images/${imageIdentifier}/`;
+    const path = `/organizations/${encodeURIComponent(organizationSlug)}/preprodartifacts/snapshots/${encodeURIComponent(snapshotId)}/images/${encodeURIComponent(imageIdentifier)}/`;
     return this.requestJSON(path);
   }
 
