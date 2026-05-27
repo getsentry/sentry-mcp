@@ -228,15 +228,11 @@ function isSnapshotDiffPair(
 
 function entryToTreeItem(
   entry: SnapshotDiffPair | SnapshotImageEntry,
-  details: string[] = [],
 ): SnapshotImageTreeItem {
   if (isSnapshotDiffPair(entry)) {
-    const image: SnapshotImageEntry =
-      entry.head_image ?? entry.base_image ?? {};
-    return { image, details };
+    return { image: entry.head_image ?? entry.base_image ?? {} };
   }
-
-  return { image: entry, details };
+  return { image: entry };
 }
 
 function renderTreeSections(

@@ -5,10 +5,7 @@ import { apiServiceFromContext } from "../internal/tool-helpers/api";
 import type { ServerContext } from "../types";
 import { ParamOrganizationSlug, ParamRegionUrl } from "../schema";
 import { UserInputError } from "../errors";
-import {
-  fetchSnapshotImage,
-  type SnapshotImageResolution,
-} from "./snapshot-handlers";
+import { fetchSnapshotImage } from "./snapshot-handlers";
 
 export default defineTool({
   name: "get_snapshot_image",
@@ -87,7 +84,7 @@ export default defineTool({
       params.organizationSlug,
       params.snapshotId,
       params.imageIdentifier,
-      params.imageResolution as SnapshotImageResolution,
+      params.imageResolution,
       { nextSteps: "snapshot-tools" },
     );
   },
