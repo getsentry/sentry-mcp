@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { decode as decodePng, encode as encodePng } from "fast-png";
 import { http, HttpResponse } from "msw";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import getSnapshotDetails from "./get-snapshot-details.js";
@@ -222,8 +223,39 @@ const renamedImageDetailFixture = {
   previous_image_file_name: "snapshots-iphone-16/old_login.png",
 };
 
-const fakePng = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
-const fakeJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+const fakePng = Uint8Array.from(
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAIElEQVR4XmNgYDjx3waIK4B4CxAzMFQABYC4Aoi3ADEAHl0S6cHvzCcAAAAASUVORK5CYII=",
+    "base64",
+  ),
+);
+const fakeJpeg = Uint8Array.from(
+  Buffer.from(
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSgBBwcHCggKEwoKEygaFhooKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKP/AABEIAAIABAMBEQACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AI/D2mWH9lxf6Da/9+l/wr7HFYir7R+8/vZ0ZBiq/wBSh77+9n//2Q==",
+    "base64",
+  ),
+);
+
+const largeSixteenBitPng = createSolidSixteenBitPng(1200, 600);
+
+function createSolidSixteenBitPng(width: number, height: number): Uint8Array {
+  const data = new Uint16Array(width * height * 4);
+  for (let pixel = 0; pixel < width * height; pixel++) {
+    const offset = pixel * 4;
+    data[offset] = 65535;
+    data[offset + 1] = 32768;
+    data[offset + 2] = 0;
+    data[offset + 3] = 65535;
+  }
+
+  return encodePng({
+    width,
+    height,
+    data,
+    depth: 16,
+    channels: 4,
+  });
+}
 
 const IMAGE_DETAIL_PATH =
   "https://sentry.io/api/0/organizations/sentry/preprodartifacts/snapshots/231949/images/login_screen.png/";
@@ -366,7 +398,8 @@ describe("get_snapshot_details", () => {
 
       ## Next Steps
 
-      - To view a specific image, use \`get_sentry_resource(url="https://sentry.sentry.io/preprod/snapshots/231949/?selectedSnapshot=<image_file_name>")\`"
+      - To view a specific image preview, use \`get_sentry_resource(url="https://sentry.sentry.io/preprod/snapshots/231949/?selectedSnapshot=<image_file_name>")\`
+      - To fetch original full-resolution image bytes, append \`&imageResolution=full\` to the selected-image URL"
     `);
   });
 
@@ -645,6 +678,8 @@ describe("get_snapshot_details", () => {
     );
     expect(textParts[0]!.text).toContain("**Status**: changed");
     expect(textParts[0]!.text).toContain("**Diff**: 12.5%");
+    expect(textParts[0]!.text).toContain("**Image Resolution**: preview");
+    expect(textParts[0]!.text).toContain("append `&imageResolution=full`");
     expect(textParts[0]!.text).toContain("**Group**: auth");
     expect(textParts[0]!.text).toContain("1080×1920");
     expect(textParts[0]!.text).toContain("### Context");
@@ -673,9 +708,139 @@ describe("get_snapshot_details", () => {
     expect(imageParts[0]!.mimeType).toBe("image/png");
     expect(imageParts[1]!.mimeType).toBe("image/jpeg");
     expect(imageParts[2]!.mimeType).toBe("image/png");
-    expect(textParts[1]!.text).toBe("### Head (current)");
-    expect(textParts[2]!.text).toBe("### Base (previous)");
-    expect(textParts[3]!.text).toBe("### Diff Mask");
+    expect(textParts[1]!.text).toBe("### Head (current) — preview");
+    expect(textParts[2]!.text).toBe("### Base (previous) — preview");
+    expect(textParts[3]!.text).toBe("### Diff Mask — preview");
+  });
+
+  it("downsamples 16-bit PNGs in selected image responses", async () => {
+    mswServer.use(
+      http.get(
+        IMAGE_DETAIL_PATH,
+        () => HttpResponse.json(addedImageDetailFixture),
+        { once: true },
+      ),
+      http.get(
+        HEAD_DOWNLOAD_PATH,
+        () =>
+          new HttpResponse(largeSixteenBitPng, {
+            headers: { "content-type": "image/png" },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: "login_screen.png",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const parts = result as (TextContent | ImageContent)[];
+    const textParts = parts.filter((p): p is TextContent => p.type === "text");
+    const imageParts = parts.filter(
+      (p): p is ImageContent => p.type === "image",
+    );
+
+    expect(textParts[1]!.text).toBe("### Head (current) — preview");
+    expect(imageParts.length).toBe(1);
+    expect(imageParts[0]!.mimeType).toBe("image/png");
+    expect(imageParts[0]!.data).not.toBe(
+      Buffer.from(largeSixteenBitPng).toString("base64"),
+    );
+
+    const decoded = decodePng(Buffer.from(imageParts[0]!.data, "base64"));
+    expect(decoded.width).toBe(1024);
+    expect(decoded.height).toBe(512);
+    expect(decoded.depth).toBe(8);
+  });
+
+  it("returns original image bytes when full resolution is requested", async () => {
+    setupChangedImageMocks();
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl:
+          "https://sentry.sentry.io/preprod/snapshots/231949/?selectedSnapshot=login_screen.png&imageResolution=full",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: "login_screen.png",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const parts = result as (TextContent | ImageContent)[];
+    const textParts = parts.filter((p): p is TextContent => p.type === "text");
+    const imageParts = parts.filter(
+      (p): p is ImageContent => p.type === "image",
+    );
+
+    expect(textParts[0]!.text).toContain("**Image Resolution**: full");
+    expect(textParts[0]!.text).not.toContain("append `&imageResolution=full`");
+    expect(textParts[1]!.text).toBe("### Head (current) — full");
+    expect(textParts[2]!.text).toBe("### Base (previous) — full");
+    expect(textParts[3]!.text).toBe("### Diff Mask — full");
+    expect(imageParts[0]!.data).toBe(Buffer.from(fakePng).toString("base64"));
+    expect(imageParts[1]!.data).toBe(Buffer.from(fakeJpeg).toString("base64"));
+  });
+
+  it("throws on invalid image resolution query values", async () => {
+    await expect(
+      getSnapshotDetails.handler(
+        {
+          snapshotUrl:
+            "https://sentry.sentry.io/preprod/snapshots/231949/?selectedSnapshot=login_screen.png&imageResolution=thumbnail",
+          organizationSlug: null,
+          snapshotId: null,
+          selectedSnapshot: "login_screen.png",
+          regionUrl: null,
+        },
+        getServerContext(),
+      ),
+    ).rejects.toThrow("Invalid imageResolution query value");
+  });
+
+  it("does not return full image bytes when preview generation fails", async () => {
+    const invalidPng = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    mswServer.use(
+      http.get(
+        IMAGE_DETAIL_PATH,
+        () => HttpResponse.json(addedImageDetailFixture),
+        { once: true },
+      ),
+      http.get(
+        HEAD_DOWNLOAD_PATH,
+        () =>
+          new HttpResponse(invalidPng, {
+            headers: { "content-type": "image/png" },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getSnapshotDetails.handler(
+      {
+        snapshotUrl: "https://sentry.sentry.io/preprod/snapshots/231949/",
+        organizationSlug: null,
+        snapshotId: null,
+        selectedSnapshot: "login_screen.png",
+        regionUrl: null,
+      },
+      getServerContext(),
+    );
+    const parts = result as (TextContent | ImageContent)[];
+    const textParts = parts.filter((p): p is TextContent => p.type === "text");
+    const imageParts = parts.filter(
+      (p): p is ImageContent => p.type === "image",
+    );
+
+    expect(textParts[1]!.text).toBe(
+      "### Head (current) — preview unavailable. Retry with imageResolution=full to fetch the original image.",
+    );
+    expect(imageParts.length).toBe(0);
   });
 
   it("returns only head image for added comparison", async () => {
@@ -699,7 +864,7 @@ describe("get_snapshot_details", () => {
     expect(textParts[0]!.text).not.toContain("**Diff**:");
     expect(imageParts.length).toBe(1);
     expect(imageParts[0]!.mimeType).toBe("image/png");
-    expect(textParts[1]!.text).toBe("### Head (current)");
+    expect(textParts[1]!.text).toBe("### Head (current) — preview");
   });
 
   it("encodes slash-containing selected image identifiers as one path segment", async () => {
@@ -780,7 +945,7 @@ describe("get_snapshot_details", () => {
     const textParts = parts.filter((p): p is TextContent => p.type === "text");
     expect(textParts[0]!.text).toContain("**Status**: removed");
     expect(imageParts.length).toBe(1);
-    expect(textParts[1]!.text).toBe("### Base (previous)");
+    expect(textParts[1]!.text).toBe("### Base (previous) — preview");
   });
 
   it("shows previous_image_file_name for renamed images", async () => {
