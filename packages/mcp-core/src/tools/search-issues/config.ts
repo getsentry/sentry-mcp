@@ -59,7 +59,6 @@ BUILT-IN FIELDS:
 - has: Issues with a tag present
 - userCount: Number of unique users affected
 - timesSeen: Total number of events
-- eventCount: Total number of events
 - issue.seer_actionability: Seer's AI-assessed fix difficulty (super_high, high, medium, low, super_low)
   Use for: "easy to fix", "simple fixes", "quick wins", "low-hanging fruit", "actionable issues", "trivial"
   Values represent how likely Seer can automatically fix the issue.
