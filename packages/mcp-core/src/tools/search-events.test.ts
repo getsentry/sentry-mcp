@@ -426,12 +426,8 @@ describe("search_events", () => {
   });
 
   it("should include the sort field even when caller's explicit fields omit it", async () => {
-    // When the caller passes a structured Sentry-syntax query plus explicit
-    // fields that don't include the sort field, the embedded agent adds the
-    // sort field to satisfy its own refinement — but the handler trusts the
-    // caller's explicit fields verbatim and drops the agent's repair. Sentry
-    // then rejects the request with 400 "Cannot sort by a field that is not
-    // selected."
+    // Sentry rejects requests whose sort column isn't in the selected fields,
+    // so the handler must append the sort field before issuing the request.
     mockGenerateText.mockResolvedValueOnce(
       mockAIResponse(
         "errors",
