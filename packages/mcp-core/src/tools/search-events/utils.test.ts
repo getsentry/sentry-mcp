@@ -599,47 +599,39 @@ describe("createDatasetAttributesTool — should not depend on the private valid
 
   // The validate endpoint does not currently validate custom attributes and
   // will probably be replaced with a GET version that does not require
-  // org:write scope. The MCP should never call it.
-  //
-  // Marked it.fails to keep the suite green until the dependency is removed;
-  // flip back to it(...) at that point as a regression guard.
-  it.fails(
-    "verifies custom attributes via the public GET endpoint, never the private POST validate endpoint",
-    async () => {
-      const validateCalls = vi.fn();
-      mswServer.use(
-        http.post(
-          "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/validate/",
-          () => {
-            validateCalls();
-            return HttpResponse.json({ attributes: {} });
-          },
-        ),
-        http.get(
-          "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
-          ({ request }) => {
-            const attributeType = new URL(request.url).searchParams.get(
-              "attributeType",
-            );
-            return HttpResponse.json(
-              attributeType === "string"
-                ? [{ key: "tags[foo]", name: "tags[foo]" }]
-                : [],
-            );
-          },
-        ),
-      );
+  // org:write scope. The MCP should never call it — verification of custom
+  // attribute existence belongs entirely on the public GET endpoint.
+  it("verifies custom attributes via the public GET endpoint, never the private POST validate endpoint", async () => {
+    const validateCalls = vi.fn();
+    mswServer.use(
+      http.post(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/validate/",
+        () => {
+          validateCalls();
+          return HttpResponse.json({ attributes: {} });
+        },
+      ),
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const attributeType = new URL(request.url).searchParams.get(
+            "attributeType",
+          );
+          return HttpResponse.json(
+            attributeType === "string"
+              ? [{ key: "tags[foo]", name: "tags[foo]" }]
+              : [],
+          );
+        },
+      ),
+    );
 
-      const executeOptions = { toolCallId: "test", messages: [] } as any;
-      const response = await tool.execute!(
-        { dataset: "spans", attributes: ["tags[foo]"] },
-        executeOptions,
-      );
+    const executeOptions = { toolCallId: "test", messages: [] } as any;
+    const response = await tool.execute!({ dataset: "spans" }, executeOptions);
 
-      expect(validateCalls).not.toHaveBeenCalled();
-      expect(response).toHaveProperty("result");
-      const result = (response as { result: string }).result;
-      expect(result).toContain("tags[foo]");
-    },
-  );
+    expect(validateCalls).not.toHaveBeenCalled();
+    expect(response).toHaveProperty("result");
+    const result = (response as { result: string }).result;
+    expect(result).toContain("tags[foo]");
+  });
 });
