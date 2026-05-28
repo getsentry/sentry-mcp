@@ -634,4 +634,39 @@ describe("createDatasetAttributesTool — should not depend on the private valid
     const result = (response as { result: string }).result;
     expect(result).toContain("tags[foo]");
   });
+
+  // Regression guard: the spans dataset alone has 56 static fields (9 base +
+  // 47 dataset-specific). Earlier versions concatenated static and custom
+  // attributes into a single sliced list, which silently dropped every
+  // custom attribute for spans. Custom attributes must always surface in
+  // their own dedicated section, independent of the static-field cap.
+  it("surfaces custom attributes for spans even though static fields exceed the output cap", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        ({ request }) => {
+          const attributeType = new URL(request.url).searchParams.get(
+            "attributeType",
+          );
+          return HttpResponse.json(
+            attributeType === "string"
+              ? [{ key: "tags[foo]", name: "tags[foo]" }]
+              : [],
+          );
+        },
+      ),
+    );
+
+    const executeOptions = { toolCallId: "test", messages: [] } as any;
+    const response = await tool.execute!(
+      { dataset: "spans", substringMatch: "tags[foo]" },
+      executeOptions,
+    );
+
+    expect(response).toHaveProperty("result");
+    const result = (response as { result: string }).result;
+    // Must appear under the dedicated Custom Attributes heading, not in
+    // some incidental slot like Field Types or Example Queries.
+    expect(result).toMatch(/Custom Attributes[^\n]*:\s*\n- tags\[foo\]/);
+  });
 });

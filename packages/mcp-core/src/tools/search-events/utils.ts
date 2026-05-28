@@ -491,11 +491,9 @@ export function createDatasetAttributesTool(options: {
           },
         );
 
-      // Combine all available fields
-      const allFields = {
+      const staticFields = {
         ...BASE_COMMON_FIELDS,
         ...DATASET_FIELDS[normalizedDataset],
-        ...customAttributes,
       };
 
       const recommendedFields = RECOMMENDED_FIELDS[normalizedDataset];
@@ -510,14 +508,26 @@ export function createDatasetAttributesTool(options: {
         allFieldTypes[field] = "number";
       }
 
+      const customEntries = Object.entries(customAttributes);
+      const staticEntries = Object.entries(staticFields);
+      const STATIC_LIMIT = 50;
+
       return `Dataset: ${dataset}
 
-Available Fields (${Object.keys(allFields).length} total):
-${Object.entries(allFields)
-  .slice(0, 50) // Limit to first 50 to avoid overwhelming the agent
+Custom Attributes (${customEntries.length}${substringMatch ? ` matching "${substringMatch}"` : ""}):
+${
+  customEntries.length === 0
+    ? "(none returned by Sentry for this query — the attribute may not exist within the time window)"
+    : customEntries.map(([key, desc]) => `- ${key}: ${desc}`).join("\n")
+}
+
+Built-in Fields (${staticEntries.length} total):
+${staticEntries
+  .slice(0, STATIC_LIMIT)
   .map(([key, desc]) => `- ${key}: ${desc}`)
-  .join("\n")}
-${Object.keys(allFields).length > 50 ? `\n... and ${Object.keys(allFields).length - 50} more fields` : ""}
+  .join(
+    "\n",
+  )}${staticEntries.length > STATIC_LIMIT ? `\n... and ${staticEntries.length - STATIC_LIMIT} more built-in fields` : ""}
 
 Recommended Fields for ${dataset}:
 ${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
