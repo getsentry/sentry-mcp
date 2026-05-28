@@ -35,6 +35,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      - name: Check lockfile is up to date
+        run: |
+          pnpm install --lockfile-only
+          git diff --exit-code pnpm-lock.yaml || (echo "pnpm-lock.yaml is out of sync with manifest files. Run 'pnpm install' and commit the result." && exit 1)
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
