@@ -171,7 +171,6 @@ export default defineTool({
 
     if (params.includeExplanation && explanation) {
       output += `# Search Results for "${params.query}"\n\n`;
-      output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
 
       output += `## Query Translation\n`;
       output += `Input query: "${params.query}"\n`;

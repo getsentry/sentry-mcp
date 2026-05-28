@@ -330,10 +330,6 @@ function buildNoChangesOutput(params: {
   }
   output += `**Assigned To**: ${formatAssignedTo(issue.assignedTo ?? null)}\n`;
 
-  output += "\n# Using this information\n\n";
-  output += "- The issue already matched the requested state\n";
-  output += `- You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="${organizationSlug}", resourceId="${issue.shortId}")\`\n`;
-
   return output;
 }
 
@@ -850,10 +846,6 @@ export default defineTool({
     }
     const currentAssignee = formatAssignedTo(updatedIssue.assignedTo ?? null);
     output += `**Assigned To**: ${currentAssignee}\n`;
-
-    output += "\n# Using this information\n\n";
-    output += `- The issue has been successfully updated in Sentry\n`;
-    output += `- You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
 
     if (statusChanged && updatedStatusDisplay === "resolved") {
       output += `- The issue is now marked as resolved and will no longer generate alerts\n`;

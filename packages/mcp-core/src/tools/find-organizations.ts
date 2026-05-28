@@ -19,6 +19,8 @@ export default defineTool({
     "- Search for specific organizations by name or slug",
     "",
     `Returns up to ${RESULT_LIMIT} results. If you hit this limit, use the query parameter to narrow down results.`,
+    "",
+    "Organizations on Sentry Cloud include a regionUrl. Pass it to other tools that accept regionUrl to ensure requests reach the correct region.",
   ].join("\n"),
   inputSchema: {
     query: ParamSearchQuery.nullable().default(null),
@@ -63,19 +65,17 @@ export default defineTool({
       output += `\n\n---\n\n**Note:** Showing ${RESULT_LIMIT} results (maximum). There may be more organizations available. Use the \`query\` parameter to search for specific organizations.`;
     }
 
-    output += "\n\n# Using this information\n\n";
-    output += `- The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.\n`;
+    output += "\n\n## Notes\n\n";
+    output += `- The organization slug is used as the \`organizationSlug\` parameter in other tools.\n`;
 
     const hasValidRegionUrls = organizations.some((org) =>
       org.links?.regionUrl?.trim(),
     );
 
     if (hasValidRegionUrls) {
-      output += `- If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value shown above for each organization.\n`;
-      output += `- For Sentry's Cloud Service (sentry.io), always use the regionUrl to ensure requests go to the correct region.\n`;
+      output += `- The Region URL above is the \`regionUrl\` parameter for other tools, required for correct regional routing on Sentry Cloud.\n`;
     } else {
-      output += `- This appears to be a self-hosted Sentry installation. You can omit the \`regionUrl\` parameter when using other tools.\n`;
-      output += `- For self-hosted Sentry, the regionUrl is typically empty and not needed for API calls.\n`;
+      output += `- This appears to be a self-hosted Sentry installation; omit the \`regionUrl\` parameter in other tools.\n`;
     }
 
     return output;

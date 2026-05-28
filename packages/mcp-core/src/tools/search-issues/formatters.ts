@@ -59,9 +59,6 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
       }
       output += "**\n\n";
     }
-
-    // Add display instructions for UI
-    output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
   }
 
   if (issues.length === 0) {
@@ -88,8 +85,7 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
   );
 
   // Add view link with emoji and guidance text (like search_events)
-  output += `**View these results in Sentry**:\n${searchUrl}\n`;
-  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+  output += `**Sentry Dashboard**: ${searchUrl}\n\n`;
 
   output += `Found **${issues.length}** issue${issues.length === 1 ? "" : "s"}:\n\n`;
 

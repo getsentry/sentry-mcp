@@ -9,7 +9,7 @@
     "tools": [
       {
         "name": "find_organizations",
-        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.\n\nOrganizations on Sentry Cloud include a regionUrl. Pass it to other tools that accept regionUrl to ensure requests reach the correct region.",
         "requiredScopes": ["org:read"]
       },
       {
@@ -89,7 +89,7 @@
       },
       {
         "name": "find_organizations",
-        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.\n\nOrganizations on Sentry Cloud include a regionUrl. Pass it to other tools that accept regionUrl to ensure requests reach the correct region.",
         "requiredScopes": ["org:read"]
       },
       {
@@ -129,7 +129,7 @@
     "tools": [
       {
         "name": "find_organizations",
-        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.\n\nOrganizations on Sentry Cloud include a regionUrl. Pass it to other tools that accept regionUrl to ensure requests reach the correct region.",
         "requiredScopes": ["org:read"]
       },
       {
@@ -164,7 +164,7 @@
     "tools": [
       {
         "name": "find_organizations",
-        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.\n\nOrganizations on Sentry Cloud include a regionUrl. Pass it to other tools that accept regionUrl to ensure requests reach the correct region.",
         "requiredScopes": ["org:read"]
       },
       {
@@ -239,7 +239,7 @@
       },
       {
         "name": "find_organizations",
-        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.\n\nOrganizations on Sentry Cloud include a regionUrl. Pass it to other tools that accept regionUrl to ensure requests reach the correct region.",
         "requiredScopes": ["org:read"]
       },
       {
@@ -274,7 +274,7 @@
     "tools": [
       {
         "name": "find_organizations",
-        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.",
+        "description": "Find organizations that the user has access to in Sentry.\n\nUse this tool when you need to:\n- View organizations in Sentry\n- Find an organization's slug to aid other tool requests\n- Search for specific organizations by name or slug\n\nReturns up to 25 results. If you hit this limit, use the query parameter to narrow down results.\n\nOrganizations on Sentry Cloud include a regionUrl. Pass it to other tools that accept regionUrl to ensure requests reach the correct region.",
         "requiredScopes": ["org:read"]
       },
       {

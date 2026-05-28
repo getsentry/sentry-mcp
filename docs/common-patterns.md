@@ -64,9 +64,9 @@ if (data.length === 0) {
 output += "## Section\n";
 output += formatData(data);
 
-// Add usage instructions
-output += "\n\n# Using this information\n\n";
-output += "- Next steps...\n";
+// Add reference information (neutral facts, not directives)
+output += "\n\n## Reference\n\n";
+output += "- Relevant filter syntax or identifiers...\n";
 ```
 
 ### Multi-Content Resources

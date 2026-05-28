@@ -51,11 +51,6 @@ describe("update_issue", () => {
 
       **Status**: resolved
       **Assigned To**: Jane Developer
-
-      # Using this information
-
-      - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       - The issue is now marked as resolved and will no longer generate alerts
       "
     `);
@@ -87,11 +82,6 @@ describe("update_issue", () => {
 
       **Status**: unresolved
       **Assigned To**: john.doe
-
-      # Using this information
-
-      - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       "
     `);
   });
@@ -196,11 +186,6 @@ describe("update_issue", () => {
 
       **Status**: resolved
       **Assigned To**: me
-
-      # Using this information
-
-      - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       - The issue is now marked as resolved and will no longer generate alerts
       "
     `);
@@ -334,11 +319,6 @@ describe("update_issue", () => {
       **Status**: ignored
       **Ignore Behavior**: Until escalating
       **Assigned To**: Jane Developer
-
-      # Using this information
-
-      - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       - The issue is now ignored until it escalates
       "
     `);
@@ -392,11 +372,6 @@ describe("update_issue", () => {
       **Status**: ignored
       **Ignore Behavior**: Until it occurs 100 times in 60 minutes
       **Assigned To**: Jane Developer
-
-      # Using this information
-
-      - The issue has been successfully updated in Sentry
-      - You can view the issue details using: \`get_sentry_resource(resourceType="issue", organizationSlug="sentry-mcp-evals", resourceId="CLOUDFLARE-MCP-41")\`
       - The issue is now ignored until it occurs 100 times in 60 minutes
       "
     `);

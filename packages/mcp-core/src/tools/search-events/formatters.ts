@@ -142,13 +142,6 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
 
   let output = `# Search Results for "${inputQuery}"\n\n`;
 
-  // Check if this is an aggregate query and adjust display instructions
-  if (isAggregateQuery(fields)) {
-    output += `⚠️ **IMPORTANT**: Display these aggregate results as a data table with proper column alignment and formatting.\n\n`;
-  } else {
-    output += `⚠️ **IMPORTANT**: Display these errors as highlighted alert cards with color-coded severity levels and clickable Event IDs.\n\n`;
-  }
-
   if (includeExplanation && explanation) {
     output += formatExplanation(explanation);
     output += `\n\n`;
@@ -156,8 +149,7 @@ export function formatErrorResults(params: FormatEventResultsParams): string {
 
   output += formatExecutedSearch(params.executedSearch);
 
-  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
-  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+  output += `**Sentry Dashboard**: ${explorerUrl}\n\n`;
 
   if (eventData.length === 0) {
     logInfo(`No error events found for query: ${inputQuery}`, {
@@ -277,13 +269,6 @@ export function formatLogResults(params: FormatEventResultsParams): string {
 
   let output = `# Search Results for "${inputQuery}"\n\n`;
 
-  // Check if this is an aggregate query and adjust display instructions
-  if (isAggregateQuery(fields)) {
-    output += `⚠️ **IMPORTANT**: Display these aggregate results as a data table with proper column alignment and formatting.\n\n`;
-  } else {
-    output += `⚠️ **IMPORTANT**: Display these logs in console format with monospace font, color-coded severity (🔴 ERROR, 🟡 WARN, 🔵 INFO), and preserve timestamps.\n\n`;
-  }
-
   if (includeExplanation && explanation) {
     output += formatExplanation(explanation);
     output += `\n\n`;
@@ -291,8 +276,7 @@ export function formatLogResults(params: FormatEventResultsParams): string {
 
   output += formatExecutedSearch(params.executedSearch);
 
-  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
-  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+  output += `**Sentry Dashboard**: ${explorerUrl}\n\n`;
 
   if (eventData.length === 0) {
     logInfo(`No log events found for query: ${inputQuery}`, {
@@ -435,13 +419,6 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
 
   let output = `# Search Results for "${inputQuery}"\n\n`;
 
-  // Check if this is an aggregate query and adjust display instructions
-  if (isAggregateQuery(fields)) {
-    output += `⚠️ **IMPORTANT**: Display these aggregate results as a data table with proper column alignment and formatting.\n\n`;
-  } else {
-    output += `⚠️ **IMPORTANT**: Display these traces as a performance timeline with duration bars and hierarchical span relationships.\n\n`;
-  }
-
   if (includeExplanation && explanation) {
     output += formatExplanation(explanation);
     output += `\n\n`;
@@ -449,8 +426,7 @@ export function formatSpanResults(params: FormatEventResultsParams): string {
 
   output += formatExecutedSearch(params.executedSearch);
 
-  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
-  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+  output += `**Sentry Dashboard**: ${explorerUrl}\n\n`;
 
   if (eventData.length === 0) {
     logInfo(`No span events found for query: ${inputQuery}`, {
@@ -624,12 +600,6 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
 
   let output = `# Search Results for "${inputQuery}"\n\n`;
 
-  if (isAggregateQuery(fields)) {
-    output += `⚠️ **IMPORTANT**: Display these profile aggregates as a data table with proper column alignment and readable duration units.\n\n`;
-  } else {
-    output += `⚠️ **IMPORTANT**: Display these profiles as concise cards, highlighting the profile identifier, transaction, duration, release, and trace context.\n\n`;
-  }
-
   if (includeExplanation && explanation) {
     output += formatExplanation(explanation);
     output += `\n\n`;
@@ -637,8 +607,7 @@ export function formatProfileResults(params: FormatEventResultsParams): string {
 
   output += formatExecutedSearch(params.executedSearch);
 
-  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
-  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+  output += `**Sentry Dashboard**: ${explorerUrl}\n\n`;
 
   if (eventData.length === 0) {
     logInfo(`No profile events found for query: ${inputQuery}`, {
@@ -770,12 +739,6 @@ export function formatTraceMetricsResults(
 
   let output = `# Search Results for "${inputQuery}"\n\n`;
 
-  if (isAggregateQuery(fields)) {
-    output += `⚠️ **IMPORTANT**: Display these metric aggregates as a data table with proper column alignment, grouping labels, and units.\n\n`;
-  } else {
-    output += `⚠️ **IMPORTANT**: Display these as metric samples, highlighting the metric name, type, value, and trace context.\n\n`;
-  }
-
   if (includeExplanation && explanation) {
     output += formatExplanation(explanation);
     output += `\n\n`;
@@ -783,8 +746,7 @@ export function formatTraceMetricsResults(
 
   output += formatExecutedSearch(params.executedSearch);
 
-  output += `**View these results in Sentry**:\n${explorerUrl}\n`;
-  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+  output += `**Sentry Dashboard**: ${explorerUrl}\n\n`;
 
   if (eventData.length === 0) {
     logInfo(`No trace metric events found for query: ${inputQuery}`, {

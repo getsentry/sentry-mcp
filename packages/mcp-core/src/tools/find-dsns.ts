@@ -56,9 +56,8 @@ export default defineTool({
       output += `**ID**: ${clientKey.id}\n`;
       output += `**DSN**: ${clientKey.dsn.public}\n\n`;
     }
-    output += "# Using this information\n\n";
-    output +=
-      "- The `SENTRY_DSN` value is a URL that you can use to initialize Sentry's SDKs.\n";
+    output += "## Notes\n\n";
+    output += "- SENTRY_DSN initializes Sentry SDKs.\n";
     return output;
   },
 });

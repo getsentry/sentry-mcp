@@ -164,10 +164,8 @@ export default defineTool({
       output += `\n`;
     }
 
-    output += "\n# Using this information\n\n";
-    output += `- The project is now accessible at slug: \`${project.slug}\`\n`;
     if (params.teamSlug) {
-      output += `- The project is now assigned to the \`${params.teamSlug}\` team\n`;
+      output += `\n**Team**: ${params.teamSlug}\n`;
     }
     return output;
   },

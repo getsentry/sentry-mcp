@@ -27,10 +27,9 @@ describe("create_project", () => {
       **Name**: cloudflare-mcp
       **SENTRY_DSN**: https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945
 
-      # Using this information
+      ## Notes
 
-      - You can reference the **SENTRY_DSN** value to initialize Sentry's SDKs.
-      - You should always inform the user of the **SENTRY_DSN** and Project Slug values.
+      - SENTRY_DSN initializes Sentry SDKs.
       "
     `);
   });

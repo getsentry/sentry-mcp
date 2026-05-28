@@ -29,10 +29,9 @@ describe("find_releases", () => {
       **New Issues**: 0
       **Projects**: cloudflare-mcp
 
-      # Using this information
+      ## Reference
 
-      - You can reference the Release version in commit messages or documentation.
-      - You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:8ce89484-0fec-4913-a2cd-e8e2d41dee36\`.
+      - Release filter syntax: \`release:8ce89484-0fec-4913-a2cd-e8e2d41dee36\`
       "
     `);
   });
@@ -64,10 +63,9 @@ describe("find_releases", () => {
       **New Issues**: 0
       **Projects**: cloudflare-mcp
 
-      # Using this information
+      ## Reference
 
-      - You can reference the Release version in commit messages or documentation.
-      - You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:8ce89484-0fec-4913-a2cd-e8e2d41dee36\`.
+      - Release filter syntax: \`release:8ce89484-0fec-4913-a2cd-e8e2d41dee36\`
       "
     `);
   });
