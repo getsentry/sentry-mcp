@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
+import { getActiveSpan, setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import type { ServerContext } from "../../types";
@@ -520,6 +520,8 @@ export default defineTool({
         ...replayTimeParams,
       });
 
+      getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", replays.length);
+
       return formatReplayResults({
         replays,
         inputQuery: params.query || sentryQuery || "recent replays",
@@ -616,6 +618,8 @@ export default defineTool({
     if (!isValidEventArray(eventData)) {
       throw new Error("Invalid event data format from Sentry API");
     }
+
+    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", eventData.length);
 
     const explorerUrl = apiService.getEventsExplorerUrl(
       organizationSlug,

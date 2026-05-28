@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { setTag } from "@sentry/core";
+import { getActiveSpan, setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
@@ -259,6 +259,8 @@ export default defineTool({
         "Invalid event data format from Sentry API: expected array of objects",
       );
     }
+
+    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", eventsResponse.length);
 
     const naturalLanguageContext = params.query
       ? `Events in issue ${issueId}: ${params.query}`
