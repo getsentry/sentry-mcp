@@ -1934,18 +1934,18 @@ export function formatIssueOutput({
       ? event.contexts.trace.trace_id
       : undefined;
 
-  output += "# Using this information\n\n";
-  output += `- You can reference the IssueID in commit messages (e.g. \`Fixes ${issue.shortId}\`) to automatically close the issue when the commit is merged.\n`;
+  output += "## Response Notes\n\n";
+  output += `- Commit message issue reference: \`Fixes ${issue.shortId}\` automatically closes the issue when the commit is merged.\n`;
   output +=
-    "- The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.\n";
-  output += `- To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='${organizationSlug}', issueId='${issue.shortId}', query='your query')\`\n`;
+    "- The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.\n";
+  output += `- Issue event search: \`search_issue_events(organizationSlug='${organizationSlug}', issueId='${issue.shortId}', query='your query')\`\n`;
   if (traceId) {
-    output += `- To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='${organizationSlug}', resourceId='${traceId}')\`\n`;
-    output += `- To search related spans, use \`search_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\`\n`;
-    output += `- To search related logs, use \`search_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\`\n`;
+    output += `- Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='${organizationSlug}', resourceId='${traceId}')\`\n`;
+    output += `- Related span search: \`search_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\`\n`;
+    output += `- Related log search: \`search_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\`\n`;
   }
   if (experimentalMode) {
-    output += `- To see the trail of events leading up to this error, use \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
+    output += `- Breadcrumb trail leading up to this error: \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;
   }
   return output;
 }

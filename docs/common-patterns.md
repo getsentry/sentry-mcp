@@ -49,6 +49,16 @@ export type ToolParams<T> = z.infer<typeof toolDefinitions[T].parameters>;
 
 ## Response Formatting
 
+Tool descriptions and parameter `.describe()` text are trusted steering surfaces. It is fine for those descriptions to tell the model when to call a tool, which parameters to preserve, or what follow-up behavior is expected.
+
+Tool result text can include light, scoped steering when it helps the assistant present or use the result correctly. MCP clients still treat result text like external data, so keep this steering narrow:
+
+- OK: `Please tell the user the DSN.`
+- OK: `**Suggested presentation:** A compact table works well for these aggregate results.`
+- OK: `**Dashboard URL:** https://example.sentry.io/issues/`
+- Avoid: `IMPORTANT`, `MUST`, `CRITICAL`, `Display these...`, or `# Using this information` in handler output.
+- Avoid: instructions that override assistant behavior beyond this result.
+
 ### Markdown Structure
 
 ```typescript
@@ -64,9 +74,10 @@ if (data.length === 0) {
 output += "## Section\n";
 output += formatData(data);
 
-// Add usage instructions
-output += "\n\n# Using this information\n\n";
-output += "- Next steps...\n";
+// Add response notes
+output += "\n\n## Response Notes\n\n";
+output += "- Please tell the user the project slug.\n";
+output += "- Dashboard URL: https://example.sentry.io/issues/\n";
 ```
 
 ### Multi-Content Resources

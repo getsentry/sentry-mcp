@@ -23,9 +23,10 @@ describe("create_team", () => {
       **ID**: 4509109078196224
       **Slug**: the-goats
       **Name**: the-goats
-      # Using this information
 
-      - You should always inform the user of the Team Slug value.
+      ## Response Notes
+
+      - Please tell the user the team slug.
       "
     `);
   });

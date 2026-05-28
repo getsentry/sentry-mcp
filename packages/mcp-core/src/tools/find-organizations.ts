@@ -63,19 +63,17 @@ export default defineTool({
       output += `\n\n---\n\n**Note:** Showing ${RESULT_LIMIT} results (maximum). There may be more organizations available. Use the \`query\` parameter to search for specific organizations.`;
     }
 
-    output += "\n\n# Using this information\n\n";
-    output += `- The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.\n`;
+    output += "\n\n## Response Notes\n\n";
+    output += `- The organization slug is used as \`organizationSlug\` in other tools.\n`;
 
     const hasValidRegionUrls = organizations.some((org) =>
       org.links?.regionUrl?.trim(),
     );
 
     if (hasValidRegionUrls) {
-      output += `- If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value shown above for each organization.\n`;
-      output += `- For Sentry's Cloud Service (sentry.io), always use the regionUrl to ensure requests go to the correct region.\n`;
+      output += `- The Region URL shown above is the \`regionUrl\` value for later tools that accept it. This keeps Sentry Cloud requests on the correct region.\n`;
     } else {
-      output += `- This appears to be a self-hosted Sentry installation. You can omit the \`regionUrl\` parameter when using other tools.\n`;
-      output += `- For self-hosted Sentry, the regionUrl is typically empty and not needed for API calls.\n`;
+      output += `- This appears to be a self-hosted Sentry installation. The \`regionUrl\` parameter can be omitted in other tools.\n`;
     }
 
     return output;

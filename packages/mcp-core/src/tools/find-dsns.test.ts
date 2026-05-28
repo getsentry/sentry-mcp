@@ -25,9 +25,10 @@ describe("find_dsns", () => {
       **ID**: d20df0a1ab5031c7f3c7edca9c02814d
       **DSN**: https://d20df0a1ab5031c7f3c7edca9c02814d@o4509106732793856.ingest.us.sentry.io/4509109104082945
 
-      # Using this information
+      ## Response Notes
 
-      - The \`SENTRY_DSN\` value is a URL that you can use to initialize Sentry's SDKs.
+      - Please tell the user the DSN.
+      - The \`SENTRY_DSN\` value is a URL used to initialize Sentry SDKs.
       "
     `);
   });

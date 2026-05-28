@@ -92,9 +92,9 @@ export default defineTool({
     } else {
       output += "**SENTRY_DSN**: There was an error fetching this value.\n\n";
     }
-    output += "# Using this information\n\n";
-    output += `- You can reference the **SENTRY_DSN** value to initialize Sentry's SDKs.\n`;
-    output += `- You should always inform the user of the **SENTRY_DSN** and Project Slug values.\n`;
+    output += "## Response Notes\n\n";
+    output += `- Please tell the user the project slug and **SENTRY_DSN**.\n`;
+    output += `- The **SENTRY_DSN** value is used to initialize Sentry SDKs.\n`;
     return output;
   },
 });

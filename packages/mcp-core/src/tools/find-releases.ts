@@ -138,9 +138,10 @@ export default defineTool({
       })
       .join("\n\n");
     output += "\n\n";
-    output += "# Using this information\n\n";
-    output += `- You can reference the Release version in commit messages or documentation.\n`;
-    output += `- You can search for issues in a specific release using the \`find_errors()\` tool with the query \`release:${releases.length ? releases[0]!.shortVersion : "VERSION"}\`.\n`;
+    output += "## Response Notes\n\n";
+    output +=
+      "- Release versions can be referenced in commit messages or documentation.\n";
+    output += `- Release filter syntax for issue searches: \`release:${releases.length ? releases[0]!.shortVersion : "VERSION"}\`.\n`;
     return output;
   },
 });

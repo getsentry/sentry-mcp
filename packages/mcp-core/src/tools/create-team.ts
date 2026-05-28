@@ -56,8 +56,8 @@ export default defineTool({
     output += `**ID**: ${team.id}\n`;
     output += `**Slug**: ${team.slug}\n`;
     output += `**Name**: ${team.name}\n`;
-    output += "# Using this information\n\n";
-    output += `- You should always inform the user of the Team Slug value.\n`;
+    output += "\n## Response Notes\n\n";
+    output += `- Please tell the user the team slug.\n`;
     return output;
   },
 });

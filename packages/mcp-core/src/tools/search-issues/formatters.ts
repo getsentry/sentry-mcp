@@ -60,8 +60,8 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
       output += "**\n\n";
     }
 
-    // Add display instructions for UI
-    output += `⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.\n\n`;
+    // Add lightweight presentation guidance for clients that can render rich results.
+    output += `**Suggested presentation:** Cards work well for these issues, with status, assignee, and issue ID links visible.\n\n`;
   }
 
   if (issues.length === 0) {
@@ -87,9 +87,9 @@ export function formatIssueResults(params: FormatIssueResultsParams): string {
     resolvedProtocol,
   );
 
-  // Add view link with emoji and guidance text (like search_events)
+  // Add view link with lightweight guidance text (like search_events)
   output += `**View these results in Sentry**:\n${searchUrl}\n`;
-  output += `_Please share this link with the user to view the search results in their Sentry dashboard._\n\n`;
+  output += `Please tell the user this dashboard link is available if they want to open the results in Sentry.\n\n`;
 
   output += `Found **${issues.length}** issue${issues.length === 1 ? "" : "s"}:\n\n`;
 

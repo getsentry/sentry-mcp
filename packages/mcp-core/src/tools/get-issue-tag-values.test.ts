@@ -36,10 +36,10 @@ describe("get_issue_tag_values", () => {
 
       *Showing top 5 of 156 unique values*
 
-      ## Using this information
+      ## Response Notes
 
-      - Use \`get_sentry_resource(resourceType='issue', organizationSlug='sentry-mcp-evals', resourceId='CLOUDFLARE-MCP-41')\` to see the full issue details
-      - Try other tag keys like: url, browser, environment, release, os, device, user
+      - Full issue details: \`get_sentry_resource(resourceType='issue', organizationSlug='sentry-mcp-evals', resourceId='CLOUDFLARE-MCP-41')\`
+      - Other common tag keys: url, browser, environment, release, os, device, user
       "
     `);
   });

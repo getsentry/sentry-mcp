@@ -68,9 +68,10 @@ export default defineTool({
     let output = `# New DSN in **${organizationSlug}/${params.projectSlug}**\n\n`;
     output += `**DSN**: ${clientKey.dsn.public}\n`;
     output += `**Name**: ${clientKey.name}\n\n`;
-    output += "# Using this information\n\n";
+    output += "## Response Notes\n\n";
+    output += "- Please tell the user the DSN.\n";
     output +=
-      "- The `SENTRY_DSN` value is a URL that you can use to initialize Sentry's SDKs.\n";
+      "- The `SENTRY_DSN` value is a URL used to initialize Sentry SDKs.\n";
     return output;
   },
 });

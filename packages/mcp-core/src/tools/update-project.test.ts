@@ -33,9 +33,9 @@ describe("update_project", () => {
       - Updated name to "New Project Name"
       - Updated platform to "python"
 
-      # Using this information
+      ## Response Notes
 
-      - The project is now accessible at slug: \`cloudflare-mcp\`
+      - Project slug for later requests: \`cloudflare-mcp\`
       "
     `);
   });
@@ -70,10 +70,10 @@ describe("update_project", () => {
       ## Updates Applied
       - Updated team assignment to "backend-team"
 
-      # Using this information
+      ## Response Notes
 
-      - The project is now accessible at slug: \`cloudflare-mcp\`
-      - The project is now assigned to the \`backend-team\` team
+      - Project slug for later requests: \`cloudflare-mcp\`
+      - Team assignment: \`backend-team\`
       "
     `);
   });
