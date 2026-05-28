@@ -2248,6 +2248,7 @@ export class SentryApiService {
     downloadUrl: string;
     filename: string;
     blob: Blob;
+    contentType: string;
   }> {
     // Get the attachment metadata first
     const attachmentsData = await this.requestJSON(
@@ -2278,11 +2279,21 @@ export class SentryApiService {
       opts,
     );
 
+    // Use the Content-Type from the download response as the authoritative MIME type.
+    // The metadata endpoint (Step 1) may store a stale or generic value like
+    // "application/octet-stream", while the download endpoint (Step 2) reflects
+    // what the server actually serves — these two can disagree, and Step 2 wins.
+    const contentType =
+      downloadResponse.headers.get("content-type")?.split(";")[0].trim() ??
+      attachment.mimetype ??
+      "application/octet-stream";
+
     return {
       attachment,
       downloadUrl: downloadResponse.url,
       filename: attachment.name,
       blob: await downloadResponse.blob(),
+      contentType,
     };
   }
 
