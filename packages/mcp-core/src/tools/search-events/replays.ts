@@ -1,5 +1,10 @@
 import type { ReplayDetails, SentryApiService } from "../../api-client";
-import { formatExecutedSearch, type ExecutedSearch } from "./formatters";
+import {
+  type ExecutedSearch,
+  formatExecutedSearch,
+  formatSearchPresentationHint,
+  formatSentryDashboardLink,
+} from "./formatters";
 
 export const DEFAULT_REPLAY_SORT = "-started_at";
 export const DEFAULT_REPLAY_STATS_PERIOD = "14d";
@@ -80,8 +85,9 @@ export function formatReplayResults(params: FormatReplayResultsParams): string {
   } = params;
 
   let output = `# Search Results for "${inputQuery}"\n\n`;
-  output +=
-    "**Suggested presentation:** Cards or rows work well for these replays, with replay IDs, user context, duration, click/error counts, and page URLs visible.\n\n";
+  output += formatSearchPresentationHint(
+    "Cards or rows work well for these replays, with replay IDs, user context, duration, click/error counts, and page URLs visible.",
+  );
 
   if (includeExplanation) {
     output += "## Query Translation\n";
@@ -100,9 +106,7 @@ export function formatReplayResults(params: FormatReplayResultsParams): string {
 
   output += formatExecutedSearch(params.executedSearch);
 
-  output += `**View these results in Sentry**:\n${searchUrl}\n`;
-  output +=
-    "Please tell the user this dashboard link is available if they want to open the results in Sentry.\n\n";
+  output += formatSentryDashboardLink(searchUrl);
 
   if (replays.length === 0) {
     output += "No replays found matching your search criteria.\n\n";

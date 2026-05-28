@@ -86,11 +86,11 @@ export function formatExecutedSearch(executedSearch?: ExecutedSearch): string {
   return `${lines.join("\n")}\n\n`;
 }
 
-function formatSearchPresentationHint(hint: string): string {
+export function formatSearchPresentationHint(hint: string): string {
   return `**Suggested presentation:** ${hint}\n\n`;
 }
 
-function formatSentryDashboardLink(url: string): string {
+export function formatSentryDashboardLink(url: string): string {
   return `**View these results in Sentry**:\n${url}\nPlease tell the user this dashboard link is available if they want to open the results in Sentry.\n\n`;
 }
 
