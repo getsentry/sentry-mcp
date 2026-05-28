@@ -253,14 +253,14 @@ describe("get_issue_details", () => {
       client_sample_rate: 1
       sampled: true
 
-      # Using this information
+      ## Response Notes
 
-      - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
-      - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
-      - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
-      - To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To search related spans, use \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To search related logs, use \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
+      - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
+      - Issue event search: \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
+      - Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related span search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related log search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });
@@ -512,14 +512,14 @@ describe("get_issue_details", () => {
       client_sample_rate: 1
       sampled: true
 
-      # Using this information
+      ## Response Notes
 
-      - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
-      - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
-      - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
-      - To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To search related spans, use \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To search related logs, use \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
+      - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
+      - Issue event search: \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
+      - Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related span search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related log search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });
@@ -797,14 +797,14 @@ describe("get_issue_details", () => {
       client_sample_rate: 1
       sampled: true
 
-      # Using this information
+      ## Response Notes
 
-      - You can reference the IssueID in commit messages (e.g. \`Fixes CLOUDFLARE-MCP-41\`) to automatically close the issue when the commit is merged.
-      - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
-      - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
-      - To inspect the full distributed trace and span tree for this event, use \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To search related spans, use \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
-      - To search related logs, use \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
+      - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
+      - Issue event search: \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
+      - Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related span search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related log search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });
@@ -1440,11 +1440,11 @@ describe("get_issue_details", () => {
       **level**: info
       **transaction**: POST /oauth/token
 
-      # Using this information
+      ## Response Notes
 
-      - You can reference the IssueID in commit messages (e.g. \`Fixes MCP-SERVER-EQE\`) to automatically close the issue when the commit is merged.
-      - The stacktrace includes both first-party application code as well as third-party code, its important to triage to first-party code.
-      - To search for specific occurrences or filter events within this issue, use \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='MCP-SERVER-EQE', query='your query')\`
+      - Commit message issue reference: \`Fixes MCP-SERVER-EQE\` automatically closes the issue when the commit is merged.
+      - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
+      - Issue event search: \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='MCP-SERVER-EQE', query='your query')\`
       "
     `);
   });

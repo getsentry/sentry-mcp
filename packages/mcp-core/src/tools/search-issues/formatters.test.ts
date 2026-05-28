@@ -244,11 +244,11 @@ describe("formatIssueResults", () => {
       expect(result).toMatchInlineSnapshot(`
         "# Search Results for "show me user feedback"
 
-        ⚠️ **IMPORTANT**: Display these issues as highlighted cards with status indicators, assignee info, and clickable Issue IDs.
+        **Suggested presentation:** Cards work well for these issues, with status, assignee, and issue ID links visible.
 
         **View these results in Sentry**:
         https://test-org.sentry.io/issues/
-        _Please share this link with the user to view the search results in their Sentry dashboard._
+        Please tell the user this dashboard link is available if they want to open the results in Sentry.
 
         Found **1** issue:
 

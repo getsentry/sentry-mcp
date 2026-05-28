@@ -183,10 +183,10 @@ export default defineTool({
       output += `\n*Showing top ${shownCount} of ${tagValues.totalValues} unique values*\n`;
     }
 
-    // Add usage hints
-    output += "\n## Using this information\n\n";
-    output += `- Use \`get_sentry_resource(resourceType='issue', organizationSlug='${orgSlug}', resourceId='${parsedIssueId}')\` to see the full issue details\n`;
-    output += `- Try other tag keys like: url, browser, environment, release, os, device, user\n`;
+    // Add lightweight follow-up hints
+    output += "\n## Response Notes\n\n";
+    output += `- Full issue details: \`get_sentry_resource(resourceType='issue', organizationSlug='${orgSlug}', resourceId='${parsedIssueId}')\`\n`;
+    output += `- Other common tag keys: url, browser, environment, release, os, device, user\n`;
 
     return output;
   },

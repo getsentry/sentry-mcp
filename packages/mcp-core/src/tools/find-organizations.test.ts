@@ -21,11 +21,10 @@ describe("find_organizations", () => {
       **Web URL:** https://sentry.io/sentry-mcp-evals
       **Region URL:** https://us.sentry.io
 
-      # Using this information
+      ## Response Notes
 
-      - The organization's name is the identifier for the organization, and is used in many tools for \`organizationSlug\`.
-      - If a tool supports passing in the \`regionUrl\`, you MUST pass in the correct value shown above for each organization.
-      - For Sentry's Cloud Service (sentry.io), always use the regionUrl to ensure requests go to the correct region.
+      - The organization slug is used as \`organizationSlug\` in other tools.
+      - The Region URL shown above is the \`regionUrl\` value for later tools that accept it. This keeps Sentry Cloud requests on the correct region.
       "
     `);
   });

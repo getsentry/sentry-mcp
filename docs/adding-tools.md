@@ -149,9 +149,9 @@ async handler(params, context: ServerContext) {
   // 6. Format data
   output += formatYourData(data);
 
-  // 7. Add next steps
-  output += "\n\n# Using this information\n\n";
-  output += "- Next tool to use: `related_tool(param='...')`\n";
+  // 7. Add response notes
+  output += "\n\n## Response Notes\n\n";
+  output += "- Please tell the user the resource ID.\n";
 
   return output;
 }
@@ -162,7 +162,7 @@ async handler(params, context: ServerContext) {
 See [common-patterns.md](common-patterns.md#response-formatting) for:
 - Markdown structure
 - ID/URL formatting
-- Next steps guidance
+- Response notes guidance
 
 ## Step 3: Add Tests
 
