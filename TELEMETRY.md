@@ -178,6 +178,7 @@ Users report sign-outs, refresh loops, DCR churn, or callback/register
 imbalance.
 
 Metrics: `app.oauth.token_exchange`, `app.oauth.grant_revoked`,
+`app.oauth.consent_prompted`, `app.oauth.consent_granted`,
 `app.oauth.callback_completed`, `app.consent.skill_granted`,
 `app.oauth.register`
 
