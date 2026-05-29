@@ -175,6 +175,10 @@ function parseGitlabUrl(url: URL): ParsedNativeIssueUrl | null {
 }
 
 function parseBitbucketUrl(url: URL): ParsedNativeIssueUrl | null {
+  const host = normalizeUrlHost(url);
+  if (host !== "bitbucket.org") {
+    return null;
+  }
   const segments = pathSegments(url);
   if (segments.length < 4 || segments[2] !== "issues") {
     return null;
@@ -188,8 +192,8 @@ function parseBitbucketUrl(url: URL): ParsedNativeIssueUrl | null {
     kind: "native",
     provider: "bitbucket",
     url: url.toString(),
-    host: normalizeUrlHost(url),
-    domainPath: `${normalizeUrlHost(url)}/${segments[0]}`,
+    host,
+    domainPath: `${host}/${segments[0]}`,
     repo,
     issueId,
   };
@@ -459,8 +463,23 @@ async function resolveNativeTarget(params: {
   }
 
   const bestDomainScore = Math.max(
+    0,
     ...candidates.map((candidate) => domainMatchScore(candidate, parsed)),
   );
+
+  // For non-public GitHub hosts (GitHub Enterprise), require a positive domain
+  // match so that arbitrary URLs with GitHub-shaped paths cannot silently link
+  // to a null-domain GitHub integration.
+  if (
+    parsed.provider === "github" &&
+    parsed.host !== "github.com" &&
+    bestDomainScore === 0
+  ) {
+    throw new UserInputError(
+      `Unsupported GitHub Enterprise URL host \`${parsed.host}\`. Configure a GitHub Enterprise integration with a matching domain name before linking this URL.`,
+    );
+  }
+
   if (bestDomainScore > 0) {
     candidates = candidates.filter(
       (candidate) => domainMatchScore(candidate, parsed) === bestDomainScore,

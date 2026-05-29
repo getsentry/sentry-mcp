@@ -135,6 +135,10 @@ describe("parseExternalIssueUrl", () => {
     expect(() =>
       parseExternalIssueUrl("https://tickets.example.com/work/ABC-1"),
     ).toThrow(UserInputError);
+    // GitLab URL missing the /-/ marker must not fall through to the Bitbucket parser
+    expect(() =>
+      parseExternalIssueUrl("https://gitlab.com/getsentry/sentry/issues/123"),
+    ).toThrow(UserInputError);
   });
 });
 
@@ -314,6 +318,60 @@ describe("resolveExternalIssueLinkTarget", () => {
       integration: { id: "2" },
       payload: {
         externalIssue: "42",
+      },
+    });
+  });
+
+  it("rejects non-github.com hosts with no matching GitHub Enterprise integration domain", async () => {
+    await expect(
+      resolveExternalIssueLinkTarget({
+        apiService: {
+          listIssueIntegrations: async () => [
+            integration({ id: "1", domainName: null }),
+          ],
+          getIssueIntegrationLinkConfig: async () => linkConfig({ id: "1" }),
+          listSentryAppInstallations: async () => [],
+        },
+        organizationSlug: "sentry",
+        issueId: "PROJ-1",
+        externalIssueUrl:
+          "https://internal.company.com/getsentry/sentry/issues/123",
+      }),
+    ).rejects.toThrow(
+      /Configure a GitHub Enterprise integration with a matching domain/,
+    );
+  });
+
+  it("resolves GitHub Enterprise URLs with a configured integration domain", async () => {
+    const target = await resolveExternalIssueLinkTarget({
+      apiService: {
+        listIssueIntegrations: async () => [
+          integration({
+            id: "1",
+            name: "GitHub Enterprise",
+            domainName: "internal.company.com/getsentry",
+            provider: { key: "github_enterprise" },
+          }),
+        ],
+        getIssueIntegrationLinkConfig: async () =>
+          linkConfig({
+            id: "1",
+            provider: { key: "github_enterprise" },
+          }),
+        listSentryAppInstallations: async () => [],
+      },
+      organizationSlug: "sentry",
+      issueId: "PROJ-1",
+      externalIssueUrl:
+        "https://internal.company.com/getsentry/sentry/issues/123",
+    });
+
+    expect(target).toMatchObject({
+      kind: "native",
+      integration: { id: "1" },
+      payload: {
+        repo: "getsentry/sentry",
+        externalIssue: "123",
       },
     });
   });
