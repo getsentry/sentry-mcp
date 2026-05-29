@@ -2323,11 +2323,23 @@ export class SentryApiService {
       opts,
     );
 
+    // Use Content-Type from the download response (Step 2) as the authoritative
+    // MIME type. The metadata endpoint (Step 1) may store a stale or generic
+    // value like "application/octet-stream" — e.g. the JS React Native SDK
+    // uploads attachments without an explicit mimetype — while the download
+    // endpoint reflects what the server actually serves after the fix in
+    // getsentry/sentry#115977. When the two disagree, Step 2 wins.
+    const contentType =
+      downloadResponse.headers.get("content-type")?.split(";")[0].trim() ??
+      attachment.mimetype ??
+      "application/octet-stream";
+
     return {
       attachment,
       downloadUrl: downloadResponse.url,
       filename: attachment.name,
       blob: await downloadResponse.blob(),
+      contentType,
     };
   }
 

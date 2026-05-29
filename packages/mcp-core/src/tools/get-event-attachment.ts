@@ -78,15 +78,20 @@ export default defineTool({
 
       const contentParts: (TextContent | ImageContent | EmbeddedResource)[] =
         [];
-      const isBinary = !attachment.attachment.mimetype?.startsWith("text/");
+      // Use Content-Type from the download response (Step 2) rather than
+      // mimetype from the metadata endpoint (Step 1). The two can disagree —
+      // notably the JS RN SDK uploads attachments as "application/octet-stream"
+      // even when the file is an image — and Step 2 is the authoritative signal.
+      const effectiveMimeType = attachment.contentType;
+      const isBinary = !effectiveMimeType.startsWith("text/");
 
       if (isBinary) {
-        const isImage = attachment.attachment.mimetype?.startsWith("image/");
+        const isImage = effectiveMimeType.startsWith("image/");
         const base64 = await blobToBase64(attachment.blob);
         if (isImage) {
           const image: ImageContent = {
             type: "image",
-            mimeType: attachment.attachment.mimetype,
+            mimeType: effectiveMimeType,
             data: base64,
           };
           contentParts.push(image);
@@ -95,7 +100,7 @@ export default defineTool({
             type: "resource",
             resource: {
               uri: `file://${attachment.filename}`,
-              mimeType: attachment.attachment.mimetype,
+              mimeType: effectiveMimeType,
               blob: base64,
             },
           };
@@ -109,7 +114,7 @@ export default defineTool({
       output += `**Filename:** ${attachment.filename}\n`;
       output += `**Type:** ${attachment.attachment.type}\n`;
       output += `**Size:** ${attachment.attachment.size} bytes\n`;
-      output += `**MIME Type:** ${attachment.attachment.mimetype}\n`;
+      output += `**MIME Type:** ${effectiveMimeType}\n`;
       output += `**Created:** ${attachment.attachment.dateCreated}\n`;
       output += `**SHA1:** ${attachment.attachment.sha1}\n\n`;
       output += `**Download URL:** ${attachment.downloadUrl}\n\n`;
