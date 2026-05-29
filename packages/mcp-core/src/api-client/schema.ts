@@ -946,6 +946,87 @@ export const ExternalIssueSchema = z.object({
 
 export const ExternalIssueListSchema = z.array(ExternalIssueSchema);
 
+export const IntegrationProviderSchema = z
+  .object({
+    key: z.string(),
+    slug: z.string().optional(),
+    name: z.string().optional(),
+  })
+  .passthrough();
+
+export const IssueIntegrationExternalIssueSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    key: z.string(),
+    url: z.string().optional(),
+    title: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    displayName: z.string().optional(),
+  })
+  .passthrough();
+
+export const IssueIntegrationSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    domainName: z.string().nullable().optional(),
+    status: z.string().optional(),
+    provider: IntegrationProviderSchema,
+    externalIssues: z.array(IssueIntegrationExternalIssueSchema).default([]),
+  })
+  .passthrough();
+
+export const IssueIntegrationListSchema = z.array(IssueIntegrationSchema);
+
+export const IssueIntegrationLinkConfigFieldSchema = z
+  .object({
+    name: z.string(),
+    label: z.string().optional(),
+    type: z.string().optional(),
+    default: z.unknown().optional(),
+    required: z.boolean().optional(),
+    choices: z.array(z.tuple([z.string(), z.string()])).optional(),
+  })
+  .passthrough();
+
+export const IssueIntegrationLinkConfigSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    domainName: z.string().nullable().optional(),
+    provider: IntegrationProviderSchema,
+    linkIssueConfig: z.array(IssueIntegrationLinkConfigFieldSchema),
+  })
+  .passthrough();
+
+export const NativeExternalIssueSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    key: z.string(),
+    url: z.string().optional(),
+    integrationId: z.union([z.string(), z.number()]).optional(),
+    displayName: z.string().optional(),
+  })
+  .passthrough();
+
+export const SentryAppInstallationSchema = z
+  .object({
+    uuid: z.string(),
+    status: z.string().optional(),
+    app: z
+      .object({
+        uuid: z.string().optional(),
+        slug: z.string(),
+        sentryAppId: z.number().optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+export const SentryAppInstallationListSchema = z.array(
+  SentryAppInstallationSchema,
+);
+
 /**
  * Schema for Sentry trace metadata response.
  *

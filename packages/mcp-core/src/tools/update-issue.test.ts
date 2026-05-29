@@ -755,8 +755,376 @@ describe("update_issue", () => {
         serverContext,
       ),
     ).rejects.toThrow(
-      "At least one of `status` or `assignedTo` must be provided to update the issue",
+      "At least one of `status`, `assignedTo`, `externalIssueUrl`, or `reason` must be provided to update the issue",
     );
+  });
+
+  it("links a native external issue without updating status or assignment", async () => {
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+        status: undefined,
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(result).toContain(
+      "**Linked External Issue**: getsentry/sentry#123 (github) → https://github.com/getsentry/sentry/issues/123",
+    );
+    expect(result).toContain("- The external issue has been linked in Sentry.");
+  });
+
+  it("updates status and links a native external issue", async () => {
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(result).toContain("**Status**: unresolved → **resolved**");
+    expect(result).toContain(
+      "**Linked External Issue**: getsentry/sentry#123 (github) → https://github.com/getsentry/sentry/issues/123",
+    );
+  });
+
+  it("links a Linear issue through Sentry Apps", async () => {
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        externalIssueUrl: "https://linear.app/acme/issue/ENG-123/test",
+        status: undefined,
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(result).toContain(
+      "**Linked External Issue**: ENG-123 (linear) → https://linear.app/acme/issue/ENG-123/test",
+    );
+  });
+
+  it.each([
+    {
+      provider: "jira",
+      url: "https://acme.atlassian.net/browse/ENG-123",
+      integration: {
+        id: "jira-1",
+        name: "Jira",
+        domainName: "acme.atlassian.net",
+        provider: { key: "jira", slug: "jira", name: "Jira" },
+      },
+      config: [
+        { name: "externalIssue", required: true },
+        { name: "comment", required: false, default: "Sentry Issue" },
+      ],
+      response: {
+        id: "external-issue-jira",
+        key: "ENG-123",
+        url: "https://acme.atlassian.net/browse/ENG-123",
+        integrationId: "jira-1",
+        displayName: "ENG-123",
+      },
+      expected: "ENG-123 (jira)",
+    },
+    {
+      provider: "gitlab",
+      url: "https://gitlab.com/getsentry/backend/-/issues/456",
+      integration: {
+        id: "gitlab-1",
+        name: "GitLab",
+        domainName: "gitlab.com/getsentry",
+        provider: { key: "gitlab", slug: "gitlab", name: "GitLab" },
+      },
+      config: [
+        {
+          name: "project",
+          required: true,
+          choices: [["getsentry/backend", "getsentry/backend"]],
+        },
+        { name: "externalIssue", required: true },
+      ],
+      response: {
+        id: "external-issue-gitlab",
+        key: "getsentry/backend#456",
+        url: "https://gitlab.com/getsentry/backend/-/issues/456",
+        integrationId: "gitlab-1",
+        displayName: "getsentry/backend#456",
+      },
+      expected: "getsentry/backend#456 (gitlab)",
+    },
+    {
+      provider: "bitbucket",
+      url: "https://bitbucket.org/getsentry/sentry/issues/789/test",
+      integration: {
+        id: "bitbucket-1",
+        name: "Bitbucket",
+        domainName: "bitbucket.org/getsentry",
+        provider: { key: "bitbucket", slug: "bitbucket", name: "Bitbucket" },
+      },
+      config: [
+        {
+          name: "repo",
+          required: true,
+          choices: [["getsentry/sentry", "getsentry/sentry"]],
+        },
+        { name: "externalIssue", required: true },
+      ],
+      response: {
+        id: "external-issue-bitbucket",
+        key: "getsentry/sentry#789",
+        url: "https://bitbucket.org/getsentry/sentry/issues/789/test",
+        integrationId: "bitbucket-1",
+        displayName: "getsentry/sentry#789",
+      },
+      expected: "getsentry/sentry#789 (bitbucket)",
+    },
+    {
+      provider: "vsts",
+      url: "https://dev.azure.com/acme/project/_workitems/edit/42",
+      integration: {
+        id: "vsts-1",
+        name: "Azure DevOps",
+        domainName: "dev.azure.com/acme",
+        provider: { key: "vsts", slug: "vsts", name: "Azure DevOps" },
+      },
+      config: [{ name: "externalIssue", required: true }],
+      response: {
+        id: "external-issue-vsts",
+        key: "42",
+        url: "https://dev.azure.com/acme/project/_workitems/edit/42",
+        integrationId: "vsts-1",
+        displayName: "42",
+      },
+      expected: "42 (vsts)",
+    },
+  ])(
+    "links $provider issue URLs through native integrations",
+    async (testCase) => {
+      mswServer.use(
+        http.get(
+          "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/integrations/",
+          () =>
+            HttpResponse.json([
+              { ...testCase.integration, externalIssues: [] },
+            ]),
+        ),
+        http.get(
+          `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/integrations/${testCase.integration.id}/`,
+          ({ request }) => {
+            const url = new URL(request.url);
+            if (url.searchParams.get("action") !== "link") {
+              return HttpResponse.json(
+                { detail: "bad action" },
+                { status: 400 },
+              );
+            }
+            return HttpResponse.json({
+              ...testCase.integration,
+              linkIssueConfig: testCase.config,
+            });
+          },
+        ),
+        http.put(
+          `https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/integrations/${testCase.integration.id}/`,
+          () => HttpResponse.json(testCase.response),
+        ),
+      );
+
+      const result = await updateIssue.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          externalIssueUrl: testCase.url,
+          status: undefined,
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        serverContext,
+      );
+
+      expect(result).toContain(
+        `**Linked External Issue**: ${testCase.expected}`,
+      );
+    },
+  );
+
+  it("links a Shortcut issue through Sentry Apps", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/sentry-app-installations/",
+        () =>
+          HttpResponse.json([
+            {
+              uuid: "shortcut-installation-uuid",
+              status: "installed",
+              app: {
+                uuid: "shortcut-app-uuid",
+                slug: "shortcut",
+                sentryAppId: 2,
+              },
+            },
+          ]),
+      ),
+      http.post(
+        "https://sentry.io/api/0/sentry-app-installations/shortcut-installation-uuid/external-issues/",
+        async ({ request }) => {
+          const body = (await request.json()) as {
+            issueId: number;
+            webUrl: string;
+            identifier: string;
+          };
+          return HttpResponse.json({
+            id: "platform-external-issue-shortcut",
+            issueId: String(body.issueId),
+            serviceType: "shortcut",
+            displayName: body.identifier,
+            webUrl: body.webUrl,
+          });
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        externalIssueUrl: "https://app.shortcut.com/acme/story/123/test",
+        status: undefined,
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(result).toContain(
+      "**Linked External Issue**: 123 (shortcut) → https://app.shortcut.com/acme/story/123/test",
+    );
+  });
+
+  it("does not update the issue when external issue URL validation fails", async () => {
+    let updateCalled = false;
+    mswServer.use(
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => {
+          updateCalled = true;
+          return HttpResponse.json(issueFixture);
+        },
+      ),
+    );
+
+    await expect(
+      updateIssue.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "resolved",
+          externalIssueUrl: "https://tickets.example.com/work/ABC-1",
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        serverContext,
+      ),
+    ).rejects.toThrow("Unsupported external issue URL host");
+    expect(updateCalled).toBe(false);
+  });
+
+  it("reports ambiguous native integrations before updating", async () => {
+    let updateCalled = false;
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/integrations/",
+        () =>
+          HttpResponse.json([
+            {
+              id: "github-1",
+              name: "GitHub A",
+              domainName: null,
+              provider: { key: "github", slug: "github", name: "GitHub" },
+              externalIssues: [],
+            },
+            {
+              id: "github-2",
+              name: "GitHub B",
+              domainName: null,
+              provider: { key: "github", slug: "github", name: "GitHub" },
+              externalIssues: [],
+            },
+          ]),
+      ),
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => {
+          updateCalled = true;
+          return HttpResponse.json(issueFixture);
+        },
+      ),
+    );
+
+    await expect(
+      updateIssue.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "resolved",
+          externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        serverContext,
+      ),
+    ).rejects.toThrow("Multiple installed integrations");
+    expect(updateCalled).toBe(false);
+  });
+
+  it("reports partial success when link write fails after issue update", async () => {
+    mswServer.use(
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/integrations/github-integration-1/",
+        () =>
+          HttpResponse.json(
+            { detail: "GitHub rejected the issue link" },
+            { status: 400 },
+          ),
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(result).toContain("Partially Updated");
+    expect(result).toContain("The Sentry issue update succeeded.");
+    expect(result).toContain("External issue linking failed");
+    expect(result).toContain("GitHub rejected the issue link");
   });
 
   it("validates ignore options require ignored status", async () => {
