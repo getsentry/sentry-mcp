@@ -204,12 +204,15 @@ function parseVstsUrl(url: URL): ParsedNativeIssueUrl | null {
   if (!issueId) {
     return null;
   }
+  const host = normalizeHost(url.hostname);
+  const domainPath =
+    host === "dev.azure.com" && segments[0] ? `${host}/${segments[0]}` : host;
   return {
     kind: "native",
     provider: "vsts",
     url: url.toString(),
-    host: normalizeHost(url.hostname),
-    domainPath: normalizeHost(url.hostname),
+    host,
+    domainPath,
     issueId,
   };
 }

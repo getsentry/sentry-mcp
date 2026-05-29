@@ -205,6 +205,45 @@ describe("resolveExternalIssueLinkTarget", () => {
     });
   });
 
+  it("uses the Azure DevOps organization segment for domain matching", async () => {
+    const target = await resolveExternalIssueLinkTarget({
+      apiService: {
+        listIssueIntegrations: async () => [
+          integration({
+            id: "1",
+            name: "Azure Other",
+            domainName: "dev.azure.com/other",
+            provider: { key: "vsts" },
+          }),
+          integration({
+            id: "2",
+            name: "Azure Acme",
+            domainName: "dev.azure.com/acme",
+            provider: { key: "vsts" },
+          }),
+        ],
+        getIssueIntegrationLinkConfig: async ({ integrationId }) =>
+          linkConfig({
+            id: integrationId,
+            provider: { key: "vsts" },
+            linkIssueConfig: [{ name: "externalIssue", required: true }],
+          }),
+        listSentryAppInstallations: async () => [],
+      },
+      organizationSlug: "sentry",
+      issueId: "PROJ-1",
+      externalIssueUrl: "https://dev.azure.com/acme/project/_workitems/edit/42",
+    });
+
+    expect(target).toMatchObject({
+      kind: "native",
+      integration: { id: "2" },
+      payload: {
+        externalIssue: "42",
+      },
+    });
+  });
+
   it("reports ambiguous native integrations", async () => {
     await expect(
       resolveExternalIssueLinkTarget({
