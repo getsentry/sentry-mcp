@@ -85,6 +85,10 @@ function normalizeHost(value: string): string {
   return value.toLowerCase().replace(/^www\./, "");
 }
 
+function normalizeUrlHost(url: URL): string {
+  return normalizeHost(url.host);
+}
+
 function normalizeDomain(value?: string | null): string | null {
   if (!value) {
     return null;
@@ -113,14 +117,14 @@ function parseJiraUrl(url: URL): ParsedNativeIssueUrl | null {
     kind: "native",
     provider: "jira",
     url: url.toString(),
-    host: normalizeHost(url.hostname),
-    domainPath: normalizeHost(url.hostname),
+    host: normalizeUrlHost(url),
+    domainPath: normalizeUrlHost(url),
     issueId,
   };
 }
 
 function parseGithubUrl(url: URL): ParsedNativeIssueUrl | null {
-  const host = normalizeHost(url.hostname);
+  const host = normalizeUrlHost(url);
   if (host === "bitbucket.org" || host === "gitlab.com") {
     return null;
   }
@@ -163,8 +167,8 @@ function parseGitlabUrl(url: URL): ParsedNativeIssueUrl | null {
     kind: "native",
     provider: "gitlab",
     url: url.toString(),
-    host: normalizeHost(url.hostname),
-    domainPath: `${normalizeHost(url.hostname)}/${project}`,
+    host: normalizeUrlHost(url),
+    domainPath: `${normalizeUrlHost(url)}/${project}`,
     project,
     issueId,
   };
@@ -184,8 +188,8 @@ function parseBitbucketUrl(url: URL): ParsedNativeIssueUrl | null {
     kind: "native",
     provider: "bitbucket",
     url: url.toString(),
-    host: normalizeHost(url.hostname),
-    domainPath: `${normalizeHost(url.hostname)}/${segments[0]}`,
+    host: normalizeUrlHost(url),
+    domainPath: `${normalizeUrlHost(url)}/${segments[0]}`,
     repo,
     issueId,
   };
@@ -205,9 +209,11 @@ function parseVstsUrl(url: URL): ParsedNativeIssueUrl | null {
   if (!issueId) {
     return null;
   }
-  const host = normalizeHost(url.hostname);
+  const host = normalizeUrlHost(url);
   const domainPath =
-    host === "dev.azure.com" && segments[0] ? `${host}/${segments[0]}` : host;
+    normalizeHost(url.hostname) === "dev.azure.com" && segments[0]
+      ? `${host}/${segments[0]}`
+      : host;
   return {
     kind: "native",
     provider: "vsts",
