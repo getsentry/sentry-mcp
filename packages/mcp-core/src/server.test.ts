@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { type Span, setUser, startSpan } from "@sentry/core";
+import { type Span, getActiveSpan, setUser, startSpan } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { buildServer } from "./server";
@@ -194,6 +194,13 @@ describe("buildServer", () => {
     });
 
     it("preserves tool result error state", async () => {
+      const setStatus = vi.fn();
+      const span = {
+        setAttribute: vi.fn(),
+        setStatus,
+        recordException: vi.fn(),
+      } as unknown as Span;
+      vi.mocked(getActiveSpan).mockReturnValue(span);
       const server = buildServer({
         context: baseContext,
         tools: {
@@ -236,6 +243,7 @@ describe("buildServer", () => {
         ],
         isError: true,
       });
+      expect(setStatus).toHaveBeenCalledWith({ code: 2 });
     });
   });
 
