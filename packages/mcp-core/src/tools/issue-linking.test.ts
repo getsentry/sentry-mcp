@@ -205,6 +205,32 @@ describe("resolveExternalIssueLinkTarget", () => {
     });
   });
 
+  it("normalizes www-prefixed integration domains for matching", async () => {
+    const target = await resolveExternalIssueLinkTarget({
+      apiService: {
+        listIssueIntegrations: async () => [
+          integration({ id: "1", name: "GitHub Other", domainName: null }),
+          integration({
+            id: "2",
+            name: "GitHub Getsentry",
+            domainName: "www.github.com/getsentry",
+          }),
+        ],
+        getIssueIntegrationLinkConfig: async ({ integrationId }) =>
+          linkConfig({ id: integrationId }),
+        listSentryAppInstallations: async () => [],
+      },
+      organizationSlug: "sentry",
+      issueId: "PROJ-1",
+      externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+    });
+
+    expect(target).toMatchObject({
+      kind: "native",
+      integration: { id: "2" },
+    });
+  });
+
   it("uses the Azure DevOps organization segment for domain matching", async () => {
     const target = await resolveExternalIssueLinkTarget({
       apiService: {

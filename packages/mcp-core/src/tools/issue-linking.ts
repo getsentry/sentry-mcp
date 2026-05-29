@@ -90,7 +90,8 @@ function normalizeDomain(value?: string | null): string | null {
     return null;
   }
   const withoutProtocol = value.replace(/^https?:\/\//i, "");
-  return trimSlashes(withoutProtocol).toLowerCase();
+  const withoutWww = withoutProtocol.replace(/^www\./i, "");
+  return trimSlashes(withoutWww).toLowerCase();
 }
 
 function pathSegments(url: URL): string[] {
