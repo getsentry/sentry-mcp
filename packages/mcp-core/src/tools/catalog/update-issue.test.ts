@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { issueFixture, mswServer } from "@sentry/mcp-server-mocks";
 import updateIssue from "./update-issue.js";
+import type { ToolHandlerResult, ToolResult } from "../types";
 
 type MockIssue = typeof issueFixture;
 
@@ -18,6 +19,24 @@ function createIssue(overrides: Partial<MockIssue> = {}): MockIssue {
     ...structuredClone(issueFixture),
     ...overrides,
   };
+}
+
+function getErroredTextResult(result: ToolHandlerResult): string {
+  expect(typeof result).toBe("object");
+  expect(result).not.toBeNull();
+  expect(Array.isArray(result)).toBe(false);
+
+  const toolResult = result as ToolResult;
+  expect(toolResult.isError).toBe(true);
+  expect(toolResult.content).toHaveLength(1);
+
+  const content = toolResult.content[0];
+  expect(content.type).toBe("text");
+  if (content.type !== "text") {
+    throw new Error(`Expected text content, got ${content.type}`);
+  }
+
+  return content.text;
 }
 
 afterEach(() => {
@@ -1108,17 +1127,19 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = await updateIssue.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        issueId: "CLOUDFLARE-MCP-41",
-        status: "resolved",
-        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-        assignedTo: undefined,
-        issueUrl: undefined,
-        regionUrl: null,
-      },
-      serverContext,
+    const result = getErroredTextResult(
+      await updateIssue.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "resolved",
+          externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        serverContext,
+      ),
     );
 
     expect(result).toContain("Partially Updated");
@@ -1139,18 +1160,20 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = await updateIssue.handler(
-      {
-        organizationSlug: "sentry-mcp-evals",
-        issueId: "CLOUDFLARE-MCP-41",
-        status: "resolved",
-        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-        reason: "Fixing in linked ticket",
-        assignedTo: undefined,
-        issueUrl: undefined,
-        regionUrl: null,
-      },
-      serverContext,
+    const result = getErroredTextResult(
+      await updateIssue.handler(
+        {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+          status: "resolved",
+          externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+          reason: "Fixing in linked ticket",
+          assignedTo: undefined,
+          issueUrl: undefined,
+          regionUrl: null,
+        },
+        serverContext,
+      ),
     );
 
     expect(result).toContain("Partially Updated");
