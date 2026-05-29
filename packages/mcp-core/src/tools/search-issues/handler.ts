@@ -1,4 +1,4 @@
-import { setTag } from "@sentry/core";
+import { getActiveSpan, setTag } from "@sentry/core";
 import { z } from "zod";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
@@ -165,6 +165,8 @@ export default defineTool({
       sortBy: sort,
       limit: params.limit,
     });
+
+    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", issues.length);
 
     // Build output with explanation first (if requested and NL was used), then results
     let output = "";
