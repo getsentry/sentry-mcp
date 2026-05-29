@@ -1160,6 +1160,129 @@ export const restHandlers = buildHandlers([
     path: "/api/0/organizations/:org/issues/:issueId/external-issues/",
     fetch: () => HttpResponse.json([]),
   },
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/integrations/",
+    fetch: () =>
+      HttpResponse.json([
+        {
+          id: "github-integration-1",
+          name: "GitHub",
+          domainName: "github.com/getsentry",
+          status: "active",
+          provider: {
+            key: "github",
+            slug: "github",
+            name: "GitHub",
+          },
+          externalIssues: [],
+        },
+      ]),
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/issues/:issueId/integrations/:integrationId/",
+    fetch: ({ params, request }) => {
+      const url = new URL(request.url);
+      if (url.searchParams.get("action") !== "link") {
+        return HttpResponse.json(
+          { detail: "Action is required and should be either link or create" },
+          { status: 400 },
+        );
+      }
+      const integrationId = String(params.integrationId);
+      return HttpResponse.json({
+        id: integrationId,
+        name: "GitHub",
+        domainName: "github.com/getsentry",
+        provider: {
+          key: "github",
+          slug: "github",
+          name: "GitHub",
+        },
+        linkIssueConfig: [
+          {
+            name: "repo",
+            label: "GitHub Repository",
+            type: "select",
+            default: "getsentry/sentry",
+            required: true,
+            choices: [["getsentry/sentry", "getsentry/sentry"]],
+          },
+          {
+            name: "externalIssue",
+            label: "Issue Number or Title",
+            type: "select",
+            required: true,
+          },
+          {
+            name: "comment",
+            label: "Comment",
+            type: "textarea",
+            required: false,
+            default: "Sentry Issue: [CLOUDFLARE-MCP-41](https://sentry.io)",
+          },
+        ],
+      });
+    },
+  },
+  {
+    method: "put",
+    path: "/api/0/organizations/:org/issues/:issueId/integrations/:integrationId/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as {
+        repo?: string;
+        externalIssue?: string;
+      };
+      const key = `${body.repo ?? "getsentry/sentry"}#${body.externalIssue ?? "123"}`;
+      return HttpResponse.json({
+        id: "external-issue-1",
+        key,
+        url: `https://github.com/${body.repo ?? "getsentry/sentry"}/issues/${body.externalIssue ?? "123"}`,
+        integrationId: "github-integration-1",
+        displayName: key,
+      });
+    },
+  },
+  {
+    method: "get",
+    path: "/api/0/organizations/:org/sentry-app-installations/",
+    fetch: () =>
+      HttpResponse.json([
+        {
+          uuid: "linear-installation-uuid",
+          status: "installed",
+          app: {
+            uuid: "linear-app-uuid",
+            slug: "linear",
+            sentryAppId: 1,
+          },
+          organization: {
+            slug: "sentry-mcp-evals",
+            id: 1,
+          },
+        },
+      ]),
+  },
+  {
+    method: "post",
+    path: "/api/0/sentry-app-installations/:uuid/external-issues/",
+    fetch: async ({ request }) => {
+      const body = (await request.json()) as {
+        issueId: number;
+        webUrl: string;
+        project: string;
+        identifier: string;
+      };
+      return HttpResponse.json({
+        id: "platform-external-issue-1",
+        issueId: String(body.issueId),
+        serviceType: "linear",
+        displayName: body.identifier,
+        webUrl: body.webUrl,
+      });
+    },
+  },
   // Issue tag values endpoints
   {
     method: "get",

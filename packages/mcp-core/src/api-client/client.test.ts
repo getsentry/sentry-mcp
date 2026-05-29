@@ -139,6 +139,196 @@ describe("getTraceUrl", () => {
   });
 });
 
+describe("external issue linking API methods", () => {
+  function mockJsonResponse(body: unknown) {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers: {
+        get: (key: string) =>
+          key.toLowerCase() === "content-type" ? "application/json" : null,
+      },
+      json: () => Promise.resolve(body),
+    });
+  }
+
+  it("lists issue integrations", async () => {
+    mockJsonResponse([
+      {
+        id: "123",
+        name: "GitHub",
+        domainName: "github.com/getsentry",
+        provider: { key: "github", slug: "github", name: "GitHub" },
+        externalIssues: [],
+      },
+    ]);
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const result = await apiService.listIssueIntegrations({
+      organizationSlug: "test-org",
+      issueId: "PROJ-1",
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://sentry.io/api/0/organizations/test-org/issues/PROJ-1/integrations/",
+      expect.any(Object),
+    );
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "domainName": "github.com/getsentry",
+          "externalIssues": [],
+          "id": "123",
+          "name": "GitHub",
+          "provider": {
+            "key": "github",
+            "name": "GitHub",
+            "slug": "github",
+          },
+        },
+      ]
+    `);
+  });
+
+  it("gets issue integration link config", async () => {
+    mockJsonResponse({
+      id: "123",
+      name: "GitHub",
+      domainName: "github.com/getsentry",
+      provider: { key: "github", slug: "github" },
+      linkIssueConfig: [
+        {
+          name: "repo",
+          label: "Repository",
+          type: "select",
+          required: true,
+          default: "getsentry/sentry",
+          choices: [["getsentry/sentry", "getsentry/sentry"]],
+        },
+        { name: "externalIssue", required: true },
+      ],
+    });
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const result = await apiService.getIssueIntegrationLinkConfig({
+      organizationSlug: "test-org",
+      issueId: "PROJ-1",
+      integrationId: "123",
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://sentry.io/api/0/organizations/test-org/issues/PROJ-1/integrations/123/?action=link",
+      expect.any(Object),
+    );
+    expect(result.linkIssueConfig).toHaveLength(2);
+  });
+
+  it("links a native external issue", async () => {
+    mockJsonResponse({
+      id: "456",
+      key: "getsentry/sentry#123",
+      url: "https://github.com/getsentry/sentry/issues/123",
+      integrationId: "123",
+      displayName: "getsentry/sentry#123",
+    });
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const result = await apiService.linkNativeExternalIssue({
+      organizationSlug: "test-org",
+      issueId: "PROJ-1",
+      integrationId: "123",
+      data: {
+        repo: "getsentry/sentry",
+        externalIssue: "123",
+        comment: "Sentry Issue: PROJ-1",
+      },
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://sentry.io/api/0/organizations/test-org/issues/PROJ-1/integrations/123/",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({
+          repo: "getsentry/sentry",
+          externalIssue: "123",
+          comment: "Sentry Issue: PROJ-1",
+        }),
+      }),
+    );
+    expect(result.key).toBe("getsentry/sentry#123");
+  });
+
+  it("lists Sentry App installations", async () => {
+    mockJsonResponse([
+      {
+        uuid: "install-uuid",
+        status: "installed",
+        app: { slug: "linear", uuid: "app-uuid", sentryAppId: 1 },
+      },
+    ]);
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const result = await apiService.listSentryAppInstallations({
+      organizationSlug: "test-org",
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://sentry.io/api/0/organizations/test-org/sentry-app-installations/",
+      expect.any(Object),
+    );
+    expect(result[0]?.app.slug).toBe("linear");
+  });
+
+  it("creates a Sentry App external issue link", async () => {
+    mockJsonResponse({
+      id: "789",
+      issueId: "123",
+      serviceType: "linear",
+      displayName: "ENG-123",
+      webUrl: "https://linear.app/acme/issue/ENG-123/test",
+    });
+    const apiService = new SentryApiService({
+      host: "sentry.io",
+      accessToken: "test-token",
+    });
+
+    const result = await apiService.createSentryAppExternalIssueLink({
+      installationUuid: "install-uuid",
+      issueId: 123,
+      webUrl: "https://linear.app/acme/issue/ENG-123/test",
+      project: "ENG",
+      identifier: "ENG-123",
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://sentry.io/api/0/sentry-app-installations/install-uuid/external-issues/",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          issueId: 123,
+          webUrl: "https://linear.app/acme/issue/ENG-123/test",
+          project: "ENG",
+          identifier: "ENG-123",
+        }),
+      }),
+    );
+    expect(result.serviceType).toBe("linear");
+  });
+});
+
 describe("getEventsExplorerUrl", () => {
   it("should work with sentry.io", () => {
     const apiService = new SentryApiService({ host: "sentry.io" });
