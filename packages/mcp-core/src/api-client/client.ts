@@ -2293,6 +2293,7 @@ export class SentryApiService {
     downloadUrl: string;
     filename: string;
     blob: Blob;
+    contentType: string;
   }> {
     // Get the attachment metadata first
     const attachmentsData = await this.requestJSON(
