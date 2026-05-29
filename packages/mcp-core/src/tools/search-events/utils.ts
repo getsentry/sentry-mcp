@@ -2,7 +2,6 @@ import { z } from "zod";
 import type {
   SentryApiService,
   TraceItemAttributeType,
-  TraceItemAttributeValidationResult,
   TraceItemType,
 } from "../../api-client";
 import { agentTool } from "../../internal/agents/tools/utils";
@@ -420,26 +419,6 @@ function getTraceItemType(dataset: EventsDataset): TraceItemType | null {
   return null;
 }
 
-function formatValidationResults(
-  validationResults: Record<string, TraceItemAttributeValidationResult>,
-): string {
-  const entries = Object.entries(validationResults);
-  if (entries.length === 0) {
-    return "";
-  }
-
-  return `Validated Attributes:
-${entries
-  .map(([attribute, result]) => {
-    if (result.valid) {
-      return `- ${attribute}: valid${result.type ? ` (${result.type})` : ""}`;
-    }
-    return `- ${attribute}: invalid${result.error ? ` (${result.error})` : ""}`;
-  })
-  .join("\n")}
-`;
-}
-
 /**
  * Create a tool for the agent to query available attributes by dataset
  * The tool is pre-bound with the API service and organization configured for the appropriate region
@@ -454,7 +433,7 @@ export function createDatasetAttributesTool(options: {
 
   return agentTool({
     description:
-      "Query, filter, and validate available attributes and fields for a specific Sentry dataset to understand what data is available",
+      "Discover available attributes and fields for a specific Sentry dataset. Pass substringMatch with an exact attribute name to verify whether a specific field exists.",
     parameters: z.object({
       dataset: z
         .enum(PUBLIC_EVENTS_DATASETS)
@@ -464,7 +443,9 @@ export function createDatasetAttributesTool(options: {
         .trim()
         .min(1)
         .optional()
-        .describe("Optional substring to find matching attribute names"),
+        .describe(
+          "Substring to find matching attribute names. Pass an exact field name (e.g. 'span.duration', 'tags[type]') to verify whether it exists.",
+        ),
       query: z
         .string()
         .trim()
@@ -480,21 +461,8 @@ export function createDatasetAttributesTool(options: {
         .describe(
           "Optional attribute types to list. Use ['string','number','boolean'] when unsure.",
         ),
-      attributes: z
-        .array(z.string().trim().min(1))
-        .min(1)
-        .optional()
-        .describe(
-          "Optional exact attribute keys to validate, such as ['tags[type]', 'span.duration']",
-        ),
     }),
-    execute: async ({
-      dataset,
-      substringMatch,
-      query,
-      attributeTypes,
-      attributes,
-    }) => {
+    execute: async ({ dataset, substringMatch, query, attributeTypes }) => {
       const {
         BASE_COMMON_FIELDS,
         DATASET_FIELDS,
@@ -508,18 +476,7 @@ export function createDatasetAttributesTool(options: {
       // UserInputError will be converted to error string for the AI agent
       // Other errors will bubble up to be captured by Sentry
       const normalizedDataset = normalizeEventsDataset(dataset);
-      const traceItemType = getTraceItemType(normalizedDataset);
       const attributeTimeParams = { statsPeriod: "14d" };
-      const validationResults =
-        traceItemType && attributes?.length
-          ? await apiService.validateTraceItemAttributes({
-              organizationSlug,
-              itemType: traceItemType,
-              attributes,
-              project: projectId,
-              ...attributeTimeParams,
-            })
-          : {};
       const { attributes: customAttributes, fieldTypes } =
         await fetchCustomAttributes(
           apiService,
@@ -534,11 +491,9 @@ export function createDatasetAttributesTool(options: {
           },
         );
 
-      // Combine all available fields
-      const allFields = {
+      const staticFields = {
         ...BASE_COMMON_FIELDS,
         ...DATASET_FIELDS[normalizedDataset],
-        ...customAttributes,
       };
 
       const recommendedFields = RECOMMENDED_FIELDS[normalizedDataset];
@@ -553,15 +508,26 @@ export function createDatasetAttributesTool(options: {
         allFieldTypes[field] = "number";
       }
 
-      return `Dataset: ${dataset}
-${formatValidationResults(validationResults)}
+      const customEntries = Object.entries(customAttributes);
+      const staticEntries = Object.entries(staticFields);
+      const STATIC_LIMIT = 50;
 
-Available Fields (${Object.keys(allFields).length} total):
-${Object.entries(allFields)
-  .slice(0, 50) // Limit to first 50 to avoid overwhelming the agent
+      return `Dataset: ${dataset}
+
+Custom Attributes (${customEntries.length}${substringMatch ? ` matching "${substringMatch}"` : ""}):
+${
+  customEntries.length === 0
+    ? "(none returned by Sentry for this query — the attribute may not exist within the time window)"
+    : customEntries.map(([key, desc]) => `- ${key}: ${desc}`).join("\n")
+}
+
+Built-in Fields (${staticEntries.length} total):
+${staticEntries
+  .slice(0, STATIC_LIMIT)
   .map(([key, desc]) => `- ${key}: ${desc}`)
-  .join("\n")}
-${Object.keys(allFields).length > 50 ? `\n... and ${Object.keys(allFields).length - 50} more fields` : ""}
+  .join(
+    "\n",
+  )}${staticEntries.length > STATIC_LIMIT ? `\n... and ${staticEntries.length - STATIC_LIMIT} more built-in fields` : ""}
 
 Recommended Fields for ${dataset}:
 ${recommendedFields.basic.map((f) => `- ${f}`).join("\n")}
