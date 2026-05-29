@@ -378,15 +378,9 @@ function configureServer({
 
           const output = await tool.handler(paramsWithConstraints, context);
 
-          if (activeSpan) {
-            activeSpan.setStatus({
-              code: 1, // ok
-            });
-          }
-
           // if the tool returns a string, assume it's a message
           if (typeof output === "string") {
-            return {
+            const result = {
               content: [
                 {
                   type: "text" as const,
@@ -394,14 +388,31 @@ function configureServer({
                 },
               ],
             };
+            if (activeSpan) {
+              activeSpan.setStatus({
+                code: 1, // ok
+              });
+            }
+            return result;
           }
           // if the tool returns a list, assume it's a content list
           if (Array.isArray(output)) {
-            return {
+            const result = {
               content: output,
             };
+            if (activeSpan) {
+              activeSpan.setStatus({
+                code: 1, // ok
+              });
+            }
+            return result;
           }
           if (isToolResult(output)) {
+            if (activeSpan) {
+              activeSpan.setStatus({
+                code: output.isError ? 2 : 1,
+              });
+            }
             return output;
           }
           throw new Error(`Invalid tool output: ${output}`);
