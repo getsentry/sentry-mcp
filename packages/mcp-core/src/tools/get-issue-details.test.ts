@@ -406,7 +406,7 @@ describe("get_issue_details", () => {
     expect(replaySection).toMatchInlineSnapshot(`
       "## Session Replay
 
-      **Attached Replay**: https://sentry-mcp-evals.sentry.io/explore/replays/7e07485f12f9416b8b1426260799b51f/
+      **Attached Replay**: https://sentry-mcp-evals.sentry.io/explore/replays/7e07485f12f9416b8b1426260799b51f/?event_t=2025-10-02T12%3A00%3A00.000Z
       **Related Replay Count**: 2
 
       ### Other Related Replays

@@ -301,6 +301,27 @@ describe("url-utils", () => {
         "https://sentry.example.com/organizations/myorg/explore/replays/abc123/",
       );
     });
+
+    it("should append event_t query param when eventTimestamp is provided", () => {
+      const result = getReplayUrl("us.sentry.io", "myorg", "abc123", "https", {
+        eventTimestamp: "2024-01-15T10:23:45.123456Z",
+      });
+      expect(result).toBe(
+        "https://myorg.sentry.io/explore/replays/abc123/?event_t=2024-01-15T10%3A23%3A45.123456Z",
+      );
+    });
+
+    it("should not append event_t when eventTimestamp is undefined", () => {
+      const result = getReplayUrl("us.sentry.io", "myorg", "abc123", "https", {
+        eventTimestamp: undefined,
+      });
+      expect(result).toBe("https://myorg.sentry.io/explore/replays/abc123/");
+    });
+
+    it("should not append event_t when options is omitted", () => {
+      const result = getReplayUrl("us.sentry.io", "myorg", "abc123");
+      expect(result).toBe("https://myorg.sentry.io/explore/replays/abc123/");
+    });
   });
 
   describe("getEventsExplorerUrl", () => {
