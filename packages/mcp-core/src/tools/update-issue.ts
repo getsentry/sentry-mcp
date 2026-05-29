@@ -890,12 +890,19 @@ export default defineTool({
           throw error;
         }
         logIssue(error);
+        const partialCommentResult = await tryPostReasonComment(
+          apiService,
+          orgSlug,
+          parsedIssueId!,
+          params.reason,
+        );
         let output = `# Issue ${updatedIssue.shortId} Partially Updated in **${orgSlug}**\n\n`;
         output += `**Issue**: ${updatedIssue.title}\n`;
         output += `**URL**: ${apiService.getIssueUrl(orgSlug, updatedIssue.shortId)}\n\n`;
         output += "## Changes Made\n\n";
         output += "- The Sentry issue update succeeded.\n";
         output += `- External issue linking failed: ${error instanceof Error ? error.message : String(error)}\n`;
+        output += formatReasonCommentLine(params.reason, partialCommentResult);
         output += "\n## Response Notes\n\n";
         output += `- Full issue details: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
         return output;

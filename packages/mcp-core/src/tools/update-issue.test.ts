@@ -1127,6 +1127,39 @@ describe("update_issue", () => {
     expect(result).toContain("GitHub rejected the issue link");
   });
 
+  it("posts reason comment in partial success path when link write fails", async () => {
+    mswServer.use(
+      http.put(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/integrations/github-integration-1/",
+        () =>
+          HttpResponse.json(
+            { detail: "GitHub rejected the issue link" },
+            { status: 400 },
+          ),
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+        reason: "Fixing in linked ticket",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+
+    expect(result).toContain("Partially Updated");
+    expect(result).toContain("The Sentry issue update succeeded.");
+    expect(result).toContain("External issue linking failed");
+    expect(result).toContain("Comment posted");
+    expect(result).toContain("Fixing in linked ticket");
+  });
+
   it("validates ignore options require ignored status", async () => {
     await expect(
       updateIssue.handler(
