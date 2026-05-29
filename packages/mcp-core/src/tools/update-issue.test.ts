@@ -21,24 +21,6 @@ function createIssue(overrides: Partial<MockIssue> = {}): MockIssue {
   };
 }
 
-function getErroredTextResult(result: ToolHandlerResult): string {
-  expect(typeof result).toBe("object");
-  expect(result).not.toBeNull();
-  expect(Array.isArray(result)).toBe(false);
-
-  const toolResult = result as ToolResult;
-  expect(toolResult.isError).toBe(true);
-  expect(toolResult.content).toHaveLength(1);
-
-  const content = toolResult.content[0];
-  expect(content.type).toBe("text");
-  if (content.type !== "text") {
-    throw new Error(`Expected text content, got ${content.type}`);
-  }
-
-  return content.text;
-}
-
 function getTextToolResult(result: ToolHandlerResult): string {
   expect(typeof result).toBe("object");
   expect(result).not.toBeNull();
