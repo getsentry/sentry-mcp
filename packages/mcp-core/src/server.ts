@@ -22,6 +22,7 @@ import type { ServerOptions } from "@modelcontextprotocol/sdk/server/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
+  CallToolResult,
   ServerNotification,
   ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -44,11 +45,21 @@ import { type LogIssueOptions, logIssue } from "./telem/logging";
 import tools from "./tools/index";
 import {
   type ToolConfig,
+  type ToolResult,
   isToolVisibleInMode,
   resolveDescription,
 } from "./tools/types";
 import type { ProjectCapabilities, ServerContext } from "./types";
 import { LIB_VERSION } from "./version";
+
+function isToolResult(output: unknown): output is ToolResult {
+  return (
+    typeof output === "object" &&
+    output !== null &&
+    "content" in output &&
+    Array.isArray(output.content)
+  );
+}
 
 function getSkillGrantedAttributeName(skill: Skill): string {
   return `app.consent.skill.${skill.replaceAll("-", "_")}.granted`;
@@ -295,7 +306,7 @@ function configureServer({
       async (
         params: any,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-      ) => {
+      ): Promise<CallToolResult> => {
         // Get the active MCP server span and attach request-scoped attributes.
         const activeSpan = getActiveSpan();
 
@@ -389,6 +400,9 @@ function configureServer({
             return {
               content: output,
             };
+          }
+          if (isToolResult(output)) {
+            return output;
           }
           throw new Error(`Invalid tool output: ${output}`);
         } catch (error) {

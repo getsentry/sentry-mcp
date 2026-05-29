@@ -111,6 +111,51 @@ describe("buildServer", () => {
         ip_address: "192.0.2.1",
       });
     });
+
+    it("preserves tool result error state", async () => {
+      const server = buildServer({
+        context: baseContext,
+        tools: {
+          example_tool: createMockTool("example_tool", {
+            annotations: { readOnlyHint: true },
+            handler: async () => ({
+              content: [
+                {
+                  type: "text",
+                  text: "partial failure",
+                },
+              ],
+              isError: true,
+            }),
+          }),
+        },
+      });
+      const registeredTools = (
+        server as unknown as {
+          _registeredTools: Record<
+            string,
+            {
+              handler: (
+                params: Record<string, unknown>,
+                extra: unknown,
+              ) => Promise<unknown>;
+            }
+          >;
+        }
+      )._registeredTools;
+
+      await expect(
+        registeredTools.example_tool?.handler({}, {}),
+      ).resolves.toEqual({
+        content: [
+          {
+            type: "text",
+            text: "partial failure",
+          },
+        ],
+        isError: true,
+      });
+    });
   });
 
   describe("experimental tool filtering", () => {

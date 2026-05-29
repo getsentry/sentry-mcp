@@ -66,6 +66,9 @@ describe("get_event_attachment", () => {
 
     // Should return an array with both text description and image content
     expect(Array.isArray(result)).toBe(true);
+    if (!Array.isArray(result)) {
+      throw new Error("Expected attachment handler to return content array");
+    }
     expect(result).toHaveLength(2);
 
     // First item should be the image content

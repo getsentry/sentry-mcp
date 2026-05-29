@@ -905,7 +905,15 @@ export default defineTool({
         output += formatReasonCommentLine(params.reason, partialCommentResult);
         output += "\n## Response Notes\n\n";
         output += `- Full issue details: \`get_sentry_resource(resourceType="issue", organizationSlug="${orgSlug}", resourceId="${updatedIssue.shortId}")\`\n`;
-        return output;
+        return {
+          content: [
+            {
+              type: "text",
+              text: output,
+            },
+          ],
+          isError: true,
+        };
       }
     }
 
