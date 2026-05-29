@@ -39,6 +39,24 @@ function getErroredTextResult(result: ToolHandlerResult): string {
   return content.text;
 }
 
+function getTextToolResult(result: ToolHandlerResult): string {
+  expect(typeof result).toBe("object");
+  expect(result).not.toBeNull();
+  expect(Array.isArray(result)).toBe(false);
+
+  const toolResult = result as ToolResult;
+  expect(toolResult.isError).not.toBe(true);
+  expect(toolResult.content).toHaveLength(1);
+
+  const content = toolResult.content[0];
+  expect(content.type).toBe("text");
+  if (content.type !== "text") {
+    throw new Error(`Expected text content, got ${content.type}`);
+  }
+
+  return content.text;
+}
+
 afterEach(() => {
   mswServer.resetHandlers();
 });
@@ -1127,7 +1145,7 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = getErroredTextResult(
+    const result = getTextToolResult(
       await updateIssue.handler(
         {
           organizationSlug: "sentry-mcp-evals",
@@ -1160,7 +1178,7 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = getErroredTextResult(
+    const result = getTextToolResult(
       await updateIssue.handler(
         {
           organizationSlug: "sentry-mcp-evals",
