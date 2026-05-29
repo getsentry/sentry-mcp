@@ -912,7 +912,6 @@ export default defineTool({
               text: output,
             },
           ],
-          isError: true,
         };
       }
     }
