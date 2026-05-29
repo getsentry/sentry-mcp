@@ -123,6 +123,35 @@ export const ProjectSchema = z
 
 export const ProjectListSchema = z.array(ProjectSchema);
 
+export const RepositorySchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    name: z.string(),
+    provider: z
+      .object({
+        id: z.string(),
+        name: z.string(),
+      })
+      .passthrough(),
+    status: z.string(),
+    externalSlug: z.string().optional(),
+    externalId: z.string().optional(),
+    integrationId: z.union([z.string(), z.number()]).nullable().optional(),
+  })
+  .passthrough();
+
+export const RepositoryListSchema = z.array(RepositorySchema);
+
+export const ProjectRepoLinkSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    projectId: z.union([z.string(), z.number()]),
+    repositoryId: z.union([z.string(), z.number()]),
+    source: z.string(),
+    created: z.boolean(),
+  })
+  .passthrough();
+
 const ReplayTagsSchema = z.preprocess(
   (value) => {
     if (value === undefined || value === null || Array.isArray(value)) {

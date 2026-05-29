@@ -10,6 +10,7 @@ describe("create_project", () => {
         name: "cloudflare-mcp",
         platform: "node",
         regionUrl: null,
+        repository: null,
       },
       {
         constraints: {
@@ -33,5 +34,47 @@ describe("create_project", () => {
       - The **SENTRY_DSN** value is used to initialize Sentry SDKs.
       "
     `);
+  });
+
+  it("links repository when provided", async () => {
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        platform: "node",
+        regionUrl: null,
+        repository: "getsentry/sentry",
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toContain("**Repository**: getsentry/sentry (linked)");
+  });
+
+  it("reports when repository is not found", async () => {
+    const result = await createProject.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        teamSlug: "the-goats",
+        name: "cloudflare-mcp",
+        platform: "node",
+        regionUrl: null,
+        repository: "nonexistent/repo",
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+    expect(result).toContain('Could not find repository "nonexistent/repo"');
   });
 });

@@ -1572,4 +1572,175 @@ describe("API query builders", () => {
       });
     });
   });
+
+  describe("listRepos", () => {
+    let apiService: SentryApiService;
+
+    beforeEach(() => {
+      apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("should call the repos endpoint without query", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () =>
+          Promise.resolve([
+            {
+              id: "101",
+              name: "getsentry/sentry",
+              provider: { id: "integrations:github", name: "GitHub" },
+              status: "active",
+            },
+          ]),
+      });
+
+      const repos = await apiService.listRepos({
+        organizationSlug: "test-org",
+      });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/organizations/test-org/repos/"),
+        expect.any(Object),
+      );
+      expect(globalThis.fetch).not.toHaveBeenCalledWith(
+        expect.stringContaining("query="),
+        expect.any(Object),
+      );
+      expect(repos).toHaveLength(1);
+      expect(repos[0].name).toBe("getsentry/sentry");
+    });
+
+    it("should include query parameter when provided", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () =>
+          Promise.resolve([
+            {
+              id: "101",
+              name: "getsentry/sentry",
+              provider: { id: "integrations:github", name: "GitHub" },
+              status: "active",
+            },
+          ]),
+      });
+
+      await apiService.listRepos({
+        organizationSlug: "test-org",
+        query: "getsentry/sentry",
+      });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("query=getsentry"),
+        expect.any(Object),
+      );
+    });
+
+    it("should return empty array when no repos exist", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () => Promise.resolve([]),
+      });
+
+      const repos = await apiService.listRepos({
+        organizationSlug: "test-org",
+      });
+
+      expect(repos).toHaveLength(0);
+    });
+  });
+
+  describe("linkProjectRepo", () => {
+    let apiService: SentryApiService;
+
+    beforeEach(() => {
+      apiService = new SentryApiService({
+        host: "sentry.io",
+        accessToken: "test-token",
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("should POST to the repo endpoint with repositoryId", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () =>
+          Promise.resolve({
+            id: "1",
+            projectId: "456",
+            repositoryId: "101",
+            source: "scm_onboarding",
+            created: true,
+          }),
+      });
+
+      const result = await apiService.linkProjectRepo({
+        organizationSlug: "test-org",
+        projectSlug: "my-project",
+        repositoryId: 101,
+      });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/projects/test-org/my-project/repo/"),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ repositoryId: 101 }),
+        }),
+      );
+      expect(result.created).toBe(true);
+      expect(result.repositoryId).toBe("101");
+    });
+
+    it("should handle idempotent response", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (key: string) =>
+            key === "content-type" ? "application/json" : null,
+        },
+        json: () =>
+          Promise.resolve({
+            id: "1",
+            projectId: "456",
+            repositoryId: "101",
+            source: "manual",
+            created: false,
+          }),
+      });
+
+      const result = await apiService.linkProjectRepo({
+        organizationSlug: "test-org",
+        projectSlug: "my-project",
+        repositoryId: 101,
+      });
+
+      expect(result.created).toBe(false);
+      expect(result.source).toBe("manual");
+    });
+  });
 });
