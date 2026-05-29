@@ -471,30 +471,52 @@ export function createDatasetAttributesTool(options: {
         DATASET_EXAMPLES,
       } = await import("./config");
 
-      // Get custom attributes for this dataset
-      // IMPORTANT: Let ALL errors bubble up to wrapAgentToolExecute
-      // UserInputError will be converted to error string for the AI agent
-      // Other errors will bubble up to be captured by Sentry
       const normalizedDataset = normalizeEventsDataset(dataset);
       const attributeTimeParams = { statsPeriod: "14d" };
-      const { attributes: customAttributes, fieldTypes } =
-        await fetchCustomAttributes(
-          apiService,
-          organizationSlug,
-          dataset,
-          projectId,
-          attributeTimeParams,
-          {
-            attributeTypes,
-            substringMatch,
-            query,
-          },
-        );
 
       const staticFields = {
         ...BASE_COMMON_FIELDS,
         ...DATASET_FIELDS[normalizedDataset],
       };
+      const staticNumericFields =
+        NUMERIC_FIELDS[normalizedDataset] || new Set<string>();
+
+      // Built-in fields are known from static config, so verifying one needs
+      // no API call. When the agent passes an exact built-in name as
+      // substringMatch (the field-existence check the prompt encourages), skip
+      // the trace-items attributes lookup entirely — the field is already
+      // confirmed, and a custom-attribute scan would only add a network
+      // round-trip per field, bloating discovery-heavy agent turns.
+      const builtInFieldNames = new Set([
+        ...Object.keys(staticFields),
+        ...staticNumericFields,
+      ]);
+      const matchedBuiltInField =
+        substringMatch != null && builtInFieldNames.has(substringMatch)
+          ? substringMatch
+          : null;
+
+      // Get custom attributes for this dataset
+      // IMPORTANT: Let ALL errors bubble up to wrapAgentToolExecute
+      // UserInputError will be converted to error string for the AI agent
+      // Other errors will bubble up to be captured by Sentry
+      const { attributes: customAttributes, fieldTypes } = matchedBuiltInField
+        ? {
+            attributes: {} as Record<string, string>,
+            fieldTypes: {} as Record<string, TraceItemAttributeType>,
+          }
+        : await fetchCustomAttributes(
+            apiService,
+            organizationSlug,
+            dataset,
+            projectId,
+            attributeTimeParams,
+            {
+              attributeTypes,
+              substringMatch,
+              query,
+            },
+          );
 
       const recommendedFields = RECOMMENDED_FIELDS[normalizedDataset];
 
@@ -502,8 +524,6 @@ export function createDatasetAttributesTool(options: {
       const allFieldTypes: Record<string, TraceItemAttributeType> = {
         ...fieldTypes,
       };
-      const staticNumericFields =
-        NUMERIC_FIELDS[normalizedDataset] || new Set();
       for (const field of staticNumericFields) {
         allFieldTypes[field] = "number";
       }
@@ -512,14 +532,19 @@ export function createDatasetAttributesTool(options: {
       const staticEntries = Object.entries(staticFields);
       const STATIC_LIMIT = 50;
 
+      const customAttributesSection = matchedBuiltInField
+        ? `Custom Attributes:\n(skipped — "${matchedBuiltInField}" is a built-in field for this dataset, so no custom-attribute lookup was needed)`
+        : `Custom Attributes (${customEntries.length}${substringMatch ? ` matching "${substringMatch}"` : ""}):\n${
+            customEntries.length === 0
+              ? "(none returned by Sentry for this query — the attribute may not exist within the time window)"
+              : customEntries
+                  .map(([key, desc]) => `- ${key}: ${desc}`)
+                  .join("\n")
+          }`;
+
       return `Dataset: ${dataset}
 
-Custom Attributes (${customEntries.length}${substringMatch ? ` matching "${substringMatch}"` : ""}):
-${
-  customEntries.length === 0
-    ? "(none returned by Sentry for this query — the attribute may not exist within the time window)"
-    : customEntries.map(([key, desc]) => `- ${key}: ${desc}`).join("\n")
-}
+${customAttributesSection}
 
 Built-in Fields (${staticEntries.length} total):
 ${staticEntries

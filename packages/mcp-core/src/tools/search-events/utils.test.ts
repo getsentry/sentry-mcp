@@ -669,4 +669,37 @@ describe("createDatasetAttributesTool — should not depend on the private valid
     // some incidental slot like Field Types or Example Queries.
     expect(result).toMatch(/Custom Attributes[^\n]*:\s*\n- tags\[foo\]/);
   });
+
+  // Built-in fields are known from static config. Verifying one (the prompt
+  // tells the agent to pass an exact field name as substringMatch) must not
+  // hit the trace-items attributes endpoint — that network round-trip is pure
+  // overhead and, repeated per built-in field, is what bloated discovery-heavy
+  // agent turns into multi-second failures.
+  it("verifies a built-in field from static config without calling the attributes endpoint", async () => {
+    const attributesCalls = vi.fn();
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/test-org/trace-items/attributes/",
+        () => {
+          attributesCalls();
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+
+    const executeOptions = { toolCallId: "test", messages: [] } as any;
+    // span.duration is a built-in span field (and a known numeric field).
+    const response = await tool.execute!(
+      { dataset: "spans", substringMatch: "span.duration" },
+      executeOptions,
+    );
+
+    expect(attributesCalls).not.toHaveBeenCalled();
+    expect(response).toHaveProperty("result");
+    const result = (response as { result: string }).result;
+    // The field is confirmed as built-in, and the custom-attribute lookup is
+    // explicitly reported as skipped rather than silently empty.
+    expect(result).toContain("span.duration");
+    expect(result).toMatch(/skipped — "span\.duration" is a built-in field/);
+  });
 });

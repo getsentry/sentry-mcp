@@ -28,7 +28,7 @@ Before constructing ANY query, you MUST verify field availability:
 2. This includes ALL fields: custom attributes, database fields, HTTP fields, AI fields, user fields, etc.
 3. Fields vary by project based on what data is being sent to Sentry
 4. Using an unverified field WILL cause your query to fail with "field not found" errors
-5. For spans, logs, and metrics, datasetAttributes lists fields and supports substringMatch/query/attributeTypes for targeted lookup; pass the exact field name as substringMatch to confirm whether it exists
+5. For spans, logs, and metrics, datasetAttributes lists fields and supports substringMatch/query/attributeTypes for targeted lookup. Fields shown under "Built-in Fields" are already confirmed — do NOT re-check them with substringMatch. Reserve substringMatch for suspected custom attributes (e.g. tags[...]) that are not in the built-in list; pass the exact name to confirm whether it exists
 6. A broad datasetAttributes listing is a discovery preview and may be truncated; if a user-supplied field is missing from the preview, look it up explicitly with substringMatch before discarding it
 7. Replay fields vary by project too, so use replayFields before constructing replay queries
 
@@ -38,7 +38,7 @@ TOOL USAGE GUIDELINES:
 3. Use otelSemantics tool when you need specific OpenTelemetry semantic convention attributes
 4. Use whoami tool when queries contain "me" references for user.id or user.email fields
 5. IMPORTANT: For ambiguous terms like "user agents", "browser", "client" - use the appropriate field discovery tool instead of guessing field names
-6. When the user already supplied Sentry search syntax for spans/logs/metrics, look up each explicit field name with datasetAttributes substringMatch before dropping or renaming it
+6. When the user already supplied Sentry search syntax for spans/logs/metrics, look up each explicit field that is NOT in the built-in list with datasetAttributes substringMatch before dropping or renaming it
 7. Use datasetAttributes substringMatch, query, and attributeTypes for targeted lookup when broad field discovery is truncated
 
 CRITICAL - TOOL RESPONSE HANDLING:
