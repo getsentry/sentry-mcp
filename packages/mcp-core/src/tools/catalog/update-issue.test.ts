@@ -1366,6 +1366,56 @@ describe("update_issue", () => {
     );
   });
 
+  it("reports comment-only calls as commented", async () => {
+    let commentPosted: { text: string } | undefined;
+    const currentIssue = createIssue({
+      status: "unresolved",
+      statusDetails: {},
+    });
+
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/",
+        () => HttpResponse.json(currentIssue),
+      ),
+      http.post(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/notes/",
+        async ({ request }) => {
+          commentPosted = (await request.json()) as { text: string };
+          return HttpResponse.json({
+            id: "12345",
+            text: commentPosted.text,
+            type: "note",
+            dateCreated: new Date().toISOString(),
+          });
+        },
+      ),
+    );
+
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+        reason: "Adding investigation notes for the on-call handoff",
+      },
+      serverContext,
+    );
+
+    expect(commentPosted).toEqual({
+      text: "Adding investigation notes for the on-call handoff",
+    });
+    expect(result).toContain(
+      "# Issue CLOUDFLARE-MCP-41 Commented in **sentry-mcp-evals**",
+    );
+    expect(result).not.toContain("No changes were needed.");
+    expect(result).toContain(
+      '**Comment posted**: "Adding investigation notes for the on-call handoff"',
+    );
+  });
+
   it("does not throw when comment posting fails after a successful update", async () => {
     const currentIssue = createIssue({
       status: "unresolved",

@@ -344,6 +344,45 @@ function buildNoChangesOutput(params: {
   return output;
 }
 
+function buildCommentOnlyOutput(params: {
+  issue: Issue;
+  organizationSlug: string;
+  ignoreState: IgnoreState | null;
+  issueUrl: string;
+  reason: string;
+  commentResult: ReasonCommentResult;
+}): string {
+  const {
+    issue,
+    organizationSlug,
+    ignoreState,
+    issueUrl,
+    reason,
+    commentResult,
+  } = params;
+  const title = commentResult.posted ? "Commented" : "Comment Not Posted";
+  let output = `# Issue ${issue.shortId} ${title} in **${organizationSlug}**\n\n`;
+  output += `**Issue**: ${issue.title}\n`;
+  output += `**URL**: ${issueUrl}\n\n`;
+
+  output += "## Changes Made\n\n";
+  output += formatReasonCommentLine(reason, commentResult);
+  output += "- No issue fields were changed.\n";
+
+  output += "\n## Current Status\n\n";
+  output += `**Status**: ${getIssueStatusDisplay(issue)}\n`;
+  if (ignoreState) {
+    output += `**Ignore Behavior**: ${ignoreState.behavior}\n`;
+  }
+  output += `**Assigned To**: ${formatAssignedTo(issue.assignedTo ?? null)}\n`;
+
+  output += "\n## Response Notes\n\n";
+  output += "- The request only attempted to add a comment to the issue.\n";
+  output += `- Full issue details: \`get_sentry_resource(resourceType="issue", organizationSlug="${organizationSlug}", resourceId="${issue.shortId}")\`\n`;
+
+  return output;
+}
+
 function isAssigneeAlreadySet(
   issue: Issue,
   requestedAssignee: string | undefined,
@@ -846,6 +885,22 @@ export default defineTool({
         parsedIssueId!,
         params.reason,
       );
+
+      if (
+        params.reason &&
+        !params.status &&
+        !params.assignedTo &&
+        !params.externalIssueUrl
+      ) {
+        return buildCommentOnlyOutput({
+          issue: currentIssue,
+          organizationSlug: orgSlug,
+          ignoreState: currentIgnoreState,
+          issueUrl: requestedIssueUrl,
+          reason: params.reason,
+          commentResult,
+        });
+      }
 
       return (
         buildNoChangesOutput({
