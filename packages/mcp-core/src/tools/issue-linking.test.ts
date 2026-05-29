@@ -65,6 +65,15 @@ describe("parseExternalIssueUrl", () => {
       issueId: "ENG-123",
     });
     expect(
+      parseExternalIssueUrl("https://jira.example.org:8443/browse/OPS-456"),
+    ).toMatchObject({
+      kind: "native",
+      provider: "jira",
+      host: "jira.example.org:8443",
+      domainPath: "jira.example.org:8443",
+      issueId: "OPS-456",
+    });
+    expect(
       parseExternalIssueUrl("https://github.com/getsentry/sentry/issues/123"),
     ).toMatchObject({
       kind: "native",
@@ -228,6 +237,45 @@ describe("resolveExternalIssueLinkTarget", () => {
     expect(target).toMatchObject({
       kind: "native",
       integration: { id: "2" },
+    });
+  });
+
+  it("resolves self-hosted Jira Server integrations by domain", async () => {
+    const target = await resolveExternalIssueLinkTarget({
+      apiService: {
+        listIssueIntegrations: async () => [
+          integration({
+            id: "1",
+            name: "Jira Cloud",
+            domainName: "acme.atlassian.net",
+            provider: { key: "jira" },
+          }),
+          integration({
+            id: "2",
+            name: "Example Jira",
+            domainName: "jira.example.org:8443",
+            provider: { key: "jira_server" },
+          }),
+        ],
+        getIssueIntegrationLinkConfig: async ({ integrationId }) =>
+          linkConfig({
+            id: integrationId,
+            provider: { key: "jira_server" },
+            linkIssueConfig: [{ name: "externalIssue", required: true }],
+          }),
+        listSentryAppInstallations: async () => [],
+      },
+      organizationSlug: "sentry",
+      issueId: "PROJ-1",
+      externalIssueUrl: "https://jira.example.org:8443/browse/OPS-456",
+    });
+
+    expect(target).toMatchObject({
+      kind: "native",
+      integration: { id: "2" },
+      payload: {
+        externalIssue: "OPS-456",
+      },
     });
   });
 
