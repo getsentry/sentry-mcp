@@ -376,22 +376,56 @@ describe("resolveExternalIssueLinkTarget", () => {
     });
   });
 
-  it("reports ambiguous native integrations", async () => {
+  it("ignores integrations whose configured domain does not match the URL", async () => {
     await expect(
       resolveExternalIssueLinkTarget({
         apiService: {
           listIssueIntegrations: async () => [
-            integration({ id: "1", name: "GitHub A", domainName: null }),
-            integration({ id: "2", name: "GitHub B", domainName: null }),
+            integration({
+              id: "1",
+              name: "Jira Cloud",
+              domainName: "other.atlassian.net",
+              provider: { key: "jira" },
+            }),
           ],
-          getIssueIntegrationLinkConfig: async () => linkConfig(),
+          getIssueIntegrationLinkConfig: async ({ integrationId }) =>
+            linkConfig({
+              id: integrationId,
+              provider: { key: "jira" },
+              linkIssueConfig: [{ name: "externalIssue", required: true }],
+            }),
           listSentryAppInstallations: async () => [],
         },
         organizationSlug: "sentry",
         issueId: "PROJ-1",
-        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+        externalIssueUrl: "https://acme.atlassian.net/browse/PROJ-1",
       }),
-    ).rejects.toThrow(/Multiple installed integrations/);
+    ).rejects.toThrow(/No installed jira issue integration/);
+  });
+
+  it("uses the first matching candidate when multiple integrations match", async () => {
+    const target = await resolveExternalIssueLinkTarget({
+      apiService: {
+        listIssueIntegrations: async () => [
+          integration({ id: "1", name: "GitHub A", domainName: null }),
+          integration({ id: "2", name: "GitHub B", domainName: null }),
+        ],
+        getIssueIntegrationLinkConfig: async () => linkConfig(),
+        listSentryAppInstallations: async () => [],
+      },
+      organizationSlug: "sentry",
+      issueId: "PROJ-1",
+      externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+    });
+
+    expect(target).toMatchObject({
+      kind: "native",
+      integration: { id: "1" },
+      payload: {
+        repo: "getsentry/sentry",
+        externalIssue: "123",
+      },
+    });
   });
 
   it("resolves Sentry App installations without exposing UUIDs", async () => {
