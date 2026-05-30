@@ -388,15 +388,6 @@ function configMatchesParsedUrl(
   return true;
 }
 
-function describeNativeCandidates(candidates: IssueIntegration[]): string {
-  return candidates
-    .map(
-      (candidate) =>
-        `${candidate.name} (${candidate.provider.key}${candidate.domainName ? `, ${candidate.domainName}` : ""})`,
-    )
-    .join(", ");
-}
-
 function buildNativeLinkPayload(
   parsed: ParsedNativeIssueUrl,
   config: IssueIntegrationLinkConfig,
@@ -476,7 +467,7 @@ async function resolveNativeTarget(params: {
     bestDomainScore === 0
   ) {
     throw new UserInputError(
-      `Unsupported GitHub Enterprise URL host \`${parsed.host}\`. Configure a GitHub Enterprise integration with a matching domain name before linking this URL.`,
+      `No installed GitHub Enterprise integration matches the URL domain/path \`${parsed.domainPath ?? parsed.host}\`. Configure a GitHub Enterprise integration with a matching domain name before linking this URL.`,
     );
   }
 
@@ -493,6 +484,11 @@ async function resolveNativeTarget(params: {
     candidates = candidates.filter(
       (candidate) => !normalizeDomain(candidate.domainName),
     );
+    if (candidates.length === 0) {
+      throw new UserInputError(
+        `No installed ${parsed.provider} issue integration matches the URL domain/path \`${parsed.domainPath ?? parsed.host}\` for ${parsed.url}.`,
+      );
+    }
   }
 
   const candidatesWithConfig = await Promise.all(
