@@ -300,8 +300,7 @@ const mcpHandler: ExportedHandler<Env> = {
       }
     }
 
-    // Verify user has access to the requested org/project
-    // Cache verification results in KV to avoid repeated API calls
+    // Verify URL constraints and cache results in KV to avoid repeated API calls.
     const verification = await verifyConstraintsAccess(
       { organizationSlug, projectSlug },
       {
@@ -310,6 +309,7 @@ const mcpHandler: ExportedHandler<Env> = {
         cache: {
           kv: env.MCP_CACHE,
           userId,
+          waitUntil: (promise) => ctx.waitUntil(promise),
         },
       },
     );
