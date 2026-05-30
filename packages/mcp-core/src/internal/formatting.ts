@@ -1976,8 +1976,16 @@ function formatIssueReplayOutput({
   const lines: string[] = ["## Session Replay", ""];
 
   if (attachedReplayId) {
+    const eventDateCreated =
+      "dateCreated" in event && typeof event.dateCreated === "string"
+        ? event.dateCreated
+        : undefined;
     lines.push(
-      `**Attached Replay**: ${apiService.getReplayUrl(organizationSlug, attachedReplayId)}`,
+      `**Attached Replay**: ${apiService.getReplayUrl(
+        organizationSlug,
+        attachedReplayId,
+        eventDateCreated ? { eventTimestamp: eventDateCreated } : undefined,
+      )}`,
     );
   }
 

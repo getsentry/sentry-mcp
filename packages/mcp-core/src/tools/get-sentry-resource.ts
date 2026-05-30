@@ -216,7 +216,7 @@ function resolveFromParsedUrl(
     }
     throw new UserInputError(
       "Could not determine resource type from URL. " +
-        "Supported URL patterns: issues, events, traces, AI conversations, profiles, replays, monitors, and releases.",
+        "Supported URL patterns: issues, events, traces, AI conversations, profiles, replays, monitors, releases, and feedback.",
     );
   }
 

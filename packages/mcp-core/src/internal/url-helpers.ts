@@ -414,6 +414,26 @@ function identifyResource(
     }
   }
 
+  // Feedback URL: /feedback/?feedbackSlug={projectSlug}:{groupId}
+  const feedbackIndex = pathParts.indexOf("feedback");
+  if (feedbackIndex !== -1) {
+    const feedbackSlug = parsedUrl.searchParams.get("feedbackSlug");
+    if (feedbackSlug) {
+      // feedbackSlug format is "{projectSlug}:{groupId}" where groupId is numeric
+      const colonIndex = feedbackSlug.lastIndexOf(":");
+      if (colonIndex !== -1) {
+        const groupId = feedbackSlug.slice(colonIndex + 1);
+        if (groupId && /^\d+$/.test(groupId)) {
+          return {
+            type: "issue",
+            organizationSlug,
+            issueId: groupId,
+          };
+        }
+      }
+    }
+  }
+
   // Could not identify resource type
   return {
     type: "unknown",

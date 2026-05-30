@@ -529,6 +529,9 @@ export function getTraceUrl(
  * @param host The Sentry host (may include regional subdomain for API access)
  * @param organizationSlug Organization identifier
  * @param replayId Replay identifier
+ * @param protocol Protocol (https or http)
+ * @param options Optional parameters
+ * @param options.eventTimestamp ISO timestamp of a related event; when provided the replay player jumps to that moment using `?event_t=`
  * @returns The complete replay URL
  */
 export function getReplayUrl(
@@ -536,13 +539,23 @@ export function getReplayUrl(
   organizationSlug: string,
   replayId: string,
   protocol: SentryProtocol = "https",
+  options?: {
+    eventTimestamp?: string;
+  },
 ): string {
-  return getSentryWebBaseUrl(
-    host,
-    organizationSlug,
-    `/explore/replays/${replayId}/`,
-    protocol,
-  );
+  const path = `/explore/replays/${replayId}/`;
+
+  if (options?.eventTimestamp) {
+    const params = new URLSearchParams({ event_t: options.eventTimestamp });
+    return getSentryWebBaseUrl(
+      host,
+      organizationSlug,
+      `${path}?${params.toString()}`,
+      protocol,
+    );
+  }
+
+  return getSentryWebBaseUrl(host, organizationSlug, path, protocol);
 }
 
 /**

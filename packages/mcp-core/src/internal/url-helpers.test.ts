@@ -567,6 +567,60 @@ describe("parseSentryUrl", () => {
     });
   });
 
+  describe("feedback URLs", () => {
+    it("parses feedback URL with feedbackSlug as issue", () => {
+      expect(
+        parseSentryUrl(
+          "https://sentry.sentry.io/feedback/?feedbackSlug=javascript%3A7513887620",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "issueId": "7513887620",
+          "organizationSlug": "sentry",
+          "type": "issue",
+        }
+      `);
+    });
+
+    it("parses feedback URL with organizations path", () => {
+      expect(
+        parseSentryUrl(
+          "https://us.sentry.io/organizations/my-org/feedback/?feedbackSlug=my-project%3A9876543210",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "issueId": "9876543210",
+          "organizationSlug": "my-org",
+          "type": "issue",
+        }
+      `);
+    });
+
+    it("returns unknown for feedback URL without feedbackSlug", () => {
+      expect(
+        parseSentryUrl("https://my-org.sentry.io/feedback/"),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "type": "unknown",
+        }
+      `);
+    });
+
+    it("returns unknown for feedback URL with non-numeric groupId", () => {
+      expect(
+        parseSentryUrl(
+          "https://my-org.sentry.io/feedback/?feedbackSlug=project%3Anot-a-number",
+        ),
+      ).toMatchInlineSnapshot(`
+        {
+          "organizationSlug": "my-org",
+          "type": "unknown",
+        }
+      `);
+    });
+  });
+
   describe("unknown URLs", () => {
     it("returns unknown for unrecognized path", () => {
       expect(

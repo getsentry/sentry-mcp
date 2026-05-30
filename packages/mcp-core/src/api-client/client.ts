@@ -677,12 +677,19 @@ export class SentryApiService {
     return getTraceUrlUtil(this.host, organizationSlug, traceId, this.protocol);
   }
 
-  getReplayUrl(organizationSlug: string, replayId: string): string {
+  getReplayUrl(
+    organizationSlug: string,
+    replayId: string,
+    options?: {
+      eventTimestamp?: string;
+    },
+  ): string {
     return getReplayUrlUtil(
       this.host,
       organizationSlug,
       replayId,
       this.protocol,
+      options,
     );
   }
 
