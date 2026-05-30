@@ -484,6 +484,15 @@ async function resolveNativeTarget(params: {
     candidates = candidates.filter(
       (candidate) => domainMatchScore(candidate, parsed) === bestDomainScore,
     );
+  } else {
+    // No candidate matched the URL's domain. Filter out any candidate that has
+    // an explicit domainName configured — a domain that is set but doesn't
+    // match is a stronger exclusion signal than having no domain restriction.
+    // Candidates with no domainName are kept as fallback (e.g. github.com
+    // integrations that don't advertise a domainName).
+    candidates = candidates.filter(
+      (candidate) => !normalizeDomain(candidate.domainName),
+    );
   }
 
   const candidatesWithConfig = await Promise.all(
@@ -505,12 +514,9 @@ async function resolveNativeTarget(params: {
       `No installed ${parsed.provider} issue integration can access the project or repository in ${parsed.url}.`,
     );
   }
-  if (matchingCandidates.length > 1) {
-    throw new UserInputError(
-      `Multiple installed integrations can link ${parsed.url}: ${describeNativeCandidates(matchingCandidates.map(({ integration }) => integration))}. Unlink duplicate integration access in Sentry or use a URL that maps to a single installed integration.`,
-    );
-  }
-
+  // When multiple integrations still match, use the first one rather than
+  // surfacing an ambiguity error — the caller has no way to resolve it and
+  // any matching candidate should produce a correct link.
   const [{ integration, config }] = matchingCandidates;
   return {
     kind: "native",

@@ -1066,7 +1066,7 @@ describe("update_issue", () => {
     expect(updateCalled).toBe(false);
   });
 
-  it("reports ambiguous native integrations before updating", async () => {
+  it("uses the first matching integration when multiple candidates exist", async () => {
     let updateCalled = false;
     mswServer.use(
       http.get(
@@ -1098,21 +1098,20 @@ describe("update_issue", () => {
       ),
     );
 
-    await expect(
-      updateIssue.handler(
-        {
-          organizationSlug: "sentry-mcp-evals",
-          issueId: "CLOUDFLARE-MCP-41",
-          status: "resolved",
-          externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
-          assignedTo: undefined,
-          issueUrl: undefined,
-          regionUrl: null,
-        },
-        serverContext,
-      ),
-    ).rejects.toThrow("Multiple installed integrations");
-    expect(updateCalled).toBe(false);
+    const result = await updateIssue.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        status: "resolved",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+        assignedTo: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      serverContext,
+    );
+    expect(updateCalled).toBe(true);
+    expect(result).toContain("CLOUDFLARE-MCP-41");
   });
 
   it("reports partial success when link write fails after issue update", async () => {
