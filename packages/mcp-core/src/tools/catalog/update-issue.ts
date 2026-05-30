@@ -8,7 +8,11 @@ import {
 import { formatAssignedTo } from "../../internal/tool-helpers/formatting";
 import { logIssue } from "../../telem/logging";
 import { UserInputError } from "../../errors";
-import type { Issue } from "../../api-client/types";
+import type {
+  ExternalIssue,
+  Issue,
+  NativeExternalIssue,
+} from "../../api-client/types";
 import type { ServerContext } from "../../types";
 import {
   formatLinkedExternalIssue,
@@ -621,14 +625,14 @@ async function executeExternalIssueLink(
       issueId: string;
       integrationId: string;
       data: Record<string, unknown>;
-    }) => Promise<LinkedExternalIssue["issue"]>;
+    }) => Promise<NativeExternalIssue>;
     createSentryAppExternalIssueLink: (params: {
       installationUuid: string;
       issueId: number;
       webUrl: string;
       project: string;
       identifier: string;
-    }) => Promise<LinkedExternalIssue["issue"]>;
+    }) => Promise<ExternalIssue>;
   },
   params: {
     organizationSlug: string;
@@ -648,7 +652,7 @@ async function executeExternalIssueLink(
       kind: "native",
       issue,
       provider: params.target.integration.provider.key,
-    } as LinkedExternalIssue;
+    };
   }
 
   const numericIssueId = Number(params.currentIssue.id);
@@ -667,7 +671,7 @@ async function executeExternalIssueLink(
     kind: "sentryApp",
     issue,
     provider: params.target.installation.app.slug,
-  } as LinkedExternalIssue;
+  };
 }
 
 async function tryPostReasonComment(

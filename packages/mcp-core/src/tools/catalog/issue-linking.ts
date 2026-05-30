@@ -113,12 +113,13 @@ function parseJiraUrl(url: URL): ParsedNativeIssueUrl | null {
   if (!issueId || !/^[A-Z][A-Z0-9]+-\d+$/i.test(issueId)) {
     return null;
   }
+  const host = normalizeUrlHost(url);
   return {
     kind: "native",
     provider: "jira",
     url: url.toString(),
-    host: normalizeUrlHost(url),
-    domainPath: normalizeUrlHost(url),
+    host,
+    domainPath: host,
     issueId,
   };
 }
@@ -149,6 +150,7 @@ function parseGithubUrl(url: URL): ParsedNativeIssueUrl | null {
 }
 
 function parseGitlabUrl(url: URL): ParsedNativeIssueUrl | null {
+  const host = normalizeUrlHost(url);
   const segments = pathSegments(url);
   const markerIndex = segments.findIndex((segment) => segment === "-");
   if (
@@ -167,8 +169,8 @@ function parseGitlabUrl(url: URL): ParsedNativeIssueUrl | null {
     kind: "native",
     provider: "gitlab",
     url: url.toString(),
-    host: normalizeUrlHost(url),
-    domainPath: `${normalizeUrlHost(url)}/${project}`,
+    host,
+    domainPath: `${host}/${project}`,
     project,
     issueId,
   };
@@ -290,26 +292,26 @@ export function parseExternalIssueUrl(
 
   const host = normalizeHost(url.hostname);
 
-  const nativeParsers: Array<() => ParsedNativeIssueUrl | null> = [
-    parseJiraUrl.bind(null, url),
-    parseGithubUrl.bind(null, url),
-    parseGitlabUrl.bind(null, url),
-    parseBitbucketUrl.bind(null, url),
-    parseVstsUrl.bind(null, url),
+  const nativeParsers: Array<(url: URL) => ParsedNativeIssueUrl | null> = [
+    parseJiraUrl,
+    parseGithubUrl,
+    parseGitlabUrl,
+    parseBitbucketUrl,
+    parseVstsUrl,
   ];
   for (const parse of nativeParsers) {
-    const parsed = parse();
+    const parsed = parse(url);
     if (parsed) {
       return parsed;
     }
   }
 
-  const appParsers: Array<() => ParsedAppIssueUrl | null> = [
-    parseLinearUrl.bind(null, url),
-    parseShortcutUrl.bind(null, url),
+  const appParsers: Array<(url: URL) => ParsedAppIssueUrl | null> = [
+    parseLinearUrl,
+    parseShortcutUrl,
   ];
   for (const parse of appParsers) {
-    const parsed = parse();
+    const parsed = parse(url);
     if (parsed) {
       return parsed;
     }
