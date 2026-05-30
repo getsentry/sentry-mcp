@@ -2,7 +2,7 @@ version = 1
 
 [defaults]
 failOn = "high"
-reportOn = "medium"
+reportOn = "low"
 
 [[skills]]
 name = "mcp-audit"
