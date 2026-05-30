@@ -377,6 +377,7 @@ describe("resolveExternalIssueLinkTarget", () => {
   });
 
   it("ignores integrations whose configured domain does not match the URL", async () => {
+    let configCalled = false;
     await expect(
       resolveExternalIssueLinkTarget({
         apiService: {
@@ -388,19 +389,49 @@ describe("resolveExternalIssueLinkTarget", () => {
               provider: { key: "jira" },
             }),
           ],
-          getIssueIntegrationLinkConfig: async ({ integrationId }) =>
-            linkConfig({
+          getIssueIntegrationLinkConfig: async ({ integrationId }) => {
+            configCalled = true;
+            return linkConfig({
               id: integrationId,
               provider: { key: "jira" },
               linkIssueConfig: [{ name: "externalIssue", required: true }],
-            }),
+            });
+          },
           listSentryAppInstallations: async () => [],
         },
         organizationSlug: "sentry",
         issueId: "PROJ-1",
         externalIssueUrl: "https://acme.atlassian.net/browse/PROJ-1",
       }),
-    ).rejects.toThrow(/No installed jira issue integration/);
+    ).rejects.toThrow(
+      /No installed jira issue integration matches the URL domain\/path/,
+    );
+    // domain filtering should short-circuit before fetching link config
+    expect(configCalled).toBe(false);
+  });
+
+  it("rejects github.com URLs when only a wrong-org integration is configured", async () => {
+    await expect(
+      resolveExternalIssueLinkTarget({
+        apiService: {
+          listIssueIntegrations: async () => [
+            integration({
+              id: "1",
+              name: "GitHub Other",
+              domainName: "github.com/other",
+              provider: { key: "github" },
+            }),
+          ],
+          getIssueIntegrationLinkConfig: async () => linkConfig({ id: "1" }),
+          listSentryAppInstallations: async () => [],
+        },
+        organizationSlug: "sentry",
+        issueId: "PROJ-1",
+        externalIssueUrl: "https://github.com/getsentry/sentry/issues/123",
+      }),
+    ).rejects.toThrow(
+      /No installed github issue integration matches the URL domain\/path/,
+    );
   });
 
   it("uses the first matching candidate when multiple integrations match", async () => {
