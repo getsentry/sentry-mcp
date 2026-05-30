@@ -26,6 +26,7 @@ import {
 import { setSentryUserFromRequest } from "../utils/sentry-user";
 import { resolveClientFamily } from "./client-family";
 import { verifyConstraintsAccess } from "./constraint-utils";
+import { isValidSlug } from "./slug-validation";
 
 /**
  * ExecutionContext with OAuth props injected by the OAuth provider.
@@ -138,6 +139,12 @@ const mcpHandler: ExportedHandler<Env> = {
     const { groups } = result.pathname;
     const organizationSlug = groups?.org || null;
     const projectSlug = groups?.project || null;
+    if (organizationSlug && !isValidSlug(organizationSlug)) {
+      return new Response("Invalid organization slug", { status: 400 });
+    }
+    if (projectSlug && !isValidSlug(projectSlug)) {
+      return new Response("Invalid project slug", { status: 400 });
+    }
 
     // Check for agent mode query parameter
     const isAgentMode = url.searchParams.get("agent") === "1";

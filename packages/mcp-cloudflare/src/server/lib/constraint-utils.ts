@@ -1,6 +1,7 @@
 import type { Constraints, ProjectCapabilities } from "@sentry/mcp-core/types";
 import { SentryApiService, ApiError } from "@sentry/mcp-core/api-client";
 import { logIssue, logWarn } from "@sentry/mcp-core/telem/logging";
+import { z } from "zod";
 
 // Timeout for fetching project capabilities (5 seconds)
 const CAPABILITIES_TIMEOUT_MS = 5000;
@@ -10,29 +11,42 @@ const CACHE_TTL_SECONDS = 900; // 15 minutes
 const PROJECT_TIMEOUT_CACHE_TTL_SECONDS = 60; // Avoid repeated startup stalls.
 const CACHE_KEY_VERSION = "v2";
 
-/**
- * Cached org constraints data stored in KV.
- */
-type CachedOrgConstraints = {
-  scope: "org";
-  regionUrl: string | null;
-  cachedAt: number;
-};
+const ProjectCapabilitiesSchema = z.object({
+  profiles: z.boolean().optional(),
+  replays: z.boolean().optional(),
+  logs: z.boolean().optional(),
+  traces: z.boolean().optional(),
+});
 
-type CachedProjectConstraints =
-  | {
-      scope: "project";
-      status: "verified";
-      regionUrl: string | null;
-      projectCapabilities: ProjectCapabilities;
-      cachedAt: number;
-    }
-  | {
-      scope: "project";
-      status: "timeout";
-      regionUrl: string | null;
-      cachedAt: number;
-    };
+const CachedOrgConstraintsSchema = z.object({
+  scope: z.literal("org"),
+  regionUrl: z.string().nullable(),
+  cachedAt: z.number(),
+});
+
+const CachedProjectConstraintsSchema = z.discriminatedUnion("status", [
+  z.object({
+    scope: z.literal("project"),
+    status: z.literal("verified"),
+    regionUrl: z.string().nullable(),
+    projectCapabilities: ProjectCapabilitiesSchema,
+    cachedAt: z.number(),
+  }),
+  z.object({
+    scope: z.literal("project"),
+    status: z.literal("timeout"),
+    regionUrl: z.string().nullable(),
+    cachedAt: z.number(),
+  }),
+]);
+
+const CachedConstraintsSchema = z.union([
+  CachedOrgConstraintsSchema,
+  CachedProjectConstraintsSchema,
+]);
+
+type CachedOrgConstraints = z.infer<typeof CachedOrgConstraintsSchema>;
+type CachedProjectConstraints = z.infer<typeof CachedProjectConstraintsSchema>;
 
 /**
  * Cached constraints data stored in KV.
@@ -59,56 +73,8 @@ function buildCacheKey(
   organizationSlug: string,
   projectSlug: string | null | undefined,
 ): string {
-  const normalizedProjectSlug = projectSlug?.trim();
-  const scopeKey = normalizedProjectSlug
-    ? `project:${normalizedProjectSlug}`
-    : "org";
+  const scopeKey = projectSlug ? `project:${projectSlug}` : "org";
   return `caps:${CACHE_KEY_VERSION}:${userId}:${sentryHost}:${organizationSlug}:${scopeKey}`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isNullableString(value: unknown): value is string | null {
-  return typeof value === "string" || value === null;
-}
-
-function isProjectCapabilities(value: unknown): value is ProjectCapabilities {
-  return (
-    isRecord(value) &&
-    (value.profiles === undefined || typeof value.profiles === "boolean") &&
-    (value.replays === undefined || typeof value.replays === "boolean") &&
-    (value.logs === undefined || typeof value.logs === "boolean") &&
-    (value.traces === undefined || typeof value.traces === "boolean")
-  );
-}
-
-function isCachedConstraints(value: unknown): value is CachedConstraints {
-  if (
-    !isRecord(value) ||
-    !isNullableString(value.regionUrl) ||
-    typeof value.cachedAt !== "number"
-  ) {
-    return false;
-  }
-
-  if (value.scope === "org") {
-    return true;
-  }
-
-  if (value.scope !== "project") {
-    return false;
-  }
-
-  if (value.status === "timeout") {
-    return true;
-  }
-
-  return (
-    value.status === "verified" &&
-    isProjectCapabilities(value.projectCapabilities)
-  );
 }
 
 /**
@@ -121,7 +87,8 @@ async function getCachedConstraints(
 ): Promise<CachedConstraints | null> {
   try {
     const cached = await kv.get(key, "json");
-    return isCachedConstraints(cached) ? cached : null;
+    const parsed = CachedConstraintsSchema.safeParse(cached);
+    return parsed.success ? parsed.data : null;
   } catch (error) {
     logWarn("Failed to read constraints cache", {
       loggerScope: ["cloudflare", "constraint-utils"],

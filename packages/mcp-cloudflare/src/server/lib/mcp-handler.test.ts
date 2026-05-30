@@ -291,6 +291,26 @@ describe("MCP Handler", () => {
       expect(response.status).toBe(404);
     });
 
+    it("should reject invalid organization and project slugs", async () => {
+      const testCases = [
+        { path: "/mcp/%20", message: "Invalid organization slug" },
+        {
+          path: "/mcp/sentry-mcp-evals/%20",
+          message: "Invalid project slug",
+        },
+      ];
+
+      for (const { path, message } of testCases) {
+        const request = createMcpRequest("initialize", {}, { path });
+        const ctx = createMcpContext();
+
+        const response = await mcpHandler.fetch!(request, createTestEnv(), ctx);
+
+        expect(response.status).toBe(400);
+        expect(await response.text()).toBe(message);
+      }
+    });
+
     it("should handle /mcp/:org with valid organization", async () => {
       const request = createMcpRequest(
         "initialize",
