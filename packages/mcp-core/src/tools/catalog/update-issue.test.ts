@@ -22,12 +22,23 @@ function createIssue(overrides: Partial<MockIssue> = {}): MockIssue {
 }
 
 function getTextToolResult(result: ToolHandlerResult): string {
+  return getToolResultText(result, false);
+}
+
+function getErrorToolResult(result: ToolHandlerResult): string {
+  return getToolResultText(result, true);
+}
+
+function getToolResultText(
+  result: ToolHandlerResult,
+  expectedIsError: boolean,
+): string {
   expect(typeof result).toBe("object");
   expect(result).not.toBeNull();
   expect(Array.isArray(result)).toBe(false);
 
   const toolResult = result as ToolResult;
-  expect(toolResult.isError).not.toBe(true);
+  expect(toolResult.isError === true).toBe(expectedIsError);
   expect(toolResult.content).toHaveLength(1);
 
   const content = toolResult.content[0];
@@ -1126,7 +1137,7 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = getTextToolResult(
+    const result = getErrorToolResult(
       await updateIssue.handler(
         {
           organizationSlug: "sentry-mcp-evals",
@@ -1159,7 +1170,7 @@ describe("update_issue", () => {
       ),
     );
 
-    const result = getTextToolResult(
+    const result = getErrorToolResult(
       await updateIssue.handler(
         {
           organizationSlug: "sentry-mcp-evals",
