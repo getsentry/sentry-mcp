@@ -2293,6 +2293,7 @@ export class SentryApiService {
     downloadUrl: string;
     filename: string;
     blob: Blob;
+    contentType: string;
   }> {
     // Get the attachment metadata first
     const attachmentsData = await this.requestJSON(
@@ -2314,20 +2315,24 @@ export class SentryApiService {
     const downloadUrl = `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/?download=1`;
     const downloadResponse = await this.request(
       downloadUrl,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/octet-stream",
-        },
-      },
+      { method: "GET" },
       opts,
     );
+
+    // Prefer Content-Type from the download response over the metadata mimetype:
+    // the two share the same DB source but the download header reflects any
+    // server-side correction (getsentry/sentry#115977) applied at request time.
+    const contentType =
+      downloadResponse.headers.get("content-type")?.split(";")[0].trim() ||
+      attachment.mimetype ||
+      "application/octet-stream";
 
     return {
       attachment,
       downloadUrl: downloadResponse.url,
       filename: attachment.name,
       blob: await downloadResponse.blob(),
+      contentType,
     };
   }
 
