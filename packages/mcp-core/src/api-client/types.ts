@@ -54,6 +54,10 @@ import type {
   EventSchema,
   ExternalIssueListSchema,
   ExternalIssueSchema,
+  IssueIntegrationLinkConfigSchema,
+  IssueIntegrationListSchema,
+  IssueIntegrationSchema,
+  NativeExternalIssueSchema,
   FlamegraphFrameInfoSchema,
   FlamegraphFrameSchema,
   FlamegraphProfileMetadataSchema,
@@ -76,6 +80,8 @@ import type {
   ReplayDetailsSchema,
   ReplayListResponseSchema,
   ReplayRecordingSegmentsSchema,
+  SentryAppInstallationListSchema,
+  SentryAppInstallationSchema,
   TagListSchema,
   TagSchema,
   TeamListSchema,
@@ -168,3 +174,13 @@ export type IssueTagValues = z.infer<typeof IssueTagValuesSchema>;
 // External issue links (Jira, GitHub, etc.)
 export type ExternalIssue = z.infer<typeof ExternalIssueSchema>;
 export type ExternalIssueList = z.infer<typeof ExternalIssueListSchema>;
+export type IssueIntegration = z.infer<typeof IssueIntegrationSchema>;
+export type IssueIntegrationList = z.infer<typeof IssueIntegrationListSchema>;
+export type IssueIntegrationLinkConfig = z.infer<
+  typeof IssueIntegrationLinkConfigSchema
+>;
+export type NativeExternalIssue = z.infer<typeof NativeExternalIssueSchema>;
+export type SentryAppInstallation = z.infer<typeof SentryAppInstallationSchema>;
+export type SentryAppInstallationList = z.infer<
+  typeof SentryAppInstallationListSchema
+>;

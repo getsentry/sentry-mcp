@@ -2,11 +2,13 @@ import type { z } from "zod";
 import type { ServerContext, ProjectCapabilities } from "../types";
 import type { Scope } from "../permissions";
 import type { Skill } from "../skills";
-import type {
-  TextContent,
-  ImageContent,
-  EmbeddedResource,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+
+export type ToolContent = CallToolResult["content"][number];
+
+export type ToolResult = Pick<CallToolResult, "content" | "isError">;
+
+export type ToolHandlerResult = string | ToolContent[] | ToolResult;
 
 /**
  * Context passed to dynamic description functions.
@@ -77,7 +79,7 @@ export interface ToolConfig<
   handler: (
     params: z.infer<z.ZodObject<TSchema>>,
     context: ServerContext,
-  ) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
+  ) => Promise<ToolHandlerResult>;
 }
 
 /**
