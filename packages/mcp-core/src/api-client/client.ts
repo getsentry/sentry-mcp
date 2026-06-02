@@ -2334,8 +2334,8 @@ export class SentryApiService {
     // runtime fallback. So Step 2 is the best available signal; when it
     // disagrees with Step 1, Step 2 wins.
     const contentType =
-      downloadResponse.headers.get("content-type")?.split(";")[0].trim() ??
-      attachment.mimetype ??
+      downloadResponse.headers.get("content-type")?.split(";")[0].trim() ||
+      attachment.mimetype ||
       "application/octet-stream";
 
     return {
