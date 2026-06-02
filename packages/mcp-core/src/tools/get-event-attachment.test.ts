@@ -100,6 +100,40 @@ describe("get_event_attachment", () => {
     `);
   });
 
+  it("prefers Content-Type from download response over stale metadata mimetype", async () => {
+    // Covers the case where the SDK uploaded with application/octet-stream at
+    // ingest time (metadata Step 1) but the download endpoint (Step 2) now
+    // returns the correct Content-Type after getsentry/sentry#115977, or where
+    // the two values simply disagree. The MCP should use Step 2 and render
+    // the attachment as an image, not a generic binary resource.
+    const result = await getEventAttachment.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: "cloudflare-mcp",
+        eventId: "octet-stream-event-id",
+        attachmentId: "456",
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+          projectSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+      },
+    );
+
+    expect(Array.isArray(result)).toBe(true);
+    // First item must be an image, not an EmbeddedResource — proving the MCP
+    // used image/png from the download Content-Type, not application/octet-stream
+    // from the metadata.
+    expect(result[0]).toMatchObject({
+      type: "image",
+      mimeType: "image/png",
+    });
+  });
+
   it("throws error for malformed regionUrl", async () => {
     await expect(
       getEventAttachment.handler(

@@ -1166,6 +1166,39 @@ export const restHandlers = buildHandlers([
       });
     },
   },
+  // Scenario: metadata mimetype is stale "application/octet-stream" (pre-fix
+  // ingest or legacy attachment) but the download response returns the correct
+  // Content-Type. Validates that the MCP uses Step 2 (download header) over
+  // Step 1 (metadata), so the attachment is rendered as an image not a blob.
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/octet-stream-event-id/attachments/",
+    fetch: () =>
+      HttpResponse.json([
+        {
+          id: "456",
+          name: "screenshot.png",
+          type: "event.attachment",
+          size: 1024,
+          mimetype: "application/octet-stream",
+          dateCreated: "2025-04-08T21:15:04.000Z",
+          sha1: "abc123def456",
+          headers: { "Content-Type": "application/octet-stream" },
+        },
+      ]),
+  },
+  {
+    method: "get",
+    path: "/api/0/projects/sentry-mcp-evals/cloudflare-mcp/events/octet-stream-event-id/attachments/456/",
+    fetch: () => {
+      const mockBlob = new Blob(["fake image data"], { type: "image/png" });
+      return new HttpResponse(mockBlob, {
+        headers: {
+          "Content-Type": "image/png",
+        },
+      });
+    },
+  },
   {
     method: "get",
     path: "/api/0/organizations/:organizationSlug/repos/",
