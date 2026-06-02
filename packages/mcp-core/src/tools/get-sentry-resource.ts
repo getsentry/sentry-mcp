@@ -493,6 +493,8 @@ export default defineTool({
     "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.",
     "Trace lookups return a condensed overview by default.",
     "",
+    "AI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.",
+    "",
     "For preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):",
     "- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)",
     "- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use `get_snapshot_image` for full-resolution image bytes.",
