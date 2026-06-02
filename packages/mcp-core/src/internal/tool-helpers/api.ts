@@ -34,6 +34,7 @@ export function apiServiceFromContext(
     accessToken: context.accessToken,
     clientId: context.clientId,
     clientName: context.clientName,
+    clientFamily: context.clientFamily,
   });
 }
 
