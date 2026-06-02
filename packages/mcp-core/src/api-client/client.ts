@@ -2315,24 +2315,13 @@ export class SentryApiService {
     const downloadUrl = `/projects/${organizationSlug}/${projectSlug}/events/${eventId}/attachments/${attachmentId}/?download=1`;
     const downloadResponse = await this.request(
       downloadUrl,
-      {
-        method: "GET",
-        headers: {
-          Accept: "*/*",
-        },
-      },
+      { method: "GET" },
       opts,
     );
 
-    // Use Content-Type from the download response (Step 2) as the authoritative
-    // MIME type. The metadata endpoint (Step 1) reflects the value stored at
-    // ingest time, which may be "application/octet-stream" — e.g. the JS React
-    // Native SDK uploads attachments without an explicit MIME type. The
-    // server-side fix in getsentry/sentry#115977 corrects this at ingest for
-    // new attachments, but existing attachments remain stale in the DB, and the
-    // download endpoint sets Content-Type directly from the DB value with no
-    // runtime fallback. So Step 2 is the best available signal; when it
-    // disagrees with Step 1, Step 2 wins.
+    // Prefer Content-Type from the download response over the metadata mimetype:
+    // the two share the same DB source but the download header reflects any
+    // server-side correction (getsentry/sentry#115977) applied at request time.
     const contentType =
       downloadResponse.headers.get("content-type")?.split(";")[0].trim() ||
       attachment.mimetype ||
