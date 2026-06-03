@@ -187,7 +187,7 @@ export default defineTool({
       .describe("Number of hot paths to display (1-20, default: 10)"),
   },
 
-  annotations: { readOnlyHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, openWorldHint: true },
 
   async handler(params, context: ServerContext) {
     const apiService = apiServiceFromContext(context, {

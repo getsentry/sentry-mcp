@@ -2,6 +2,13 @@ import { describe, it, expect } from "vitest";
 import getProfile from "./get-profile";
 
 describe("get_profile", () => {
+  it("marks profile analysis as open-world because it reads Sentry APIs", () => {
+    expect(getProfile.annotations).toEqual({
+      readOnlyHint: true,
+      openWorldHint: true,
+    });
+  });
+
   describe("single period analysis", () => {
     it("analyzes a transaction profile", async () => {
       const result = await getProfile.handler(
