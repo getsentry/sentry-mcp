@@ -1,5 +1,4 @@
 import {
-  type Options,
   addATeamToAProject as sdkAddATeamToAProject,
   createANewClientKey as sdkCreateANewClientKey,
   createANewProject as sdkCreateANewProject,
@@ -462,6 +461,15 @@ export class SentryApiService {
     };
     if (this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+    if (this.clientId) {
+      headers["X-Sentry-MCP-Client-Id"] = this.clientId;
+    }
+    if (this.clientName) {
+      headers["X-Sentry-MCP-Client-Name"] = this.clientName;
+    }
+    if (this.clientFamily) {
+      headers["X-Sentry-MCP-Client-Family"] = this.clientFamily;
     }
     return {
       baseUrl: `${this.protocol}://${host}`,
@@ -2662,9 +2670,7 @@ export class SentryApiService {
       ...this.getSdkConfig(opts),
       path: { organization_id_or_slug: organizationSlug },
       query: sdkQuery,
-    } as Options<
-      Parameters<typeof sdkListAnOrganizationSReplays>[0] & { url: string }
-    >);
+    } as Parameters<typeof sdkListAnOrganizationSReplays>[0]);
     const data = this.unwrapSdkResult(result, "searchReplays");
 
     return ReplayListResponseSchema.parse(data).data;
