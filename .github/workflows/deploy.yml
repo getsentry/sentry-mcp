@@ -54,6 +54,8 @@ jobs:
         run: pnpm -w run build
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
 
       - name: Deploy to Canary Worker
         id: deploy_canary
