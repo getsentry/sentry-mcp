@@ -434,8 +434,11 @@ export default defineTool({
   internalOnly: true,
   requiredScopes: ["event:read", "project:read"],
 
-  description:
-    "Fetch a structured AI conversation transcript by conversation ID.",
+  description: [
+    "Fetch all spans for an AI conversation by its gen_ai.conversation.id.",
+    "",
+    "A conversation is a set of spans sharing the same gen_ai.conversation.id. To discover conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'.",
+  ].join("\n"),
 
   inputSchema: {
     organizationSlug: ParamOrganizationSlug,
