@@ -3597,7 +3597,7 @@ export class SentryApiService {
           "timestamp",
         ],
         query: sentryQuery.join(" "),
-        allowAggregateConditions: false,
+        allowAggregateConditions: "0",
         useRpc: "1",
       },
     } as unknown as Parameters<typeof sdkQueryExploreEvents>[0]);
