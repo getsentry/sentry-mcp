@@ -1471,10 +1471,7 @@ export class SentryApiService {
     if (!this.isSaas()) {
       const result = await sdkListYourOrganizations({
         ...this.getSdkConfig(opts),
-        query: { query: params?.query, per_page: 25 } as Record<
-          string,
-          unknown
-        >,
+        query: { query: params?.query, per_page: 25 },
       } as Parameters<typeof sdkListYourOrganizations>[0]);
       const data = this.unwrapSdkResult(result, "listOrganizations");
       return OrganizationListSchema.parse(data);
@@ -1499,10 +1496,7 @@ export class SentryApiService {
                 ...opts,
                 host: new URL(region.url).host,
               }),
-              query: { query: params?.query, per_page: 25 } as Record<
-                string,
-                unknown
-              >,
+              query: { query: params?.query, per_page: 25 },
             } as Parameters<typeof sdkListYourOrganizations>[0]);
             return this.unwrapSdkResult(
               regionResult,
@@ -1523,10 +1517,7 @@ export class SentryApiService {
         // logger.info("Regions endpoint not found, falling back to direct organizations endpoint");
         const result = await sdkListYourOrganizations({
           ...this.getSdkConfig(opts),
-          query: { query: params?.query, per_page: 25 } as Record<
-            string,
-            unknown
-          >,
+          query: { query: params?.query, per_page: 25 },
         } as Parameters<typeof sdkListYourOrganizations>[0]);
         const data = this.unwrapSdkResult(result, "listOrganizations");
         return OrganizationListSchema.parse(data);
@@ -1573,7 +1564,7 @@ export class SentryApiService {
       query: {
         per_page: 25,
         query: params?.query,
-      } as Record<string, unknown>,
+      },
     } as Parameters<typeof sdkListAnOrganizationSTeams>[0]);
     const data = this.unwrapSdkResult(result, "listTeams");
     return TeamListSchema.parse(data);
@@ -1629,7 +1620,7 @@ export class SentryApiService {
       query: {
         query: params?.query,
         per_page: 25,
-      } as Record<string, unknown>,
+      },
     } as Parameters<typeof sdkListAnOrganizationSProjects>[0]);
     const data = this.unwrapSdkResult(result, "listProjects");
     return ProjectListSchema.parse(data);
@@ -2909,7 +2900,7 @@ export class SentryApiService {
           statsPeriod: "24h",
           query: sentryQuery.join(" "),
           collapse: ["unhandled"],
-        } as Record<string, unknown>,
+        },
       } as Parameters<typeof sdkListAProjectSIssues>[0]);
       const data = this.unwrapSdkResult(result, "listIssues(project)");
       return IssueListSchema.parse(data);
@@ -3329,7 +3320,7 @@ export class SentryApiService {
         returnIds: "true",
         data_source: dataSource,
         project: "-1",
-      } as Record<string, unknown>,
+      },
     } as Parameters<typeof sdkRetrieveACountOfReplays>[0]);
     const data = this.unwrapSdkResult(result, "listReplayIdsForIssue");
 
@@ -3357,7 +3348,7 @@ export class SentryApiService {
         project_id_or_slug: projectSlugOrId,
         replay_id: replayId,
       },
-      query: { download: "true" } as Record<string, unknown>,
+      query: { download: "true" },
     } as Parameters<typeof sdkListRecordingSegments>[0]);
     const data = this.unwrapSdkResult(result, "getReplayRecordingSegments");
     return ReplayRecordingSegmentsSchema.parse(data);
@@ -3599,7 +3590,7 @@ export class SentryApiService {
         query: sentryQuery.join(" "),
         allowAggregateConditions: "0",
         useRpc: "1",
-      } as Record<string, unknown>,
+      },
     } as Parameters<typeof sdkQueryExploreEvents>[0]);
     const data = this.unwrapSdkResult(result, "searchSpans");
     return SpansSearchResponseSchema.parse(data).data;
@@ -3983,7 +3974,7 @@ export class SentryApiService {
         statsPeriod,
         limit: String(limit),
         project,
-      } as Record<string, unknown>,
+      },
     } as Parameters<typeof sdkRetrieveATrace>[0]);
     const data = this.unwrapSdkResult(result, "getTrace");
     return TraceSchema.parse(data);
