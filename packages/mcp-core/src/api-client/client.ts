@@ -12,6 +12,7 @@ import {
   listAnOrganization_sProjects as sdkListAnOrganizationSProjects,
   listAnOrganization_sReleases as sdkListAnOrganizationSReleases,
   listAnOrganization_sReplays as sdkListAnOrganizationSReplays,
+  listAnOrganization_sTags as sdkListAnOrganizationSTags,
   listAnOrganization_sTeams as sdkListAnOrganizationSTeams,
   listRecordingSegments as sdkListRecordingSegments,
   listTraceItemAttributes as sdkListTraceItemAttributes,
@@ -2590,29 +2591,34 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<TagList> {
-    const searchQuery = new URLSearchParams();
+    // The SDK type doesn't include useCache, so we pass extra params via cast.
+    const sdkQuery: Record<string, unknown> = {};
     if (dataset) {
-      searchQuery.set("dataset", dataset);
+      sdkQuery.dataset = dataset;
     }
     if (project) {
-      searchQuery.set("project", project);
+      sdkQuery.project = [Number(project)];
     }
-    this.applyTimeParams(searchQuery, statsPeriod, start, end);
+    if (statsPeriod) {
+      sdkQuery.statsPeriod = statsPeriod;
+    } else if (start && end) {
+      sdkQuery.start = start;
+      sdkQuery.end = end;
+    }
     if (useCache !== undefined) {
-      searchQuery.set("useCache", useCache ? "1" : "0");
+      sdkQuery.useCache = useCache ? "1" : "0";
     }
     if (useFlagsBackend !== undefined) {
-      searchQuery.set("useFlagsBackend", useFlagsBackend ? "1" : "0");
+      sdkQuery.useFlagsBackend = useFlagsBackend ? "1" : "0";
     }
 
-    const body = await this.requestJSON(
-      searchQuery.toString()
-        ? `/organizations/${organizationSlug}/tags/?${searchQuery.toString()}`
-        : `/organizations/${organizationSlug}/tags/`,
-      undefined,
-      opts,
-    );
-    return TagListSchema.parse(body);
+    const result = await sdkListAnOrganizationSTags({
+      ...this.getSdkConfig(opts),
+      path: { organization_id_or_slug: organizationSlug },
+      query: sdkQuery,
+    } as Parameters<typeof sdkListAnOrganizationSTags>[0]);
+    const data = this.unwrapSdkResult(result, "listTags");
+    return TagListSchema.parse(data);
   }
 
   async searchReplays(
