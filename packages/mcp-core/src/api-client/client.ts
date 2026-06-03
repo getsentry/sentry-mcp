@@ -481,6 +481,11 @@ export class SentryApiService {
    * Unwraps an SDK result (`{ data, error }` discriminated union) and converts
    * errors to the existing MCP error types.
    *
+   * The runtime shape matches {@link SdkResult} from `@sentry/api`, but SDK
+   * functions return `RequestResult` whose conditional generic encoding
+   * (`TData[keyof TData]`) is not structurally assignable to `SdkResult`.
+   * We accept `any` to avoid casting at every call site.
+   *
    * @param result The SDK result to unwrap
    * @param context A descriptive label for error messages (e.g. method name)
    * @returns The data on success

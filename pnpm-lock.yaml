@@ -422,8 +422,8 @@ importers:
         specifier: ^1.26.0
         version: 1.26.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
       '@sentry/api':
-        specifier: ^0.171.0
-        version: 0.171.0(zod@3.25.76)
+        specifier: ^0.172.0
+        version: 0.172.0(zod@3.25.76)
       '@sentry/core':
         specifier: 'catalog:'
         version: 10.54.0
@@ -2330,8 +2330,8 @@ packages:
     resolution: {integrity: sha512-B7eicNhAomJ7bGihJO7mCw7pZ8FFo/THQgGPo85VR3FaJVCCot20WxVgvhjc7IVBQVlaaxSrnlUFvA+yHjszqQ==}
     engines: {node: '>=18'}
 
-  '@sentry/api@0.171.0':
-    resolution: {integrity: sha512-CGDw1VfWzmQM6oszfbZiV1tZ/rGj5GcjxhYBDlXH8UhMqz2EtJ+8vlXob2AVkMy/xGQLfAA6M0Ge9cUGpTtuZg==}
+  '@sentry/api@0.172.0':
+    resolution: {integrity: sha512-uRFclajrAnTPhH/1styZ9b+NfgfCoVS0O1OtNeoVP5vbguE59hPeTfW9trcZsWtf+UYJ8JowP71tndTB6t936w==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.24.0
@@ -7677,7 +7677,7 @@ snapshots:
       '@sentry-internal/browser-utils': 10.54.0
       '@sentry/core': 10.54.0
 
-  '@sentry/api@0.171.0(zod@3.25.76)':
+  '@sentry/api@0.172.0(zod@3.25.76)':
     optionalDependencies:
       zod: 3.25.76
 
