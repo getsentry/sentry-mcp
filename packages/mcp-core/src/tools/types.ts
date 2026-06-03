@@ -3,10 +3,27 @@ import type { ServerContext, ProjectCapabilities } from "../types";
 import type { Scope } from "../permissions";
 import type { Skill } from "../skills";
 import type {
+  CallToolResult,
   TextContent,
   ImageContent,
   EmbeddedResource,
 } from "@modelcontextprotocol/sdk/types.js";
+
+export type ToolContent = TextContent | ImageContent | EmbeddedResource;
+export type ToolOutput = string | ToolContent[] | CallToolResult;
+/**
+ * Keeps schema-inferred handler params at tool definition sites while allowing
+ * heterogeneous tool registries to store many concrete handler signatures.
+ */
+export type ToolHandler<
+  TSchema extends Record<string, z.ZodType>,
+  TOutput extends ToolOutput = ToolOutput,
+> = {
+  handler(
+    params: z.infer<z.ZodObject<TSchema>>,
+    context: ServerContext,
+  ): Promise<TOutput>;
+}["handler"];
 
 /**
  * Context passed to dynamic description functions.
@@ -36,20 +53,15 @@ export function resolveDescription(
 }
 
 /**
- * Determines if a tool should be externally visible through MCP surfaces.
- * - Tools with `internalOnly: true` are never exposed through server registration
- * - Tools with `experimental: true` are only visible when experimentalMode is true
- * - Tools with `hideInExperimentalMode: true` are hidden when experimentalMode is true
+ * Determines if a tool is enabled for the current release mode.
  */
 export function isToolVisibleInMode(
   tool: {
     experimental?: boolean;
     hideInExperimentalMode?: boolean;
-    internalOnly?: boolean;
   },
   experimentalMode: boolean,
 ): boolean {
-  if (tool.internalOnly) return false;
   if (tool.experimental && !experimentalMode) return false;
   if (tool.hideInExperimentalMode && experimentalMode) return false;
   return true;
@@ -65,19 +77,15 @@ export interface ToolConfig<
   requiredScopes: Scope[]; // LEGACY: Which API scopes needed (deprecated, for backward compatibility)
   experimental?: boolean; // Mark tool as experimental (only shown in experimental mode)
   hideInExperimentalMode?: boolean; // Hide tool when experimental mode is active (for tools replaced by unified tools)
-  agentOnly?: boolean; // Tool is only available in agent mode (excluded from plugin allowedTools)
-  internalOnly?: boolean; // Tool is retained as an implementation detail and never exposed as an MCP tool
   requiredCapabilities?: (keyof ProjectCapabilities)[]; // Project capabilities required for this tool
+  outputSchema?: z.ZodType;
   annotations: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
     idempotentHint?: boolean;
     openWorldHint?: boolean;
   };
-  handler: (
-    params: z.infer<z.ZodObject<TSchema>>,
-    context: ServerContext,
-  ) => Promise<string | (TextContent | ImageContent | EmbeddedResource)[]>;
+  handler: ToolHandler<TSchema>;
 }
 
 /**

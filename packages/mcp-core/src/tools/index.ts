@@ -1,67 +1,24 @@
-import whoami from "./whoami";
-import findOrganizations from "./find-organizations";
-import findTeams from "./find-teams";
-import findProjects from "./find-projects";
-import findReleases from "./find-releases";
-import getIssueDetails from "./get-issue-details";
-import getIssueTagValues from "./get-issue-tag-values";
-import getTraceDetails from "./get-trace-details";
-import getReplayDetails from "./get-replay-details";
-import getEventAttachment from "./get-event-attachment";
-import updateIssue from "./update-issue";
-import searchEvents from "./search-events";
-import createTeam from "./create-team";
-import createProject from "./create-project";
-import updateProject from "./update-project";
-import createDsn from "./create-dsn";
-import findDsns from "./find-dsns";
-import analyzeIssueWithSeer from "./analyze-issue-with-seer";
-import searchDocs from "./search-docs";
-import getDoc from "./get-doc";
-import searchIssues from "./search-issues";
-import searchIssueEvents from "./search-issue-events";
-import useSentry from "./use-sentry";
-import getProfileDetails from "./get-profile-details";
-import getSentryResource from "./get-sentry-resource";
-import getSnapshot from "./get-snapshot";
-import getSnapshotImage from "./get-snapshot-image";
-import getLatestBaseSnapshot from "./get-latest-base-snapshot";
-import getAIConversationDetails from "./get-ai-conversation-details";
+import catalogTools from "./catalog";
+import useSentry from "./special/use-sentry";
+import { createSearchToolsTool } from "./special/search-tools";
+import { createExecuteTool } from "./special/execute-tool";
+import type { ToolConfig } from "./types";
+
+type ToolRegistry = Record<string, ToolConfig<any>>;
+
+function getAllTools(): ToolRegistry {
+  return allTools;
+}
+
+const allTools = {
+  ...catalogTools,
+  use_sentry: useSentry,
+  search_tools: createSearchToolsTool(getAllTools),
+  execute_tool: createExecuteTool(getAllTools),
+} as const satisfies ToolRegistry;
 
 // Default export: object mapping tool names to tools
-export default {
-  whoami,
-  find_organizations: findOrganizations,
-  find_teams: findTeams,
-  find_projects: findProjects,
-  find_releases: findReleases,
-  // Legacy detail handlers stay available for internal composition behind
-  // get_sentry_resource, but are filtered from all external MCP surfaces.
-  get_issue_details: getIssueDetails,
-  get_issue_tag_values: getIssueTagValues,
-  get_trace_details: getTraceDetails,
-  get_replay_details: getReplayDetails,
-  get_event_attachment: getEventAttachment,
-  update_issue: updateIssue,
-  search_events: searchEvents,
-  create_team: createTeam,
-  create_project: createProject,
-  update_project: updateProject,
-  create_dsn: createDsn,
-  find_dsns: findDsns,
-  analyze_issue_with_seer: analyzeIssueWithSeer,
-  search_docs: searchDocs,
-  get_doc: getDoc,
-  search_issues: searchIssues,
-  search_issue_events: searchIssueEvents,
-  use_sentry: useSentry,
-  get_profile_details: getProfileDetails,
-  get_sentry_resource: getSentryResource,
-  get_snapshot: getSnapshot,
-  get_snapshot_image: getSnapshotImage,
-  get_latest_base_snapshot: getLatestBaseSnapshot,
-  get_ai_conversation_details: getAIConversationDetails,
-} as const;
+export default allTools;
 
 // Type export
-export type ToolName = keyof typeof import("./index").default;
+export type ToolName = keyof typeof allTools;

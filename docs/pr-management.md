@@ -287,8 +287,8 @@ This PR implements comprehensive improvements to the search_events tool...
 4. Check that performance remains optimal
 
 ### File Structure Changes
-- src/tools/search-events.ts → src/tools/search-events/handler.ts
-- Added src/tools/search-events/agent.ts for AI logic
+- src/tools/search-events.ts → src/tools/catalog/search-events.ts
+- Added src/tools/support/search-events/agent.ts for AI logic
 - [... detailed file-by-file breakdown ...]
 ```
 

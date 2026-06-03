@@ -16,7 +16,9 @@ const __dirname = path.dirname(__filename);
 
 // Lazy imports of server modules to avoid type bleed
 const toolsModule = await import("../src/tools/index.ts");
+const surfacesModule = await import("../src/tools/surfaces.ts");
 const skillsModule = await import("../src/skills.ts");
+const toolTypesModule = await import("../src/tools/types.ts");
 
 function writeJson(file: string, data: unknown) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
@@ -36,13 +38,21 @@ function zodFieldMapToJsonSchema(
 
 // Plugin variants whose agent frontmatter gets synced by this script.
 // Add new entries here when creating a new plugin variant.
-const PLUGIN_AGENT_DIRS = ["sentry-mcp", "sentry-mcp-experimental"];
+const PLUGIN_AGENT_CONFIGS = [
+  { dir: "sentry-mcp", experimentalMode: false },
+  { dir: "sentry-mcp-experimental", experimentalMode: true },
+] as const;
 const PLUGINS_DIR = path.join(__dirname, "../../../plugins");
 
+function agentConfigs() {
+  return PLUGIN_AGENT_CONFIGS.map((config) => ({
+    ...config,
+    path: path.join(PLUGINS_DIR, config.dir, "agents/sentry-mcp.md"),
+  }));
+}
+
 function agentPaths(): string[] {
-  return PLUGIN_AGENT_DIRS.map((dir) =>
-    path.join(PLUGINS_DIR, dir, "agents/sentry-mcp.md"),
-  );
+  return agentConfigs().map((config) => config.path);
 }
 
 function byName<T extends { name: string }>(a: T, b: T) {
@@ -54,7 +64,11 @@ function isNonNull<T>(value: T | null): value is T {
 }
 
 // Tools
-function generateToolDefinitions() {
+function generateToolDefinitions({
+  experimentalMode,
+}: {
+  experimentalMode: boolean;
+}) {
   const toolsDefault = toolsModule.default as
     | Record<string, unknown>
     | undefined;
@@ -70,9 +84,13 @@ function generateToolDefinitions() {
       description: string;
       inputSchema: Record<string, ZodTypeAny>;
       requiredScopes: string[]; // must exist on all tools (can be empty)
-      internalOnly?: boolean;
+      experimental?: boolean;
+      hideInExperimentalMode?: boolean;
     };
-    if (t.internalOnly) {
+    if (!surfacesModule.isDefaultTopLevelToolName(t.name)) {
+      return null;
+    }
+    if (!toolTypesModule.isToolVisibleInMode(t, experimentalMode)) {
       return null;
     }
     if (!Array.isArray(t.requiredScopes)) {
@@ -139,10 +157,12 @@ async function generateSkillDefinitions() {
         description: string;
         skills: string[];
         requiredScopes: string[];
-        internalOnly?: boolean;
       };
 
-      if (t.internalOnly) {
+      if (
+        surfacesModule.isWrapperToolName(t.name) ||
+        surfacesModule.isCatalogInfrastructureToolName(t.name)
+      ) {
         continue;
       }
 
@@ -222,6 +242,7 @@ function isUpToDate(outDir: string): boolean {
   // Check other input files
   const otherInputs = [
     path.join(__dirname, "../src/skills.ts"),
+    path.join(__dirname, "../src/tools/surfaces.ts"),
     path.join(__dirname, "generate-definitions.ts"),
   ];
   for (const inputPath of otherInputs) {
@@ -267,38 +288,33 @@ async function main() {
 
     console.log("Generating tool and skill definitions...");
 
-    const tools = generateToolDefinitions();
+    const tools = generateToolDefinitions({ experimentalMode: false });
+    const experimentalTools = generateToolDefinitions({
+      experimentalMode: true,
+    });
     const skills = await generateSkillDefinitions();
 
     writeJson(path.join(outDir, "toolDefinitions.json"), tools);
     writeJson(path.join(outDir, "skillDefinitions.json"), skills);
 
-    // Sync allowedTools in agent frontmatter
-    // Exclude agent-only tools (e.g., use_sentry) since plugins don't use agent mode
-    const agentOnlyToolNames = new Set(
-      Object.values(
-        toolsModule.default as Record<
-          string,
-          { name: string; agentOnly?: boolean; internalOnly?: boolean }
-        >,
-      )
-        .filter((t) => t.agentOnly || t.internalOnly)
-        .map((t) => t.name),
-    );
-    const toolNames = tools
-      .map((t) => t.name)
-      .filter((name) => !agentOnlyToolNames.has(name));
+    // Sync allowedTools in agent frontmatter with the direct MCP surface for
+    // each plugin's MCP mode.
+    const toolNames = tools.map((t) => t.name);
+    const experimentalToolNames = experimentalTools.map((t) => t.name);
 
     let agentsSynced = 0;
-    for (const agentPath of agentPaths()) {
-      if (fs.existsSync(agentPath)) {
-        syncAgentFrontmatter(agentPath, toolNames);
+    for (const agentConfig of agentConfigs()) {
+      if (fs.existsSync(agentConfig.path)) {
+        syncAgentFrontmatter(
+          agentConfig.path,
+          agentConfig.experimentalMode ? experimentalToolNames : toolNames,
+        );
         agentsSynced++;
       }
     }
 
     console.log(
-      `✅ Generated: tools(${tools.length}), skills(${skills.length}), agents(${agentsSynced})`,
+      `✅ Generated: tools(${tools.length}), experimentalTools(${experimentalTools.length}), skills(${skills.length}), agents(${agentsSynced})`,
     );
   } catch (error) {
     const err = error as Error;

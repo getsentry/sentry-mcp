@@ -113,7 +113,7 @@ export const ParamOrganizationSlug = z
 - If multiple sections share a name, include a short hint: `("Zod Patterns" in @docs/common-patterns.md)`
 
 ### Code References:
-- Use concrete paths and identifiers: `@packages/mcp-server/src/tools/search-events/index.ts:buildQuery`
+- Use concrete paths and identifiers: `@packages/mcp-core/src/tools/catalog/search-events.ts:buildQuery`
 - Optional line hints for humans: `server.ts:45-52` (agents may ignore)
 - Prefer real implementations over fabricated examples
 

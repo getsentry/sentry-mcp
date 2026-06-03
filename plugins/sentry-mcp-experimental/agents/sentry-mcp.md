@@ -14,6 +14,7 @@ allowedTools:
   - create_dsn
   - create_project
   - create_team
+  - execute_tool
   - find_dsns
   - find_organizations
   - find_projects
@@ -22,16 +23,13 @@ allowedTools:
   - get_doc
   - get_event_attachment
   - get_issue_tag_values
-  - get_latest_base_snapshot
-  - get_profile_details
   - get_replay_details
   - get_sentry_resource
-  - get_snapshot
-  - get_snapshot_image
   - search_docs
   - search_events
   - search_issue_events
   - search_issues
+  - search_tools
   - update_issue
   - update_project
   - whoami

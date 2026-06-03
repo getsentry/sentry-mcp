@@ -3,7 +3,12 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { setUser } from "@sentry/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "./server";
-import type { ToolConfig } from "./tools/types";
+import tools from "./tools";
+import {
+  CATALOG_INFRASTRUCTURE_TOOL_NAMES,
+  TOP_LEVEL_TOOL_NAMES,
+} from "./tools/surfaces";
+import { isToolVisibleInMode, type ToolConfig } from "./tools/types";
 import type { ServerContext } from "./types";
 
 // Mock the Sentry core module
@@ -45,6 +50,71 @@ async function listRegisteredTools(server: ReturnType<typeof buildServer>) {
     await client.close();
     await server.close();
   }
+}
+
+async function callRegisteredTool(
+  server: ReturnType<typeof buildServer>,
+  name: string,
+  args: Record<string, unknown>,
+) {
+  const [clientTransport, serverTransport] =
+    InMemoryTransport.createLinkedPair();
+  const client = new Client({
+    name: "server-test-client",
+    version: "1.0.0",
+  });
+
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  try {
+    return await client.callTool({ name, arguments: args });
+  } finally {
+    await client.close();
+    await server.close();
+  }
+}
+
+function getTextContent(result: unknown): string {
+  const content = (result as { content?: Array<{ text?: string }> }).content;
+  return content?.find((item) => typeof item.text === "string")?.text ?? "";
+}
+
+function getStructuredContent<T extends Record<string, unknown>>(
+  result: unknown,
+): T {
+  const structuredContent = (result as { structuredContent?: unknown })
+    .structuredContent;
+  if (
+    !structuredContent ||
+    typeof structuredContent !== "object" ||
+    Array.isArray(structuredContent)
+  ) {
+    throw new Error(`No structured content found: ${JSON.stringify(result)}`);
+  }
+
+  return structuredContent as T;
+}
+
+const DOC_TOOL_NAMES = new Set(["search_docs", "get_doc"]);
+const CATALOG_GATEWAY_TOOL_NAMES = new Set<string>(
+  CATALOG_INFRASTRUCTURE_TOOL_NAMES,
+);
+
+function getExpectedTopLevelToolNames({
+  docs = false,
+  experimental = false,
+}: {
+  docs?: boolean;
+  experimental?: boolean;
+} = {}) {
+  return [...TOP_LEVEL_TOOL_NAMES]
+    .filter((toolName) => docs || !DOC_TOOL_NAMES.has(toolName))
+    .filter((toolName) => isToolVisibleInMode(tools[toolName], experimental))
+    .filter(
+      (toolName) => experimental || !CATALOG_GATEWAY_TOOL_NAMES.has(toolName),
+    )
+    .sort();
 }
 
 describe("buildServer", () => {
@@ -189,22 +259,6 @@ describe("buildServer", () => {
       const toolNames = getRegisteredToolNames(server);
       expect(toolNames).toContain("tool_with_false");
       expect(toolNames).toContain("tool_without_flag");
-    });
-
-    it("filters internal-only tools regardless of mode", () => {
-      const server = buildServer({
-        context: baseContext,
-        tools: {
-          public_tool: createMockTool("public_tool"),
-          internal_tool: createMockTool("internal_tool", {
-            internalOnly: true,
-          }),
-        },
-      });
-
-      const toolNames = getRegisteredToolNames(server);
-      expect(toolNames).toContain("public_tool");
-      expect(toolNames).not.toContain("internal_tool");
     });
   });
 
@@ -507,14 +561,12 @@ describe("buildServer", () => {
       expect(toolNames).not.toContain("get_snapshot");
       expect(toolNames).not.toContain("get_snapshot_image");
       expect(toolNames).not.toContain("get_snapshot_details");
-      // Currently no default tools are gated behind experimental visibility
+      expect(toolNames).not.toContain("search_tools");
+      expect(toolNames).not.toContain("execute_tool");
       expect(toolNames.length).toBeGreaterThan(0);
     });
 
     it("filters experimental default tools when experimentalMode is false", () => {
-      // This test validates the filtering code path with default tools
-      // Since no default tools are currently marked experimental, this verifies
-      // the code runs without error
       const server = buildServer({
         context: baseContext,
         experimentalMode: false,
@@ -526,6 +578,8 @@ describe("buildServer", () => {
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
+      expect(toolNames).not.toContain("search_tools");
+      expect(toolNames).not.toContain("execute_tool");
     });
 
     it("includes all default tools when experimentalMode is true", () => {
@@ -540,6 +594,8 @@ describe("buildServer", () => {
       expect(toolNames).toContain("get_sentry_resource");
       expect(toolNames).not.toContain("get_issue_details");
       expect(toolNames).not.toContain("get_trace_details");
+      expect(toolNames).toContain("search_tools");
+      expect(toolNames).toContain("execute_tool");
     });
 
     it("keeps get_sentry_resource available for legacy triage and seer skills", () => {
@@ -557,14 +613,101 @@ describe("buildServer", () => {
       }
     });
 
-    it("exposes snapshot tools only when preprod skill is granted", () => {
+    it("discloses exactly the top-level tools allowed by granted skills through MCP tools/list", async () => {
+      const server = buildServer({
+        context: baseContext,
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+      const toolNames = registeredTools.map((tool) => tool.name).sort();
+      const expectedToolNames = getExpectedTopLevelToolNames();
+
+      expect(toolNames).toEqual(expectedToolNames);
+      expect(toolNames).not.toContain("search_tools");
+      expect(toolNames).not.toContain("execute_tool");
+      expect(toolNames).not.toContain("use_sentry");
+      expect(toolNames).not.toContain("search_docs");
+      expect(toolNames).not.toContain("get_doc");
+      expect(toolNames).not.toContain("get_issue_details");
+      expect(toolNames).not.toContain("get_trace_details");
+      expect(toolNames).not.toContain("get_profile");
+    });
+
+    it("discloses docs tools through MCP tools/list when docs skill is granted", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          grantedSkills: new Set([
+            "inspect",
+            "triage",
+            "project-management",
+            "seer",
+            "docs",
+          ]),
+        },
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+      const toolNames = registeredTools.map((tool) => tool.name).sort();
+
+      expect(toolNames).toEqual(getExpectedTopLevelToolNames({ docs: true }));
+      expect(toolNames).toContain("search_docs");
+      expect(toolNames).toContain("get_doc");
+      expect(toolNames).not.toContain("search_tools");
+      expect(toolNames).not.toContain("execute_tool");
+    });
+
+    it("discloses catalog gateway tools through MCP tools/list in experimental mode", async () => {
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+      const toolNames = registeredTools.map((tool) => tool.name).sort();
+
+      expect(toolNames).toEqual(
+        getExpectedTopLevelToolNames({ experimental: true }),
+      );
+      expect(toolNames).toContain("search_tools");
+      expect(toolNames).toContain("execute_tool");
+    });
+
+    it("discloses only use_sentry through MCP tools/list in agent mode", async () => {
+      const server = buildServer({
+        context: baseContext,
+        agentMode: true,
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+
+      expect(registeredTools.map((tool) => tool.name)).toEqual(["use_sentry"]);
+    });
+
+    it("keeps preprod tools catalog-only while enforcing their skill gate", async () => {
       const withoutPreprod = buildServer({
         context: baseContext,
+        experimentalMode: true,
       });
       const withoutPreprodToolNames = getRegisteredToolNames(withoutPreprod);
       expect(withoutPreprodToolNames).not.toContain("get_snapshot");
       expect(withoutPreprodToolNames).not.toContain("get_snapshot_image");
       expect(withoutPreprodToolNames).not.toContain("get_latest_base_snapshot");
+
+      const hiddenResult = await callRegisteredTool(
+        withoutPreprod,
+        "search_tools",
+        {
+          query: "snapshot",
+          limit: 10,
+        },
+      );
+      const hiddenPayload = getStructuredContent<{
+        results: Array<{ name: string }>;
+      }>(hiddenResult);
+      expect(hiddenPayload.results.map((tool) => tool.name)).not.toContain(
+        "get_snapshot",
+      );
 
       const withPreprod = buildServer({
         context: {
@@ -577,11 +720,28 @@ describe("buildServer", () => {
             "preprod",
           ]),
         },
+        experimentalMode: true,
       });
       const withPreprodToolNames = getRegisteredToolNames(withPreprod);
-      expect(withPreprodToolNames).toContain("get_snapshot");
-      expect(withPreprodToolNames).toContain("get_snapshot_image");
-      expect(withPreprodToolNames).toContain("get_latest_base_snapshot");
+      expect(withPreprodToolNames).not.toContain("get_snapshot");
+      expect(withPreprodToolNames).not.toContain("get_snapshot_image");
+      expect(withPreprodToolNames).not.toContain("get_latest_base_snapshot");
+
+      const visibleResult = await callRegisteredTool(
+        withPreprod,
+        "search_tools",
+        {
+          query: "snapshot",
+          limit: 10,
+        },
+      );
+      const visiblePayload = getStructuredContent<{
+        results: Array<{ name: string }>;
+      }>(visibleResult);
+      const catalogToolNames = visiblePayload.results.map((tool) => tool.name);
+      expect(catalogToolNames).toContain("get_snapshot");
+      expect(catalogToolNames).toContain("get_snapshot_image");
+      expect(catalogToolNames).toContain("get_latest_base_snapshot");
     });
 
     it("exposes use_sentry safety annotations through tool metadata in agent mode", async () => {
@@ -603,6 +763,217 @@ describe("buildServer", () => {
           openWorldHint: true,
         },
       });
+    });
+
+    it("exposes catalog tools with conservative safety annotations", async () => {
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+      });
+
+      const registeredTools = await listRegisteredTools(server);
+      const searchTools = registeredTools.find(
+        (tool) => tool.name === "search_tools",
+      );
+      const executeTool = registeredTools.find(
+        (tool) => tool.name === "execute_tool",
+      );
+
+      expect(searchTools).toMatchObject({
+        name: "search_tools",
+        outputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            results: { type: "array" },
+          },
+          required: ["query", "results"],
+        },
+        annotations: {
+          readOnlyHint: true,
+          openWorldHint: false,
+        },
+      });
+      expect(executeTool).toMatchObject({
+        name: "execute_tool",
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          openWorldHint: true,
+        },
+      });
+    });
+
+    it("search_tools returns available tools with constrained schemas", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "bound-org",
+            projectSlug: null,
+          },
+        },
+        experimentalMode: true,
+      });
+
+      const result = await callRegisteredTool(server, "search_tools", {
+        query: "replay",
+        limit: 1,
+      });
+      const payload = getStructuredContent<{
+        query: string;
+        results: Array<
+          {
+            name: string;
+            inputSchema: {
+              properties?: Record<string, unknown>;
+            };
+          } & Record<string, unknown>
+        >;
+      }>(result);
+      const firstResult = payload.results[0];
+
+      expect(payload.query).toBe("replay");
+      expect(getTextContent(result)).toBe(JSON.stringify(payload, null, 2));
+      expect(getTextContent(result)).not.toContain("# Tool Search Results");
+      expect(getTextContent(result)).not.toContain("```json");
+      expect(firstResult?.name).toBe("get_replay_details");
+      expect(Object.keys(firstResult ?? {}).sort()).toEqual([
+        "annotations",
+        "description",
+        "inputSchema",
+        "name",
+      ]);
+      expect(firstResult).not.toHaveProperty("requiredSkills");
+      expect(firstResult).not.toHaveProperty("requiredScopes");
+      expect(firstResult).not.toHaveProperty("skills");
+      expect(firstResult?.inputSchema.properties).not.toHaveProperty(
+        "organizationSlug",
+      );
+    });
+
+    it("search_tools hides constraint-injected schema parameters", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "sentry-mcp-evals",
+            projectSlug: "cloudflare-mcp",
+            regionUrl: "https://us.sentry.io",
+          },
+        },
+        experimentalMode: true,
+      });
+
+      const result = await callRegisteredTool(server, "search_tools", {
+        query: "issues",
+        limit: 10,
+      });
+      const payload = getStructuredContent<{
+        results: Array<{
+          name: string;
+          inputSchema: {
+            properties?: Record<string, unknown>;
+          };
+        }>;
+      }>(result);
+      const searchIssues = payload.results.find(
+        (tool) => tool.name === "search_issues",
+      );
+
+      expect(searchIssues?.inputSchema.properties).not.toHaveProperty(
+        "organizationSlug",
+      );
+      expect(searchIssues?.inputSchema.properties).not.toHaveProperty(
+        "projectSlugOrId",
+      );
+      expect(searchIssues?.inputSchema.properties).not.toHaveProperty(
+        "regionUrl",
+      );
+      expect(searchIssues?.inputSchema.properties).toHaveProperty("query");
+    });
+
+    it("search_tools includes catalog-only tools that are not directly registered", async () => {
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).not.toContain("get_issue_details");
+
+      const result = await callRegisteredTool(server, "search_tools", {
+        query: "issue details",
+        limit: 5,
+      });
+      const payload = getStructuredContent<{
+        results: Array<{ name: string }>;
+      }>(result);
+
+      expect(payload.results.map((tool) => tool.name)).toContain(
+        "get_issue_details",
+      );
+    });
+
+    it("execute_tool dispatches to an available tool", async () => {
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+      });
+
+      const result = await callRegisteredTool(server, "execute_tool", {
+        name: "find_organizations",
+        arguments: {},
+      });
+
+      expect(getTextContent(result)).toContain("# Organizations");
+    });
+
+    it("execute_tool dispatches to a catalog-only tool", async () => {
+      const server = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+      });
+
+      const toolNames = getRegisteredToolNames(server);
+      expect(toolNames).not.toContain("get_issue_details");
+
+      const result = await callRegisteredTool(server, "execute_tool", {
+        name: "get_issue_details",
+        arguments: {
+          organizationSlug: "sentry-mcp-evals",
+          issueId: "CLOUDFLARE-MCP-41",
+        },
+      });
+
+      expect(getTextContent(result)).toContain(
+        "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
+      );
+    });
+
+    it("execute_tool injects constrained arguments for catalog-only tools", async () => {
+      const server = buildServer({
+        context: {
+          ...baseContext,
+          constraints: {
+            organizationSlug: "sentry-mcp-evals",
+            projectSlug: null,
+            regionUrl: "https://us.sentry.io",
+          },
+        },
+        experimentalMode: true,
+      });
+
+      const result = await callRegisteredTool(server, "execute_tool", {
+        name: "get_issue_details",
+        arguments: {
+          issueId: "CLOUDFLARE-MCP-41",
+        },
+      });
+
+      expect(getTextContent(result)).toContain(
+        "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
+      );
     });
 
     it("exposes get_profile_details safety annotations through tool metadata", async () => {

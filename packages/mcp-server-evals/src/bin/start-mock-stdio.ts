@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { buildServer } from "@sentry/mcp-core/server";
 import { startStdio } from "@sentry/mcp-server/transports/stdio";
 import { mswServer } from "@sentry/mcp-server-mocks";
 import { SKILLS, type Skill } from "@sentry/mcp-core/skills";
+import type { ServerContext } from "@sentry/mcp-core/types";
 
 mswServer.listen({
   onUnhandledRequest: (req, print) => {
@@ -22,20 +23,20 @@ const accessToken = "mocked-access-token";
 // Grant all available skills for evals to ensure MSW mocks apply broadly
 const allSkills = Object.keys(SKILLS) as Skill[];
 
-const server = new McpServer({
-  name: "Sentry MCP",
-  version: "0.1.0",
-});
-
-// Run in-process MCP with all skills so MSW mocks apply
-startStdio(server, {
+const context: ServerContext = {
   accessToken,
+  sentryHost: process.env.SENTRY_HOST ?? "sentry.io",
   grantedSkills: new Set<Skill>(allSkills),
   constraints: {
     organizationSlug: null,
     projectSlug: null,
   },
-}).catch((err: unknown) => {
+};
+
+const server = buildServer({ context, experimentalMode: true });
+
+// Run in-process MCP with all skills so MSW mocks apply
+startStdio(server, context).catch((err: unknown) => {
   console.error("Server error:", err);
   process.exit(1);
 });

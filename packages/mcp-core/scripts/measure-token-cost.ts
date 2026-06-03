@@ -17,6 +17,8 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 
 // Lazy imports to avoid type bleed
 const toolsModule = await import("../src/tools/index.ts");
+const surfacesModule = await import("../src/tools/surfaces.ts");
+const toolTypesModule = await import("../src/tools/types.ts");
 
 /**
  * Parse CLI arguments
@@ -56,6 +58,8 @@ type ToolDefinition = {
   name: string;
   description: string;
   inputSchema: Record<string, ZodTypeAny>;
+  experimental?: boolean;
+  hideInExperimentalMode?: boolean;
   annotations?: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
@@ -154,9 +158,13 @@ async function main() {
       throw new Error("Failed to import tools from src/tools/index.ts");
     }
 
-    // Filter out use_sentry - it's agent-mode only, not part of normal MCP server
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { use_sentry, ...toolsToMeasure } = toolsDefault;
+    const toolsToMeasure = Object.fromEntries(
+      Object.entries(toolsDefault).filter(
+        ([, tool]) =>
+          surfacesModule.isDefaultTopLevelToolName(tool.name) &&
+          toolTypesModule.isToolVisibleInMode(tool, false),
+      ),
+    );
 
     // Format as MCP would send them (as a complete tools array)
     const mcpTools = formatToolsForMCP(toolsToMeasure);
