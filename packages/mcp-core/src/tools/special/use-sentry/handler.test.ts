@@ -129,6 +129,42 @@ describe("use_sentry handler", () => {
     expect(toolsArg.get_trace_details).toBeDefined();
   });
 
+  it("filters capability-gated tools for the embedded agent in experimental mode", async () => {
+    const projectConstrainedContext: ServerContext = {
+      ...mockContext,
+      experimentalMode: true,
+      constraints: {
+        organizationSlug: "constrained-org",
+        projectSlug: "constrained-project",
+        projectCapabilities: {
+          profiles: false,
+          replays: false,
+          traces: false,
+        },
+      },
+    };
+
+    mockUseSentryAgent.mockResolvedValue({
+      result: {
+        result: "Success",
+      },
+      toolCalls: [],
+    });
+
+    await useSentry.handler(
+      { request: "test capability filtering", trace: null },
+      projectConstrainedContext,
+    );
+
+    const toolsArg = mockUseSentryAgent.mock.calls[0][0].tools;
+    expect(toolsArg.search_issues).toBeDefined();
+    expect(toolsArg.get_issue_details).toBeDefined();
+    expect(toolsArg.get_profile).toBeUndefined();
+    expect(toolsArg.get_profile_details).toBeUndefined();
+    expect(toolsArg.get_replay_details).toBeUndefined();
+    expect(toolsArg.get_trace_details).toBeUndefined();
+  });
+
   it("excludes use_sentry from available tools to prevent recursion", async () => {
     mockUseSentryAgent.mockResolvedValue({
       result: {

@@ -7,7 +7,6 @@ import { useSentryAgent } from "./agent";
 import { buildServer } from "../../../server";
 import tools from "../../index";
 import { CATALOG_INFRASTRUCTURE_TOOL_NAMES } from "../../surfaces";
-import { isToolVisibleInMode } from "../../types";
 import type { ToolCall } from "../../../internal/agents/callEmbeddedAgent";
 
 /**
@@ -102,11 +101,7 @@ export default defineTool({
       ...CATALOG_INFRASTRUCTURE_TOOL_NAMES,
     ]);
     const toolsForAgent = Object.fromEntries(
-      Object.entries(tools).filter(
-        ([key, tool]) =>
-          !toolsToExclude.has(key) &&
-          isToolVisibleInMode(tool, context.experimentalMode ?? false),
-      ),
+      Object.entries(tools).filter(([key]) => !toolsToExclude.has(key)),
     );
 
     // Build internal MCP server with the provided context.
@@ -117,6 +112,7 @@ export default defineTool({
     // will need to pass CfWorkerJsonSchemaValidator through this path as well.
     const server = buildServer({
       context,
+      experimentalMode: context.experimentalMode ?? false,
       tools: toolsForAgent,
     });
 
