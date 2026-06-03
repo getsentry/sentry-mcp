@@ -514,7 +514,9 @@ export class SentryApiService {
             : JSON.stringify(result.error);
 
         throw createApiError(
-          `${context}: ${response.status} ${response.statusText ?? "Unknown"}`,
+          hasUsableDetail
+            ? detail
+            : `${context}: ${response.status} ${response.statusText ?? "Unknown"}`,
           response.status,
           detail,
           result.error,
@@ -1471,15 +1473,6 @@ export class SentryApiService {
     params?: { query?: string },
     opts?: RequestOptions,
   ): Promise<OrganizationList> {
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    queryParams.set("per_page", "25");
-    if (params?.query) {
-      queryParams.set("query", params.query);
-    }
-    const queryString = queryParams.toString();
-    const path = `/organizations/?${queryString}`;
-
     // For self-hosted instances, the regions endpoint doesn't exist
     if (!this.isSaas()) {
       const result = await sdkListYourOrganizations({
