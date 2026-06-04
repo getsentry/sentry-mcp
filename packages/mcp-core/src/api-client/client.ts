@@ -12,7 +12,6 @@ import {
   listAnOrganization_sProjects as sdkListAnOrganizationSProjects,
   listAnOrganization_sReleases as sdkListAnOrganizationSReleases,
   listAnOrganization_sReplays as sdkListAnOrganizationSReplays,
-  listAnOrganization_sTags as sdkListAnOrganizationSTags,
   listAnOrganization_sTeams as sdkListAnOrganizationSTeams,
   listRecordingSegments as sdkListRecordingSegments,
   listTraceItemAttributes as sdkListTraceItemAttributes,
@@ -36,6 +35,7 @@ import {
   updateAProject as sdkUpdateAProject,
   updateAnIssue as sdkUpdateAnIssue,
 } from "@sentry/api";
+import type { ListAnOrganizationSReplaysData } from "@sentry/api";
 import { z } from "zod";
 import { ConfigurationError } from "../errors";
 import { logIssue, logWarn } from "../telem/logging";
@@ -2591,33 +2591,19 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<TagList> {
-    // The SDK type doesn't include useCache, so we pass extra params via cast.
-    const sdkQuery: Record<string, unknown> = {};
-    if (dataset) {
-      sdkQuery.dataset = dataset;
-    }
-    if (project) {
-      sdkQuery.project = [Number(project)];
-    }
-    if (statsPeriod) {
-      sdkQuery.statsPeriod = statsPeriod;
-    } else if (start && end) {
-      sdkQuery.start = start;
-      sdkQuery.end = end;
-    }
-    if (useCache !== undefined) {
-      sdkQuery.useCache = useCache ? "1" : "0";
-    }
-    if (useFlagsBackend !== undefined) {
-      sdkQuery.useFlagsBackend = useFlagsBackend ? "1" : "0";
-    }
+    const params = new URLSearchParams();
+    if (dataset) params.set("dataset", dataset);
+    if (project) params.set("project", project);
+    this.applyTimeParams(params, statsPeriod, start, end);
+    if (useCache !== undefined) params.set("useCache", useCache ? "1" : "0");
+    if (useFlagsBackend !== undefined)
+      params.set("useFlagsBackend", useFlagsBackend ? "1" : "0");
 
-    const result = await sdkListAnOrganizationSTags({
-      ...this.getSdkConfig(opts),
-      path: { organization_id_or_slug: organizationSlug },
-      query: sdkQuery,
-    } as Parameters<typeof sdkListAnOrganizationSTags>[0]);
-    const data = this.unwrapSdkResult(result, "listTags");
+    const data = await this.requestJSON(
+      `/organizations/${organizationSlug}/tags/?${params}`,
+      undefined,
+      opts,
+    );
     return TagListSchema.parse(data);
   }
 
@@ -2647,34 +2633,29 @@ export class SentryApiService {
     },
     opts?: RequestOptions,
   ): Promise<ReplayList> {
-    const timeParams = new URLSearchParams();
-    this.applyTimeParams(timeParams, statsPeriod, start, end);
-
-    // The SDK's field type is a strict enum, but the API accepts arbitrary strings.
-    // We also need extra query params (project as string) not in the SDK type.
-    const sdkQuery: Record<string, unknown> = {
-      query,
-      per_page: limit,
-      sort,
-      ...Object.fromEntries(timeParams),
-      environment: environment
-        ? Array.isArray(environment)
-          ? environment
-          : [environment]
-        : undefined,
-    };
-    if (projectId) {
-      sdkQuery.project = [Number(projectId)];
-    }
-    if (fields && fields.length > 0) {
-      sdkQuery.field = fields;
-    }
-
     const result = await sdkListAnOrganizationSReplays({
       ...this.getSdkConfig(opts),
       path: { organization_id_or_slug: organizationSlug },
-      query: sdkQuery,
-    } as Parameters<typeof sdkListAnOrganizationSReplays>[0]);
+      query: {
+        query,
+        per_page: limit,
+        sort,
+        statsPeriod,
+        start,
+        end,
+        // SDK types environment as a single string
+        environment: Array.isArray(environment) ? environment[0] : environment,
+        ...(projectId ? { project: [Number(projectId)] } : {}),
+        // SDK types field as a strict enum — the API accepts arbitrary strings at runtime
+        ...(fields?.length
+          ? {
+              field: fields as NonNullable<
+                ListAnOrganizationSReplaysData["query"]
+              >["field"],
+            }
+          : {}),
+      },
+    });
     const data = this.unwrapSdkResult(result, "searchReplays");
 
     return ReplayListResponseSchema.parse(data).data;
