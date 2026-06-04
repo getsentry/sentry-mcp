@@ -33,7 +33,8 @@ const context: ServerContext = {
   },
 };
 
-const server = buildServer({ context, experimentalMode: true });
+const experimentalMode = process.env.SENTRY_MCP_EXPERIMENTAL_MODE !== "false";
+const server = buildServer({ context, experimentalMode });
 
 // Run in-process MCP with all skills so MSW mocks apply
 startStdio(server, context).catch((err: unknown) => {
