@@ -1,3 +1,4 @@
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 /**
  * Standard I/O Transport for MCP Server.
  *
@@ -19,10 +20,31 @@
  * ```
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import * as Sentry from "@sentry/node";
-import { LIB_VERSION } from "@sentry/mcp-core/version";
 import type { ServerContext } from "@sentry/mcp-core/types";
+import { LIB_VERSION } from "@sentry/mcp-core/version";
+import * as Sentry from "@sentry/node";
+
+function getStdioSpanAttributes(
+  context: ServerContext,
+): Record<string, string | boolean> {
+  const attributes: Record<string, string | boolean> = {
+    "app.transport": "stdio",
+    "app.server.version": LIB_VERSION,
+    "app.server.mode.agent": context.agentMode ?? false,
+    "app.server.mode.experimental": context.experimentalMode ?? false,
+    "network.transport": "pipe",
+    "service.version": LIB_VERSION,
+  };
+
+  if (context.sentryHost) {
+    attributes["app.upstream.host"] = context.sentryHost;
+  }
+  if (context.mcpUrl) {
+    attributes["app.url.full"] = context.mcpUrl;
+  }
+
+  return attributes;
+}
 
 /**
  * Starts the MCP server with stdio transport and telemetry.
@@ -56,11 +78,7 @@ export async function startStdio(server: McpServer, context: ServerContext) {
     return await Sentry.startSpan(
       {
         name: "mcp.server/stdio",
-        attributes: {
-          "app.transport": "stdio",
-          "network.transport": "pipe",
-          "service.version": LIB_VERSION,
-        },
+        attributes: getStdioSpanAttributes(context),
       },
       async () => {
         // Context already captured in tool handler closures during buildServer()

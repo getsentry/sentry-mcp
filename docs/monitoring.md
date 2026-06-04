@@ -154,10 +154,11 @@ These are Sentry MCP application attributes that are not part of the MCP semanti
 
 - `app.resource.type` - Resolved Sentry resource type for `get_sentry_resource`
 - `app.transport` - The product transport label (values: "http", "sse", "stdio")
+- `app.client.family` - Low-cardinality MCP client bucket derived from User-Agent or registered client name
 - `app.constraint.organization_slug` - Session organization constraint
 - `app.constraint.project_slug` - Session project constraint
-- `app.server.mode.agent` - Whether stdio started in agent mode
-- `app.server.mode.experimental` - Whether experimental tools are enabled
+- `app.server.mode.agent` - Whether agent mode is enabled for this MCP request or stdio session
+- `app.server.mode.experimental` - Whether experimental tools are enabled for this MCP request or stdio session
 - `app.consent.skill.<skill>.granted` - Per-skill boolean attributes for skills granted to the MCP request. Skill ids are normalized with `-` replaced by `_`
 - `app.upstream.host` - Upstream Sentry host configured for the server
 - `app.url.full` - MCP URL configured for stdio
@@ -262,6 +263,12 @@ Shared low-cardinality attributes:
 - `app.response.status_class` - Status family such as `2xx` or `4xx`
 - `app.route.group` - Coarse route family: `mcp`, `oauth`, `chat`, or `search`
 
+Additional attributes on MCP response metrics:
+
+- `app.client.family` - Bucketed MCP client User-Agent
+- `app.server.mode.agent` - `true` when the MCP URL includes `?agent=1`
+- `app.server.mode.experimental` - `true` when the MCP URL includes `?experimental=1`
+
 Optional local rate-limit attributes:
 
 - `app.response.reason` - `local_rate_limit`
@@ -271,6 +278,9 @@ Interpretation:
 
 - Use `sum(app.server.response)` grouped by `http.route` and
   `http.response.status_code` for response rates
+- Use `sum(app.server.response)` filtered to the MCP route and grouped by
+  `app.client.family`, `app.server.mode.agent`, and
+  `app.server.mode.experimental` for mode adoption
 - Use `sum(app.server.response)` filtered by
   `app.response.reason=local_rate_limit` to measure when we rate-limited the
   customer

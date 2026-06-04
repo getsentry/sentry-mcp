@@ -6,6 +6,7 @@ import { resolveClientFamily } from "./lib/client-family";
 import sentryMcpHandler from "./lib/mcp-handler";
 import {
   type RateLimitScope,
+  annotateMcpRequestSpan,
   extractResponseMetricOptions,
   recordResponseMetric,
   stripResponseMetricHeaders,
@@ -92,6 +93,7 @@ function finalizeResponse(
     ? addCorsHeaders(responseWithoutMetricHeaders)
     : stripCorsHeaders(responseWithoutMetricHeaders);
 
+  annotateMcpRequestSpan(request, url);
   recordResponseMetric(request, finalized, {
     ...responseMetricOptions,
     ...options,

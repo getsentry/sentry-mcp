@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/cloudflare";
+import { resolveClientFamily } from "./lib/client-family";
 
 export type RateLimitScope = "ip" | "user";
 type ResponseReason = "local_rate_limit";
@@ -76,6 +77,18 @@ function getStatusClass(status: number): string {
   return `${Math.floor(status / 100)}xx`;
 }
 
+function getBooleanAttribute(value: boolean): string {
+  return value ? "true" : "false";
+}
+
+function getMcpRequestAttributes(request: Request, url: URL) {
+  return {
+    clientFamily: resolveClientFamily(request.headers.get("user-agent")),
+    agentMode: url.searchParams.get("agent") === "1",
+    experimentalMode: url.searchParams.get("experimental") === "1",
+  };
+}
+
 function getMetricAttributes(
   request: Request,
 ): Record<string, string | number> | null {
@@ -83,17 +96,57 @@ function getMetricAttributes(
     return null;
   }
 
-  const trackedRoute = classifyTrackedRoute(new URL(request.url).pathname);
+  const url = new URL(request.url);
+  const trackedRoute = classifyTrackedRoute(url.pathname);
 
   if (!trackedRoute) {
     return null;
   }
 
-  return {
+  const attributes: Record<string, string | number> = {
     "http.request.method": request.method,
     "http.route": trackedRoute.route,
     "app.route.group": trackedRoute.group,
   };
+
+  if (trackedRoute.group === "mcp") {
+    const mcpAttributes = getMcpRequestAttributes(request, url);
+    attributes["app.client.family"] = mcpAttributes.clientFamily;
+    attributes["app.server.mode.agent"] = getBooleanAttribute(
+      mcpAttributes.agentMode,
+    );
+    attributes["app.server.mode.experimental"] = getBooleanAttribute(
+      mcpAttributes.experimentalMode,
+    );
+  }
+
+  return attributes;
+}
+
+export function annotateMcpRequestSpan(request: Request, url: URL): void {
+  if (request.method === "OPTIONS") {
+    return;
+  }
+
+  const trackedRoute = classifyTrackedRoute(url.pathname);
+
+  if (trackedRoute?.group !== "mcp") {
+    return;
+  }
+
+  const activeSpan = Sentry.getActiveSpan();
+  if (!activeSpan) {
+    return;
+  }
+
+  const mcpAttributes = getMcpRequestAttributes(request, url);
+  activeSpan.setAttribute("app.transport", "http");
+  activeSpan.setAttribute("app.client.family", mcpAttributes.clientFamily);
+  activeSpan.setAttribute("app.server.mode.agent", mcpAttributes.agentMode);
+  activeSpan.setAttribute(
+    "app.server.mode.experimental",
+    mcpAttributes.experimentalMode,
+  );
 }
 
 export function annotateResponseMetric(

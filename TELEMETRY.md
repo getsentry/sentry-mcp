@@ -38,21 +38,23 @@ the pivots and recipes below.
 | `app.rate_limit.scope` | local rate-limit scope | metrics | IP vs user rate limits |
 | `app.route.group` | coarse route family | metrics | `mcp`, `oauth`, `chat`, `search` |
 | `app.transport` | MCP transport | tags, spans | `http`, `sse`, or `stdio` |
+| `app.server.mode.agent` | agent-mode flag | metrics, spans, tags | `?agent=1` or stdio `--agent` adoption |
+| `app.server.mode.experimental` | experimental-mode flag | metrics, spans, tags | `?experimental=1` or stdio `--experimental` adoption |
 | `mcp.session.id` | MCP session identity | spans | session timeline |
 | `gen_ai.tool.name` | MCP tool being called | spans, issues | tool timeline |
 | `app.resource.type` | resolved Sentry resource type | spans | resource dispatch |
 | `app.constraint.organization_slug` | active organization constraint | spans | constrained session behavior |
 | `app.constraint.project_slug` | active project constraint | spans | constrained session behavior |
 | `gen_ai.tool.call.arguments.<key>` | effective tool arguments | spans | called tool input |
-| `app.client.family` | bucketed MCP client family | metrics | client-specific OAuth behavior |
+| `app.client.family` | bucketed MCP client family | metrics, spans | client-specific OAuth behavior |
 | `app.oauth.token_exchange.outcome` | OAuth refresh outcome | metrics | token refresh diagnosis |
 | `app.oauth.grant_revoked.reason` | wrapper grant revoke reason | metrics | sign-out diagnosis |
 | `app.consent.skill` | skill granted during approval | metrics | per-skill adoption |
 | `app.consent.skill.<skill>.granted` | skill granted on an MCP request | spans | tool behavior by enabled skills |
 | `app.oauth.probe.status_code` | upstream probe HTTP status | metrics | Sentry token validity probe result |
 | `app.oauth.probe.reason` | indeterminate probe bucket | metrics | upstream instability |
-| `app.upstream.host` | configured Sentry host | tags | host-specific behavior |
-| `app.server.version` | MCP server package version | tags | release/version behavior |
+| `app.upstream.host` | configured Sentry host | tags, spans | host-specific behavior |
+| `app.server.version` | MCP server package version | tags, spans | release/version behavior |
 | `app.utm_source` | sanitized in-product `utm_source` query param | spans | in-product attribution |
 | `app.referrer.family` | low-cardinality bucket of the `Referer` host | spans | external traffic attribution |
 | `gen_ai.provider.name` | GenAI provider | spans, tags | provider-specific model behavior |
@@ -81,8 +83,16 @@ HTTP response rates by route and status.
 
 ```text
 dataset=tracemetrics query='metric:app.server.response http.route:"<route>"'
-fields=timestamp,metric,http.request.method,http.route,http.response.status_code,app.response.status_class,app.route.group,value
+fields=timestamp,metric,http.request.method,http.route,http.response.status_code,app.response.status_class,app.route.group,app.client.family,app.server.mode.agent,app.server.mode.experimental,value
 aggregate=sum(value) by http.route,http.response.status_code
+```
+
+MCP mode adoption by client family.
+
+```text
+dataset=tracemetrics query='metric:app.server.response http.route:"/mcp/:organizationSlug?/:projectSlug?"'
+fields=timestamp,metric,app.client.family,app.server.mode.agent,app.server.mode.experimental,value
+aggregate=sum(value) by app.client.family,app.server.mode.agent,app.server.mode.experimental
 ```
 
 Local rate-limit volume and scope.
@@ -129,7 +139,7 @@ Tool execution timeline for a slow or failing tool.
 
 ```text
 dataset=spans query='gen_ai.tool.name:"<tool_name>" app.consent.skill.<skill>.granted:true'
-fields=timestamp,trace,span_id,span.op,span.duration,gen_ai.tool.name,app.constraint.organization_slug,app.constraint.project_slug,gen_ai.tool.call.arguments.organizationSlug,gen_ai.tool.call.arguments.projectSlugOrId,error.type
+fields=timestamp,trace,span_id,span.op,span.duration,gen_ai.tool.name,app.transport,app.client.family,app.server.mode.agent,app.server.mode.experimental,app.constraint.organization_slug,app.constraint.project_slug,gen_ai.tool.call.arguments.organizationSlug,gen_ai.tool.call.arguments.projectSlugOrId,error.type
 sort=-timestamp
 ```
 
@@ -172,7 +182,9 @@ Metrics: `app.server.response`
 Attributes: `http.request.method`, `http.route`,
 `http.response.status_code`, `app.response.status_class`,
 `app.route.group`, `app.response.reason`, `app.rate_limit.scope`,
-`app.request.duration_ms`
+`app.request.duration_ms`. MCP responses also include
+`app.client.family`, `app.server.mode.agent`, and
+`app.server.mode.experimental`.
 
 ### OAuth And Client Registration
 
@@ -255,10 +267,10 @@ Attributes: `gen_ai.provider.name`, `gen_ai.request.model`,
   full request bodies, or other high-cardinality or sensitive values.
 - Do not log secrets. Authorization headers and access tokens must remain
   scrubbed.
-- Update this document, `docs/monitoring.md`, and
-  `packages/mcp-core/src/internal/agents/tools/data/mcp.json` when adding or
-  renaming telemetry fields. Do not add unit tests solely to assert telemetry
-  attribute spelling.
+- Update this document, `docs/monitoring.md`, and the relevant semantic lookup
+  data file under `packages/mcp-core/src/internal/agents/tools/data/` when
+  adding or renaming telemetry fields. Do not add unit tests solely to assert
+  telemetry attribute spelling.
 
 ## References
 

@@ -166,7 +166,14 @@ const mcpHandler: ExportedHandler<Env> = {
       userId,
     );
 
-    Sentry.getActiveSpan()?.setAttribute("app.client.family", clientFamily);
+    const activeSpan = Sentry.getActiveSpan();
+    activeSpan?.setAttribute("app.transport", "http");
+    activeSpan?.setAttribute("app.client.family", clientFamily);
+    activeSpan?.setAttribute("app.server.mode.agent", isAgentMode);
+    activeSpan?.setAttribute(
+      "app.server.mode.experimental",
+      isExperimentalMode,
+    );
 
     // Parse and validate granted skills (primary authorization method)
     // Legacy tokens without grantedSkills are no longer supported
@@ -257,7 +264,6 @@ const mcpHandler: ExportedHandler<Env> = {
       );
     }
 
-    const activeSpan = Sentry.getActiveSpan();
     for (const skill of Array.from(validSkills).sort()) {
       activeSpan?.setAttribute(getSkillGrantedAttributeName(skill), true);
     }
