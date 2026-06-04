@@ -63,6 +63,29 @@ function isNonNull<T>(value: T | null): value is T {
   return value !== null;
 }
 
+type DefinitionTool = {
+  name: string;
+  description:
+    | string
+    | ((context: {
+        experimentalMode: boolean;
+        availableToolNames?: ReadonlySet<string>;
+        directToolNames?: ReadonlySet<string>;
+      }) => string);
+  inputSchema: Record<string, ZodTypeAny>;
+  skills: string[];
+  requiredScopes: string[];
+  experimental?: boolean;
+  hideInExperimentalMode?: boolean;
+};
+
+function isSkillDefinitionTool(tool: DefinitionTool): boolean {
+  return (
+    !surfacesModule.isWrapperToolName(tool.name) &&
+    !surfacesModule.isCatalogInfrastructureToolName(tool.name)
+  );
+}
+
 // Tools
 function generateToolDefinitions({
   experimentalMode,
@@ -79,16 +102,7 @@ function generateToolDefinitions({
   const defs = Object.entries(toolsDefault).map(([key, tool]) => {
     if (!tool || typeof tool !== "object")
       throw new Error(`Invalid tool: ${key}`);
-    const t = tool as {
-      name: string;
-      description:
-        | string
-        | ((context: { experimentalMode: boolean }) => string);
-      inputSchema: Record<string, ZodTypeAny>;
-      requiredScopes: string[]; // must exist on all tools (can be empty)
-      experimental?: boolean;
-      hideInExperimentalMode?: boolean;
-    };
+    const t = tool as DefinitionTool;
     if (!surfacesModule.isTopLevelToolName(t.name, experimentalMode)) {
       return null;
     }
@@ -151,39 +165,36 @@ async function generateSkillDefinitions() {
       requiredScopes: string[];
     }> = [];
 
-    for (const [toolName, tool] of Object.entries(toolsDefault)) {
+    const skillToolEntries = Object.entries(toolsDefault).filter(([, tool]) => {
       if (!tool || typeof tool !== "object") {
-        continue;
+        return false;
       }
 
-      const t = tool as {
-        name: string;
-        description:
-          | string
-          | ((context: { experimentalMode: boolean }) => string);
-        skills: string[];
-        requiredScopes: string[];
-      };
+      const t = tool as DefinitionTool;
+      return (
+        isSkillDefinitionTool(t) &&
+        Array.isArray(t.skills) &&
+        t.skills.includes(skill.id)
+      );
+    });
+    const skillToolNames = new Set(
+      skillToolEntries.flatMap(([toolKey, tool]) => {
+        const t = tool as DefinitionTool;
+        return [toolKey, t.name];
+      }),
+    );
 
-      if (
-        surfacesModule.isWrapperToolName(t.name) ||
-        surfacesModule.isCatalogInfrastructureToolName(t.name)
-      ) {
-        continue;
-      }
-
-      // Check if this tool is enabled by this skill
-      if (Array.isArray(t.skills) && t.skills.includes(skill.id)) {
-        skillTools.push({
-          name: t.name,
-          description: toolTypesModule.resolveDescription(t.description, {
-            experimentalMode: false,
-          }),
-          requiredScopes: Array.isArray(t.requiredScopes)
-            ? t.requiredScopes
-            : [],
-        });
-      }
+    for (const [, tool] of skillToolEntries) {
+      const t = tool as DefinitionTool;
+      skillTools.push({
+        name: t.name,
+        description: toolTypesModule.resolveDescription(t.description, {
+          experimentalMode: false,
+          availableToolNames: skillToolNames,
+          directToolNames: skillToolNames,
+        }),
+        requiredScopes: Array.isArray(t.requiredScopes) ? t.requiredScopes : [],
+      });
     }
 
     // Sort tools alphabetically by name
