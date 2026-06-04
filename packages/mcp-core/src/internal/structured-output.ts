@@ -87,10 +87,12 @@ function previewStructuredValue(
   if (typeof value === "object") {
     if (depth >= (options.depthLimit ?? STRUCTURED_PREVIEW_DEPTH_LIMIT)) {
       const keys = Object.keys(value);
+      const limit =
+        options.objectKeyLimit ?? STRUCTURED_PREVIEW_OBJECT_KEY_LIMIT;
       state.truncated = state.truncated || keys.length > 0;
       return {
         type: "object",
-        keys: keys.slice(0, options.objectKeyLimit ?? 10),
+        keys: keys.slice(0, limit),
       };
     }
 
