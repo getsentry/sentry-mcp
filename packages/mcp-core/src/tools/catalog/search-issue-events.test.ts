@@ -209,11 +209,6 @@ describe("search_issue_events", () => {
       schemaVersion: "sentry.mcp.search_issue_events.v1",
       security: {
         note: expect.stringContaining("user-controlled telemetry"),
-        untrustedFields: expect.arrayContaining([
-          "issue.identifier",
-          "search.query",
-          "results.data",
-        ]),
       },
       meta: {
         organizationSlug: "test-org",
@@ -248,6 +243,9 @@ describe("search_issue_events", () => {
         ],
       },
     });
+    expect(result.structuredContent.security).not.toHaveProperty(
+      "untrustedFields",
+    );
   });
 
   it("should include user geo details in formatted event output", async () => {

@@ -304,11 +304,6 @@ describe("search_events", () => {
       schemaVersion: "sentry.mcp.search_events.v1",
       security: {
         note: expect.stringContaining("user-controlled telemetry"),
-        untrustedFields: expect.arrayContaining([
-          "search.query",
-          "search.requestFields",
-          "results.data",
-        ]),
       },
       meta: {
         organizationSlug: "test-org",
@@ -339,6 +334,9 @@ describe("search_events", () => {
         ],
       },
     });
+    expect(result.structuredContent.security).not.toHaveProperty(
+      "untrustedFields",
+    );
     expect(result.structuredContent.links).toMatchObject({
       explorer: expect.stringContaining("https://test-org.sentry.io"),
     });
@@ -1696,6 +1694,9 @@ describe("search_events", () => {
 
     expect(result.structuredContent).toMatchObject({
       schemaVersion: "sentry.mcp.search_events.v1",
+      security: {
+        note: expect.stringContaining("user-controlled telemetry"),
+      },
       meta: {
         organizationSlug: "test-org",
         projectSlug: null,
@@ -1724,6 +1725,9 @@ describe("search_events", () => {
         ],
       },
     });
+    expect(result.structuredContent.security).not.toHaveProperty(
+      "untrustedFields",
+    );
   });
 
   it("should not add default statsPeriod to replay absolute time ranges", async () => {

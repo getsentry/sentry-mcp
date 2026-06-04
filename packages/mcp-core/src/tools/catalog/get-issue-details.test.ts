@@ -296,12 +296,6 @@ describe("get_issue_details", () => {
       schemaVersion: "sentry.mcp.issue_details.v1",
       security: {
         note: expect.stringContaining("user-controlled telemetry"),
-        untrustedFields: expect.arrayContaining([
-          "issue.title",
-          "event.entries",
-          "event.contexts",
-          "related.autofixState",
-        ]),
       },
       meta: {
         organizationSlug: "sentry-mcp-evals",
@@ -334,6 +328,9 @@ describe("get_issue_details", () => {
         issue: "https://sentry-mcp-evals.sentry.io/issues/CLOUDFLARE-MCP-41",
       },
     });
+    expect(result.structuredContent.security).not.toHaveProperty(
+      "untrustedFields",
+    );
   });
 
   it("omits null culprit values from issue output", async () => {

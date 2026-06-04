@@ -53,16 +53,7 @@ function formatSearchIssueEventsResult(
 
   return createStructuredToolResult({
     schemaVersion: SEARCH_ISSUE_EVENTS_STRUCTURED_CONTENT_VERSION,
-    security: createStructuredOutputSecurity([
-      "issue.identifier",
-      "search.inputQuery",
-      "search.query",
-      "search.fields",
-      "search.sort",
-      "search.timeRange",
-      "search.explanation",
-      "results.data",
-    ]),
+    security: createStructuredOutputSecurity(),
     meta: {
       organizationSlug: params.organizationSlug,
       issueIdentifier: params.issueIdentifier,

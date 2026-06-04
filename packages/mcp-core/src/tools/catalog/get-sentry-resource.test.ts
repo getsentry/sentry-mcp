@@ -122,6 +122,9 @@ describe("get_sentry_resource", () => {
       ]);
       expect(result.structuredContent).toMatchObject({
         schemaVersion: "sentry.mcp.issue_details.v1",
+        security: {
+          note: expect.stringContaining("user-controlled telemetry"),
+        },
         issue: {
           shortId: "CLOUDFLARE-MCP-41",
           title: "Error: Tool list_organizations is already registered",
@@ -130,6 +133,9 @@ describe("get_sentry_resource", () => {
           id: "7ca573c0f4814912aaa9bdc77d1a7d51",
         },
       });
+      expect(result.structuredContent.security).not.toHaveProperty(
+        "untrustedFields",
+      );
     });
 
     it("resolves issue from path-based org URL (/{org}/issues/)", async () => {

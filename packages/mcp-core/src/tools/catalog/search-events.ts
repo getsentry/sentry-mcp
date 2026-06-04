@@ -291,16 +291,7 @@ function formatSearchEventsResult(
 
   return createStructuredToolResult({
     schemaVersion: SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION,
-    security: createStructuredOutputSecurity([
-      "search.inputQuery",
-      "search.query",
-      "search.fields",
-      "search.requestFields",
-      "search.sort",
-      "search.timeRange",
-      "search.explanation",
-      "results.data",
-    ]),
+    security: createStructuredOutputSecurity(),
     meta: {
       organizationSlug: params.organizationSlug,
       projectSlug: params.projectSlug ?? null,
@@ -338,15 +329,7 @@ function formatSearchEventsReplayResult(
 
   return createStructuredToolResult({
     schemaVersion: SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION,
-    security: createStructuredOutputSecurity([
-      "search.inputQuery",
-      "search.query",
-      "search.sort",
-      "search.environment",
-      "search.timeRange",
-      "search.explanation",
-      "results.data",
-    ]),
+    security: createStructuredOutputSecurity(),
     meta: {
       organizationSlug: params.organizationSlug,
       projectSlug: params.projectSlug ?? null,

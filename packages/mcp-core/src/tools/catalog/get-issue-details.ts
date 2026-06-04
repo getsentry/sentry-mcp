@@ -296,23 +296,7 @@ function formatIssueDetailsStructuredContent({
 
   return {
     schemaVersion: ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION,
-    security: createStructuredOutputSecurity([
-      "issue.title",
-      "issue.culprit",
-      "issue.metadata",
-      "event.title",
-      "event.message",
-      "event.entries",
-      "event.context",
-      "event.contexts",
-      "event.tags",
-      "event.user",
-      "event.occurrence",
-      "related.autofixState",
-      "related.externalIssues",
-      "related.replayIds",
-      "related.performanceTrace",
-    ]),
+    security: createStructuredOutputSecurity(),
     meta: {
       organizationSlug,
       projectSlug: issue.project.slug,
