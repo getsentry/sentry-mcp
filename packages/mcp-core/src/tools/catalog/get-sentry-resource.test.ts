@@ -1,16 +1,16 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { http, HttpResponse } from "msw";
-import { encode as encodePng } from "fast-png";
 import {
+  eventFixture,
   mswServer,
   organizationFixture,
-  transactionProfileV1Fixture,
   replayDetailsFixture,
+  traceFixture,
   traceMetaFixture,
   traceMixedFixture,
-  traceFixture,
-  eventFixture,
+  transactionProfileV1Fixture,
 } from "@sentry/mcp-server-mocks";
+import { encode as encodePng } from "fast-png";
+import { http, HttpResponse } from "msw";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import getSentryResource from "./get-sentry-resource.js";
 
 const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
@@ -338,9 +338,9 @@ describe("get_sentry_resource", () => {
 
         ## Next Steps
 
-        - **Search spans**: \`search_events(organizationSlug='test-org', dataset='spans', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-        - **Search errors**: \`search_events(organizationSlug='test-org', dataset='errors', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-        - **Search logs**: \`search_events(organizationSlug='test-org', dataset='logs', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
+        - **Search spans**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='spans', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+        - **Search errors**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='errors', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+        - **Search logs**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='logs', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
       `);
     });
 
@@ -489,7 +489,7 @@ describe("get_sentry_resource", () => {
         To get release information:
 
         - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/v1.2.3/)
-        - **Find releases**: Use \`find_releases(organizationSlug='my-org')\` to list releases and their details
+        - **Find releases**: Use the Sentry tool \`find_releases(organizationSlug='my-org')\` to list releases and their details
         - **Search issues**: Use \`search_issues\` with query \`release:v1.2.3\` to find issues in this release"
       `);
     });
@@ -507,7 +507,7 @@ describe("get_sentry_resource", () => {
         To get release information:
 
         - **View in Sentry**: [Open Release](https://my-org.sentry.io/releases/backend@2024.01.15-abc123/)
-        - **Find releases**: Use \`find_releases(organizationSlug='my-org')\` to list releases and their details
+        - **Find releases**: Use the Sentry tool \`find_releases(organizationSlug='my-org')\` to list releases and their details
         - **Search issues**: Use \`search_issues\` with query \`release:backend@2024.01.15-abc123\` to find issues in this release"
       `);
     });
@@ -844,7 +844,7 @@ describe("get_sentry_resource", () => {
         'get_sentry_resource(resourceType="snapshotImage", resourceId="55:<image_file_name>")',
       );
       expect(result).toContain(
-        "- To fetch original full-resolution image bytes, use `get_snapshot_image`",
+        "- Full-resolution snapshot image bytes are not available in this session",
       );
       expect(result).not.toContain("?selectedSnapshot=");
     });
@@ -940,7 +940,7 @@ describe("get_sentry_resource", () => {
       expect(result[0]).toMatchObject({
         type: "text",
         text: expect.stringContaining(
-          'set `imageResolution="full"` in `get_snapshot_image`',
+          "Full-resolution snapshot image bytes are not available in this session",
         ),
       });
     });
@@ -1014,7 +1014,7 @@ describe("get_sentry_resource", () => {
       expect(result[0]).toMatchObject({
         type: "text",
         text: expect.stringContaining(
-          '- **Full Resolution**: set `imageResolution="full"` in `get_snapshot_image`',
+          "- **Full Resolution**: Full-resolution snapshot image bytes are not available in this session",
         ),
       });
       expect(result).toContainEqual(

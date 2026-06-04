@@ -72,7 +72,11 @@ export function searchToolCatalog({
   })
     .map(({ tool }) => {
       const inputSchema = getFilteredInputSchema(tool, context);
-      const description = resolveToolDescription(tool, experimentalMode);
+      const description = resolveToolDescription(tool, {
+        experimentalMode,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
+      });
       const searchable: SearchableToolText = {
         name: tool.name,
         description,

@@ -168,6 +168,8 @@ export default defineTool({
         externalIssues,
         relatedReplayIds,
         experimentalMode: context.experimentalMode,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
       });
     }
 
@@ -248,6 +250,8 @@ export default defineTool({
       externalIssues,
       relatedReplayIds,
       experimentalMode: context.experimentalMode,
+      availableToolNames: context.availableToolNames,
+      directToolNames: context.directToolNames,
     });
   },
 });

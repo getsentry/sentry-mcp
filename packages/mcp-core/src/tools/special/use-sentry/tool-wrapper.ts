@@ -78,6 +78,8 @@ export function wrapToolForAgent<TSchema extends Record<string, z.ZodType>>(
   // Resolve dynamic descriptions based on context
   const resolved = resolveDescription(tool.description, {
     experimentalMode: options.context.experimentalMode ?? false,
+    availableToolNames: options.context.availableToolNames,
+    directToolNames: options.context.directToolNames,
   });
 
   return agentTool({

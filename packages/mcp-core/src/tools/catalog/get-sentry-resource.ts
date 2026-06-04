@@ -1,31 +1,32 @@
-import { z } from "zod";
 import { getActiveSpan, setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
+import { z } from "zod";
+import { ApiNotFoundError, type SentryApiService } from "../../api-client";
 import { UserInputError } from "../../errors";
-import type { ServerContext } from "../../types";
-import { ParamOrganizationSlug } from "../../schema";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { fetchAndFormatBreadcrumbs } from "../../internal/tool-helpers/breadcrumbs";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
+import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
+import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import {
-  parseSentryUrl,
   type ParsedSentryUrl,
+  parseSentryUrl,
 } from "../../internal/url-helpers";
 import {
   resolveScopedOrganizationSlug,
   resolveScopedProjectSlug,
 } from "../../internal/url-scope";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import { ApiNotFoundError, type SentryApiService } from "../../api-client";
-import { enhanceNotFoundError } from "../../internal/tool-helpers/enhance-error";
-import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
-import { fetchAndFormatBreadcrumbs } from "../../internal/tool-helpers/breadcrumbs";
-import getIssueDetails from "./get-issue-details";
-import getTraceDetails from "./get-trace-details";
-import getProfileDetails from "./get-profile-details";
-import getReplayDetails from "./get-replay-details";
-import getAIConversationDetails from "./get-ai-conversation-details";
+import { ParamOrganizationSlug } from "../../schema";
+import type { ServerContext } from "../../types";
 import {
   fetchSnapshotImage,
   fetchSnapshotSummary,
 } from "../support/snapshots/handlers";
+import getAIConversationDetails from "./get-ai-conversation-details";
+import getIssueDetails from "./get-issue-details";
+import getProfileDetails from "./get-profile-details";
+import getReplayDetails from "./get-replay-details";
+import getTraceDetails from "./get-trace-details";
 
 /** Types with full API integration. */
 export const FULLY_SUPPORTED_TYPES = [
@@ -431,6 +432,9 @@ function parseSpanResourceId(resourceId: string): {
 function generateUnsupportedResourceMessage(
   resolved: ResolvedResourceParams,
   apiService: SentryApiService,
+  experimentalMode: boolean,
+  availableToolNames?: ReadonlySet<string>,
+  directToolNames?: ReadonlySet<string>,
 ): string {
   const { type, organizationSlug } = resolved;
 
@@ -467,6 +471,15 @@ function generateUnsupportedResourceMessage(
         organizationSlug,
         resolved.releaseVersion ?? "",
       );
+      const findReleasesInstruction = formatToolCallInstruction({
+        toolName: "find_releases",
+        arguments: { organizationSlug },
+        experimentalMode,
+        availableToolNames,
+        directToolNames,
+        fallbackInstruction: "Release listing is not available in this session",
+        purpose: "to list releases and their details",
+      });
       return [
         "# Release Detected",
         "",
@@ -476,7 +489,7 @@ function generateUnsupportedResourceMessage(
         "To get release information:",
         "",
         `- **View in Sentry**: [Open Release](${releaseUrl})`,
-        `- **Find releases**: Use \`find_releases(organizationSlug='${organizationSlug}')\` to list releases and their details`,
+        `- **Find releases**: ${findReleasesInstruction}`,
         `- **Search issues**: Use \`search_issues\` with query \`release:${resolved.releaseVersion}\` to find issues in this release`,
       ].join("\n");
     }
@@ -492,33 +505,51 @@ export default defineTool({
   skills: ["inspect", "triage", "seer", "preprod"],
   requiredScopes: ["event:read", "project:read"],
 
-  description: [
-    "Fetch a Sentry resource by URL, or by resourceType plus resourceId.",
-    "Pass a Sentry URL directly when possible; the resource type is auto-detected.",
-    "",
-    "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.",
-    "Trace lookups return a condensed overview by default.",
-    "",
-    "AI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.",
-    "",
-    "For preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):",
-    "- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)",
-    "- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. Use `get_snapshot_image` for full-resolution image bytes.",
-    "",
-    "Resource IDs:",
-    "- span: <traceId>:<spanId>",
-    "- snapshot: <snapshotId>",
-    "- snapshotImage: <snapshotId>:<image_file_name>",
-    "",
-    "<examples>",
-    "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
-    "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
-    "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')",
-    "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
-    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')",
-    "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')",
-    "</examples>",
-  ].join("\n"),
+  description: ({ experimentalMode, availableToolNames, directToolNames }) => {
+    const fullResolutionInstruction = formatToolCallInstruction({
+      toolName: "get_snapshot_image",
+      arguments: {
+        organizationSlug: "<organization_slug>",
+        snapshotId: "<snapshot_id>",
+        imageIdentifier: "<image_file_name>",
+        imageResolution: "full",
+      },
+      experimentalMode,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Full-resolution snapshot image bytes are not available in this session",
+      purpose: "for full-resolution image bytes",
+    });
+
+    return [
+      "Fetch a Sentry resource by URL, or by resourceType plus resourceId.",
+      "Pass a Sentry URL directly when possible; the resource type is auto-detected.",
+      "",
+      "Supports issues, events, traces, spans, AI conversations, breadcrumbs, replays, preprod snapshots, and snapshot images.",
+      "Trace lookups return a condensed overview by default.",
+      "",
+      "AI Conversations: A conversation is a set of spans sharing the same gen_ai.conversation.id. Use resourceType='ai_conversation' with a conversation ID to fetch all spans for that conversation. To discover or list conversation IDs, use search_events with dataset='spans' and query='has:gen_ai.conversation.id'. Conversations are NOT issues — do not use search_issues for conversation queries.",
+      "",
+      "For preprod snapshot URLs (matching 'sentry.io/preprod/snapshots/'):",
+      "- Without ?selectedSnapshot=: returns the snapshot diff summary (changed, added, removed images)",
+      `- With ?selectedSnapshot=<image_file_name>: returns the image preview and metadata. ${fullResolutionInstruction}.`,
+      "",
+      "Resource IDs:",
+      "- span: <traceId>:<spanId>",
+      "- snapshot: <snapshotId>",
+      "- snapshotImage: <snapshotId>:<image_file_name>",
+      "",
+      "<examples>",
+      "get_sentry_resource(url='https://sentry.io/issues/PROJECT-123/')",
+      "get_sentry_resource(resourceType='issue', organizationSlug='my-org', resourceId='PROJECT-123')",
+      "get_sentry_resource(resourceType='span', organizationSlug='my-org', resourceId='<traceId>:<spanId>')",
+      "get_sentry_resource(resourceType='ai_conversation', organizationSlug='my-org', resourceId='conversation-123')",
+      "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/')",
+      "get_sentry_resource(url='https://sentry.sentry.io/preprod/snapshots/123/?selectedSnapshot=login_screen.png')",
+      "</examples>",
+    ].join("\n");
+  },
 
   inputSchema: {
     url: z
@@ -582,7 +613,13 @@ export default defineTool({
       const apiService = apiServiceFromContext(context, {
         regionUrl: context.constraints.regionUrl ?? undefined,
       });
-      return generateUnsupportedResourceMessage(resolved, apiService);
+      return generateUnsupportedResourceMessage(
+        resolved,
+        apiService,
+        context.experimentalMode ?? false,
+        context.availableToolNames,
+        context.directToolNames,
+      );
     }
 
     switch (resolved.type) {
@@ -708,7 +745,12 @@ export default defineTool({
             resolved.snapshotId!,
             resolved.selectedSnapshot,
             "preview",
-            { nextSteps },
+            {
+              nextSteps,
+              experimentalMode: context.experimentalMode ?? false,
+              availableToolNames: context.availableToolNames,
+              directToolNames: context.directToolNames,
+            },
           );
         }
 
@@ -717,7 +759,13 @@ export default defineTool({
           resolved.organizationSlug,
           resolved.snapshotId!,
           params.url ?? null,
-          { listImagesWhenNoDiffs: true, nextSteps },
+          {
+            listImagesWhenNoDiffs: true,
+            nextSteps,
+            experimentalMode: context.experimentalMode ?? false,
+            availableToolNames: context.availableToolNames,
+            directToolNames: context.directToolNames,
+          },
         );
       }
 

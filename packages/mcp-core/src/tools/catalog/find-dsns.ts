@@ -1,12 +1,13 @@
 import { setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import type { ServerContext } from "../../types";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import {
   ParamOrganizationSlug,
-  ParamRegionUrl,
   ParamProjectSlug,
+  ParamRegionUrl,
 } from "../../schema";
+import type { ServerContext } from "../../types";
 
 export default defineTool({
   name: "find_dsns",
@@ -47,8 +48,19 @@ export default defineTool({
     });
     let output = `# DSNs in **${organizationSlug}/${params.projectSlug}**\n\n`;
     if (clientKeys.length === 0) {
-      output +=
-        "No DSNs were found.\n\nYou can create new one using the `create_dsn` tool.";
+      output += `No DSNs were found.\n\nYou can create a new one. ${formatToolCallInstruction(
+        {
+          toolName: "create_dsn",
+          arguments: {
+            organizationSlug,
+            projectSlug: params.projectSlug,
+            name: "Production",
+          },
+          experimentalMode: context.experimentalMode ?? false,
+          availableToolNames: context.availableToolNames,
+          directToolNames: context.directToolNames,
+        },
+      )}.`;
       return output;
     }
     for (const clientKey of clientKeys) {

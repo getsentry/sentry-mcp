@@ -103,7 +103,11 @@ function callHandler(
       regionUrl: null,
       ...overrides,
     },
-    getServerContext(),
+    {
+      ...getServerContext(),
+      availableToolNames: new Set(["get_snapshot_image"]),
+      directToolNames: new Set(["get_snapshot_image"]),
+    },
   );
 }
 
@@ -149,8 +153,8 @@ describe("get_snapshot", () => {
 
       ## Next Steps
 
-      - To view a specific image preview, use \`get_snapshot_image(organizationSlug="sentry", snapshotId="231949", imageIdentifier="<image_file_name>")\`
-      - To fetch original full-resolution image bytes, set \`imageResolution="full"\` in \`get_snapshot_image\`"
+      - Use the Sentry tool \`get_snapshot_image(organizationSlug='sentry', snapshotId='231949', imageIdentifier='<image_file_name>')\` to view a specific image preview
+      - Use the Sentry tool \`get_snapshot_image(organizationSlug='sentry', snapshotId='231949', imageIdentifier='<image_file_name>', imageResolution='full')\` to fetch original full-resolution image bytes"
     `);
     expect(result).not.toContain("**Unchanged:**");
     expect(result).not.toContain("skipped.png");

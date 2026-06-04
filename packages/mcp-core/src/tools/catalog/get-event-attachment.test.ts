@@ -38,8 +38,8 @@ describe("get_event_attachment", () => {
       **Created:** 2025-04-08T21:15:04.000Z
       **SHA1:** abc123def456
 
-      To download this attachment, use the "get_event_attachment" tool with the attachmentId provided:
-      \`get_event_attachment(organizationSlug="sentry-mcp-evals", projectSlug="cloudflare-mcp", eventId="7ca573c0f4814912aaa9bdc77d1a7d51", attachmentId="123")\`
+      To download this attachment with the attachmentId provided:
+      Use the Sentry tool \`get_event_attachment(organizationSlug='sentry-mcp-evals', projectSlug='cloudflare-mcp', eventId='7ca573c0f4814912aaa9bdc77d1a7d51', attachmentId='123')\`
 
       "
     `);

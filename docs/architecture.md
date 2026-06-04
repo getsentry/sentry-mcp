@@ -225,8 +225,11 @@ search, schema, and execution helpers. Wrapper/gateway tools such as
 `search_tools`, `execute_tool`, and `use_sentry` live in
 `packages/mcp-core/src/tools/special/`.
 
-`packages/mcp-core/src/tools/surfaces.ts` only centralizes the subset of
+`packages/mcp-core/src/tools/surfaces.ts` only centralizes the subsets of
 catalog tools that should also be exposed directly through MCP `tools/list`.
+Stable mode keeps a broader direct surface for compatibility. Experimental mode
+keeps a smaller direct surface because long-tail operations can be discovered
+with `search_tools` and invoked with `execute_tool`.
 The same availability filters (skills, constraints, experimental mode, and
 required capabilities) apply before either direct registration or catalog
 execution.

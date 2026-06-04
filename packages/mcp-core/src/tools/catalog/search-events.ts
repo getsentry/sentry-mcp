@@ -1,43 +1,43 @@
-import { z } from "zod";
 import { getActiveSpan, setTag } from "@sentry/core";
-import { defineTool } from "../../internal/tool-helpers/define";
+import { z } from "zod";
+import { UserInputError } from "../../errors";
+import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import type { ServerContext } from "../../types";
+import { defineTool } from "../../internal/tool-helpers/define";
 import {
   ParamOrganizationSlug,
-  ParamRegionUrl,
   ParamProjectSlug,
+  ParamRegionUrl,
 } from "../../schema";
-import { hasAgentProvider } from "../../internal/agents/provider-factory";
-import { UserInputError } from "../../errors";
-import { searchEventsAgent } from "../support/search-events/agent";
+import type { ServerContext } from "../../types";
 import {
-  formatErrorResults,
-  formatLogResults,
-  formatProfileResults,
-  formatTraceMetricsResults,
-  formatSpanResults,
-} from "../support/search-events/formatters";
+  PUBLIC_EVENTS_DATASETS,
+  type PublicEventsDataset,
+  isMetricsDataset,
+  normalizeEventsDataset,
+} from "../../utils/events-datasets";
+import { searchEventsAgent } from "../support/search-events/agent";
 import {
   RECOMMENDED_FIELDS,
   TRACE_METRICS_SAMPLE_IDENTITY_FIELDS,
 } from "../support/search-events/config";
 import {
-  isMetricsDataset,
-  normalizeEventsDataset,
-  PUBLIC_EVENTS_DATASETS,
-  type PublicEventsDataset,
-} from "../../utils/events-datasets";
-import {
-  isAggregateQuery,
-  looksLikeSentrySearchSyntax,
-} from "../support/search-events/utils";
+  formatErrorResults,
+  formatLogResults,
+  formatProfileResults,
+  formatSpanResults,
+  formatTraceMetricsResults,
+} from "../support/search-events/formatters";
 import {
   DEFAULT_REPLAY_SORT,
   DEFAULT_REPLAY_STATS_PERIOD,
   formatReplayResults,
   isValidReplaySort,
 } from "../support/search-events/replays";
+import {
+  isAggregateQuery,
+  looksLikeSentrySearchSyntax,
+} from "../support/search-events/utils";
 
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 const DEFAULT_EVENTS_SORT = "-timestamp";
@@ -523,7 +523,10 @@ export default defineTool({
         ...replayTimeParams,
       });
 
-      getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", replays.length);
+      getActiveSpan()?.setAttribute(
+        "gen_ai.tool.call.result.count",
+        replays.length,
+      );
 
       return formatReplayResults({
         replays,
@@ -544,6 +547,9 @@ export default defineTool({
           sort: replaySort,
           timeRange: replayTimeParams,
         },
+        experimentalMode: context.experimentalMode ?? false,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
       });
     }
 
@@ -622,7 +628,10 @@ export default defineTool({
       throw new Error("Invalid event data format from Sentry API");
     }
 
-    getActiveSpan()?.setAttribute("gen_ai.tool.call.result.count", eventData.length);
+    getActiveSpan()?.setAttribute(
+      "gen_ai.tool.call.result.count",
+      eventData.length,
+    );
 
     const explorerUrl = apiService.getEventsExplorerUrl(
       organizationSlug,
@@ -656,6 +665,9 @@ export default defineTool({
         sort: sortParam,
         timeRange: timeParams,
       },
+      experimentalMode: context.experimentalMode ?? false,
+      availableToolNames: context.availableToolNames,
+      directToolNames: context.directToolNames,
     };
 
     switch (dataset) {

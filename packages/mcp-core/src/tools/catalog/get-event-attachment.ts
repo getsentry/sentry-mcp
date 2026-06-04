@@ -1,20 +1,21 @@
-import { defineTool } from "../../internal/tool-helpers/define";
-import { apiServiceFromContext } from "../../internal/tool-helpers/api";
-import type { ServerContext } from "../../types";
 import type {
-  TextContent,
-  ImageContent,
   EmbeddedResource,
+  ImageContent,
+  TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
+import { setTag } from "@sentry/core";
 import { blobToBase64 } from "../../internal/blob-utils";
+import { apiServiceFromContext } from "../../internal/tool-helpers/api";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import {
+  ParamAttachmentId,
+  ParamEventId,
   ParamOrganizationSlug,
   ParamProjectSlug,
-  ParamEventId,
-  ParamAttachmentId,
   ParamRegionUrl,
 } from "../../schema";
-import { setTag } from "@sentry/core";
+import type { ServerContext } from "../../types";
 
 export default defineTool({
   name: "get_event_attachment",
@@ -166,8 +167,19 @@ export default defineTool({
       output += `**MIME Type:** ${attachment.mimetype}\n`;
       output += `**Created:** ${attachment.dateCreated}\n`;
       output += `**SHA1:** ${attachment.sha1}\n\n`;
-      output += `To download this attachment, use the "get_event_attachment" tool with the attachmentId provided:\n`;
-      output += `\`get_event_attachment(organizationSlug="${params.organizationSlug}", projectSlug="${params.projectSlug}", eventId="${params.eventId}", attachmentId="${attachment.id}")\`\n\n`;
+      output += "To download this attachment with the attachmentId provided:\n";
+      output += `${formatToolCallInstruction({
+        toolName: "get_event_attachment",
+        arguments: {
+          organizationSlug: params.organizationSlug,
+          projectSlug: params.projectSlug,
+          eventId: params.eventId,
+          attachmentId: attachment.id,
+        },
+        experimentalMode: context.experimentalMode ?? false,
+        availableToolNames: context.availableToolNames,
+        directToolNames: context.directToolNames,
+      })}\n\n`;
     });
 
     return output;

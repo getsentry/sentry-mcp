@@ -62,6 +62,10 @@ export type ServerContext = {
   agentMode?: boolean;
   /** Whether experimental tools are enabled */
   experimentalMode?: boolean;
+  /** Tool names available after mode, skill, constraint, and capability filters */
+  availableToolNames?: ReadonlySet<string>;
+  /** Tool names registered directly in the current MCP tools/list surface */
+  directToolNames?: ReadonlySet<string>;
   /** Transport type - affects error message formatting */
   transport?: TransportType;
   /**

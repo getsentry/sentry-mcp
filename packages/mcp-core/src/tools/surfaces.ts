@@ -40,11 +40,31 @@ export const TOP_LEVEL_TOOL_NAMES = [
   ...CATALOG_INFRASTRUCTURE_TOOL_NAMES,
 ] as const;
 
+export const EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES = [
+  "whoami",
+  "find_organizations",
+  "find_projects",
+  "update_issue",
+  "search_events",
+  "analyze_issue_with_seer",
+  "search_docs",
+  "search_issues",
+  "get_sentry_resource",
+  ...CATALOG_INFRASTRUCTURE_TOOL_NAMES,
+] as const;
+
 const topLevelToolNames = new Set<string>(TOP_LEVEL_TOOL_NAMES);
+const experimentalTopLevelToolNames = new Set<string>(
+  EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES,
+);
 const wrapperToolNames = new Set<string>(WRAPPER_TOOL_NAMES);
 const catalogInfrastructureToolNames = new Set<string>(
   CATALOG_INFRASTRUCTURE_TOOL_NAMES,
 );
+
+export type TopLevelToolName =
+  | (typeof TOP_LEVEL_TOOL_NAMES)[number]
+  | (typeof EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES)[number];
 
 export function isOutsideCatalogToolName(toolName: string): boolean {
   return (
@@ -55,6 +75,25 @@ export function isOutsideCatalogToolName(toolName: string): boolean {
 
 export function isDefaultTopLevelToolName(toolName: string): boolean {
   return topLevelToolNames.has(toolName);
+}
+
+export function isTopLevelToolName(
+  toolName: string,
+  experimentalMode: boolean,
+): boolean {
+  return experimentalMode
+    ? experimentalTopLevelToolNames.has(toolName)
+    : topLevelToolNames.has(toolName);
+}
+
+export function getTopLevelToolNames({
+  experimentalMode,
+}: {
+  experimentalMode: boolean;
+}): readonly TopLevelToolName[] {
+  return experimentalMode
+    ? EXPERIMENTAL_TOP_LEVEL_TOOL_NAMES
+    : TOP_LEVEL_TOOL_NAMES;
 }
 
 export function isWrapperToolName(toolName: string): boolean {

@@ -1,4 +1,5 @@
 import type { ReplayDetails, SentryApiService } from "../../../api-client";
+import { formatToolCallInstruction } from "../../../internal/tool-helpers/tool-call-formatting";
 import {
   type ExecutedSearch,
   formatExecutedSearch,
@@ -63,6 +64,9 @@ export interface FormatReplayResultsParams {
   explanation?: string;
   timeRange?: ReplayTimeRange;
   executedSearch?: ExecutedSearch;
+  experimentalMode?: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }
 
 export function isValidReplaySort(sort: string): boolean {
@@ -150,8 +154,17 @@ export function formatReplayResults(params: FormatReplayResultsParams): string {
   });
 
   output += "## Next Steps\n\n";
-  output +=
-    "- Inspect a specific replay in more detail: Use `get_replay_details` with the replay ID or replay URL\n";
+  const replayDetailsInstruction = formatToolCallInstruction({
+    toolName: "get_replay_details",
+    arguments: { replayUrl: "<replay_url>" },
+    experimentalMode: params.experimentalMode ?? false,
+    availableToolNames: params.availableToolNames,
+    directToolNames: params.directToolNames,
+    fallbackInstruction:
+      "Replay detail lookup is not available in this session",
+    purpose: "to inspect a specific replay in more detail",
+  });
+  output += `- ${replayDetailsInstruction}\n`;
   output +=
     "- Pivot from a replay into related issues or traces: Open the replay link above, then use `get_sentry_resource` on related issue or trace URLs\n";
 

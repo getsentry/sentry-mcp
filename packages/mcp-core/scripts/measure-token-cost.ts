@@ -12,7 +12,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { type Tiktoken, encoding_for_model } from "tiktoken";
-import { z, type ZodTypeAny } from "zod";
+import { type ZodTypeAny, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 // Lazy imports to avoid type bleed
@@ -56,7 +56,7 @@ Examples:
 
 type ToolDefinition = {
   name: string;
-  description: string;
+  description: string | ((context: { experimentalMode: boolean }) => string);
   inputSchema: Record<string, ZodTypeAny>;
   experimental?: boolean;
   hideInExperimentalMode?: boolean;
@@ -87,7 +87,9 @@ function formatToolsForMCP(tools: Record<string, ToolDefinition>) {
 
     return {
       name: tool.name,
-      description: tool.description,
+      description: toolTypesModule.resolveDescription(tool.description, {
+        experimentalMode: false,
+      }),
       inputSchema: jsonSchema,
       ...(tool.annotations && { annotations: tool.annotations }),
     };
@@ -161,7 +163,7 @@ async function main() {
     const toolsToMeasure = Object.fromEntries(
       Object.entries(toolsDefault).filter(
         ([, tool]) =>
-          surfacesModule.isDefaultTopLevelToolName(tool.name) &&
+          surfacesModule.isTopLevelToolName(tool.name, false) &&
           toolTypesModule.isToolVisibleInMode(tool, false),
       ),
     );
