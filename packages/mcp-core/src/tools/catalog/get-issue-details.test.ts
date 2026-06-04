@@ -258,9 +258,9 @@ describe("get_issue_details", () => {
       - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
       - Issue event search: Use the Sentry tool \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
-      - Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - Related span search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
-      - Related log search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related span search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related log search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });
@@ -517,9 +517,9 @@ describe("get_issue_details", () => {
       - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
       - Issue event search: Use the Sentry tool \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
-      - Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - Related span search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
-      - Related log search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related span search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related log search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });
@@ -802,9 +802,9 @@ describe("get_issue_details", () => {
       - Commit message issue reference: \`Fixes CLOUDFLARE-MCP-41\` automatically closes the issue when the commit is merged.
       - The stacktrace includes first-party application code and third-party code. First-party frames are usually the best starting point for triage.
       - Issue event search: Use the Sentry tool \`search_issue_events(organizationSlug='sentry-mcp-evals', issueId='CLOUDFLARE-MCP-41', query='your query')\`
-      - Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
-      - Related span search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
-      - Related log search: \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Full distributed trace and span tree: Use the Sentry tool \`get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related span search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
+      - Related log search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
   });

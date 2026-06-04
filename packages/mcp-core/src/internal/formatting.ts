@@ -1966,9 +1966,48 @@ export function formatIssueOutput({
   });
   output += `- Issue event search: ${issueEventSearchInstruction}\n`;
   if (traceId) {
-    output += `- Full distributed trace and span tree: \`get_sentry_resource(resourceType='trace', organizationSlug='${organizationSlug}', resourceId='${traceId}')\`\n`;
-    output += `- Related span search: \`search_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\`\n`;
-    output += `- Related log search: \`search_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\`\n`;
+    const traceDetailsInstruction = formatToolCallInstruction({
+      toolName: "get_sentry_resource",
+      arguments: {
+        resourceType: "trace",
+        organizationSlug,
+        resourceId: traceId,
+      },
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Full distributed trace lookup is not available in this session",
+    });
+    const spanSearchInstruction = formatToolCallInstruction({
+      toolName: "search_events",
+      arguments: {
+        organizationSlug,
+        dataset: "spans",
+        query: `trace:${traceId}`,
+      },
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Related span search is not available in this session",
+    });
+    const logSearchInstruction = formatToolCallInstruction({
+      toolName: "search_events",
+      arguments: {
+        organizationSlug,
+        dataset: "logs",
+        query: `trace:${traceId}`,
+      },
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction:
+        "Related log search is not available in this session",
+    });
+    output += `- Full distributed trace and span tree: ${traceDetailsInstruction}\n`;
+    output += `- Related span search: ${spanSearchInstruction}\n`;
+    output += `- Related log search: ${logSearchInstruction}\n`;
   }
   if (experimentalMode) {
     output += `- Breadcrumb trail leading up to this error: \`get_sentry_resource(url='${apiService.getIssueUrl(organizationSlug, issue.shortId)}', resourceType='breadcrumbs')\`\n`;

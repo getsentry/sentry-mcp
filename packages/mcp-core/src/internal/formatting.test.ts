@@ -156,6 +156,51 @@ describe("formatIssueOutput", () => {
     );
     expect(output).not.toContain("<seer_analysis");
   });
+
+  it("does not show trace search tool calls when search_events is unavailable", () => {
+    const output = formatIssueOutput({
+      organizationSlug: "sentry-mcp-evals",
+      issue: {
+        shortId: "CLOUDFLARE-MCP-42",
+        title: "Retry job failed",
+        count: "1",
+        userCount: 1,
+        status: "unresolved",
+        project: {
+          name: "cloudflare-mcp",
+          slug: "cloudflare-mcp",
+        },
+      } as Issue,
+      event: new EventBuilder("javascript")
+        .withId("event-1")
+        .withContexts({
+          trace: {
+            trace_id: "3032af8bcdfe4423b937fc5c041d5d82",
+          },
+        })
+        .build(),
+      apiService: {
+        getIssueUrl: () => "https://sentry.example/issues/CLOUDFLARE-MCP-42",
+      } as unknown as SentryApiService,
+      experimentalMode: true,
+      availableToolNames: new Set([
+        "get_sentry_resource",
+        "search_issue_events",
+      ]),
+      directToolNames: new Set(["get_sentry_resource", "search_issue_events"]),
+    });
+
+    expect(output).toContain(
+      "- Full distributed trace and span tree: Use the Sentry tool `get_sentry_resource(resourceType='trace', organizationSlug='sentry-mcp-evals', resourceId='3032af8bcdfe4423b937fc5c041d5d82')`",
+    );
+    expect(output).toContain(
+      "- Related span search: Related span search is not available in this session",
+    );
+    expect(output).toContain(
+      "- Related log search: Related log search is not available in this session",
+    );
+    expect(output).not.toContain("search_events(");
+  });
 });
 
 describe("formatFrameHeader", () => {

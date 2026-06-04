@@ -338,9 +338,9 @@ describe("get_sentry_resource", () => {
 
         ## Next Steps
 
-        - **Search spans**: \`search_events(organizationSlug='test-org', dataset='spans', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-        - **Search errors**: \`search_events(organizationSlug='test-org', dataset='errors', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-        - **Search logs**: \`search_events(organizationSlug='test-org', dataset='logs', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
+        - **Search spans**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='spans', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+        - **Search errors**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='errors', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+        - **Search logs**: Use the Sentry tool \`search_events(organizationSlug='test-org', dataset='logs', query='trace:b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
       `);
     });
 

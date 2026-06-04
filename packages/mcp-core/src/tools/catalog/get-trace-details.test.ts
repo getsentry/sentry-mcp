@@ -209,9 +209,9 @@ describe("get_trace_details", () => {
 
       ## Next Steps
 
-      - **Search spans**: \`search_events(organizationSlug='sentry-mcp-evals', query='show more spans from trace a4d1aae7216b47ff8117cf4e09ce9d0a')\`
-      - **Search errors**: \`search_events(organizationSlug='sentry-mcp-evals', query='show error events from trace a4d1aae7216b47ff8117cf4e09ce9d0a')\`
-      - **Search logs**: \`search_events(organizationSlug='sentry-mcp-evals', query='show logs from trace a4d1aae7216b47ff8117cf4e09ce9d0a')\`"
+      - **Search spans**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show more spans from trace a4d1aae7216b47ff8117cf4e09ce9d0a')\`
+      - **Search errors**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show error events from trace a4d1aae7216b47ff8117cf4e09ce9d0a')\`
+      - **Search logs**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show logs from trace a4d1aae7216b47ff8117cf4e09ce9d0a')\`"
     `);
   });
 
@@ -235,7 +235,7 @@ describe("get_trace_details", () => {
     );
     expect(result).toContain("**Total Spans**: 112");
     expect(result).toContain(
-      "**Search spans**: `search_events(organizationSlug='sentry-mcp-evals', query='show more spans from trace a4d1aae7216b47ff8117cf4e09ce9d0a')`",
+      "**Search spans**: Use the Sentry tool `search_events(organizationSlug='sentry-mcp-evals', query='show more spans from trace a4d1aae7216b47ff8117cf4e09ce9d0a')`",
     );
   });
 
@@ -260,8 +260,39 @@ describe("get_trace_details", () => {
     );
 
     expect(result).toContain(
-      "**Search spans**: `search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:a4d1aae7216b47ff8117cf4e09ce9d0a')`",
+      "**Search spans**: Use the Sentry tool `search_events(organizationSlug='sentry-mcp-evals', dataset='spans', query='trace:a4d1aae7216b47ff8117cf4e09ce9d0a')`",
     );
+  });
+
+  it("does not show trace next-step tool calls when search_events is unavailable", async () => {
+    Reflect.deleteProperty(process.env, "OPENAI_API_KEY");
+    Reflect.deleteProperty(process.env, "ANTHROPIC_API_KEY");
+    Reflect.deleteProperty(process.env, "EMBEDDED_AGENT_PROVIDER");
+
+    const result = await getTraceDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        traceId: "a4d1aae7216b47ff8117cf4e09ce9d0a",
+        regionUrl: null,
+      },
+      {
+        constraints: {
+          organizationSlug: null,
+        },
+        accessToken: "access-token",
+        userId: "1",
+        experimentalMode: true,
+        availableToolNames: new Set(["get_trace_details"]),
+        directToolNames: new Set(["get_trace_details"]),
+      },
+    );
+
+    expect(result).toContain("**Search spans**: Span search is not available");
+    expect(result).toContain(
+      "**Search errors**: Error search is not available",
+    );
+    expect(result).toContain("**Search logs**: Log search is not available");
+    expect(result).not.toContain("search_events(");
   });
 
   it("handles trace not found error", async () => {
@@ -565,9 +596,9 @@ describe("get_trace_details", () => {
 
       ## Next Steps
 
-      - **Search spans**: \`search_events(organizationSlug='sentry-mcp-evals', query='show more spans from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-      - **Search errors**: \`search_events(organizationSlug='sentry-mcp-evals', query='show error events from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-      - **Search logs**: \`search_events(organizationSlug='sentry-mcp-evals', query='show logs from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
+      - **Search spans**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show more spans from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+      - **Search errors**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show error events from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+      - **Search logs**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show logs from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
     `);
   });
 
@@ -1288,9 +1319,9 @@ describe("get_trace_details", () => {
 
       ## Next Steps
 
-      - **Search spans**: \`search_events(organizationSlug='sentry-mcp-evals', query='show sibling spans or the rest of trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-      - **Search errors**: \`search_events(organizationSlug='sentry-mcp-evals', query='show error events from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
-      - **Search logs**: \`search_events(organizationSlug='sentry-mcp-evals', query='show logs from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
+      - **Search spans**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show sibling spans or the rest of trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+      - **Search errors**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show error events from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`
+      - **Search logs**: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', query='show logs from trace b4d1aae7216b47ff8117cf4e09ce9d0b')\`"
     `);
   });
 });

@@ -2,6 +2,7 @@ import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
+import { formatToolCallInstruction } from "../../internal/tool-helpers/tool-call-formatting";
 import { resolveRegionUrlForOrganization } from "../../internal/tool-helpers/resolve-region-url";
 import type { SentryApiService, Trace, TraceSpan } from "../../api-client";
 import { UserInputError } from "../../errors";
@@ -177,6 +178,9 @@ export default defineTool({
       trace,
       traceFetchState,
       apiService,
+      experimentalMode: context.experimentalMode,
+      availableToolNames: context.availableToolNames,
+      directToolNames: context.directToolNames,
     });
   },
 });
@@ -677,6 +681,9 @@ function formatTraceOutput({
   trace,
   traceFetchState,
   apiService,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
 }: {
   organizationSlug: string;
   traceId: string;
@@ -685,6 +692,9 @@ function formatTraceOutput({
   trace: Trace;
   traceFetchState: TraceFetchState;
   apiService: SentryApiService;
+  experimentalMode?: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }): string {
   if (spanId) {
     return formatFocusedSpanOutput({
@@ -695,6 +705,9 @@ function formatTraceOutput({
       trace,
       traceFetchState,
       apiService,
+      experimentalMode,
+      availableToolNames,
+      directToolNames,
     });
   }
 
@@ -704,6 +717,9 @@ function formatTraceOutput({
     summary,
     trace,
     apiService,
+    experimentalMode,
+    availableToolNames,
+    directToolNames,
   });
 }
 
@@ -713,12 +729,18 @@ function formatTraceOverviewOutput({
   summary,
   trace,
   apiService,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
 }: {
   organizationSlug: string;
   traceId: string;
   summary: TraceSummary;
   trace: Trace;
   apiService: SentryApiService;
+  experimentalMode?: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }): string {
   const sections: string[] = [];
 
@@ -785,7 +807,15 @@ function formatTraceOverviewOutput({
   sections.push("");
   sections.push("## Next Steps");
   sections.push("");
-  sections.push(...buildTraceNextSteps({ organizationSlug, traceId }));
+  sections.push(
+    ...buildTraceNextSteps({
+      organizationSlug,
+      traceId,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    }),
+  );
 
   return sections.join("\n");
 }
@@ -798,6 +828,9 @@ function formatFocusedSpanOutput({
   trace,
   traceFetchState,
   apiService,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
 }: {
   organizationSlug: string;
   traceId: string;
@@ -806,6 +839,9 @@ function formatFocusedSpanOutput({
   trace: Trace;
   traceFetchState: TraceFetchState;
   apiService: SentryApiService;
+  experimentalMode?: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }): string {
   const focusedSpan = findTraceSpan(trace, spanId);
   if (!focusedSpan) {
@@ -876,7 +912,14 @@ function formatFocusedSpanOutput({
   sections.push("## Next Steps");
   sections.push("");
   sections.push(
-    ...buildTraceNextSteps({ organizationSlug, traceId, spanFocused: true }),
+    ...buildTraceNextSteps({
+      organizationSlug,
+      traceId,
+      spanFocused: true,
+      experimentalMode: experimentalMode ?? false,
+      availableToolNames,
+      directToolNames,
+    }),
   );
 
   return sections.join("\n");
@@ -1043,26 +1086,92 @@ function buildTraceNextSteps({
   organizationSlug,
   traceId,
   spanFocused = false,
+  experimentalMode,
+  availableToolNames,
+  directToolNames,
 }: {
   organizationSlug: string;
   traceId: string;
   spanFocused?: boolean;
+  experimentalMode: boolean;
+  availableToolNames?: ReadonlySet<string>;
+  directToolNames?: ReadonlySet<string>;
 }): string[] {
+  const formatSearchStep = ({
+    label,
+    arguments: args,
+    fallbackInstruction,
+  }: {
+    label: string;
+    arguments: Record<string, string>;
+    fallbackInstruction: string;
+  }) =>
+    `- **${label}**: ${formatToolCallInstruction({
+      toolName: "search_events",
+      arguments: {
+        organizationSlug,
+        ...args,
+      },
+      experimentalMode,
+      availableToolNames,
+      directToolNames,
+      fallbackInstruction,
+    })}`;
+
   if (hasAgentProvider()) {
     const spanQuery = spanFocused
       ? `show sibling spans or the rest of trace ${traceId}`
       : `show more spans from trace ${traceId}`;
 
     return [
-      `- **Search spans**: \`search_events(organizationSlug='${organizationSlug}', query='${spanQuery}')\``,
-      `- **Search errors**: \`search_events(organizationSlug='${organizationSlug}', query='show error events from trace ${traceId}')\``,
-      `- **Search logs**: \`search_events(organizationSlug='${organizationSlug}', query='show logs from trace ${traceId}')\``,
+      formatSearchStep({
+        label: "Search spans",
+        arguments: {
+          query: spanQuery,
+        },
+        fallbackInstruction: "Span search is not available in this session",
+      }),
+      formatSearchStep({
+        label: "Search errors",
+        arguments: {
+          query: `show error events from trace ${traceId}`,
+        },
+        fallbackInstruction: "Error search is not available in this session",
+      }),
+      formatSearchStep({
+        label: "Search logs",
+        arguments: {
+          query: `show logs from trace ${traceId}`,
+        },
+        fallbackInstruction: "Log search is not available in this session",
+      }),
     ];
   }
 
   return [
-    `- **Search spans**: \`search_events(organizationSlug='${organizationSlug}', dataset='spans', query='trace:${traceId}')\``,
-    `- **Search errors**: \`search_events(organizationSlug='${organizationSlug}', dataset='errors', query='trace:${traceId}')\``,
-    `- **Search logs**: \`search_events(organizationSlug='${organizationSlug}', dataset='logs', query='trace:${traceId}')\``,
+    formatSearchStep({
+      label: "Search spans",
+      arguments: {
+        dataset: "spans",
+        query: `trace:${traceId}`,
+      },
+      fallbackInstruction: "Span search is not available in this session",
+    }),
+    formatSearchStep({
+      label: "Search errors",
+      arguments: {
+        dataset: "errors",
+        query: `trace:${traceId}`,
+      },
+      fallbackInstruction: "Error search is not available in this session",
+    }),
+    formatSearchStep({
+      label: "Search logs",
+      arguments: {
+        dataset: "logs",
+        query: `trace:${traceId}`,
+      },
+      fallbackInstruction: "Log search is not available in this session",
+    }),
   ];
 }
