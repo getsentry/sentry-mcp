@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/cloudflare";
+import { resolveClientFamily } from "./lib/client-family";
 
 export type RateLimitScope = "ip" | "user";
 type ResponseReason = "local_rate_limit";
@@ -76,6 +77,10 @@ function getStatusClass(status: number): string {
   return `${Math.floor(status / 100)}xx`;
 }
 
+function getBooleanAttribute(value: boolean): string {
+  return value ? "true" : "false";
+}
+
 function getMetricAttributes(
   request: Request,
 ): Record<string, string | number> | null {
@@ -83,17 +88,32 @@ function getMetricAttributes(
     return null;
   }
 
-  const trackedRoute = classifyTrackedRoute(new URL(request.url).pathname);
+  const url = new URL(request.url);
+  const trackedRoute = classifyTrackedRoute(url.pathname);
 
   if (!trackedRoute) {
     return null;
   }
 
-  return {
+  const attributes: Record<string, string | number> = {
     "http.request.method": request.method,
     "http.route": trackedRoute.route,
     "app.route.group": trackedRoute.group,
   };
+
+  if (trackedRoute.group === "mcp") {
+    attributes["app.client.family"] = resolveClientFamily(
+      request.headers.get("user-agent"),
+    );
+    attributes["app.server.mode.agent"] = getBooleanAttribute(
+      url.searchParams.get("agent") === "1",
+    );
+    attributes["app.server.mode.experimental"] = getBooleanAttribute(
+      url.searchParams.get("experimental") === "1",
+    );
+  }
+
+  return attributes;
 }
 
 export function annotateResponseMetric(

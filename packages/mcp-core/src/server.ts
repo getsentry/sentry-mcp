@@ -31,18 +31,18 @@ import {
 import { isApiAuthenticationErrorDeep } from "./api-client";
 import { MCP_SERVER_NAME } from "./constants";
 import { formatErrorForUser } from "./internal/error-handling";
+import type { Skill } from "./skills";
 import { type LogIssueOptions, logIssue } from "./telem/logging";
-import tools from "./tools/index";
 import {
+  type RegisteredToolHandlerExtra,
+  type ToolRegistry,
   executeToolHandler,
   getFilteredInputSchema,
   getToolsForMcpRegistration,
   injectConstraintParams,
   resolveToolDescription,
-  type RegisteredToolHandlerExtra,
-  type ToolRegistry,
 } from "./tools/catalog-runtime/availability";
-import type { Skill } from "./skills";
+import tools from "./tools/index";
 import type { ServerContext } from "./types";
 import { LIB_VERSION } from "./version";
 
@@ -220,6 +220,17 @@ function configureServer({
         const activeSpan = getActiveSpan();
 
         if (activeSpan) {
+          activeSpan.setAttribute("app.server.mode.agent", agentMode);
+          activeSpan.setAttribute(
+            "app.server.mode.experimental",
+            experimentalMode,
+          );
+          if (context.transport) {
+            activeSpan.setAttribute("app.transport", context.transport);
+          }
+          if (context.clientFamily) {
+            activeSpan.setAttribute("app.client.family", context.clientFamily);
+          }
           if (context.constraints.organizationSlug) {
             activeSpan.setAttribute(
               "app.constraint.organization_slug",
@@ -254,8 +265,14 @@ function configureServer({
         if (context.clientId) {
           setTag("client.id", context.clientId);
         }
-        setTag("mode.agent", agentMode);
-        setTag("mode.experimental", experimentalMode);
+        if (context.clientFamily) {
+          setTag("app.client.family", context.clientFamily);
+        }
+        if (context.transport) {
+          setTag("app.transport", context.transport);
+        }
+        setTag("app.server.mode.agent", agentMode);
+        setTag("app.server.mode.experimental", experimentalMode);
 
         try {
           const rawParams =
