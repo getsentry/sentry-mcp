@@ -81,6 +81,14 @@ function getBooleanAttribute(value: boolean): string {
   return value ? "true" : "false";
 }
 
+function getMcpRequestAttributes(request: Request, url: URL) {
+  return {
+    clientFamily: resolveClientFamily(request.headers.get("user-agent")),
+    agentMode: url.searchParams.get("agent") === "1",
+    experimentalMode: url.searchParams.get("experimental") === "1",
+  };
+}
+
 function getMetricAttributes(
   request: Request,
 ): Record<string, string | number> | null {
@@ -102,18 +110,43 @@ function getMetricAttributes(
   };
 
   if (trackedRoute.group === "mcp") {
-    attributes["app.client.family"] = resolveClientFamily(
-      request.headers.get("user-agent"),
-    );
+    const mcpAttributes = getMcpRequestAttributes(request, url);
+    attributes["app.client.family"] = mcpAttributes.clientFamily;
     attributes["app.server.mode.agent"] = getBooleanAttribute(
-      url.searchParams.get("agent") === "1",
+      mcpAttributes.agentMode,
     );
     attributes["app.server.mode.experimental"] = getBooleanAttribute(
-      url.searchParams.get("experimental") === "1",
+      mcpAttributes.experimentalMode,
     );
   }
 
   return attributes;
+}
+
+export function annotateMcpRequestSpan(request: Request, url: URL): void {
+  if (request.method === "OPTIONS") {
+    return;
+  }
+
+  const trackedRoute = classifyTrackedRoute(url.pathname);
+
+  if (trackedRoute?.group !== "mcp") {
+    return;
+  }
+
+  const activeSpan = Sentry.getActiveSpan();
+  if (!activeSpan) {
+    return;
+  }
+
+  const mcpAttributes = getMcpRequestAttributes(request, url);
+  activeSpan.setAttribute("app.transport", "http");
+  activeSpan.setAttribute("app.client.family", mcpAttributes.clientFamily);
+  activeSpan.setAttribute("app.server.mode.agent", mcpAttributes.agentMode);
+  activeSpan.setAttribute(
+    "app.server.mode.experimental",
+    mcpAttributes.experimentalMode,
+  );
 }
 
 export function annotateResponseMetric(
