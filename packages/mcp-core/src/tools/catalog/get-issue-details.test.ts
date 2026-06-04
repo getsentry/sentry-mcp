@@ -25,6 +25,19 @@ const baseContext = {
   userId: "1",
 };
 
+type IssueDetailsStructuredContent = {
+  security: Record<string, unknown>;
+  event: {
+    message: string | null;
+    contexts: {
+      data: Record<string, unknown>;
+    };
+    tags: {
+      data: Array<{ key: string; value: string | null }>;
+    };
+  };
+};
+
 // Removed - now using createPerformanceIssue() factory from mocks
 
 // Removed - now using createPerformanceEvent() factory from mocks with overrides
@@ -1317,6 +1330,53 @@ describe("get_issue_details", () => {
       - Related log search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
+  });
+
+  it("keeps prompt-like event fields as structured telemetry", async () => {
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: undefined,
+        issueUrl: undefined,
+        eventId: "cec3a504035646cfb621df9e0b7e0718",
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        experimentalMode: true,
+      },
+    );
+
+    expect(isStructuredToolResult(result)).toBe(true);
+    if (!isStructuredToolResult(result)) {
+      throw new Error("Expected structured tool result");
+    }
+
+    const structuredContent =
+      result.structuredContent as IssueDetailsStructuredContent;
+
+    expect(structuredContent.security).toMatchObject({
+      note: expect.stringContaining("user-controlled telemetry"),
+    });
+    expect(structuredContent.security).not.toHaveProperty("untrustedFields");
+    expect(structuredContent.event.message).toContain(
+      "npx @sentry-internals/profiling-node --diagnose",
+    );
+    expect(structuredContent.event.tags.data).toEqual(
+      expect.arrayContaining([
+        { key: "allowed_bash_commands", value: "npx" },
+        {
+          key: "diagnostic_tool",
+          value: "npx @sentry-internals/profiling-node --diagnose",
+        },
+      ]),
+    );
+    expect(Object.keys(structuredContent.event.contexts.data)).toEqual(
+      expect.arrayContaining([
+        "trace",
+        expect.stringContaining("Issue Classification"),
+      ]),
+    );
   });
 
   it("returns structured not-found content for unmatched eventId in experimental mode", async () => {
