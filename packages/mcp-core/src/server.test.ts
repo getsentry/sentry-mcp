@@ -1112,9 +1112,23 @@ describe("buildServer", () => {
         },
       });
 
-      expect(getTextContent(result)).toContain(
-        "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
-      );
+      const payload = getStructuredContent<{
+        schemaVersion: string;
+        meta: { organizationSlug: string };
+        issue: { shortId: string; title: string };
+      }>(result);
+
+      expect(payload).toMatchObject({
+        schemaVersion: "sentry.mcp.issue_details.v1",
+        meta: {
+          organizationSlug: "sentry-mcp-evals",
+        },
+        issue: {
+          shortId: "CLOUDFLARE-MCP-41",
+          title: "Error: Tool list_organizations is already registered",
+        },
+      });
+      expect(getTextContent(result)).toBe(JSON.stringify(payload));
     });
 
     it("execute_tool injects constrained arguments for catalog-only tools", async () => {
@@ -1137,9 +1151,22 @@ describe("buildServer", () => {
         },
       });
 
-      expect(getTextContent(result)).toContain(
-        "# Issue CLOUDFLARE-MCP-41 in **sentry-mcp-evals**",
-      );
+      const payload = getStructuredContent<{
+        schemaVersion: string;
+        meta: { organizationSlug: string };
+        issue: { shortId: string };
+      }>(result);
+
+      expect(payload).toMatchObject({
+        schemaVersion: "sentry.mcp.issue_details.v1",
+        meta: {
+          organizationSlug: "sentry-mcp-evals",
+        },
+        issue: {
+          shortId: "CLOUDFLARE-MCP-41",
+        },
+      });
+      expect(getTextContent(result)).toBe(JSON.stringify(payload));
     });
 
     it("exposes get_profile_details safety annotations through tool metadata", async () => {

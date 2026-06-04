@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
-import { createStructuredOutputSecurity } from "../../internal/structured-output";
+import {
+  createStructuredDataPreview,
+  createStructuredOutputSecurity,
+} from "../../internal/structured-output";
 import {
   createStructuredToolResult,
   type StructuredToolResult,
@@ -22,6 +25,7 @@ import type {
   DefaultEvent,
   TransactionEvent,
   Trace,
+  TraceSpan,
   ExternalIssueList,
   Issue,
 } from "../../api-client/types";
@@ -268,6 +272,10 @@ export default defineTool({
 });
 
 const ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION = "sentry.mcp.issue_details.v1";
+const STRUCTURED_EVENT_ENTRIES_LIMIT = 12;
+const STRUCTURED_TRACE_ROOT_LIMIT = 5;
+const STRUCTURED_TRACE_CHILD_LIMIT = 5;
+const STRUCTURED_TRACE_DEPTH_LIMIT = 2;
 
 type FormatIssueOutputArgs = Parameters<typeof formatIssueOutput>[0];
 
@@ -341,18 +349,20 @@ function formatIssueDetailsStructuredContent({
       platform: event.platform ?? null,
       dateCreated: getEventDateCreated(event),
       dateReceived: event.dateReceived ?? null,
-      entries: event.entries,
-      contexts: event.contexts ?? {},
-      context: event.context ?? {},
-      tags: event.tags ?? [],
-      user: event.user ?? null,
-      occurrence: getEventOccurrence(event),
+      entries: createStructuredDataPreview(event.entries ?? [], {
+        arrayLimit: STRUCTURED_EVENT_ENTRIES_LIMIT,
+      }),
+      contexts: createStructuredDataPreview(event.contexts ?? {}),
+      context: createStructuredDataPreview(event.context ?? {}),
+      tags: createStructuredDataPreview(event.tags ?? []),
+      user: createStructuredDataPreview(event.user ?? null),
+      occurrence: createStructuredDataPreview(getEventOccurrence(event)),
     },
     related: {
       autofixState: autofixState ?? null,
       externalIssues: externalIssues ?? [],
       replayIds: relatedReplayIds ?? [],
-      performanceTrace: performanceTrace ?? null,
+      performanceTrace: summarizePerformanceTrace(performanceTrace),
     },
   };
 }
@@ -368,6 +378,128 @@ function getEventOccurrence(event: Event): unknown {
 function getTraceId(event: Event): string | null {
   const traceId = event.contexts?.trace?.trace_id;
   return typeof traceId === "string" && traceId.length > 0 ? traceId : null;
+}
+
+function summarizePerformanceTrace(trace: Trace | undefined) {
+  if (!trace) {
+    return null;
+  }
+
+  const counts = countTraceNodes(trace);
+  const rootPreview = trace
+    .slice(0, STRUCTURED_TRACE_ROOT_LIMIT)
+    .map((node) => summarizeTraceNode(node, 0));
+  const truncated =
+    trace.length > STRUCTURED_TRACE_ROOT_LIMIT ||
+    rootPreview.some((node) => node.truncated);
+
+  return {
+    rootCount: trace.length,
+    spanCount: counts.spanCount,
+    issueCount: counts.issueCount,
+    truncated,
+    rootPreview,
+  };
+}
+
+function countTraceNodes(trace: Trace): {
+  spanCount: number;
+  issueCount: number;
+} {
+  const stack: unknown[] = [...trace];
+  let spanCount = 0;
+  let issueCount = 0;
+
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (isTraceSpanNode(node)) {
+      spanCount += 1;
+      stack.push(...(node.children as unknown[]));
+    } else if (node) {
+      issueCount += 1;
+    }
+  }
+
+  return { spanCount, issueCount };
+}
+
+function summarizeTraceNode(
+  node: unknown,
+  depth: number,
+): Record<string, unknown> & { truncated: boolean } {
+  if (!isTraceSpanNode(node)) {
+    return summarizeTraceIssue(node);
+  }
+
+  const children = node.children as unknown[];
+  const childCount = children.length;
+  const canIncludeChildren = depth < STRUCTURED_TRACE_DEPTH_LIMIT;
+  const childPreview = canIncludeChildren
+    ? children
+        .slice(0, STRUCTURED_TRACE_CHILD_LIMIT)
+        .map((child: unknown) => summarizeTraceNode(child, depth + 1))
+    : [];
+  const truncated =
+    (canIncludeChildren && childCount > STRUCTURED_TRACE_CHILD_LIMIT) ||
+    (!canIncludeChildren && childCount > 0) ||
+    childPreview.some((child) => child.truncated);
+
+  return {
+    type: "span",
+    spanId: node.span_id ?? null,
+    eventId: node.event_id,
+    transactionId: node.transaction_id,
+    projectSlug: node.project_slug,
+    operation: node.op ?? null,
+    description: node.description ?? node.name ?? node.transaction ?? null,
+    duration: node.duration,
+    status: node.status ?? null,
+    startTimestamp: node.start_timestamp,
+    endTimestamp: node.end_timestamp,
+    childCount,
+    childPreview,
+    truncated,
+  };
+}
+
+function summarizeTraceIssue(
+  node: unknown,
+): Record<string, unknown> & { truncated: boolean } {
+  if (!isRecord(node)) {
+    return {
+      type: "issue",
+      truncated: true,
+    };
+  }
+
+  return {
+    type: "issue",
+    id: getRecordValue(node, "id"),
+    issueId: getRecordValue(node, "issue_id"),
+    projectSlug: getRecordValue(node, "project_slug"),
+    title: getRecordValue(node, "title"),
+    culprit: getRecordValue(node, "culprit"),
+    timestamp: getRecordValue(node, "timestamp"),
+    truncated: false,
+  };
+}
+
+function isTraceSpanNode(node: unknown): node is TraceSpan {
+  return (
+    isRecord(node) &&
+    Array.isArray(node.children) &&
+    typeof node.event_id === "string" &&
+    typeof node.transaction_id === "string" &&
+    typeof node.duration === "number"
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getRecordValue(record: Record<string, unknown>, key: string): unknown {
+  return record[key] ?? null;
 }
 
 /**
