@@ -4,6 +4,8 @@ import { defineTool } from "../../internal/tool-helpers/define";
 import {
   createStructuredDataPreview,
   createStructuredOutputSecurity,
+  StructuredDataPreviewSchema,
+  StructuredOutputSecuritySchema,
 } from "../../internal/structured-output";
 import {
   createStructuredToolResult,
@@ -38,6 +40,98 @@ import {
   ParamIssueShortId,
   ParamIssueUrl,
 } from "../../schema";
+
+const ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION = "sentry.mcp.issue_details.v1";
+const STRUCTURED_EVENT_ENTRIES_LIMIT = 12;
+const STRUCTURED_TRACE_ROOT_LIMIT = 5;
+const STRUCTURED_TRACE_CHILD_LIMIT = 5;
+const STRUCTURED_TRACE_DEPTH_LIMIT = 2;
+const STRUCTURED_AUTOFIX_ARRAY_LIMIT = 10;
+const STRUCTURED_AUTOFIX_OBJECT_KEY_LIMIT = 20;
+const STRUCTURED_AUTOFIX_DEPTH_LIMIT = 3;
+
+const issueDetailsSuccessStructuredOutputSchema = z.object({
+  schemaVersion: z.literal(ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION),
+  security: StructuredOutputSecuritySchema,
+  meta: z.object({
+    organizationSlug: z.string(),
+    projectSlug: z.string(),
+  }),
+  links: z.object({
+    issue: z.string(),
+    trace: z.string().nullable(),
+    replays: z.array(z.string()),
+  }),
+  issue: z.object({
+    id: z.unknown(),
+    shortId: z.string(),
+    title: z.string(),
+    culprit: z.unknown(),
+    permalink: z.unknown(),
+    project: z.object({ slug: z.string() }).passthrough(),
+    platform: z.string().nullable(),
+    status: z.unknown(),
+    substatus: z.unknown().nullable(),
+    type: z.unknown(),
+    issueType: z.unknown().nullable(),
+    issueCategory: z.unknown().nullable(),
+    metadata: z.unknown().nullable(),
+    assignedTo: z.unknown().nullable(),
+    seerFixabilityScore: z.unknown().nullable(),
+    counts: z.object({
+      occurrences: z.unknown(),
+      users: z.unknown(),
+    }),
+    timestamps: z.object({
+      firstSeen: z.unknown(),
+      lastSeen: z.unknown(),
+    }),
+  }),
+  event: z.object({
+    id: z.string(),
+    type: z.unknown(),
+    title: z.string(),
+    message: z.unknown(),
+    platform: z.string().nullable(),
+    dateCreated: z.string().nullable(),
+    dateReceived: z.string().nullable(),
+    entries: StructuredDataPreviewSchema,
+    contexts: StructuredDataPreviewSchema,
+    context: StructuredDataPreviewSchema,
+    tags: StructuredDataPreviewSchema,
+    user: StructuredDataPreviewSchema,
+    occurrence: StructuredDataPreviewSchema,
+  }),
+  related: z.object({
+    autofixState: StructuredDataPreviewSchema,
+    externalIssues: z.array(z.unknown()),
+    replayIds: z.array(z.string()),
+    performanceTrace: z.unknown().nullable(),
+  }),
+});
+
+const issueDetailsNotFoundStructuredOutputSchema = z.object({
+  schemaVersion: z.literal(ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION),
+  security: StructuredOutputSecuritySchema,
+  status: z.literal("not_found"),
+  reason: z.literal("event_not_found"),
+  meta: z.object({
+    organizationSlug: z.string(),
+    projectSlug: z.string().nullable(),
+  }),
+  links: z.object({
+    issue: z.null(),
+    trace: z.null(),
+    replays: z.array(z.string()),
+  }),
+  eventId: z.string(),
+  message: z.string(),
+});
+
+const issueDetailsStructuredOutputSchema = z.union([
+  issueDetailsSuccessStructuredOutputSchema,
+  issueDetailsNotFoundStructuredOutputSchema,
+]);
 
 export default defineTool({
   name: "get_issue_details",
@@ -90,6 +184,8 @@ export default defineTool({
     eventId: z.string().trim().describe("The ID of the event.").optional(),
     issueUrl: ParamIssueUrl.optional(),
   },
+  outputSchema: ({ experimentalMode }) =>
+    experimentalMode ? issueDetailsStructuredOutputSchema : undefined,
   annotations: {
     readOnlyHint: true,
     openWorldHint: true,
@@ -122,7 +218,12 @@ export default defineTool({
           query: eventId,
         });
         if (!found) {
-          return `# Event Not Found\n\nNo issue found for Event ID: ${eventId}`;
+          return formatIssueEventNotFoundResult({
+            organizationSlug: orgSlug,
+            projectSlug: context.constraints.projectSlug ?? null,
+            eventId,
+            context,
+          });
         }
         issue = found;
       }
@@ -271,13 +372,43 @@ export default defineTool({
   },
 });
 
-const ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION = "sentry.mcp.issue_details.v1";
-const STRUCTURED_EVENT_ENTRIES_LIMIT = 12;
-const STRUCTURED_TRACE_ROOT_LIMIT = 5;
-const STRUCTURED_TRACE_CHILD_LIMIT = 5;
-const STRUCTURED_TRACE_DEPTH_LIMIT = 2;
-
 type FormatIssueOutputArgs = Parameters<typeof formatIssueOutput>[0];
+
+function formatIssueEventNotFoundResult({
+  organizationSlug,
+  projectSlug,
+  eventId,
+  context,
+}: {
+  organizationSlug: string;
+  projectSlug: string | null;
+  eventId: string;
+  context: ServerContext;
+}): string | StructuredToolResult {
+  const message = `No issue found for Event ID: ${eventId}`;
+
+  if (!context.experimentalMode) {
+    return `# Event Not Found\n\n${message}`;
+  }
+
+  return createStructuredToolResult({
+    schemaVersion: ISSUE_DETAILS_STRUCTURED_CONTENT_VERSION,
+    security: createStructuredOutputSecurity(),
+    status: "not_found",
+    reason: "event_not_found",
+    meta: {
+      organizationSlug,
+      projectSlug,
+    },
+    links: {
+      issue: null,
+      trace: null,
+      replays: [],
+    },
+    eventId,
+    message,
+  });
+}
 
 function formatIssueDetailsResult(
   args: FormatIssueOutputArgs,
@@ -359,7 +490,11 @@ function formatIssueDetailsStructuredContent({
       occurrence: createStructuredDataPreview(getEventOccurrence(event)),
     },
     related: {
-      autofixState: autofixState ?? null,
+      autofixState: createStructuredDataPreview(autofixState ?? null, {
+        arrayLimit: STRUCTURED_AUTOFIX_ARRAY_LIMIT,
+        objectKeyLimit: STRUCTURED_AUTOFIX_OBJECT_KEY_LIMIT,
+        depthLimit: STRUCTURED_AUTOFIX_DEPTH_LIMIT,
+      }),
       externalIssues: externalIssues ?? [],
       replayIds: relatedReplayIds ?? [],
       performanceTrace: summarizePerformanceTrace(performanceTrace),

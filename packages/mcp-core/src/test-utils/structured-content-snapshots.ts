@@ -45,7 +45,7 @@ interface StructuredIssueContent {
     occurrence: StructuredPreview<Record<string, unknown> | null>;
   };
   related: {
-    autofixState: unknown;
+    autofixState: StructuredPreview<unknown>;
     externalIssues: unknown[];
     replayIds: string[];
     performanceTrace: unknown;
@@ -111,7 +111,11 @@ export function toIssueDetailsStructuredContentSnapshot(content: unknown) {
       },
     },
     related: {
-      hasAutofixState: structuredContent.related.autofixState !== null,
+      autofixState: {
+        present: structuredContent.related.autofixState.data !== null,
+        truncated: structuredContent.related.autofixState.truncated,
+        keys: getObjectKeys(structuredContent.related.autofixState.data),
+      },
       externalIssueCount: structuredContent.related.externalIssues.length,
       replayIds: structuredContent.related.replayIds,
       performanceTrace: toPerformanceTraceSnapshot(

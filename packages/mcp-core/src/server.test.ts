@@ -13,7 +13,11 @@ import {
   CATALOG_INFRASTRUCTURE_TOOL_NAMES,
   getTopLevelToolNames,
 } from "./tools/surfaces";
-import { type ToolConfig, isToolVisibleInMode } from "./tools/types";
+import {
+  isToolVisibleInMode,
+  resolveOutputSchema,
+  type ToolConfig,
+} from "./tools/types";
 import type { ServerContext } from "./types";
 
 // Mock the Sentry core module
@@ -970,6 +974,69 @@ describe("buildServer", () => {
       });
     });
 
+    it("exposes structured output schemas only in experimental mode", async () => {
+      const stableServer = buildServer({
+        context: baseContext,
+      });
+      const stableTools = await listRegisteredTools(stableServer);
+      const stableSearchEvents = stableTools.find(
+        (tool) => tool.name === "search_events",
+      );
+      const stableSearchIssueEvents = stableTools.find(
+        (tool) => tool.name === "search_issue_events",
+      );
+
+      expect(stableSearchEvents).not.toHaveProperty("outputSchema");
+      expect(stableSearchIssueEvents).not.toHaveProperty("outputSchema");
+
+      const experimentalServer = buildServer({
+        context: baseContext,
+        experimentalMode: true,
+      });
+      const experimentalTools = await listRegisteredTools(experimentalServer);
+      const searchEvents = experimentalTools.find(
+        (tool) => tool.name === "search_events",
+      );
+      const searchIssueEvents = experimentalTools.find(
+        (tool) => tool.name === "search_issue_events",
+      );
+
+      expect(JSON.stringify(searchEvents?.outputSchema)).toContain(
+        "sentry.mcp.search_events.v1",
+      );
+      expect(searchIssueEvents).toBeUndefined();
+      expect(
+        resolveOutputSchema(tools.search_issue_events.outputSchema, {
+          experimentalMode: true,
+        }),
+      ).toBeDefined();
+      expect(
+        resolveOutputSchema(tools.search_issue_events.outputSchema, {
+          experimentalMode: false,
+        }),
+      ).toBeUndefined();
+      expect(
+        resolveOutputSchema(tools.get_issue_details.outputSchema, {
+          experimentalMode: true,
+        }),
+      ).toBeDefined();
+      expect(
+        resolveOutputSchema(tools.get_issue_details.outputSchema, {
+          experimentalMode: false,
+        }),
+      ).toBeUndefined();
+      expect(
+        resolveOutputSchema(tools.search_events.outputSchema, {
+          experimentalMode: false,
+        }),
+      ).toBeUndefined();
+      expect(
+        resolveOutputSchema(tools.search_events.outputSchema, {
+          experimentalMode: true,
+        }),
+      ).toBeDefined();
+    });
+
     it("search_tools returns available tools with constrained schemas", async () => {
       const server = buildServer({
         context: {
@@ -1073,11 +1140,20 @@ describe("buildServer", () => {
         limit: 5,
       });
       const payload = getStructuredContent<{
-        results: Array<{ name: string }>;
+        results: Array<{
+          name: string;
+          outputSchema?: Record<string, unknown>;
+        }>;
       }>(result);
+      const issueDetailsTool = payload.results.find(
+        (tool) => tool.name === "get_issue_details",
+      );
 
       expect(payload.results.map((tool) => tool.name)).toContain(
         "get_issue_details",
+      );
+      expect(JSON.stringify(issueDetailsTool?.outputSchema)).toContain(
+        "sentry.mcp.issue_details.v1",
       );
     });
 

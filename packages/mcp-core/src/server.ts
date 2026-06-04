@@ -41,6 +41,7 @@ import {
   getAvailableTools,
   injectConstraintParams,
   resolveToolDescription,
+  resolveToolOutputSchema,
 } from "./tools/catalog-runtime/availability";
 import tools from "./tools/index";
 import type { ServerContext } from "./types";
@@ -211,18 +212,26 @@ function configureServer({
       tool,
       contextWithToolAvailability,
     );
-    const resolvedDescription = resolveToolDescription(tool, {
+    const descriptionContext = {
       experimentalMode,
       availableToolNames: contextWithToolAvailability.availableToolNames,
       directToolNames: contextWithToolAvailability.directToolNames,
-    });
+    };
+    const resolvedDescription = resolveToolDescription(
+      tool,
+      descriptionContext,
+    );
+    const resolvedOutputSchema = resolveToolOutputSchema(
+      tool,
+      descriptionContext,
+    );
 
     server.registerTool(
       tool.name,
       {
         description: resolvedDescription,
         inputSchema: filteredInputSchema,
-        outputSchema: tool.outputSchema,
+        outputSchema: resolvedOutputSchema,
         annotations: tool.annotations,
       },
       async (params: unknown, extra: RegisteredToolHandlerExtra) => {

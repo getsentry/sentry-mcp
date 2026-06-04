@@ -211,8 +211,14 @@ describe("get_sentry_resource", () => {
             "projectSlug": "CLOUDFLARE-MCP",
           },
           "related": {
+            "autofixState": {
+              "keys": [
+                "autofix",
+              ],
+              "present": true,
+              "truncated": false,
+            },
             "externalIssueCount": 0,
-            "hasAutofixState": true,
             "performanceTrace": null,
             "replayIds": [],
           },

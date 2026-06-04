@@ -4,9 +4,10 @@ import {
   getFilteredInputSchema,
   getSearchableTools,
   resolveToolDescription,
+  resolveToolOutputSchema,
   type ToolRegistry,
 } from "./availability";
-import { zodFieldMapToJsonSchema } from "./schema";
+import { zodFieldMapToJsonSchema, zodTypeToJsonSchema } from "./schema";
 
 interface SearchableToolText {
   name: string;
@@ -17,6 +18,7 @@ export interface ToolSearchResult {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
   annotations: ToolConfig<any>["annotations"];
 }
 
@@ -72,11 +74,13 @@ export function searchToolCatalog({
   })
     .map(({ tool }) => {
       const inputSchema = getFilteredInputSchema(tool, context);
-      const description = resolveToolDescription(tool, {
+      const descriptionContext = {
         experimentalMode,
         availableToolNames: context.availableToolNames,
         directToolNames: context.directToolNames,
-      });
+      };
+      const description = resolveToolDescription(tool, descriptionContext);
+      const outputSchema = resolveToolOutputSchema(tool, descriptionContext);
       const searchable: SearchableToolText = {
         name: tool.name,
         description,
@@ -87,15 +91,19 @@ export function searchToolCatalog({
         tool,
         description,
         inputSchema,
+        outputSchema,
       };
     })
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score || a.tool.name.localeCompare(b.tool.name))
     .slice(0, limit)
-    .map(({ tool, description, inputSchema }) => ({
+    .map(({ tool, description, inputSchema, outputSchema }) => ({
       name: tool.name,
       description,
       inputSchema: zodFieldMapToJsonSchema(inputSchema),
+      ...(outputSchema
+        ? { outputSchema: zodTypeToJsonSchema(outputSchema) }
+        : {}),
       annotations: tool.annotations,
     }));
 }

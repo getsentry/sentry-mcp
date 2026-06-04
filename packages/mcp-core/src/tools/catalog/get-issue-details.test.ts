@@ -383,8 +383,14 @@ describe("get_issue_details", () => {
           "projectSlug": "CLOUDFLARE-MCP",
         },
         "related": {
+          "autofixState": {
+            "keys": [
+              "autofix",
+            ],
+            "present": true,
+            "truncated": false,
+          },
           "externalIssueCount": 0,
-          "hasAutofixState": true,
           "performanceTrace": null,
           "replayIds": [],
         },
@@ -439,6 +445,59 @@ describe("get_issue_details", () => {
     expect(result.structuredContent.security).not.toHaveProperty(
       "untrustedFields",
     );
+  });
+
+  it("bounds autofix state in structured content", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/CLOUDFLARE-MCP-41/autofix/",
+        () =>
+          HttpResponse.json({
+            autofix: {
+              run_id: 12345,
+              status: "COMPLETED",
+              updated_at: "2025-04-09T22:39:50.778146",
+              request: {},
+              steps: [],
+              blocks: Array.from({ length: 25 }, (_, index) => ({
+                kind: "log",
+                title: `block-${index}`,
+                payload: "x".repeat(4096),
+              })),
+            },
+          }),
+        { once: true },
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: "CLOUDFLARE-MCP-41",
+        eventId: undefined,
+        issueUrl: undefined,
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        experimentalMode: true,
+      },
+    );
+
+    expect(isStructuredToolResult(result)).toBe(true);
+    if (!isStructuredToolResult(result)) {
+      throw new Error("Expected structured tool result");
+    }
+
+    const related = result.structuredContent.related as {
+      autofixState: {
+        data: { autofix?: { blocks?: unknown[] } };
+        truncated: boolean;
+      };
+    };
+    expect(related.autofixState.truncated).toBe(true);
+    expect(related.autofixState.data.autofix?.blocks).toHaveLength(10);
+    expect(JSON.stringify(related.autofixState)).not.toContain("block-24");
   });
 
   it("returns bounded structured trace summaries in experimental mode", async () => {
@@ -586,8 +645,14 @@ describe("get_issue_details", () => {
           "projectSlug": "CLOUDFLARE-MCP",
         },
         "related": {
+          "autofixState": {
+            "keys": [
+              "autofix",
+            ],
+            "present": true,
+            "truncated": false,
+          },
           "externalIssueCount": 0,
-          "hasAutofixState": true,
           "performanceTrace": {
             "issueCount": 0,
             "rootCount": 1,
@@ -1252,6 +1317,60 @@ describe("get_issue_details", () => {
       - Related log search: Use the Sentry tool \`search_events(organizationSlug='sentry-mcp-evals', dataset='logs', query='trace:3032af8bcdfe4423b937fc5c041d5d82')\`
       "
     `);
+  });
+
+  it("returns structured not-found content for unmatched eventId in experimental mode", async () => {
+    mswServer.use(
+      http.get(
+        "https://sentry.io/api/0/organizations/sentry-mcp-evals/issues/",
+        () => HttpResponse.json([]),
+      ),
+    );
+
+    const result = await getIssueDetails.handler(
+      {
+        organizationSlug: "sentry-mcp-evals",
+        issueId: undefined,
+        issueUrl: undefined,
+        eventId: "missing-event-id",
+        regionUrl: null,
+      },
+      {
+        ...baseContext,
+        experimentalMode: true,
+      },
+    );
+
+    expect(isStructuredToolResult(result)).toBe(true);
+    if (!isStructuredToolResult(result)) {
+      throw new Error("Expected structured tool result");
+    }
+
+    expect(result.content).toEqual([
+      {
+        type: "text",
+        text: JSON.stringify(result.structuredContent),
+      },
+    ]);
+    expect(result.structuredContent).toEqual({
+      schemaVersion: "sentry.mcp.issue_details.v1",
+      security: {
+        note: expect.any(String),
+      },
+      status: "not_found",
+      reason: "event_not_found",
+      meta: {
+        organizationSlug: "sentry-mcp-evals",
+        projectSlug: null,
+      },
+      links: {
+        issue: null,
+        trace: null,
+        replays: [],
+      },
+      eventId: "missing-event-id",
+      message: "No issue found for Event ID: missing-event-id",
+    });
   });
 
   it("throws error for malformed regionUrl", async () => {

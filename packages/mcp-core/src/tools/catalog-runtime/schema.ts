@@ -7,7 +7,13 @@ export function zodFieldMapToJsonSchema(
   const zodObject =
     Object.keys(fieldMap).length > 0 ? z.object(fieldMap) : z.object({});
 
-  return zodToJsonSchema(zodObject, {
+  return zodTypeToJsonSchema(zodObject);
+}
+
+export function zodTypeToJsonSchema(
+  schema: ZodTypeAny,
+): Record<string, unknown> {
+  return zodToJsonSchema(schema, {
     $refStrategy: "none",
     strictUnions: true,
     pipeStrategy: "input",

@@ -3,7 +3,10 @@ import { getActiveSpan, setTag } from "@sentry/core";
 import { defineTool } from "../../internal/tool-helpers/define";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { ensureIssueWithinProjectConstraint } from "../../internal/tool-helpers/issue";
-import { createStructuredOutputSecurity } from "../../internal/structured-output";
+import {
+  createStructuredOutputSecurity,
+  StructuredOutputSecuritySchema,
+} from "../../internal/structured-output";
 import {
   createStructuredToolResult,
   type StructuredToolResult,
@@ -26,6 +29,43 @@ import { parseIssueParams } from "../support/search-issue-events/utils";
 
 const SEARCH_ISSUE_EVENTS_STRUCTURED_CONTENT_VERSION =
   "sentry.mcp.search_issue_events.v1";
+
+const searchIssueEventsStructuredOutputSchema = z.object({
+  schemaVersion: z.literal(SEARCH_ISSUE_EVENTS_STRUCTURED_CONTENT_VERSION),
+  security: StructuredOutputSecuritySchema,
+  meta: z.object({
+    organizationSlug: z.string(),
+    issueIdentifier: z.string(),
+    projectSlug: z.string().nullable(),
+    projectId: z.string().nullable(),
+  }),
+  links: z.object({
+    explorer: z.string(),
+  }),
+  issue: z.object({
+    identifier: z.string(),
+  }),
+  search: z.object({
+    inputQuery: z.string(),
+    dataset: z.literal("errors"),
+    query: z.string(),
+    explorerQuery: z.string(),
+    fields: z.array(z.string()),
+    sort: z.string(),
+    timeRange: z.object({
+      statsPeriod: z.string().optional(),
+      start: z.string().optional(),
+      end: z.string().optional(),
+    }),
+    limit: z.number(),
+    explanation: z.string().nullable(),
+  }),
+  results: z.object({
+    kind: z.literal("issue_events"),
+    count: z.number(),
+    data: z.array(z.unknown()),
+  }),
+});
 
 interface SearchTimeRange {
   statsPeriod?: string;
@@ -196,6 +236,8 @@ export default defineTool({
         "Include explanation of how the query was translated or repaired",
       ),
   },
+  outputSchema: ({ experimentalMode }) =>
+    experimentalMode ? searchIssueEventsStructuredOutputSchema : undefined,
   annotations: {
     readOnlyHint: true,
     openWorldHint: true,

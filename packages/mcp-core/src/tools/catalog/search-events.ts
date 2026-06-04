@@ -4,7 +4,10 @@ import { UserInputError } from "../../errors";
 import { hasAgentProvider } from "../../internal/agents/provider-factory";
 import { apiServiceFromContext } from "../../internal/tool-helpers/api";
 import { defineTool } from "../../internal/tool-helpers/define";
-import { createStructuredOutputSecurity } from "../../internal/structured-output";
+import {
+  createStructuredOutputSecurity,
+  StructuredOutputSecuritySchema,
+} from "../../internal/structured-output";
 import {
   createStructuredToolResult,
   type StructuredToolResult,
@@ -49,6 +52,36 @@ import {
 const SEARCH_EVENTS_DATASETS = [...PUBLIC_EVENTS_DATASETS, "replays"] as const;
 const DEFAULT_EVENTS_SORT = "-timestamp";
 const SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION = "sentry.mcp.search_events.v1";
+
+const searchEventsStructuredOutputSchema = z.object({
+  schemaVersion: z.literal(SEARCH_EVENTS_STRUCTURED_CONTENT_VERSION),
+  security: StructuredOutputSecuritySchema,
+  meta: z.object({
+    organizationSlug: z.string(),
+    projectSlug: z.string().nullable(),
+    projectId: z.string().nullable(),
+  }),
+  links: z.object({
+    explorer: z.string(),
+  }),
+  search: z.object({
+    inputQuery: z.string(),
+    dataset: z.enum(SEARCH_EVENTS_DATASETS),
+    query: z.string(),
+    fields: z.array(z.string()),
+    requestFields: z.array(z.string()).optional(),
+    sort: z.string().nullable(),
+    environment: z.unknown().optional(),
+    timeRange: z.unknown().nullable(),
+    limit: z.number(),
+    explanation: z.string().nullable(),
+  }),
+  results: z.object({
+    kind: z.enum(["events", "replays"]),
+    count: z.number(),
+    data: z.array(z.unknown()),
+  }),
+});
 
 function defaultSortForDataset(dataset: PublicEventsDataset | "replays") {
   return dataset === "replays" ? DEFAULT_REPLAY_SORT : DEFAULT_EVENTS_SORT;
@@ -455,6 +488,8 @@ export default defineTool({
         "Include explanation of how the query was translated or repaired",
       ),
   },
+  outputSchema: ({ experimentalMode }) =>
+    experimentalMode ? searchEventsStructuredOutputSchema : undefined,
   annotations: {
     readOnlyHint: true,
     openWorldHint: true,
