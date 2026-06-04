@@ -34,7 +34,11 @@ export function McpToolCallTaskRunner(
     const client = await experimental_createMCPClient({ transport });
 
     try {
-      const tools = await client.tools();
+      const availableTools = await client.tools();
+      const tools = {
+        search_tools: availableTools.search_tools,
+        execute_tool: availableTools.execute_tool,
+      };
       const result = await generateText({
         model,
         tools,
