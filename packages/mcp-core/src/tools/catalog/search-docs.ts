@@ -1,10 +1,11 @@
+import { getActiveSpan } from "@sentry/core";
 import { z } from "zod";
-import { defineTool } from "../../internal/tool-helpers/define";
-import { fetchWithTimeout } from "../../internal/fetch-utils";
 import { ApiError } from "../../api-client/index";
+import { fetchWithTimeout } from "../../internal/fetch-utils";
+import { defineTool } from "../../internal/tool-helpers/define";
+import { ParamSentryGuide } from "../../schema";
 import type { ServerContext } from "../../types";
 import type { SearchResponse } from "../types";
-import { ParamSentryGuide } from "../../schema";
 
 export default defineTool({
   name: "search_docs",
@@ -107,6 +108,11 @@ export default defineTool({
       output += `**Error**: ${data.error}\n\n`;
       return output;
     }
+
+    getActiveSpan()?.setAttribute(
+      "gen_ai.tool.call.result.count",
+      data.results.length,
+    );
 
     // Display results
     if (data.results.length === 0) {

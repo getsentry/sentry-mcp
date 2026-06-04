@@ -1,12 +1,15 @@
 import { z } from "zod";
 import type { SentryApiService } from "../../../api-client";
-import { agentTool } from "../../../internal/agents/tools/utils";
 import { UserInputError } from "../../../errors";
+import {
+  agentTool,
+  recordAgentToolResultCount,
+} from "../../../internal/agents/tools/utils";
 import { resolveScopedOrganizationSlug } from "../../../internal/url-scope";
 import {
+  EXAMPLE_QUERIES,
   ISSUE_EVENT_TAGS,
   RECOMMENDED_FIELDS,
-  EXAMPLE_QUERIES,
 } from "./config";
 
 /**
@@ -49,9 +52,12 @@ export function createIssueEventFieldsTool(options: {
 
       // Combine with common known tags
       const allTags = { ...ISSUE_EVENT_TAGS, ...availableTags };
+      const tagCount = Object.keys(allTags).length;
+
+      recordAgentToolResultCount(tagCount);
 
       // Format the response
-      return `Available Tags and Fields (${Object.keys(allTags).length} total):
+      return `Available Tags and Fields (${tagCount} total):
 
 Common Tags:
 ${Object.entries(ISSUE_EVENT_TAGS)

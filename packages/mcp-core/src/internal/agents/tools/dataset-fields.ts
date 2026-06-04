@@ -173,6 +173,7 @@ export function createDatasetFieldsTool(options: {
         projectId,
       });
     },
+    getResultCount: (result) => result.fields.length,
   });
 }
 
