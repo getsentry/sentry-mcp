@@ -3300,6 +3300,10 @@ export class SentryApiService {
     opts?: RequestOptions,
   ): Promise<string[]> {
     const normalizedIssueId = String(issueId);
+    // `project` is not in the SDK type — it is processed by the base class
+    // (OrganizationEventsEndpointBase.get_snuba_params) rather than the endpoint validator.
+    // -1 is the sentinel for all-accessible projects; without it the API returns only
+    // projects the caller is a member of, which misses replays in access-only projects.
     const result = await sdkRetrieveACountOfReplays({
       ...this.getSdkConfig(opts),
       path: { organization_id_or_slug: organizationSlug },
@@ -3308,8 +3312,9 @@ export class SentryApiService {
         statsPeriod: "90d",
         returnIds: true,
         data_source: dataSource,
+        project: -1,
       },
-    });
+    } as unknown as Parameters<typeof sdkRetrieveACountOfReplays>[0]);
     const data = this.unwrapSdkResult(result, "listReplayIdsForIssue");
 
     const replayIdsByResource = ReplayIdsByResourceSchema.parse(data);
