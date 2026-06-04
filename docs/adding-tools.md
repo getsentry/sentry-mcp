@@ -13,6 +13,7 @@ Not every tool is exposed to every consumer. We rely on several mechanisms to ke
 - **`requiredCapabilities`** — Tools declare which project capabilities they need (e.g. `profiles`, `replays`, `traces`). If the upstream project doesn't have a capability enabled, the tool is automatically hidden.
 - **`experimental` / `hideInExperimentalMode`** — Feature flags for tools that are being tested or replaced.
 - **Skills & constraints** — The server filters tools based on granted skills and org/project constraints.
+- **Experimental skill merging** — A skill can set `mergedIntoSkillInExperimentalMode` to make its tools available through another skill in experimental mode only. For example, `preprod` currently merges into `inspect` for `?experimental=1` sessions.
 
 We also expect upstream consumers (Claude Code plugins, Cursor, etc.) to use **tool selection** or **progressive disclosure** on their end. The catalog can contain more tools than the direct MCP surface, but the registered top-level tool count must still stay within the limits below.
 

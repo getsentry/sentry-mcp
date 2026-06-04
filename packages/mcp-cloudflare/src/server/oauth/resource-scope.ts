@@ -36,3 +36,17 @@ export function parseResourceMcpConstraints(
     return null;
   }
 }
+
+export function parseResourceExperimentalMode(
+  resource: string | null | undefined,
+): boolean {
+  if (!resource) {
+    return false;
+  }
+
+  try {
+    return new URL(resource).searchParams.get("experimental") === "1";
+  } catch {
+    return false;
+  }
+}
